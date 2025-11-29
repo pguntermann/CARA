@@ -1,0 +1,4 @@
+PyQt6>=6.6.0
+python-chess>=1.999
+requests>=2.31.0
+

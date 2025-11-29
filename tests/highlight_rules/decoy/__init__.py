@@ -1,0 +1,2 @@
+"""Decoy rule tests."""
+

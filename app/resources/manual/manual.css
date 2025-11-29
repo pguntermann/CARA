@@ -1,0 +1,568 @@
+* {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: rgb(220, 220, 220);
+            background-color: rgb(40, 40, 45);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px;
+            background-color: rgb(40, 40, 45);
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        
+        header {
+            border-bottom: 3px solid rgb(60, 60, 65);
+            padding-bottom: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .header-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 25px;
+        }
+        
+        .header-icon {
+            width: 120px;
+            height: 120px;
+            flex-shrink: 0;
+            margin: 0;
+            border: none;
+            border-radius: 0;
+        }
+        
+        .header-text {
+            flex: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
+        }
+        
+        .header-left {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex: 1;
+        }
+        
+        .header-right {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            align-items: flex-end;
+            text-align: right;
+        }
+        
+        .header-app-name {
+            color: rgb(240, 240, 240);
+            font-size: 2.5em;
+            font-weight: bold;
+            margin: 0;
+            padding: 0;
+            line-height: 1.2;
+        }
+        
+        .header-full-name {
+            color: rgb(200, 200, 200);
+            font-size: 1.8em;
+            margin: 0;
+            padding: 0;
+            line-height: 1.4;
+        }
+        
+        .header-version {
+            color: rgb(180, 180, 180);
+            font-size: 1em;
+            margin: 0;
+            padding: 0;
+            line-height: 1.4;
+        }
+        
+        .header-manual-label {
+            color: rgb(180, 180, 180);
+            font-size: 1.2em;
+            margin: 0;
+            padding: 0;
+            line-height: 1.4;
+        }
+        
+        h1 {
+            color: rgb(240, 240, 240);
+            font-size: 2.5em;
+            margin-bottom: 15px;
+        }
+        
+        h2 {
+            color: rgb(240, 240, 240);
+            font-size: 1.8em;
+            margin-top: 50px;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid rgb(60, 60, 65);
+        }
+        
+        h3 {
+            color: rgb(240, 240, 240);
+            font-size: 1.4em;
+            margin-top: 35px;
+            margin-bottom: 20px;
+        }
+        
+        h4 {
+            color: rgb(220, 220, 220);
+            font-size: 1.2em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        
+        h5 {
+            color: rgb(200, 200, 200);
+            font-size: 1.1em;
+            margin-top: 20px;
+            margin-bottom: 12px;
+        }
+        
+        nav {
+            background-color: rgb(45, 45, 50);
+            color: rgb(240, 240, 240);
+            padding: 15px 20px;
+            margin: 30px 0;
+            border-radius: 5px;
+            border: 1px solid rgb(60, 60, 65);
+        }
+        
+        nav h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        
+        nav ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        
+        nav > ul {
+            margin-left: 0;
+            /* Multi-column layout - responsive */
+            column-count: 3;
+            column-gap: 30px;
+            column-fill: balance;
+        }
+        
+        nav > ul > li {
+            margin-bottom: 15px;
+        }
+        
+        nav ul ul {
+            margin-left: 40px;
+            margin-top: 2px;
+            margin-bottom: 2px;
+        }
+        
+        nav ul ul ul {
+            display: none; /* Hide sub-sub sections */
+        }
+        
+        nav ul li {
+            margin: 3px 0;
+        }
+        
+        nav a {
+            color: rgb(220, 220, 220);
+            text-decoration: none;
+            display: inline-block;
+            padding-left: 25px;
+            padding-top: 2px;
+            padding-bottom: 2px;
+            position: relative;
+            font-size: 0.95em;
+            line-height: 1.4;
+        }
+        
+        nav ul ul a {
+            font-size: 0.9em;
+            padding-left: 0; /* No padding needed since no indicator box */
+        }
+        
+        nav ul ul ul a {
+            font-size: 0.85em;
+            padding-left: 0; /* No padding needed since no indicator box */
+        }
+        
+        /* Hide indicators by default for all links */
+        nav a::before {
+            display: none;
+        }
+        
+        nav a:hover {
+            color: rgb(240, 240, 240);
+            text-decoration: underline;
+        }
+        
+        nav a:visited {
+            color: rgb(220, 220, 220); /* Same color as non-visited nav links */
+        }
+        
+        /* TOC color indicators matching section colors - only for main sections */
+        nav > ul > li > a::before {
+            display: block;
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+        
+        nav a[href="#introduction"]::before {
+            background-color: #3498db; /* Bright Blue */
+        }
+        
+        nav a[href="#attributions"]::before {
+            background-color: #8e44ad; /* Deep Purple */
+        }
+        
+        nav a[href="#installation"]::before {
+            background-color: #2ecc71; /* Green */
+        }
+        
+        nav a[href="#getting-started"]::before {
+            background-color: #e67e22; /* Orange */
+        }
+        
+        nav a[href="#tasks"]::before {
+            background-color: #1abc9c; /* Turquoise/Teal */
+        }
+        
+        nav a[href="#reference"]::before {
+            background-color: #e74c3c; /* Red */
+        }
+        
+        nav a[href="#advanced-topics"]::before {
+            background-color: #f1c40f; /* Gold/Yellow */
+        }
+        
+        section {
+            margin: 40px 0;
+        }
+        
+        p {
+            margin-bottom: 18px;
+            color: rgb(220, 220, 220);
+        }
+        
+        ul, ol {
+            margin-left: 30px;
+            margin-bottom: 25px;
+        }
+        
+        li {
+            margin: 10px 0;
+            color: rgb(220, 220, 220);
+        }
+        
+        code {
+            background-color: rgb(30, 30, 35);
+            color: rgb(220, 220, 220);
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            border: 1px solid rgb(60, 60, 65);
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        
+        /* Terminal/command code blocks */
+        code.command {
+            background-color: rgb(25, 30, 40);
+            color: rgb(240, 240, 240);
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid rgb(70, 80, 100);
+            display: inline-block;
+            margin-top: 8px;
+            margin-bottom: 12px;
+            line-height: 1.5;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        
+        /* Pre-formatted code blocks */
+        pre {
+            background-color: rgb(30, 30, 35);
+            color: rgb(220, 220, 220);
+            padding: 15px;
+            border-radius: 3px;
+            border: 1px solid rgb(60, 60, 65);
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            border: none;
+            font-size: inherit;
+        }
+        
+        .outline-item {
+            margin: 15px 0;
+            padding: 20px;
+            background-color: rgb(35, 35, 40);
+            border-left: 4px solid #3498db;
+            border: 1px solid rgb(60, 60, 65);
+            border-left-width: 4px;
+        }
+        
+        .outline-item h4 {
+            margin-top: 0;
+            color: rgb(240, 240, 240);
+        }
+        
+        /* Section-specific colors - matching TOC indicators */
+        #introduction .outline-item {
+            border-left-color: #3498db; /* Bright Blue */
+        }
+        
+        #attributions .outline-item {
+            border-left-color: #8e44ad; /* Deep Purple */
+        }
+        
+        #installation .outline-item {
+            border-left-color: #2ecc71; /* Green */
+        }
+        
+        #getting-started .outline-item {
+            border-left-color: #e67e22; /* Orange */
+        }
+        
+        #tasks .outline-item {
+            border-left-color: #1abc9c; /* Turquoise/Teal */
+        }
+        
+        #reference .outline-item {
+            border-left-color: #e74c3c; /* Red */
+        }
+        
+        #advanced-topics .outline-item {
+            border-left-color: #f1c40f; /* Gold/Yellow */
+        }
+        
+        .placeholder {
+            color: rgb(150, 150, 150);
+            font-style: italic;
+        }
+        
+        .tip-box {
+            background-color: rgb(45, 45, 50);
+            border-left: 4px solid #f39c12;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 3px;
+            border: 1px solid rgb(60, 60, 65);
+        }
+        
+        .tip-box strong {
+            color: #f39c12;
+        }
+        
+        .menu-item {
+            background-color: rgb(50, 50, 55);
+            border: 1px solid rgb(80, 80, 90);
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            color: rgb(220, 220, 220);
+            font-size: 0.95em;
+        }
+        
+        strong {
+            color: rgb(240, 240, 240);
+        }
+        
+        /* Links */
+        a {
+            color: #5dade2; /* Light blue matching section indicator */
+            text-decoration: underline;
+        }
+        
+        a:hover {
+            color: #7fb3d3; /* Lighter blue on hover */
+            text-decoration: underline;
+        }
+        
+        a:visited {
+            color: #bb8fce; /* Purple for visited links */
+        }
+        
+        /* Responsive images */
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 20px auto;
+            border-radius: 5px;
+            border: 1px solid rgb(60, 60, 65);
+        }
+        
+        /* Responsive container padding for small screens */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                gap: 20px;
+            }
+            
+            .header-icon {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .header-text {
+                flex-direction: column;
+                align-items: center;
+                gap: 15px;
+            }
+            
+            .header-left {
+                align-items: center;
+                text-align: center;
+            }
+            
+            .header-right {
+                align-items: center;
+                text-align: center;
+            }
+            
+            .header-app-name {
+                font-size: 2em;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+            
+            h2 {
+                font-size: 1.5em;
+                margin-top: 35px;
+            }
+            
+            /* Code elements on small screens */
+            code {
+                font-size: 0.85em;
+                padding: 3px 6px;
+            }
+            
+            code.command {
+                display: block;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            
+            pre {
+                font-size: 0.85em;
+                padding: 10px;
+            }
+            
+            nav {
+                padding: 15px;
+            }
+            
+            /* Two columns on medium screens */
+            nav > ul {
+                column-count: 2;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .header-content {
+                gap: 15px;
+            }
+            
+            .header-icon {
+                width: 80px;
+                height: 80px;
+            }
+            
+            .header-app-name {
+                font-size: 1.75em;
+            }
+            
+            /* Code elements on very small screens */
+            code {
+                font-size: 0.8em;
+                padding: 2px 4px;
+            }
+            
+            code.command {
+                display: block;
+                width: 100%;
+                padding: 8px;
+            }
+            
+            pre {
+                font-size: 0.8em;
+                padding: 8px;
+            }
+            
+            .header-full-name {
+                font-size: 1.5em;
+            }
+            
+            .header-version {
+                font-size: 0.9em;
+            }
+            
+            .header-manual-label {
+                font-size: 1.1em;
+            }
+            
+            h1 {
+                font-size: 1.75em;
+            }
+            
+            h2 {
+                font-size: 1.3em;
+            }
+            
+            ul, ol {
+                margin-left: 20px;
+            }
+            
+            /* Single column on small screens */
+            nav > ul {
+                column-count: 1;
+            }
+        }

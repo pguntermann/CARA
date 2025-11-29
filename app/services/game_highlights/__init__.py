@@ -1,0 +1,2 @@
+"""Game highlights detection service."""
+
