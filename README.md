@@ -140,7 +140,9 @@ CARA uses three configuration files, all located in the CARA root directory:
 
 ## Documentation
 
-- **User Manual**: Access the comprehensive HTML manual from **Help → Open Manual** in the application
+- **User Manual**: 
+  - [Online version](https://pguntermann.github.io/CARA/manual.html) (GitHub Pages)
+  - Access from **Help → Open Manual** in the application
 - **Architecture**: See `doc/architecture_outline.md` for technical architecture details
 
 ## Keyboard Shortcuts
