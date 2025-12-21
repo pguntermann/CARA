@@ -3,11 +3,148 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="0; url=manual.html">
-    <title>CARA - User Manual</title>
+    <title>CARA - Chess Analysis and Review Application</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: rgb(220, 220, 220);
+            background-color: rgb(40, 40, 45);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 60px 40px;
+            background-color: rgb(40, 40, 45);
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .logo {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 30px;
+            display: block;
+        }
+        
+        h1 {
+            color: rgb(240, 240, 240);
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: rgb(200, 200, 200);
+            font-size: 1.4em;
+            margin-bottom: 15px;
+        }
+        
+        .version {
+            color: rgb(180, 180, 180);
+            font-size: 1em;
+            margin-bottom: 50px;
+        }
+        
+        .description {
+            color: rgb(200, 200, 200);
+            font-size: 1.1em;
+            margin-bottom: 50px;
+            line-height: 1.8;
+        }
+        
+        .nav-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .nav-button {
+            display: inline-block;
+            padding: 15px 40px;
+            background-color: rgb(58, 117, 196);
+            color: rgb(255, 255, 255);
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 1.1em;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .nav-button:hover {
+            background-color: rgb(70, 130, 220);
+        }
+        
+        .nav-button.secondary {
+            background-color: rgb(60, 60, 65);
+        }
+        
+        .nav-button.secondary:hover {
+            background-color: rgb(80, 80, 85);
+        }
+        
+        .footer {
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 1px solid rgb(60, 60, 65);
+            color: rgb(160, 160, 160);
+            font-size: 0.9em;
+        }
+        
+        .footer a {
+            color: rgb(100, 150, 255);
+            text-decoration: none;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
-    <p>Redirecting to <a href="manual.html">User Manual</a>...</p>
+    <div class="container">
+        <img src="appicon.svg" alt="CARA Logo" class="logo">
+        
+        <h1>CARA</h1>
+        <p class="subtitle">Chess Analysis and Review Application</p>
+        <p class="version">Version 2.4.5</p>
+        
+        <p class="description">
+            A full-featured desktop application for analyzing and reviewing chess games. 
+            CARA helps you understand your games, identify mistakes, recognize patterns, 
+            and improve your chess understanding.
+        </p>
+        
+        <div class="nav-buttons">
+            <a href="https://github.com/pguntermann/CARA" class="nav-button" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
+            <a href="manual.html" class="nav-button secondary">User Manual</a>
+        </div>
+        
+        <div class="footer">
+            <p>
+                <a href="README.md">README</a> • 
+                <a href="RELEASE_NOTES.md">Release Notes</a> • 
+                <a href="LICENSE">License</a>
+            </p>
+            <p style="margin-top: 15px;">
+                Licensed under <a href="LICENSE">GNU General Public License v3.0</a>
+            </p>
+        </div>
+    </div>
 </body>
 </html>
-
