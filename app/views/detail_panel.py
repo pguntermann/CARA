@@ -83,7 +83,7 @@ class DetailPanel(QWidget):
         layout.addWidget(splitter)
         
         # PGN Notation view (top) - will be connected to game model in set_game_model
-        self.pgn_view = DetailPgnView(self.config)
+        self.pgn_view = DetailPgnView(self.config, game_controller=self._game_controller)
         splitter.addWidget(self.pgn_view)
         
         # Tab widget for different detail views (bottom)

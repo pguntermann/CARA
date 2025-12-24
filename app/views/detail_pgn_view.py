@@ -1,28 +1,110 @@
 """PGN Notation view for detail panel."""
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTextEdit
-from PyQt6.QtGui import QPalette, QColor, QFont, QTextCursor, QTextCharFormat
+from PyQt6.QtGui import QPalette, QColor, QFont, QTextCursor, QTextCharFormat, QMouseEvent
 from PyQt6.QtCore import Qt, QRegularExpression
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING, Callable
 import re
 
 from app.services.pgn_formatter_service import PgnFormatterService
 from app.models.game_model import GameModel
 
+if TYPE_CHECKING:
+    from app.controllers.game_controller import GameController
+
+
+class ClickablePgnTextEdit(QTextEdit):
+    """Custom QTextEdit that handles mouse clicks for move navigation."""
+    
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        """Initialize the clickable PGN text edit.
+        
+        Args:
+            parent: Parent widget.
+        """
+        super().__init__(parent)
+        self._click_handler: Optional[Callable[[int], int]] = None
+        self._move_checker: Optional[Callable[[int], int]] = None
+    
+    def set_click_handler(self, handler: Callable[[int], int]) -> None:
+        """Set the handler function to call when a move is clicked.
+        
+        Args:
+            handler: Function that takes a document position and returns ply index (or 0 if no move).
+        """
+        self._click_handler = handler
+    
+    def set_move_checker(self, checker: Callable[[int], int]) -> None:
+        """Set the function to check if there's a move at a position (without navigating).
+        
+        Args:
+            checker: Function that takes a document position and returns ply index (or 0 if no move).
+        """
+        self._move_checker = checker
+    
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        """Handle mouse click to navigate to clicked move.
+        
+        Args:
+            event: Mouse event.
+        """
+        if event.button() == Qt.MouseButton.LeftButton and self._click_handler:
+            # Get cursor position from click
+            cursor = self.cursorForPosition(event.pos())
+            click_pos = cursor.position()
+            
+            # Call handler to find move and navigate
+            ply_index = self._click_handler(click_pos)
+            
+            if ply_index > 0:
+                # Move was found and navigation should happen
+                # Don't call super() to prevent default text selection behavior
+                event.accept()
+                return
+        
+        # For non-move clicks or if no handler, use default behavior
+        super().mousePressEvent(event)
+    
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        """Handle mouse move to change cursor when over clickable moves.
+        
+        Args:
+            event: Mouse event.
+        """
+        if self._move_checker:
+            # Get cursor position from mouse position
+            cursor = self.cursorForPosition(event.pos())
+            click_pos = cursor.position()
+            
+            # Check if there's a move at this position (without navigating)
+            ply_index = self._move_checker(click_pos)
+            
+            if ply_index > 0:
+                # Over a clickable move - show pointing hand cursor
+                self.setCursor(Qt.CursorShape.PointingHandCursor)
+            else:
+                # Not over a move - show default text cursor
+                self.setCursor(Qt.CursorShape.IBeamCursor)
+        
+        super().mouseMoveEvent(event)
+
 
 class DetailPgnView(QWidget):
     """PGN notation view displaying formatted PGN text with colors."""
     
-    def __init__(self, config: Dict[str, Any], game_model: Optional[GameModel] = None) -> None:
+    def __init__(self, config: Dict[str, Any], game_model: Optional[GameModel] = None,
+                 game_controller: Optional['GameController'] = None) -> None:
         """Initialize the PGN notation view.
         
         Args:
             config: Configuration dictionary.
             game_model: Optional GameModel to observe for active move changes.
+            game_controller: Optional GameController for navigating to specific plies.
         """
         super().__init__()
         self.config = config
         self._game_model: Optional[GameModel] = None
+        self._game_controller: Optional['GameController'] = None
         self._current_pgn_text: str = ""  # Store plain PGN text for re-formatting
         self._current_formatted_html: str = ""  # Store formatted HTML for highlighting
         self._move_info: List[Tuple[str, int, bool]] = []  # List of (move_san, move_number, is_white) tuples for each ply
@@ -40,6 +122,10 @@ class DetailPgnView(QWidget):
         # Connect to game model if provided
         if game_model:
             self.set_game_model(game_model)
+        
+        # Set game controller if provided
+        if game_controller:
+            self.set_game_controller(game_controller)
     
     def _setup_ui(self) -> None:
         """Setup the PGN notation UI."""
@@ -52,10 +138,14 @@ class DetailPgnView(QWidget):
         panel_config = ui_config.get('panels', {}).get('detail', {})
         pgn_config = panel_config.get('pgn_notation', {})
         
-        # PGN Text widget
-        self.pgn_text = QTextEdit()
+        # PGN Text widget - use custom clickable version
+        self.pgn_text = ClickablePgnTextEdit()
         self.pgn_text.setReadOnly(True)  # Display only for now
         self.pgn_text.setAcceptRichText(True)  # Enable HTML/rich text formatting
+        # Set click handler to find moves and navigate
+        self.pgn_text.set_click_handler(self._handle_pgn_click)
+        # Set move checker for cursor changes (without navigating)
+        self.pgn_text.set_move_checker(self._find_mainline_move_at_position)
         
         # Configure PGN text styling
         pgn_font_family = pgn_config.get('font_family', 'Courier New')
@@ -219,6 +309,14 @@ class DetailPgnView(QWidget):
         
         # Initialize with current active move if any
         self._on_active_move_changed(model.get_active_move_ply())
+    
+    def set_game_controller(self, controller: 'GameController') -> None:
+        """Set the game controller for navigating to specific plies.
+        
+        Args:
+            controller: The GameController instance.
+        """
+        self._game_controller = controller
     
     def _on_active_move_changed(self, ply_index: int) -> None:
         """Handle active move change from model.
@@ -684,3 +782,172 @@ class DetailPgnView(QWidget):
             Current PGN text content.
         """
         return self._current_pgn_text if self._current_pgn_text else self.pgn_text.toPlainText()
+    
+    def _handle_pgn_click(self, click_pos: int) -> int:
+        """Handle click on PGN text at given position.
+        
+        Args:
+            click_pos: Document character position where click occurred.
+            
+        Returns:
+            Ply index if main-line move found, 0 otherwise.
+        """
+        # Find which main-line move (if any) contains this position
+        ply_index = self._find_mainline_move_at_position(click_pos)
+        
+        if ply_index > 0 and self._game_controller:
+            # Navigate to this ply
+            self._game_controller.navigate_to_ply(ply_index)
+        
+        return ply_index
+    
+    def _find_mainline_move_at_position(self, position: int) -> int:
+        """Find ply index of main-line move at given document position.
+        
+        Only returns ply index for main-line moves, not variation moves.
+        Returns 0 if no main-line move found at position.
+        
+        Args:
+            position: Document character position.
+            
+        Returns:
+            Ply index (1-based) if main-line move found, 0 otherwise.
+        """
+        # Ensure document is ready
+        if not self.pgn_text.document():
+            return 0
+        
+        document = self.pgn_text.document()
+        document_length = document.characterCount()
+        
+        # If document is empty or position is out of bounds, nothing to find
+        if document_length == 0 or position < 0 or position >= document_length:
+            return 0
+        
+        # If no move info available, can't find move
+        if not self._move_info:
+            return 0
+        
+        # Search through all moves sequentially to find which one contains the click position
+        # We need to find main-line moves only (not variations)
+        search_cursor = QTextCursor(document)
+        search_cursor.movePosition(QTextCursor.MoveOperation.Start)
+        
+        # Iterate through moves in order
+        for move_pos_index in range(len(self._move_info)):
+            move_san, move_number, is_white = self._move_info[move_pos_index]
+            
+            # Strip any annotations from move_san (they might be filtered out)
+            move_san_clean = re.sub(r'[!?]{1,2}$', '', move_san)
+            
+            # Build regex pattern for this move
+            if is_white:
+                # White move: search for "move_number. move_san"
+                escaped_move = re.escape(move_san_clean)
+                escaped_number = re.escape(str(move_number))
+                pattern = rf'\b{escaped_number}\.\s+{escaped_move}(?:[!?]{{1,2}})?(?=\s|$|\.|,|;|</span>|>|<|\))'
+            else:
+                # Black move: search for move_san
+                escaped_move = re.escape(move_san_clean)
+                pattern = rf'\b{escaped_move}(?:[!?]{{1,2}})?(?=\s|$|\.|,|;|</span>|>|<|\))'
+            
+            regex = QRegularExpression(pattern)
+            
+            # Find all occurrences of this move, but only consider main-line moves
+            found_cursor = document.find(regex, search_cursor)
+            mainline_move_found = False
+            
+            while not found_cursor.isNull():
+                # Check if this is a main-line move (not italic = not in variation)
+                format_at_pos = found_cursor.charFormat()
+                is_italic = format_at_pos.fontItalic()
+                
+                if not is_italic:
+                    # Found main-line move - check if click position is within this move
+                    move_start = found_cursor.selectionStart()
+                    move_end = found_cursor.selectionEnd()
+                    
+                    # For white moves, the match might include the move number
+                    # We want to check if position is within the actual move text
+                    if is_white:
+                        # Adjust start position to exclude move number
+                        match_text = found_cursor.selectedText()
+                        move_number_str = str(move_number) + "."
+                        move_text_start_in_match = match_text.find(move_number_str)
+                        if move_text_start_in_match >= 0:
+                            move_text_start_in_match += len(move_number_str)
+                            # Skip whitespace after move number
+                            while (move_text_start_in_match < len(match_text) and 
+                                   match_text[move_text_start_in_match] in [' ', '\t']):
+                                move_text_start_in_match += 1
+                            move_start = found_cursor.selectionStart() + move_text_start_in_match
+                    
+                    # Check if click position is within this move's text range
+                    if move_start <= position <= move_end:
+                        # Found the move! Return ply index (1-based)
+                        ply_index = move_pos_index + 1
+                        return ply_index
+                    
+                    # Update search position to continue after this move
+                    search_cursor = QTextCursor(found_cursor)
+                    search_cursor.setPosition(found_cursor.selectionEnd())
+                    # Skip annotations, spaces, and HTML tags after the move
+                    while search_cursor.position() < document_length - 1:
+                        char = document.characterAt(search_cursor.position())
+                        if char in ['+', '#', '!', '?']:
+                            search_cursor.movePosition(QTextCursor.MoveOperation.NextCharacter)
+                        elif char == ' ' or char == '\t' or char == '\n':
+                            search_cursor.movePosition(QTextCursor.MoveOperation.NextCharacter)
+                        elif char == '<':
+                            # Skip HTML tags
+                            tag_end = search_cursor.position()
+                            while tag_end < document_length - 1:
+                                if document.characterAt(tag_end) == '>':
+                                    search_cursor.setPosition(tag_end + 1)
+                                    break
+                                tag_end += 1
+                            if tag_end >= document_length - 1:
+                                break
+                        else:
+                            break
+                    mainline_move_found = True
+                    break  # Found main-line move, move to next move in sequence
+                
+                # This is a variation move, continue searching for main-line move
+                # Advance search position past this variation move
+                search_pos = QTextCursor(found_cursor)
+                search_pos.setPosition(found_cursor.selectionEnd())
+                # Skip annotations, spaces, and HTML tags
+                while search_pos.position() < document_length - 1:
+                    char = document.characterAt(search_pos.position())
+                    if char in ['+', '#', '!', '?']:
+                        search_pos.movePosition(QTextCursor.MoveOperation.NextCharacter)
+                    elif char == ' ' or char == '\t' or char == '\n':
+                        search_pos.movePosition(QTextCursor.MoveOperation.NextCharacter)
+                    elif char == '<':
+                        # Skip HTML tags
+                        tag_end = search_pos.position()
+                        while tag_end < document_length - 1:
+                            if document.characterAt(tag_end) == '>':
+                                search_pos.setPosition(tag_end + 1)
+                                break
+                            tag_end += 1
+                        if tag_end >= document_length - 1:
+                            break
+                    else:
+                        break
+                found_cursor = document.find(regex, search_pos)
+            
+            # If we didn't find a main-line move for this move_pos_index,
+            # we need to advance the search cursor to avoid getting stuck
+            if not mainline_move_found:
+                # Couldn't find this move - advance search cursor
+                if search_cursor.position() < document_length - 1:
+                    # Try to advance past potential HTML/whitespace to find next move
+                    for _ in range(10):  # Limit advancement to avoid going too far
+                        if search_cursor.position() >= document_length - 1:
+                            break
+                        search_cursor.movePosition(QTextCursor.MoveOperation.NextCharacter)
+        
+        # No main-line move found at this position
+        return 0
