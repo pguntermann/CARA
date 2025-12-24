@@ -9,7 +9,7 @@ import chess
 
 from app.models.board_model import BoardModel
 from app.utils.material_tracker import PIECE_VALUES, calculate_material_balance
-from app.utils.font_utils import resolve_font_family
+from app.utils.font_utils import resolve_font_family, scale_font_size
 
 
 class MaterialWidget(QWidget):
@@ -64,7 +64,7 @@ class MaterialWidget(QWidget):
         self.border_radius = material_config.get("border_radius", 5)
         font_family_raw = material_config.get("font_family", "Helvetica Neue")
         self.font_family = resolve_font_family(font_family_raw)
-        self.font_size = material_config.get("font_size", 10)
+        self.font_size = int(scale_font_size(material_config.get("font_size", 10)))
         self.white_text_color = QColor(*material_config.get("white_text_color", [240, 240, 240]))
         self.black_text_color = QColor(*material_config.get("black_text_color", [200, 200, 200]))
         self.difference_text_color = QColor(*material_config.get("difference_text_color", [255, 255, 100]))

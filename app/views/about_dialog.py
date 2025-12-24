@@ -8,9 +8,10 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
 )
-from PyQt6.QtGui import QColor, QIcon
+from PyQt6.QtGui import QColor, QIcon, QFontMetrics
 from PyQt6.QtCore import Qt
 from typing import Dict, Any
+from app.utils.font_utils import resolve_font_family, scale_font_size
 
 
 class AboutDialog(QDialog):
@@ -33,7 +34,9 @@ class AboutDialog(QDialog):
         self.setWindowTitle("About CARA")
         dialog_width = dialog_config.get('width', 550)
         dialog_height = dialog_config.get('height', 300)
-        self.setFixedSize(dialog_width, dialog_height)
+        # Use setMinimumSize instead of setFixedSize to allow dialog to grow if needed
+        self.setMinimumSize(dialog_width, dialog_height)
+        self.resize(dialog_width, dialog_height)
         
         # Set dialog background color
         bg_color = dialog_config.get('background_color', [40, 40, 45])
@@ -77,8 +80,8 @@ class AboutDialog(QDialog):
         
         # App name
         app_name_config = dialog_config.get('app_name', {})
-        app_name_font_family = app_name_config.get('font_family', 'Helvetica Neue')
-        app_name_font_size = app_name_config.get('font_size', 26)
+        app_name_font_family = resolve_font_family(app_name_config.get('font_family', 'Helvetica Neue'))
+        app_name_font_size = scale_font_size(app_name_config.get('font_size', 26))
         app_name_font_weight = app_name_config.get('font_weight', 'bold')
         app_name_color = app_name_config.get('color', [240, 240, 240])
         app_name_margin_bottom = app_name_config.get('margin_bottom', 6)
@@ -99,8 +102,8 @@ class AboutDialog(QDialog):
         
         # Full name
         full_name_config = dialog_config.get('full_name', {})
-        full_name_font_family = full_name_config.get('font_family', 'Helvetica Neue')
-        full_name_font_size = full_name_config.get('font_size', 13)
+        full_name_font_family = resolve_font_family(full_name_config.get('font_family', 'Helvetica Neue'))
+        full_name_font_size = scale_font_size(full_name_config.get('font_size', 13))
         full_name_color = full_name_config.get('color', [200, 200, 200])
         full_name_margin_bottom = full_name_config.get('margin_bottom', 12)
         
@@ -119,8 +122,8 @@ class AboutDialog(QDialog):
         
         # Version
         version_config = dialog_config.get('version', {})
-        version_font_family = version_config.get('font_family', 'Helvetica Neue')
-        version_font_size = version_config.get('font_size', 11)
+        version_font_family = resolve_font_family(version_config.get('font_family', 'Helvetica Neue'))
+        version_font_size = scale_font_size(version_config.get('font_size', 11))
         version_color = version_config.get('color', [180, 180, 180])
         version_label_text = version_config.get('label', 'Version')
         version_margin_bottom = version_config.get('margin_bottom', 12)
@@ -141,18 +144,46 @@ class AboutDialog(QDialog):
         
         # Description
         description_config = dialog_config.get('description', {})
-        description_font_family = description_config.get('font_family', 'Helvetica Neue')
-        description_font_size = description_config.get('font_size', 11)
+        description_font_family = resolve_font_family(description_config.get('font_family', 'Helvetica Neue'))
+        description_font_size = scale_font_size(description_config.get('font_size', 11))
         description_color = description_config.get('color', [200, 200, 200])
         description_text = description_config.get('text', 'A comprehensive chess analysis and review application.')
         description_line_height = description_config.get('line_height', 1.5)
         description_margin_bottom = description_config.get('margin_bottom', 15)
-        description_max_width = description_config.get('max_width', 350)
         
         description_label = QLabel(description_text)
         description_label.setIndent(0)
         description_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         description_label.setWordWrap(True)
+        
+        # Calculate available width for text (dialog width - margins - icon - gap)
+        dialog_width = dialog_config.get('width', 550)
+        layout_margins = layout_config.get('margins', [30, 30, 30, 30])
+        icon_size = icon_config.get('size', 120)
+        icon_text_gap = layout_config.get('icon_text_gap', 25)
+        available_width = dialog_width - layout_margins[0] - layout_margins[2] - icon_size - icon_text_gap
+        
+        # Calculate minimum height needed for the text with word wrap
+        from PyQt6.QtGui import QFont, QTextDocument
+        from PyQt6.QtCore import QSizeF
+        font = QFont(description_font_family, int(description_font_size))
+        font_metrics = QFontMetrics(font)
+        
+        # Use QTextDocument to properly calculate height with word wrap
+        doc = QTextDocument()
+        doc.setDefaultFont(font)
+        doc.setTextWidth(available_width)
+        doc.setPlainText(description_text)
+        # Account for line-height multiplier and add small buffer
+        base_height = doc.size().height()
+        min_height = int(base_height * description_line_height) + 5  # Add small buffer
+        
+        # Set size policy to allow expansion and set minimum height
+        from PyQt6.QtWidgets import QSizePolicy
+        description_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        description_label.setMinimumHeight(min_height)
+        # Don't set maximum height - allow it to expand if needed
+        
         description_label.setStyleSheet(
             f"font-family: {description_font_family}; "
             f"font-size: {description_font_size}pt; "
@@ -162,13 +193,13 @@ class AboutDialog(QDialog):
             f"margin-bottom: {description_margin_bottom}px; "
             f"padding: 0px;"
         )
-        description_label.setMaximumWidth(description_max_width)
+        # Don't set maximum width or height - let it use available space naturally with word wrap
         text_layout.addWidget(description_label, 0, Qt.AlignmentFlag.AlignLeft)
         
         # Copyright
         copyright_config = dialog_config.get('copyright', {})
-        copyright_font_family = copyright_config.get('font_family', 'Helvetica Neue')
-        copyright_font_size = copyright_config.get('font_size', 10)
+        copyright_font_family = resolve_font_family(copyright_config.get('font_family', 'Helvetica Neue'))
+        copyright_font_size = scale_font_size(copyright_config.get('font_size', 10))
         copyright_color = copyright_config.get('color', [150, 150, 150])
         copyright_text1 = copyright_config.get('text1', 'Copyright (C) 2025 Philipp Guntermann')
         copyright_text2 = copyright_config.get('text2', '')
@@ -201,8 +232,8 @@ class AboutDialog(QDialog):
         
         # Contact email
         contact_config = dialog_config.get('contact', {})
-        contact_font_family = contact_config.get('font_family', 'Helvetica Neue')
-        contact_font_size = contact_config.get('font_size', 10)
+        contact_font_family = resolve_font_family(contact_config.get('font_family', 'Helvetica Neue'))
+        contact_font_size = scale_font_size(contact_config.get('font_size', 10))
         contact_color = contact_config.get('color', [150, 150, 150])
         contact_email = contact_config.get('email', 'pguntermann@me.com')
         contact_label_text = contact_config.get('label', 'Contact:')
@@ -228,8 +259,8 @@ class AboutDialog(QDialog):
         
         # License
         license_config = dialog_config.get('license', {})
-        license_font_family = license_config.get('font_family', 'Helvetica Neue')
-        license_font_size = license_config.get('font_size', 10)
+        license_font_family = resolve_font_family(license_config.get('font_family', 'Helvetica Neue'))
+        license_font_size = scale_font_size(license_config.get('font_size', 10))
         license_color = license_config.get('color', [150, 150, 150])
         license_text = license_config.get('text', 'Licensed under the GNU General Public License v3.0 (GPL-3.0)')
         license_margin_top = license_config.get('margin_top', 8)
@@ -246,11 +277,10 @@ class AboutDialog(QDialog):
             f"margin-top: {license_margin_top}px; "
             f"padding: 0px;"
         )
-        license_label.setMaximumWidth(description_max_width)
+        # Don't set maximum width - let it use available space naturally with word wrap
         text_layout.addWidget(license_label, 0, Qt.AlignmentFlag.AlignLeft)
         
-        # Add stretch to push content to top
-        text_layout.addStretch()
+        # Don't add stretch - let content expand naturally to use available space
         
         content_layout.addLayout(text_layout)
         content_layout.addStretch()
@@ -273,7 +303,7 @@ class AboutDialog(QDialog):
         button_bg_offset = buttons_config.get('background_offset', 20)
         button_hover_offset = buttons_config.get('hover_background_offset', 30)
         button_pressed_offset = buttons_config.get('pressed_background_offset', 10)
-        button_font_size = buttons_config.get('font_size', 10)
+        button_font_size = scale_font_size(buttons_config.get('font_size', 10))
         text_color = buttons_config.get('text_color', [200, 200, 200])
         border_color = buttons_config.get('border_color', [60, 60, 65])
         button_alignment = buttons_config.get('alignment', 'right')

@@ -737,9 +737,10 @@ class BulkAnalysisDialog(QDialog):
         movetime_row_layout.setSpacing(8)  # Space between label and spinbox
         
         # Movetime input
+        from app.utils.font_utils import scale_font_size
         movetime_label = QLabel("Time per move:")
         movetime_label.setStyleSheet(
-            f"font-size: {dialog_config.get('labels', {}).get('font_size', 11)}pt; "
+            f"font-size: {scale_font_size(dialog_config.get('labels', {}).get('font_size', 11))}pt; "
             f"color: rgb({dialog_config.get('labels', {}).get('text_color', [200, 200, 200])[0]}, "
             f"{dialog_config.get('labels', {}).get('text_color', [200, 200, 200])[1]}, "
             f"{dialog_config.get('labels', {}).get('text_color', [200, 200, 200])[2]});"
@@ -1069,8 +1070,9 @@ class BulkAnalysisDialog(QDialog):
         
         # Labels styling
         labels_config = dialog_config.get('labels', {})
-        label_font_family = labels_config.get('font_family', 'Helvetica Neue')
-        label_font_size = labels_config.get('font_size', 11)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        label_font_family = resolve_font_family(labels_config.get('font_family', 'Helvetica Neue'))
+        label_font_size = scale_font_size(labels_config.get('font_size', 11))
         label_text_color = labels_config.get('text_color', [200, 200, 200])
         
         label_style = (

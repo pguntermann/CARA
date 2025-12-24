@@ -35,6 +35,7 @@ from app.models.column_profile_model import DEFAULT_PROFILE_NAME
 from app.models.database_model import DatabaseModel, GameData
 from app.controllers.engine_controller import TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS
 from app.services.pgn_cleaning_service import PgnCleaningService
+from app.utils.font_utils import resolve_font_family, scale_font_size
 from typing import Dict, Any, Optional, List
 
 
@@ -1032,8 +1033,8 @@ class MainWindow(QMainWindow):
         menu_config = ui_config.get('menu', {})
         
         # Get font settings
-        font_family = menu_config.get('font_family', 'Helvetica Neue')
-        font_size = menu_config.get('font_size', 10)
+        font_family = resolve_font_family(menu_config.get('font_family', 'Helvetica Neue'))
+        font_size = scale_font_size(menu_config.get('font_size', 10))
         
         # Get color settings
         colors_config = menu_config.get('colors', {})

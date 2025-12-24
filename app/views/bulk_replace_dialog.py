@@ -92,7 +92,8 @@ class BulkReplaceDialog(QDialog):
         self.text_color = QColor(text_color[0], text_color[1], text_color[2])
         
         # Font
-        font_size = dialog_config.get("font_size", 11)
+        from app.utils.font_utils import scale_font_size
+        font_size = scale_font_size(dialog_config.get("font_size", 11))
         self.font_family = dialog_config.get("font_family", "Helvetica Neue")
         self.font_size = font_size
         
@@ -119,7 +120,7 @@ class BulkReplaceDialog(QDialog):
         from app.utils.font_utils import resolve_font_family
         input_font_family_raw = inputs_config.get("font_family", "Cascadia Mono")
         self.input_font_family = resolve_font_family(input_font_family_raw)
-        self.input_font_size = inputs_config.get("font_size", 11)
+        self.input_font_size = scale_font_size(inputs_config.get("font_size", 11))
         self.input_text_color = QColor(*inputs_config.get("text_color", [240, 240, 240]))
         self.input_bg_color = QColor(*inputs_config.get("background_color", [30, 30, 35]))
         self.input_border_color = QColor(*inputs_config.get("border_color", [60, 60, 65]))
@@ -130,10 +131,11 @@ class BulkReplaceDialog(QDialog):
         
         # Labels
         labels_config = dialog_config.get("labels", {})
-        self.label_font_family = labels_config.get("font_family", "Helvetica Neue")
-        self.label_font_size = labels_config.get("font_size", 11)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        self.label_font_family = resolve_font_family(labels_config.get("font_family", "Helvetica Neue"))
+        self.label_font_size = int(scale_font_size(labels_config.get("font_size", 11)))
         self.label_text_color = QColor(*labels_config.get("text_color", [200, 200, 200]))
-        self.label_note_font_size = labels_config.get("note_font_size", 10)
+        self.label_note_font_size = int(scale_font_size(labels_config.get("note_font_size", 10)))
         self.label_minimum_width = labels_config.get("minimum_width", 90)
         
         # Checkboxes
@@ -528,7 +530,8 @@ class BulkReplaceDialog(QDialog):
         bg_color = self.config.get("ui", {}).get("dialogs", {}).get("bulk_replace", {}).get("background_color", [40, 40, 45])
         border_color = self.config.get("ui", {}).get("dialogs", {}).get("bulk_replace", {}).get("border_color", [60, 60, 65])
         text_color = self.config.get("ui", {}).get("dialogs", {}).get("bulk_replace", {}).get("text_color", [200, 200, 200])
-        font_size = self.config.get("ui", {}).get("dialogs", {}).get("bulk_replace", {}).get("font_size", 11)
+        from app.utils.font_utils import scale_font_size
+        font_size = scale_font_size(self.config.get("ui", {}).get("dialogs", {}).get("bulk_replace", {}).get("font_size", 11))
         
         button_width = buttons_config.get("width", 120)
         button_height = buttons_config.get("height", 30)
@@ -645,8 +648,9 @@ class BulkReplaceDialog(QDialog):
         group_bg_color = groups_config.get("background_color", bg_color) if "background_color" in groups_config else bg_color
         group_border_color = groups_config.get("border_color", border_color) if "border_color" in groups_config else border_color
         group_border_radius = groups_config.get("border_radius", 5)
-        group_title_font_family = groups_config.get("title_font_family", "Helvetica Neue")
-        group_title_font_size = groups_config.get("title_font_size", 11)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        group_title_font_family = resolve_font_family(groups_config.get("title_font_family", "Helvetica Neue"))
+        group_title_font_size = scale_font_size(groups_config.get("title_font_size", 11))
         group_title_color = groups_config.get("title_color", [240, 240, 240])
         group_content_margins = groups_config.get("content_margins", [10, 15, 10, 10])
         group_margin_top = groups_config.get("margin_top", 10)
@@ -1144,14 +1148,15 @@ class BulkReplaceDialog(QDialog):
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
         # Title
-        title_font_size = title_config.get('font_size', 14)
+        from app.utils.font_utils import scale_font_size
+        title_font_size = scale_font_size(title_config.get('font_size', 14))
         title_padding = title_config.get('padding', 5)
         title_label = QLabel(f"<b>{title}</b>")
         title_label.setStyleSheet(f"font-size: {title_font_size}pt; padding: {title_padding}px;")
         layout.addWidget(title_label)
         
         # Message
-        message_font_size = message_config.get('font_size', 11)
+        message_font_size = scale_font_size(message_config.get('font_size', 11))
         message_padding = message_config.get('padding', 5)
         message_text_color = message_config.get('text_color', [200, 200, 200])
         message_label = QLabel(message)
@@ -1177,7 +1182,8 @@ class BulkReplaceDialog(QDialog):
         button_bg_offset = buttons_config.get('background_offset', 20)
         button_hover_offset = buttons_config.get('hover_background_offset', 30)
         button_pressed_offset = buttons_config.get('pressed_background_offset', 10)
-        button_font_size = buttons_config.get('font_size', 10)
+        from app.utils.font_utils import scale_font_size
+        button_font_size = scale_font_size(buttons_config.get('font_size', 10))
         text_color = buttons_config.get('text_color', [200, 200, 200])
         border_color = buttons_config.get('border_color', [60, 60, 65])
         

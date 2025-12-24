@@ -54,7 +54,8 @@ class ConfirmationDialog(QDialog):
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
         # Title
-        title_font_size = title_config.get('font_size', 14)
+        from app.utils.font_utils import scale_font_size
+        title_font_size = scale_font_size(title_config.get('font_size', 14))
         title_padding = title_config.get('padding', 5)
         title_label = QLabel(f"<b>{title}</b>")
         title_label.setStyleSheet(f"font-size: {title_font_size}pt; padding: {title_padding}px;")
@@ -87,7 +88,8 @@ class ConfirmationDialog(QDialog):
         button_bg_offset = buttons_config.get('background_offset', 20)
         button_hover_offset = buttons_config.get('hover_background_offset', 30)
         button_pressed_offset = buttons_config.get('pressed_background_offset', 10)
-        button_font_size = buttons_config.get('font_size', 10)
+        from app.utils.font_utils import scale_font_size
+        button_font_size = scale_font_size(buttons_config.get('font_size', 10))
         text_color = buttons_config.get('text_color', [200, 200, 200])
         border_color = buttons_config.get('border_color', [60, 60, 65])
         

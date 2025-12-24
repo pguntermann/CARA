@@ -13,6 +13,7 @@ from app.models.database_model import DatabaseModel
 
 from app.models.game_model import GameModel
 from app.controllers.game_controller import GameController
+from app.utils.font_utils import resolve_font_family, scale_font_size
 
 if TYPE_CHECKING:
     from app.controllers.player_stats_controller import PlayerStatsController
@@ -788,13 +789,13 @@ class DetailPlayerStatsView(QWidget):
         grid_spacing = widgets_config.get('grid_spacing', 5)
         row_spacing = widgets_config.get('row_spacing', 5)
         
-        header_font = QFont(fonts_config.get('header_font_family', 'Helvetica Neue'),
-                           fonts_config.get('header_font_size', 14))
+        header_font = QFont(resolve_font_family(fonts_config.get('header_font_family', 'Helvetica Neue')),
+                           int(scale_font_size(fonts_config.get('header_font_size', 14))))
         header_font.setBold(fonts_config.get('header_font_weight', 'bold') == 'bold')
-        label_font = QFont(fonts_config.get('label_font_family', 'Helvetica Neue'),
-                          fonts_config.get('label_font_size', 11))
-        value_font = QFont(fonts_config.get('value_font_family', 'Helvetica Neue'),
-                          fonts_config.get('value_font_size', 11))
+        label_font = QFont(resolve_font_family(fonts_config.get('label_font_family', 'Helvetica Neue')),
+                          int(scale_font_size(fonts_config.get('label_font_size', 11))))
+        value_font = QFont(resolve_font_family(fonts_config.get('value_font_family', 'Helvetica Neue')),
+                          int(scale_font_size(fonts_config.get('value_font_size', 11))))
         
         section_spacing_val = layout_config.get('section_spacing', 20)
         
@@ -872,8 +873,8 @@ class DetailPlayerStatsView(QWidget):
         text_color = QColor(*colors_config.get('text_color', [220, 220, 220]))
         
         fonts_config = player_stats_config.get('fonts', {})
-        label_font = QFont(fonts_config.get('label_font_family', 'Helvetica Neue'),
-                          fonts_config.get('label_font_size', 11))
+        label_font = QFont(resolve_font_family(fonts_config.get('label_font_family', 'Helvetica Neue')),
+                          int(scale_font_size(fonts_config.get('label_font_size', 11))))
         
         widgets_config = player_stats_config.get('widgets', {})
         border_radius = widgets_config.get('border_radius', 5)
@@ -1044,8 +1045,9 @@ class DetailPlayerStatsView(QWidget):
         hover_bg = button_config.get('hover_background_color', [60, 60, 65])
         hover_text = button_config.get('hover_text_color', [240, 240, 240])
         pressed_offset = button_config.get('pressed_background_offset', 10)
-        font_family = button_config.get('font_family', 'Helvetica Neue')
-        font_size = button_config.get('font_size', 10)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        font_family = resolve_font_family(button_config.get('font_family', 'Helvetica Neue'))
+        font_size = int(scale_font_size(button_config.get('font_size', 10)))
         
         button_stylesheet = f"""
             QPushButton {{
@@ -1096,8 +1098,8 @@ class DetailPlayerStatsView(QWidget):
             combo_padding_h = 6
         
         font_config = player_stats_config.get('fonts', {})
-        font_family = font_config.get('label_font_family', 'Helvetica Neue')
-        font_size = font_config.get('label_font_size', 11)
+        font_family = resolve_font_family(font_config.get('label_font_family', 'Helvetica Neue'))
+        font_size = int(scale_font_size(font_config.get('label_font_size', 11)))
         
         # Get button height to match button styling
         button_height = button_config.get('height', 28)

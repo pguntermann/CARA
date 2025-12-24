@@ -611,7 +611,8 @@ class AIModelSettingsDialog(QDialog):
         
         # Labels
         label_font_family = self.labels_config.get('font_family', 'Helvetica Neue')
-        label_font_size = self.labels_config.get('font_size', 10)
+        from app.utils.font_utils import scale_font_size
+        label_font_size = scale_font_size(self.labels_config.get('font_size', 10))
         label_text_color = self.labels_config.get('text_color', [200, 200, 200])
         
         label_style = (

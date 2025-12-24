@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt
 from typing import Dict, Any, Optional
 
 from app.models.progress_model import ProgressModel
+from app.utils.font_utils import resolve_font_family, scale_font_size
 
 
 class StatusPanel(QWidget):
@@ -47,8 +48,8 @@ class StatusPanel(QWidget):
         
         # Section 1: Version label (left)
         version_config = panel_config.get('version', {})
-        version_font_family = version_config.get('font_family', 'Helvetica Neue')
-        version_font_size = version_config.get('font_size', 10)
+        version_font_family = resolve_font_family(version_config.get('font_family', 'Helvetica Neue'))
+        version_font_size = int(scale_font_size(version_config.get('font_size', 10)))
         version_color = version_config.get('color', [180, 180, 180])
         version_width = version_config.get('width', 80)
         
@@ -64,8 +65,8 @@ class StatusPanel(QWidget):
         
         # Section 2: Status message label (middle - expandable)
         message_config = panel_config.get('message', {})
-        message_font_family = message_config.get('font_family', 'Helvetica Neue')
-        message_font_size = message_config.get('font_size', 11)
+        message_font_family = resolve_font_family(message_config.get('font_family', 'Helvetica Neue'))
+        message_font_size = int(scale_font_size(message_config.get('font_size', 11)))
         message_color = message_config.get('color', [220, 220, 220])
         
         self.status_label = QLabel("Ready")

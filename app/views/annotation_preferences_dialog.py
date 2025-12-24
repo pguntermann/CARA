@@ -116,7 +116,8 @@ class AnnotationPreferencesDialog(QDialog):
         self.bg_color = dialog_config.get('background_color', [40, 40, 45])
         self.border_color = dialog_config.get('border_color', [60, 60, 65])
         self.text_color = dialog_config.get('text_color', [200, 200, 200])
-        self.font_size = dialog_config.get('font_size', 11)
+        from app.utils.font_utils import scale_font_size
+        self.font_size = scale_font_size(dialog_config.get('font_size', 11))
         
         # Layout
         layout_config = dialog_config.get('layout', {})
@@ -137,16 +138,17 @@ class AnnotationPreferencesDialog(QDialog):
         
         # Labels
         labels_config = dialog_config.get('labels', {})
-        self.label_font_family = labels_config.get('font_family', 'Helvetica Neue')
-        self.label_font_size = labels_config.get('font_size', 11)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        self.label_font_family = resolve_font_family(labels_config.get('font_family', 'Helvetica Neue'))
+        self.label_font_size = scale_font_size(labels_config.get('font_size', 11))
         self.label_text_color = labels_config.get('text_color', [200, 200, 200])
         
         # Inputs
         inputs_config = dialog_config.get('inputs', {})
-        from app.utils.font_utils import resolve_font_family
+        from app.utils.font_utils import resolve_font_family, scale_font_size
         input_font_family_raw = inputs_config.get('font_family', 'Cascadia Mono')
         self.input_font_family = resolve_font_family(input_font_family_raw)
-        self.input_font_size = inputs_config.get('font_size', 11)
+        self.input_font_size = scale_font_size(inputs_config.get('font_size', 11))
         self.input_text_color = inputs_config.get('text_color', [240, 240, 240])
         self.input_bg_color = inputs_config.get('background_color', [30, 30, 35])
         self.input_border_color = inputs_config.get('border_color', [60, 60, 65])
@@ -155,8 +157,8 @@ class AnnotationPreferencesDialog(QDialog):
         
         # Groups
         groups_config = dialog_config.get('groups', {})
-        self.group_title_font_family = groups_config.get('title_font_family', 'Helvetica Neue')
-        self.group_title_font_size = groups_config.get('title_font_size', 11)
+        self.group_title_font_family = resolve_font_family(groups_config.get('title_font_family', 'Helvetica Neue'))
+        self.group_title_font_size = scale_font_size(groups_config.get('title_font_size', 11))
         self.group_title_color = groups_config.get('title_color', [240, 240, 240])
         self.group_content_margins = groups_config.get('content_margins', [10, 15, 10, 10])
         self.group_margin_top = groups_config.get('margin_top', 10)

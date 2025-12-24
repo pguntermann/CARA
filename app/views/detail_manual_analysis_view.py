@@ -652,12 +652,13 @@ class DetailManualAnalysisView(QWidget):
         active_text = active.get('text', [240, 240, 240])
         
         # Get font settings
-        font_family = tabs_config.get('font_family', 'Helvetica Neue')
-        font_size = tabs_config.get('font_size', 10)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        font_family = resolve_font_family(tabs_config.get('font_family', 'Helvetica Neue'))
+        font_size = scale_font_size(tabs_config.get('font_size', 10))
         
         # Label config (needed for disabled_color_multiplier in button stylesheet)
         label_config = manual_analysis_config.get('labels', {})
-        label_font_size = label_config.get('font_size', font_size)
+        label_font_size = scale_font_size(label_config.get('font_size', tabs_config.get('font_size', 10)))
         disabled_color_multiplier = label_config.get('disabled_color_multiplier', 0.5)
         empty_label_color_multiplier = label_config.get('empty_label_color_multiplier', 0.7)
         

@@ -60,7 +60,8 @@ class InputDialog(QDialog):
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
         # Title
-        title_font_size = title_config.get('font_size', 14)
+        from app.utils.font_utils import scale_font_size
+        title_font_size = scale_font_size(title_config.get('font_size', 14))
         title_padding = title_config.get('padding', 5)
         title_spacing_after = title_config.get('spacing_after', 5)
         title_label = QLabel(f"<b>{title}</b>")
@@ -71,7 +72,7 @@ class InputDialog(QDialog):
         layout.addSpacing(title_spacing_after)
         
         # Label
-        label_font_size = label_config.get('font_size', 11)
+        label_font_size = scale_font_size(label_config.get('font_size', 11))
         label_padding = label_config.get('padding', 5)
         label_text_color = label_config.get('text_color', [200, 200, 200])
         label_spacing_after = label_config.get('spacing_after', 3)
@@ -133,7 +134,8 @@ class InputDialog(QDialog):
         button_bg_offset = buttons_config.get('background_offset', 20)
         button_hover_offset = buttons_config.get('hover_background_offset', 30)
         button_pressed_offset = buttons_config.get('pressed_background_offset', 10)
-        button_font_size = buttons_config.get('font_size', 10)
+        from app.utils.font_utils import scale_font_size
+        button_font_size = scale_font_size(buttons_config.get('font_size', 10))
         text_color = buttons_config.get('text_color', [200, 200, 200])
         border_color = buttons_config.get('border_color', [60, 60, 65])
         

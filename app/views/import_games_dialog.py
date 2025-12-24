@@ -100,8 +100,9 @@ class ImportGamesDialog(QDialog):
         
         # Labels
         labels_config = dialog_config.get("labels", {})
-        self.label_font_family = labels_config.get("font_family", "Helvetica Neue")
-        self.label_font_size = labels_config.get("font_size", 11)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        self.label_font_family = resolve_font_family(labels_config.get("font_family", "Helvetica Neue"))
+        self.label_font_size = scale_font_size(labels_config.get("font_size", 11))
         self.label_text_color = QColor(*labels_config.get("text_color", [200, 200, 200]))
         self.label_minimum_width = labels_config.get("minimum_width", 120)
         

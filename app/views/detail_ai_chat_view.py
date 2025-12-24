@@ -13,6 +13,7 @@ from typing import Dict, Any, Optional, List
 
 from app.models.game_model import GameModel
 from app.controllers.ai_chat_controller import AIChatController
+from app.utils.font_utils import resolve_font_family, scale_font_size
 
 
 class DetailAIChatView(QWidget):
@@ -56,14 +57,15 @@ class DetailAIChatView(QWidget):
         # Get styling
         self.background_color = self.chat_config.get('background_color', [40, 40, 45])
         self.text_color = self.chat_config.get('text_color', [200, 200, 200])
-        self.font_family = self.chat_config.get('font_family', 'Helvetica Neue')
-        self.font_size = self.chat_config.get('font_size', 11)
+        self.font_family = resolve_font_family(self.chat_config.get('font_family', 'Helvetica Neue'))
+        self.font_size = scale_font_size(self.chat_config.get('font_size', 11))
         
         separator_config = self.chat_config.get('separator', {})
         default_separator_color = self.chat_config.get('messages', {}).get('system', {}).get('text_color', self.text_color)
         self.separator_line_color = separator_config.get('line_color', default_separator_color)
         self.separator_text_color = separator_config.get('text_color', default_separator_color)
-        self.separator_font_size = separator_config.get('font_size', self.font_size - 1 if self.font_size > 1 else self.font_size)
+        base_separator_size = separator_config.get('font_size', self.chat_config.get('font_size', 11) - 1)
+        self.separator_font_size = scale_font_size(base_separator_size if base_separator_size > 0 else self.font_size)
         
         # Get input config
         input_config = self.chat_config.get('input', {})
@@ -354,7 +356,7 @@ class DetailAIChatView(QWidget):
         token_focus = tokens_config.get('focus_border_color', combo_focus)
         token_padding = tokens_config.get('padding', [6, 8])
         token_font_family = tokens_config.get('font_family', self.font_family)
-        token_font_size = tokens_config.get('font_size', self.font_size)
+        token_font_size = scale_font_size(tokens_config.get('font_size', self.chat_config.get('font_size', 11)))
         
         spin_style = f"""
             QSpinBox {{

@@ -21,6 +21,7 @@ from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtGui import QIntValidator, QResizeEvent, QShowEvent, QMoveEvent, QWheelEvent
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+from app.utils.font_utils import resolve_font_family, scale_font_size
 
 
 class NoWheelComboBox(QComboBox):
@@ -818,14 +819,14 @@ class EngineConfigurationDialog(QDialog):
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
         # Title
-        title_font_size = validation_title_config.get('font_size', 14)
+        title_font_size = scale_font_size(validation_title_config.get('font_size', 14))
         title_padding = validation_title_config.get('padding', 5)
         title_label = QLabel("<b>Parameter Validation Issues</b>")
         title_label.setStyleSheet(f"font-size: {title_font_size}pt; padding: {title_padding}px;")
         layout.addWidget(title_label)
         
         # Description
-        desc_font_size = validation_desc_config.get('font_size', 11)
+        desc_font_size = scale_font_size(validation_desc_config.get('font_size', 11))
         desc_padding = validation_desc_config.get('padding', 5)
         desc_text_color = validation_desc_config.get('text_color', [200, 200, 200])
         desc_label = QLabel(
@@ -862,7 +863,7 @@ class EngineConfigurationDialog(QDialog):
                 continue
             
             # Task header
-            task_header_font_size = validation_task_header_config.get('font_size', 12)
+            task_header_font_size = scale_font_size(validation_task_header_config.get('font_size', 12))
             task_header_padding = validation_task_header_config.get('padding', 5)
             task_header_text_color = validation_task_header_config.get('text_color', [220, 220, 220])
             task_label = QLabel(f"<b>{task_names[task]}</b>")
@@ -916,7 +917,7 @@ class EngineConfigurationDialog(QDialog):
         border_color = groups_config.get('border_color', [60, 60, 65])
         labels_config = dialog_config.get('labels', {})
         text_color = labels_config.get('text_color', [200, 200, 200])
-        font_size = labels_config.get('font_size', 11)
+        font_size = scale_font_size(labels_config.get('font_size', 11))
         
         button_style = (
             f"QPushButton {{"
@@ -995,7 +996,7 @@ class EngineConfigurationDialog(QDialog):
         }
         
         severity_width = severity_labels_config.get('width', 80)
-        severity_font_size = severity_labels_config.get('font_size', 10)
+        severity_font_size = scale_font_size(severity_labels_config.get('font_size', 10))
         severity_padding = severity_labels_config.get('padding', [2, 8])
         severity_border_radius = severity_labels_config.get('border_radius', 3)
         
@@ -1014,7 +1015,7 @@ class EngineConfigurationDialog(QDialog):
         layout.addWidget(severity_label)
         
         # Issue message
-        message_font_size = issue_message_config.get('font_size', 11)
+        message_font_size = scale_font_size(issue_message_config.get('font_size', 11))
         message_padding = issue_message_config.get('padding', 2)
         message_text_color = issue_message_config.get('text_color', [200, 200, 200])
         message_label = QLabel(issue.message)
@@ -1108,7 +1109,7 @@ class EngineConfigurationDialog(QDialog):
         header_border_radius = header_config.get('border_radius', 5)
         header_padding = header_config.get('padding', [10, 10, 10, 10])
         header_font_family = header_config.get('font_family', 'Helvetica Neue')
-        header_font_size = header_config.get('font_size', 11)
+        header_font_size = scale_font_size(header_config.get('font_size', 11))
         header_font_style = header_config.get('font_style', 'normal')
         
         header_style = (
@@ -1126,7 +1127,7 @@ class EngineConfigurationDialog(QDialog):
         # Tab widget styling
         tabs_config = dialog_config.get('tabs', {})
         tab_font_family = tabs_config.get('font_family', 'Helvetica Neue')
-        tab_font_size = tabs_config.get('font_size', 10)
+        tab_font_size = scale_font_size(tabs_config.get('font_size', 10))
         tab_height = tabs_config.get('tab_height', 24)
         pane_bg = tabs_config.get('pane_background', [255, 255, 255])
         colors_config = tabs_config.get('colors', {})
@@ -1228,7 +1229,7 @@ class EngineConfigurationDialog(QDialog):
         group_border_width = groups_config.get('border_width', 1)
         group_border_radius = groups_config.get('border_radius', 5)
         group_title_font_family = groups_config.get('title_font_family', 'Helvetica Neue')
-        group_title_font_size = groups_config.get('title_font_size', 11)
+        group_title_font_size = scale_font_size(groups_config.get('title_font_size', 11))
         group_title_font_weight = groups_config.get('title_font_weight', 'bold')
         group_title_color = groups_config.get('title_color', [220, 220, 220])
         group_spacing = groups_config.get('spacing', 10)
@@ -1263,8 +1264,8 @@ class EngineConfigurationDialog(QDialog):
         # Labels styling
         labels_config = dialog_config.get('labels', {})
         label_font_family = labels_config.get('font_family', 'Helvetica Neue')
-        label_font_size = labels_config.get('font_size', 10)
-        form_label_font_size = labels_config.get('form_label_font_size', label_font_size)
+        label_font_size = scale_font_size(labels_config.get('font_size', 10))
+        form_label_font_size = scale_font_size(labels_config.get('form_label_font_size', labels_config.get('font_size', 10)))
         label_text_color = labels_config.get('text_color', [200, 200, 200])
         label_disabled_color = labels_config.get('disabled_color', [128, 128, 128])
         label_empty_color = labels_config.get('empty_label_color', [128, 128, 128])
@@ -1325,7 +1326,7 @@ class EngineConfigurationDialog(QDialog):
         input_border_radius = input_config.get('border_radius', 3)
         input_padding = input_config.get('padding', [2, 6, 2, 6])
         input_font_family = input_config.get('font_family', 'Helvetica Neue')
-        input_font_size = input_config.get('font_size', 9)
+        input_font_size = scale_font_size(input_config.get('font_size', 9))
         
         # Get checkmark icon path
         from pathlib import Path
@@ -1429,7 +1430,7 @@ class EngineConfigurationDialog(QDialog):
         bg_color = groups_config.get('background_color', [40, 40, 45])
         border_color = groups_config.get('border_color', [60, 60, 65])
         text_color = labels_config.get('text_color', [200, 200, 200])
-        font_size = labels_config.get('font_size', 11)
+        font_size = scale_font_size(labels_config.get('font_size', 11))
         
         button_style = (
             f"QPushButton {{"

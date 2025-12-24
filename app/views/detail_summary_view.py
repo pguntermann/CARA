@@ -13,6 +13,7 @@ from app.models.game_model import GameModel
 from app.models.moveslist_model import MoveData
 from app.services.game_summary_service import GameSummary, GameHighlight
 from app.controllers.game_controller import GameController
+from app.utils.font_utils import resolve_font_family, scale_font_size
 
 if TYPE_CHECKING:
     from app.controllers.game_summary_controller import GameSummaryController
@@ -96,8 +97,8 @@ class EvaluationGraphWidget(QWidget):
         self.axis_color = QColor(*graph_config.get('axis_color', [150, 150, 150]))
         self.padding = graph_config.get('padding', [40, 20, 20, 40])  # [left, top, right, bottom]
         
-        self.font_family = graph_config.get('font_family', 'Helvetica Neue')
-        self.font_size = graph_config.get('font_size', 10)
+        self.font_family = resolve_font_family(graph_config.get('font_family', 'Helvetica Neue'))
+        self.font_size = int(scale_font_size(graph_config.get('font_size', 10)))
         
         # Graph configuration values
         self.scale_cap_cp = graph_config.get('scale_cap_cp', 1000.0)
@@ -107,7 +108,7 @@ class EvaluationGraphWidget(QWidget):
         self.min_grid_spacing = graph_config.get('min_grid_spacing', 30)
         self.min_grid_lines = graph_config.get('min_grid_lines', 3)
         self.show_all_labels_height_threshold = graph_config.get('show_all_labels_height_threshold', 150)
-        self.min_font_size = graph_config.get('min_font_size', 8)
+        self.min_font_size = int(scale_font_size(graph_config.get('min_font_size', 8)))
         self.font_size_calculation_divisor = graph_config.get('font_size_calculation_divisor', 20)
         self.label_skip_divisor = graph_config.get('label_skip_divisor', 3)
         self.y_axis_label_spacing = graph_config.get('y_axis_label_spacing', 5)
@@ -525,8 +526,8 @@ class PieChartWidget(QWidget):
         }
         
         self.text_color = QColor(*colors_config.get('text_color', [220, 220, 220]))
-        self.font_family = summary_config.get('fonts', {}).get('label_font_family', 'Helvetica Neue')
-        self.font_size = summary_config.get('fonts', {}).get('label_font_size', 11)
+        self.font_family = resolve_font_family(summary_config.get('fonts', {}).get('label_font_family', 'Helvetica Neue'))
+        self.font_size = int(scale_font_size(summary_config.get('fonts', {}).get('label_font_size', 11)))
         
         # Pie chart configuration
         minimum_size = pie_chart_config.get('minimum_size', [200, 200])

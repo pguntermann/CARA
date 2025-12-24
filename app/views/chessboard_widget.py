@@ -121,8 +121,9 @@ class ChessBoardWidget(QWidget):
         coords_config = board_config.get('coordinates', {})
         self.show_coordinates = coords_config.get('show', True)
         self.coord_border_width = coords_config.get('border_width', 25)
-        self.coord_font_family = coords_config.get('font_family', 'Helvetica Neue')
-        self.coord_font_size = coords_config.get('font_size', 10)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        self.coord_font_family = resolve_font_family(coords_config.get('font_family', 'Helvetica Neue'))
+        self.coord_font_size = int(scale_font_size(coords_config.get('font_size', 10)))
         self.coord_color = coords_config.get('color', [200, 200, 200])
         self.coord_font_style = coords_config.get('font_style', 'normal')
         
@@ -207,8 +208,8 @@ class ChessBoardWidget(QWidget):
         # Markers for trajectory 1
         numbered_markers_config = positional_plans_config.get('numbered_markers', {})
         self.markers_enabled = numbered_markers_config.get('enabled', True)
-        self.marker_font_size = numbered_markers_config.get('font_size', 10)
-        self.marker_font_family = numbered_markers_config.get('font_family', 'Helvetica Neue')
+        self.marker_font_size = int(scale_font_size(numbered_markers_config.get('font_size', 10)))
+        self.marker_font_family = resolve_font_family(numbered_markers_config.get('font_family', 'Helvetica Neue'))
         self.marker_font_weight = numbered_markers_config.get('font_weight', 'bold')
         self.marker_background_color = numbered_markers_config.get('background_color', [0, 100, 255])
         self.marker_background_radius = numbered_markers_config.get('background_radius', 8)

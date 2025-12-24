@@ -243,7 +243,8 @@ class EngineDialog(QDialog):
         # Labels styling
         labels_config = dialog_config.get('labels', {})
         label_font_family = labels_config.get('font_family', 'Helvetica Neue')
-        label_font_size = labels_config.get('font_size', 11)
+        from app.utils.font_utils import scale_font_size
+        label_font_size = scale_font_size(labels_config.get('font_size', 11))
         label_text_color = labels_config.get('text_color', [200, 200, 200])
         label_min_width = labels_config.get('minimum_width', 100)
         
@@ -339,7 +340,8 @@ class EngineDialog(QDialog):
         # Get colors from dialog background and labels for consistency
         dialog_bg = dialog_config.get('background_color', [40, 40, 45])
         label_text_color = labels_config.get('text_color', [200, 200, 200])
-        label_font_size = labels_config.get('font_size', 11)
+        from app.utils.font_utils import scale_font_size
+        label_font_size = scale_font_size(labels_config.get('font_size', 11))
         # Use border color from input widgets for consistency
         input_border = input_config.get('border_color', [60, 60, 65])
         

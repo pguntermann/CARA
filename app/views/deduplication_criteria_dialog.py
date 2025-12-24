@@ -100,7 +100,8 @@ class DeduplicationCriteriaDialog(QDialog):
         # Labels
         labels_config = dialog_config.get('labels', {})
         self.label_font_family = labels_config.get('font_family', 'Helvetica Neue')
-        self.label_font_size = labels_config.get('font_size', 11)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        self.label_font_size = scale_font_size(labels_config.get('font_size', 11))
         self.label_text_color = labels_config.get('text_color', [200, 200, 200])
         
         # Description text
@@ -135,7 +136,8 @@ class DeduplicationCriteriaDialog(QDialog):
         checkbox_config = dialog_config.get('checkboxes', {})
         self.checkbox_spacing = checkbox_config.get('spacing', 5)
         self.checkbox_text_color = checkbox_config.get('text_color', [200, 200, 200])
-        self.checkbox_font_size = checkbox_config.get('font_size', 11)
+        from app.utils.font_utils import scale_font_size
+        self.checkbox_font_size = scale_font_size(checkbox_config.get('font_size', 11))
         
         # Mode options and descriptions
         modes_config = dialog_config.get('modes', {})

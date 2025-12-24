@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
 from typing import Dict, Any
+from app.utils.font_utils import resolve_font_family, scale_font_size
 
 
 class MainGameInfoView(QWidget):
@@ -35,10 +36,10 @@ class MainGameInfoView(QWidget):
         layout.setSpacing(spacing)
         
         # Get font settings
-        font_family = gameinfo_config.get('font_family', 'Helvetica Neue')
-        player_name_size = gameinfo_config.get('player_name_size', 16)
-        player_elo_size = gameinfo_config.get('player_elo_size', 12)
-        opening_size = gameinfo_config.get('opening_size', 14)
+        font_family = resolve_font_family(gameinfo_config.get('font_family', 'Helvetica Neue'))
+        player_name_size = int(scale_font_size(gameinfo_config.get('player_name_size', 16)))
+        player_elo_size = int(scale_font_size(gameinfo_config.get('player_elo_size', 12)))
+        opening_size = int(scale_font_size(gameinfo_config.get('opening_size', 14)))
         text_color = gameinfo_config.get('text_color', [240, 240, 240])
         
         # Get colors
@@ -64,7 +65,7 @@ class MainGameInfoView(QWidget):
         
         # Result (replaces separator)
         result_config = gameinfo_config.get('result', {})
-        result_size = result_config.get('font_size', player_name_size)
+        result_size = int(scale_font_size(result_config.get('font_size', gameinfo_config.get('player_name_size', 16))))
         result_font = QFont(font_family, result_size)
         
         self.result_label = QLabel("*")

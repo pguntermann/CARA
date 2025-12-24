@@ -18,6 +18,7 @@ from app.models.game_model import GameModel
 from app.models.moveslist_model import MovesListModel
 from app.models.metadata_model import MetadataModel
 from app.models.engine_model import EngineModel
+from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.models.database_model import DatabaseModel
 from app.controllers.game_controller import GameController
 from typing import Optional
@@ -140,8 +141,8 @@ class DetailPanel(QWidget):
         tabs_config = panel_config.get('tabs', {})
         
         # Get font settings
-        font_family = tabs_config.get('font_family', 'Helvetica Neue')
-        font_size = tabs_config.get('font_size', 10)
+        font_family = resolve_font_family(tabs_config.get('font_family', 'Helvetica Neue'))
+        font_size = scale_font_size(tabs_config.get('font_size', 10))
         tab_height = tabs_config.get('tab_height', 24)
         pane_bg = tabs_config.get('pane_background', [40, 40, 45])
         

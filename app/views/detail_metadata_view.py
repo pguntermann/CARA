@@ -181,8 +181,9 @@ class DetailMetadataView(QWidget):
         active_bg = metadata_button_config.get('active_background_color', [70, 90, 130])
         active_text = metadata_button_config.get('active_text_color', [240, 240, 240])
         pressed_offset = metadata_button_config.get('pressed_background_offset', 10)
-        font_family = metadata_button_config.get('font_family', tabs_config.get('font_family', 'Helvetica Neue'))
-        font_size = metadata_button_config.get('font_size', tabs_config.get('font_size', 10))
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        font_family = resolve_font_family(metadata_button_config.get('font_family', tabs_config.get('font_family', 'Helvetica Neue')))
+        font_size = scale_font_size(metadata_button_config.get('font_size', tabs_config.get('font_size', 10)))
         
         button_stylesheet = f"""
             QPushButton {{
@@ -808,7 +809,8 @@ class AddTagDialog(QDialog):
         
         labels_config = dialog_config.get('labels', {})
         self.label_font_family = labels_config.get('font_family', 'Helvetica Neue')
-        self.label_font_size = labels_config.get('font_size', 11)
+        from app.utils.font_utils import scale_font_size
+        self.label_font_size = scale_font_size(labels_config.get('font_size', 11))
         self.label_text_color = labels_config.get('text_color', [200, 200, 200])
         
         inputs_config = dialog_config.get('inputs', {})
@@ -832,7 +834,8 @@ class AddTagDialog(QDialog):
         self.button_bg_offset = buttons_config.get('background_offset', 20)
         self.button_hover_bg_offset = buttons_config.get('hover_background_offset', 30)
         self.button_pressed_bg_offset = buttons_config.get('pressed_background_offset', 10)
-        self.button_font_size = buttons_config.get('font_size', 10)
+        from app.utils.font_utils import scale_font_size
+        self.button_font_size = scale_font_size(buttons_config.get('font_size', 10))
         self.button_text_color = buttons_config.get('text_color', [200, 200, 200])
         self.button_border_color = buttons_config.get('border_color', [60, 60, 65])
         self.button_spacing = buttons_config.get('spacing', 10)

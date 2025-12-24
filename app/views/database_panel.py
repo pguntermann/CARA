@@ -12,6 +12,7 @@ import math
 
 from app.models.database_model import DatabaseModel
 from app.models.database_panel_model import DatabasePanelModel
+from app.utils.font_utils import resolve_font_family, scale_font_size
 
 
 class DatabasePanel(QWidget):
@@ -113,8 +114,8 @@ class DatabasePanel(QWidget):
         tabs_config = panel_config.get('tabs', {})
         
         # Get font settings
-        font_family = tabs_config.get('font_family', 'Helvetica Neue')
-        font_size = tabs_config.get('font_size', 10)
+        font_family = resolve_font_family(tabs_config.get('font_family', 'Helvetica Neue'))
+        font_size = scale_font_size(tabs_config.get('font_size', 10))
         tab_height = tabs_config.get('tab_height', 24)
         pane_bg = tabs_config.get('pane_background', [35, 35, 40])
         

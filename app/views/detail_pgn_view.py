@@ -8,6 +8,7 @@ import re
 
 from app.services.pgn_formatter_service import PgnFormatterService
 from app.models.game_model import GameModel
+from app.utils.font_utils import resolve_font_family, scale_font_size
 
 if TYPE_CHECKING:
     from app.controllers.game_controller import GameController
@@ -148,8 +149,8 @@ class DetailPgnView(QWidget):
         self.pgn_text.set_move_checker(self._find_mainline_move_at_position)
         
         # Configure PGN text styling
-        pgn_font_family = pgn_config.get('font_family', 'Courier New')
-        pgn_font_size = pgn_config.get('font_size', 11)
+        pgn_font_family = resolve_font_family(pgn_config.get('font_family', 'Courier New'))
+        pgn_font_size = int(scale_font_size(pgn_config.get('font_size', 11)))
         pgn_text_color = pgn_config.get('text_color', [220, 220, 220])
         pgn_background_color = pgn_config.get('background_color', [30, 30, 35])
         

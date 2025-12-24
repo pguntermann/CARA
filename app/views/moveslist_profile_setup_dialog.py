@@ -942,7 +942,8 @@ class MovesListProfileSetupDialog(QDialog):
         bg_color = dialog_config.get('background_color', [40, 40, 45])
         border_color = dialog_config.get('border_color', [60, 60, 65])
         text_color = dialog_config.get('text_color', [200, 200, 200])
-        font_size = dialog_config.get('font_size', 11)
+        from app.utils.font_utils import scale_font_size
+        font_size = scale_font_size(dialog_config.get('font_size', 11))
         
         # Set dialog background
         self.setAutoFillBackground(True)
@@ -984,8 +985,9 @@ class MovesListProfileSetupDialog(QDialog):
         
         # Label styling
         labels_config = dialog_config.get('labels', {})
-        label_font_family = labels_config.get('font_family', 'Helvetica Neue')
-        label_font_size = labels_config.get('font_size', 11)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        label_font_family = resolve_font_family(labels_config.get('font_family', 'Helvetica Neue'))
+        label_font_size = scale_font_size(labels_config.get('font_size', 11))
         label_text_color = labels_config.get('text_color', [200, 200, 200])
         
         label_style = (
@@ -1052,7 +1054,7 @@ class MovesListProfileSetupDialog(QDialog):
         from app.utils.font_utils import resolve_font_family
         input_font_family_raw = inputs_config.get('font_family', 'Cascadia Mono')
         input_font_family = resolve_font_family(input_font_family_raw)
-        input_font_size = inputs_config.get('font_size', 11)
+        input_font_size = scale_font_size(inputs_config.get('font_size', 11))
         input_text_color = inputs_config.get('text_color', [240, 240, 240])
         input_bg_color = inputs_config.get('background_color', [30, 30, 35])
         input_border_color = inputs_config.get('border_color', [60, 60, 65])
