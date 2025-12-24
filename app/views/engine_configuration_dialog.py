@@ -242,12 +242,16 @@ class EngineConfigurationDialog(QDialog):
         
         # Tab widget for tasks
         self.tab_widget = QTabWidget()
+        self.tab_widget.setDocumentMode(False)  # Disable document mode for better control
         self.tab_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         # Create tabs for each task
         self._create_task_tab(self.TASK_EVALUATION, "Evaluation")
         self._create_task_tab(self.TASK_GAME_ANALYSIS, "Game Analysis")
         self._create_task_tab(self.TASK_MANUAL_ANALYSIS, "Manual Analysis")
+        
+        # Configure QTabBar after tabs are added
+        self._configure_tab_bar()
         
         layout.addWidget(self.tab_widget, stretch=1)
         
@@ -1150,6 +1154,9 @@ class EngineConfigurationDialog(QDialog):
                 background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
                 border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
             }}
+            QTabBar {{
+                alignment: left;
+            }}
             QTabBar::tab {{
                 background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
                 color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
@@ -1159,6 +1166,7 @@ class EngineConfigurationDialog(QDialog):
                 font-family: {tab_font_family};
                 font-size: {tab_font_size}pt;
                 min-height: {tab_height}px;
+                min-width: 80px;
             }}
             QTabBar::tab:hover {{
                 background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});
@@ -1172,9 +1180,24 @@ class EngineConfigurationDialog(QDialog):
             }}
         """
         self.tab_widget.setStyleSheet(tab_stylesheet)
+    
+    def _configure_tab_bar(self) -> None:
+        """Configure QTabBar for macOS compatibility (left-aligned, content-sized tabs)."""
+        from PyQt6.QtGui import QPalette, QColor
+        
+        tab_bar = self.tab_widget.tabBar()
+        tab_bar.setExpanding(False)  # Allow tabs to size to content instead of filling space
+        tab_bar.setElideMode(Qt.TextElideMode.ElideNone)  # Prevent text truncation
+        tab_bar.setUsesScrollButtons(True)  # Enable scroll buttons when tabs don't fit
+        tab_bar.setDrawBase(False)  # Don't draw base line
+        
+        # Get pane background color from config
+        ui_config = self.config.get('ui', {})
+        dialog_config = ui_config.get('dialogs', {}).get('engine_configuration', {})
+        tabs_config = dialog_config.get('tabs', {})
+        pane_bg = tabs_config.get('pane_background', [255, 255, 255])
         
         # Set background color directly on tab widgets (QWidget) to ensure dark background
-        from PyQt6.QtGui import QPalette, QColor
         for i in range(self.tab_widget.count()):
             tab = self.tab_widget.widget(i)
             # Use setAutoFillBackground and palette to ensure background is applied

@@ -908,6 +908,8 @@ class MainWindow(QMainWindow):
         
         # About action
         about_action = QAction("About...", self)
+        # Set menu role to NoRole to prevent macOS from moving it to the application menu
+        about_action.setMenuRole(QAction.MenuRole.NoRole)
         about_action.triggered.connect(self._show_about_dialog)
         help_menu.addAction(about_action)
         
@@ -2686,12 +2688,14 @@ Visibility Settings:
         # Save Profile action (overwrites current profile, not available for default)
         if active_profile_name != DEFAULT_PROFILE_NAME:
             save_profile_action = QAction("Save Profile", self)
+            save_profile_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
             save_profile_action.setShortcut(QKeySequence("Ctrl+Shift+P"))
             save_profile_action.triggered.connect(self._save_current_profile)
             menu.addAction(save_profile_action)
         
         # Save Profile as... action (creates new profile)
         save_profile_as_action = QAction("Save Profile as...", self)
+        save_profile_as_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         save_profile_as_action.setShortcut(QKeySequence("Ctrl+Alt+P"))
         save_profile_as_action.triggered.connect(self._save_profile_as)
         menu.addAction(save_profile_as_action)
@@ -2699,6 +2703,7 @@ Visibility Settings:
         # Remove Profile action (only if not default profile)
         if active_profile_name != DEFAULT_PROFILE_NAME:
             remove_profile_action = QAction("Remove Profile", self)
+            remove_profile_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
             remove_profile_action.setShortcut(QKeySequence("Ctrl+Shift+Delete"))
             remove_profile_action.triggered.connect(self._remove_profile)
             menu.addAction(remove_profile_action)
@@ -2708,6 +2713,7 @@ Visibility Settings:
         
         # Setup Profile... action (opens dialog)
         setup_profile_action = QAction("Setup Profile...", self)
+        setup_profile_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         setup_profile_action.triggered.connect(self._on_setup_profile)
         menu.addAction(setup_profile_action)
         

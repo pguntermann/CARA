@@ -69,6 +69,7 @@ class DatabasePanel(QWidget):
         
         # Tab widget for database tabs
         self.tab_widget = QTabWidget()
+        self.tab_widget.setDocumentMode(False)  # Disable document mode for better control
         main_layout.addWidget(self.tab_widget, 1)  # Takes remaining space
         
         # Apply tab styling from config
@@ -81,6 +82,9 @@ class DatabasePanel(QWidget):
         
         # Initialize tabs: "Clipboard" first, "+" last
         self._initialize_tabs()
+        
+        # Configure QTabBar after tabs are added
+        self._configure_tab_bar()
         
         # Set minimum size so widget is visible
         # Store minimum height for expanding, but allow override when collapsed
@@ -142,6 +146,10 @@ class DatabasePanel(QWidget):
                 background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
             }}
             
+            QTabBar {{
+                alignment: left;
+            }}
+            
             QTabBar::tab {{
                 background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
                 color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
@@ -150,7 +158,7 @@ class DatabasePanel(QWidget):
                 border-top-left-radius: 4px;
                 border-top-right-radius: 4px;
                 padding: 6px 12px;
-                min-width: 60px;
+                min-width: 80px;
                 height: {tab_height}px;
                 font-family: "{font_family}";
                 font-size: {font_size}pt;
@@ -184,6 +192,14 @@ class DatabasePanel(QWidget):
         """
         
         self.tab_widget.setStyleSheet(stylesheet)
+    
+    def _configure_tab_bar(self) -> None:
+        """Configure QTabBar for macOS compatibility (left-aligned, content-sized tabs)."""
+        tab_bar = self.tab_widget.tabBar()
+        tab_bar.setExpanding(False)  # Allow tabs to size to content instead of filling space
+        tab_bar.setElideMode(Qt.TextElideMode.ElideNone)  # Prevent text truncation
+        tab_bar.setUsesScrollButtons(True)  # Enable scroll buttons when tabs don't fit
+        tab_bar.setDrawBase(False)  # Don't draw base line
     
     def _initialize_tabs(self) -> None:
         """Initialize the database panel tabs."""
@@ -437,6 +453,9 @@ class DatabasePanel(QWidget):
         
         # Update add tab index (it's now one position later)
         self._add_tab_index += 1
+        
+        # Reconfigure tab bar after adding new tab
+        self._configure_tab_bar()
         
         return tab_index
     

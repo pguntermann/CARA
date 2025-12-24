@@ -88,12 +88,17 @@ class DetailPanel(QWidget):
         
         # Tab widget for different detail views (bottom)
         self.tab_widget = QTabWidget()
+        self.tab_widget.setDocumentMode(False)  # Disable document mode for better control
         
         # Apply tab styling from config
         self._apply_tab_styling()
         
         # Initialize tabs
         self._initialize_tabs()
+        
+        # Configure QTabBar for macOS compatibility (left-aligned, content-sized tabs)
+        # Must be done after tabs are added
+        self._configure_tab_bar()
         
         splitter.addWidget(self.tab_widget)
         
@@ -168,6 +173,10 @@ class DetailPanel(QWidget):
                 background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
             }}
             
+            QTabBar {{
+                alignment: left;
+            }}
+            
             QTabBar::tab {{
                 background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
                 color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
@@ -176,7 +185,7 @@ class DetailPanel(QWidget):
                 border-top-left-radius: 4px;
                 border-top-right-radius: 4px;
                 padding: 6px 12px;
-                min-width: 60px;
+                min-width: 80px;
                 height: {tab_height}px;
                 font-family: "{font_family}";
                 font-size: {font_size}pt;
@@ -214,6 +223,14 @@ class DetailPanel(QWidget):
         """
         
         self.tab_widget.setStyleSheet(stylesheet)
+    
+    def _configure_tab_bar(self) -> None:
+        """Configure QTabBar for macOS compatibility (left-aligned, content-sized tabs)."""
+        tab_bar = self.tab_widget.tabBar()
+        tab_bar.setExpanding(False)  # Allow tabs to size to content instead of filling space
+        tab_bar.setElideMode(Qt.TextElideMode.ElideNone)  # Prevent text truncation
+        tab_bar.setUsesScrollButtons(True)  # Enable scroll buttons when tabs don't fit
+        tab_bar.setDrawBase(False)  # Don't draw base line
     
     def _initialize_tabs(self) -> None:
         """Initialize the detail panel tabs."""

@@ -109,7 +109,9 @@ class BulkTagDialog(QDialog):
         
         # Inputs
         inputs_config = dialog_config.get("inputs", {})
-        self.input_font_family = inputs_config.get("font_family", "Cascadia Mono")
+        from app.utils.font_utils import resolve_font_family
+        input_font_family_raw = inputs_config.get("font_family", "Cascadia Mono")
+        self.input_font_family = resolve_font_family(input_font_family_raw)
         self.input_font_size = inputs_config.get("font_size", 11)
         self.input_text_color = QColor(*inputs_config.get("text_color", [240, 240, 240]))
         self.input_bg_color = QColor(*inputs_config.get("background_color", [30, 30, 35]))

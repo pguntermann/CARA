@@ -1049,7 +1049,9 @@ class MovesListProfileSetupDialog(QDialog):
         
         # Spinbox styling (use input styling from config)
         inputs_config = dialog_config.get('inputs', {})
-        input_font_family = inputs_config.get('font_family', 'Cascadia Mono')
+        from app.utils.font_utils import resolve_font_family
+        input_font_family_raw = inputs_config.get('font_family', 'Cascadia Mono')
+        input_font_family = resolve_font_family(input_font_family_raw)
         input_font_size = inputs_config.get('font_size', 11)
         input_text_color = inputs_config.get('text_color', [240, 240, 240])
         input_bg_color = inputs_config.get('background_color', [30, 30, 35])
