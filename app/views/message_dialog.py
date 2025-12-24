@@ -39,12 +39,6 @@ class MessageDialog(QDialog):
         # Set dialog properties
         self.setWindowTitle(title)
         dialog_width = dialog_config.get('width', 400)
-        # Calculate height based on message length
-        base_height = message_config.get('base_height', 150)
-        line_height = message_config.get('line_height', 20)
-        estimated_height = base_height + (message.count('\n') * line_height)
-        dialog_height = max(dialog_config.get('height', 150), estimated_height)
-        self.setFixedSize(dialog_width, dialog_height)
         
         # Set dialog background color
         bg_color = dialog_config.get('background_color', [40, 40, 45])
@@ -74,6 +68,8 @@ class MessageDialog(QDialog):
         message_text_color = message_config.get('text_color', [200, 200, 200])
         message_label = QLabel(message)
         message_label.setWordWrap(True)
+        # Set minimum width to ensure proper word wrapping calculation
+        message_label.setMinimumWidth(dialog_width - layout_margins[0] - layout_margins[2] - (message_padding * 2))
         message_label.setStyleSheet(
             f"font-size: {message_font_size}pt; "
             f"padding: {message_padding}px; "
@@ -95,7 +91,6 @@ class MessageDialog(QDialog):
         button_bg_offset = buttons_config.get('background_offset', 20)
         button_hover_offset = buttons_config.get('hover_background_offset', 30)
         button_pressed_offset = buttons_config.get('pressed_background_offset', 10)
-        from app.utils.font_utils import scale_font_size
         button_font_size = scale_font_size(buttons_config.get('font_size', 10))
         text_color = buttons_config.get('text_color', [200, 200, 200])
         border_color = buttons_config.get('border_color', [60, 60, 65])
@@ -125,6 +120,17 @@ class MessageDialog(QDialog):
         button_layout.addWidget(ok_button)
         
         layout.addLayout(button_layout)
+        
+        # Let Qt calculate the natural size after layout is set up
+        # This accounts for DPI scaling automatically
+        self.setMinimumWidth(dialog_width)
+        self.adjustSize()
+        
+        # Ensure minimum height from config
+        min_height = dialog_config.get('height', 150)
+        if self.height() < min_height:
+            self.setMinimumHeight(min_height)
+            self.resize(self.width(), min_height)
     
     @staticmethod
     def show_warning(config: Dict[str, Any], title: str, message: str, parent=None) -> None:
