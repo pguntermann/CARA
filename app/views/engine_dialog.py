@@ -1,5 +1,6 @@
 """Engine dialog for adding UCI chess engines."""
 
+import sys
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -408,11 +409,19 @@ class EngineDialog(QDialog):
     
     def _browse_engine_path(self) -> None:
         """Browse for engine executable file."""
+        # Determine file filter based on platform
+        if sys.platform == "win32":
+            file_filter = "Executable Files (*.exe);;All Files (*)"
+        elif sys.platform == "darwin":  # macOS
+            file_filter = "All Files (*)"
+        else:  # Linux and other Unix-like systems
+            file_filter = "All Files (*)"
+        
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select UCI Engine Executable",
             "",
-            "Executable Files (*.exe);;All Files (*)"
+            file_filter
         )
         
         if file_path:
