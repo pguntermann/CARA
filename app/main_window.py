@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
 )
-from PyQt6.QtGui import QAction, QKeySequence, QCloseEvent, QColor, QDesktopServices
+from PyQt6.QtGui import QAction, QKeySequence, QCloseEvent, QColor, QDesktopServices, QCursor
 from PyQt6.QtCore import Qt, QEvent, QTimer, QUrl
 
 from app.views.main_panel import MainPanel
@@ -132,6 +132,7 @@ class MainWindow(QMainWindow):
         # Save PGN Database as action
         save_pgn_database_as_action = QAction("Save PGN Database as...", self)
         save_pgn_database_as_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        save_pgn_database_as_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         save_pgn_database_as_action.triggered.connect(self._save_pgn_database_as)
         file_menu.addAction(save_pgn_database_as_action)
         
@@ -140,6 +141,7 @@ class MainWindow(QMainWindow):
         # Import Games from Online action
         import_online_games_action = QAction("Import Games from Online...", self)
         import_online_games_action.setShortcut(QKeySequence("Ctrl+Shift+I"))
+        import_online_games_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         import_online_games_action.triggered.connect(self._import_online_games)
         file_menu.addAction(import_online_games_action)
         
@@ -148,18 +150,21 @@ class MainWindow(QMainWindow):
         # Bulk Replace action
         bulk_replace_action = QAction("Bulk Replace Tags...", self)
         bulk_replace_action.setShortcut(QKeySequence("Ctrl+Shift+R"))
+        bulk_replace_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         bulk_replace_action.triggered.connect(self._bulk_replace)
         file_menu.addAction(bulk_replace_action)
         
         # Bulk Add/Remove Tags action
         bulk_tag_action = QAction("Bulk Add/Remove Tags...", self)
         bulk_tag_action.setShortcut(QKeySequence("Ctrl+Alt+T"))
+        bulk_tag_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         bulk_tag_action.triggered.connect(self._bulk_tag)
         file_menu.addAction(bulk_tag_action)
         
         # Bulk Clean PGN action
         bulk_clean_pgn_action = QAction("Bulk Clean PGN...", self)
         bulk_clean_pgn_action.setShortcut(QKeySequence("Ctrl+Shift+L"))
+        bulk_clean_pgn_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         bulk_clean_pgn_action.triggered.connect(self._bulk_clean_pgn)
         file_menu.addAction(bulk_clean_pgn_action)
         
@@ -168,6 +173,7 @@ class MainWindow(QMainWindow):
         # Deduplicate Games action
         deduplicate_games_action = QAction("Deduplicate Games in Active Database...", self)
         deduplicate_games_action.setShortcut(QKeySequence("Ctrl+Shift+U"))
+        deduplicate_games_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         deduplicate_games_action.triggered.connect(self._deduplicate_games)
         file_menu.addAction(deduplicate_games_action)
         
@@ -176,6 +182,7 @@ class MainWindow(QMainWindow):
         # Search Games action
         search_games_action = QAction("Search Games...", self)
         search_games_action.setShortcut(QKeySequence("Ctrl+Shift+F"))
+        search_games_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         search_games_action.triggered.connect(self._search_games)
         file_menu.addAction(search_games_action)
         
@@ -529,6 +536,7 @@ class MainWindow(QMainWindow):
         
         # Bulk Analyze Database action
         self.bulk_analyze_database_action = QAction("Bulk Analyze Database...", self)
+        self.bulk_analyze_database_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         self.bulk_analyze_database_action.triggered.connect(self._on_bulk_analyze_database)
         game_analysis_menu.addAction(self.bulk_analyze_database_action)
         
@@ -538,6 +546,7 @@ class MainWindow(QMainWindow):
         # Configure Classification Settings action
         self.configure_classification_action = QAction("Configure Classification Settings...", self)
         self.configure_classification_action.setShortcut(QKeySequence("Ctrl+Shift+K"))
+        self.configure_classification_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         self.configure_classification_action.triggered.connect(self._open_classification_settings)
         game_analysis_menu.addAction(self.configure_classification_action)
         
@@ -758,6 +767,7 @@ class MainWindow(QMainWindow):
         annotations_menu.addSeparator()
         
         setup_preferences_action = QAction("Setup Preferences...", self)
+        setup_preferences_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         setup_preferences_action.triggered.connect(self._show_annotation_preferences)
         annotations_menu.addAction(setup_preferences_action)
         
@@ -767,6 +777,7 @@ class MainWindow(QMainWindow):
         # Add Engine action
         add_engine_action = QAction("Add Engine...", self)
         add_engine_action.setShortcut(QKeySequence("Ctrl+E"))
+        add_engine_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         add_engine_action.triggered.connect(self._add_engine)
         engines_menu.addAction(add_engine_action)
         
@@ -795,6 +806,7 @@ class MainWindow(QMainWindow):
         
         # AI Model Settings action (top of menu)
         ai_model_settings_action = QAction("AI Model Settings...", self)
+        ai_model_settings_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         ai_model_settings_action.triggered.connect(self._show_ai_model_settings)
         ai_summary_menu.addAction(ai_model_settings_action)
         
@@ -2297,6 +2309,9 @@ class MainWindow(QMainWindow):
         # Setup double-click handler on splitter handle to collapse/expand database panel
         self._setup_splitter_double_click()
         
+        # Fix cursor on splitter handles for macOS compatibility
+        self._fix_splitter_cursors()
+        
         # Main layout: Middle splitter (with top and database panels) and status panel
         main_layout.addWidget(self.middle_splitter, 1)  # Takes most space
         main_layout.addWidget(self.status_panel, 0)  # Fixed height
@@ -2345,6 +2360,27 @@ class MainWindow(QMainWindow):
             # Install event filter to detect double-clicks
             handle.installEventFilter(self)
     
+    def _fix_splitter_cursors(self) -> None:
+        """Fix cursor on all splitter handles for macOS compatibility.
+        
+        On macOS, child widgets can reset the cursor, causing the resize cursor
+        to only show briefly. This function explicitly sets the cursor on all
+        splitter handles to ensure it persists.
+        """
+        # Fix cursor on top_splitter (horizontal splitter needs vertical resize cursor)
+        top_splitter = self.middle_splitter.widget(0)
+        if isinstance(top_splitter, QSplitter):
+            for i in range(top_splitter.count() - 1):
+                handle = top_splitter.handle(i)
+                if handle:
+                    handle.setCursor(Qt.CursorShape.SizeHorCursor)
+        
+        # Fix cursor on middle_splitter (vertical splitter needs horizontal resize cursor)
+        for i in range(self.middle_splitter.count() - 1):
+            handle = self.middle_splitter.handle(i)
+            if handle:
+                handle.setCursor(Qt.CursorShape.SizeVerCursor)
+    
     def eventFilter(self, obj, event) -> bool:
         """Filter events to detect double-clicks on splitter handle."""
         # Check if this is a double-click on the database panel splitter handle
@@ -2355,6 +2391,27 @@ class MainWindow(QMainWindow):
                 return True  # Event handled
         # Let other events pass through
         return super().eventFilter(obj, event)
+    
+    def _fix_splitter_cursors(self) -> None:
+        """Fix cursor on all splitter handles for macOS compatibility.
+        
+        On macOS, child widgets can reset the cursor, causing the resize cursor
+        to only show briefly. This function explicitly sets the cursor on all
+        splitter handles to ensure it persists.
+        """
+        # Fix cursor on top_splitter (horizontal splitter needs vertical resize cursor)
+        top_splitter = self.middle_splitter.widget(0)
+        if isinstance(top_splitter, QSplitter):
+            for i in range(top_splitter.count() - 1):
+                handle = top_splitter.handle(i)
+                if handle:
+                    handle.setCursor(Qt.CursorShape.SizeHorCursor)
+        
+        # Fix cursor on middle_splitter (vertical splitter needs horizontal resize cursor)
+        for i in range(self.middle_splitter.count() - 1):
+            handle = self.middle_splitter.handle(i)
+            if handle:
+                handle.setCursor(Qt.CursorShape.SizeVerCursor)
     
     def _setup_shortcuts(self) -> None:
         """Setup global keyboard shortcuts."""

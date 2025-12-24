@@ -460,6 +460,13 @@ class DetailAnnotationView(QWidget):
         self.splitter.setCollapsible(0, False)  # Don't allow controls to collapse
         self.splitter.setCollapsible(1, False)  # Don't allow annotations to collapse
         
+        # Fix cursor on splitter handle for macOS compatibility
+        # Vertical splitter needs horizontal resize cursor
+        for i in range(self.splitter.count() - 1):
+            handle = self.splitter.handle(i)
+            if handle:
+                handle.setCursor(Qt.CursorShape.SizeVerCursor)
+        
         # Add splitter to main layout
         layout.addWidget(self.splitter)
         

@@ -338,6 +338,11 @@ class EngineConfigurationDialog(QDialog):
         common_layout = QFormLayout()
         common_layout_spacing = tabs_layout_config.get('common_layout_spacing', 10)
         common_layout.setSpacing(common_layout_spacing)
+        # Set field growth policy to make fields expand
+        common_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        # Set alignment for macOS compatibility (left-align labels and form)
+        common_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        common_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         
         # Get saved parameters for this task (with fallback to recommended defaults)
         task_type_map = {
@@ -361,6 +366,7 @@ class EngineConfigurationDialog(QDialog):
         threads_edit.setText(str(threads_value))
         threads_edit.setValidator(QIntValidator(1, 512))
         threads_edit.setToolTip("Number of threads for engine analysis (1-512)")
+        threads_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         common_layout.addRow("Threads:", threads_edit)
         self.task_widgets[task]["threads"] = threads_edit
         
@@ -369,6 +375,7 @@ class EngineConfigurationDialog(QDialog):
         depth_edit.setText(str(depth_value))
         depth_edit.setValidator(QIntValidator(0, 100))
         depth_edit.setToolTip("Maximum search depth (0 = unlimited, max 100)")
+        depth_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         common_layout.addRow("Max Depth:", depth_edit)
         self.task_widgets[task]["depth"] = depth_edit
         
@@ -377,6 +384,7 @@ class EngineConfigurationDialog(QDialog):
         movetime_edit.setText(str(movetime_value))
         movetime_edit.setValidator(QIntValidator(0, 3600000))  # 1 hour max
         movetime_edit.setToolTip("Maximum time per move in milliseconds (0 = unlimited, max 3600000)")
+        movetime_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         common_layout.addRow("Move Time:", movetime_edit)
         self.task_widgets[task]["movetime"] = movetime_edit
         
@@ -389,6 +397,9 @@ class EngineConfigurationDialog(QDialog):
             engine_params_layout = QFormLayout()
             engine_params_layout_spacing = tabs_layout_config.get('engine_params_layout_spacing', 10)
             engine_params_layout.setSpacing(engine_params_layout_spacing)
+            # Set alignment for macOS compatibility (left-align labels and form)
+            engine_params_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+            engine_params_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             
             # Create scroll area for engine parameters (in case there are many)
             scroll_area_config = dialog_config.get('scroll_area', {})
@@ -405,6 +416,11 @@ class EngineConfigurationDialog(QDialog):
             scroll_layout = QFormLayout(scroll_widget)
             scroll_layout_spacing = tabs_layout_config.get('scroll_layout_spacing', 10)
             scroll_layout.setSpacing(scroll_layout_spacing)
+            # Set field growth policy to make fields expand
+            scroll_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+            # Set alignment for macOS compatibility (left-align labels and form)
+            scroll_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+            scroll_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             scroll_layout_margins = tabs_layout_config.get('scroll_layout_margins', [0, 0, 0, 0])
             scroll_layout.setContentsMargins(
                 scroll_layout_margins[0],
@@ -496,6 +512,7 @@ class EngineConfigurationDialog(QDialog):
         """
         if option_type == "spin":
             line_edit = QLineEdit()
+            line_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             # Set up validator with min/max values
             if min_val is not None and max_val is not None:
                 line_edit.setValidator(QIntValidator(min_val, max_val))
@@ -523,6 +540,7 @@ class EngineConfigurationDialog(QDialog):
         
         elif option_type == "string":
             line_edit = QLineEdit()
+            line_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             if default is not None:
                 line_edit.setText(str(default))
             return line_edit

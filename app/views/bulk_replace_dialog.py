@@ -287,6 +287,11 @@ class BulkReplaceDialog(QDialog):
         replace_layout.setSpacing(self.form_spacing)
         replace_layout.setVerticalSpacing(self.form_spacing)  # Ensure vertical spacing between rows
         replace_layout.setRowWrapPolicy(QFormLayout.RowWrapPolicy.DontWrapRows)  # Prevent row wrapping
+        # Set field growth policy to make fields expand
+        replace_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        # Set alignment for macOS compatibility (left-align labels and form)
+        replace_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        replace_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         replace_content_margins = groups_config.get("content_margins", [10, 20, 10, 15])
         replace_layout.setContentsMargins(
             replace_content_margins[0],
@@ -425,6 +430,7 @@ class BulkReplaceDialog(QDialog):
         # Populate with available tags (will be updated when dialog is shown)
         self.source_tag_combo.setMinimumWidth(self.input_minimum_width)
         self.source_tag_combo.setMinimumHeight(self.input_minimum_height)
+        self.source_tag_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.source_tag_combo.setVisible(False)
         source_tag_label = QLabel("Source tag:")
         source_tag_label.setFont(QFont(self.label_font_family, self.label_font_size))
@@ -437,6 +443,7 @@ class BulkReplaceDialog(QDialog):
         self.find_input = QLineEdit()
         self.find_input.setMinimumWidth(self.input_minimum_width)
         self.find_input.setMinimumHeight(self.input_minimum_height)
+        self.find_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.find_label = QLabel("Find:")
         self.find_label.setFont(QFont(self.label_font_family, self.label_font_size))
         self.find_label.setMinimumWidth(label_min_width)
@@ -446,6 +453,7 @@ class BulkReplaceDialog(QDialog):
         self.replace_input = QLineEdit()
         self.replace_input.setMinimumWidth(self.input_minimum_width)
         self.replace_input.setMinimumHeight(self.input_minimum_height)
+        self.replace_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.replace_label = QLabel("Replace:")
         self.replace_label.setFont(QFont(self.label_font_family, self.label_font_size))
         self.replace_label.setMinimumWidth(label_min_width)

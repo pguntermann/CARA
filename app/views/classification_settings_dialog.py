@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QSizePolicy,
     QApplication,
+    QFrame,
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QShowEvent, QColor, QPalette, QPainter, QPen, QFont, QFontMetrics
@@ -352,6 +353,7 @@ class ClassificationSettingsDialog(QDialog):
         
         # Create scroll area for form
         scroll = QScrollArea()
+        scroll.setFrameShape(QFrame.Shape.NoFrame)  # Remove border on macOS
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -409,6 +411,9 @@ class ClassificationSettingsDialog(QDialog):
         
         form_layout = QFormLayout()
         form_layout.setSpacing(fields_config.get('spacing', 8))
+        # Set alignment for macOS compatibility (left-align labels and form)
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         input_width = fields_config.get('input_width', 100)
         label_width = fields_config.get('label_width', 200)
         right_padding = fields_config.get('right_padding', 20)
@@ -575,6 +580,9 @@ class ClassificationSettingsDialog(QDialog):
         
         form_layout = QFormLayout()
         form_layout.setSpacing(fields_config.get('spacing', 8))
+        # Set alignment for macOS compatibility (left-align labels and form)
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         input_width = fields_config.get('input_width', 100)
         label_width = fields_config.get('label_width', 200)
         right_padding = fields_config.get('right_padding', 20)

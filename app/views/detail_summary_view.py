@@ -695,6 +695,13 @@ class DetailSummaryView(QWidget):
         splitter.setStretchFactor(0, graph_stretch)
         splitter.setStretchFactor(1, content_stretch)
         
+        # Fix cursor on splitter handle for macOS compatibility
+        # Vertical splitter needs horizontal resize cursor
+        for i in range(splitter.count() - 1):
+            handle = splitter.handle(i)
+            if handle:
+                handle.setCursor(Qt.CursorShape.SizeVerCursor)
+        
         # Store splitter reference for potential future use
         self.splitter = splitter
         

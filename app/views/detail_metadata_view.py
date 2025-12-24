@@ -865,12 +865,18 @@ class AddTagDialog(QDialog):
         # Create form layout for inputs
         form_layout = QFormLayout()
         form_layout.setSpacing(self.layout_spacing)
+        # Set field growth policy to make fields expand
+        form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        # Set alignment for macOS compatibility (left-align labels and form)
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         
         # Tag name input
         tag_name_label = QLabel("Tag Name:")
         self.tag_name_input = QLineEdit()
         self.tag_name_input.setMinimumWidth(self.input_min_width)
         self.tag_name_input.setMinimumHeight(self.input_min_height)
+        self.tag_name_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         form_layout.addRow(tag_name_label, self.tag_name_input)
         
         # Tag value input
@@ -878,6 +884,7 @@ class AddTagDialog(QDialog):
         self.tag_value_input = QLineEdit()
         self.tag_value_input.setMinimumWidth(self.input_min_width)
         self.tag_value_input.setMinimumHeight(self.input_min_height)
+        self.tag_value_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         form_layout.addRow(tag_value_label, self.tag_value_input)
         
         layout.addLayout(form_layout)

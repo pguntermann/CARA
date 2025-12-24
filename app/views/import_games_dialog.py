@@ -191,6 +191,11 @@ class ImportGamesDialog(QDialog):
         platform_group = QGroupBox("Platform")
         platform_layout = QFormLayout()
         platform_layout.setSpacing(self.form_spacing)
+        # Set field growth policy to make fields expand
+        platform_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        # Set alignment for macOS compatibility (left-align labels and form)
+        platform_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        platform_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         platform_layout.setContentsMargins(
             self.group_content_margins[0],
             self.group_content_margins[1],
@@ -208,6 +213,7 @@ class ImportGamesDialog(QDialog):
         self.username_input = QLineEdit()
         self.username_input.setMinimumWidth(self.input_minimum_width)
         self.username_input.setMinimumHeight(self.input_minimum_height)
+        self.username_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         username_label = QLabel("Username:")
         username_label.setMinimumWidth(self.label_minimum_width)
         platform_layout.addRow(username_label, self.username_input)
@@ -219,6 +225,9 @@ class ImportGamesDialog(QDialog):
         filters_group = QGroupBox("Filters")
         filters_layout = QFormLayout()
         filters_layout.setSpacing(self.form_spacing)
+        # Set alignment for macOS compatibility (left-align labels and form)
+        filters_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        filters_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         filters_layout.setContentsMargins(
             self.group_content_margins[0],
             self.group_content_margins[1],

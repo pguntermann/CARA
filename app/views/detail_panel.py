@@ -114,6 +114,13 @@ class DetailPanel(QWidget):
         splitter.setStretchFactor(0, pgn_stretch)
         splitter.setStretchFactor(1, tabs_stretch)
         
+        # Fix cursor on splitter handle for macOS compatibility
+        # Vertical splitter needs horizontal resize cursor
+        for i in range(splitter.count() - 1):
+            handle = splitter.handle(i)
+            if handle:
+                handle.setCursor(Qt.CursorShape.SizeVerCursor)
+        
         # Set minimum size so widget is visible
         min_width = panel_config.get('minimum_width', 200)
         min_height = panel_config.get('minimum_height', 200)

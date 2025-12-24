@@ -302,6 +302,11 @@ class BulkTagDialog(QDialog):
         tag_group = QGroupBox("Tag Operation")
         tag_layout = QFormLayout()
         tag_layout.setSpacing(self.form_spacing)
+        # Set field growth policy to make fields expand
+        tag_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        # Set alignment for macOS compatibility (left-align labels and form)
+        tag_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        tag_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         tag_content_margins = groups_config.get("content_margins", [10, 20, 10, 15])
         tag_layout.setContentsMargins(
             tag_content_margins[0],
@@ -320,6 +325,7 @@ class BulkTagDialog(QDialog):
         self.tag_combo.setCurrentText("EventDate")
         self.tag_combo.setMinimumWidth(self.input_minimum_width)
         self.tag_combo.setMinimumHeight(self.input_minimum_height)
+        self.tag_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.tag_label = QLabel("Tag:")
         self.tag_label.setFont(QFont(self.label_font_family, self.label_font_size))
         self.tag_label.setMinimumWidth(label_min_width)
@@ -357,6 +363,7 @@ class BulkTagDialog(QDialog):
         self.fixed_value_input = QLineEdit()
         self.fixed_value_input.setMinimumWidth(self.input_minimum_width)
         self.fixed_value_input.setMinimumHeight(self.input_minimum_height)
+        self.fixed_value_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.fixed_value_label = QLabel("Value:")
         self.fixed_value_label.setFont(QFont(self.label_font_family, self.label_font_size))
         self.fixed_value_label.setMinimumWidth(label_min_width)

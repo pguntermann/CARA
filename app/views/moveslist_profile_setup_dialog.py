@@ -137,6 +137,13 @@ class MovesListProfileSetupDialog(QDialog):
         self.splitter.setCollapsible(0, False)  # Left panel cannot be collapsed
         self.splitter.setCollapsible(1, False)  # Right panel cannot be collapsed
         
+        # Fix cursor on splitter handle for macOS compatibility
+        # Horizontal splitter needs vertical resize cursor
+        for i in range(self.splitter.count() - 1):
+            handle = self.splitter.handle(i)
+            if handle:
+                handle.setCursor(Qt.CursorShape.SizeHorCursor)
+        
         main_layout.addWidget(self.splitter)
         
         # Store dialog width for splitter sizing

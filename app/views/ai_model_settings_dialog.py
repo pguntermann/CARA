@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QSizePolicy,
     QWidget,
+    QFrame,
 )
 from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal
 from PyQt6.QtGui import QWheelEvent, QShowEvent, QPalette, QColor
@@ -178,6 +179,7 @@ class AIModelSettingsDialog(QDialog):
         
         # Create scroll area for form
         scroll = QScrollArea()
+        scroll.setFrameShape(QFrame.Shape.NoFrame)  # Remove border on macOS
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -239,11 +241,20 @@ class AIModelSettingsDialog(QDialog):
         
         form_layout = QFormLayout()
         form_layout.setSpacing(self.fields_config.get('spacing', 8))
+        # Set field growth policy to make fields expand
+        form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        # Set alignment for macOS compatibility (left-align labels and form)
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         
         # API Key field
         api_key_label = QLabel("API Key:")
         api_key_input = QLineEdit()
         api_key_input.setPlaceholderText("Enter your API key")
+        # Make input field expand to fill available width in form layout
+        api_key_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        # Set minimum width to ensure it's not too narrow
+        api_key_input.setMinimumWidth(200)
         
         # Store reference
         setattr(self, f"{provider_key}_api_key_input", api_key_input)
