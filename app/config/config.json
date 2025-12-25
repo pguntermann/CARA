@@ -1156,10 +1156,14 @@
         "padding": 5,
         "background_offset": 20,
         "hover_background_offset": 30,
-        "pressed_background_offset": 10
+        "pressed_background_offset": 10,
+        "font_size": 10,
+        "text_color": [200, 200, 200],
+        "border_color": [60, 60, 65]
       },
       "scroll_area": {
         "min_height": 200,
+        "background_color": [30, 30, 30],
         "height_calculation": {
           "header_height": 60,
           "button_area_height": 50,
@@ -1197,7 +1201,7 @@
       },
       "validation_dialog": {
         "width": 600,
-        "height": 400,
+        "height": 500,
         "layout": {
           "spacing": 15,
           "margins": [15, 15, 15, 15]

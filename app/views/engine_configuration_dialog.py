@@ -404,6 +404,7 @@ class EngineConfigurationDialog(QDialog):
             # Create scroll area for engine parameters (in case there are many)
             scroll_area_config = dialog_config.get('scroll_area', {})
             min_height = scroll_area_config.get('min_height', 200)
+            scroll_bg = scroll_area_config.get('background_color', [30, 30, 30])
             
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
@@ -411,6 +412,9 @@ class EngineConfigurationDialog(QDialog):
             scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             scroll.setMinimumHeight(min_height)
             scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            # Fix white background
+            scroll.setStyleSheet(f"QScrollArea {{ background-color: rgb({scroll_bg[0]}, {scroll_bg[1]}, {scroll_bg[2]}); }}")
+            scroll.viewport().setStyleSheet(f"background-color: rgb({scroll_bg[0]}, {scroll_bg[1]}, {scroll_bg[2]});")
             
             scroll_widget = QWidget()
             scroll_layout = QFormLayout(scroll_widget)
@@ -839,8 +843,19 @@ class EngineConfigurationDialog(QDialog):
         # Title
         title_font_size = scale_font_size(validation_title_config.get('font_size', 14))
         title_padding = validation_title_config.get('padding', 5)
+        title_text_color = validation_title_config.get('text_color', [240, 240, 240])
         title_label = QLabel("<b>Parameter Validation Issues</b>")
-        title_label.setStyleSheet(f"font-size: {title_font_size}pt; padding: {title_padding}px;")
+        title_label.setStyleSheet(
+            f"font-size: {title_font_size}pt; "
+            f"padding: {title_padding}px; "
+            f"color: rgb({title_text_color[0]}, {title_text_color[1]}, {title_text_color[2]});"
+            f"background-color: transparent;"
+        )
+        # Set palette to prevent macOS override
+        title_label_palette = title_label.palette()
+        title_label_palette.setColor(title_label.foregroundRole(), QColor(title_text_color[0], title_text_color[1], title_text_color[2]))
+        title_label.setPalette(title_label_palette)
+        title_label.update()
         layout.addWidget(title_label)
         
         # Description
@@ -863,7 +878,11 @@ class EngineConfigurationDialog(QDialog):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll_min_height = validation_scroll_config.get('min_height', 250)
-        scroll.setMinimumHeight(scroll_min_height)
+        # Fix white background - use scroll_area background_color from main dialog config
+        scroll_area_config = dialog_config.get('scroll_area', {})
+        scroll_bg = scroll_area_config.get('background_color', [30, 30, 30])
+        scroll.setStyleSheet(f"QScrollArea {{ background-color: rgb({scroll_bg[0]}, {scroll_bg[1]}, {scroll_bg[2]}); }}")
+        scroll.viewport().setStyleSheet(f"background-color: rgb({scroll_bg[0]}, {scroll_bg[1]}, {scroll_bg[2]});")
         scroll_widget = QWidget()
         scroll_layout = QVBoxLayout(scroll_widget)
         scroll_layout.setSpacing(10)
@@ -917,7 +936,10 @@ class EngineConfigurationDialog(QDialog):
         
         scroll_layout.addStretch()
         scroll.setWidget(scroll_widget)
-        layout.addWidget(scroll)
+        # Set minimum height for scroll area
+        scroll.setMinimumHeight(scroll_min_height)
+        # Add scroll area with stretch factor so buttons don't intersect
+        layout.addWidget(scroll, stretch=1)
         
         # Buttons (use same styling as main dialog)
         buttons_config = dialog_config.get('buttons', {})
@@ -932,10 +954,9 @@ class EngineConfigurationDialog(QDialog):
         # Get colors for button styling
         groups_config = dialog_config.get('groups', {})
         bg_color = groups_config.get('background_color', [40, 40, 45])
-        border_color = groups_config.get('border_color', [60, 60, 65])
-        labels_config = dialog_config.get('labels', {})
-        text_color = labels_config.get('text_color', [200, 200, 200])
-        font_size = scale_font_size(labels_config.get('font_size', 11))
+        border_color = buttons_config.get('border_color', groups_config.get('border_color', [60, 60, 65]))
+        text_color = buttons_config.get('text_color', [200, 200, 200])
+        font_size = scale_font_size(buttons_config.get('font_size', 10))
         
         button_style = (
             f"QPushButton {{"
@@ -1214,6 +1235,9 @@ class EngineConfigurationDialog(QDialog):
             }}
         """
         self.tab_widget.setStyleSheet(tab_stylesheet)
+        
+        # Call _configure_tab_bar to apply group box, labels, form layout, input widgets, and button styling
+        self._configure_tab_bar()
     
     def _configure_tab_bar(self) -> None:
         """Configure QTabBar for macOS compatibility (left-aligned, content-sized tabs)."""
@@ -1476,9 +1500,9 @@ class EngineConfigurationDialog(QDialog):
         # Get background color for button offset calculation
         groups_config = dialog_config.get('groups', {})
         bg_color = groups_config.get('background_color', [40, 40, 45])
-        border_color = groups_config.get('border_color', [60, 60, 65])
-        text_color = labels_config.get('text_color', [200, 200, 200])
-        font_size = scale_font_size(labels_config.get('font_size', 11))
+        border_color = buttons_config.get('border_color', groups_config.get('border_color', [60, 60, 65]))
+        text_color = buttons_config.get('text_color', [200, 200, 200])
+        font_size = scale_font_size(buttons_config.get('font_size', 10))
         
         button_style = (
             f"QPushButton {{"
@@ -1487,9 +1511,9 @@ class EngineConfigurationDialog(QDialog):
             f"background-color: rgb({bg_color[0] + button_bg_offset}, {bg_color[1] + button_bg_offset}, {bg_color[2] + button_bg_offset});"
             f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
             f"border-radius: {button_border_radius}px;"
+            f"padding: {button_padding}px;"
             f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
             f"font-size: {font_size}pt;"
-            f"padding: {button_padding}px;"
             f"}}"
             f"QPushButton:hover {{"
             f"background-color: rgb({bg_color[0] + button_hover_offset}, {bg_color[1] + button_hover_offset}, {bg_color[2] + button_hover_offset});"
@@ -1497,13 +1521,13 @@ class EngineConfigurationDialog(QDialog):
             f"QPushButton:pressed {{"
             f"background-color: rgb({bg_color[0] + button_pressed_offset}, {bg_color[1] + button_pressed_offset}, {bg_color[2] + button_pressed_offset});"
             f"}}"
+            f"QPushButton:disabled {{"
+            f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
+            f"color: rgb({text_color[0] // 2}, {text_color[1] // 2}, {text_color[2] // 2});"
+            f"}}"
         )
         
-        # Apply button styling to all buttons
-        for button in self.findChildren(QPushButton):
-            button.setStyleSheet(button_style)
-        
-        # Set dialog background color to match dark theme (apply last to ensure it's not overridden)
+        # Set dialog background color to match dark theme (apply first)
         tabs_config = dialog_config.get('tabs', {})
         pane_bg = tabs_config.get('pane_background', [40, 40, 45])
         from PyQt6.QtGui import QPalette, QColor
@@ -1513,7 +1537,6 @@ class EngineConfigurationDialog(QDialog):
         self.setAutoFillBackground(True)
         
         # Also set stylesheet to ensure background color covers the entire window including frame
-        # Apply this last so it doesn't get overridden by other stylesheets
         dialog_stylesheet = f"""
             QDialog {{
                 background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
@@ -1525,4 +1548,38 @@ class EngineConfigurationDialog(QDialog):
             self.setStyleSheet(current_stylesheet + "\n" + dialog_stylesheet)
         else:
             self.setStyleSheet(dialog_stylesheet)
+        
+        # Apply button styling to all buttons AFTER dialog stylesheet (to ensure it takes precedence)
+        # Only style buttons if they exist (they're created in _setup_ui which may call _apply_styling)
+        text_color_qcolor = QColor(text_color[0], text_color[1], text_color[2])
+        
+        # Only style buttons if they exist
+        if hasattr(self, 'ok_button') and self.ok_button is not None:
+            self.ok_button.setStyleSheet(button_style)
+            # Set palette to prevent macOS from overriding text color
+            ok_palette = self.ok_button.palette()
+            ok_palette.setColor(self.ok_button.foregroundRole(), text_color_qcolor)
+            self.ok_button.setPalette(ok_palette)
+            self.ok_button.update()
+        
+        if hasattr(self, 'cancel_button') and self.cancel_button is not None:
+            self.cancel_button.setStyleSheet(button_style)
+            # Set palette to prevent macOS from overriding text color
+            cancel_palette = self.cancel_button.palette()
+            cancel_palette.setColor(self.cancel_button.foregroundRole(), text_color_qcolor)
+            self.cancel_button.setPalette(cancel_palette)
+            self.cancel_button.update()
+        
+        # Then apply to any other buttons (copy buttons, reset buttons, etc.)
+        all_buttons = self.findChildren(QPushButton)
+        ok_btn = getattr(self, 'ok_button', None)
+        cancel_btn = getattr(self, 'cancel_button', None)
+        for button in all_buttons:
+            if button not in [ok_btn, cancel_btn]:
+                button.setStyleSheet(button_style)
+                # Set palette to prevent macOS from overriding text color
+                button_palette = button.palette()
+                button_palette.setColor(button.foregroundRole(), text_color_qcolor)
+                button.setPalette(button_palette)
+                button.update()
 
