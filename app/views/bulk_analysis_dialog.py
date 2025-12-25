@@ -1003,6 +1003,9 @@ class BulkAnalysisDialog(QDialog):
         if self.database_model:
             # Update game in database model (this will refresh the view)
             self.database_model.update_game(game)
+            # Mark database as having unsaved changes to show flashing indicator
+            if self.database_panel:
+                self.database_panel.mark_database_unsaved(self.database_model)
             QApplication.processEvents()
     
     def _on_analysis_finished(self, success: bool, message: str) -> None:
