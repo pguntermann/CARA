@@ -27,6 +27,42 @@ class NoWheelComboBox(QComboBox):
     def wheelEvent(self, event: QWheelEvent) -> None:
         """Override wheel event to ignore it completely."""
         event.ignore()
+    
+    def showPopup(self) -> None:
+        """Override showPopup to apply styling to popup window on macOS."""
+        super().showPopup()
+        # Access view after popup is shown to ensure it's fully initialized
+        view = self.view()
+        if view:
+            # Get background and text colors from combo box palette (set via stylesheet)
+            combo_palette = self.palette()
+            bg_color = combo_palette.color(self.backgroundRole())
+            text_color = combo_palette.color(self.foregroundRole())
+            
+            # Set viewport background to remove white borders
+            viewport = view.viewport()
+            if viewport:
+                viewport.setAutoFillBackground(True)
+                viewport_palette = viewport.palette()
+                viewport_palette.setColor(viewport.backgroundRole(), bg_color)
+                viewport.setPalette(viewport_palette)
+            
+            # Also set view palette to ensure consistency
+            view_palette = view.palette()
+            view_palette.setColor(view.backgroundRole(), bg_color)
+            view_palette.setColor(view.foregroundRole(), text_color)
+            view.setPalette(view_palette)
+            view.setAutoFillBackground(True)
+            
+            # CRITICAL: Fix the popup window itself (QFrame) - this is where the white borders come from
+            popup_window = view.window()
+            if popup_window and popup_window != self.window():
+                popup_window.setAutoFillBackground(True)
+                popup_palette = popup_window.palette()
+                popup_palette.setColor(popup_window.backgroundRole(), bg_color)
+                popup_palette.setColor(QPalette.ColorRole.Window, bg_color)
+                popup_palette.setColor(QPalette.ColorRole.Base, bg_color)
+                popup_window.setPalette(popup_palette)
 
 
 class ModelDiscoveryThread(QThread):
@@ -134,7 +170,8 @@ class AIModelSettingsDialog(QDialog):
         self.bg_color = dialog_config.get('background_color', [40, 40, 45])
         self.border_color = dialog_config.get('border_color', [60, 60, 65])
         self.text_color = dialog_config.get('text_color', [200, 200, 200])
-        self.font_size = dialog_config.get('font_size', 11)
+        from app.utils.font_utils import scale_font_size
+        self.font_size = scale_font_size(dialog_config.get('font_size', 11))
         
         # Layout
         layout_config = dialog_config.get('layout', {})
@@ -266,6 +303,10 @@ class AIModelSettingsDialog(QDialog):
         model_combo = NoWheelComboBox()
         model_combo.setEditable(False)
         model_combo.addItem("(Select model)")
+        # Make combo box expand to fill available width in form layout, same as API key input
+        model_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        # Set minimum width to ensure it's not too narrow, same as API key input
+        model_combo.setMinimumWidth(200)
         
         # Store reference
         setattr(self, f"{provider_key}_model_combo", model_combo)
@@ -576,7 +617,8 @@ class AIModelSettingsDialog(QDialog):
         border_radius = self.groups_config.get('border_radius', 5)
         title_color = self.groups_config.get('title_color', [240, 240, 240])
         title_font_family = self.groups_config.get('title_font_family', 'Helvetica Neue')
-        title_font_size = self.groups_config.get('title_font_size', 11)
+        from app.utils.font_utils import scale_font_size
+        title_font_size = scale_font_size(self.groups_config.get('title_font_size', 11))
         margin_top = self.groups_config.get('margin_top', 10)
         padding_top = self.groups_config.get('padding_top', 20)
         title_left = self.groups_config.get('title_left', 10)
@@ -648,7 +690,7 @@ class AIModelSettingsDialog(QDialog):
         input_border_radius = self.inputs_config.get('border_radius', 3)
         input_padding = self.inputs_config.get('padding', 5)
         input_font_family = self.inputs_config.get('font_family', 'Helvetica Neue')
-        input_font_size = self.inputs_config.get('font_size', 10)
+        input_font_size = scale_font_size(self.inputs_config.get('font_size', 10))
         input_focus_border_color = self.inputs_config.get('focus_border_color', [0, 120, 212])
         
         # Handle padding as int or list
@@ -660,8 +702,8 @@ class AIModelSettingsDialog(QDialog):
             input_padding_v = input_padding
         
         # Get selection colors from config (use defaults if not available)
-        selection_bg = inputs_config.get('selection_background_color', [70, 90, 130])
-        selection_text = inputs_config.get('selection_text_color', [240, 240, 240])
+        selection_bg = self.inputs_config.get('selection_background_color', [70, 90, 130])
+        selection_text = self.inputs_config.get('selection_text_color', [240, 240, 240])
         
         input_style = (
             f"QLineEdit, QComboBox {{"
@@ -681,18 +723,18 @@ class AIModelSettingsDialog(QDialog):
             f"height: 0px;"
             f"image: none;"
             f"}}"
-            f"QComboBox::down-arrow {{
-                width: 0px;
-                height: 0px;
-                image: none;
-            }}"
-            f"QComboBox QAbstractItemView {{
-                background-color: rgb({input_bg_color[0]}, {input_bg_color[1]}, {input_bg_color[2]});
-                color: rgb({input_text_color[0]}, {input_text_color[1]}, {input_text_color[2]});
-                selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});
-                selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});
-                border: {input_border_width}px solid rgb({input_border_color[0]}, {input_border_color[1]}, {input_border_color[2]});
-            }}"
+            f"QComboBox::down-arrow {{"
+            f"width: 0px;"
+            f"height: 0px;"
+            f"image: none;"
+            f"}}"
+            f"QComboBox QAbstractItemView {{"
+            f"background-color: rgb({input_bg_color[0]}, {input_bg_color[1]}, {input_bg_color[2]});"
+            f"color: rgb({input_text_color[0]}, {input_text_color[1]}, {input_text_color[2]});"
+            f"selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});"
+            f"selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});"
+            f"border: {input_border_width}px solid rgb({input_border_color[0]}, {input_border_color[1]}, {input_border_color[2]});"
+            f"}}"
         )
         
         input_bg_qcolor = QColor(input_bg_color[0], input_bg_color[1], input_bg_color[2])
