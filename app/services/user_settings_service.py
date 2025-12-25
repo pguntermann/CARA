@@ -12,6 +12,7 @@ from app.models.column_profile_model import (DEFAULT_PROFILE_NAME, COL_NUM, COL_
                                              COL_WHITE_IS_TOP3, COL_BLACK_IS_TOP3, COL_WHITE_DEPTH, COL_BLACK_DEPTH, 
                                              COL_COMMENT, COL_ECO, COL_OPENING, COL_WHITE_CAPTURE, COL_BLACK_CAPTURE,
                                              COL_WHITE_MATERIAL, COL_BLACK_MATERIAL)
+from app.utils.path_resolver import resolve_data_file_path
 
 
 class UserSettingsService:
@@ -131,12 +132,13 @@ class UserSettingsService:
         """Initialize the user settings service.
         
         Args:
-            settings_path: Path to user_settings.json. If None, uses app root directory.
+            settings_path: Path to user_settings.json. If None, uses smart path resolution
+                          (app root if writable, otherwise user data directory).
         """
         if settings_path is None:
-            # Default: user_settings.json in app root directory
-            app_root = Path(__file__).parent.parent.parent
-            settings_path = app_root / "user_settings.json"
+            # Use smart path resolution: check write access to app root,
+            # fall back to user data directory if needed
+            settings_path, _ = resolve_data_file_path("user_settings.json")
         
         self.settings_path = settings_path
         self._settings: Dict[str, Any] = {}

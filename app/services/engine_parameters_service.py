@@ -6,6 +6,8 @@ import threading
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
+from app.utils.path_resolver import resolve_data_file_path
+
 
 class EngineParametersService:
     """Service for managing engine parameters persistence.
@@ -27,9 +29,9 @@ class EngineParametersService:
             with cls._lock:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
-                    # Initialize instance variables
-                    app_root = Path(__file__).parent.parent.parent
-                    cls._instance.parameters_path = app_root / "engine_parameters.json"
+                    # Initialize instance variables using smart path resolution
+                    # Check write access to app root, fall back to user data directory if needed
+                    cls._instance.parameters_path, _ = resolve_data_file_path("engine_parameters.json")
                     cls._instance._parameters: Dict[str, Any] = {}
         return cls._instance
     

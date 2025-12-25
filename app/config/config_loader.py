@@ -3,13 +3,13 @@
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 class ConfigLoader:
     """Strict configuration loader that fails fast on validation errors."""
     
-    def __init__(self, config_path: Path | None = None) -> None:
+    def __init__(self, config_path: Optional[Path] = None) -> None:
         """Initialize the config loader.
         
         Args:
