@@ -1558,8 +1558,10 @@
           "border_color": [60, 60, 65],
           "border_radius": 3,
           "padding": [8, 6],
-          "minimum_width": 200,
-          "minimum_height": 30
+          "minimum_width": 250,
+          "minimum_height": 30,
+          "selection_background_color": [70, 90, 130],
+          "selection_text_color": [240, 240, 240]
         },
         "groups": {
           "background_color": [45, 45, 50],

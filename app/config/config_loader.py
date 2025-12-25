@@ -1071,6 +1071,8 @@ class ConfigLoader:
             'ui.dialogs.import_games.inputs.padding',
             'ui.dialogs.import_games.inputs.minimum_width',
             'ui.dialogs.import_games.inputs.minimum_height',
+            'ui.dialogs.import_games.inputs.selection_background_color',
+            'ui.dialogs.import_games.inputs.selection_text_color',
             'ui.dialogs.import_games.groups.background_color',
             'ui.dialogs.import_games.groups.border_color',
             'ui.dialogs.import_games.groups.border_radius',

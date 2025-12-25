@@ -31,6 +31,44 @@ class NoWheelComboBox(QComboBox):
     
     def wheelEvent(self, event) -> None:
         event.ignore()
+    
+    def showPopup(self) -> None:
+        """Override showPopup to apply styling to popup window on macOS."""
+        super().showPopup()
+        # Access view after popup is shown to ensure it's fully initialized
+        view = self.view()
+        if view:
+            # Get background and text colors from combo box palette (set via stylesheet)
+            combo_palette = self.palette()
+            bg_color = combo_palette.color(self.backgroundRole())
+            text_color = combo_palette.color(self.foregroundRole())
+            
+            # Set viewport background to remove white borders
+            viewport = view.viewport()
+            if viewport:
+                viewport.setAutoFillBackground(True)
+                viewport_palette = viewport.palette()
+                viewport_palette.setColor(viewport.backgroundRole(), bg_color)
+                viewport.setPalette(viewport_palette)
+            
+            # Also set view palette to ensure consistency
+            view_palette = view.palette()
+            view_palette.setColor(view.backgroundRole(), bg_color)
+            view_palette.setColor(view.foregroundRole(), text_color)
+            view.setPalette(view_palette)
+            view.setAutoFillBackground(True)
+            
+            # CRITICAL: Fix the popup window itself (QFrame) - this is where the white borders come from
+            popup_window = view.window()
+            if popup_window and popup_window != self.window():
+                popup_window.setAutoFillBackground(True)
+                popup_palette = popup_window.palette()
+                # Set all background-related roles to the dark color
+                popup_palette.setColor(popup_window.backgroundRole(), bg_color)
+                popup_palette.setColor(popup_palette.ColorRole.Base, bg_color)
+                popup_palette.setColor(popup_palette.ColorRole.Window, bg_color)
+                popup_palette.setColor(popup_palette.ColorRole.Button, bg_color)
+                popup_window.setPalette(popup_palette)
 
 
 class ImportGamesDialog(QDialog):
@@ -108,10 +146,10 @@ class ImportGamesDialog(QDialog):
         
         # Inputs
         inputs_config = dialog_config.get("inputs", {})
-        from app.utils.font_utils import resolve_font_family
+        from app.utils.font_utils import resolve_font_family, scale_font_size
         input_font_family_raw = inputs_config.get("font_family", "Cascadia Mono")
         self.input_font_family = resolve_font_family(input_font_family_raw)
-        self.input_font_size = inputs_config.get("font_size", 11)
+        self.input_font_size = scale_font_size(inputs_config.get("font_size", 11))
         self.input_text_color = QColor(*inputs_config.get("text_color", [240, 240, 240]))
         self.input_bg_color = QColor(*inputs_config.get("background_color", [30, 30, 35]))
         self.input_border_color = QColor(*inputs_config.get("border_color", [60, 60, 65]))
@@ -206,6 +244,9 @@ class ImportGamesDialog(QDialog):
         self.platform_combo = NoWheelComboBox()
         self.platform_combo.addItems(["Lichess", "Chess.com"])
         self.platform_combo.currentTextChanged.connect(self._on_platform_changed)
+        self.platform_combo.setMinimumWidth(self.input_minimum_width)
+        self.platform_combo.setMinimumHeight(self.input_minimum_height)
+        self.platform_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         platform_label = QLabel("Platform:")
         platform_label.setMinimumWidth(self.label_minimum_width)
         platform_layout.addRow(platform_label, self.platform_combo)
@@ -225,6 +266,8 @@ class ImportGamesDialog(QDialog):
         filters_group = QGroupBox("Filters")
         filters_layout = QFormLayout()
         filters_layout.setSpacing(self.form_spacing)
+        # Set field growth policy to make fields expand
+        filters_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         # Set alignment for macOS compatibility (left-align labels and form)
         filters_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
         filters_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
@@ -247,6 +290,7 @@ class ImportGamesDialog(QDialog):
         self.max_games_spin.setValue(1000)
         self.max_games_spin.setEnabled(False)
         self.max_games_spin.setMinimumWidth(self.input_minimum_width)
+        self.max_games_spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.max_games_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         max_games_label = QLabel("Maximum games:")
         max_games_label.setMinimumWidth(self.label_minimum_width)
@@ -264,6 +308,7 @@ class ImportGamesDialog(QDialog):
         self.since_date_edit.setDate(QDate.currentDate().addYears(-1))
         self.since_date_edit.setEnabled(False)
         self.since_date_edit.setMinimumWidth(self.input_minimum_width)
+        self.since_date_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         since_date_label = QLabel("From date:")
         since_date_label.setMinimumWidth(self.label_minimum_width)
         filters_layout.addRow(since_date_label, self.since_date_edit)
@@ -274,6 +319,7 @@ class ImportGamesDialog(QDialog):
         self.until_date_edit.setDate(QDate.currentDate())
         self.until_date_edit.setEnabled(False)
         self.until_date_edit.setMinimumWidth(self.input_minimum_width)
+        self.until_date_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         until_date_label = QLabel("To date:")
         until_date_label.setMinimumWidth(self.label_minimum_width)
         filters_layout.addRow(until_date_label, self.until_date_edit)
@@ -285,6 +331,8 @@ class ImportGamesDialog(QDialog):
         self.game_type_combo.addItems(["All", "Blitz", "Rapid", "Classical", "Bullet", "Correspondence"])
         self.game_type_combo.setCurrentText("All")
         self.game_type_combo.setMinimumWidth(self.input_minimum_width)
+        self.game_type_combo.setMinimumHeight(self.input_minimum_height)
+        self.game_type_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         filters_layout.addRow(self.game_type_label, self.game_type_combo)
         
         filters_group.setLayout(filters_layout)
@@ -368,7 +416,8 @@ class ImportGamesDialog(QDialog):
         bg_color = dialog_config.get("background_color", [40, 40, 45])
         border_color = dialog_config.get("border_color", [60, 60, 65])
         text_color = dialog_config.get("text_color", [200, 200, 200])
-        font_size = dialog_config.get("font_size", 11)
+        from app.utils.font_utils import scale_font_size
+        font_size = scale_font_size(dialog_config.get("font_size", 11))
         
         # Button styling
         buttons_config = dialog_config.get("buttons", {})
@@ -406,9 +455,14 @@ class ImportGamesDialog(QDialog):
         for button in self.findChildren(QPushButton):
             button.setStyleSheet(button_style)
         
-        # Input styling
+        # Get selection colors from config (use defaults if not available)
+        inputs_config = dialog_config.get("inputs", {})
+        selection_bg = inputs_config.get('selection_background_color', [70, 90, 130])
+        selection_text = inputs_config.get('selection_text_color', [240, 240, 240])
+        
+        # Input styling - separate combo box styling to match bulk_replace_dialog exactly
         input_style = (
-            f"QLineEdit, QComboBox, QSpinBox, QDateEdit {{"
+            f"QLineEdit, QComboBox {{"
             f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
             f"border: 1px solid rgb({self.input_border_color.red()}, {self.input_border_color.green()}, {self.input_border_color.blue()});"
             f"border-radius: {self.input_border_radius}px;"
@@ -417,7 +471,35 @@ class ImportGamesDialog(QDialog):
             f"font-family: {self.input_font_family};"
             f"font-size: {self.input_font_size}pt;"
             f"}}"
-            f"QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QDateEdit:disabled {{"
+            f"QLineEdit:disabled {{"
+            f"background-color: rgb({self.input_bg_color.red() // 2}, {self.input_bg_color.green() // 2}, {self.input_bg_color.blue() // 2});"
+            f"color: rgb({self.input_text_color.red() // 2}, {self.input_text_color.green() // 2}, {self.input_text_color.blue() // 2});"
+            f"}}"
+            f"QComboBox:disabled {{"
+            f"background-color: rgb({self.input_bg_color.red() // 2}, {self.input_bg_color.green() // 2}, {self.input_bg_color.blue() // 2});"
+            f"color: rgb({self.input_text_color.red() // 2}, {self.input_text_color.green() // 2}, {self.input_text_color.blue() // 2});"
+            f"}}"
+            f"QComboBox QAbstractItemView {{"
+            f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
+            f"color: rgb({self.input_text_color.red()}, {self.input_text_color.green()}, {self.input_text_color.blue()});"
+            f"selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});"
+            f"selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});"
+            f"border: 1px solid rgb({self.input_border_color.red()}, {self.input_border_color.green()}, {self.input_border_color.blue()});"
+            f"}}"
+        )
+        
+        # Separate styling for QSpinBox and QDateEdit
+        spinbox_dateedit_style = (
+            f"QSpinBox, QDateEdit {{"
+            f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
+            f"border: 1px solid rgb({self.input_border_color.red()}, {self.input_border_color.green()}, {self.input_border_color.blue()});"
+            f"border-radius: {self.input_border_radius}px;"
+            f"padding: {self.input_padding[1]}px {self.input_padding[0]}px;"
+            f"color: rgb({self.input_text_color.red()}, {self.input_text_color.green()}, {self.input_text_color.blue()});"
+            f"font-family: {self.input_font_family};"
+            f"font-size: {self.input_font_size}pt;"
+            f"}}"
+            f"QSpinBox:disabled, QDateEdit:disabled {{"
             f"background-color: rgb({self.input_bg_color.red() // 2}, {self.input_bg_color.green() // 2}, {self.input_bg_color.blue() // 2});"
             f"color: rgb({self.input_text_color.red() // 2}, {self.input_text_color.green() // 2}, {self.input_text_color.blue() // 2});"
             f"}}"
@@ -429,9 +511,34 @@ class ImportGamesDialog(QDialog):
         self.username_input.setStyleSheet(input_style)
         self.platform_combo.setStyleSheet(input_style)
         self.game_type_combo.setStyleSheet(input_style)
-        self.max_games_spin.setStyleSheet(input_style)
-        self.since_date_edit.setStyleSheet(input_style)
-        self.until_date_edit.setStyleSheet(input_style)
+        self.max_games_spin.setStyleSheet(spinbox_dateedit_style)
+        self.since_date_edit.setStyleSheet(spinbox_dateedit_style)
+        self.until_date_edit.setStyleSheet(spinbox_dateedit_style)
+        
+        # Set palette on combo boxes to prevent macOS override
+        # Match bulk_replace_dialog exactly - access view after stylesheet is set
+        for combo in [self.platform_combo, self.game_type_combo]:
+            # Fix combo box palette roles that are white (Base and Button)
+            combo_palette = combo.palette()
+            combo_palette.setColor(combo_palette.ColorRole.Base, self.input_bg_color)
+            combo_palette.setColor(combo_palette.ColorRole.Button, self.input_bg_color)
+            combo.setPalette(combo_palette)
+            
+            view = combo.view()
+            if view:
+                # Set viewport background color explicitly to remove white borders
+                viewport = view.viewport()
+                if viewport:
+                    viewport.setAutoFillBackground(True)
+                    viewport_palette = viewport.palette()
+                    viewport_palette.setColor(viewport.backgroundRole(), self.input_bg_color)
+                    viewport.setPalette(viewport_palette)
+                
+                view_palette = view.palette()
+                view_palette.setColor(view.backgroundRole(), self.input_bg_color)
+                view_palette.setColor(view.foregroundRole(), self.input_text_color)
+                view.setPalette(view_palette)
+                view.setAutoFillBackground(True)
         
         # Apply checkbox styling
         self._apply_checkbox_styling()
@@ -454,7 +561,7 @@ class ImportGamesDialog(QDialog):
         group_border_color = groups_config.get("border_color", border_color) if "border_color" in groups_config else border_color
         group_border_radius = groups_config.get("border_radius", 5)
         group_title_font_family = groups_config.get("title_font_family", "Helvetica Neue")
-        group_title_font_size = groups_config.get("title_font_size", 11)
+        group_title_font_size = scale_font_size(groups_config.get("title_font_size", 11))
         group_title_color = groups_config.get("title_color", [240, 240, 240])
         group_margin_top = groups_config.get("margin_top", 10)
         group_padding_top = groups_config.get("padding_top", 5)
