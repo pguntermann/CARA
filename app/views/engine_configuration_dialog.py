@@ -1197,7 +1197,7 @@ class EngineConfigurationDialog(QDialog):
                 background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
                 border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
             }}
-            QTabBar {{
+            QTabWidget::tab-bar {{
                 alignment: left;
             }}
             QTabBar::tab {{

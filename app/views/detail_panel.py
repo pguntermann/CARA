@@ -197,7 +197,7 @@ class DetailPanel(QWidget):
                 background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
             }}
             
-            QTabBar {{
+            QTabWidget::tab-bar {{
                 alignment: left;
             }}
             
