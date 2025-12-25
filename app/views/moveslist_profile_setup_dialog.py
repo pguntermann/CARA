@@ -144,6 +144,19 @@ class MovesListProfileSetupDialog(QDialog):
             if handle:
                 handle.setCursor(Qt.CursorShape.SizeHorCursor)
         
+        # Apply splitter styling to prevent macOS theme override
+        ui_config = self.config.get('ui', {})
+        splitter_config = ui_config.get('splitter', {})
+        handle_color = splitter_config.get('handle_color', [30, 30, 30])
+        self.splitter.setStyleSheet(f"""
+            QSplitter::handle {{
+                background-color: rgb({handle_color[0]}, {handle_color[1]}, {handle_color[2]});
+            }}
+            QSplitter::handle:horizontal {{
+                background-color: rgb({handle_color[0]}, {handle_color[1]}, {handle_color[2]});
+            }}
+        """)
+        
         main_layout.addWidget(self.splitter)
         
         # Store dialog width for splitter sizing

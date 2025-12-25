@@ -775,6 +775,7 @@
           "font_size": 10,
           "tab_height": 24,
           "pane_background": [40, 40, 45],
+          "scroll_button_color": [30, 30, 30],
           "colors": {
             "normal": {
               "background": [45, 45, 50],
@@ -815,6 +816,7 @@
           "font_size": 10,
           "tab_height": 24,
           "pane_background": [35, 35, 40],
+          "scroll_button_color": [30, 30, 30],
           "colors": {
             "normal": {
               "background": [45, 45, 50],
@@ -890,6 +892,7 @@
       }
     },
     "splitter": {
+      "handle_color": [30, 30, 30],
       "top": {
         "main_size": 600,
         "detail_size": 400,
@@ -1098,6 +1101,7 @@
         "font_size": 11,
         "tab_height": 24,
         "pane_background": [40, 40, 45],
+        "scroll_button_color": [30, 30, 30],
         "colors": {
           "normal": {
             "background": [45, 45, 50],

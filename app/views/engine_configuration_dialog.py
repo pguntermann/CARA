@@ -1165,6 +1165,9 @@ class EngineConfigurationDialog(QDialog):
         active_text = active.get('text', [255, 255, 255])
         active_border = active.get('border', [100, 120, 160])
         
+        # Scroll button color
+        scroll_button_color = tabs_config.get('scroll_button_color', [30, 30, 30])
+        
         tab_stylesheet = f"""
             QTabWidget {{
                 background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
@@ -1196,6 +1199,18 @@ class EngineConfigurationDialog(QDialog):
                 background-color: rgb({active_bg[0]}, {active_bg[1]}, {active_bg[2]});
                 color: rgb({active_text[0]}, {active_text[1]}, {active_text[2]});
                 border: 1px solid rgb({active_border[0]}, {active_border[1]}, {active_border[2]});
+            }}
+            QTabBar QToolButton {{
+                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
+                border: none;
+            }}
+            
+            QTabBar QToolButton:hover {{
+                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
+            }}
+            
+            QTabBar QToolButton:pressed {{
+                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
             }}
         """
         self.tab_widget.setStyleSheet(tab_stylesheet)

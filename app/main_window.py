@@ -2312,6 +2312,9 @@ class MainWindow(QMainWindow):
         # Fix cursor on splitter handles for macOS compatibility
         self._fix_splitter_cursors()
         
+        # Apply splitter styling to prevent macOS theme override
+        self._apply_splitter_styling()
+        
         # Main layout: Middle splitter (with top and database panels) and status panel
         main_layout.addWidget(self.middle_splitter, 1)  # Takes most space
         main_layout.addWidget(self.status_panel, 0)  # Fixed height
@@ -2412,6 +2415,33 @@ class MainWindow(QMainWindow):
             handle = self.middle_splitter.handle(i)
             if handle:
                 handle.setCursor(Qt.CursorShape.SizeVerCursor)
+    
+    def _apply_splitter_styling(self) -> None:
+        """Apply styling to splitter handles to prevent macOS theme override."""
+        ui_config = self.config.get('ui', {})
+        splitter_config = ui_config.get('splitter', {})
+        handle_color = splitter_config.get('handle_color', [30, 30, 30])
+        
+        # Create stylesheet for splitter handles
+        stylesheet = f"""
+            QSplitter::handle {{
+                background-color: rgb({handle_color[0]}, {handle_color[1]}, {handle_color[2]});
+            }}
+            QSplitter::handle:horizontal {{
+                background-color: rgb({handle_color[0]}, {handle_color[1]}, {handle_color[2]});
+            }}
+            QSplitter::handle:vertical {{
+                background-color: rgb({handle_color[0]}, {handle_color[1]}, {handle_color[2]});
+            }}
+        """
+        
+        # Apply to middle_splitter
+        self.middle_splitter.setStyleSheet(stylesheet)
+        
+        # Apply to top_splitter (nested inside middle_splitter)
+        top_splitter = self.middle_splitter.widget(0)
+        if isinstance(top_splitter, QSplitter):
+            top_splitter.setStyleSheet(stylesheet)
     
     def _setup_shortcuts(self) -> None:
         """Setup global keyboard shortcuts."""

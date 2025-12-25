@@ -121,6 +121,19 @@ class DetailPanel(QWidget):
             if handle:
                 handle.setCursor(Qt.CursorShape.SizeVerCursor)
         
+        # Apply splitter styling to prevent macOS theme override
+        ui_config = self.config.get('ui', {})
+        splitter_config = ui_config.get('splitter', {})
+        handle_color = splitter_config.get('handle_color', [30, 30, 30])
+        splitter.setStyleSheet(f"""
+            QSplitter::handle {{
+                background-color: rgb({handle_color[0]}, {handle_color[1]}, {handle_color[2]});
+            }}
+            QSplitter::handle:vertical {{
+                background-color: rgb({handle_color[0]}, {handle_color[1]}, {handle_color[2]});
+            }}
+        """)
+        
         # Set minimum size so widget is visible
         min_width = panel_config.get('minimum_width', 200)
         min_height = panel_config.get('minimum_height', 200)
@@ -173,6 +186,9 @@ class DetailPanel(QWidget):
         active_bg = active.get('background', [70, 90, 130])
         active_text = active.get('text', [240, 240, 240])
         active_border = active.get('border', [100, 120, 160])
+        
+        # Scroll button color
+        scroll_button_color = tabs_config.get('scroll_button_color', [30, 30, 30])
         
         # Create stylesheet
         stylesheet = f"""
@@ -227,6 +243,19 @@ class DetailPanel(QWidget):
             
             QTabBar::tab:last:selected {{
                 margin-right: 0px;
+            }}
+            
+            QTabBar QToolButton {{
+                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
+                border: none;
+            }}
+            
+            QTabBar QToolButton:hover {{
+                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
+            }}
+            
+            QTabBar QToolButton:pressed {{
+                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
             }}
         """
         

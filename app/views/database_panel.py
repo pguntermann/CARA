@@ -140,6 +140,9 @@ class DatabasePanel(QWidget):
         active_text = active.get('text', [240, 240, 240])
         active_border = active.get('border', [100, 120, 160])
         
+        # Scroll button color
+        scroll_button_color = tabs_config.get('scroll_button_color', [30, 30, 30])
+        
         # Create stylesheet
         stylesheet = f"""
             QTabWidget::pane {{
@@ -189,6 +192,19 @@ class DatabasePanel(QWidget):
             
             QTabBar::tab:last:selected {{
                 margin-right: 0px;
+            }}
+            
+            QTabBar QToolButton {{
+                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
+                border: none;
+            }}
+            
+            QTabBar QToolButton:hover {{
+                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
+            }}
+            
+            QTabBar QToolButton:pressed {{
+                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
             }}
         """
         

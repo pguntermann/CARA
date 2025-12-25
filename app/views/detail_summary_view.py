@@ -702,6 +702,19 @@ class DetailSummaryView(QWidget):
             if handle:
                 handle.setCursor(Qt.CursorShape.SizeVerCursor)
         
+        # Apply splitter styling to prevent macOS theme override
+        ui_config = self.config.get('ui', {})
+        splitter_config = ui_config.get('splitter', {})
+        handle_color = splitter_config.get('handle_color', [30, 30, 30])
+        splitter.setStyleSheet(f"""
+            QSplitter::handle {{
+                background-color: rgb({handle_color[0]}, {handle_color[1]}, {handle_color[2]});
+            }}
+            QSplitter::handle:vertical {{
+                background-color: rgb({handle_color[0]}, {handle_color[1]}, {handle_color[2]});
+            }}
+        """)
+        
         # Store splitter reference for potential future use
         self.splitter = splitter
         
