@@ -53,6 +53,8 @@ CARA was built in large part by an AI model under the author's direction. The au
 
 ## Installation
 
+> **Note**: Pre-built application bundles are available for Windows and macOS, which include all dependencies and can be run directly without Python installation. See the [releases page](https://github.com/pguntermann/CARA/releases) for download options. The following instructions are for installing from source code.
+
 ### 1. Install Python
 
 CARA requires Python 3.8 or higher. If you don't have Python installed:
