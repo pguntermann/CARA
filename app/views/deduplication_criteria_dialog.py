@@ -24,6 +24,44 @@ class NoWheelComboBox(QComboBox):
     def wheelEvent(self, event: QWheelEvent) -> None:
         """Override wheel event to ignore it completely."""
         event.ignore()
+    
+    def showPopup(self) -> None:
+        """Override showPopup to apply styling to popup window on macOS."""
+        super().showPopup()
+        # Access view after popup is shown to ensure it's fully initialized
+        view = self.view()
+        if view:
+            # Get background and text colors from combo box palette (set via stylesheet)
+            combo_palette = self.palette()
+            bg_color = combo_palette.color(self.backgroundRole())
+            text_color = combo_palette.color(self.foregroundRole())
+            
+            # Set viewport background to remove white borders
+            viewport = view.viewport()
+            if viewport:
+                viewport.setAutoFillBackground(True)
+                viewport_palette = viewport.palette()
+                viewport_palette.setColor(viewport.backgroundRole(), bg_color)
+                viewport.setPalette(viewport_palette)
+            
+            # Also set view palette to ensure consistency
+            view_palette = view.palette()
+            view_palette.setColor(view.backgroundRole(), bg_color)
+            view_palette.setColor(view.foregroundRole(), text_color)
+            view.setPalette(view_palette)
+            view.setAutoFillBackground(True)
+            
+            # CRITICAL: Fix the popup window itself (QFrame) - this is where the white borders come from
+            popup_window = view.window()
+            if popup_window and popup_window != self.window():
+                popup_window.setAutoFillBackground(True)
+                popup_palette = popup_window.palette()
+                # Set all background-related roles to the dark color
+                popup_palette.setColor(popup_window.backgroundRole(), bg_color)
+                popup_palette.setColor(popup_palette.ColorRole.Base, bg_color)
+                popup_palette.setColor(popup_palette.ColorRole.Window, bg_color)
+                popup_palette.setColor(popup_palette.ColorRole.Button, bg_color)
+                popup_window.setPalette(popup_palette)
 
 
 class DeduplicationMode(Enum):
@@ -78,7 +116,8 @@ class DeduplicationCriteriaDialog(QDialog):
         self.bg_color = dialog_config.get('background_color', [40, 40, 45])
         self.border_color = dialog_config.get('border_color', [60, 60, 65])
         self.text_color = dialog_config.get('text_color', [200, 200, 200])
-        self.font_size = dialog_config.get('font_size', 11)
+        from app.utils.font_utils import scale_font_size
+        self.font_size = scale_font_size(dialog_config.get('font_size', 11))
         
         # Layout
         layout_config = dialog_config.get('layout', {})
@@ -107,16 +146,17 @@ class DeduplicationCriteriaDialog(QDialog):
         # Description text
         description_config = dialog_config.get('description', {})
         self.description_font_family = description_config.get('font_family', 'Helvetica Neue')
-        self.description_font_size = description_config.get('font_size', 10)
+        from app.utils.font_utils import scale_font_size
+        self.description_font_size = scale_font_size(description_config.get('font_size', 10))
         self.description_text_color = description_config.get('text_color', [180, 180, 180])
         self.description_margin_top = description_config.get('margin_top', 8)
         
         # Inputs (for combo box)
         inputs_config = dialog_config.get('inputs', {})
-        from app.utils.font_utils import resolve_font_family
+        from app.utils.font_utils import resolve_font_family, scale_font_size
         input_font_family_raw = inputs_config.get('font_family', 'Cascadia Mono')
         self.input_font_family = resolve_font_family(input_font_family_raw)
-        self.input_font_size = inputs_config.get('font_size', 11)
+        self.input_font_size = scale_font_size(inputs_config.get('font_size', 11))
         self.input_text_color = inputs_config.get('text_color', [240, 240, 240])
         self.input_bg_color = inputs_config.get('background_color', [30, 30, 35])
         self.input_border_color = inputs_config.get('border_color', [60, 60, 65])
@@ -125,8 +165,9 @@ class DeduplicationCriteriaDialog(QDialog):
         
         # Groups
         groups_config = dialog_config.get('groups', {})
-        self.group_title_font_family = groups_config.get('title_font_family', 'Helvetica Neue')
-        self.group_title_font_size = groups_config.get('title_font_size', 11)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        self.group_title_font_family = resolve_font_family(groups_config.get('title_font_family', 'Helvetica Neue'))
+        self.group_title_font_size = scale_font_size(groups_config.get('title_font_size', 11))
         self.group_title_color = groups_config.get('title_color', [240, 240, 240])
         self.group_content_margins = groups_config.get('content_margins', [10, 15, 10, 10])
         self.group_margin_top = groups_config.get('margin_top', 10)
@@ -249,6 +290,10 @@ class DeduplicationCriteriaDialog(QDialog):
     
     def _apply_styling(self) -> None:
         """Apply styling from config.json to all UI elements."""
+        # Get inputs config for combo box styling
+        dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('deduplication_criteria', {})
+        inputs_config = dialog_config.get('inputs', {})
+        
         # Button styling
         button_style = (
             f"QPushButton {{"
@@ -272,17 +317,27 @@ class DeduplicationCriteriaDialog(QDialog):
         for button in self.findChildren(QPushButton):
             button.setStyleSheet(button_style)
         
-        # Label styling
+        # Label styling - apply to ALL labels to prevent macOS theme override
         label_style = (
             f"QLabel {{"
             f"font-family: \"{self.label_font_family}\";"
             f"font-size: {self.label_font_size}pt;"
             f"color: rgb({self.label_text_color[0]}, {self.label_text_color[1]}, {self.label_text_color[2]});"
+            f"background-color: transparent;"
             f"}}"
         )
         
+        # Apply stylesheet and palette to all labels to ensure macOS doesn't override
+        # Group box titles are styled via QGroupBox::title, not QLabel, so we can style all QLabels
         for label in self.findChildren(QLabel):
+            # Apply stylesheet
             label.setStyleSheet(label_style)
+            # Also set palette to ensure color is applied (macOS sometimes ignores stylesheet)
+            label_palette = label.palette()
+            label_palette.setColor(label.foregroundRole(), QColor(self.label_text_color[0], self.label_text_color[1], self.label_text_color[2]))
+            label.setPalette(label_palette)
+            # Force update to ensure styling is applied
+            label.update()
         
         # Description label styling (override for description)
         description_style = (
@@ -291,11 +346,21 @@ class DeduplicationCriteriaDialog(QDialog):
             f"font-size: {self.description_font_size}pt;"
             f"color: rgb({self.description_text_color[0]}, {self.description_text_color[1]}, {self.description_text_color[2]});"
             f"margin-top: {self.description_margin_top}px;"
+            f"background-color: transparent;"
             f"}}"
         )
         self.description_label.setStyleSheet(description_style)
+        # Set palette to prevent macOS override
+        description_palette = self.description_label.palette()
+        description_palette.setColor(self.description_label.foregroundRole(), QColor(self.description_text_color[0], self.description_text_color[1], self.description_text_color[2]))
+        self.description_label.setPalette(description_palette)
+        self.description_label.update()
         
         # Combo box styling (using input styling)
+        # Get selection colors from config (use defaults if not available)
+        selection_bg = inputs_config.get('selection_background_color', [70, 90, 130])
+        selection_text = inputs_config.get('selection_text_color', [240, 240, 240])
+        
         combo_style = (
             f"QComboBox {{"
             f"font-family: \"{self.input_font_family}\";"
@@ -309,8 +374,32 @@ class DeduplicationCriteriaDialog(QDialog):
             f"QComboBox:hover {{"
             f"border: 1px solid rgb({self.input_border_color[0] + 20}, {self.input_border_color[1] + 20}, {self.input_border_color[2] + 20});"
             f"}}"
+            f"QComboBox QAbstractItemView {{"
+            f"background-color: rgb({self.input_bg_color[0]}, {self.input_bg_color[1]}, {self.input_bg_color[2]});"
+            f"color: rgb({self.input_text_color[0]}, {self.input_text_color[1]}, {self.input_text_color[2]});"
+            f"selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});"
+            f"selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});"
+            f"border: 1px solid rgb({self.input_border_color[0]}, {self.input_border_color[1]}, {self.input_border_color[2]});"
+            f"}}"
         )
         self.mode_combo.setStyleSheet(combo_style)
+        
+        # Fix combo box palette roles that are white (Base and Button)
+        combo_palette = self.mode_combo.palette()
+        combo_palette.setColor(combo_palette.ColorRole.Base, QColor(self.input_bg_color[0], self.input_bg_color[1], self.input_bg_color[2]))
+        combo_palette.setColor(combo_palette.ColorRole.Button, QColor(self.input_bg_color[0], self.input_bg_color[1], self.input_bg_color[2]))
+        self.mode_combo.setPalette(combo_palette)
+        
+        # Set palette on combo box view to prevent macOS override
+        view = self.mode_combo.view()
+        if view:
+            view_palette = view.palette()
+            view_palette.setColor(view.backgroundRole(), QColor(self.input_bg_color[0], self.input_bg_color[1], self.input_bg_color[2]))
+            view_palette.setColor(view.foregroundRole(), QColor(self.input_text_color[0], self.input_text_color[1], self.input_text_color[2]))
+            view_palette.setColor(QPalette.ColorRole.Highlight, QColor(selection_bg[0], selection_bg[1], selection_bg[2]))
+            view_palette.setColor(QPalette.ColorRole.HighlightedText, QColor(selection_text[0], selection_text[1], selection_text[2]))
+            view.setPalette(view_palette)
+            view.setAutoFillBackground(True)
         
         # Checkbox styling
         checkbox_style = (

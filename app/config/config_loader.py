@@ -1309,6 +1309,8 @@ class ConfigLoader:
             'ui.dialogs.deduplication_criteria.inputs.border_color',
             'ui.dialogs.deduplication_criteria.inputs.border_radius',
             'ui.dialogs.deduplication_criteria.inputs.padding',
+            'ui.dialogs.deduplication_criteria.inputs.selection_background_color',
+            'ui.dialogs.deduplication_criteria.inputs.selection_text_color',
             'ui.dialogs.deduplication_criteria.groups.title_font_family',
             'ui.dialogs.deduplication_criteria.groups.title_font_size',
             'ui.dialogs.deduplication_criteria.groups.title_color',
