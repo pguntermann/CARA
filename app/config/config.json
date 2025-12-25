@@ -236,7 +236,13 @@
             "active_move": {
               "background_color": [100, 120, 180],
               "text_color": [255, 255, 255]
-            }
+            },
+            "header_background_color": [45, 45, 50],
+            "header_text_color": [200, 200, 200],
+            "header_border_color": [60, 60, 65],
+            "gridline_color": [60, 60, 65],
+            "selection_background_color": [70, 90, 130],
+            "selection_text_color": [240, 240, 240]
           }
         },
         "metadata": {
@@ -868,7 +874,13 @@
             "col_analyzed": 70,
             "col_annotated": 70,
             "col_source_db": 120
-          }
+          },
+          "header_background_color": [45, 45, 50],
+          "header_text_color": [200, 200, 200],
+          "header_border_color": [60, 60, 65],
+          "gridline_color": [60, 60, 65],
+          "selection_background_color": [70, 90, 130],
+          "selection_text_color": [240, 240, 240]
         }
       },
       "status": {

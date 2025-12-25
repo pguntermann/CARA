@@ -937,23 +937,64 @@ class DatabasePanel(QWidget):
         normal = colors_config.get('normal', {})
         norm_text = normal.get('text', [200, 200, 200])
         
+        # Get table styling from config
+        table_config = ui_config.get('panels', {}).get('database', {}).get('table', {})
+        header_bg = table_config.get('header_background_color', [45, 45, 50])
+        header_text = table_config.get('header_text_color', [200, 200, 200])
+        header_border = table_config.get('header_border_color', [60, 60, 65])
+        gridline_color = table_config.get('gridline_color', [60, 60, 65])
+        selection_bg = table_config.get('selection_background_color', [70, 90, 130])
+        selection_text = table_config.get('selection_text_color', [240, 240, 240])
+        
+        header_bg_color = QColor(header_bg[0], header_bg[1], header_bg[2])
+        header_text_color = QColor(header_text[0], header_text[1], header_text[2])
+        
         stylesheet = f"""
             QTableView {{
                 background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
                 color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
-                gridline-color: rgb(60, 60, 65);
-                selection-background-color: rgb(70, 90, 130);
-                selection-color: rgb(240, 240, 240);
+                gridline-color: rgb({gridline_color[0]}, {gridline_color[1]}, {gridline_color[2]});
+                selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});
+                selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});
+            }}
+            QHeaderView {{
+                background-color: rgb({header_bg[0]}, {header_bg[1]}, {header_bg[2]});
             }}
             QHeaderView::section {{
-                background-color: rgb(45, 45, 50);
-                color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
+                background-color: rgb({header_bg[0]}, {header_bg[1]}, {header_bg[2]});
+                color: rgb({header_text[0]}, {header_text[1]}, {header_text[2]});
                 padding: 4px;
-                border: 1px solid rgb(60, 60, 65);
+                border: 1px solid rgb({header_border[0]}, {header_border[1]}, {header_border[2]});
                 font-weight: 500;
+            }}
+            QTableCornerButton::section {{
+                background-color: rgb({header_bg[0]}, {header_bg[1]}, {header_bg[2]});
+                border: 1px solid rgb({header_border[0]}, {header_border[1]}, {header_border[2]});
             }}
         """
         table.setStyleSheet(stylesheet)
+        
+        # Also set palette on header views to prevent macOS override
+        horizontal_header = table.horizontalHeader()
+        if horizontal_header:
+            header_palette = horizontal_header.palette()
+            header_palette.setColor(horizontal_header.backgroundRole(), header_bg_color)
+            header_palette.setColor(horizontal_header.foregroundRole(), header_text_color)
+            horizontal_header.setPalette(header_palette)
+            horizontal_header.setAutoFillBackground(True)
+        
+        # Set palette on vertical header to prevent macOS override
+        vertical_header = table.verticalHeader()
+        if vertical_header:
+            vertical_header_palette = vertical_header.palette()
+            vertical_header_palette.setColor(vertical_header.backgroundRole(), header_bg_color)
+            vertical_header_palette.setColor(vertical_header.foregroundRole(), header_text_color)
+            vertical_header.setPalette(vertical_header_palette)
+            vertical_header.setAutoFillBackground(True)
+        
+        # Style corner button widget directly (it's a child widget of the table)
+        # The corner button is created by QAbstractScrollArea and can be accessed
+        # after the table is shown, but we can style it via stylesheet which should be sufficient
     
     
     def set_collapsed_state(self, is_collapsed: bool) -> None:
