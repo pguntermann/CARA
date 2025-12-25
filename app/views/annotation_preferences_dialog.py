@@ -330,6 +330,12 @@ class AnnotationPreferencesDialog(QDialog):
             label.setStyleSheet(label_style)
         
         # Input styling (font combo and spinbox)
+        # Get inputs config and selection colors
+        dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('annotation_preferences', {})
+        inputs_config = dialog_config.get('inputs', {})
+        selection_bg = inputs_config.get('selection_background_color', [70, 90, 130])
+        selection_text = inputs_config.get('selection_text_color', [240, 240, 240])
+        
         input_style = (
             f"QComboBox, QSpinBox {{"
             f"font-family: \"{self.input_font_family}\";"
@@ -340,10 +346,33 @@ class AnnotationPreferencesDialog(QDialog):
             f"border-radius: {self.input_border_radius}px;"
             f"padding: {self.input_padding[1]}px {self.input_padding[0]}px;"
             f"}}"
+            f"QComboBox QAbstractItemView {{"
+            f"background-color: rgb({self.input_bg_color[0]}, {self.input_bg_color[1]}, {self.input_bg_color[2]});"
+            f"color: rgb({self.input_text_color[0]}, {self.input_text_color[1]}, {self.input_text_color[2]});"
+            f"selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});"
+            f"selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});"
+            f"border: 1px solid rgb({self.input_border_color[0]}, {self.input_border_color[1]}, {self.input_border_color[2]});"
+            f"}}"
         )
         
         self.font_family_combo.setStyleSheet(input_style)
         self.font_size_spinbox.setStyleSheet(input_style)
+        
+        # Set palette on combo box to prevent macOS override
+        combo_palette = self.font_family_combo.palette()
+        combo_palette.setColor(combo_palette.ColorRole.Base, QColor(*self.input_bg_color))
+        combo_palette.setColor(combo_palette.ColorRole.Button, QColor(*self.input_bg_color))
+        self.font_family_combo.setPalette(combo_palette)
+        
+        view = self.font_family_combo.view()
+        if view:
+            view_palette = view.palette()
+            view_palette.setColor(view.backgroundRole(), QColor(*self.input_bg_color))
+            view_palette.setColor(view.foregroundRole(), QColor(*self.input_text_color))
+            view_palette.setColor(QPalette.ColorRole.Highlight, QColor(*selection_bg))
+            view_palette.setColor(QPalette.ColorRole.HighlightedText, QColor(*selection_text))
+            view.setPalette(view_palette)
+            view.setAutoFillBackground(True)
         
         # Group box styling
         group_style = (

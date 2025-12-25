@@ -1266,6 +1266,8 @@ class ConfigLoader:
             'ui.dialogs.annotation_preferences.inputs.border_color',
             'ui.dialogs.annotation_preferences.inputs.border_radius',
             'ui.dialogs.annotation_preferences.inputs.padding',
+            'ui.dialogs.annotation_preferences.inputs.selection_background_color',
+            'ui.dialogs.annotation_preferences.inputs.selection_text_color',
             'ui.dialogs.annotation_preferences.groups.title_font_family',
             'ui.dialogs.annotation_preferences.groups.title_font_size',
             'ui.dialogs.annotation_preferences.groups.title_color',
