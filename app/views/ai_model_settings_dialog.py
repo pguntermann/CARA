@@ -659,6 +659,10 @@ class AIModelSettingsDialog(QDialog):
             input_padding_h = input_padding
             input_padding_v = input_padding
         
+        # Get selection colors from config (use defaults if not available)
+        selection_bg = inputs_config.get('selection_background_color', [70, 90, 130])
+        selection_text = inputs_config.get('selection_text_color', [240, 240, 240])
+        
         input_style = (
             f"QLineEdit, QComboBox {{"
             f"font-family: \"{input_font_family}\";"
@@ -677,15 +681,34 @@ class AIModelSettingsDialog(QDialog):
             f"height: 0px;"
             f"image: none;"
             f"}}"
-            f"QComboBox::down-arrow {{"
-            f"width: 0px;"
-            f"height: 0px;"
-            f"image: none;"
-            f"}}"
+            f"QComboBox::down-arrow {{
+                width: 0px;
+                height: 0px;
+                image: none;
+            }}"
+            f"QComboBox QAbstractItemView {{
+                background-color: rgb({input_bg_color[0]}, {input_bg_color[1]}, {input_bg_color[2]});
+                color: rgb({input_text_color[0]}, {input_text_color[1]}, {input_text_color[2]});
+                selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});
+                selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});
+                border: {input_border_width}px solid rgb({input_border_color[0]}, {input_border_color[1]}, {input_border_color[2]});
+            }}"
         )
+        
+        input_bg_qcolor = QColor(input_bg_color[0], input_bg_color[1], input_bg_color[2])
+        input_text_qcolor = QColor(input_text_color[0], input_text_color[1], input_text_color[2])
         
         for widget in self.findChildren((QLineEdit, QComboBox)):
             widget.setStyleSheet(input_style)
+            # Set palette on combo boxes to prevent macOS override
+            if isinstance(widget, QComboBox):
+                view = widget.view()
+                if view:
+                    view_palette = view.palette()
+                    view_palette.setColor(view.backgroundRole(), input_bg_qcolor)
+                    view_palette.setColor(view.foregroundRole(), input_text_qcolor)
+                    view.setPalette(view_palette)
+                    view.setAutoFillBackground(True)
         
         # Buttons - using background_offset approach from style guide
         button_width = self.buttons_config.get('width', 120)

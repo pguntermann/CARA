@@ -1067,7 +1067,9 @@
           "padding": 5,
           "font_family": "Helvetica Neue",
           "font_size": 10,
-          "focus_border_color": [0, 120, 212]
+          "focus_border_color": [0, 120, 212],
+          "selection_background_color": [70, 90, 130],
+          "selection_text_color": [240, 240, 240]
         },
         "buttons": {
           "spacing": 10,
@@ -1187,7 +1189,10 @@
         "border_radius": 3,
         "padding": [2, 6, 2, 6],
         "font_family": "Helvetica Neue",
-        "font_size": 11
+        "font_size": 11,
+        "selection_background_color": [70, 90, 130],
+        "selection_text_color": [240, 240, 240],
+        "focus_border_color": [70, 90, 130]
       },
       "validation_dialog": {
         "width": 600,
@@ -1258,7 +1263,10 @@
           "border_radius": 3,
           "padding": [2, 6, 2, 6],
           "font_family": "Helvetica Neue",
-          "font_size": 11
+          "font_size": 11,
+          "selection_background_color": [70, 90, 130],
+          "selection_text_color": [240, 240, 240],
+          "focus_border_color": [70, 90, 130]
         },
         "buttons": {
           "spacing": 10,
@@ -1344,7 +1352,9 @@
           "border_radius": 3,
           "padding": [8, 6],
           "minimum_width": 200,
-          "minimum_height": 30
+          "minimum_height": 30,
+          "selection_background_color": [70, 90, 130],
+          "selection_text_color": [240, 240, 240]
         },
         "groups": {
           "background_color": [45, 45, 50],
@@ -1432,7 +1442,9 @@
           "border_radius": 3,
           "padding": [8, 6],
           "minimum_width": 200,
-          "minimum_height": 30
+          "minimum_height": 30,
+          "selection_background_color": [70, 90, 130],
+          "selection_text_color": [240, 240, 240]
         },
         "groups": {
           "background_color": [45, 45, 50],
@@ -1488,7 +1500,9 @@
           "background_color": [30, 30, 35],
           "border_color": [60, 60, 65],
           "border_radius": 3,
-          "padding": [8, 6]
+          "padding": [8, 6],
+          "selection_background_color": [70, 90, 130],
+          "selection_text_color": [240, 240, 240]
         },
         "groups": {
           "background_color": [45, 45, 50],
@@ -1694,7 +1708,9 @@
           "border_radius": 3,
           "padding": [8, 6],
           "minimum_width": 200,
-          "minimum_height": 30
+          "minimum_height": 30,
+          "selection_background_color": [70, 90, 130],
+          "selection_text_color": [240, 240, 240]
         },
         "groups": {
           "background_color": [45, 45, 50],

@@ -219,6 +219,11 @@ class CriteriaRowWidget(QWidget):
         self.remove_btn.setStyleSheet(button_style)
         
         # ComboBox styling
+        # Get selection colors from config (use defaults if not available)
+        inputs_config = self.config.get('ui', {}).get('dialogs', {}).get('search', {}).get('inputs', {})
+        selection_bg = inputs_config.get('selection_background_color', [70, 90, 130])
+        selection_text = inputs_config.get('selection_text_color', [240, 240, 240])
+        
         combo_style = (
             f"QComboBox {{"
             f"font-family: {self.input_font_family};"
@@ -237,10 +242,27 @@ class CriteriaRowWidget(QWidget):
             f"width: 0px;"
             f"height: 0px;"
             f"}}"
+            f"QComboBox QAbstractItemView {{"
+            f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
+            f"color: rgb({self.input_text_color.red()}, {self.input_text_color.green()}, {self.input_text_color.blue()});"
+            f"selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});"
+            f"selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});"
+            f"border: 1px solid rgb({self.input_border_color.red()}, {self.input_border_color.green()}, {self.input_border_color.blue()});"
+            f"}}"
         )
         self.field_combo.setStyleSheet(combo_style)
         self.operator_combo.setStyleSheet(combo_style)
         self.logic_combo.setStyleSheet(combo_style)
+        
+        # Set palette on combo boxes to prevent macOS override
+        for combo in [self.field_combo, self.operator_combo, self.logic_combo]:
+            view = combo.view()
+            if view:
+                view_palette = view.palette()
+                view_palette.setColor(view.backgroundRole(), self.input_bg_color)
+                view_palette.setColor(view.foregroundRole(), self.input_text_color)
+                view.setPalette(view_palette)
+                view.setAutoFillBackground(True)
         
         # LineEdit styling
         input_style = (

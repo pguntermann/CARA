@@ -1360,6 +1360,11 @@ class EngineConfigurationDialog(QDialog):
         input_padding = input_config.get('padding', [2, 6, 2, 6])
         input_font_family = input_config.get('font_family', 'Helvetica Neue')
         input_font_size = scale_font_size(input_config.get('font_size', 9))
+        # Get selection colors from config (use defaults if not available)
+        selection_bg = input_config.get('selection_background_color', [70, 90, 130])
+        selection_text = input_config.get('selection_text_color', [240, 240, 240])
+        # Get focus border color from config (use default if not available)
+        input_focus_border = input_config.get('focus_border_color', [70, 90, 130])
         
         # Get checkmark icon path
         from pathlib import Path
@@ -1381,7 +1386,7 @@ class EngineConfigurationDialog(QDialog):
                 border: {input_border_width}px solid rgb({min(255, input_border[0] + 20)}, {min(255, input_border[1] + 20)}, {min(255, input_border[2] + 20)});
             }}
             QLineEdit:focus {{
-                border: {input_border_width}px solid rgb(70, 90, 130);
+                border: {input_border_width}px solid rgb({input_focus_border[0]}, {input_focus_border[1]}, {input_focus_border[2]});
             }}
             QComboBox {{
                 background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});
@@ -1396,7 +1401,7 @@ class EngineConfigurationDialog(QDialog):
                 border: {input_border_width}px solid rgb({min(255, input_border[0] + 20)}, {min(255, input_border[1] + 20)}, {min(255, input_border[2] + 20)});
             }}
             QComboBox:focus {{
-                border: {input_border_width}px solid rgb(70, 90, 130);
+                border: {input_border_width}px solid rgb({input_focus_border[0]}, {input_focus_border[1]}, {input_focus_border[2]});
             }}
             QComboBox::drop-down {{
                 border: none;
@@ -1411,8 +1416,8 @@ class EngineConfigurationDialog(QDialog):
             QComboBox QAbstractItemView {{
                 background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});
                 color: rgb({input_text[0]}, {input_text[1]}, {input_text[2]});
-                selection-background-color: rgb(70, 90, 130);
-                selection-color: rgb(240, 240, 240);
+                selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});
+                selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});
                 border: {input_border_width}px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});
             }}
             QCheckBox {{
@@ -1445,6 +1450,16 @@ class EngineConfigurationDialog(QDialog):
                 lineedit.setStyleSheet(input_stylesheet)
             for combobox in tab.findChildren(QComboBox):
                 combobox.setStyleSheet(input_stylesheet)
+                # Set palette on combo box view to prevent macOS override
+                view = combobox.view()
+                if view:
+                    input_bg_qcolor = QColor(input_bg[0], input_bg[1], input_bg[2])
+                    input_text_qcolor = QColor(input_text[0], input_text[1], input_text[2])
+                    view_palette = view.palette()
+                    view_palette.setColor(view.backgroundRole(), input_bg_qcolor)
+                    view_palette.setColor(view.foregroundRole(), input_text_qcolor)
+                    view.setPalette(view_palette)
+                    view.setAutoFillBackground(True)
             for checkbox in tab.findChildren(QCheckBox):
                 checkbox.setStyleSheet(input_stylesheet)
         
