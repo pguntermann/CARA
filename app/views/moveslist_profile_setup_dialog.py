@@ -199,10 +199,12 @@ class MovesListProfileSetupDialog(QDialog):
         layout.addWidget(label)
         
         # Scroll area for categories
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        from PyQt6.QtWidgets import QFrame
+        self.available_columns_scroll = QScrollArea()
+        self.available_columns_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.available_columns_scroll.setWidgetResizable(True)
+        self.available_columns_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.available_columns_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         
         scroll_widget = QWidget()
         scroll_layout = QVBoxLayout(scroll_widget)
@@ -253,8 +255,8 @@ class MovesListProfileSetupDialog(QDialog):
             scroll_layout.addWidget(group)
         
         scroll_layout.addStretch()
-        scroll.setWidget(scroll_widget)
-        layout.addWidget(scroll)
+        self.available_columns_scroll.setWidget(scroll_widget)
+        layout.addWidget(self.available_columns_scroll)
         
         return panel
     
@@ -1015,11 +1017,16 @@ class MovesListProfileSetupDialog(QDialog):
             f"font-family: {label_font_family};"
             f"font-size: {label_font_size}pt;"
             f"color: rgb({label_text_color[0]}, {label_text_color[1]}, {label_text_color[2]});"
+            f"background-color: transparent;"
             f"}}"
         )
         
         for label in self.findChildren(QLabel):
             label.setStyleSheet(label_style)
+            label_palette = label.palette()
+            label_palette.setColor(label.foregroundRole(), QColor(*label_text_color))
+            label.setPalette(label_palette)
+            label.update()
         
         # Checkbox styling
         checkbox_style = (
@@ -1028,11 +1035,78 @@ class MovesListProfileSetupDialog(QDialog):
             f"font-size: {label_font_size}pt;"
             f"color: rgb({label_text_color[0]}, {label_text_color[1]}, {label_text_color[2]});"
             f"spacing: 5px;"
+            f"background-color: transparent;"
             f"}}"
         )
         
         for checkbox in self.findChildren(QCheckBox):
             checkbox.setStyleSheet(checkbox_style)
+            # Set palette to prevent macOS override of background color
+            checkbox_palette = checkbox.palette()
+            checkbox_palette.setColor(checkbox.foregroundRole(), QColor(*label_text_color))
+            checkbox_palette.setColor(checkbox_palette.ColorRole.Base, QColor(bg_color[0], bg_color[1], bg_color[2]))
+            checkbox_palette.setColor(checkbox_palette.ColorRole.Window, QColor(bg_color[0], bg_color[1], bg_color[2]))
+            checkbox.setPalette(checkbox_palette)
+            checkbox.setAutoFillBackground(True)
+            checkbox.update()
+        
+        # Scroll area styling
+        if hasattr(self, 'available_columns_scroll'):
+            inputs_config = dialog_config.get('inputs', {})
+            input_bg = inputs_config.get('background_color', [30, 30, 35])
+            input_border = inputs_config.get('border_color', [60, 60, 65])
+            input_border_radius = inputs_config.get('border_radius', 3)
+            
+            scroll_area_style = (
+                f"QScrollArea {{"
+                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+                f"border: 1px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
+                f"border-radius: {input_border_radius}px;"
+                f"}}"
+                f"QScrollArea QWidget {{"
+                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+                f"}}"
+                f"QScrollBar:vertical {{"
+                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+                f"width: 12px;"
+                f"border: none;"
+                f"}}"
+                f"QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{"
+                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+                f"border: none;"
+                f"height: 0px;"
+                f"}}"
+                f"QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{"
+                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+                f"}}"
+                f"QScrollBar::handle:vertical {{"
+                f"background-color: rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
+                f"border-radius: 6px;"
+                f"min-height: 20px;"
+                f"border: none;"
+                f"}}"
+                f"QScrollBar::handle:vertical:hover {{"
+                f"background-color: rgb({min(255, input_border[0] + 20)}, {min(255, input_border[1] + 20)}, {min(255, input_border[2] + 20)});"
+                f"}}"
+            )
+            self.available_columns_scroll.setStyleSheet(scroll_area_style)
+            # Set palette on scroll area viewport to prevent macOS override
+            viewport = self.available_columns_scroll.viewport()
+            if viewport:
+                viewport_palette = viewport.palette()
+                viewport_palette.setColor(viewport.backgroundRole(), QColor(*input_bg))
+                viewport.setPalette(viewport_palette)
+                viewport.setAutoFillBackground(True)
+            
+            # Set palette on scrollbar to prevent macOS override of arrow buttons
+            scrollbar = self.available_columns_scroll.verticalScrollBar()
+            if scrollbar:
+                scrollbar_palette = scrollbar.palette()
+                scrollbar_palette.setColor(scrollbar.backgroundRole(), QColor(*input_bg))
+                scrollbar_palette.setColor(scrollbar_palette.ColorRole.Base, QColor(*input_bg))
+                scrollbar_palette.setColor(scrollbar_palette.ColorRole.Window, QColor(*input_bg))
+                scrollbar.setPalette(scrollbar_palette)
+                scrollbar.setAutoFillBackground(True)
         
         # Table widget styling
         table_config = dialog_config.get('table', {})
@@ -1069,6 +1143,15 @@ class MovesListProfileSetupDialog(QDialog):
         
         self.visible_table.setStyleSheet(table_style)
         
+        # Set palette on table header to prevent macOS override
+        header = self.visible_table.horizontalHeader()
+        if header:
+            header_palette = header.palette()
+            header_palette.setColor(header.backgroundRole(), QColor(*table_header_bg))
+            header_palette.setColor(header.foregroundRole(), QColor(*table_header_text))
+            header.setPalette(header_palette)
+            header.setAutoFillBackground(True)
+        
         # Spinbox styling (use input styling from config)
         inputs_config = dialog_config.get('inputs', {})
         from app.utils.font_utils import resolve_font_family
@@ -1100,8 +1183,9 @@ class MovesListProfileSetupDialog(QDialog):
         
         # Group box styling
         groups_config = dialog_config.get('groups', {})
-        group_title_font = groups_config.get('title_font_family', 'Helvetica Neue')
-        group_title_size = groups_config.get('title_font_size', 11)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        group_title_font = resolve_font_family(groups_config.get('title_font_family', 'Helvetica Neue'))
+        group_title_size = scale_font_size(groups_config.get('title_font_size', 11))
         group_title_color = groups_config.get('title_color', [240, 240, 240])
         content_margins = groups_config.get('content_margins', [10, 15, 10, 10])
         margin_top = groups_config.get('margin_top', 10)
