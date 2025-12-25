@@ -75,7 +75,8 @@ class BulkCleanPgnDialog(QDialog):
         self.text_color = QColor(text_color[0], text_color[1], text_color[2])
         
         # Font
-        font_size = dialog_config.get("font_size", 11)
+        from app.utils.font_utils import scale_font_size
+        font_size = scale_font_size(dialog_config.get("font_size", 11))
         self.font_family = dialog_config.get("font_family", "Helvetica Neue")
         self.font_size = font_size
         
@@ -249,7 +250,10 @@ class BulkCleanPgnDialog(QDialog):
         
         # Checkboxes grid layout
         options_layout = QGridLayout()
-        options_layout.setSpacing(self.checkbox_spacing)
+        # Use a larger spacing value for better visual separation (checkbox_spacing is for checkbox indicator spacing)
+        # Set both vertical and horizontal spacing for proper separation
+        options_layout.setVerticalSpacing(10)  # Vertical spacing between rows
+        options_layout.setHorizontalSpacing(15)  # Horizontal spacing between columns
         options_layout.setContentsMargins(
             options_content_margins[0],
             0,
@@ -287,8 +291,6 @@ class BulkCleanPgnDialog(QDialog):
         self.apply_button.clicked.connect(self._on_apply_clicked)
         buttons_layout.addWidget(self.apply_button)
         
-        buttons_layout.addSpacing(self.button_spacing)
-        
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.clicked.connect(self.reject)
         buttons_layout.addWidget(self.cancel_button)
@@ -308,7 +310,8 @@ class BulkCleanPgnDialog(QDialog):
         bg_color = self.config.get("ui", {}).get("dialogs", {}).get("bulk_clean_pgn", {}).get("background_color", [40, 40, 45])
         border_color = self.config.get("ui", {}).get("dialogs", {}).get("bulk_clean_pgn", {}).get("border_color", [60, 60, 65])
         text_color = self.config.get("ui", {}).get("dialogs", {}).get("bulk_clean_pgn", {}).get("text_color", [200, 200, 200])
-        font_size = self.config.get("ui", {}).get("dialogs", {}).get("bulk_clean_pgn", {}).get("font_size", 11)
+        from app.utils.font_utils import scale_font_size
+        font_size = scale_font_size(self.config.get("ui", {}).get("dialogs", {}).get("bulk_clean_pgn", {}).get("font_size", 11))
         
         button_width = buttons_config.get("width", 120)
         button_height = buttons_config.get("height", 30)
@@ -353,8 +356,9 @@ class BulkCleanPgnDialog(QDialog):
         group_bg_color = groups_config.get("background_color", bg_color) if "background_color" in groups_config else bg_color
         group_border_color = groups_config.get("border_color", border_color) if "border_color" in groups_config else border_color
         group_border_radius = groups_config.get("border_radius", 5)
-        group_title_font_family = groups_config.get("title_font_family", "Helvetica Neue")
-        group_title_font_size = groups_config.get("title_font_size", 11)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        group_title_font_family = resolve_font_family(groups_config.get("title_font_family", "Helvetica Neue"))
+        group_title_font_size = scale_font_size(groups_config.get("title_font_size", 11))
         group_title_color = groups_config.get("title_color", [240, 240, 240])
         group_content_margins = groups_config.get("content_margins", [10, 15, 10, 10])
         group_margin_top = groups_config.get("margin_top", 10)
@@ -393,20 +397,27 @@ class BulkCleanPgnDialog(QDialog):
                     group_content_margins[3]
                 )
         
-        # Apply label styling
+        # Apply label styling - apply to ALL labels to prevent macOS theme override
         label_style = (
             f"QLabel {{"
             f"color: rgb({self.label_text_color.red()}, {self.label_text_color.green()}, {self.label_text_color.blue()});"
             f"font-family: {self.label_font_family};"
             f"font-size: {self.label_font_size}pt;"
+            f"background-color: transparent;"
             f"}}"
         )
         
+        # Apply stylesheet and palette to all labels to ensure macOS doesn't override
+        # Group box titles are styled via QGroupBox::title, not QLabel, so we can style all QLabels
         for label in self.findChildren(QLabel):
-            # Skip group box titles (they're styled via QGroupBox::title)
-            if isinstance(label.parent(), QGroupBox):
-                continue
+            # Apply stylesheet
             label.setStyleSheet(label_style)
+            # Also set palette to ensure color is applied (macOS sometimes ignores stylesheet)
+            label_palette = label.palette()
+            label_palette.setColor(label.foregroundRole(), self.label_text_color)
+            label.setPalette(label_palette)
+            # Force update to ensure styling is applied
+            label.update()
         
         # Apply checkbox styling
         self._apply_checkbox_styling()
@@ -463,7 +474,8 @@ class BulkCleanPgnDialog(QDialog):
         bg_color = dialog_config.get("background_color", [40, 40, 45])
         border_color = dialog_config.get("border_color", [60, 60, 65])
         text_color = dialog_config.get("text_color", [200, 200, 200])
-        font_size = dialog_config.get("font_size", 11)
+        from app.utils.font_utils import scale_font_size
+        font_size = scale_font_size(dialog_config.get("font_size", 11))
         
         button_border_radius = buttons_config.get("border_radius", 3)
         button_padding = buttons_config.get("padding", 5)
