@@ -34,7 +34,7 @@ class DetailManualAnalysisView(QWidget):
         self._analysis_controller: Optional[ManualAnalysisController] = None
         self._board_model = None
         self._is_analyzing = False
-        self._multipv_count = 1
+        self._multipv_count = 2
         
         # Track which line is being hovered (multipv -> HoverablePvLabel)
         self._hovered_labels: Dict[int, 'HoverablePvLabel'] = {}
@@ -243,7 +243,7 @@ class DetailManualAnalysisView(QWidget):
         self.remove_line_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         row1_layout.addWidget(self.remove_line_button)
         
-        self.multipv_label = QLabel("1")
+        self.multipv_label = QLabel("2")
         # Width will be set from config in _apply_styling()
         self.multipv_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         row1_layout.addWidget(self.multipv_label)

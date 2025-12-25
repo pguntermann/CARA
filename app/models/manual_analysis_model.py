@@ -38,7 +38,7 @@ class ManualAnalysisModel(QObject):
         super().__init__()
         self._lines: List[AnalysisLine] = []
         self._is_analyzing: bool = False
-        self._multipv: int = 1  # Number of lines to analyze
+        self._multipv: int = 2  # Number of lines to analyze
         self._start_time: Optional[float] = None  # Timestamp when analysis started (None if not analyzing)
         self._enable_miniature_preview: bool = True  # Enable miniature board preview on PV hover
     
