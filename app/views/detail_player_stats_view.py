@@ -992,6 +992,22 @@ class DetailPlayerStatsView(QWidget):
         self.active_db_radio.toggled.connect(self._on_source_changed)
         self.all_db_radio.toggled.connect(self._on_source_changed)
         
+        # Style radio buttons with text color and palette to prevent macOS override
+        radio_style = f"QRadioButton {{ color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); }}"
+        self.active_db_radio.setStyleSheet(radio_style)
+        self.all_db_radio.setStyleSheet(radio_style)
+        
+        # Set palette to prevent macOS override
+        radio_palette = self.active_db_radio.palette()
+        radio_palette.setColor(self.active_db_radio.foregroundRole(), text_color)
+        self.active_db_radio.setPalette(radio_palette)
+        self.active_db_radio.update()
+        
+        all_db_palette = self.all_db_radio.palette()
+        all_db_palette.setColor(self.all_db_radio.foregroundRole(), text_color)
+        self.all_db_radio.setPalette(all_db_palette)
+        self.all_db_radio.update()
+        
         source_row.addWidget(self.active_db_radio)
         source_row.addWidget(self.all_db_radio)
         source_row.addStretch()

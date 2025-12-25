@@ -118,7 +118,8 @@ class DetailManualAnalysisView(QWidget):
         self.statistics_show_hash = statistics_config.get('show_hash', True)
         self.statistics_show_time = statistics_config.get('show_time', True)
         self.statistics_show_nodes = statistics_config.get('show_nodes', False)
-        self.statistics_font_size = statistics_config.get('font_size', 9)
+        from app.utils.font_utils import scale_font_size
+        self.statistics_font_size = scale_font_size(statistics_config.get('font_size', 9))
         self.statistics_color = statistics_config.get('color', [180, 180, 180])
         self.statistics_format = statistics_config.get('format', 'compact')
         self.statistics_separator = statistics_config.get('separator', ' | ')
@@ -232,8 +233,8 @@ class DetailManualAnalysisView(QWidget):
         row1_layout.addSpacing(button_group_spacing)
         
         # Multipv controls
-        multipv_label = QLabel("Lines:")
-        row1_layout.addWidget(multipv_label)
+        self.lines_label = QLabel("Lines:")
+        row1_layout.addWidget(self.lines_label)
         
         # Get multipv button width from config (will be set after config is loaded)
         # We'll set it in _apply_styling() after config is available
@@ -269,8 +270,8 @@ class DetailManualAnalysisView(QWidget):
         board_visibility = user_settings.get('board_visibility', {})
         
         # Explore controls
-        explore_label = QLabel("Explore:")
-        row2_layout.addWidget(explore_label)
+        self.explore_label = QLabel("Explore:")
+        row2_layout.addWidget(self.explore_label)
         
         # Explore PV1 button
         self.explore_pv1_button = QPushButton("PV1")
@@ -307,8 +308,8 @@ class DetailManualAnalysisView(QWidget):
         row2_layout.addSpacing(button_group_spacing)
         
         # Pieces controls
-        pieces_label = QLabel("Pieces:")
-        row2_layout.addWidget(pieces_label)
+        self.pieces_label = QLabel("Pieces:")
+        row2_layout.addWidget(self.pieces_label)
         
         max_pieces = manual_analysis_settings.get('max_pieces_to_explore', 1)
         
@@ -339,8 +340,8 @@ class DetailManualAnalysisView(QWidget):
         row2_layout.addSpacing(button_group_spacing)
         
         # Depth controls
-        depth_label = QLabel("Depth:")
-        row2_layout.addWidget(depth_label)
+        self.depth_label = QLabel("Depth:")
+        row2_layout.addWidget(self.depth_label)
         
         max_depth = manual_analysis_settings.get('max_exploration_depth', 2)
         
@@ -577,6 +578,11 @@ class DetailManualAnalysisView(QWidget):
                 background-color: transparent;
             }}
         """)
+        # Set palette to prevent macOS override
+        stats_palette = self.statistics_label.palette()
+        stats_palette.setColor(self.statistics_label.foregroundRole(), QColor(text_color[0], text_color[1], text_color[2]))
+        self.statistics_label.setPalette(stats_palette)
+        self.statistics_label.update()
         
         layout.addWidget(self.statistics_label)
         layout.addStretch()
@@ -755,9 +761,29 @@ class DetailManualAnalysisView(QWidget):
             }}
         """
         
-        self.position_label.setStyleSheet(label_stylesheet)
-        self.engine_label.setStyleSheet(label_stylesheet)
-        self.multipv_label.setStyleSheet(label_stylesheet)
+        # Style all labels with palette to prevent macOS override
+        labels_to_style = []
+        if hasattr(self, 'position_label'):
+            labels_to_style.append(self.position_label)
+        if hasattr(self, 'engine_label'):
+            labels_to_style.append(self.engine_label)
+        if hasattr(self, 'multipv_label'):
+            labels_to_style.append(self.multipv_label)
+        if hasattr(self, 'lines_label'):
+            labels_to_style.append(self.lines_label)
+        if hasattr(self, 'explore_label'):
+            labels_to_style.append(self.explore_label)
+        if hasattr(self, 'pieces_label'):
+            labels_to_style.append(self.pieces_label)
+        if hasattr(self, 'depth_label'):
+            labels_to_style.append(self.depth_label)
+        
+        for label in labels_to_style:
+            label.setStyleSheet(label_stylesheet)
+            label_palette = label.palette()
+            label_palette.setColor(label.foregroundRole(), QColor(norm_text[0], norm_text[1], norm_text[2]))
+            label.setPalette(label_palette)
+            label.update()
         
         # Control bar and info bar styling
         control_bar_stylesheet = f"""
@@ -799,6 +825,8 @@ class DetailManualAnalysisView(QWidget):
         
         # Apply styling to scroll area
         self.analysis_area.setStyleSheet(scroll_stylesheet)
+        # Also set viewport background to fix white background on macOS
+        self.analysis_area.viewport().setStyleSheet(f"background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});")
         
         # Empty label styling
         analysis_area_config = manual_analysis_config.get('analysis_area', {})
@@ -1433,10 +1461,11 @@ class DetailManualAnalysisView(QWidget):
         norm_border = normal.get('border', [60, 60, 65])
         
         # Get font settings
-        font_family = tabs_config.get('font_family', 'Helvetica Neue')
-        font_size = tabs_config.get('font_size', 10)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        font_family = resolve_font_family(tabs_config.get('font_family', 'Helvetica Neue'))
+        font_size = scale_font_size(tabs_config.get('font_size', 10))
         label_config = manual_analysis_config.get('labels', {})
-        label_font_size = label_config.get('font_size', font_size)
+        label_font_size = scale_font_size(label_config.get('font_size', tabs_config.get('font_size', 10)))
         
         # Format evaluation
         if line.is_mate:
@@ -1496,7 +1525,7 @@ class DetailManualAnalysisView(QWidget):
             pv_moves = line.pv.strip().split()
             if pv_moves:
                 # Create font for measuring text width
-                font = QFont(font_family, label_font_size)
+                font = QFont(font_family, int(label_font_size))
                 font_metrics = QFontMetrics(font)
                 
                 # Calculate width of header part (without PV)
@@ -1725,7 +1754,7 @@ class DetailManualAnalysisView(QWidget):
                 QLabel {{
                     color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
                     font-family: "{font_family}";
-                    font-size: {label_font_size}pt;
+                    font-size: {int(label_font_size)}pt;
                     border: none;
                     background-color: transparent;
                 }}
@@ -1734,11 +1763,15 @@ class DetailManualAnalysisView(QWidget):
             # Add " | PV: " prefix
             prefix_label = QLabel(" | PV: ")
             prefix_label.setStyleSheet(shared_stylesheet)
+            prefix_palette = prefix_label.palette()
+            prefix_palette.setColor(prefix_label.foregroundRole(), QColor(norm_text[0], norm_text[1], norm_text[2]))
+            prefix_label.setPalette(prefix_palette)
+            prefix_label.update()
             pv_layout.addWidget(prefix_label)
             
             # Calculate available width for PV moves (same logic as non-hoverable version)
             # Create font for measuring text width
-            font = QFont(font_family, label_font_size)
+            font = QFont(font_family, int(label_font_size))
             font_metrics = QFontMetrics(font)
             
             # Calculate width of header part (without PV)
@@ -1824,6 +1857,10 @@ class DetailManualAnalysisView(QWidget):
                 move_label.setWordWrap(False)
                 move_label.setText(formatted_move)
                 move_label.setStyleSheet(shared_stylesheet)
+                move_palette = move_label.palette()
+                move_palette.setColor(move_label.foregroundRole(), QColor(norm_text[0], norm_text[1], norm_text[2]))
+                move_label.setPalette(move_palette)
+                move_label.update()
                 pv_layout.addWidget(move_label)
                 
                 # Add space after move (except last)
@@ -1838,6 +1875,10 @@ class DetailManualAnalysisView(QWidget):
                 ellipsis_label = QLabel(f'<span style="color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});">...</span>')
                 ellipsis_label.setTextFormat(Qt.TextFormat.RichText)
                 ellipsis_label.setStyleSheet(shared_stylesheet)
+                ellipsis_palette = ellipsis_label.palette()
+                ellipsis_palette.setColor(ellipsis_label.foregroundRole(), QColor(norm_text[0], norm_text[1], norm_text[2]))
+                ellipsis_label.setPalette(ellipsis_palette)
+                ellipsis_label.update()
                 pv_layout.addWidget(ellipsis_label)
             
             # Create container widget for PV section
@@ -1859,11 +1900,15 @@ class DetailManualAnalysisView(QWidget):
                 QLabel {{
                     color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
                     font-family: "{font_family}";
-                    font-size: {label_font_size}pt;
+                    font-size: {int(label_font_size)}pt;
                     border: none;
                     background-color: transparent;
                 }}
             """)
+            line_palette = line_label.palette()
+            line_palette.setColor(line_label.foregroundRole(), QColor(norm_text[0], norm_text[1], norm_text[2]))
+            line_label.setPalette(line_palette)
+            line_label.update()
             
             # Create horizontal layout for entire line
             line_layout = QHBoxLayout()
@@ -1885,11 +1930,15 @@ class DetailManualAnalysisView(QWidget):
                 QLabel {{
                     color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
                     font-family: "{font_family}";
-                    font-size: {label_font_size}pt;
+                    font-size: {int(label_font_size)}pt;
                     border: none;
                     background-color: transparent;
                 }}
             """)
+            line_palette = line_label.palette()
+            line_palette.setColor(line_label.foregroundRole(), QColor(norm_text[0], norm_text[1], norm_text[2]))
+            line_label.setPalette(line_palette)
+            line_label.update()
             layout.addWidget(line_label)
         
         # Check if this line should show an indicator based on multipv and arrow visibility
