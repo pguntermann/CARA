@@ -18,7 +18,7 @@
                     </div>
                     <div class="header-right">
                         <p class="header-manual-label">User Manual</p>
-                        <p class="header-version">Version 2.4.5</p>
+                        <p class="header-version">Version 2.4.6</p>
                     </div>
                 </div>
             </div>
@@ -185,7 +185,7 @@
                 <ul>
                     <li><strong>Introduction:</strong> Overview of CARA, its features, and what makes it unique</li>
                     <li><strong>Attributions:</strong> Credits for libraries, resources, and licensing information</li>
-                    <li><strong>Installation:</strong> Step-by-step installation instructions for Windows</li>
+                    <li><strong>Installation:</strong> Step-by-step installation instructions for Windows and macOS</li>
                     <li><strong>Getting Started:</strong> Interface overview and your first game analysis</li>
                     <li><strong>Common Tasks:</strong> Detailed guides for everyday operations</li>
                     <li><strong>Complete Reference:</strong> Comprehensive menu and keyboard shortcut documentation</li>
@@ -278,8 +278,7 @@
                 <p>Before installing CARA, ensure your system meets the following requirements:</p>
                 
                 <h5>Operating System</h5>
-                <p>The application has been tested on Windows 11.</p>
-                <p>In general, CARA should also run on Linux and macOS, but it has not been tested on these platforms and may require some minor adjustments. The author may look into cross-platform support at a later time.</p>
+                <p>The application has been tested on Windows 11 and macOS Tahoe 26.2. In general, CARA should also run on Linux, but it has not been tested on Linux and may require some minor adjustments.</p>
                 
                 <h5>Python</h5>
                 <p>Python 3.8 or higher is required. CARA uses PyQt6, which requires Python 3.8+. See <a href="#installing-python">section 3.2</a> for installation instructions.</p>
@@ -292,26 +291,38 @@
             </div>
             <div class="outline-item">
                 <h4 id="installing-python">3.2 Installing Python</h4>
-                <p>CARA requires Python 3.8 or higher. If you don't have Python installed, you can install it using either method below:</p>
+                <p>CARA requires Python 3.8 or higher. If you don't have Python installed, you can install it using the methods below:</p>
                 
-                <h5>Method 1: Using Windows Package Manager (Recommended)</h5>
-                <p>Open PowerShell or Windows Terminal and run:</p>
+                <h5>Windows</h5>
+                <p><strong>Method 1: Using Windows Package Manager (Recommended)</strong><br>
+                Open PowerShell or Windows Terminal and run:</p>
                 <code class="command">winget install Python.Python.3</code><br>
                 <p>This automatically installs Python and adds it to your PATH.</p>
                 
-                <h5>Method 2: Manual Download</h5>
+                <p><strong>Method 2: Manual Download</strong></p>
                 <ol>
-                    <li><strong>Download Python:</strong> Visit <a href="https://www.python.org/downloads/" target="_blank">python.org/downloads</a> and download the latest Python 3.x installer for Windows.</li>
-                    
-                    <li><strong>Run the installer:</strong> When installing, make sure to check the box labeled "Add Python to PATH" at the bottom of the installer window. This ensures Python can be accessed from the command line.</li>
+                    <li>Visit <a href="https://www.python.org/downloads/" target="_blank">python.org/downloads</a> and download the latest Python 3.x installer for Windows.</li>
+                    <li>When installing, make sure to check the box labeled "Add Python to PATH" at the bottom of the installer window.</li>
+                </ol>
+                
+                <h5>macOS</h5>
+                <p><strong>Method 1: Using Homebrew (Recommended)</strong><br>
+                If you have Homebrew installed, open Terminal and run:</p>
+                <code class="command">brew install python3</code><br>
+                
+                <p><strong>Method 2: Manual Download</strong></p>
+                <ol>
+                    <li>Visit <a href="https://www.python.org/downloads/" target="_blank">python.org/downloads</a> and download the latest Python 3.x installer for macOS.</li>
+                    <li>Run the installer and follow the installation wizard.</li>
                 </ol>
                 
                 <h5>Verifying Installation</h5>
-                <p>After installation, open a command prompt or PowerShell and run:</p>
+                <p>After installation, open a terminal (PowerShell/Command Prompt on Windows, Terminal on macOS) and run:</p>
                 <code class="command">python --version</code><br>
                 <p>This should display the Python version number (e.g., "Python 3.11.5").</p>
+                <p><strong>Note:</strong> On macOS, you may need to use <code>python3</code> instead of <code>python</code> to access Python 3.</p>
                 
-                <p>If you see a "python is not recognized" error, Python may not be in your system PATH. Re-run the installer and ensure "Add Python to PATH" is checked, or manually add Python to your system PATH:</p>
+                <p><strong>Windows PATH Troubleshooting:</strong> If you see a "python is not recognized" error on Windows, Python may not be in your system PATH. Re-run the installer and ensure "Add Python to PATH" is checked, or manually add Python to your system PATH:</p>
                 <ol>
                     <li>Find your Python installation directory (typically <code>C:\Users\YourUsername\AppData\Local\Programs\Python\Python3XX</code> or <code>C:\Python3XX</code>).</li>
                     <li>Press <code>Win+X</code> and select "System", then click "Advanced system settings".</li>
@@ -331,9 +342,9 @@
                 
                 <ol>
                     <li><strong>Navigate to the CARA directory:</strong><br>
-                    Open PowerShell or Command Prompt and navigate to the directory where you extracted or cloned CARA:<br>
-                    <code class="command">cd path\to\cara</code><br>
-                    Replace <code>path\to\cara</code> with the actual path to your CARA installation directory.</li>
+                    Open a terminal (PowerShell or Command Prompt on Windows, Terminal on macOS) and navigate to the directory where you extracted or cloned CARA:<br>
+                    <code class="command">cd path/to/cara</code><br>
+                    Replace <code>path/to/cara</code> with the actual path to your CARA installation directory.</li>
                     
                     <li><strong>Install the required libraries:</strong><br>
                     Run the following command to install all dependencies:<br>
@@ -356,9 +367,9 @@
                     Download the <code>get-pip.py</code> script from <a href="https://bootstrap.pypa.io/get-pip.py" target="_blank">bootstrap.pypa.io/get-pip.py</a> and save it to a folder on your computer.</li>
                     
                     <li><strong>Run the installer:</strong><br>
-                    Open PowerShell or Command Prompt, navigate to the folder containing <code>get-pip.py</code>, and run:<br>
+                    Open a terminal, navigate to the folder containing <code>get-pip.py</code>, and run:<br>
                     <code class="command">python get-pip.py</code><br>
-                    </li>
+                    <strong>Note:</strong> On macOS, you may need to use <code>python3</code> instead of <code>python</code>.</li>
                     
                     <li><strong>Verify installation:</strong><br>
                     After installation completes, verify pip is installed:<br>
@@ -385,8 +396,9 @@
             </div>
             <div class="outline-item">
                 <h4 id="running-application">3.5 Running the Application</h4>
-                <p>To start CARA, open PowerShell or Command Prompt, navigate to the CARA directory, and run:</p>
+                <p>To start CARA, open a terminal (PowerShell or Command Prompt on Windows, Terminal on macOS), navigate to the CARA directory, and run:</p>
                 <code class="command">python cara.py</code><br>
+                <p><strong>Note:</strong> On macOS, you may need to use <code>python3</code> instead of <code>python</code>.</p>
                 
                 <h5>Configuration Files</h5>
                 <p>CARA uses several configuration files to manage settings and preferences:</p>
@@ -430,7 +442,7 @@
                     <li><strong>Database Panel</strong> (bottom): Manages your game collections with tabs for multiple PGN databases, searchable game tables, and column customization. This panel can be collapsed to maximize space for the main and detail panels.</li>
                 </ul>
                 
-                <p>You can resize any panel by dragging the splitter handles between them. The database panel can be collapsed by double-clicking its splitter handle or using <span class="menu-item">View → Hide Database Panel</span> (<code>Ctrl+Shift+D</code>). The status bar at the bottom of the window displays status messages and progress indicators during long-running operations.</p>
+                <p>You can resize any panel by dragging the splitter handles between them. The database panel can be collapsed by double-clicking its splitter handle or using <span class="menu-item">View → Hide Database Panel</span> (<code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>). The status bar at the bottom of the window displays status messages and progress indicators during long-running operations.</p>
             </div>
             <div class="outline-item">
                 <h4 id="main-panel-components">4.3 Main Panel Components</h4>
@@ -445,13 +457,13 @@
                 
                 <p>The following visual indicators can be toggled on or off:</p>
                 <ul>
-                    <li><strong>Coordinates:</strong> File and rank labels around the board edges. Toggle with <code>Alt+C</code> or <span class="menu-item">Board → Show Coordinates</span>.</li>
-                    <li><strong>Turn Indicator:</strong> Shows whose turn it is to move. Toggle with <code>Alt+T</code> or <span class="menu-item">Board → Show Turn Indicator</span>.</li>
-                    <li><strong>Played Move Arrow:</strong> Highlights the last move made in the game. Toggle with <code>Alt+P</code> or <span class="menu-item">Board → Show Played Move</span>.</li>
-                    <li><strong>Best Next Move Arrow (PV1):</strong> Shows the engine's recommended move during manual analysis mode. Toggle with <code>Alt+B</code> or <span class="menu-item">Board → Show Best Next Move</span>.</li>
-                    <li><strong>PV2 and PV3 Arrows:</strong> Display alternative candidate moves from MultiPV analysis during manual analysis mode. Toggle with <code>Alt+2</code>, <code>Alt+3</code> or <span class="menu-item">Board → Show Next Best Move (PV2/PV3)</span>.</li>
-                    <li><strong>Best Alternative Move Arrow:</strong> Highlights superior moves found after analyzing the game with the Game Analysis function. The arrow appears once analysis has been performed and indicates when the played move was not optimal. Toggle with <code>Alt+A</code> or <span class="menu-item">Board → Show Best Alternative Move</span>.</li>
-                    <li><strong>Positional Heatmap:</strong> Color-coded overlay showing positional factors (weak squares, passed pawns, outposts, piece activity, king safety). Toggle with <code>Alt+H</code> or <span class="menu-item">Board → Show Positional Heat-map</span>.</li>
+                    <li><strong>Coordinates:</strong> File and rank labels around the board edges. Toggle with <code>Alt+C</code> / <code>⌥+C</code> or <span class="menu-item">Board → Show Coordinates</span>.</li>
+                    <li><strong>Turn Indicator:</strong> Shows whose turn it is to move. Toggle with <code>Alt+T</code> / <code>⌥+T</code> or <span class="menu-item">Board → Show Turn Indicator</span>.</li>
+                    <li><strong>Played Move Arrow:</strong> Highlights the last move made in the game. Toggle with <code>Alt+P</code> / <code>⌥+P</code> or <span class="menu-item">Board → Show Played Move</span>.</li>
+                    <li><strong>Best Next Move Arrow (PV1):</strong> Shows the engine's recommended move during manual analysis mode. Toggle with <code>Alt+B</code> / <code>⌥+B</code> or <span class="menu-item">Board → Show Best Next Move</span>.</li>
+                    <li><strong>PV2 and PV3 Arrows:</strong> Display alternative candidate moves from MultiPV analysis during manual analysis mode. Toggle with <code>Alt+2</code> / <code>⌥+2</code>, <code>Alt+3</code> / <code>⌥+3</code> or <span class="menu-item">Board → Show Next Best Move (PV2/PV3)</span>.</li>
+                    <li><strong>Best Alternative Move Arrow:</strong> Highlights superior moves found after analyzing the game with the Game Analysis function. The arrow appears once analysis has been performed and indicates when the played move was not optimal. Toggle with <code>Alt+A</code> / <code>⌥+A</code> or <span class="menu-item">Board → Show Best Alternative Move</span>.</li>
+                    <li><strong>Positional Heatmap:</strong> Color-coded overlay showing positional factors (weak squares, passed pawns, outposts, piece activity, king safety). Toggle with <code>Alt+H</code> / <code>⌥+H</code> or <span class="menu-item">Board → Show Positional Heat-map</span>.</li>
                 </ul>
                 
                 <h5 id="game-information-display">4.3.2 Game Information Display</h5>
@@ -461,17 +473,17 @@
                     <li>Game result (1-0, 0-1, 1/2-1/2, or * for indecisive results)</li>
                     <li>Opening ECO code and name (e.g., "A00 - Unknown Opening")</li>
                 </ul>
-                <p>Toggle visibility with <code>Alt+I</code> or <span class="menu-item">Board → Show Game Info</span>.</p>
+                <p>Toggle visibility with <code>Alt+I</code> / <code>⌥+I</code> or <span class="menu-item">Board → Show Game Info</span>.</p>
                 
                 <h5 id="evaluation-bar">4.3.3 Evaluation Bar</h5>
-                <p>The evaluation bar appears on the left side of the chessboard and shows the engine's evaluation of the current position. The bar uses white and black colors: positive values (White advantage) are shown in white extending upward from the center, negative values (Black advantage) are shown in black extending downward from the center. The scale ranges from -1000 to +1000 centipawns, with division marks at 100, 200, 300, 500, and 1000 centipawns to help gauge the evaluation magnitude. Toggle with <code>Alt+E</code> or <span class="menu-item">Board → Show Evaluation Bar</span>. When the evaluation bar is shown, the status bar displays detailed engine information including the engine name, search depth, evaluation score, principal variation, and performance metrics such as nodes per second and hash table usage.</p>
+                <p>The evaluation bar appears on the left side of the chessboard and shows the engine's evaluation of the current position. The bar uses white and black colors: positive values (White advantage) are shown in white extending upward from the center, negative values (Black advantage) are shown in black extending downward from the center. The scale ranges from -1000 to +1000 centipawns, with division marks at 100, 200, 300, 500, and 1000 centipawns to help gauge the evaluation magnitude. Toggle with <code>Alt+E</code> / <code>⌥+E</code> or <span class="menu-item">Board → Show Evaluation Bar</span>. When the evaluation bar is shown, the status bar displays detailed engine information including the engine name, search depth, evaluation score, principal variation, and performance metrics such as nodes per second and hash table usage.</p>
                 
                 <div class="tip-box">
                     <strong>Quick Tip:</strong> The evaluation bar normally uses the engine assigned to the evaluation task. However, if manual analysis is currently running, the evaluation bar automatically switches to use the manual analysis engine's data instead. This ensures efficient resource usage by avoiding simultaneous analysis of the same position by two concurrent engines.
                 </div>
                 
                 <h5 id="material-widget">4.3.4 Material Widget</h5>
-                <p>The material widget appears in the upper right corner of the chessboard and shows captured pieces and the material difference between the two sides. The widget updates automatically as you navigate through the game. Toggle with <code>Alt+U</code> or <span class="menu-item">Board → Show Material</span>.</p>
+                <p>The material widget appears in the upper right corner of the chessboard and shows captured pieces and the material difference between the two sides. The widget updates automatically as you navigate through the game. Toggle with <code>Alt+U</code> / <code>⌥+U</code> or <span class="menu-item">Board → Show Material</span>.</p>
                 
                 <img src="screenshots/material_widget.png" alt="CARA Material Widget - Widget showing captured pieces and material difference displayed in the upper right corner of the chessboard" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
@@ -484,10 +496,10 @@
                 <p>Pieces are displayed using standard chess notation letters (P for Pawn, N for Knight, B for Bishop, R for Rook, Q for Queen).</p>
                 
                 <h5 id="turn-indicator">4.3.5 Turn Indicator</h5>
-                <p>The turn indicator shows which side is to move in the current position. Toggle with <code>Alt+T</code> or <span class="menu-item">Board → Show Turn Indicator</span>.</p>
+                <p>The turn indicator shows which side is to move in the current position. Toggle with <code>Alt+T</code> / <code>⌥+T</code> or <span class="menu-item">Board → Show Turn Indicator</span>.</p>
                 
                 <h5 id="positional-heatmap">4.3.6 Positional Heatmap</h5>
-                <p>The positional heatmap is a color-coded overlay that visualizes positional factors for each piece on the chessboard. It helps you quickly identify positional strengths and weaknesses by displaying colored gradients on squares containing pieces.<br>Toggle with <code>Alt+H</code> or <span class="menu-item">Board → Show Positional Heat-map</span>.</p>
+                <p>The positional heatmap is a color-coded overlay that visualizes positional factors for each piece on the chessboard. It helps you quickly identify positional strengths and weaknesses by displaying colored gradients on squares containing pieces.<br>Toggle with <code>Alt+H</code> / <code>⌥+H</code> or <span class="menu-item">Board → Show Positional Heat-map</span>.</p>
                 
                 <img src="screenshots/positional_heatmap.png" alt="CARA Positional Heatmap - Color-coded overlay showing positional factors on the chessboard with green gradients for strong positions and red gradients for weak positions" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
@@ -562,28 +574,28 @@
                 <h5 id="interacting-table">4.4.3 Interacting with the Table</h5>
                 <p>You can interact with the game table in several ways:</p>
                 <ul>
-                    <li><strong>Selecting Games:</strong> Click a row to select a single game. Use <code>Shift+Click</code> to select a range of games, or <code>Ctrl+Click</code> to select multiple individual games.</li>
+                    <li><strong>Selecting Games:</strong> Click a row to select a single game. Use <code>Shift+Click</code> to select a range of games, or <code>Ctrl+Click</code> / <code>⌘+Click</code> to select multiple individual games.</li>
                     <li><strong>Opening Games:</strong> Double-click any row to open that game in the main panel for review and analysis. The chessboard, moves list, and all other views update to show the selected game.</li>
                     <li><strong>Sorting:</strong> Click any column header to sort the table by that column. Click again to reverse the sort order. The sort indicator arrow shows the current sort column and direction.</li>
                     <li><strong>Resizing Columns:</strong> Drag the borders between column headers to resize columns. Most columns can be resized, while the PGN column always stretches to fill the remaining space.</li>
                 </ul>
                 
                 <h5 id="panel-management">4.4.4 Panel Management</h5>
-                <p>The Database Panel can be collapsed to maximize space for the main and detail panels. Double-click the horizontal splitter handle above the panel, or use <span class="menu-item">View → Hide Database Panel</span> (<code>Ctrl+Shift+D</code>) to toggle its visibility. When collapsed, the panel is minimized to a thin strip, and you can expand it again using the same method.</p>
+                <p>The Database Panel can be collapsed to maximize space for the main and detail panels. Double-click the horizontal splitter handle above the panel, or use <span class="menu-item">View → Hide Database Panel</span> (<code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>) to toggle its visibility. When collapsed, the panel is minimized to a thin strip, and you can expand it again using the same method.</p>
                 
                 <p>The panel automatically updates when games are added, removed, or modified in any database. Changes are reflected immediately in the table view, and unsaved indicators appear as needed to help you track which databases contain games with unsaved changes.</p>
                 
                 <h5 id="common-database-actions">4.4.5 Common Database Actions</h5>
                 <p>You can perform common database operations using the File menu or keyboard shortcuts:</p>
                 <ul>
-                    <li><strong>Open PGN Database:</strong> Use <span class="menu-item">File → Open PGN Database</span> (<code>Ctrl+O</code>) to open one or multiple PGN files. Each file appears as a separate tab in the Database Panel.</li>
-                    <li><strong>Save PGN Database:</strong> Use <span class="menu-item">File → Save PGN Database</span> (<code>Ctrl+S</code>) to save the active database. This overwrites the existing database file with the current contents.</li>
-                    <li><strong>Save PGN Database as...</strong>: Use <span class="menu-item">File → Save PGN Database as...</span> (<code>Ctrl+Shift+S</code>) to save the active database as a new copy.</li>
-                    <li><strong>Close PGN Database:</strong> Use <span class="menu-item">File → Close PGN Database</span> (<code>Ctrl+W</code>) to close the active database tab.</li>
+                    <li><strong>Open PGN Database:</strong> Use <span class="menu-item">File → Open PGN Database</span> (<code>Ctrl+O</code> / <code>⌘+O</code>) to open one or multiple PGN files. Each file appears as a separate tab in the Database Panel.</li>
+                    <li><strong>Save PGN Database:</strong> Use <span class="menu-item">File → Save PGN Database</span> (<code>Ctrl+S</code> / <code>⌘+S</code>) to save the active database. This overwrites the existing database file with the current contents.</li>
+                    <li><strong>Save PGN Database as...</strong>: Use <span class="menu-item">File → Save PGN Database as...</span> (<code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>) to save the active database as a new copy.</li>
+                    <li><strong>Close PGN Database:</strong> Use <span class="menu-item">File → Close PGN Database</span> (<code>Ctrl+W</code> / <code>⌘+W</code>) to close the active database tab.</li>
                 </ul>
                 
                 <div class="tip-box">
-                    <strong>Quick Tip:</strong> You can quickly paste PGN games from your system clipboard into either the Clipboard database or the active database. If you have PGN text copied to your clipboard (from another application, a website, or elsewhere), use <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+V</code>) to paste into the Clipboard database, or <span class="menu-item">Edit → Paste PGN to active DB</span> (<code>Ctrl+Alt+V</code>) to paste into the active database instead.
+                    <strong>Quick Tip:</strong> You can quickly paste PGN games from your system clipboard into either the Clipboard database or the active database. If you have PGN text copied to your clipboard (from another application, a website, or elsewhere), use <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+V</code> / <code>⌘+V</code>) to paste into the Clipboard database, or <span class="menu-item">Edit → Paste PGN to active DB</span> (<code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>) to paste into the active database instead.
                 </div>
             </div>
             <div class="outline-item">
@@ -598,12 +610,12 @@
                 
                 <p>You can control what elements are displayed in the PGN Notation Pane using the PGN menu. The following options are available:</p>
                 <ul>
-                    <li><span class="menu-item">PGN → Show Metadata</span> (<code>Ctrl+M</code>): Toggle display of PGN header tags (Event, Site, Date, etc.)</li>
-                    <li><span class="menu-item">PGN → Show Comments</span> (<code>Ctrl+Shift+M</code>): Toggle display of move comments</li>
-                    <li><span class="menu-item">PGN → Show Variations</span> (<code>Ctrl+Shift+V</code>): Toggle display of move variations</li>
-                    <li><span class="menu-item">PGN → Show Non-Standard Tags</span> (<code>Ctrl+Shift+T</code>): Toggle display of non-standard tags like [%evp] and [%mdl] within comments</li>
-                    <li><span class="menu-item">PGN → Show Annotations</span> (<code>Ctrl+Shift+A</code>): Toggle display of move annotations, including symbol-based annotations (!, !!, ?, ??, !?, ?!) and NAGs (Numeric Annotation Glyphs). NAGs are numeric codes (stored as $1, $2, etc. in PGN) that represent standardized chess annotations and are displayed as readable text descriptions (e.g., "good move", "poor move", "White has a slight advantage").</li>
-                    <li><span class="menu-item">PGN → Show Results</span> (<code>Ctrl+R</code>): Toggle display of game results (1-0, 0-1, 1/2-1/2)</li>
+                    <li><span class="menu-item">PGN → Show Metadata</span> (<code>Ctrl+M</code> / <code>⌘+M</code>): Toggle display of PGN header tags (Event, Site, Date, etc.)</li>
+                    <li><span class="menu-item">PGN → Show Comments</span> (<code>Ctrl+Shift+M</code> / <code>⌘+Shift+M</code>): Toggle display of move comments</li>
+                    <li><span class="menu-item">PGN → Show Variations</span> (<code>Ctrl+Shift+V</code> / <code>⌘+Shift+V</code>): Toggle display of move variations</li>
+                    <li><span class="menu-item">PGN → Show Non-Standard Tags</span> (<code>Ctrl+Shift+T</code> / <code>⌘+Shift+T</code>): Toggle display of non-standard tags like [%evp] and [%mdl] within comments</li>
+                    <li><span class="menu-item">PGN → Show Annotations</span> (<code>Ctrl+Shift+A</code> / <code>⌘+Shift+A</code>): Toggle display of move annotations, including symbol-based annotations (!, !!, ?, ??, !?, ?!) and NAGs (Numeric Annotation Glyphs). NAGs are numeric codes (stored as $1, $2, etc. in PGN) that represent standardized chess annotations and are displayed as readable text descriptions (e.g., "good move", "poor move", "White has a slight advantage").</li>
+                    <li><span class="menu-item">PGN → Show Results</span> (<code>Ctrl+R</code> / <code>⌘+R</code>): Toggle display of game results (1-0, 0-1, 1/2-1/2)</li>
                 </ul>
                 
                 <p>The PGN menu also provides options to permanently remove elements from the game's PGN. The following options are available:</p>
@@ -646,9 +658,9 @@
                 
                 <p><strong>MultiPV Analysis:</strong> The standard analysis mode displays multiple candidate moves and their evaluations. You can analyze any number of principal variation lines simultaneously, each displaying the engine's recommended moves, evaluations, and depths. The first three PV lines (PV1, PV2, PV3) have color-coded indicators in the analysis display that match the colors of the corresponding arrows on the chessboard when enabled. This visual connection helps you quickly identify which analysis line corresponds to which arrow on the board. The following options are available:</p>
                 <ul>
-                    <li><span class="menu-item">Manual Analysis → Start Manual Analysis</span> (<code>Alt+M</code>): Start or stop continuous engine analysis of the current position</li>
-                    <li><span class="menu-item">Manual Analysis → Add PV Line</span> (<code>Alt+N</code>): Add an additional principal variation line</li>
-                    <li><span class="menu-item">Manual Analysis → Remove PV Line</span> (<code>Alt+R</code>): Remove the last added PV line (requires at least two lines)</li>
+                    <li><span class="menu-item">Manual Analysis → Start Manual Analysis</span> (<code>Alt+M</code> / <code>⌥+M</code>): Start or stop continuous engine analysis of the current position</li>
+                    <li><span class="menu-item">Manual Analysis → Add PV Line</span> (<code>Alt+N</code> / <code>⌥+N</code>): Add an additional principal variation line</li>
+                    <li><span class="menu-item">Manual Analysis → Remove PV Line</span> (<code>Alt+R</code> / <code>⌥+R</code>): Remove the last added PV line (requires at least two lines)</li>
                     <li><span class="menu-item">Manual Analysis → Enable miniature preview</span>: Toggle display of a miniature board preview when hovering over PV moves</li>
                 </ul>
                 
@@ -669,7 +681,7 @@
                 <p>The Game Summary tab provides a comprehensive overview of the current game by synthesizing data from the Game Analysis function into key performance indicators (KPIs) and valuable insights. Access this tab using <span class="menu-item">View → Game Summary</span> or press <code>F4</code>.</p>
                 
                 <div class="tip-box">
-                    <strong>Quick Tip:</strong> The Game Summary is only available after running game analysis using <span class="menu-item">Game Analysis → Start Game Analysis</span> (<code>Ctrl+G</code>).
+                    <strong>Quick Tip:</strong> The Game Summary is only available after running game analysis using <span class="menu-item">Game Analysis → Start Game Analysis</span> (<code>Ctrl+G</code> / <code>⌘+G</code>).
                 </div>
                 
                 <img src="screenshots/game_summary.png" alt="CARA Game Summary View - Evaluation graph, key statistics, move classification charts, phase analysis, game highlights, and critical moments" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
@@ -678,7 +690,7 @@
                 
                 <img src="screenshots/evaluation_graph.png" alt="CARA Evaluation Graph - Visual graph showing position evaluation changes throughout the game with phase transitions and critical move indicators" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
-                <p>The evaluation graph supports two display modes that you can toggle using <span class="menu-item">Game Analysis → Normalized Evaluation Graph</span> (<code>Ctrl+Shift+N</code>):</p>
+                <p>The evaluation graph supports two display modes that you can toggle using <span class="menu-item">Game Analysis → Normalized Evaluation Graph</span> (<code>Ctrl+Shift+N</code> / <code>⌘+Shift+N</code>):</p>
                 <ul>
                     <li><strong>Zero-based mode:</strong> In this mode, 0.00 (equal position) is displayed at the bottom of the graph. Positive evaluations (White advantage) extend upward, and negative evaluations (Black advantage) extend downward from the zero line.</li>
                     <li><strong>Normalized mode:</strong> In this mode, 0.00 (equal position) is displayed in the middle of the graph with a symmetric scale. This mode is particularly useful for games with large evaluation swings, as it provides better visual balance and makes it easier to see relative changes in evaluation throughout the game.</li>
@@ -757,29 +769,29 @@
                 <h5>4.6.2 Board Controls</h5>
                 <ul>
                     <li><code>X</code>: Rotate the board 180 degrees</li>
-                    <li><code>Alt+C</code>: Toggle coordinates display</li>
-                    <li><code>Alt+T</code>: Toggle turn indicator</li>
-                    <li><code>Alt+P</code>: Toggle played move arrow</li>
-                    <li><code>Alt+B</code>: Toggle best next move arrow (PV1)</li>
-                    <li><code>Alt+2</code>: Toggle PV2 arrow</li>
-                    <li><code>Alt+3</code>: Toggle PV3 arrow</li>
-                    <li><code>Alt+A</code>: Toggle best alternative move arrow</li>
-                    <li><code>Alt+H</code>: Toggle positional heatmap</li>
-                    <li><code>Alt+E</code>: Toggle evaluation bar</li>
-                    <li><code>Alt+U</code>: Toggle material widget</li>
-                    <li><code>Alt+I</code>: Toggle game information display</li>
-                    <li><code>Alt+L</code>: Toggle annotations layer</li>
+                    <li><code>Alt+C</code> / <code>⌥+C</code>: Toggle coordinates display</li>
+                    <li><code>Alt+T</code> / <code>⌥+T</code>: Toggle turn indicator</li>
+                    <li><code>Alt+P</code> / <code>⌥+P</code>: Toggle played move arrow</li>
+                    <li><code>Alt+B</code> / <code>⌥+B</code>: Toggle best next move arrow (PV1)</li>
+                    <li><code>Alt+2</code> / <code>⌥+2</code>: Toggle PV2 arrow</li>
+                    <li><code>Alt+3</code> / <code>⌥+3</code>: Toggle PV3 arrow</li>
+                    <li><code>Alt+A</code> / <code>⌥+A</code>: Toggle best alternative move arrow</li>
+                    <li><code>Alt+H</code> / <code>⌥+H</code>: Toggle positional heatmap</li>
+                    <li><code>Alt+E</code> / <code>⌥+E</code>: Toggle evaluation bar</li>
+                    <li><code>Alt+U</code> / <code>⌥+U</code>: Toggle material widget</li>
+                    <li><code>Alt+I</code> / <code>⌥+I</code>: Toggle game information display</li>
+                    <li><code>Alt+L</code> / <code>⌥+L</code>: Toggle annotations layer</li>
                 </ul>
                 
                 <h5>4.6.3 Database Operations</h5>
                 <ul>
-                    <li><code>Ctrl+Shift+F</code>: Search games across databases</li>
-                    <li><code>Ctrl+Shift+W</code>: Close search results</li>
-                    <li><code>Ctrl+Shift+I</code>: Import online games</li>
-                    <li><code>Ctrl+Shift+R</code>: Bulk replace in databases</li>
-                    <li><code>Ctrl+Alt+T</code>: Bulk tag games</li>
-                    <li><code>Ctrl+Shift+L</code>: Bulk clean PGN</li>
-                    <li><code>Ctrl+Shift+U</code>: Deduplicate games</li>
+                    <li><code>Ctrl+Shift+F</code> / <code>⌘+Shift+F</code>: Search games across databases</li>
+                    <li><code>Ctrl+Shift+W</code> / <code>⌘+Shift+W</code>: Close search results</li>
+                    <li><code>Ctrl+Shift+I</code> / <code>⌘+Shift+I</code>: Import online games</li>
+                    <li><code>Ctrl+Shift+R</code> / <code>⌘+Shift+R</code>: Bulk replace in databases</li>
+                    <li><code>Ctrl+Alt+T</code> / <code>⌘+⌥+T</code>: Bulk tag games</li>
+                    <li><code>Ctrl+Shift+L</code> / <code>⌘+Shift+L</code>: Bulk clean PGN</li>
+                    <li><code>Ctrl+Shift+U</code> / <code>⌘+Shift+U</code>: Deduplicate games</li>
                 </ul>
                 
                 <h5>4.6.4 Detail Panel Tabs</h5>
@@ -795,67 +807,67 @@
                 
                 <h5>4.6.5 Game Analysis</h5>
                 <ul>
-                    <li><code>Ctrl+G</code>: Start game analysis for the current game</li>
+                    <li><code>Ctrl+G</code> / <code>⌘+G</code>: Start game analysis for the current game</li>
                     <li><code>Escape</code>: Cancel ongoing game analysis</li>
-                    <li><code>Ctrl+Shift+N</code>: Toggle normalized evaluation graph mode</li>
-                    <li><code>Ctrl+Shift+K</code>: Configure move classification settings</li>
+                    <li><code>Ctrl+Shift+N</code> / <code>⌘+Shift+N</code>: Toggle normalized evaluation graph mode</li>
+                    <li><code>Ctrl+Shift+K</code> / <code>⌘+Shift+K</code>: Configure move classification settings</li>
                 </ul>
                 
                 <h5>4.6.6 Manual Analysis</h5>
                 <ul>
-                    <li><code>Alt+M</code>: Start or stop continuous engine analysis of the current position</li>
-                    <li><code>Alt+N</code>: Add an additional principal variation line</li>
-                    <li><code>Alt+R</code>: Remove the last added PV line</li>
+                    <li><code>Alt+M</code> / <code>⌥+M</code>: Start or stop continuous engine analysis of the current position</li>
+                    <li><code>Alt+N</code> / <code>⌥+N</code>: Add an additional principal variation line</li>
+                    <li><code>Alt+R</code> / <code>⌥+R</code>: Remove the last added PV line</li>
                 </ul>
                 
                 <h5>4.6.7 File Operations</h5>
                 <ul>
-                    <li><code>Ctrl+O</code>: Open PGN database</li>
-                    <li><code>Ctrl+S</code>: Save active PGN database</li>
-                    <li><code>Ctrl+Shift+S</code>: Save active PGN database as...</li>
-                    <li><code>Ctrl+W</code>: Close active PGN database</li>
-                    <li><code>Ctrl+Q</code>: Close application</li>
+                    <li><code>Ctrl+O</code> / <code>⌘+O</code>: Open PGN database</li>
+                    <li><code>Ctrl+S</code> / <code>⌘+S</code>: Save active PGN database</li>
+                    <li><code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>: Save active PGN database as...</li>
+                    <li><code>Ctrl+W</code> / <code>⌘+W</code>: Close active PGN database</li>
+                    <li><code>Ctrl+Q</code> / <code>⌘+Q</code>: Close application</li>
                 </ul>
                 
                 <h5>4.6.8 Edit Operations</h5>
                 <ul>
-                    <li><code>Ctrl+V</code>: Paste PGN to Clipboard database</li>
-                    <li><code>Ctrl+Alt+V</code>: Paste PGN to active database</li>
-                    <li><code>Ctrl+P</code>: Copy PGN to clipboard</li>
+                    <li><code>Ctrl+V</code> / <code>⌘+V</code>: Paste PGN to Clipboard database</li>
+                    <li><code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>: Paste PGN to active database</li>
+                    <li><code>Ctrl+P</code> / <code>⌘+P</code>: Copy PGN to clipboard</li>
                     <li><code>Shift+F</code>: Copy FEN to clipboard</li>
-                    <li><code>Ctrl+F</code>: Paste FEN to board</li>
-                    <li><code>Ctrl+Shift+C</code>: Copy selected games</li>
+                    <li><code>Ctrl+F</code> / <code>⌘+F</code>: Paste FEN to board</li>
+                    <li><code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code>: Copy selected games</li>
                     <li><code>Ctrl+Shift+X</code>: Cut selected games</li>
                 </ul>
                 
                 <h5>4.6.9 PGN Display Options</h5>
                 <ul>
-                    <li><code>Ctrl+M</code>: Toggle metadata display</li>
-                    <li><code>Ctrl+Shift+M</code>: Toggle comments display</li>
-                    <li><code>Ctrl+Shift+V</code>: Toggle variations display</li>
-                    <li><code>Ctrl+Shift+T</code>: Toggle non-standard tags display</li>
-                    <li><code>Ctrl+Shift+A</code>: Toggle annotations display</li>
-                    <li><code>Ctrl+R</code>: Toggle results display</li>
+                    <li><code>Ctrl+M</code> / <code>⌘+M</code>: Toggle metadata display</li>
+                    <li><code>Ctrl+Shift+M</code> / <code>⌘+Shift+M</code>: Toggle comments display</li>
+                    <li><code>Ctrl+Shift+V</code> / <code>⌘+Shift+V</code>: Toggle variations display</li>
+                    <li><code>Ctrl+Shift+T</code> / <code>⌘+Shift+T</code>: Toggle non-standard tags display</li>
+                    <li><code>Ctrl+Shift+A</code> / <code>⌘+Shift+A</code>: Toggle annotations display</li>
+                    <li><code>Ctrl+R</code> / <code>⌘+R</code>: Toggle results display</li>
                 </ul>
                 
                 <h5>4.6.10 Moves List Profiles</h5>
                 <ul>
                     <li><code>1</code> - <code>9</code>: Switch to column profile 1 through 9</li>
-                    <li><code>Ctrl+Shift+P</code>: Save current profile</li>
-                    <li><code>Ctrl+Alt+P</code>: Save current profile as...</li>
-                    <li><code>Ctrl+Shift+Delete</code>: Remove current profile</li>
+                    <li><code>Ctrl+Shift+P</code> / <code>⌘+Shift+P</code>: Save current profile</li>
+                    <li><code>Ctrl+Alt+P</code> / <code>⌘+⌥+P</code>: Save current profile as...</li>
+                    <li><code>Ctrl+Shift+Delete</code> / <code>⌘+Shift+Delete</code>: Remove current profile</li>
                 </ul>
                 
                 <h5>4.6.11 Annotations</h5>
                 <ul>
                     <li><code>Ctrl+Alt+S</code>: Save annotations</li>
-                    <li><code>Ctrl+Shift+D</code>: Clear all annotations</li>
+                    <li><code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>: Clear all annotations</li>
                     <li><code>Ctrl+Alt+D</code>: Clear move annotations</li>
                 </ul>
                 
                 <h5>4.6.12 View Options</h5>
                 <ul>
-                    <li><code>Ctrl+Shift+D</code>: Toggle database panel visibility</li>
+                    <li><code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>: Toggle database panel visibility</li>
                 </ul>
                 
                 <h5>4.6.13 Engine Configuration</h5>
@@ -872,13 +884,13 @@
                     Before starting, make sure you have at least one UCI-compatible chess engine added to CARA. See <a href="#configuring-engines">section 5.1</a> for instructions on configuring engines. If you're unsure which engine to choose, <a href="https://stockfishchess.org/download/" target="_blank">Stockfish</a> is an excellent free option to get started.</li>
                     
                     <li><strong>Open a game or paste PGN:</strong><br>
-                    Open a PGN database using <span class="menu-item">File → Open PGN Database</span> (<code>Ctrl+O</code>), or paste PGN text into the Clipboard database using <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+V</code>)—the pasted game gets loaded automatically.</li>
+                    Open a PGN database using <span class="menu-item">File → Open PGN Database</span> (<code>Ctrl+O</code> / <code>⌘+O</code>), or paste PGN text into the Clipboard database using <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+V</code> / <code>⌘+V</code>)—the pasted game gets loaded automatically.</li>
                     
                     <li><strong>Switch to the Moves List view:</strong><br>
                     Press <code>F1</code> to switch to the Moves List tab, then press <code>3</code> to select the "Game Analysis - Full" profile. This profile displays all the important analysis columns you'll need to review the game.</li>
                     
                     <li><strong>Start the game analysis:</strong><br>
-                    Press <code>Ctrl+G</code> (or use <span class="menu-item">Game Analysis → Start Game Analysis</span>) to begin analyzing the game. Watch as the moves list fills in with evaluation data, move classifications, CPL values, and best move alternatives as the analysis progresses. Progress and estimated time remaining are shown in the status bar.</li>
+                    Press <code>Ctrl+G</code> / <code>⌘+G</code> (or use <span class="menu-item">Game Analysis → Start Game Analysis</span>) to begin analyzing the game. Watch as the moves list fills in with evaluation data, move classifications, CPL values, and best move alternatives as the analysis progresses. Progress and estimated time remaining are shown in the status bar.</li>
                     
                     <li><strong>Review the results:</strong><br>
                     Once analysis completes, you can review the per-move analysis directly in the Moves List, or press <code>F4</code> to switch to the Game Summary tab for a condensed overview showing key statistics, the evaluation graph, critical moments, and detected game highlights.</li>
@@ -943,7 +955,7 @@
                     Copy PGN game data from any source (website, text file, another application) to your system clipboard.</li>
                     
                     <li><strong>Paste into CARA:</strong><br>
-                    Use <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+V</code>) to paste into the Clipboard database, or <span class="menu-item">Edit → Paste PGN to active DB</span> (<code>Ctrl+Alt+V</code>) to paste into the currently active database. The pasted game gets loaded automatically and becomes the active game.</li>
+                    Use <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+V</code> / <code>⌘+V</code>) to paste into the Clipboard database, or <span class="menu-item">Edit → Paste PGN to active DB</span> (<code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>) to paste into the currently active database. The pasted game gets loaded automatically and becomes the active game.</li>
                 </ol>
                 
                 <div class="tip-box">
@@ -954,7 +966,7 @@
                 <p>To import games from one or more PGN files on your computer:</p>
                 <ol>
                     <li><strong>Open the file dialog:</strong><br>
-                    Use <span class="menu-item">File → Open PGN Database</span> (<code>Ctrl+O</code>) to open the file selection dialog.</li>
+                    Use <span class="menu-item">File → Open PGN Database</span> (<code>Ctrl+O</code> / <code>⌘+O</code>) to open the file selection dialog.</li>
                     
                     <li><strong>Select files:</strong><br>
                     Select one or multiple PGN files from your computer. You can select multiple files by holding <code>Ctrl</code> (individual selection) or <code>Shift</code> (range selection) while clicking.</li>
@@ -967,7 +979,7 @@
                 <p>CARA can import games directly from online chess platforms:</p>
                 <ol>
                     <li><strong>Open the import dialog:</strong><br>
-                    Use <span class="menu-item">File → Import Games from Online...</span> (<code>Ctrl+Shift+I</code>) to open the import dialog.</li>
+                    Use <span class="menu-item">File → Import Games from Online...</span> (<code>Ctrl+Shift+I</code> / <code>⌘+Shift+I</code>) to open the import dialog.</li>
                     
                     <li><strong>Select platform and enter username:</strong><br>
                     Choose either <strong>Lichess</strong> or <strong>Chess.com</strong>, then enter the username of the player whose games you want to import.</li>
@@ -990,14 +1002,14 @@
                 <p>CARA provides several tools for managing your game databases, including basic file operations and powerful bulk operations for batch processing multiple games at once.</p>
                 
                 <div class="tip-box">
-                    <strong>Quick Tip:</strong> All changes made to a database (including bulk operations, tag modifications, and game edits) are applied in memory only and are not persisted to disk until you explicitly save the database using <span class="menu-item">File → Save PGN Database</span> (<code>Ctrl+S</code>) or <span class="menu-item">File → Save PGN Database as...</span> (<code>Ctrl+Shift+S</code>). The unsaved changes indicator (orange dot) on database tabs helps you track which databases have unsaved modifications.
+                    <strong>Quick Tip:</strong> All changes made to a database (including bulk operations, tag modifications, and game edits) are applied in memory only and are not persisted to disk until you explicitly save the database using <span class="menu-item">File → Save PGN Database</span> (<code>Ctrl+S</code> / <code>⌘+S</code>) or <span class="menu-item">File → Save PGN Database as...</span> (<code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>). The unsaved changes indicator (orange dot) on database tabs helps you track which databases have unsaved modifications.
                 </div>
                 
                 <h5 id="basic-database-operations">5.3.1 Basic Database Operations</h5>
                 <p>For opening, saving, and closing databases, see <a href="#common-database-actions">section 4.4.5</a>.</p>
                 
                 <h5 id="bulk-replace-tags">5.3.2 Bulk Replace Tags</h5>
-                <p>Use <span class="menu-item">File → Bulk Replace Tags...</span> (<code>Ctrl+Shift+R</code>) to find and replace text in metadata tags across multiple games. This is useful for correcting typos, standardizing player names, or updating event information.</p>
+                <p>Use <span class="menu-item">File → Bulk Replace Tags...</span> (<code>Ctrl+Shift+R</code> / <code>⌘+Shift+R</code>) to find and replace text in metadata tags across multiple games. This is useful for correcting typos, standardizing player names, or updating event information.</p>
                 <img src="screenshots/bulk_replace_tags_dialog.png" alt="CARA Bulk Replace Tags Dialog - Dialog for finding and replacing text in metadata tags across multiple games with tag selection, find/replace fields, and matching options" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 <p>The dialog allows you to:</p>
                 <ul>
@@ -1014,7 +1026,7 @@
                 </ul>
                 
                 <h5 id="bulk-add-remove-tags">5.3.3 Bulk Add/Remove Tags</h5>
-                <p>Use <span class="menu-item">File → Bulk Add/Remove Tags...</span> (<code>Ctrl+Alt+T</code>) to add or remove metadata tags across multiple games. This is useful for adding missing information or cleaning up tag sets.</p>
+                <p>Use <span class="menu-item">File → Bulk Add/Remove Tags...</span> (<code>Ctrl+Alt+T</code> / <code>⌘+⌥+T</code>) to add or remove metadata tags across multiple games. This is useful for adding missing information or cleaning up tag sets.</p>
                 <p>The dialog allows you to:</p>
                 <ul>
                     <li>Add a new tag with a fixed value or copy from another tag</li>
@@ -1023,7 +1035,7 @@
                 </ul>
                 
                 <h5 id="bulk-clean-pgn">5.3.4 Bulk Clean PGN</h5>
-                <p>Use <span class="menu-item">File → Bulk Clean PGN...</span> (<code>Ctrl+Shift+L</code>) to remove unwanted elements from PGN notation across multiple games.</p>
+                <p>Use <span class="menu-item">File → Bulk Clean PGN...</span> (<code>Ctrl+Shift+L</code> / <code>⌘+Shift+L</code>) to remove unwanted elements from PGN notation across multiple games.</p>
                 <p>The dialog allows you to remove:</p>
                 <ul>
                     <li>Comments</li>
@@ -1035,7 +1047,7 @@
                 <p>You can select any combination of these options and process all games or only selected games in the database table.</p>
                 
                 <h5 id="deduplicate-games">5.3.5 Deduplicate Games</h5>
-                <p>Use <span class="menu-item">File → Deduplicate Games in Active Database...</span> (<code>Ctrl+Shift+U</code>) to identify and remove duplicate games from the active database.</p>
+                <p>Use <span class="menu-item">File → Deduplicate Games in Active Database...</span> (<code>Ctrl+Shift+U</code> / <code>⌘+Shift+U</code>) to identify and remove duplicate games from the active database.</p>
                 <p>The deduplication dialog allows you to choose how games are matched:</p>
                 <ul>
                     <li><strong>Exact PGN:</strong> Matches games with identical PGN notation (including headers, moves, comments, and variations)</li>
@@ -1053,7 +1065,7 @@
                 <img src="screenshots/search_games_dialog.png" alt="CARA Search Games Dialog - Dialog for searching games with search scope options, criteria rows with fields/operators/values, logical operators, and grouping controls" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
                 <h5 id="search-scope">5.4.1 Search Scope</h5>
-                <p>When you open the search dialog using <span class="menu-item">File → Search Games...</span> (<code>Ctrl+F</code>), you can choose where to search:</p>
+                <p>When you open the search dialog using <span class="menu-item">File → Search Games...</span> (<code>Ctrl+F</code> / <code>⌘+F</code>), you can choose where to search:</p>
                 <ul>
                     <li><strong>Active database:</strong> Search only within the currently active database tab.</li>
                     <li><strong>All open databases:</strong> Search across all open database tabs simultaneously. Results from different databases are combined and displayed in a dedicated "Search Results" tab with an additional "Source DB" column indicating which database each game came from.</li>
@@ -1119,7 +1131,7 @@
                     Make sure you have at least one UCI-compatible chess engine configured and assigned to the game analysis task. See <a href="#configuring-engines">section 5.1</a> for engine setup instructions.</li>
                     
                     <li><strong>Start the analysis:</strong><br>
-                    Use <span class="menu-item">Game Analysis → Start Game Analysis</span> (<code>Ctrl+G</code>) to begin analyzing the game. CARA will automatically switch to the Moves List tab if configured to do so (see <a href="#analysis-settings">section 5.5.3</a>).</li>
+                    Use <span class="menu-item">Game Analysis → Start Game Analysis</span> (<code>Ctrl+G</code> / <code>⌘+G</code>) to begin analyzing the game. CARA will automatically switch to the Moves List tab if configured to do so (see <a href="#analysis-settings">section 5.5.3</a>).</li>
                 </ol>
                 <p>During analysis, CARA processes each move sequentially, evaluating the position before and after each move, calculating Centipawn Loss (CPL), and classifying move quality. Progress is displayed in the status bar, showing the current move being analyzed, the engine name, search depth, and evaluation.</p>
                 
@@ -1145,7 +1157,7 @@
                 </ul>
                 
                 <div class="tip-box">
-                    <strong>Quick Tip:</strong> The thresholds used for move classification (e.g., what CPL value constitutes a "Mistake" vs. "Blunder") can be customized in the Classification Settings dialog. Access it via <span class="menu-item">Game Analysis → Configure Classification Settings...</span> (<code>Ctrl+Shift+K</code>).
+                    <strong>Quick Tip:</strong> The thresholds used for move classification (e.g., what CPL value constitutes a "Mistake" vs. "Blunder") can be customized in the Classification Settings dialog. Access it via <span class="menu-item">Game Analysis → Configure Classification Settings...</span> (<code>Ctrl+Shift+K</code> / <code>⌘+Shift+K</code>).
                 </div>
                 
                 <p>You can review this information in the Moves List, or switch to the <span class="menu-item">Game Summary</span> tab (<code>F4</code>) for a condensed overview of key game moments, statistics, and highlights.</p>
@@ -1183,7 +1195,7 @@
                     Navigate to the <span class="menu-item">Manual Analysis</span> tab in the Detail Panel (<code>F3</code>).</li>
                     
                     <li><strong>Start analysis:</strong><br>
-                    Use <span class="menu-item">Manual Analysis → Start Manual Analysis</span> (<code>Alt+M</code>) to begin continuous analysis. The engine will analyze the current position and display principal variation lines with evaluations, depths, and move sequences.</li>
+                    Use <span class="menu-item">Manual Analysis → Start Manual Analysis</span> (<code>Alt+M</code> / <code>⌥+M</code>) to begin continuous analysis. The engine will analyze the current position and display principal variation lines with evaluations, depths, and move sequences.</li>
                 </ol>
                 <p>Analysis continues automatically as you navigate to different positions in the game. To stop analysis, use the same menu item or keyboard shortcut again.</p>
                 
@@ -1191,8 +1203,8 @@
                 <p>Manual Analysis supports MultiPV (Multiple Principal Variations), allowing you to see multiple candidate moves simultaneously. By default, analysis shows one principal variation line (PV1). You can add additional lines to compare different candidate moves:</p>
                 <img src="screenshots/manual_analysis.png" alt="CARA Manual Analysis View - MultiPV analysis display showing principal variation lines with evaluations, depths, and move sequences" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 <ul>
-                    <li><strong>Add PV Line:</strong> Use <span class="menu-item">Manual Analysis → Add PV Line</span> (<code>Alt+N</code>) to add another principal variation line. You can add as many lines as needed.</li>
-                    <li><strong>Remove PV Line:</strong> Use <span class="menu-item">Manual Analysis → Remove PV Line</span> (<code>Alt+R</code>) to remove the last added line (requires at least two lines).</li>
+                    <li><strong>Add PV Line:</strong> Use <span class="menu-item">Manual Analysis → Add PV Line</span> (<code>Alt+N</code> / <code>⌥+N</code>) to add another principal variation line. You can add as many lines as needed.</li>
+                    <li><strong>Remove PV Line:</strong> Use <span class="menu-item">Manual Analysis → Remove PV Line</span> (<code>Alt+R</code> / <code>⌥+R</code>) to remove the last added line (requires at least two lines).</li>
                 </ul>
                 <p>Each PV line displays the engine's recommended move sequence, evaluation, search depth, and performance metrics. The first three PV lines (PV1, PV2, PV3) have color-coded indicators that match the colors of the corresponding arrows on the chessboard when enabled, helping you visually connect the analysis lines to the board arrows.</p>
                 
@@ -1200,7 +1212,7 @@
                 <p>You can explore variations by hovering over moves in the PV lines:</p>
                 <ul>
                     <li><strong>Miniature Board Preview:</strong> Enable <span class="menu-item">Manual Analysis → Enable miniature preview</span> to display a small board preview when hovering over moves in the PV lines. This shows the resulting position if that move were played.</li>
-                    <li><strong>PV Arrows on Board:</strong> The PV1, PV2, and PV3 arrows on the chessboard (toggle with <code>Alt+B</code>, <code>Alt+2</code>, <code>Alt+3</code>) show the recommended moves from each analysis line, making it easy to see candidate moves visually.</li>
+                    <li><strong>PV Arrows on Board:</strong> The PV1, PV2, and PV3 arrows on the chessboard (toggle with <code>Alt+B</code> / <code>⌥+B</code>, <code>Alt+2</code> / <code>⌥+2</code>, <code>Alt+3</code> / <code>⌥+3</code>) show the recommended moves from each analysis line, making it easy to see candidate moves visually.</li>
                 </ul>
                 
                 <h5 id="positional-plan-exploration">5.6.4 Positional Plan Exploration</h5>
@@ -1293,8 +1305,8 @@
                 <ul>
                     <li><strong>Save Annotations:</strong> Use <span class="menu-item">Annotations → Save Annotations to current game</span> (<code>Ctrl+Alt+S</code>) to save all annotations to the active game. Annotations are compressed and stored in a PGN metadata tag, keeping the PGN move notation clean.</li>
                     <li><strong>Clear Move Annotations:</strong> Use <span class="menu-item">Annotations → Clear all Annotations for current move</span> (<code>Ctrl+Alt+D</code>) to remove all annotations for the current position.</li>
-                    <li><strong>Clear All Annotations:</strong> Use <span class="menu-item">Annotations → Clear all Annotations for current game</span> (<code>Ctrl+Shift+D</code>) to remove all annotations from the entire game.</li>
-                    <li><strong>Toggle Visibility:</strong> Use <span class="menu-item">Board → Show Annotations</span> (<code>Alt+L</code>) to show or hide the annotation layer on the chessboard.</li>
+                    <li><strong>Clear All Annotations:</strong> Use <span class="menu-item">Annotations → Clear all Annotations for current game</span> (<code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>) to remove all annotations from the entire game.</li>
+                    <li><strong>Toggle Visibility:</strong> Use <span class="menu-item">Board → Show Annotations</span> (<code>Alt+L</code> / <code>⌥+L</code>) to show or hide the annotation layer on the chessboard.</li>
                 </ul>
                 
                 <div class="tip-box">
@@ -1313,7 +1325,7 @@
                     In the Database Panel, select one or more games in the game table. You can select multiple games by holding <code>Ctrl</code> (individual selection) or <code>Shift</code> (range selection) while clicking.</li>
                     
                     <li><strong>Copy to clipboard:</strong><br>
-                    Use <span class="menu-item">Edit → Copy selected Games</span> (<code>Ctrl+Shift+C</code>) to copy the selected games to your system clipboard as PGN text. The games remain in the source database.</li>
+                    Use <span class="menu-item">Edit → Copy selected Games</span> (<code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code>) to copy the selected games to your system clipboard as PGN text. The games remain in the source database.</li>
                 </ol>
                 <p>The copied games are stored as standard PGN text, separated by double newlines. You can paste them into another database in CARA, or into any other application that accepts PGN text.</p>
                 
@@ -1338,7 +1350,7 @@
                     Activate the database tab where you want to paste the games, or use the Clipboard database.</li>
                     
                     <li><strong>Paste games:</strong><br>
-                    Use <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+V</code>) to paste into the Clipboard database, or <span class="menu-item">Edit → Paste PGN to active DB</span> (<code>Ctrl+Alt+V</code>) to paste into the currently active database.</li>
+                    Use <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+V</code> / <code>⌘+V</code>) to paste into the Clipboard database, or <span class="menu-item">Edit → Paste PGN to active DB</span> (<code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>) to paste into the currently active database.</li>
                 </ol>
                 <p>All games in the clipboard PGN text are added to the selected database. If the clipboard contains multiple games, all are added, and the first game automatically becomes the active game. The destination database is marked as having unsaved changes.</p>
                 
@@ -1353,7 +1365,7 @@
                     Make sure you have a game open and active (displayed in the main panel).</li>
                     
                     <li><strong>Copy PGN:</strong><br>
-                    Use <span class="menu-item">Edit → Copy PGN</span> (<code>Ctrl+P</code>) to copy the active game's complete PGN text to your system clipboard.</li>
+                    Use <span class="menu-item">Edit → Copy PGN</span> (<code>Ctrl+P</code> / <code>⌘+P</code>) to copy the active game's complete PGN text to your system clipboard.</li>
                 </ol>
                 <p>This copies the full PGN notation of the active game, including all metadata tags, moves, comments, and variations. You can then paste it into another application or share it with others.</p>
                 
@@ -1362,7 +1374,7 @@
                 <ul>
                     <li><strong>Copy FEN:</strong> Use <span class="menu-item">Edit → Copy FEN</span> (<code>Shift+F</code>) to copy the current board position as FEN notation to your system clipboard. This is useful for sharing specific positions or setting up positions in other chess applications.</li>
                     
-                    <li><strong>Paste FEN:</strong> Use <span class="menu-item">Edit → Paste FEN to Board</span> (<code>Ctrl+F</code>) to paste a FEN position from your clipboard and update the chessboard to that position. When a FEN is pasted, the active game is cleared (set to None) since the board position is no longer part of a game sequence.</li>
+                    <li><strong>Paste FEN:</strong> Use <span class="menu-item">Edit → Paste FEN to Board</span> (<code>Ctrl+F</code> / <code>⌘+F</code>) to paste a FEN position from your clipboard and update the chessboard to that position. When a FEN is pasted, the active game is cleared (set to None) since the board position is no longer part of a game sequence.</li>
                 </ul>
             </div>
         </section>
@@ -1376,55 +1388,55 @@
                 <h4 id="file-menu">6.1 File Menu</h4>
                 
                 <h5>6.1.1 Clear Clipboard Database</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+C</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code></p>
                 <p>Removes all games from the Clipboard database.</p>
                 
                 <h5>6.1.2 Open PGN Database</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+O</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+O</code> / <code>⌘+O</code></p>
                 <p>Opens one or more PGN files from your computer. Each file appears as a separate tab in the Database Panel.<br>See <a href="#open-pgn-files">section 5.2.2</a> for detailed instructions.</p>
                 
                 <h5>6.1.3 Close PGN Database</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+W</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+W</code> / <code>⌘+W</code></p>
                 <p>Closes the currently active database tab. Any unsaved changes will be lost if you haven't saved the database first.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
                 
                 <h5>6.1.4 Save PGN Database</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+S</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+S</code> / <code>⌘+S</code></p>
                 <p>Saves the active database to disk, overwriting the existing file.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
                 
                 <h5>6.1.5 Save PGN Database as...</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+S</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code></p>
                 <p>Saves the active database to a new file location. This allows you to create a copy of the database without overwriting the original.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
                 
                 <h5>6.1.6 Import Games from Online...</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+I</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+I</code> / <code>⌘+Shift+I</code></p>
                 <p>Opens a dialog to import games from Lichess or Chess.com.<br>See <a href="#import-from-online">section 5.2.3</a> for detailed instructions.</p>
                 
                 <h5>6.1.7 Bulk Replace Tags...</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+R</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+R</code> / <code>⌘+Shift+R</code></p>
                 <p>Opens a dialog to find and replace text in metadata tags across multiple games.<br>See <a href="#bulk-replace-tags">section 5.3.2</a> for detailed instructions.</p>
                 
                 <h5>6.1.8 Bulk Add/Remove Tags...</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Alt+T</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Alt+T</code> / <code>⌘+⌥+T</code></p>
                 <p>Opens a dialog to add or remove metadata tags across multiple games.<br>See <a href="#bulk-add-remove-tags">section 5.3.3</a> for detailed instructions.</p>
                 
                 <h5>6.1.9 Bulk Clean PGN...</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+L</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+L</code> / <code>⌘+Shift+L</code></p>
                 <p>Opens a dialog to remove unwanted elements (comments, variations, annotations, etc.) from PGN notation across multiple games.<br>See <a href="#bulk-clean-pgn">section 5.3.4</a> for detailed instructions.</p>
                 
                 <h5>6.1.10 Deduplicate Games in Active Database...</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+U</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+U</code> / <code>⌘+Shift+U</code></p>
                 <p>Opens a dialog to identify and remove duplicate games from the active database.<br>See <a href="#deduplicate-games">section 5.3.5</a> for detailed instructions.</p>
                 
                 <h5>6.1.11 Search Games...</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+F</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+F</code> / <code>⌘+Shift+F</code></p>
                 <p>Opens a dialog to search for games across databases using multiple criteria and logical operators.<br>See <a href="#searching-games">section 5.4</a> for detailed instructions.</p>
                 
                 <h5>6.1.12 Close Search Results</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+W</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+W</code> / <code>⌘+Shift+W</code></p>
                 <p>Closes the Search Results tab in the Database Panel. This menu item is only enabled when a search results tab is open.</p>
                 
                 <h5>6.1.13 Close Application</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Q</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Q</code> / <code>⌘+Q</code></p>
                 <p>Closes the CARA application. Any unsaved changes in open databases will be lost if you haven't saved them first.</p>
             </div>
 
@@ -1437,11 +1449,11 @@
                 <p>Copies the current board position as FEN (Forsyth-Edwards Notation) to your system clipboard.<br>See <a href="#copying-pasting-positions">section 5.9.5</a> for more information.</p>
                 
                 <h5>6.2.2 Copy PGN</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+P</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+P</code> / <code>⌘+P</code></p>
                 <p>Copies the currently active game's complete PGN text to your system clipboard.<br>See <a href="#copying-active-game-pgn">section 5.9.4</a> for more information.</p>
                 
                 <h5>6.2.3 Copy selected Games</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+C</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code></p>
                 <p>Copies the selected games from the active database to your system clipboard as PGN text. The games remain in the source database.<br>See <a href="#copying-selected-games">section 5.9.1</a> for more information.</p>
                 
                 <h5>6.2.4 Cut selected Games</h5>
@@ -1449,15 +1461,15 @@
                 <p>Copies the selected games to your system clipboard and removes them from the source database.<br>See <a href="#cutting-selected-games">section 5.9.2</a> for more information.</p>
                 
                 <h5>6.2.5 Paste FEN to Board</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+F</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+F</code> / <code>⌘+F</code></p>
                 <p>Pastes a FEN position from your clipboard and updates the chessboard to that position. The active game is cleared when a FEN is pasted.<br>See <a href="#copying-pasting-positions">section 5.9.5</a> for more information.</p>
                 
                 <h5>6.2.6 Paste PGN to Clipboard DB</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+V</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+V</code> / <code>⌘+V</code></p>
                 <p>Pastes PGN text from your system clipboard into the Clipboard database. All games in the clipboard are added, and the first game becomes active.<br>See <a href="#copy-from-clipboard">section 5.2.1</a> and <a href="#pasting-games">section 5.9.3</a> for more information.</p>
                 
                 <h5>6.2.7 Paste PGN to active DB</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Alt+V</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code></p>
                 <p>Pastes PGN text from your system clipboard into the currently active database. All games in the clipboard are added, and the first game becomes active.<br>See <a href="#copy-from-clipboard">section 5.2.1</a> and <a href="#pasting-games">section 5.9.3</a> for more information.</p>
             </div>
 
@@ -1470,51 +1482,51 @@
                 <p>Toggles the board orientation, rotating it 180 degrees. This is useful for viewing positions from the opposite side's perspective.</p>
                 
                 <h5>6.3.2 Show Game Info</h5>
-                <p><strong>Shortcut:</strong> <code>Alt+I</code></p>
+                <p><strong>Shortcut:</strong> <code>Alt+I</code> / <code>⌥+I</code></p>
                 <p>Toggles the display of game information (players, result, date, etc.) above the chessboard.</p>
                 
                 <h5>6.3.3 Show Coordinates</h5>
-                <p><strong>Shortcut:</strong> <code>Alt+C</code></p>
+                <p><strong>Shortcut:</strong> <code>Alt+C</code> / <code>⌥+C</code></p>
                 <p>Toggles the display of coordinate labels (a-h, 1-8) around the chessboard edges.</p>
                 
                 <h5>6.3.4 Show Turn Indicator</h5>
-                <p><strong>Shortcut:</strong> <code>Alt+T</code></p>
+                <p><strong>Shortcut:</strong> <code>Alt+T</code> / <code>⌥+T</code></p>
                 <p>Toggles the display of the turn indicator showing which side is to move.<br>See <a href="#turn-indicator">section 4.3.5</a> for more information.</p>
                 
                 <h5>6.3.5 Show Material</h5>
-                <p><strong>Shortcut:</strong> <code>Alt+U</code></p>
+                <p><strong>Shortcut:</strong> <code>Alt+U</code> / <code>⌥+U</code></p>
                 <p>Toggles the display of the material widget showing captured pieces and material difference.<br>See <a href="#material-widget">section 4.3.4</a> for more information.</p>
                 
                 <h5>6.3.6 Show Evaluation Bar</h5>
-                <p><strong>Shortcut:</strong> <code>Alt+E</code></p>
+                <p><strong>Shortcut:</strong> <code>Alt+E</code> / <code>⌥+E</code></p>
                 <p>Toggles the display of the evaluation bar showing the engine's assessment of the current position.<br>See <a href="#evaluation-bar">section 4.3.3</a> for more information.</p>
                 
                 <h5>6.3.7 Show Positional Heat-map</h5>
-                <p><strong>Shortcut:</strong> <code>Alt+H</code></p>
+                <p><strong>Shortcut:</strong> <code>Alt+H</code> / <code>⌥+H</code></p>
                 <p>Toggles the display of the positional heatmap overlay showing positional factors through color-coded gradients.<br>See <a href="#positional-heatmap">section 4.3.6</a> for detailed information.</p>
                 
                 <h5>6.3.8 Show Played Move</h5>
-                <p><strong>Shortcut:</strong> <code>Alt+P</code></p>
+                <p><strong>Shortcut:</strong> <code>Alt+P</code> / <code>⌥+P</code></p>
                 <p>Toggles the display of an arrow on the chessboard indicating the last move played in the game.</p>
                 
                 <h5>6.3.9 Show Best Next Move</h5>
-                <p><strong>Shortcut:</strong> <code>Alt+B</code></p>
+                <p><strong>Shortcut:</strong> <code>Alt+B</code> / <code>⌥+B</code></p>
                 <p>Toggles the display of an arrow showing the engine's best recommended move (PV1) from manual analysis.</p>
                 
                 <h5>6.3.10 Show Next Best Move (PV2)</h5>
-                <p><strong>Shortcut:</strong> <code>Alt+2</code></p>
+                <p><strong>Shortcut:</strong> <code>Alt+2</code> / <code>⌥+2</code></p>
                 <p>Toggles the display of an arrow showing the engine's second-best recommended move (PV2) from manual analysis.</p>
                 
                 <h5>6.3.11 Show Next Best Move (PV3)</h5>
-                <p><strong>Shortcut:</strong> <code>Alt+3</code></p>
+                <p><strong>Shortcut:</strong> <code>Alt+3</code> / <code>⌥+3</code></p>
                 <p>Toggles the display of an arrow showing the engine's third-best recommended move (PV3) from manual analysis.</p>
                 
                 <h5>6.3.12 Show Best Alternative Move</h5>
-                <p><strong>Shortcut:</strong> <code>Alt+A</code></p>
+                <p><strong>Shortcut:</strong> <code>Alt+A</code> / <code>⌥+A</code></p>
                 <p>Toggles the display of an arrow showing the best alternative move found during game analysis (the move that should have been played instead of the actual move).</p>
                 
                 <h5>6.3.13 Show Annotations Layer</h5>
-                <p><strong>Shortcut:</strong> <code>Alt+L</code></p>
+                <p><strong>Shortcut:</strong> <code>Alt+L</code> / <code>⌥+L</code></p>
                 <p>Toggles the visibility of the annotations layer on the chessboard, showing or hiding all custom annotations (text, arrows, circles, squares).<br>See <a href="#adding-annotations">section 5.8</a> for more information.</p>
                 
                 <h5>6.3.14 Path trajectory style</h5>
@@ -1530,27 +1542,27 @@
                 <h4 id="pgn-menu">6.4 PGN Menu</h4>
                 
                 <h5>6.4.1 Show Metadata</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+M</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+M</code> / <code>⌘+M</code></p>
                 <p>Toggles the display of PGN header tags (Event, Site, Date, etc.) in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
                 <h5>6.4.2 Show Comments</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+M</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+M</code> / <code>⌘+Shift+M</code></p>
                 <p>Toggles the display of move comments in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
                 <h5>6.4.3 Show Variations</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+V</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+V</code> / <code>⌘+Shift+V</code></p>
                 <p>Toggles the display of move variations in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
                 <h5>6.4.4 Show Non-Standard Tags</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+T</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+T</code> / <code>⌘+Shift+T</code></p>
                 <p>Toggles the display of non-standard tags like [%evp] and [%mdl] within comments in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
                 <h5>6.4.5 Show Annotations</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+A</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+A</code> / <code>⌘+Shift+A</code></p>
                 <p>Toggles the display of move annotations (symbols like !, ?, and NAGs) in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
                 <h5>6.4.6 Show Results</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+R</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+R</code> / <code>⌘+R</code></p>
                 <p>Toggles the display of game results (1-0, 0-1, 1/2-1/2) in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
                 <h5>6.4.7 Remove Comments</h5>
@@ -1574,15 +1586,15 @@
                 <p>The Moves List menu displays all available column profiles at the top. Each profile is a named configuration that defines which columns are visible and their order. Switch between profiles by selecting them from the menu or using number keys <code>1</code> through <code>9</code> (assigned to the first nine profiles).<br>See <a href="#moves-list">section 4.5.1</a> for detailed information about column profiles and default profiles.</p>
                 
                 <h5>6.5.2 Save Profile</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+P</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+P</code> / <code>⌘+Shift+P</code></p>
                 <p>Saves the current column profile, overwriting the existing profile with the current column visibility, order, and width settings.<br>See <a href="#moves-list">section 4.5.1</a> for more information.</p>
                 
                 <h5>6.5.3 Save Profile as...</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Alt+P</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Alt+P</code> / <code>⌘+⌥+P</code></p>
                 <p>Creates a new column profile with a custom name, using the current column visibility, order, and width settings. The new profile is then accessible via the Moves List menu and is assigned a keyboard shortcut (1-9) based on its position in the profile list.<br>See <a href="#moves-list">section 4.5.1</a> for more information.</p>
                 
                 <h5>6.5.4 Remove Profile</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+Delete</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+Delete</code> / <code>⌘+Shift+Delete</code></p>
                 <p>Permanently removes the currently active column profile.</p>
                 
                 <h5>6.5.5 Setup Profile...</h5>
@@ -1607,7 +1619,7 @@
                 <h4 id="game-analysis-menu">6.6 Game Analysis Menu</h4>
                 
                 <h5>6.6.1 Start Game Analysis</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+G</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+G</code> / <code>⌘+G</code></p>
                 <p>Initiates automatic analysis of the currently active game using the engine assigned to the Game Analysis task. The engine analyzes each move in the game, providing evaluations, move classifications, and best move alternatives.<br>See <a href="#analyzing-game">section 5.5</a> for detailed instructions.</p>
                 
                 <h5>6.6.2 Cancel Game Analysis</h5>
@@ -1618,11 +1630,11 @@
                 <p>Opens a dialog to analyze multiple games at once. CARA automatically optimizes available CPU cores to analyze multiple games in parallel, maximizing analysis speed. Progress and estimated time remaining are displayed in the status bar, and you can cancel and resume bulk analysis at any time.<br>See <a href="#bulk-analysis">section 5.5.5</a> for detailed instructions.</p>
                 
                 <h5>6.6.4 Configure Classification Settings...</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+K</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+K</code> / <code>⌘+Shift+K</code></p>
                 <p>Opens a dialog to customize the thresholds used for move classification (Brilliant, Best Move, Good Move, Inaccuracy, Mistake, Blunder). These thresholds determine how moves are categorized based on Centipawn Loss (CPL) values.<br>See <a href="#analysis-results">section 5.5.2</a> for more information about move classifications.</p>
                 
                 <h5>6.6.5 Normalized Evaluation Graph</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+N</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+N</code> / <code>⌘+Shift+N</code></p>
                 <p>Toggles the normalized evaluation graph display mode in the Moves List. When enabled, evaluation values are normalized to a scale that better highlights relative evaluation changes throughout the game, making it easier to identify critical moments and evaluation swings.</p>
                 
                 <h5>6.6.6 Post-Game Brilliancy Refinement</h5>
@@ -1645,15 +1657,15 @@
             <div class="outline-item">
                 <h4 id="manual-analysis-menu">6.7 Manual Analysis Menu</h4>
                 <h5>6.7.1 Start Manual Analysis</h5>
-                <p><strong>Shortcut:</strong> <code>Alt+M</code></p>
+                <p><strong>Shortcut:</strong> <code>Alt+M</code> / <code>⌥+M</code></p>
                 <p>Starts or stops continuous engine analysis of the current position. When enabled, the engine analyzes the current position and displays principal variation lines with evaluations, depths, and move sequences. Analysis continues automatically as you navigate to different positions. Use the same menu item or shortcut again to stop analysis.<br>See <a href="#starting-manual-analysis">section 5.6.1</a> for detailed instructions.</p>
                 
                 <h5>6.7.2 Add PV Line</h5>
-                <p><strong>Shortcut:</strong> <code>Alt+N</code></p>
+                <p><strong>Shortcut:</strong> <code>Alt+N</code> / <code>⌥+N</code></p>
                 <p>Adds an additional principal variation line to the MultiPV analysis display. This allows you to compare multiple candidate moves simultaneously. You can add as many lines as needed.<br>See <a href="#multipv-analysis">section 5.6.2</a> for more information.</p>
                 
                 <h5>6.7.3 Remove PV Line</h5>
-                <p><strong>Shortcut:</strong> <code>Alt+R</code></p>
+                <p><strong>Shortcut:</strong> <code>Alt+R</code> / <code>⌥+R</code></p>
                 <p>Removes the last added principal variation line from the MultiPV analysis display.<br>See <a href="#multipv-analysis">section 5.6.2</a> for more information.</p>
                 
                 <h5>6.7.4 Enable miniature preview</h5>
@@ -1683,7 +1695,7 @@
                 <h4 id="annotations-menu">6.8 Annotations Menu</h4>
                 
                 <h5>6.8.1 Clear all Annotations for current game</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+D</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code></p>
                 <p>Removes all annotations from the entire active game. This action affects all positions in the game and cannot be undone.<br>See <a href="#managing-annotations">section 5.8.3</a> for more information.</p>
                 
                 <h5>6.8.2 Clear all Annotations for current move</h5>
@@ -1786,37 +1798,37 @@
                 <h5>6.12.3 Game Analysis</h5>
                 <p>Shortcuts for analyzing games:</p>
                 <ul>
-                    <li><code>Ctrl+G</code>: Start game analysis for the current game</li>
+                    <li><code>Ctrl+G</code> / <code>⌘+G</code>: Start game analysis for the current game</li>
                     <li><code>Escape</code>: Cancel ongoing game analysis</li>
-                    <li><code>Ctrl+Shift+K</code>: Configure move classification settings</li>
-                    <li><code>Ctrl+Shift+N</code>: Toggle normalized evaluation graph mode</li>
+                    <li><code>Ctrl+Shift+K</code> / <code>⌘+Shift+K</code>: Configure move classification settings</li>
+                    <li><code>Ctrl+Shift+N</code> / <code>⌘+Shift+N</code>: Toggle normalized evaluation graph mode</li>
                 </ul>
                 
                 <h5>6.12.4 File Operations</h5>
                 <p>Standard file management shortcuts:</p>
                 <ul>
-                    <li><code>Ctrl+O</code>: Open PGN database</li>
-                    <li><code>Ctrl+S</code>: Save active PGN database</li>
-                    <li><code>Ctrl+Shift+S</code>: Save active PGN database as...</li>
-                    <li><code>Ctrl+W</code>: Close active PGN database</li>
-                    <li><code>Ctrl+Q</code>: Close application</li>
+                    <li><code>Ctrl+O</code> / <code>⌘+O</code>: Open PGN database</li>
+                    <li><code>Ctrl+S</code> / <code>⌘+S</code>: Save active PGN database</li>
+                    <li><code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>: Save active PGN database as...</li>
+                    <li><code>Ctrl+W</code> / <code>⌘+W</code>: Close active PGN database</li>
+                    <li><code>Ctrl+Q</code> / <code>⌘+Q</code>: Close application</li>
                 </ul>
                 
                 <h5>6.12.5 Importing and Opening Games</h5>
                 <p>Shortcuts for importing and opening games:</p>
                 <ul>
-                    <li><code>Ctrl+V</code>: Paste PGN to Clipboard database</li>
-                    <li><code>Ctrl+Alt+V</code>: Paste PGN to active database</li>
-                    <li><code>Ctrl+Shift+I</code>: Import games from online platforms</li>
+                    <li><code>Ctrl+V</code> / <code>⌘+V</code>: Paste PGN to Clipboard database</li>
+                    <li><code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>: Paste PGN to active database</li>
+                    <li><code>Ctrl+Shift+I</code> / <code>⌘+Shift+I</code>: Import games from online platforms</li>
                 </ul>
                 
                 <h5>6.12.6 Copy and Cut Operations</h5>
                 <p>Shortcuts for copying and moving game data:</p>
                 <ul>
-                    <li><code>Ctrl+P</code>: Copy active game PGN to clipboard</li>
+                    <li><code>Ctrl+P</code> / <code>⌘+P</code>: Copy active game PGN to clipboard</li>
                     <li><code>Shift+F</code>: Copy current board position (FEN) to clipboard</li>
-                    <li><code>Ctrl+F</code>: Paste FEN position to board</li>
-                    <li><code>Ctrl+Shift+C</code>: Copy selected games to clipboard</li>
+                    <li><code>Ctrl+F</code> / <code>⌘+F</code>: Paste FEN position to board</li>
+                    <li><code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code>: Copy selected games to clipboard</li>
                     <li><code>Ctrl+Shift+X</code>: Cut selected games to clipboard</li>
                 </ul>
                 
@@ -1824,35 +1836,35 @@
                 <p>Shortcuts for managing and switching column profiles:</p>
                 <ul>
                     <li><code>1</code> - <code>9</code>: Switch to column profile 1 through 9</li>
-                    <li><code>Ctrl+Shift+P</code>: Save current profile</li>
-                    <li><code>Ctrl+Alt+P</code>: Save current profile as...</li>
-                    <li><code>Ctrl+Shift+Delete</code>: Remove current profile</li>
+                    <li><code>Ctrl+Shift+P</code> / <code>⌘+Shift+P</code>: Save current profile</li>
+                    <li><code>Ctrl+Alt+P</code> / <code>⌘+⌥+P</code>: Save current profile as...</li>
+                    <li><code>Ctrl+Shift+Delete</code> / <code>⌘+Shift+Delete</code>: Remove current profile</li>
                 </ul>
                 
                 <h5>6.12.8 Board Display Options</h5>
                 <p>Shortcuts for toggling board display elements:</p>
                 <ul>
                     <li><code>X</code>: Rotate board 180 degrees</li>
-                    <li><code>Alt+C</code>: Toggle coordinates display</li>
-                    <li><code>Alt+T</code>: Toggle turn indicator</li>
-                    <li><code>Alt+I</code>: Toggle game information display</li>
-                    <li><code>Alt+E</code>: Toggle evaluation bar</li>
-                    <li><code>Alt+U</code>: Toggle material widget</li>
-                    <li><code>Alt+H</code>: Toggle positional heatmap</li>
-                    <li><code>Alt+P</code>: Toggle played move arrow</li>
-                    <li><code>Alt+B</code>: Toggle best next move arrow (PV1)</li>
-                    <li><code>Alt+2</code>: Toggle PV2 arrow</li>
-                    <li><code>Alt+3</code>: Toggle PV3 arrow</li>
-                    <li><code>Alt+A</code>: Toggle best alternative move arrow</li>
-                    <li><code>Alt+L</code>: Toggle annotations layer</li>
+                    <li><code>Alt+C</code> / <code>⌥+C</code>: Toggle coordinates display</li>
+                    <li><code>Alt+T</code> / <code>⌥+T</code>: Toggle turn indicator</li>
+                    <li><code>Alt+I</code> / <code>⌥+I</code>: Toggle game information display</li>
+                    <li><code>Alt+E</code> / <code>⌥+E</code>: Toggle evaluation bar</li>
+                    <li><code>Alt+U</code> / <code>⌥+U</code>: Toggle material widget</li>
+                    <li><code>Alt+H</code> / <code>⌥+H</code>: Toggle positional heatmap</li>
+                    <li><code>Alt+P</code> / <code>⌥+P</code>: Toggle played move arrow</li>
+                    <li><code>Alt+B</code> / <code>⌥+B</code>: Toggle best next move arrow (PV1)</li>
+                    <li><code>Alt+2</code> / <code>⌥+2</code>: Toggle PV2 arrow</li>
+                    <li><code>Alt+3</code> / <code>⌥+3</code>: Toggle PV3 arrow</li>
+                    <li><code>Alt+A</code> / <code>⌥+A</code>: Toggle best alternative move arrow</li>
+                    <li><code>Alt+L</code> / <code>⌥+L</code>: Toggle annotations layer</li>
                 </ul>
                 
                 <h5>6.12.9 Manual Analysis</h5>
                 <p>Shortcuts for manual position analysis:</p>
                 <ul>
-                    <li><code>Alt+M</code>: Start or stop continuous engine analysis</li>
-                    <li><code>Alt+N</code>: Add principal variation line</li>
-                    <li><code>Alt+R</code>: Remove principal variation line</li>
+                    <li><code>Alt+M</code> / <code>⌥+M</code>: Start or stop continuous engine analysis</li>
+                    <li><code>Alt+N</code> / <code>⌥+N</code>: Add principal variation line</li>
+                    <li><code>Alt+R</code> / <code>⌥+R</code>: Remove principal variation line</li>
                 </ul>
                 
                 <h5>6.12.10 Annotations</h5>
@@ -1860,7 +1872,7 @@
                 <ul>
                     <li><code>Ctrl+Alt+S</code>: Save annotations to current game</li>
                     <li><code>Ctrl+Alt+D</code>: Clear all annotations for current move</li>
-                    <li><code>Ctrl+Shift+D</code>: Clear all annotations for current game</li>
+                    <li><code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>: Clear all annotations for current game</li>
                 </ul>
                 
                 <h5>6.12.11 Engine Management</h5>
@@ -1872,24 +1884,24 @@
                 <h5>6.12.12 Database Operations</h5>
                 <p>Shortcuts for database management and bulk operations:</p>
                 <ul>
-                    <li><code>Ctrl+Shift+F</code>: Search games across databases</li>
-                    <li><code>Ctrl+Shift+W</code>: Close search results tab</li>
-                    <li><code>Ctrl+Shift+R</code>: Bulk replace tags</li>
-                    <li><code>Ctrl+Alt+T</code>: Bulk add/remove tags</li>
-                    <li><code>Ctrl+Shift+L</code>: Bulk clean PGN</li>
-                    <li><code>Ctrl+Shift+U</code>: Deduplicate games</li>
-                    <li><code>Ctrl+Shift+C</code>: Clear Clipboard database</li>
+                    <li><code>Ctrl+Shift+F</code> / <code>⌘+Shift+F</code>: Search games across databases</li>
+                    <li><code>Ctrl+Shift+W</code> / <code>⌘+Shift+W</code>: Close search results tab</li>
+                    <li><code>Ctrl+Shift+R</code> / <code>⌘+Shift+R</code>: Bulk replace tags</li>
+                    <li><code>Ctrl+Alt+T</code> / <code>⌘+⌥+T</code>: Bulk add/remove tags</li>
+                    <li><code>Ctrl+Shift+L</code> / <code>⌘+Shift+L</code>: Bulk clean PGN</li>
+                    <li><code>Ctrl+Shift+U</code> / <code>⌘+Shift+U</code>: Deduplicate games</li>
+                    <li><code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code>: Clear Clipboard database</li>
                 </ul>
                 
                 <h5>6.12.13 PGN Display Options</h5>
                 <p>Shortcuts for controlling PGN notation display:</p>
                 <ul>
-                    <li><code>Ctrl+M</code>: Toggle metadata display</li>
-                    <li><code>Ctrl+Shift+M</code>: Toggle comments display</li>
-                    <li><code>Ctrl+Shift+V</code>: Toggle variations display</li>
-                    <li><code>Ctrl+Shift+T</code>: Toggle non-standard tags display</li>
-                    <li><code>Ctrl+Shift+A</code>: Toggle annotations display</li>
-                    <li><code>Ctrl+R</code>: Toggle results display</li>
+                    <li><code>Ctrl+M</code> / <code>⌘+M</code>: Toggle metadata display</li>
+                    <li><code>Ctrl+Shift+M</code> / <code>⌘+Shift+M</code>: Toggle comments display</li>
+                    <li><code>Ctrl+Shift+V</code> / <code>⌘+Shift+V</code>: Toggle variations display</li>
+                    <li><code>Ctrl+Shift+T</code> / <code>⌘+Shift+T</code>: Toggle non-standard tags display</li>
+                    <li><code>Ctrl+Shift+A</code> / <code>⌘+Shift+A</code>: Toggle annotations display</li>
+                    <li><code>Ctrl+R</code> / <code>⌘+R</code>: Toggle results display</li>
                 </ul>
             </div>
         </section>
@@ -2094,7 +2106,7 @@
         </section>
 
         <footer style="margin-top: 50px; padding-top: 20px; border-top: 2px solid rgb(60, 60, 65); color: rgb(180, 180, 180); text-align: center;">
-            <p>CARA - Chess Analysis and Review Application v2.4.5</p>
+            <p>CARA - Chess Analysis and Review Application v2.4.6</p>
             <p>Copyright (C) 2025 Philipp Guntermann</p>
             <p>This program is free software: you can redistribute it and/or modify it under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" style="color: rgb(100, 150, 255);">GNU General Public License version 3</a> (GPL-3.0) or any later version.</p>
             <p>This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.</p>

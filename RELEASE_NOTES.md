@@ -1,3 +1,28 @@
+# CARA v2.4.6 - macOS Compatibility Update
+
+**Release Date:** 25.12.2025
+
+This release focuses on macOS compatibility improvements, ensuring CARA works seamlessly on macOS systems.
+
+## macOS Compatibility Improvements
+
+- **Cross-platform UI fixes**: Resolved visual styling issues on macOS, including:
+  - Fixed tab bar alignment (left-aligned tabs on macOS)
+  - Corrected button and label text colors that were overridden by macOS system theme
+  - Fixed white backgrounds in scroll areas, combobox dropdowns, and table headers
+  - Applied DPI-aware font scaling for consistent text rendering across different display resolutions
+  - Fixed splitter handle and tab scroll button colors
+  - Resolved menu item visibility issues (About menu, move classification, etc.)
+- **Dialog improvements**: Fixed sizing and styling issues in message boxes, confirmation dialogs, and various setup dialogs on macOS
+- **Table view fixes**: Corrected white background in table corner buttons and header sections
+- **Documentation updates**: Updated user manual with macOS installation instructions and keyboard shortcuts (showing both Windows and macOS equivalents)
+
+## System Requirements Update
+
+- **OS**: Windows 11 (tested), macOS Tahoe 26.2 (tested), Linux (may require some adjustments)
+
+---
+
 # CARA v2.4.5 - Initial Release
 
 **Release Date:** 29.11.2025
@@ -44,7 +69,7 @@ For detailed installation instructions and documentation, see the [README](READM
 
 ## System Requirements
 
-- **OS**: Windows 11 (tested), Linux/macOS (may require some adjustments, will be tested later)
+- **OS**: Windows 11 (tested), macOS Tahoe 26.2 (tested), Linux (may require some adjustments)
 - **Python**: 3.8 or higher
 - **Screen**: Minimum 1280×1024 pixels recommended
 - **Hardware**: Modern multi-core processor recommended

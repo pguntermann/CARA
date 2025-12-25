@@ -2,7 +2,7 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-**Version 2.4.5**
+**Version 2.4.6**
 
 CARA is a full-featured desktop application designed for analyzing and reviewing chess games. Unlike chess playing applications or puzzle solvers, CARA focuses exclusively on post-game analysis and review, helping you understand your games, identify mistakes, recognize patterns, and improve your chess understanding.
 
@@ -46,7 +46,7 @@ CARA was built in large part by an AI model under the author's direction. The au
 
 ## System Requirements
 
-- **Operating System**: The application has been tested on Windows 11. In general, CARA should also run on Linux and macOS, but it has not been tested on these platforms and may require some minor adjustments.
+- **Operating System**: The application has been tested on Windows 11 and macOS Tahoe 26.2. In general, CARA should also run on Linux, but it has not been tested on Linux and may require some minor adjustments.
 - **Python**: 3.8 or higher (CARA uses PyQt6, which requires Python 3.8+)
 - **Screen Resolution**: A minimum screen resolution of 1280×1024 pixels is recommended. Some dialogs require at least 800 pixels in width and 900 pixels in height to display properly. Lower resolutions may cause dialogs to be cut off or difficult to use.
 - **Hardware**: No specific hardware requirements beyond what is needed to run Python and the operating system. For optimal performance when analyzing games with chess engines, a modern multi-core processor is recommended.
@@ -67,7 +67,17 @@ winget install Python.Python.3
 2. Run the installer and check "Add Python to PATH"
 3. Verify installation: `python --version`
 
-**Note**: If you see a "python is not recognized" error, Python may not be in your system PATH. Re-run the installer and ensure "Add Python to PATH" is checked, or manually add Python to your system PATH. For detailed instructions on manually adding Python to PATH, see the user manual.
+**macOS (using Homebrew - Recommended):**
+```bash
+brew install python3
+```
+
+**macOS (manual download):**
+1. Download Python from [python.org](https://www.python.org/downloads/)
+2. Run the installer and follow the installation wizard
+3. Verify installation: `python3 --version`
+
+**Note**: On Windows, if you see a "python is not recognized" error, Python may not be in your system PATH. Re-run the installer and ensure "Add Python to PATH" is checked, or manually add Python to your system PATH. For detailed instructions on manually adding Python to PATH, see the user manual. On macOS, you may need to use `python3` instead of `python` to access Python 3.
 
 ### 2. Install Dependencies
 
@@ -89,7 +99,8 @@ This installs:
 If pip is not available after installing Python, you can install it manually:
 
 1. **Download get-pip.py**: Download the `get-pip.py` script from [bootstrap.pypa.io/get-pip.py](https://bootstrap.pypa.io/get-pip.py) and save it to a folder on your computer.
-2. **Run the installer**: Open PowerShell or Command Prompt, navigate to the folder containing `get-pip.py`, and run: `python get-pip.py`
+2. **Run the installer**: Open a terminal (PowerShell or Command Prompt on Windows, Terminal on macOS), navigate to the folder containing `get-pip.py`, and run: `python get-pip.py`  
+   **Note**: On macOS, you may need to use `python3` instead of `python`.
 3. **Verify installation**: After installation completes, verify pip is installed: `pip --version`
 
 If you prefer to install dependencies individually instead of using the requirements file, you can install each library separately:
@@ -116,15 +127,17 @@ After downloading an engine, configure it in CARA via **Engines → Add Engine..
 python cara.py
 ```
 
+**Note**: On macOS, you may need to use `python3` instead of `python`.
+
 ### Quick Start
 
 1. **Ensure you have a chess engine configured**: Before starting, make sure you have at least one UCI-compatible chess engine added to CARA. Go to **Engines → Add Engine...** and select your UCI engine. If you're unsure which engine to choose, [Stockfish](https://stockfishchess.org/download/) is an excellent free option to get started.
 
-2. **Open a game or paste PGN**: Open a PGN database using **File → Open PGN Database** (`Ctrl+O`), or paste PGN text into the Clipboard database using **Edit → Paste PGN to Clipboard DB** (`Ctrl+V`)—the pasted game gets loaded automatically.
+2. **Open a game or paste PGN**: Open a PGN database using **File → Open PGN Database** (`Ctrl+O` / `⌘+O`), or paste PGN text into the Clipboard database using **Edit → Paste PGN to Clipboard DB** (`Ctrl+V` / `⌘+V`)—the pasted game gets loaded automatically.
 
 3. **Switch to the Moves List view**: Press `F1` to switch to the Moves List tab, then press `3` to select the "Game Analysis - Full" profile. This profile displays all the important analysis columns you'll need to review the game.
 
-4. **Start the game analysis**: Press `Ctrl+G` (or use **Game Analysis → Start Game Analysis**) to begin analyzing the game. Watch as the moves list fills in with evaluation data, move classifications, CPL values, and best move alternatives as the analysis progresses. Progress and estimated time remaining are shown in the status bar.
+4. **Start the game analysis**: Press `Ctrl+G` / `⌘+G` (or use **Game Analysis → Start Game Analysis**) to begin analyzing the game. Watch as the moves list fills in with evaluation data, move classifications, CPL values, and best move alternatives as the analysis progresses. Progress and estimated time remaining are shown in the status bar.
 
 5. **Review the results**: Once analysis completes, you can review the per-move analysis directly in the Moves List, or press `F4` to switch to the Game Summary tab for a condensed overview showing key statistics, the evaluation graph, critical moments, and detected game highlights.
 
@@ -148,14 +161,14 @@ CARA uses three configuration files, all located in the CARA root directory:
 ## Keyboard Shortcuts
 
 - `←` / `→`: Navigate through game moves
-- `Ctrl+G`: Start game analysis
+- `Ctrl+G` / `⌘+G`: Start game analysis
 - `Escape`: Cancel analysis
 - `F1`: Switch to Moves List tab
 - `F4`: Switch to Game Summary tab
-- `Ctrl+Shift+K`: Configure classification settings
-- `Ctrl+O`: Open PGN database
-- `Ctrl+V`: Paste PGN to Clipboard database
-- `Ctrl+Alt+V`: Paste PGN to active database
+- `Ctrl+Shift+K` / `⌘+Shift+K`: Configure classification settings
+- `Ctrl+O` / `⌘+O`: Open PGN database
+- `Ctrl+V` / `⌘+V`: Paste PGN to Clipboard database
+- `Ctrl+Alt+V` / `⌘+⌥+V`: Paste PGN to active database
 
 See the user manual for a complete list of keyboard shortcuts.
 
