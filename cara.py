@@ -8,6 +8,7 @@ from PyQt6.QtGui import QIcon
 from app.config.config_loader import ConfigLoader
 from app.main_window import MainWindow
 from app.services.error_handler import ErrorHandler
+from app.utils.path_resolver import get_app_resource_path
 
 
 def main() -> None:
@@ -21,7 +22,7 @@ def main() -> None:
         app.setOrganizationName("CARA")
         
         # Set application icon
-        icon_path = Path(__file__).parent / "appicon.svg"
+        icon_path = get_app_resource_path("appicon.svg")
         if icon_path.exists():
             app.setWindowIcon(QIcon(str(icon_path)))
         
