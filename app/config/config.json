@@ -1819,7 +1819,8 @@
         "title": {
           "font_size": 14,
           "padding": 5,
-          "spacing_after": 5
+          "spacing_after": 5,
+          "text_color": [240, 240, 240]
         },
         "label": {
           "font_size": 11,

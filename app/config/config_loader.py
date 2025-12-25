@@ -1185,6 +1185,7 @@ class ConfigLoader:
             'ui.dialogs.input_dialog.title.font_size',
             'ui.dialogs.input_dialog.title.padding',
             'ui.dialogs.input_dialog.title.spacing_after',
+            'ui.dialogs.input_dialog.title.text_color',
             'ui.dialogs.input_dialog.label.font_size',
             'ui.dialogs.input_dialog.label.padding',
             'ui.dialogs.input_dialog.label.text_color',
