@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QScrollArea,
     QGridLayout,
+    QFrame,
 )
 from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent
@@ -348,6 +349,8 @@ class BulkReplaceDialog(QDialog):
         
         # Create scrollable area for tag checkboxes
         tags_scroll_area = QScrollArea()
+        # Remove default frame to prevent white bar on macOS
+        tags_scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         # Set fixed height - this is the visible height of the scroll area
         # Account for scrollbar width (12px) plus frame/border (2px) to prevent clipping
         scrollbar_width = 12  # From scrollbar styling
@@ -365,6 +368,11 @@ class BulkReplaceDialog(QDialog):
         
         # Create widget and grid layout for checkboxes
         tags_widget = QWidget()
+        # Set background color to match scroll area to prevent white bar
+        tags_widget.setAutoFillBackground(True)
+        tags_palette = tags_widget.palette()
+        tags_palette.setColor(tags_widget.backgroundRole(), self.input_bg_color)
+        tags_widget.setPalette(tags_palette)
         tags_grid = QGridLayout(tags_widget)
         tags_grid.setSpacing(self.tags_list_spacing)
         # Use configurable margins for proper padding: [left, top, right, bottom]
@@ -630,6 +638,9 @@ class BulkReplaceDialog(QDialog):
             f"border: 1px solid rgb({self.input_border_color.red()}, {self.input_border_color.green()}, {self.input_border_color.blue()});"
             f"border-radius: {self.input_border_radius}px;"
             f"}}"
+            f"QScrollArea QWidget {{"
+            f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
+            f"}}"
             f"QScrollBar:vertical {{"
             f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
             f"width: 12px;"
@@ -697,20 +708,40 @@ class BulkReplaceDialog(QDialog):
                     group_content_margins[3]
                 )
         
-        # Apply label styling
+        # Apply label styling - apply to ALL labels to prevent macOS theme override
         label_style = (
             f"QLabel {{"
             f"color: rgb({self.label_text_color.red()}, {self.label_text_color.green()}, {self.label_text_color.blue()});"
             f"font-family: {self.label_font_family};"
             f"font-size: {self.label_font_size}pt;"
+            f"background-color: transparent;"
             f"}}"
         )
         
+        # Apply stylesheet and palette to all labels to ensure macOS doesn't override
+        # Group box titles are styled via QGroupBox::title, not QLabel, so we can style all QLabels
         for label in self.findChildren(QLabel):
-            # Skip group box titles (they're styled via QGroupBox::title)
-            if isinstance(label.parent(), QGroupBox):
-                continue
+            # Apply stylesheet
             label.setStyleSheet(label_style)
+            # Also set palette to ensure color is applied (macOS sometimes ignores stylesheet)
+            label_palette = label.palette()
+            label_palette.setColor(label.foregroundRole(), self.label_text_color)
+            label.setPalette(label_palette)
+            # Force update to ensure styling is applied
+            label.update()
+        
+        # Apply radio button styling to match import games dialog (simple styling, no custom indicator)
+        radio_button_style = (
+            f"QRadioButton {{"
+            f"color: rgb({self.label_text_color.red()}, {self.label_text_color.green()}, {self.label_text_color.blue()});"
+            f"font-family: {self.label_font_family};"
+            f"font-size: {self.label_font_size}pt;"
+            f"spacing: 5px;"
+            f"}}"
+        )
+        
+        for radio_button in self.findChildren(QRadioButton):
+            radio_button.setStyleSheet(radio_button_style)
         
         # Apply checkbox styling to ensure consistent font size and style
         self._apply_checkbox_styling()
