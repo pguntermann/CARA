@@ -30,6 +30,41 @@ class NoWheelComboBox(QComboBox):
     
     def wheelEvent(self, event) -> None:
         event.ignore()
+    
+    def showPopup(self) -> None:
+        """Override showPopup to apply styling to popup window on macOS."""
+        super().showPopup()
+        view = self.view()
+        if view:
+            combo_palette = self.palette()
+            bg_color = combo_palette.color(self.backgroundRole())
+            text_color = combo_palette.color(self.foregroundRole())
+            
+            # Set viewport background to remove white borders
+            viewport = view.viewport()
+            if viewport:
+                viewport.setAutoFillBackground(True)
+                viewport_palette = viewport.palette()
+                viewport_palette.setColor(viewport.backgroundRole(), bg_color)
+                viewport.setPalette(viewport_palette)
+            
+            # Also set view palette to ensure consistency
+            view_palette = view.palette()
+            view_palette.setColor(view.backgroundRole(), bg_color)
+            view_palette.setColor(view.foregroundRole(), text_color)
+            view.setPalette(view_palette)
+            view.setAutoFillBackground(True)
+            
+            # Fix the popup window itself (QFrame) - this is where the white borders come from
+            popup_window = view.window()
+            if popup_window and popup_window != self.window():
+                popup_window.setAutoFillBackground(True)
+                popup_palette = popup_window.palette()
+                popup_palette.setColor(popup_window.backgroundRole(), bg_color)
+                popup_palette.setColor(popup_palette.ColorRole.Base, bg_color)
+                popup_palette.setColor(popup_palette.ColorRole.Window, bg_color)
+                popup_palette.setColor(popup_palette.ColorRole.Button, bg_color)
+                popup_window.setPalette(popup_palette)
 
 
 class CriteriaRowWidget(QWidget):
@@ -56,10 +91,10 @@ class CriteriaRowWidget(QWidget):
         
         # Inputs
         inputs_config = dialog_config.get("inputs", {})
-        from app.utils.font_utils import resolve_font_family
+        from app.utils.font_utils import resolve_font_family, scale_font_size
         input_font_family_raw = inputs_config.get("font_family", "Cascadia Mono")
         self.input_font_family = resolve_font_family(input_font_family_raw)
-        self.input_font_size = inputs_config.get("font_size", 11)
+        self.input_font_size = scale_font_size(inputs_config.get("font_size", 11))
         self.input_text_color = QColor(*inputs_config.get("text_color", [240, 240, 240]))
         self.input_bg_color = QColor(*inputs_config.get("background_color", [30, 30, 35]))
         self.input_border_color = QColor(*inputs_config.get("border_color", [60, 60, 65]))
@@ -256,11 +291,19 @@ class CriteriaRowWidget(QWidget):
         
         # Set palette on combo boxes to prevent macOS override
         for combo in [self.field_combo, self.operator_combo, self.logic_combo]:
+            # Fix combo box palette roles that are white (Base and Button)
+            combo_palette = combo.palette()
+            combo_palette.setColor(combo_palette.ColorRole.Base, self.input_bg_color)
+            combo_palette.setColor(combo_palette.ColorRole.Button, self.input_bg_color)
+            combo.setPalette(combo_palette)
+            
             view = combo.view()
             if view:
                 view_palette = view.palette()
                 view_palette.setColor(view.backgroundRole(), self.input_bg_color)
                 view_palette.setColor(view.foregroundRole(), self.input_text_color)
+                view_palette.setColor(QPalette.ColorRole.Highlight, QColor(*selection_bg))
+                view_palette.setColor(QPalette.ColorRole.HighlightedText, QColor(*selection_text))
                 view.setPalette(view_palette)
                 view.setAutoFillBackground(True)
         
@@ -551,9 +594,10 @@ class SearchDialog(QDialog):
         self.text_color = QColor(text_color[0], text_color[1], text_color[2])
         
         # Font
+        from app.utils.font_utils import scale_font_size
         font_size = dialog_config.get("font_size", 11)
         self.font_family = dialog_config.get("font_family", "Helvetica Neue")
-        self.font_size = font_size
+        self.font_size = scale_font_size(font_size)
         
         # Layout
         layout_config = dialog_config.get("layout", {})
@@ -624,9 +668,11 @@ class SearchDialog(QDialog):
         criteria_layout.setSpacing(8)
         
         # Scroll area for criteria rows
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        from PyQt6.QtWidgets import QFrame
+        self.criteria_scroll_area = QScrollArea()
+        self.criteria_scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.criteria_scroll_area.setWidgetResizable(True)
+        self.criteria_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         
         self.criteria_container = QWidget()
         self.criteria_layout = QVBoxLayout(self.criteria_container)
@@ -634,8 +680,8 @@ class SearchDialog(QDialog):
         self.criteria_layout.setContentsMargins(5, 5, 5, 5)
         self.criteria_layout.addStretch()
         
-        scroll_area.setWidget(self.criteria_container)
-        criteria_layout.addWidget(scroll_area)
+        self.criteria_scroll_area.setWidget(self.criteria_container)
+        criteria_layout.addWidget(self.criteria_scroll_area)
         
         # Buttons for managing criteria
         criteria_buttons_layout = QHBoxLayout()
@@ -875,8 +921,9 @@ class SearchDialog(QDialog):
         group_bg_color = groups_config.get("background_color", dialog_bg) if "background_color" in groups_config else dialog_bg
         group_border_color = groups_config.get("border_color", dialog_border) if "border_color" in groups_config else dialog_border
         group_border_radius = groups_config.get("border_radius", 5)
-        group_title_font_family = groups_config.get("title_font_family", "Helvetica Neue")
-        group_title_font_size = groups_config.get("title_font_size", 11)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        group_title_font_family = resolve_font_family(groups_config.get("title_font_family", "Helvetica Neue"))
+        group_title_font_size = scale_font_size(groups_config.get("title_font_size", 11))
         group_title_color = groups_config.get("title_color", [240, 240, 240])
         group_content_margins = groups_config.get("content_margins", [10, 20, 10, 15])
         group_margin_top = groups_config.get("margin_top", 10)
@@ -926,6 +973,45 @@ class SearchDialog(QDialog):
         )
         for radio in self.findChildren(QRadioButton):
             radio.setStyleSheet(radio_style)
+        
+        # Scroll area styling
+        inputs_config = dialog_config.get("inputs", {})
+        input_bg = inputs_config.get("background_color", [30, 30, 35])
+        input_border = inputs_config.get("border_color", [60, 60, 65])
+        input_border_radius = inputs_config.get("border_radius", 3)
+        
+        scroll_area_style = (
+            f"QScrollArea {{"
+            f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+            f"border: 1px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
+            f"border-radius: {input_border_radius}px;"
+            f"}}"
+            f"QScrollArea QWidget {{"
+            f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+            f"}}"
+            f"QScrollBar:vertical {{"
+            f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+            f"width: 12px;"
+            f"border: none;"
+            f"}}"
+            f"QScrollBar::handle:vertical {{"
+            f"background-color: rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
+            f"border-radius: 6px;"
+            f"min-height: 20px;"
+            f"}}"
+            f"QScrollBar::handle:vertical:hover {{"
+            f"background-color: rgb({min(255, input_border[0] + 20)}, {min(255, input_border[1] + 20)}, {min(255, input_border[2] + 20)});"
+            f"}}"
+        )
+        if hasattr(self, 'criteria_scroll_area'):
+            self.criteria_scroll_area.setStyleSheet(scroll_area_style)
+            # Set palette on scroll area viewport to prevent macOS override
+            viewport = self.criteria_scroll_area.viewport()
+            if viewport:
+                viewport_palette = viewport.palette()
+                viewport_palette.setColor(viewport.backgroundRole(), QColor(*input_bg))
+                viewport.setPalette(viewport_palette)
+                viewport.setAutoFillBackground(True)
         
         # Button styling (standardized pattern)
         buttons_config = self.config.get("ui", {}).get("dialogs", {}).get("search", {}).get("buttons", {})
