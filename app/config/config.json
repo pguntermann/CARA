@@ -987,6 +987,7 @@
           "scale_line_color": [150, 150, 150],
           "tick_color": [200, 200, 200],
           "text_color": [220, 220, 220],
+          "font_family": "Helvetica Neue",
           "font_size": 9,
           "best_move_color": [100, 255, 100],
           "good_move_color": [150, 255, 150],

@@ -21,6 +21,7 @@ from PyQt6.QtGui import QShowEvent, QColor, QPalette, QPainter, QPen, QFont, QFo
 from typing import Optional, Dict, Any, Tuple
 
 from app.controllers.move_classification_controller import MoveClassificationController
+from app.utils.font_utils import resolve_font_family, scale_font_size
 
 
 class CPLScaleWidget(QWidget):
@@ -51,7 +52,9 @@ class CPLScaleWidget(QWidget):
         self.scale_line_color = QColor(*scale_config.get('scale_line_color', [150, 150, 150]))
         self.tick_color = QColor(*scale_config.get('tick_color', [200, 200, 200]))
         self.text_color = QColor(*scale_config.get('text_color', [220, 220, 220]))
-        self.font_size = scale_config.get('font_size', 9)
+        self.font_size = scale_font_size(scale_config.get('font_size', 9))
+        font_family_raw = scale_config.get('font_family', 'Helvetica Neue')
+        self.font_family = resolve_font_family(font_family_raw)
         self.scale_config = scale_config  # Store for use in paintEvent
         
         # Threshold colors
@@ -134,7 +137,7 @@ class CPLScaleWidget(QWidget):
                 
                 return compressed_x
         
-        font = QFont("Helvetica Neue", self.font_size)
+        font = QFont(self.font_family, self.font_size)
         painter.setFont(font)
         metrics = QFontMetrics(font)
         
@@ -682,8 +685,8 @@ class ClassificationSettingsDialog(QDialog):
         border_color = groups_config.get('border_color', [60, 60, 65])
         border_radius = groups_config.get('border_radius', 5)
         title_color = groups_config.get('title_color', [240, 240, 240])
-        title_font_family = groups_config.get('title_font_family', 'Helvetica Neue')
-        title_font_size = groups_config.get('title_font_size', 11)
+        title_font_family = resolve_font_family(groups_config.get('title_font_family', 'Helvetica Neue'))
+        title_font_size = scale_font_size(groups_config.get('title_font_size', 11))
         margin_top = groups_config.get('margin_top', 10)
         padding_top = groups_config.get('padding_top', 10)
         title_left = groups_config.get('title_left', 10)
@@ -712,7 +715,7 @@ class ClassificationSettingsDialog(QDialog):
         
         # Labels
         text_color = fields_config.get('text_color', [220, 220, 220])
-        font_size = fields_config.get('font_size', 10)
+        font_size = scale_font_size(fields_config.get('font_size', 10))
         
         label_style = (
             f"QLabel {{"
@@ -938,10 +941,13 @@ class ClassificationSettingsDialog(QDialog):
                 bg_color = self._disabled_bg_color
                 text_color = [self._text_color[0] // 2 + 64, self._text_color[1] // 2 + 64, self._text_color[2] // 2 + 64]
             
+            # Get scaled font size for disabled style
+            fields_config = self.config.get('ui', {}).get('dialogs', {}).get('classification_settings', {}).get('fields', {})
+            disabled_font_size = scale_font_size(fields_config.get('font_size', 10))
             disabled_style = (
                 f"QSpinBox {{"
                 f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
-                f"font-size: {self.config.get('ui', {}).get('dialogs', {}).get('classification_settings', {}).get('fields', {}).get('font_size', 10)}pt;"
+                f"font-size: {disabled_font_size}pt;"
                 f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
                 f"border: 1px solid rgb({self._border_color[0]}, {self._border_color[1]}, {self._border_color[2]});"
                 f"border-radius: 3px;"

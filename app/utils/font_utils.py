@@ -95,7 +95,7 @@ def get_font_size_multiplier() -> float:
     return multiplier
 
 
-def scale_font_size(base_size: float) -> float:
+def scale_font_size(base_size: float) -> int:
     """Scale a font size based on screen DPI.
     
     Convenience function that applies the DPI multiplier to a base font size.
@@ -104,7 +104,7 @@ def scale_font_size(base_size: float) -> float:
         base_size: Base font size in points.
         
     Returns:
-        Scaled font size in points.
+        Scaled font size in points as an integer.
     """
-    return base_size * get_font_size_multiplier()
+    return int(round(base_size * get_font_size_multiplier()))
 
