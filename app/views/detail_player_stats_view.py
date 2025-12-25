@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QGraphicsOpacityEffect
 )
 from PyQt6.QtCore import Qt, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QThread, pyqtSignal, QMutex, QMutexLocker
-from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush
+from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QWheelEvent, QPalette
 from app.views.detail_summary_view import PieChartWidget
 from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 from app.models.database_model import DatabaseModel
@@ -20,6 +20,52 @@ if TYPE_CHECKING:
     from app.controllers.database_controller import DatabaseController
     from app.services.player_stats_service import AggregatedPlayerStats
     from app.services.error_pattern_service import ErrorPattern
+
+
+class NoWheelComboBox(QComboBox):
+    """QComboBox that ignores mouse wheel events and fixes white background on macOS."""
+    
+    def wheelEvent(self, event: QWheelEvent) -> None:
+        """Override wheel event to ignore it completely."""
+        event.ignore()
+    
+    def showPopup(self) -> None:
+        """Override showPopup to apply styling to popup window on macOS."""
+        super().showPopup()
+        # Access view after popup is shown to ensure it's fully initialized
+        view = self.view()
+        if view:
+            # Get background and text colors from combo box palette (set via stylesheet)
+            combo_palette = self.palette()
+            bg_color = combo_palette.color(self.backgroundRole())
+            text_color = combo_palette.color(self.foregroundRole())
+            
+            # Set viewport background to remove white borders
+            viewport = view.viewport()
+            if viewport:
+                viewport.setAutoFillBackground(True)
+                viewport_palette = viewport.palette()
+                viewport_palette.setColor(viewport.backgroundRole(), bg_color)
+                viewport.setPalette(viewport_palette)
+            
+            # Also set view palette to ensure consistency
+            view_palette = view.palette()
+            view_palette.setColor(view.backgroundRole(), bg_color)
+            view_palette.setColor(view.foregroundRole(), text_color)
+            view.setPalette(view_palette)
+            view.setAutoFillBackground(True)
+            
+            # CRITICAL: Fix the popup window itself (QFrame) - this is where the white borders come from
+            popup_window = view.window()
+            if popup_window and popup_window != self.window():
+                popup_window.setAutoFillBackground(True)
+                popup_palette = popup_window.palette()
+                # Set all background-related roles to the dark color
+                popup_palette.setColor(popup_window.backgroundRole(), bg_color)
+                popup_palette.setColor(QPalette.ColorRole.Base, bg_color)
+                popup_palette.setColor(QPalette.ColorRole.Window, bg_color)
+                popup_palette.setColor(QPalette.ColorRole.Button, bg_color)
+                popup_window.setPalette(popup_palette)
 
 
 class PlayerDropdownWorker(QThread):
@@ -533,6 +579,13 @@ class DetailPlayerStatsView(QWidget):
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         
+        # Get background color for scroll area - use pane_background from tabs config
+        tabs_config = panel_config.get('tabs', {})
+        pane_bg = tabs_config.get('pane_background', [40, 40, 45])
+        # Fix white background on macOS
+        self.scroll_area.setStyleSheet(f"QScrollArea {{ background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]}); }}")
+        self.scroll_area.viewport().setStyleSheet(f"background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});")
+        
         # Content widget
         self.content_widget = QWidget()
         # Set minimum width to 0 to allow proper shrinking
@@ -552,7 +605,7 @@ class DetailPlayerStatsView(QWidget):
         # This will be shown when no player is selected, inside the content layout
         placeholder_config = player_stats_config.get('placeholder', {})
         placeholder_text_color = placeholder_config.get('text_color', [150, 150, 150])
-        placeholder_font_size = placeholder_config.get('font_size', 14)
+        placeholder_font_size = int(scale_font_size(placeholder_config.get('font_size', 14)))
         placeholder_padding = placeholder_config.get('padding', 20)
         
         self.disabled_placeholder = QLabel(self.placeholder_text_no_player)
@@ -562,7 +615,7 @@ class DetailPlayerStatsView(QWidget):
         self.disabled_placeholder.setStyleSheet(f"""
             QLabel {{
                 color: rgb({placeholder_text_color[0]}, {placeholder_text_color[1]}, {placeholder_text_color[2]});
-                font-size: {placeholder_font_size}px;
+                font-size: {placeholder_font_size}pt;
                 padding: {placeholder_padding}px;
             }}
         """)
@@ -906,7 +959,7 @@ class DetailPlayerStatsView(QWidget):
         player_row.addWidget(player_label)
         
         # Player combo box - make non-editable and clickable anywhere to open dropdown
-        self.player_combo = QComboBox()
+        self.player_combo = NoWheelComboBox()
         self.player_combo.setEditable(False)  # Non-editable - clicking anywhere opens dropdown
         self.player_combo.currentIndexChanged.connect(self._on_player_selected)
         self.player_combo.activated.connect(self._on_player_activated)  # Fired when user selects from dropdown
@@ -1133,11 +1186,30 @@ class DetailPlayerStatsView(QWidget):
                 color: rgb({combo_text[0]}, {combo_text[1]}, {combo_text[2]});
                 border: {combo_border_width}px solid rgb({combo_border[0]}, {combo_border[1]}, {combo_border[2]});
                 selection-background-color: rgb({combo_focus[0]}, {combo_focus[1]}, {combo_focus[2]});
+                selection-color: rgb({combo_text[0]}, {combo_text[1]}, {combo_text[2]});
             }}
         """
         combo.setMinimumHeight(button_height)
         combo.setMaximumHeight(button_height)
         combo.setStyleSheet(combo_style)
+        
+        # Set palette on combo box to prevent macOS override
+        from PyQt6.QtGui import QPalette
+        combo_palette = combo.palette()
+        combo_palette.setColor(combo.backgroundRole(), QColor(combo_bg[0], combo_bg[1], combo_bg[2]))
+        combo_palette.setColor(combo.foregroundRole(), QColor(combo_text[0], combo_text[1], combo_text[2]))
+        combo.setPalette(combo_palette)
+        
+        # Set palette on view to prevent macOS override
+        view = combo.view()
+        if view:
+            view_palette = view.palette()
+            view_palette.setColor(view.backgroundRole(), QColor(combo_bg[0], combo_bg[1], combo_bg[2]))
+            view_palette.setColor(view.foregroundRole(), QColor(combo_text[0], combo_text[1], combo_text[2]))
+            view_palette.setColor(QPalette.ColorRole.Highlight, QColor(combo_focus[0], combo_focus[1], combo_focus[2]))
+            view_palette.setColor(QPalette.ColorRole.HighlightedText, QColor(combo_text[0], combo_text[1], combo_text[2]))
+            view.setPalette(view_palette)
+            view.setAutoFillBackground(True)
     
     def _on_refresh_clicked(self) -> None:
         """Handle refresh button click."""

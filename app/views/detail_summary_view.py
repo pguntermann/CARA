@@ -665,6 +665,13 @@ class DetailSummaryView(QWidget):
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         
+        # Get background color for scroll area - use pane_background from tabs config or summary background
+        tabs_config = panel_config.get('tabs', {})
+        pane_bg = tabs_config.get('pane_background', [40, 40, 45])
+        # Fix white background on macOS
+        scroll_area.setStyleSheet(f"QScrollArea {{ background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]}); }}")
+        scroll_area.viewport().setStyleSheet(f"background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});")
+        
         # Content widget
         self.content_widget = QWidget()
         self.content_layout = QVBoxLayout(self.content_widget)
@@ -938,12 +945,12 @@ class DetailSummaryView(QWidget):
         phase_spacing = widgets_config.get('phase_spacing', 1)
         
         header_font = QFont(fonts_config.get('header_font_family', 'Helvetica Neue'),
-                           fonts_config.get('header_font_size', 14))
+                           int(scale_font_size(fonts_config.get('header_font_size', 14))))
         header_font.setBold(fonts_config.get('header_font_weight', 'bold') == 'bold')
         label_font = QFont(fonts_config.get('label_font_family', 'Helvetica Neue'),
-                          fonts_config.get('label_font_size', 11))
+                          int(scale_font_size(fonts_config.get('label_font_size', 11))))
         value_font = QFont(fonts_config.get('value_font_family', 'Helvetica Neue'),
-                          fonts_config.get('value_font_size', 11))
+                          int(scale_font_size(fonts_config.get('value_font_size', 11))))
         
         section_spacing = layout_config.get('section_spacing', 20)
         player_spacing = layout_config.get('player_section_spacing', 10)

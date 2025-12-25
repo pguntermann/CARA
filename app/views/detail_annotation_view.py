@@ -13,6 +13,7 @@ from app.models.game_model import GameModel
 from app.views.chessboard_widget import ChessBoardWidget
 from app.controllers.annotation_controller import AnnotationController
 from app.models.annotation_model import AnnotationType
+from app.utils.font_utils import scale_font_size
 
 
 class DetailAnnotationView(QWidget):
@@ -372,6 +373,8 @@ class DetailAnnotationView(QWidget):
         size_slider_layout.setSpacing(8)
         
         size_label = QLabel("Size:")
+        # Store reference for styling later
+        self.size_label = size_label
         size_slider_layout.addWidget(size_label)
         
         self.size_slider = QSlider(Qt.Orientation.Horizontal)
@@ -441,6 +444,13 @@ class DetailAnnotationView(QWidget):
         self.annotation_scroll.setMinimumHeight(self.annotations_list_min_height)
         self.annotation_scroll.setFrameShape(QFrame.Shape.NoFrame)
         
+        # Get background color for scroll area - use pane_background from tabs config
+        tabs_config = panel_config.get('tabs', {})
+        pane_bg = tabs_config.get('pane_background', [40, 40, 45])
+        # Fix white background on macOS
+        self.annotation_scroll.setStyleSheet(f"QScrollArea {{ background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]}); }}")
+        self.annotation_scroll.viewport().setStyleSheet(f"background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});")
+        
         self.annotation_list_widget = QWidget()
         self.annotation_list_layout = QVBoxLayout(self.annotation_list_widget)
         list_margins = self.annotations_list_margins
@@ -484,16 +494,17 @@ class DetailAnnotationView(QWidget):
         layout.addWidget(self.splitter)
         
         # Disabled state placeholder (shown when no active game)
+        placeholder_font_size = int(scale_font_size(14))
         self.disabled_placeholder = QLabel("No active game. Load a game to add annotations.")
         self.disabled_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.disabled_placeholder.setWordWrap(True)
         self.disabled_placeholder.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.disabled_placeholder.setStyleSheet("""
-            QLabel {
+        self.disabled_placeholder.setStyleSheet(f"""
+            QLabel {{
                 color: rgb(150, 150, 150);
-                font-size: 14px;
+                font-size: {placeholder_font_size}pt;
                 padding: 20px;
-            }
+            }}
         """)
         self.disabled_placeholder.hide()  # Initially hidden
         layout.addWidget(self.disabled_placeholder)
@@ -590,6 +601,11 @@ class DetailAnnotationView(QWidget):
         button_padding = button_config.get('padding', [6, 4])
         button_height = button_config.get('height', 28)
         
+        # Get font settings for buttons (with DPI scaling)
+        from app.utils.font_utils import resolve_font_family
+        font_family = resolve_font_family(tabs_config.get('font_family', 'Helvetica Neue'))
+        font_size = scale_font_size(tabs_config.get('font_size', 10))
+        
         # Style tool buttons (with rounded corners)
         tool_style = f"""
             QToolButton {{
@@ -600,6 +616,8 @@ class DetailAnnotationView(QWidget):
                 padding: {button_padding[0]}px {button_padding[1]}px;
                 min-height: {button_height}px;
                 min-width: 60px;
+                font-family: "{font_family}";
+                font-size: {font_size}pt;
             }}
             QToolButton:checked {{
                 background-color: rgb({active_bg[0]}, {active_bg[1]}, {active_bg[2]});
@@ -631,6 +649,8 @@ class DetailAnnotationView(QWidget):
                 border-radius: {button_border_radius}px;
                 padding: {button_padding[0]}px {button_padding[1]}px;
                 min-height: {button_height}px;
+                font-family: "{font_family}";
+                font-size: {font_size}pt;
             }}
             QPushButton:hover {{
                 background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});
@@ -656,6 +676,8 @@ class DetailAnnotationView(QWidget):
                 border-radius: {button_border_radius}px;
                 padding: {button_padding[0]}px {button_padding[1]}px;
                 min-height: {button_height}px;
+                font-family: "{font_family}";
+                font-size: {font_size}pt;
             }}
             QPushButton:checked {{
                 background-color: rgb({active_bg[0]}, {active_bg[1]}, {active_bg[2]});
@@ -679,8 +701,19 @@ class DetailAnnotationView(QWidget):
         
         # Style labels
         label_style = f"color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});"
-        for label in [self.annotation_count_label, self.annotation_count_value]:
+        labels_to_style = [self.annotation_count_label, self.annotation_count_value]
+        # Add size label and size value label if they exist
+        if hasattr(self, 'size_label'):
+            labels_to_style.append(self.size_label)
+        if hasattr(self, 'size_value_label'):
+            labels_to_style.append(self.size_value_label)
+        for label in labels_to_style:
             label.setStyleSheet(label_style)
+            # Set palette to prevent macOS override
+            label_palette = label.palette()
+            label_palette.setColor(label.foregroundRole(), QColor(norm_text[0], norm_text[1], norm_text[2]))
+            label.setPalette(label_palette)
+            label.update()
     
     def eventFilter(self, obj, event) -> bool:
         """Event filter to handle resize events on UI elements and mouse events on chessboard."""
