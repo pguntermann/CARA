@@ -1203,7 +1203,8 @@
         },
         "title": {
           "font_size": 14,
-          "padding": 5
+          "padding": 5,
+          "text_color": [240, 240, 240]
         },
         "description": {
           "font_size": 11,
@@ -1744,7 +1745,8 @@
         },
         "title": {
           "font_size": 14,
-          "padding": 5
+          "padding": 5,
+          "text_color": [240, 240, 240]
         },
         "message": {
           "font_size": 11,
@@ -1777,7 +1779,8 @@
         },
         "title": {
           "font_size": 14,
-          "padding": 5
+          "padding": 5,
+          "text_color": [240, 240, 240]
         },
         "message": {
           "font_size": 11,
