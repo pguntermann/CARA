@@ -87,7 +87,8 @@ class BulkTagDialog(QDialog):
         self.text_color = QColor(text_color[0], text_color[1], text_color[2])
         
         # Font
-        font_size = dialog_config.get("font_size", 11)
+        from app.utils.font_utils import scale_font_size
+        font_size = scale_font_size(dialog_config.get("font_size", 11))
         self.font_family = dialog_config.get("font_family", "Helvetica Neue")
         self.font_size = font_size
         
@@ -109,10 +110,10 @@ class BulkTagDialog(QDialog):
         
         # Inputs
         inputs_config = dialog_config.get("inputs", {})
-        from app.utils.font_utils import resolve_font_family
+        from app.utils.font_utils import resolve_font_family, scale_font_size
         input_font_family_raw = inputs_config.get("font_family", "Cascadia Mono")
         self.input_font_family = resolve_font_family(input_font_family_raw)
-        self.input_font_size = inputs_config.get("font_size", 11)
+        self.input_font_size = scale_font_size(inputs_config.get("font_size", 11))
         self.input_text_color = QColor(*inputs_config.get("text_color", [240, 240, 240]))
         self.input_bg_color = QColor(*inputs_config.get("background_color", [30, 30, 35]))
         self.input_border_color = QColor(*inputs_config.get("border_color", [60, 60, 65]))
@@ -418,7 +419,8 @@ class BulkTagDialog(QDialog):
         bg_color = self.config.get("ui", {}).get("dialogs", {}).get("bulk_tag", {}).get("background_color", [40, 40, 45])
         border_color = self.config.get("ui", {}).get("dialogs", {}).get("bulk_tag", {}).get("border_color", [60, 60, 65])
         text_color = self.config.get("ui", {}).get("dialogs", {}).get("bulk_tag", {}).get("text_color", [200, 200, 200])
-        font_size = self.config.get("ui", {}).get("dialogs", {}).get("bulk_tag", {}).get("font_size", 11)
+        from app.utils.font_utils import scale_font_size
+        font_size = scale_font_size(self.config.get("ui", {}).get("dialogs", {}).get("bulk_tag", {}).get("font_size", 11))
         
         button_width = buttons_config.get("width", 120)
         button_height = buttons_config.get("height", 30)
@@ -511,8 +513,9 @@ class BulkTagDialog(QDialog):
         group_bg_color = groups_config.get("background_color", bg_color) if "background_color" in groups_config else bg_color
         group_border_color = groups_config.get("border_color", border_color) if "border_color" in groups_config else border_color
         group_border_radius = groups_config.get("border_radius", 5)
-        group_title_font_family = groups_config.get("title_font_family", "Helvetica Neue")
-        group_title_font_size = groups_config.get("title_font_size", 11)
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        group_title_font_family = resolve_font_family(groups_config.get("title_font_family", "Helvetica Neue"))
+        group_title_font_size = scale_font_size(groups_config.get("title_font_size", 11))
         group_title_color = groups_config.get("title_color", [240, 240, 240])
         group_content_margins = groups_config.get("content_margins", [10, 15, 10, 10])
         group_margin_top = groups_config.get("margin_top", 10)
@@ -551,20 +554,40 @@ class BulkTagDialog(QDialog):
                     group_content_margins[3]
                 )
         
-        # Apply label styling
+        # Apply label styling - apply to ALL labels to prevent macOS theme override
         label_style = (
             f"QLabel {{"
             f"color: rgb({self.label_text_color.red()}, {self.label_text_color.green()}, {self.label_text_color.blue()});"
             f"font-family: {self.label_font_family};"
             f"font-size: {self.label_font_size}pt;"
+            f"background-color: transparent;"
             f"}}"
         )
         
+        # Apply stylesheet and palette to all labels to ensure macOS doesn't override
+        # Group box titles are styled via QGroupBox::title, not QLabel, so we can style all QLabels
         for label in self.findChildren(QLabel):
-            # Skip group box titles (they're styled via QGroupBox::title)
-            if isinstance(label.parent(), QGroupBox):
-                continue
+            # Apply stylesheet
             label.setStyleSheet(label_style)
+            # Also set palette to ensure color is applied (macOS sometimes ignores stylesheet)
+            label_palette = label.palette()
+            label_palette.setColor(label.foregroundRole(), self.label_text_color)
+            label.setPalette(label_palette)
+            # Force update to ensure styling is applied
+            label.update()
+        
+        # Apply radio button styling to match import games dialog (simple styling, no custom indicator)
+        radio_button_style = (
+            f"QRadioButton {{"
+            f"color: rgb({self.label_text_color.red()}, {self.label_text_color.green()}, {self.label_text_color.blue()});"
+            f"font-family: {self.label_font_family};"
+            f"font-size: {self.label_font_size}pt;"
+            f"spacing: 5px;"
+            f"}}"
+        )
+        
+        for radio_button in self.findChildren(QRadioButton):
+            radio_button.setStyleSheet(radio_button_style)
         
         # Apply checkbox styling to ensure consistent font size and style
         self._apply_checkbox_styling()
