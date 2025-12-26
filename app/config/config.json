@@ -2120,7 +2120,19 @@
         "font_size": 11,
         "layout": {
           "spacing": 10,
-          "margins": [15, 15, 15, 15]
+          "margins": [15, 15, 15, 15],
+          "scroll_area_margins": [10, 10, 10, 10],
+          "scroll_layout_spacing": 10,
+          "left_panel_width": 250,
+          "right_panel_label_left_padding": 10,
+          "left_panel": {
+            "margins": [0, 0, 0, 0],
+            "spacing": 5
+          },
+          "right_panel": {
+            "margins": [0, 0, 0, 0],
+            "spacing": 5
+          }
         },
         "buttons": {
           "spacing": 10,
@@ -2146,7 +2158,10 @@
           "border_color": [60, 60, 65],
           "border_radius": 3,
           "header_background_color": [45, 45, 50],
-          "header_text_color": [200, 200, 200]
+          "header_text_color": [200, 200, 200],
+          "item_padding": 5,
+          "header_padding": 5,
+          "width_column_width": 80
         },
         "inputs": {
           "font_family": "Cascadia Mono, Menlo",
@@ -2155,15 +2170,48 @@
           "background_color": [30, 30, 35],
           "border_color": [60, 60, 65],
           "border_radius": 3,
-          "padding": [8, 6]
+          "padding": [8, 6],
+          "spinbox": {
+            "min_value": 10,
+            "max_value": 1000,
+            "minimum_height": 30
+          }
+        },
+        "checkboxes": {
+          "spacing": 5,
+          "margin_top": 2,
+          "margin_bottom": 2,
+          "indicator": {
+            "width": 16,
+            "height": 16,
+            "border_radius": 3
+          },
+          "checked": {
+            "background_color": [70, 90, 130],
+            "border_color": [100, 120, 160]
+          },
+          "hover_border_offset": 20
         },
         "groups": {
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
           "title_color": [240, 240, 240],
           "content_margins": [10, 15, 10, 10],
+          "layout_spacing": 8,
           "margin_top": 10,
-          "padding_top": 5
+          "padding_top": 5,
+          "border_radius": 3,
+          "title": {
+            "padding_left": 5,
+            "padding_right": 5
+          }
+        },
+        "scrollbar": {
+          "width": 8,
+          "border_radius": 4,
+          "min_height": 20,
+          "hover_offset": 20,
+          "add_line_height": 0
         }
       }
     },

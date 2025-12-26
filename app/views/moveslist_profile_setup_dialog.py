@@ -101,9 +101,9 @@ class MovesListProfileSetupDialog(QDialog):
         # Left panel: fixed width (narrower), Right panel: takes remaining space
         margins = self.layout_config.get('margins', [15, 15, 15, 15])
         available_width = self._dialog_width - margins[0] - margins[2]  # left + right margins
-        left_size = 250  # Fixed width for left panel (column selection)
-        right_size = available_width - left_size  # Right panel takes remaining space
-        self.splitter.setSizes([left_size, right_size])
+        left_panel_width = self.layout_config.get('left_panel_width', 250)
+        right_size = available_width - left_panel_width  # Right panel takes remaining space
+        self.splitter.setSizes([left_panel_width, right_size])
         
         # Connect to model signals for synchronization
         self.profile_model.column_visibility_changed.connect(self._on_model_visibility_changed)
@@ -192,8 +192,14 @@ class MovesListProfileSetupDialog(QDialog):
         """Create the left panel with available columns grouped by category."""
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(5)
+        # Get left panel layout config
+        dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('moveslist_profile_setup', {})
+        layout_config = dialog_config.get('layout', {})
+        left_panel_config = layout_config.get('left_panel', {})
+        left_panel_margins = left_panel_config.get('margins', [0, 0, 0, 0])
+        left_panel_spacing = left_panel_config.get('spacing', 5)
+        layout.setContentsMargins(left_panel_margins[0], left_panel_margins[1], left_panel_margins[2], left_panel_margins[3])
+        layout.setSpacing(left_panel_spacing)
         
         label = QLabel("Available Columns")
         layout.addWidget(label)
@@ -208,11 +214,20 @@ class MovesListProfileSetupDialog(QDialog):
         
         scroll_widget = QWidget()
         scroll_layout = QVBoxLayout(scroll_widget)
-        scroll_layout.setContentsMargins(0, 0, 0, 0)
-        scroll_layout.setSpacing(10)
+        # Get scroll area margins and spacing from config
+        scroll_area_margins = self.layout_config.get('scroll_area_margins', [10, 10, 10, 10])
+        scroll_layout_spacing = self.layout_config.get('scroll_layout_spacing', 10)
+        scroll_layout.setContentsMargins(scroll_area_margins[0], scroll_area_margins[1], scroll_area_margins[2], scroll_area_margins[3])
+        scroll_layout.setSpacing(scroll_layout_spacing)
         
         # Store checkboxes for later access
         self.column_checkboxes: Dict[str, QCheckBox] = {}
+        
+        # Get groups config for layout spacing and content margins
+        dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('moveslist_profile_setup', {})
+        groups_config = dialog_config.get('groups', {})
+        group_content_margins = groups_config.get('content_margins', [10, 15, 10, 10])
+        group_layout_spacing = groups_config.get('layout_spacing', 8)
         
         # Create group boxes for each category
         all_column_names = self.profile_model.get_column_names()
@@ -221,8 +236,8 @@ class MovesListProfileSetupDialog(QDialog):
         for category_name, category_columns in self.column_categories.items():
             group = QGroupBox(category_name)
             group_layout = QVBoxLayout(group)
-            group_layout.setContentsMargins(10, 15, 10, 10)
-            group_layout.setSpacing(5)
+            group_layout.setContentsMargins(group_content_margins[0], group_content_margins[1], group_content_margins[2], group_content_margins[3])
+            group_layout.setSpacing(group_layout_spacing)
             
             for column_name in category_columns:
                 if column_name in all_column_names:
@@ -241,8 +256,8 @@ class MovesListProfileSetupDialog(QDialog):
         if uncategorized:
             group = QGroupBox("Other")
             group_layout = QVBoxLayout(group)
-            group_layout.setContentsMargins(10, 15, 10, 10)
-            group_layout.setSpacing(5)
+            group_layout.setContentsMargins(group_content_margins[0], group_content_margins[1], group_content_margins[2], group_content_margins[3])
+            group_layout.setSpacing(group_layout_spacing)
             
             for column_name in uncategorized:
                 display_name = self.profile_model.get_column_display_name(column_name)
@@ -264,10 +279,20 @@ class MovesListProfileSetupDialog(QDialog):
         """Create the right panel with visible columns in order and width editing."""
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(5)
+        # Get right panel layout config
+        dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('moveslist_profile_setup', {})
+        layout_config = dialog_config.get('layout', {})
+        right_panel_config = layout_config.get('right_panel', {})
+        right_panel_margins = right_panel_config.get('margins', [0, 0, 0, 0])
+        right_panel_spacing = right_panel_config.get('spacing', 5)
+        layout.setContentsMargins(right_panel_margins[0], right_panel_margins[1], right_panel_margins[2], right_panel_margins[3])
+        layout.setSpacing(right_panel_spacing)
+        
+        # Get label left padding from config
+        label_left_padding = layout_config.get('right_panel_label_left_padding', 10)
         
         label = QLabel("Visible Columns (drag to reorder)")
+        label.setContentsMargins(label_left_padding, 0, 0, 0)
         layout.addWidget(label)
         
         # Table widget for visible columns with drag-and-drop and width editing
@@ -413,7 +438,10 @@ class MovesListProfileSetupDialog(QDialog):
         self.visible_table.horizontalHeader().setStretchLastSection(False)
         self.visible_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.visible_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        self.visible_table.setColumnWidth(1, 80)
+        # Get width column width from config
+        table_config = dialog_config.get('table', {})
+        width_column_width = table_config.get('width_column_width', 80)
+        self.visible_table.setColumnWidth(1, width_column_width)
         self.visible_table.verticalHeader().setVisible(False)
         self.visible_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.visible_table.setDragDropMode(QTableWidget.DragDropMode.InternalMove)
@@ -530,10 +558,16 @@ class MovesListProfileSetupDialog(QDialog):
                 self.parent_dialog = parent_dialog
                 self.col_name = col_name
                 self.is_col_num = (col_name == COL_NUM)
-                self.setRange(10, 1000)  # Allow narrower columns (minimum 10px)
+                # Get spinbox range and minimum height from config
+                inputs_config = self.parent_dialog.config.get('ui', {}).get('dialogs', {}).get('moveslist_profile_setup', {}).get('inputs', {})
+                spinbox_config = inputs_config.get('spinbox', {})
+                min_value = spinbox_config.get('min_value', 10)
+                max_value = spinbox_config.get('max_value', 1000)
+                spinbox_min_height = spinbox_config.get('minimum_height', 30)
+                self.setRange(min_value, max_value)
                 self.setValue(initial_value)
                 self.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
-                self.setMinimumHeight(30)
+                self.setMinimumHeight(spinbox_min_height)
                 self.setProperty("column_name", col_name)
                 
                 # Connect to valueChanged to track user edits in real-time
@@ -1029,13 +1063,54 @@ class MovesListProfileSetupDialog(QDialog):
             label.update()
         
         # Checkbox styling
+        checkboxes_config = dialog_config.get('checkboxes', {})
+        checkbox_spacing = checkboxes_config.get('spacing', 5)
+        checkbox_margin_top = checkboxes_config.get('margin_top', 2)
+        checkbox_margin_bottom = checkboxes_config.get('margin_bottom', 2)
+        indicator_config = checkboxes_config.get('indicator', {})
+        checkbox_indicator_width = indicator_config.get('width', 16)
+        checkbox_indicator_height = indicator_config.get('height', 16)
+        checkbox_indicator_border_radius = indicator_config.get('border_radius', 3)
+        checked_config = checkboxes_config.get('checked', {})
+        checkbox_checked_bg_color = checked_config.get('background_color', [70, 90, 130])
+        checkbox_checked_border_color = checked_config.get('border_color', [100, 120, 160])
+        checkbox_hover_border_offset = checkboxes_config.get('hover_border_offset', 20)
+        
+        # Get checkmark icon path
+        from pathlib import Path
+        project_root = Path(__file__).parent.parent.parent
+        checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
+        checkmark_url = str(checkmark_path).replace("\\", "/") if checkmark_path.exists() else ""
+        
+        # Use input border and background colors for checkbox indicator
+        inputs_config = dialog_config.get('inputs', {})
+        input_border_color = inputs_config.get('border_color', [60, 60, 65])
+        input_bg_color = inputs_config.get('background_color', [30, 30, 35])
+        
         checkbox_style = (
             f"QCheckBox {{"
             f"font-family: {label_font_family};"
             f"font-size: {label_font_size}pt;"
             f"color: rgb({label_text_color[0]}, {label_text_color[1]}, {label_text_color[2]});"
-            f"spacing: 5px;"
+            f"spacing: {checkbox_spacing}px;"
+            f"margin-top: {checkbox_margin_top}px;"
+            f"margin-bottom: {checkbox_margin_bottom}px;"
             f"background-color: transparent;"
+            f"}}"
+            f"QCheckBox::indicator {{"
+            f"width: {checkbox_indicator_width}px;"
+            f"height: {checkbox_indicator_height}px;"
+            f"border: 1px solid rgb({input_border_color[0]}, {input_border_color[1]}, {input_border_color[2]});"
+            f"border-radius: {checkbox_indicator_border_radius}px;"
+            f"background-color: rgb({input_bg_color[0]}, {input_bg_color[1]}, {input_bg_color[2]});"
+            f"}}"
+            f"QCheckBox::indicator:hover {{"
+            f"border: 1px solid rgb({min(255, input_border_color[0] + checkbox_hover_border_offset)}, {min(255, input_border_color[1] + checkbox_hover_border_offset)}, {min(255, input_border_color[2] + checkbox_hover_border_offset)});"
+            f"}}"
+            f"QCheckBox::indicator:checked {{"
+            f"background-color: rgb({checkbox_checked_bg_color[0]}, {checkbox_checked_bg_color[1]}, {checkbox_checked_bg_color[2]});"
+            f"border: 1px solid rgb({checkbox_checked_border_color[0]}, {checkbox_checked_border_color[1]}, {checkbox_checked_border_color[2]});"
+            f"image: url({checkmark_url});"
             f"}}"
         )
         
@@ -1057,6 +1132,14 @@ class MovesListProfileSetupDialog(QDialog):
             input_border = inputs_config.get('border_color', [60, 60, 65])
             input_border_radius = inputs_config.get('border_radius', 3)
             
+            # Get scrollbar config
+            scrollbar_config = dialog_config.get('scrollbar', {})
+            scrollbar_width = scrollbar_config.get('width', 8)
+            scrollbar_border_radius = scrollbar_config.get('border_radius', 6)
+            scrollbar_min_height = scrollbar_config.get('min_height', 20)
+            scrollbar_hover_offset = scrollbar_config.get('hover_offset', 20)
+            scrollbar_add_line_height = scrollbar_config.get('add_line_height', 0)
+            
             scroll_area_style = (
                 f"QScrollArea {{"
                 f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
@@ -1068,25 +1151,27 @@ class MovesListProfileSetupDialog(QDialog):
                 f"}}"
                 f"QScrollBar:vertical {{"
                 f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-                f"width: 12px;"
+                f"width: {scrollbar_width}px !important;"
+                f"max-width: {scrollbar_width}px !important;"
+                f"min-width: {scrollbar_width}px !important;"
                 f"border: none;"
                 f"}}"
                 f"QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{"
                 f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
                 f"border: none;"
-                f"height: 0px;"
+                f"height: {scrollbar_add_line_height}px;"
                 f"}}"
                 f"QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{"
                 f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
                 f"}}"
                 f"QScrollBar::handle:vertical {{"
                 f"background-color: rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
-                f"border-radius: 6px;"
-                f"min-height: 20px;"
+                f"border-radius: {scrollbar_border_radius}px;"
+                f"min-height: {scrollbar_min_height}px;"
                 f"border: none;"
                 f"}}"
                 f"QScrollBar::handle:vertical:hover {{"
-                f"background-color: rgb({min(255, input_border[0] + 20)}, {min(255, input_border[1] + 20)}, {min(255, input_border[2] + 20)});"
+                f"background-color: rgb({min(255, input_border[0] + scrollbar_hover_offset)}, {min(255, input_border[1] + scrollbar_hover_offset)}, {min(255, input_border[2] + scrollbar_hover_offset)});"
                 f"}}"
             )
             self.available_columns_scroll.setStyleSheet(scroll_area_style)
@@ -1098,9 +1183,39 @@ class MovesListProfileSetupDialog(QDialog):
                 viewport.setPalette(viewport_palette)
                 viewport.setAutoFillBackground(True)
             
-            # Set palette on scrollbar to prevent macOS override of arrow buttons
+            # Apply scrollbar stylesheet directly to scrollbar widget to prevent macOS override
             scrollbar = self.available_columns_scroll.verticalScrollBar()
             if scrollbar:
+                scrollbar_stylesheet = (
+                    f"QScrollBar:vertical {{"
+                    f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+                    f"width: {scrollbar_width}px !important;"
+                    f"max-width: {scrollbar_width}px !important;"
+                    f"min-width: {scrollbar_width}px !important;"
+                    f"border: none;"
+                    f"}}"
+                    f"QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{"
+                    f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+                    f"border: none;"
+                    f"height: {scrollbar_add_line_height}px;"
+                    f"}}"
+                    f"QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{"
+                    f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+                    f"}}"
+                    f"QScrollBar::handle:vertical {{"
+                    f"background-color: rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
+                    f"border-radius: {scrollbar_border_radius}px;"
+                    f"min-height: {scrollbar_min_height}px;"
+                    f"border: none;"
+                    f"}}"
+                    f"QScrollBar::handle:vertical:hover {{"
+                    f"background-color: rgb({min(255, input_border[0] + scrollbar_hover_offset)}, {min(255, input_border[1] + scrollbar_hover_offset)}, {min(255, input_border[2] + scrollbar_hover_offset)});"
+                    f"}}"
+                )
+                scrollbar.setStyleSheet(scrollbar_stylesheet)
+                # Set fixed width programmatically to override macOS native styling
+                scrollbar.setFixedWidth(scrollbar_width)
+                # Set palette to prevent macOS override
                 scrollbar_palette = scrollbar.palette()
                 scrollbar_palette.setColor(scrollbar.backgroundRole(), QColor(*input_bg))
                 scrollbar_palette.setColor(scrollbar_palette.ColorRole.Base, QColor(*input_bg))
@@ -1116,6 +1231,8 @@ class MovesListProfileSetupDialog(QDialog):
         table_border_radius = table_config.get('border_radius', 3)
         table_header_bg = table_config.get('header_background_color', [45, 45, 50])
         table_header_text = table_config.get('header_text_color', [200, 200, 200])
+        table_item_padding = table_config.get('item_padding', 5)
+        table_header_padding = table_config.get('header_padding', 5)
         
         table_style = (
             f"QTableWidget {{"
@@ -1127,7 +1244,7 @@ class MovesListProfileSetupDialog(QDialog):
             f"gridline-color: rgb({table_border_color[0]}, {table_border_color[1]}, {table_border_color[2]});"
             f"}}"
             f"QTableWidget::item {{"
-            f"padding: 5px;"
+            f"padding: {table_item_padding}px;"
             f"}}"
             f"QTableWidget::item:selected {{"
             f"background-color: rgb({bg_color[0] + button_bg_offset}, {bg_color[1] + button_bg_offset}, {bg_color[2] + button_bg_offset});"
@@ -1136,12 +1253,96 @@ class MovesListProfileSetupDialog(QDialog):
             f"background-color: rgb({table_header_bg[0]}, {table_header_bg[1]}, {table_header_bg[2]});"
             f"color: rgb({table_header_text[0]}, {table_header_text[1]}, {table_header_text[2]});"
             f"border: 1px solid rgb({table_border_color[0]}, {table_border_color[1]}, {table_border_color[2]});"
-            f"padding: 5px;"
+            f"padding: {table_header_padding}px;"
             f"font-size: {font_size}pt;"
             f"}}"
         )
         
         self.visible_table.setStyleSheet(table_style)
+        
+        # Apply scrollbar styling to table widget to match the left scroll area exactly
+        # Get scrollbar config and input colors (same as used for left scroll area)
+        inputs_config = dialog_config.get('inputs', {})
+        input_bg = inputs_config.get('background_color', [30, 30, 35])
+        input_border = inputs_config.get('border_color', [60, 60, 65])
+        
+        scrollbar_config = dialog_config.get('scrollbar', {})
+        scrollbar_width = scrollbar_config.get('width', 8)
+        scrollbar_border_radius = scrollbar_config.get('border_radius', 4)
+        scrollbar_min_height = scrollbar_config.get('min_height', 20)
+        scrollbar_hover_offset = scrollbar_config.get('hover_offset', 20)
+        scrollbar_add_line_height = scrollbar_config.get('add_line_height', 0)
+        
+        # Use same input colors as left scroll area for exact matching
+        table_scrollbar_style = (
+            f"QTableWidget QScrollBar:vertical {{"
+            f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+            f"width: {scrollbar_width}px !important;"
+            f"max-width: {scrollbar_width}px !important;"
+            f"min-width: {scrollbar_width}px !important;"
+            f"border: none;"
+            f"}}"
+            f"QTableWidget QScrollBar::add-line:vertical, QTableWidget QScrollBar::sub-line:vertical {{"
+            f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+            f"border: none;"
+            f"height: {scrollbar_add_line_height}px;"
+            f"}}"
+            f"QTableWidget QScrollBar::add-page:vertical, QTableWidget QScrollBar::sub-page:vertical {{"
+            f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+            f"}}"
+            f"QTableWidget QScrollBar::handle:vertical {{"
+            f"background-color: rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
+            f"border-radius: {scrollbar_border_radius}px;"
+            f"min-height: {scrollbar_min_height}px;"
+            f"border: none;"
+            f"}}"
+            f"QTableWidget QScrollBar::handle:vertical:hover {{"
+            f"background-color: rgb({min(255, input_border[0] + scrollbar_hover_offset)}, {min(255, input_border[1] + scrollbar_hover_offset)}, {min(255, input_border[2] + scrollbar_hover_offset)});"
+            f"}}"
+        )
+        # Append scrollbar styling to table style
+        combined_table_style = table_style + table_scrollbar_style
+        self.visible_table.setStyleSheet(combined_table_style)
+        
+        # Apply scrollbar stylesheet directly to table scrollbar widget to prevent macOS override
+        table_scrollbar = self.visible_table.verticalScrollBar()
+        if table_scrollbar:
+            table_scrollbar_stylesheet = (
+                f"QScrollBar:vertical {{"
+                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+                f"width: {scrollbar_width}px !important;"
+                f"max-width: {scrollbar_width}px !important;"
+                f"min-width: {scrollbar_width}px !important;"
+                f"border: none;"
+                f"}}"
+                f"QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{"
+                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+                f"border: none;"
+                f"height: {scrollbar_add_line_height}px;"
+                f"}}"
+                f"QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{"
+                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
+                f"}}"
+                f"QScrollBar::handle:vertical {{"
+                f"background-color: rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
+                f"border-radius: {scrollbar_border_radius}px;"
+                f"min-height: {scrollbar_min_height}px;"
+                f"border: none;"
+                f"}}"
+                f"QScrollBar::handle:vertical:hover {{"
+                f"background-color: rgb({min(255, input_border[0] + scrollbar_hover_offset)}, {min(255, input_border[1] + scrollbar_hover_offset)}, {min(255, input_border[2] + scrollbar_hover_offset)});"
+                f"}}"
+            )
+            table_scrollbar.setStyleSheet(table_scrollbar_stylesheet)
+            # Set fixed width programmatically to override macOS native styling
+            table_scrollbar.setFixedWidth(scrollbar_width)
+            # Set palette to prevent macOS override (using input colors to match left side)
+            table_scrollbar_palette = table_scrollbar.palette()
+            table_scrollbar_palette.setColor(table_scrollbar.backgroundRole(), QColor(*input_bg))
+            table_scrollbar_palette.setColor(table_scrollbar_palette.ColorRole.Base, QColor(*input_bg))
+            table_scrollbar_palette.setColor(table_scrollbar_palette.ColorRole.Window, QColor(*input_bg))
+            table_scrollbar.setPalette(table_scrollbar_palette)
+            table_scrollbar.setAutoFillBackground(True)
         
         # Set palette on table header to prevent macOS override
         header = self.visible_table.horizontalHeader()
@@ -1191,18 +1392,24 @@ class MovesListProfileSetupDialog(QDialog):
         margin_top = groups_config.get('margin_top', 10)
         padding_top = groups_config.get('padding_top', 5)
         
+        # Get group box border radius and title padding from config
+        group_border_radius = groups_config.get('border_radius', 3)
+        title_config = groups_config.get('title', {})
+        title_padding_left = title_config.get('padding_left', 5)
+        title_padding_right = title_config.get('padding_right', 5)
+        
         group_style = (
             f"QGroupBox {{"
             f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
-            f"border-radius: 3px;"
+            f"border-radius: {group_border_radius}px;"
             f"margin-top: {margin_top}px;"
             f"padding-top: {padding_top}px;"
             f"}}"
             f"QGroupBox::title {{"
             f"subcontrol-origin: margin;"
             f"subcontrol-position: top left;"
-            f"padding-left: 5px;"
-            f"padding-right: 5px;"
+            f"padding-left: {title_padding_left}px;"
+            f"padding-right: {title_padding_right}px;"
             f"padding-top: {padding_top}px;"
             f"font-family: {group_title_font};"
             f"font-size: {group_title_size}pt;"
