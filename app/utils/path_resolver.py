@@ -104,10 +104,11 @@ def resolve_data_file_path(filename: str) -> Tuple[Path, bool]:
     """Resolve the path for a user data file (settings, parameters, etc.).
     
     This function implements the smart path resolution logic:
-    1. Check if app root has write access
-    2. If yes, use app root (portable mode)
-    3. If no, use user data directory
-    4. If using user data directory and file doesn't exist, copy from app root
+    1. For macOS app bundles: always use user data directory (to preserve code signature)
+    2. For other cases: check if app root has write access
+    3. If yes, use app root (portable mode)
+    4. If no, use user data directory
+    5. If using user data directory and file doesn't exist, copy from app root
     
     Args:
         filename: Name of the data file (e.g., "user_settings.json").
@@ -120,6 +121,28 @@ def resolve_data_file_path(filename: str) -> Tuple[Path, bool]:
     app_root = get_app_root()
     app_root_file = app_root / filename
     
+    # Special handling for macOS app bundles: never write to bundle to preserve code signature
+    # Writing to a signed app bundle invalidates the signature, causing macOS to reject the app
+    if sys.platform == "darwin" and getattr(sys, 'frozen', False):
+        executable_path = Path(sys.executable)
+        if executable_path.parent.name == "MacOS":
+            # macOS app bundle: force user data directory to preserve signature
+            user_data_dir = get_user_data_directory()
+            user_data_dir.mkdir(parents=True, exist_ok=True)
+            user_data_file = user_data_dir / filename
+            
+            # If file doesn't exist in user data directory, copy from app root if it exists
+            if not user_data_file.exists() and app_root_file.exists():
+                try:
+                    shutil.copy2(app_root_file, user_data_file)
+                except (OSError, PermissionError, shutil.Error) as e:
+                    # If copy fails, we'll just use the user data directory
+                    # The file will be created with defaults when first saved
+                    pass
+            
+            return user_data_file, False
+    
+    # For all other cases (development mode, Windows bundles, etc.):
     # Check if app root has write access
     if has_write_access(app_root):
         # Portable mode: use app root directory
