@@ -15,140 +15,130 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.6;
             color: rgb(220, 220, 220);
-            background-color: rgb(40, 40, 45);
+            background: linear-gradient(135deg, rgb(30, 30, 35) 0%, rgb(40, 40, 45) 100%);
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            padding: 40px 20px;
         }
         
         .container {
-            max-width: 800px;
+            max-width: 1100px;
             margin: 0 auto;
-            padding: 60px 40px;
-            background-color: rgb(40, 40, 45);
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            border-radius: 8px;
+        }
+        
+        /* Hero Section - Two Column Layout */
+        .hero-section {
+            display: flex;
+            gap: 40px;
+            align-items: center;
+            margin-bottom: 50px;
+        }
+        
+        .hero-left {
+            flex: 1;
+            min-width: 0;
             text-align: center;
         }
         
+        .hero-right {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
         .logo {
-            width: 120px;
-            height: 120px;
-            margin: 0 auto 30px;
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
             display: block;
         }
         
         h1 {
             color: rgb(240, 240, 240);
             font-size: 2.5em;
-            font-weight: bold;
-            margin-bottom: 10px;
+            font-weight: 700;
+            margin-bottom: 8px;
         }
         
         .subtitle {
             color: rgb(200, 200, 200);
-            font-size: 1.4em;
-            margin-bottom: 15px;
+            font-size: 1.3em;
+            margin-bottom: 8px;
+            font-weight: 400;
         }
         
         .version {
-            color: rgb(180, 180, 180);
-            font-size: 1em;
-            margin-bottom: 50px;
+            color: rgb(150, 150, 150);
+            font-size: 0.9em;
+            margin-bottom: 25px;
         }
         
         .description {
             color: rgb(200, 200, 200);
-            font-size: 1.1em;
-            margin-bottom: 50px;
-            line-height: 1.8;
+            font-size: 1.05em;
+            line-height: 1.7;
         }
         
-        .nav-button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 18px 35px;
-            background-color: rgb(58, 117, 196);
-            color: rgb(255, 255, 255);
-            text-decoration: none;
+        .screenshot {
+            width: 100%;
+            max-width: 100%;
+            height: auto;
             border-radius: 8px;
-            font-size: 1.2em;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-            min-width: 200px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgb(60, 60, 65);
         }
         
-        .nav-button:hover {
-            background-color: rgb(70, 130, 220);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
-        }
-        
-        .nav-button.secondary {
-            background: linear-gradient(135deg, rgb(60, 60, 65) 0%, rgb(50, 50, 55) 100%);
-        }
-        
-        .nav-button.secondary:hover {
-            background: linear-gradient(135deg, rgb(80, 80, 85) 0%, rgb(70, 70, 75) 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
-        }
-        
+        /* Download Section */
         .download-section {
-            margin: 50px 0;
-            padding: 30px;
-            background-color: rgb(50, 50, 55);
-            border-radius: 8px;
-            border: 2px solid rgb(60, 60, 65);
+            text-align: center;
+            margin: 50px 0 30px 0;
+            background: rgb(45, 45, 50);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgb(60, 60, 65);
         }
         
         .download-section h2 {
             color: rgb(240, 240, 240);
-            font-size: 1.5em;
-            margin-bottom: 20px;
+            font-size: 1.6em;
+            margin-bottom: 15px;
             font-weight: 600;
+        }
+        
+        .download-info {
+            color: rgb(180, 180, 180);
+            font-size: 0.95em;
+            margin-bottom: 25px;
+            line-height: 1.6;
         }
         
         .download-buttons {
             display: flex;
-            gap: 20px;
+            gap: 15px;
             justify-content: center;
             flex-wrap: wrap;
-        }
-        
-        .nav-buttons {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            flex-wrap: wrap;
+            margin-bottom: 20px;
         }
         
         .download-button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            padding: 18px 35px;
+            display: inline-block;
+            padding: 14px 32px;
             background: linear-gradient(135deg, rgb(58, 117, 196) 0%, rgb(45, 95, 160) 100%);
             color: rgb(255, 255, 255);
             text-decoration: none;
             border-radius: 8px;
-            font-size: 1.2em;
+            font-size: 1.05em;
             font-weight: 600;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            min-width: 200px;
+            transition: all 0.2s ease;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+            width: 260px;
         }
         
         .download-button:hover {
             background: linear-gradient(135deg, rgb(70, 130, 220) 0%, rgb(55, 105, 180) 100%);
             transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
         }
         
         .download-button.macos {
@@ -159,85 +149,323 @@
             background: linear-gradient(135deg, rgb(120, 120, 130) 0%, rgb(90, 90, 100) 100%);
         }
         
-        .download-info {
+        .gatekeeper-note {
+            color: rgb(140, 140, 140);
+            font-size: 0.7em;
+            margin-top: 15px;
+            line-height: 1.5;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        /* Resources Section */
+        .resources-section {
+            text-align: center;
+            margin: 30px 0 50px 0;
+            background: rgb(45, 45, 50);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgb(60, 60, 65);
+        }
+        
+        .resources-section h2 {
+            color: rgb(240, 240, 240);
+            font-size: 1.6em;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .resources-section p {
             color: rgb(180, 180, 180);
             font-size: 0.95em;
-            margin-top: 15px;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             line-height: 1.6;
         }
         
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .nav-button {
+            display: inline-block;
+            padding: 12px 28px;
+            background: linear-gradient(135deg, rgb(58, 117, 196) 0%, rgb(45, 95, 160) 100%);
+            color: rgb(255, 255, 255);
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+            width: 260px;
+        }
+        
+        .nav-button:hover {
+            background: linear-gradient(135deg, rgb(70, 130, 220) 0%, rgb(55, 105, 180) 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+        }
+        
+        .nav-button.secondary {
+            background: linear-gradient(135deg, rgb(60, 60, 65) 0%, rgb(50, 50, 55) 100%);
+        }
+        
+        .nav-button.secondary:hover {
+            background: linear-gradient(135deg, rgb(80, 80, 85) 0%, rgb(70, 70, 75) 100%);
+        }
+        
+        /* Footer */
         .footer {
             margin-top: 60px;
             padding-top: 30px;
             border-top: 1px solid rgb(60, 60, 65);
             color: rgb(160, 160, 160);
-            font-size: 0.9em;
+            font-size: 0.85em;
+            text-align: center;
         }
         
         .footer a {
             color: rgb(100, 150, 255);
             text-decoration: none;
+            transition: color 0.2s ease;
         }
         
         .footer a:hover {
+            color: rgb(120, 170, 255);
             text-decoration: underline;
+        }
+        
+        .footer-links {
+            margin-bottom: 12px;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            body {
+                padding: 20px 15px;
+            }
+            
+            .container {
+                max-width: 100%;
+            }
+            
+            .hero-section {
+                flex-direction: column;
+                gap: 30px;
+            }
+            
+            .hero-left {
+                text-align: center;
+            }
+            
+            .logo {
+                margin: 0 auto 20px;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+            
+            .subtitle {
+                font-size: 1.1em;
+            }
+            
+            .description {
+                font-size: 0.95em;
+            }
+            
+            .screenshot {
+                max-width: 100%;
+            }
+            
+            .download-section,
+            .resources-section {
+                padding: 15px;
+                margin: 30px 0;
+            }
+            
+            .download-section h2,
+            .resources-section h2 {
+                font-size: 1.4em;
+            }
+            
+            .download-buttons,
+            .nav-buttons {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+            
+            .download-button,
+            .nav-button {
+                width: 100%;
+            }
+            
+            .download-info {
+                font-size: 0.9em;
+            }
+            
+            .gatekeeper-note {
+                font-size: 0.65em;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            body {
+                padding: 15px 10px;
+            }
+            
+            h1 {
+                font-size: 1.8em;
+            }
+            
+            .subtitle {
+                font-size: 1em;
+            }
+            
+            .version {
+                font-size: 0.85em;
+            }
+            
+            .description {
+                font-size: 0.9em;
+            }
+            
+            .logo {
+                width: 60px;
+                height: 60px;
+            }
+            
+            .hero-section {
+                gap: 25px;
+            }
+            
+            .download-section,
+            .resources-section {
+                padding: 15px 12px;
+                margin: 25px 0;
+            }
+            
+            .download-section h2,
+            .resources-section h2 {
+                font-size: 1.3em;
+                margin-bottom: 12px;
+            }
+            
+            .download-info,
+            .resources-section p {
+                font-size: 0.85em;
+                margin-bottom: 20px;
+            }
+            
+            .download-button,
+            .nav-button {
+                padding: 12px 24px;
+                font-size: 0.95em;
+            }
+            
+            .gatekeeper-note {
+                font-size: 0.6em;
+                margin-top: 12px;
+            }
+            
+            .footer {
+                font-size: 0.8em;
+                margin-top: 40px;
+                padding-top: 25px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <img src="appicon.svg" alt="CARA Logo" class="logo">
+        <!-- Hero Section - Two Column Layout -->
+        <div class="hero-section">
+            <div class="hero-left">
+                <img src="appicon.svg" alt="CARA Logo" class="logo">
+                <h1>CARA</h1>
+                <p class="subtitle">Chess Analysis and Review Application</p>
+                <p class="version">Version 2.4.6</p>
+                <p class="description">
+                    A full-featured desktop application for analyzing and reviewing chess games. 
+                    CARA helps you understand your games, identify mistakes, recognize patterns, 
+                    and improve your chess understanding.
+                </p>
+            </div>
+            <div class="hero-right">
+                <img src="app/resources/manual/screenshots/app_overview.png" 
+                     alt="CARA Application Overview" 
+                     class="screenshot">
+            </div>
+        </div>
         
-        <h1>CARA</h1>
-        <p class="subtitle">Chess Analysis and Review Application</p>
-        <p class="version">Version 2.4.6</p>
-        
-        <p class="description">
-            A full-featured desktop application for analyzing and reviewing chess games. 
-            CARA helps you understand your games, identify mistakes, recognize patterns, 
-            and improve your chess understanding.
-        </p>
-        
+        <!-- Download Section -->
         <div class="download-section">
-            <h2>Download CARA</h2>
-            <p class="download-info" style="margin-top: 0;">
+            <h2>Download as App Bundle</h2>
+            <p class="download-info">
                 Pre-built application bundles are available for Windows and macOS. 
                 These bundles include all dependencies and can be run directly without Python installation.
             </p>
             <div class="download-buttons">
-                <a href="https://github.com/pguntermann/CARA/releases/download/2.4.6/CARA.2.4.6.windows.AppBundle.zip" class="download-button" target="_blank" rel="noopener noreferrer">
-                    <span>⬇</span> Download for Windows
+                <a href="https://github.com/pguntermann/CARA/releases/download/2.4.6/CARA.2.4.6.windows.AppBundle.zip" 
+                   class="download-button" 
+                   target="_blank" 
+                   rel="noopener noreferrer">
+                    Download for Windows
                 </a>
-                <a href="https://github.com/pguntermann/CARA/releases/download/2.4.6/CARA.2.4.6.macOS.AppBundle.zip" class="download-button macos" target="_blank" rel="noopener noreferrer">
-                    <span>⬇</span> Download for macOS
+                <a href="https://github.com/pguntermann/CARA/releases/download/2.4.6/CARA.2.4.6.macOS.AppBundle.zip" 
+                   class="download-button macos" 
+                   target="_blank" 
+                   rel="noopener noreferrer">
+                    Download for macOS
                 </a>
             </div>
-            <p class="download-info" style="margin-top: 20px;">
-                For source code installation or other platforms, see the <a href="README.md" style="color: rgb(100, 150, 255); text-decoration: none;">README</a>.
+            <p class="gatekeeper-note">
+                <strong>macOS users:</strong> If you see a security warning, right-click the app and select "Open", then click "Open" in the dialog. You may also need to allow the app in System Settings → Privacy & Security.
             </p>
-            
-            <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid rgb(60, 60, 65);">
-                <h2 style="color: rgb(240, 240, 240); font-size: 1.5em; margin-bottom: 20px; font-weight: 600;">Resources</h2>
-                <p class="download-info" style="margin-top: 0;">
-                    Access the source code, contribute to the project, or read the user manual 
-                    to learn more about CARA's features and capabilities.
-                </p>
-                <div class="nav-buttons">
-                    <a href="https://github.com/pguntermann/CARA" class="nav-button" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
-                    <a href="manual.html" class="nav-button secondary">User Manual</a>
-                </div>
+            <p class="download-info" style="margin-top: 20px;">
+                For source code installation or other platforms, see the 
+                <a href="README.md" style="color: rgb(100, 150, 255); text-decoration: none;">README</a>.
+            </p>
+        </div>
+        
+        <!-- Resources Section -->
+        <div class="resources-section">
+            <h2>Resources</h2>
+            <p>
+                Access the source code, contribute to the project, or read the user manual 
+                to learn more about CARA's features and capabilities.
+            </p>
+            <div class="nav-buttons">
+                <a href="https://github.com/pguntermann/CARA" 
+                   class="nav-button" 
+                   target="_blank" 
+                   rel="noopener noreferrer">
+                    GitHub Repository
+                </a>
+                <a href="manual.html" 
+                   class="nav-button secondary">
+                    User Manual
+                </a>
             </div>
         </div>
         
+        <!-- Footer -->
         <div class="footer">
-            <p>
+            <div class="footer-links">
                 <a href="README.md">README</a> • 
                 <a href="RELEASE_NOTES.md">Release Notes</a> • 
                 <a href="LICENSE">License</a>
-            </p>
-            <p style="margin-top: 15px;">
+            </div>
+            <p>
                 Licensed under <a href="LICENSE">GNU General Public License v3.0</a>
+            </p>
+            <p style="margin-top: 12px;">
+                Contact: <a href="mailto:pguntermann@me.com">pguntermann@me.com</a>
             </p>
         </div>
     </div>
