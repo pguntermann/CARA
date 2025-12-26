@@ -679,12 +679,12 @@ class ClassificationSettingsDialog(QDialog):
         buttons_config = dialog_config.get('buttons', {})
         
         # Dialog background
-        bg_color = groups_config.get('background_color', [40, 40, 45])
+        dialog_bg_color = dialog_config.get('background_color', [40, 40, 45])
         palette = self.palette()
-        palette.setColor(QPalette.ColorRole.Window, QColor(bg_color[0], bg_color[1], bg_color[2]))
+        palette.setColor(QPalette.ColorRole.Window, QColor(dialog_bg_color[0], dialog_bg_color[1], dialog_bg_color[2]))
         self.setPalette(palette)
         
-        # Group boxes
+        # Group boxes - use transparent background to match dialog background
         border_color = groups_config.get('border_color', [60, 60, 65])
         border_radius = groups_config.get('border_radius', 5)
         title_color = groups_config.get('title_color', [240, 240, 240])
@@ -701,7 +701,7 @@ class ClassificationSettingsDialog(QDialog):
             f"border-radius: {border_radius}px;"
             f"margin-top: {margin_top}px;"
             f"padding-top: {padding_top}px;"
-            f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
+            f"background-color: transparent;"
             f"}}"
             f"QGroupBox::title {{"
             f"font-family: \"{title_font_family}\";"
@@ -715,6 +715,11 @@ class ClassificationSettingsDialog(QDialog):
         
         for group in self.findChildren(QGroupBox):
             group.setStyleSheet(group_style)
+            # Set palette to ensure transparent background on macOS
+            group_palette = group.palette()
+            group_palette.setColor(group.backgroundRole(), QColor(0, 0, 0, 0))  # Transparent
+            group_palette.setColor(QPalette.ColorRole.Window, QColor(0, 0, 0, 0))  # Transparent
+            group.setPalette(group_palette)
         
         # Labels
         text_color = fields_config.get('text_color', [220, 220, 220])
@@ -724,6 +729,7 @@ class ClassificationSettingsDialog(QDialog):
             f"QLabel {{"
             f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
             f"font-size: {font_size}pt;"
+            f"background-color: transparent;"
             f"}}"
         )
         
@@ -731,6 +737,10 @@ class ClassificationSettingsDialog(QDialog):
             if not isinstance(label.parent(), QGroupBox) or label.text() in ["Move Quality Thresholds", "Brilliant Move Criteria"]:
                 continue
             label.setStyleSheet(label_style)
+            # Also set palette to ensure transparent background on macOS
+            label_palette = label.palette()
+            label_palette.setColor(label.backgroundRole(), QColor(0, 0, 0, 0))  # Transparent
+            label.setPalette(label_palette)
         
         # Spin boxes (numeric inputs)
         # Hide the up/down buttons - users can type values directly
@@ -743,7 +753,7 @@ class ClassificationSettingsDialog(QDialog):
             f"QSpinBox {{"
             f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
             f"font-size: {font_size}pt;"
-            f"background-color: rgb({bg_color[0] + input_background_offset}, {bg_color[1] + input_background_offset}, {bg_color[2] + input_background_offset});"
+            f"background-color: rgb({dialog_bg_color[0] + input_background_offset}, {dialog_bg_color[1] + input_background_offset}, {dialog_bg_color[2] + input_background_offset});"
             f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
             f"border-radius: {input_border_radius}px;"
             f"padding: {input_padding}px;"
@@ -762,7 +772,7 @@ class ClassificationSettingsDialog(QDialog):
         
         # Store disabled background color for max_eval_before_spinbox updates
         self._disabled_bg_color = disabled_bg_color
-        self._enabled_bg_color = [bg_color[0] + input_background_offset, bg_color[1] + input_background_offset, bg_color[2] + input_background_offset]
+        self._enabled_bg_color = [dialog_bg_color[0] + input_background_offset, dialog_bg_color[1] + input_background_offset, dialog_bg_color[2] + input_background_offset]
         self._text_color = text_color
         self._border_color = border_color
         
@@ -770,53 +780,34 @@ class ClassificationSettingsDialog(QDialog):
         if hasattr(self, 'max_eval_before_spinbox') and hasattr(self, 'exclude_winning_check'):
             self._on_exclude_winning_toggled(self.exclude_winning_check.isChecked())
         
-        # Check boxes
-        checkboxes_config = dialog_config.get('checkboxes', {})
-        checkbox_spacing = checkboxes_config.get('spacing', 5)
-        indicator_config = checkboxes_config.get('indicator', {})
-        checkbox_indicator_width = indicator_config.get('width', 16)
-        checkbox_indicator_height = indicator_config.get('height', 16)
-        checkbox_indicator_border_radius = indicator_config.get('border_radius', 3)
-        checked_config = checkboxes_config.get('checked', {})
-        checkbox_checked_bg_color = checked_config.get('background_color', [70, 90, 130])
-        checkbox_checked_border_color = checked_config.get('border_color', [100, 120, 160])
-        checkbox_hover_border_offset = checkboxes_config.get('hover_border_offset', 20)
+        # Apply checkbox styling using StyleManager
+        from app.views.style import StyleManager
+        from pathlib import Path
         
         # Get checkmark icon path
-        from pathlib import Path
         project_root = Path(__file__).parent.parent.parent
         checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
-        checkmark_url = str(checkmark_path).replace("\\", "/") if checkmark_path.exists() else ""
         
         # Use input border and background colors for checkbox indicator
         input_border_color = border_color
-        input_bg_color = [bg_color[0] + input_background_offset, bg_color[1] + input_background_offset, bg_color[2] + input_background_offset]
+        input_bg_color = [dialog_bg_color[0] + input_background_offset, dialog_bg_color[1] + input_background_offset, dialog_bg_color[2] + input_background_offset]
         
-        checkbox_style = (
-            f"QCheckBox {{"
-            f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
-            f"font-size: {font_size}pt;"
-            f"spacing: {checkbox_spacing}px;"
-            f"}}"
-            f"QCheckBox::indicator {{"
-            f"width: {checkbox_indicator_width}px;"
-            f"height: {checkbox_indicator_height}px;"
-            f"border-radius: {checkbox_indicator_border_radius}px;"
-            f"border: 1px solid rgb({input_border_color[0]}, {input_border_color[1]}, {input_border_color[2]});"
-            f"background-color: rgb({input_bg_color[0]}, {input_bg_color[1]}, {input_bg_color[2]});"
-            f"}}"
-            f"QCheckBox::indicator:checked {{"
-            f"background-color: rgb({checkbox_checked_bg_color[0]}, {checkbox_checked_bg_color[1]}, {checkbox_checked_bg_color[2]});"
-            f"border-color: rgb({checkbox_checked_border_color[0]}, {checkbox_checked_border_color[1]}, {checkbox_checked_border_color[2]});"
-            f"image: url({checkmark_url});"
-            f"}}"
-            f"QCheckBox::indicator:hover {{"
-            f"border-color: rgb({input_border_color[0] + checkbox_hover_border_offset}, {input_border_color[1] + checkbox_hover_border_offset}, {input_border_color[2] + checkbox_hover_border_offset});"
-            f"}}"
+        # Get font family from fields config
+        fields_config = dialog_config.get('fields', {})
+        font_family = resolve_font_family(fields_config.get('font_family', 'Helvetica Neue'))
+        
+        # Get all checkboxes and apply styling
+        checkboxes = self.findChildren(QCheckBox)
+        StyleManager.style_checkboxes(
+            checkboxes,
+            self.config,
+            text_color,
+            font_family,
+            font_size,
+            input_bg_color,
+            input_border_color,
+            checkmark_path
         )
-        
-        for checkbox in self.findChildren(QCheckBox):
-            checkbox.setStyleSheet(checkbox_style)
         
         # Buttons
         button_width = buttons_config.get('width', 120)
@@ -831,7 +822,7 @@ class ClassificationSettingsDialog(QDialog):
             f"QPushButton {{"
             f"min-width: {button_width}px;"
             f"min-height: {button_height}px;"
-            f"background-color: rgb({bg_color[0] + button_bg_offset}, {bg_color[1] + button_bg_offset}, {bg_color[2] + button_bg_offset});"
+            f"background-color: rgb({dialog_bg_color[0] + button_bg_offset}, {dialog_bg_color[1] + button_bg_offset}, {dialog_bg_color[2] + button_bg_offset});"
             f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
             f"border-radius: {button_border_radius}px;"
             f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
@@ -839,10 +830,10 @@ class ClassificationSettingsDialog(QDialog):
             f"padding: {button_padding}px;"
             f"}}"
             f"QPushButton:hover {{"
-            f"background-color: rgb({bg_color[0] + button_hover_offset}, {bg_color[1] + button_hover_offset}, {bg_color[2] + button_hover_offset});"
+            f"background-color: rgb({dialog_bg_color[0] + button_hover_offset}, {dialog_bg_color[1] + button_hover_offset}, {dialog_bg_color[2] + button_hover_offset});"
             f"}}"
             f"QPushButton:pressed {{"
-            f"background-color: rgb({bg_color[0] + button_pressed_offset}, {bg_color[1] + button_pressed_offset}, {bg_color[2] + button_pressed_offset});"
+            f"background-color: rgb({dialog_bg_color[0] + button_pressed_offset}, {dialog_bg_color[1] + button_pressed_offset}, {dialog_bg_color[2] + button_pressed_offset});"
             f"}}"
         )
         
@@ -965,12 +956,15 @@ class ClassificationSettingsDialog(QDialog):
         # Apply scrollbar styling to scroll area
         if hasattr(self, 'scroll_area'):
             from app.views.style import StyleManager
+            dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('classification_settings', {})
+            dialog_bg_color = dialog_config.get('background_color', [40, 40, 45])
+            groups_config = dialog_config.get('groups', {})
             border_color = groups_config.get('border_color', [60, 60, 65])
             border_radius = groups_config.get('border_radius', 5)
             StyleManager.style_scroll_area(
                 self.scroll_area,
                 self.config,
-                bg_color,
+                dialog_bg_color,
                 border_color,
                 border_radius
             )

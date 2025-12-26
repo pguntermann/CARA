@@ -104,7 +104,7 @@ def generate_scroll_area_stylesheet(
     stylesheet = (
         f"QScrollArea {{"
         f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
-        f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
+        f"border: none;"
         f"border-radius: {border_radius}px;"
         f"}}"
         f"QScrollArea QWidget {{"

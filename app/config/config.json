@@ -8,6 +8,17 @@
         "min_height": 20,
         "hover_offset": 20,
         "add_line_height": 0
+      },
+      "checkbox": {
+        "spacing": 5,
+        "indicator_width": 16,
+        "indicator_height": 16,
+        "indicator_border_radius": 3,
+        "checked_background_color": [70, 90, 130],
+        "checked_border_color": [100, 120, 160],
+        "hover_border_offset": 20,
+        "margin_top": 2,
+        "margin_bottom": 2
       }
     },
     "window": {
@@ -1014,19 +1025,6 @@
           "background_offset": 20,
           "hover_background_offset": 30,
           "pressed_background_offset": 10
-        },
-        "checkboxes": {
-          "spacing": 5,
-          "indicator": {
-            "width": 16,
-            "height": 16,
-            "border_radius": 3
-          },
-          "checked": {
-            "background_color": [70, 90, 130],
-            "border_color": [100, 120, 160]
-          },
-          "hover_border_offset": 20
         }
       },
       "ai_model_settings": {
@@ -1340,19 +1338,6 @@
           "note_font_size": 10,
           "minimum_width": 90
         },
-        "checkboxes": {
-          "spacing": 5,
-          "indicator": {
-            "width": 16,
-            "height": 16,
-            "border_radius": 3
-          },
-          "checked": {
-            "background_color": [70, 90, 130],
-            "border_color": [100, 120, 160]
-          },
-          "hover_border_offset": 20
-        },
         "inputs": {
           "font_family": "Cascadia Mono, Menlo",
           "font_size": 11,
@@ -1426,19 +1411,6 @@
           "font_size": 11,
           "text_color": [200, 200, 200],
           "minimum_width": 90
-        },
-        "checkboxes": {
-          "spacing": 5,
-          "indicator": {
-            "width": 16,
-            "height": 16,
-            "border_radius": 3
-          },
-          "checked": {
-            "background_color": [70, 90, 130],
-            "border_color": [100, 120, 160]
-          },
-          "hover_border_offset": 20
         },
         "radio_buttons": {
           "first_button_minimum_width": 100
@@ -1585,19 +1557,6 @@
           "padding_top": 5,
           "title_left": 10,
           "title_padding": [0, 5]
-        },
-        "checkboxes": {
-          "spacing": 5,
-          "indicator": {
-            "width": 16,
-            "height": 16,
-            "border_radius": 3
-          },
-          "checked": {
-            "background_color": [70, 90, 130],
-            "border_color": [100, 120, 160]
-          },
-          "hover_border_offset": 20
         }
       },
         "bulk_analysis_dialog": {
@@ -1630,19 +1589,6 @@
           "font_size": 11,
           "text_color": [200, 200, 200]
         },
-        "checkboxes": {
-          "spacing": 5,
-          "indicator": {
-            "width": 16,
-            "height": 16,
-            "border_radius": 3
-          },
-          "checked": {
-            "background_color": [70, 90, 130],
-            "border_color": [100, 120, 160]
-          },
-          "hover_border_offset": 20
-        },
         "radio_buttons": {
           "first_button_minimum_width": 100
         },
@@ -1664,6 +1610,13 @@
           "label_text_color": [200, 200, 200],
           "status_font_size": 10,
           "status_text_color": [150, 150, 150]
+        },
+        "progress_bar": {
+          "background_color": [30, 30, 35],
+          "border_color": [60, 60, 65],
+          "border_radius": 3,
+          "chunk_background_color": [70, 90, 130],
+          "chunk_border_radius": 2
         }
       },
       "bulk_clean_pgn": {
@@ -1697,19 +1650,6 @@
           "font_family": "Helvetica Neue",
           "font_size": 11,
           "text_color": [200, 200, 200]
-        },
-        "checkboxes": {
-          "spacing": 5,
-          "indicator": {
-            "width": 16,
-            "height": 16,
-            "border_radius": 3
-          },
-          "checked": {
-            "background_color": [70, 90, 130],
-            "border_color": [100, 120, 160]
-          },
-          "hover_border_offset": 20
         },
         "inputs": {
           "font_family": "Cascadia Mono, Menlo",
@@ -2008,11 +1948,6 @@
           "margin_top": 10,
           "padding_top": 5
         },
-        "checkboxes": {
-          "spacing": 5,
-          "text_color": [200, 200, 200],
-          "font_size": 11
-        },
         "modes": {
           "options": [
             {"value": "exact_pgn", "label": "Exact PGN Match"},
@@ -2180,21 +2115,6 @@
             "max_value": 1000,
             "minimum_height": 30
           }
-        },
-        "checkboxes": {
-          "spacing": 5,
-          "margin_top": 2,
-          "margin_bottom": 2,
-          "indicator": {
-            "width": 16,
-            "height": 16,
-            "border_radius": 3
-          },
-          "checked": {
-            "background_color": [70, 90, 130],
-            "border_color": [100, 120, 160]
-          },
-          "hover_border_offset": 20
         },
         "groups": {
           "title_font_family": "Helvetica Neue",
