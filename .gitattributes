@@ -1,0 +1,3 @@
+# Mark HTML files as documentation for GitHub language statistics
+*.html linguist-documentation
+
