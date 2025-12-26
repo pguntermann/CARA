@@ -1462,25 +1462,6 @@ class EngineConfigurationDialog(QDialog):
                 selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});
                 border: {input_border_width}px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});
             }}
-            QCheckBox {{
-                color: rgb({input_text[0]}, {input_text[1]}, {input_text[2]});
-                spacing: 5px;
-            }}
-            QCheckBox::indicator {{
-                width: 16px;
-                height: 16px;
-                border: {input_border_width}px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});
-                border-radius: 3px;
-                background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});
-            }}
-            QCheckBox::indicator:hover {{
-                border: {input_border_width}px solid rgb({min(255, input_border[0] + 20)}, {min(255, input_border[1] + 20)}, {min(255, input_border[2] + 20)});
-            }}
-            QCheckBox::indicator:checked {{
-                background-color: rgb(70, 90, 130);
-                border: {input_border_width}px solid rgb(100, 120, 160);
-                image: url({checkmark_url});
-            }}
         """
         
         # Apply input widget styling to individual widgets only (not to tab widget itself)
@@ -1502,8 +1483,22 @@ class EngineConfigurationDialog(QDialog):
                     view_palette.setColor(view.foregroundRole(), input_text_qcolor)
                     view.setPalette(view_palette)
                     view.setAutoFillBackground(True)
-            for checkbox in tab.findChildren(QCheckBox):
-                checkbox.setStyleSheet(input_stylesheet)
+            # Apply checkbox styling using StyleManager
+            from app.views.style import StyleManager
+            checkboxes = tab.findChildren(QCheckBox)
+            if checkboxes:
+                from app.utils.font_utils import resolve_font_family
+                resolved_font_family = resolve_font_family(input_font_family)
+                StyleManager.style_checkboxes(
+                    checkboxes,
+                    self.config,
+                    input_text,
+                    resolved_font_family,
+                    input_font_size,
+                    input_bg,
+                    input_border,
+                    checkmark_path
+                )
         
         # Buttons styling (match Classification Settings Dialog template)
         buttons_config = dialog_config.get('buttons', {})

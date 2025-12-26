@@ -762,40 +762,31 @@ class BulkReplaceDialog(QDialog):
         """Apply checkbox styling to all checkboxes."""
         from pathlib import Path
         
-        input_border_color = self.input_border_color
-        input_bg_color = self.input_bg_color
+        # Apply checkbox styling using StyleManager
+        from app.views.style import StyleManager
+        from pathlib import Path
         
         # Get checkmark icon path
         project_root = Path(__file__).parent.parent.parent
         checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
-        checkmark_url = str(checkmark_path).replace("\\", "/") if checkmark_path.exists() else ""
         
-        checkbox_style = (
-            f"QCheckBox {{"
-            f"color: rgb({self.label_text_color.red()}, {self.label_text_color.green()}, {self.label_text_color.blue()});"
-            f"font-family: {self.label_font_family};"
-            f"font-size: {self.label_font_size}pt;"
-            f"spacing: {self.checkbox_spacing}px;"
-            f"}}"
-            f"QCheckBox::indicator {{"
-            f"width: {self.checkbox_indicator_width}px;"
-            f"height: {self.checkbox_indicator_height}px;"
-            f"border: 1px solid rgb({input_border_color.red()}, {input_border_color.green()}, {input_border_color.blue()});"
-            f"border-radius: {self.checkbox_indicator_border_radius}px;"
-            f"background-color: rgb({input_bg_color.red()}, {input_bg_color.green()}, {input_bg_color.blue()});"
-            f"}}"
-            f"QCheckBox::indicator:hover {{"
-            f"border: 1px solid rgb({min(255, input_border_color.red() + self.checkbox_hover_border_offset)}, {min(255, input_border_color.green() + self.checkbox_hover_border_offset)}, {min(255, input_border_color.blue() + self.checkbox_hover_border_offset)});"
-            f"}}"
-            f"QCheckBox::indicator:checked {{"
-            f"background-color: rgb({self.checkbox_checked_bg_color.red()}, {self.checkbox_checked_bg_color.green()}, {self.checkbox_checked_bg_color.blue()});"
-            f"border: 1px solid rgb({self.checkbox_checked_border_color.red()}, {self.checkbox_checked_border_color.green()}, {self.checkbox_checked_border_color.blue()});"
-            f"image: url({checkmark_url});"
-            f"}}"
+        # Convert QColor to [R, G, B] lists
+        text_color = [self.label_text_color.red(), self.label_text_color.green(), self.label_text_color.blue()]
+        input_bg = [self.input_bg_color.red(), self.input_bg_color.green(), self.input_bg_color.blue()]
+        input_border = [self.input_border_color.red(), self.input_border_color.green(), self.input_border_color.blue()]
+        
+        # Get all checkboxes and apply styling
+        checkboxes = self.findChildren(QCheckBox)
+        StyleManager.style_checkboxes(
+            checkboxes,
+            self.config,
+            text_color,
+            self.label_font_family,
+            self.label_font_size,
+            input_bg,
+            input_border,
+            checkmark_path
         )
-        
-        for checkbox in self.findChildren(QCheckBox):
-            checkbox.setStyleSheet(checkbox_style)
     
     
     def _get_available_tags(self) -> List[str]:

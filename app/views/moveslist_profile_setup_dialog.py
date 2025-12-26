@@ -1062,61 +1062,34 @@ class MovesListProfileSetupDialog(QDialog):
             label.setPalette(label_palette)
             label.update()
         
-        # Checkbox styling
-        checkboxes_config = dialog_config.get('checkboxes', {})
-        checkbox_spacing = checkboxes_config.get('spacing', 5)
-        checkbox_margin_top = checkboxes_config.get('margin_top', 2)
-        checkbox_margin_bottom = checkboxes_config.get('margin_bottom', 2)
-        indicator_config = checkboxes_config.get('indicator', {})
-        checkbox_indicator_width = indicator_config.get('width', 16)
-        checkbox_indicator_height = indicator_config.get('height', 16)
-        checkbox_indicator_border_radius = indicator_config.get('border_radius', 3)
-        checked_config = checkboxes_config.get('checked', {})
-        checkbox_checked_bg_color = checked_config.get('background_color', [70, 90, 130])
-        checkbox_checked_border_color = checked_config.get('border_color', [100, 120, 160])
-        checkbox_hover_border_offset = checkboxes_config.get('hover_border_offset', 20)
+        # Checkbox styling using StyleManager
+        from app.views.style import StyleManager
+        from pathlib import Path
         
         # Get checkmark icon path
-        from pathlib import Path
         project_root = Path(__file__).parent.parent.parent
         checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
-        checkmark_url = str(checkmark_path).replace("\\", "/") if checkmark_path.exists() else ""
         
         # Use input border and background colors for checkbox indicator
         inputs_config = dialog_config.get('inputs', {})
         input_border_color = inputs_config.get('border_color', [60, 60, 65])
         input_bg_color = inputs_config.get('background_color', [30, 30, 35])
         
-        checkbox_style = (
-            f"QCheckBox {{"
-            f"font-family: {label_font_family};"
-            f"font-size: {label_font_size}pt;"
-            f"color: rgb({label_text_color[0]}, {label_text_color[1]}, {label_text_color[2]});"
-            f"spacing: {checkbox_spacing}px;"
-            f"margin-top: {checkbox_margin_top}px;"
-            f"margin-bottom: {checkbox_margin_bottom}px;"
-            f"background-color: transparent;"
-            f"}}"
-            f"QCheckBox::indicator {{"
-            f"width: {checkbox_indicator_width}px;"
-            f"height: {checkbox_indicator_height}px;"
-            f"border: 1px solid rgb({input_border_color[0]}, {input_border_color[1]}, {input_border_color[2]});"
-            f"border-radius: {checkbox_indicator_border_radius}px;"
-            f"background-color: rgb({input_bg_color[0]}, {input_bg_color[1]}, {input_bg_color[2]});"
-            f"}}"
-            f"QCheckBox::indicator:hover {{"
-            f"border: 1px solid rgb({min(255, input_border_color[0] + checkbox_hover_border_offset)}, {min(255, input_border_color[1] + checkbox_hover_border_offset)}, {min(255, input_border_color[2] + checkbox_hover_border_offset)});"
-            f"}}"
-            f"QCheckBox::indicator:checked {{"
-            f"background-color: rgb({checkbox_checked_bg_color[0]}, {checkbox_checked_bg_color[1]}, {checkbox_checked_bg_color[2]});"
-            f"border: 1px solid rgb({checkbox_checked_border_color[0]}, {checkbox_checked_border_color[1]}, {checkbox_checked_border_color[2]});"
-            f"image: url({checkmark_url});"
-            f"}}"
+        # Get all checkboxes and apply styling
+        checkboxes = self.findChildren(QCheckBox)
+        StyleManager.style_checkboxes(
+            checkboxes,
+            self.config,
+            label_text_color,
+            label_font_family,
+            label_font_size,
+            input_bg_color,
+            input_border_color,
+            checkmark_path
         )
         
-        for checkbox in self.findChildren(QCheckBox):
-            checkbox.setStyleSheet(checkbox_style)
-            # Set palette to prevent macOS override of background color
+        # Set palette to prevent macOS override of background color
+        for checkbox in checkboxes:
             checkbox_palette = checkbox.palette()
             checkbox_palette.setColor(checkbox.foregroundRole(), QColor(*label_text_color))
             checkbox_palette.setColor(checkbox_palette.ColorRole.Base, QColor(bg_color[0], bg_color[1], bg_color[2]))

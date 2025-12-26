@@ -689,6 +689,7 @@ class AIModelSettingsDialog(QDialog):
             f"font-family: \"{label_font_family}\";"
             f"font-size: {label_font_size}pt;"
             f"color: rgb({label_text_color[0]}, {label_text_color[1]}, {label_text_color[2]});"
+            f"background-color: transparent;"
             f"}}"
         )
         
@@ -697,6 +698,10 @@ class AIModelSettingsDialog(QDialog):
             if isinstance(label.parent(), QGroupBox) and label.text() in ["OpenAI", "Anthropic"]:
                 continue
             label.setStyleSheet(label_style)
+            # Also set palette to ensure transparent background on macOS
+            label_palette = label.palette()
+            label_palette.setColor(label.backgroundRole(), QColor(0, 0, 0, 0))  # Transparent
+            label.setPalette(label_palette)
         
         # Input widgets (QLineEdit, QComboBox)
         input_bg_color = self.inputs_config.get('background_color', [45, 45, 50])

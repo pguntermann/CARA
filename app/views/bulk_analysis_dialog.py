@@ -1125,54 +1125,36 @@ class BulkAnalysisDialog(QDialog):
         for group in self.findChildren(QGroupBox):
             group.setStyleSheet(group_style)
         
-        # Checkbox styling
-        checkboxes_config = dialog_config.get('checkboxes', {})
-        checkbox_spacing = checkboxes_config.get('spacing', 5)
-        indicator_config = checkboxes_config.get('indicator', {})
-        checkbox_indicator_width = indicator_config.get('width', 16)
-        checkbox_indicator_height = indicator_config.get('height', 16)
-        checkbox_indicator_border_radius = indicator_config.get('border_radius', 3)
-        checked_config = checkboxes_config.get('checked', {})
-        checkbox_checked_bg_color = checked_config.get('background_color', [70, 90, 130])
-        checkbox_checked_border_color = checked_config.get('border_color', [100, 120, 160])
-        checkbox_hover_border_offset = checkboxes_config.get('hover_border_offset', 20)
+        # Apply checkbox styling using StyleManager
+        from app.views.style import StyleManager
         
         # Get checkmark icon path
         project_root = Path(__file__).parent.parent.parent
         checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
-        checkmark_url = str(checkmark_path).replace("\\", "/") if checkmark_path.exists() else ""
         
         # Use input border and background colors for checkbox indicator
         input_border_color = dialog_config.get('border_color', [60, 60, 65])
         input_bg_color = [bg_color[0] + 5, bg_color[1] + 5, bg_color[2] + 5]
         
-        checkbox_style = (
-            f"QCheckBox {{"
-            f"color: rgb({label_text_color[0]}, {label_text_color[1]}, {label_text_color[2]});"
-            f"font-size: {label_font_size}pt;"
-            f"spacing: {checkbox_spacing}px;"
-            f"}}"
-            f"QCheckBox::indicator {{"
-            f"width: {checkbox_indicator_width}px;"
-            f"height: {checkbox_indicator_height}px;"
-            f"border-radius: {checkbox_indicator_border_radius}px;"
-            f"border: 1px solid rgb({input_border_color[0]}, {input_border_color[1]}, {input_border_color[2]});"
-            f"background-color: rgb({input_bg_color[0]}, {input_bg_color[1]}, {input_bg_color[2]});"
-            f"}}"
-            f"QCheckBox::indicator:checked {{"
-            f"background-color: rgb({checkbox_checked_bg_color[0]}, {checkbox_checked_bg_color[1]}, {checkbox_checked_bg_color[2]});"
-            f"border-color: rgb({checkbox_checked_border_color[0]}, {checkbox_checked_border_color[1]}, {checkbox_checked_border_color[2]});"
-            f"image: url({checkmark_url});"
-            f"}}"
-            f"QCheckBox::indicator:hover {{"
-            f"border-color: rgb({input_border_color[0] + checkbox_hover_border_offset}, {input_border_color[1] + checkbox_hover_border_offset}, {input_border_color[2] + checkbox_hover_border_offset});"
-            f"}}"
+        # Get all checkboxes and apply styling
+        checkboxes = self.findChildren(QCheckBox)
+        StyleManager.style_checkboxes(
+            checkboxes,
+            self.config,
+            label_text_color,
+            label_font_family,
+            label_font_size,
+            input_bg_color,
+            input_border_color,
+            checkmark_path
         )
         
-        for checkbox in self.findChildren(QCheckBox):
-            checkbox.setStyleSheet(checkbox_style)
-        
         # Radio button styling (use same as labels)
+        # Get checkbox spacing from global config for radio buttons
+        styles_config = self.config.get('ui', {}).get('styles', {})
+        checkbox_config = styles_config.get('checkbox', {})
+        checkbox_spacing = checkbox_config.get('spacing', 5)
+        
         radio_style = (
             f"QRadioButton {{"
             f"font-family: {label_font_family}; "
@@ -1248,17 +1230,24 @@ class BulkAnalysisDialog(QDialog):
         for button in self.findChildren(QPushButton):
             button.setStyleSheet(button_style)
         
-        # Progress bar styling (use input widget colors)
+        # Progress bar styling (use dedicated progress bar config)
+        progress_bar_config = dialog_config.get('progress_bar', {})
+        progress_bg_color = progress_bar_config.get('background_color', [30, 30, 35])
+        progress_border_color = progress_bar_config.get('border_color', [60, 60, 65])
+        progress_border_radius = progress_bar_config.get('border_radius', 3)
+        progress_chunk_bg_color = progress_bar_config.get('chunk_background_color', [70, 90, 130])
+        progress_chunk_border_radius = progress_bar_config.get('chunk_border_radius', 2)
+        
         progress_bar_style = (
             f"QProgressBar {{"
-            f"border: 1px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
-            f"border-radius: 3px;"
+            f"border: 1px solid rgb({progress_border_color[0]}, {progress_border_color[1]}, {progress_border_color[2]});"
+            f"border-radius: {progress_border_radius}px;"
             f"text-align: center;"
-            f"background-color: rgb({input_bg_color[0]}, {input_bg_color[1]}, {input_bg_color[2]});"
+            f"background-color: rgb({progress_bg_color[0]}, {progress_bg_color[1]}, {progress_bg_color[2]});"
             f"}}"
             f"QProgressBar::chunk {{"
-            f"background-color: rgb({checkbox_checked_bg_color[0]}, {checkbox_checked_bg_color[1]}, {checkbox_checked_bg_color[2]});"
-            f"border-radius: 2px;"
+            f"background-color: rgb({progress_chunk_bg_color[0]}, {progress_chunk_bg_color[1]}, {progress_chunk_bg_color[2]});"
+            f"border-radius: {progress_chunk_border_radius}px;"
             f"}}"
         )
         

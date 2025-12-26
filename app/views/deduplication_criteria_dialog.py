@@ -401,17 +401,30 @@ class DeduplicationCriteriaDialog(QDialog):
             view.setPalette(view_palette)
             view.setAutoFillBackground(True)
         
-        # Checkbox styling
-        checkbox_style = (
-            f"QCheckBox {{"
-            f"font-size: {self.checkbox_font_size}pt;"
-            f"color: rgb({self.checkbox_text_color[0]}, {self.checkbox_text_color[1]}, {self.checkbox_text_color[2]});"
-            f"spacing: {self.checkbox_spacing}px;"
-            f"}}"
-        )
+        # Apply checkbox styling using StyleManager
+        from app.views.style import StyleManager
+        from pathlib import Path
         
-        for checkbox in self.findChildren(QCheckBox):
-            checkbox.setStyleSheet(checkbox_style)
+        # Get checkmark icon path
+        project_root = Path(__file__).parent.parent.parent
+        checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
+        
+        # Use input border and background colors for checkbox indicator
+        input_bg_color = self.input_bg_color
+        input_border_color = self.input_border_color
+        
+        # Get all checkboxes and apply styling
+        checkboxes = self.findChildren(QCheckBox)
+        StyleManager.style_checkboxes(
+            checkboxes,
+            self.config,
+            self.checkbox_text_color,
+            self.label_font_family,  # Use label font family for checkboxes
+            self.checkbox_font_size,
+            input_bg_color,
+            input_border_color,
+            checkmark_path
+        )
         
         # Group box styling
         group_style = (
