@@ -239,6 +239,9 @@ class AIModelSettingsDialog(QDialog):
         scroll.setWidget(scroll_widget)
         layout.addWidget(scroll)
         
+        # Store scroll area for styling
+        self.scroll_area = scroll
+        
         # Buttons
         button_layout = QHBoxLayout()
         button_spacing = self.buttons_config.get('spacing', 10)
@@ -610,6 +613,19 @@ class AIModelSettingsDialog(QDialog):
         palette.setColor(QPalette.ColorRole.Window, QColor(self.bg_color[0], self.bg_color[1], self.bg_color[2]))
         self.setPalette(palette)
         self.setAutoFillBackground(True)
+        
+        # Apply scrollbar styling to scroll area
+        if hasattr(self, 'scroll_area'):
+            from app.views.style import StyleManager
+            border_color = self.groups_config.get('border_color', [60, 60, 65])
+            border_radius = self.groups_config.get('border_radius', 5)
+            StyleManager.style_scroll_area(
+                self.scroll_area,
+                self.config,
+                self.bg_color,
+                border_color,
+                border_radius
+            )
         
         # Group boxes
         group_bg_color = self.groups_config.get('background_color', [45, 45, 50])

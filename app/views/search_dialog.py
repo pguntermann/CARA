@@ -980,31 +980,16 @@ class SearchDialog(QDialog):
         input_border = inputs_config.get("border_color", [60, 60, 65])
         input_border_radius = inputs_config.get("border_radius", 3)
         
-        scroll_area_style = (
-            f"QScrollArea {{"
-            f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-            f"border: 1px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
-            f"border-radius: {input_border_radius}px;"
-            f"}}"
-            f"QScrollArea QWidget {{"
-            f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-            f"}}"
-            f"QScrollBar:vertical {{"
-            f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-            f"width: 12px;"
-            f"border: none;"
-            f"}}"
-            f"QScrollBar::handle:vertical {{"
-            f"background-color: rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
-            f"border-radius: 6px;"
-            f"min-height: 20px;"
-            f"}}"
-            f"QScrollBar::handle:vertical:hover {{"
-            f"background-color: rgb({min(255, input_border[0] + 20)}, {min(255, input_border[1] + 20)}, {min(255, input_border[2] + 20)});"
-            f"}}"
-        )
+        # Apply scrollbar styling using StyleManager
         if hasattr(self, 'criteria_scroll_area'):
-            self.criteria_scroll_area.setStyleSheet(scroll_area_style)
+            from app.views.style import StyleManager
+            StyleManager.style_scroll_area(
+                self.criteria_scroll_area,
+                self.config,
+                input_bg,
+                input_border,
+                input_border_radius
+            )
             # Set palette on scroll area viewport to prevent macOS override
             viewport = self.criteria_scroll_area.viewport()
             if viewport:

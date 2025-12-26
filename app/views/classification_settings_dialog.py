@@ -383,6 +383,9 @@ class ClassificationSettingsDialog(QDialog):
         scroll.setWidget(scroll_widget)
         layout.addWidget(scroll)
         
+        # Store scroll area for styling
+        self.scroll_area = scroll
+        
         # Buttons
         button_layout = QHBoxLayout()
         button_spacing = buttons_config.get('spacing', 10)
@@ -958,6 +961,19 @@ class ClassificationSettingsDialog(QDialog):
                 f"}}"
             )
             self.max_eval_before_spinbox.setStyleSheet(disabled_style)
+        
+        # Apply scrollbar styling to scroll area
+        if hasattr(self, 'scroll_area'):
+            from app.views.style import StyleManager
+            border_color = groups_config.get('border_color', [60, 60, 65])
+            border_radius = groups_config.get('border_radius', 5)
+            StyleManager.style_scroll_area(
+                self.scroll_area,
+                self.config,
+                bg_color,
+                border_color,
+                border_radius
+            )
     
     def _on_save(self) -> None:
         """Handle save button click."""

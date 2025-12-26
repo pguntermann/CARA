@@ -448,8 +448,16 @@ class DetailAnnotationView(QWidget):
         tabs_config = panel_config.get('tabs', {})
         pane_bg = tabs_config.get('pane_background', [40, 40, 45])
         # Fix white background on macOS
-        self.annotation_scroll.setStyleSheet(f"QScrollArea {{ background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]}); }}")
-        self.annotation_scroll.viewport().setStyleSheet(f"background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});")
+        # Apply scrollbar styling using StyleManager
+        from app.views.style import StyleManager
+        border_color = [min(255, pane_bg[0] + 20), min(255, pane_bg[1] + 20), min(255, pane_bg[2] + 20)]
+        StyleManager.style_scroll_area(
+            self.annotation_scroll,
+            self.config,
+            pane_bg,
+            border_color,
+            0  # No border radius
+        )
         
         self.annotation_list_widget = QWidget()
         self.annotation_list_layout = QVBoxLayout(self.annotation_list_widget)
