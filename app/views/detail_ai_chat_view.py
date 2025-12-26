@@ -214,6 +214,20 @@ class DetailAIChatView(QWidget):
     
     def _apply_styling(self) -> None:
         """Apply styling to chat components."""
+        # Apply scrollbar styling to scroll area using StyleManager
+        from app.views.style import StyleManager
+        # Use background color for scrollbar background, and a slightly lighter color for border
+        border_color = [min(255, self.background_color[0] + 20), 
+                       min(255, self.background_color[1] + 20), 
+                       min(255, self.background_color[2] + 20)]
+        StyleManager.style_scroll_area(
+            self.scroll_area,
+            self.config,
+            self.background_color,
+            border_color,
+            0  # No border radius for this scroll area
+        )
+        
         # Messages area styling
         messages_style = f"""
             QWidget {{

@@ -412,9 +412,17 @@ class EngineConfigurationDialog(QDialog):
             scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             scroll.setMinimumHeight(min_height)
             scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-            # Fix white background
-            scroll.setStyleSheet(f"QScrollArea {{ background-color: rgb({scroll_bg[0]}, {scroll_bg[1]}, {scroll_bg[2]}); }}")
-            scroll.viewport().setStyleSheet(f"background-color: rgb({scroll_bg[0]}, {scroll_bg[1]}, {scroll_bg[2]});")
+            
+            # Apply scrollbar styling using StyleManager
+            from app.views.style import StyleManager
+            scroll_border = scroll_area_config.get('border_color', [60, 60, 65])
+            StyleManager.style_scroll_area(
+                scroll,
+                self.config,
+                scroll_bg,
+                scroll_border,
+                0  # No border radius
+            )
             
             scroll_widget = QWidget()
             scroll_layout = QFormLayout(scroll_widget)
@@ -881,8 +889,18 @@ class EngineConfigurationDialog(QDialog):
         # Fix white background - use scroll_area background_color from main dialog config
         scroll_area_config = dialog_config.get('scroll_area', {})
         scroll_bg = scroll_area_config.get('background_color', [30, 30, 30])
-        scroll.setStyleSheet(f"QScrollArea {{ background-color: rgb({scroll_bg[0]}, {scroll_bg[1]}, {scroll_bg[2]}); }}")
-        scroll.viewport().setStyleSheet(f"background-color: rgb({scroll_bg[0]}, {scroll_bg[1]}, {scroll_bg[2]});")
+        # Get border color from dialog config (use a default if not available)
+        scroll_border = scroll_area_config.get('border_color', [60, 60, 65])
+        
+        # Apply scrollbar styling using StyleManager
+        from app.views.style import StyleManager
+        StyleManager.style_scroll_area(
+            scroll,
+            self.config,
+            scroll_bg,
+            scroll_border,
+            0  # No border radius for validation dialog
+        )
         scroll_widget = QWidget()
         scroll_layout = QVBoxLayout(scroll_widget)
         scroll_layout.setSpacing(10)

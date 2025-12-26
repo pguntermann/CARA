@@ -968,11 +968,21 @@ class DatabasePanel(QWidget):
                 font-weight: 500;
             }}
             QTableCornerButton::section {{
-                background-color: rgb({header_bg[0]}, {header_bg[1]}, {header_bg[2]});
-                border: 1px solid rgb({header_border[0]}, {header_border[1]}, {header_border[2]});
+                background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
+                border: none;
             }}
         """
         table.setStyleSheet(stylesheet)
+        
+        # Apply scrollbar styling using StyleManager
+        from app.views.style import StyleManager
+        StyleManager.style_table_view_scrollbar(
+            table,
+            self.config,
+            pane_bg,
+            gridline_color,
+            stylesheet
+        )
         
         # Also set palette on header views to prevent macOS override
         horizontal_header = table.horizontalHeader()

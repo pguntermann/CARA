@@ -352,8 +352,11 @@ class BulkReplaceDialog(QDialog):
         # Remove default frame to prevent white bar on macOS
         tags_scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         # Set fixed height - this is the visible height of the scroll area
-        # Account for scrollbar width (12px) plus frame/border (2px) to prevent clipping
-        scrollbar_width = 12  # From scrollbar styling
+        # Account for scrollbar width plus frame/border (2px) to prevent clipping
+        # Get scrollbar width from global styles config
+        styles_config = self.config.get('ui', {}).get('styles', {})
+        scrollbar_config = styles_config.get('scrollbar', {})
+        scrollbar_width = scrollbar_config.get('width', 6)
         scrollbar_clearance = scrollbar_width + 2  # Scrollbar + frame buffer
         scroll_area_height = self.tags_list_height - scrollbar_clearance
         tags_scroll_area.setFixedHeight(scroll_area_height)
@@ -653,32 +656,19 @@ class BulkReplaceDialog(QDialog):
             view.setPalette(view_palette)
             view.setAutoFillBackground(True)
         
-        # Apply scroll area styling
-        scroll_area_style = (
-            f"QScrollArea {{"
-            f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
-            f"border: 1px solid rgb({self.input_border_color.red()}, {self.input_border_color.green()}, {self.input_border_color.blue()});"
-            f"border-radius: {self.input_border_radius}px;"
-            f"}}"
-            f"QScrollArea QWidget {{"
-            f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
-            f"}}"
-            f"QScrollBar:vertical {{"
-            f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
-            f"width: 12px;"
-            f"border: none;"
-            f"}}"
-            f"QScrollBar::handle:vertical {{"
-            f"background-color: rgb({self.input_border_color.red()}, {self.input_border_color.green()}, {self.input_border_color.blue()});"
-            f"border-radius: 6px;"
-            f"min-height: 20px;"
-            f"}}"
-            f"QScrollBar::handle:vertical:hover {{"
-            f"background-color: rgb({min(255, self.input_border_color.red() + 20)}, {min(255, self.input_border_color.green() + 20)}, {min(255, self.input_border_color.blue() + 20)});"
-            f"}}"
-        )
+        # Apply scroll area styling using StyleManager
         if hasattr(self, 'tags_scroll_area'):
-            self.tags_scroll_area.setStyleSheet(scroll_area_style)
+            from app.views.style import StyleManager
+            # Convert QColor to [R, G, B] list
+            input_bg = [self.input_bg_color.red(), self.input_bg_color.green(), self.input_bg_color.blue()]
+            input_border = [self.input_border_color.red(), self.input_border_color.green(), self.input_border_color.blue()]
+            StyleManager.style_scroll_area(
+                self.tags_scroll_area,
+                self.config,
+                input_bg,
+                input_border,
+                self.input_border_radius
+            )
         
         # Apply group box styling
         dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("bulk_replace", {})

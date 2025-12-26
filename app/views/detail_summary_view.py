@@ -668,9 +668,16 @@ class DetailSummaryView(QWidget):
         # Get background color for scroll area - use pane_background from tabs config or summary background
         tabs_config = panel_config.get('tabs', {})
         pane_bg = tabs_config.get('pane_background', [40, 40, 45])
-        # Fix white background on macOS
-        scroll_area.setStyleSheet(f"QScrollArea {{ background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]}); }}")
-        scroll_area.viewport().setStyleSheet(f"background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});")
+        # Apply scrollbar styling using StyleManager
+        from app.views.style import StyleManager
+        border_color = [min(255, pane_bg[0] + 20), min(255, pane_bg[1] + 20), min(255, pane_bg[2] + 20)]
+        StyleManager.style_scroll_area(
+            scroll_area,
+            self.config,
+            pane_bg,
+            border_color,
+            0  # No border radius
+        )
         
         # Content widget
         self.content_widget = QWidget()

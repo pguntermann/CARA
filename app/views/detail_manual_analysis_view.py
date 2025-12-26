@@ -797,36 +797,16 @@ class DetailManualAnalysisView(QWidget):
         self.control_bar.setStyleSheet(control_bar_stylesheet)
         self.info_bar.setStyleSheet(control_bar_stylesheet)
         
-        # Scroll area styling
-        scrollbar_config = manual_analysis_config.get('scrollbar', {})
-        scrollbar_width = scrollbar_config.get('width', 12)
-        scrollbar_handle_min_height = scrollbar_config.get('handle_min_height', 20)
-        scrollbar_handle_border_radius = scrollbar_config.get('handle_border_radius', 6)
-        
-        scroll_stylesheet = f"""
-            QScrollArea {{
-                background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
-                border: none;
-            }}
-            QScrollBar:vertical {{
-                background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
-                width: {scrollbar_width}px;
-                border: none;
-            }}
-            QScrollBar::handle:vertical {{
-                background-color: rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
-                min-height: {scrollbar_handle_min_height}px;
-                border-radius: {scrollbar_handle_border_radius}px;
-            }}
-            QScrollBar::handle:vertical:hover {{
-                background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});
-            }}
-        """
-        
-        # Apply styling to scroll area
-        self.analysis_area.setStyleSheet(scroll_stylesheet)
-        # Also set viewport background to fix white background on macOS
-        self.analysis_area.viewport().setStyleSheet(f"background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});")
+        # Scroll area styling using StyleManager
+        # Note: This view uses different colors (norm_bg, norm_border) and no border
+        from app.views.style import StyleManager
+        StyleManager.style_scroll_area(
+            self.analysis_area,
+            self.config,
+            norm_bg,
+            norm_border,
+            0  # No border radius since border is none
+        )
         
         # Empty label styling
         analysis_area_config = manual_analysis_config.get('analysis_area', {})
@@ -1551,8 +1531,10 @@ class DetailManualAnalysisView(QWidget):
                             widget_margins = layout.contentsMargins()
                             # Also account for container layout margins
                             container_margins = self.analysis_container_layout.contentsMargins() if hasattr(self, 'analysis_container_layout') else (0, 0, 0, 0)
-                            # Get scrollbar width from config (default 12px)
-                            scrollbar_width = manual_analysis_config.get('scrollbar', {}).get('width', 12)
+                            # Get scrollbar width from global styles config
+                            styles_config = self.config.get('ui', {}).get('styles', {})
+                            scrollbar_config = styles_config.get('scrollbar', {})
+                            scrollbar_width = scrollbar_config.get('width', 6)
                             # Be conservative: account for scrollbar and add extra buffer to prevent horizontal scrolling
                             # Add buffer equivalent to about one move width (estimate ~40-50px for a typical move)
                             move_buffer = font_metrics.horizontalAdvance("Nf3 ")  # Estimate one move width
@@ -1793,7 +1775,10 @@ class DetailManualAnalysisView(QWidget):
                     if viewport_width > 0:
                         widget_margins = layout.contentsMargins()
                         container_margins = self.analysis_container_layout.contentsMargins() if hasattr(self, 'analysis_container_layout') else (0, 0, 0, 0)
-                        scrollbar_width = manual_analysis_config.get('scrollbar', {}).get('width', 12)
+                        # Get scrollbar width from global styles config
+                        styles_config = self.config.get('ui', {}).get('styles', {})
+                        scrollbar_config = styles_config.get('scrollbar', {})
+                        scrollbar_width = scrollbar_config.get('width', 6)
                         move_buffer = font_metrics.horizontalAdvance("Nf3 ")  # Estimate one move width
                         available_width = viewport_width - widget_margins.left() - widget_margins.right() - container_margins.left() - container_margins.right() - scrollbar_width - move_buffer
             

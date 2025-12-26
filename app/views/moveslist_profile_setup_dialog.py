@@ -1132,96 +1132,15 @@ class MovesListProfileSetupDialog(QDialog):
             input_border = inputs_config.get('border_color', [60, 60, 65])
             input_border_radius = inputs_config.get('border_radius', 3)
             
-            # Get scrollbar config
-            scrollbar_config = dialog_config.get('scrollbar', {})
-            scrollbar_width = scrollbar_config.get('width', 8)
-            scrollbar_border_radius = scrollbar_config.get('border_radius', 6)
-            scrollbar_min_height = scrollbar_config.get('min_height', 20)
-            scrollbar_hover_offset = scrollbar_config.get('hover_offset', 20)
-            scrollbar_add_line_height = scrollbar_config.get('add_line_height', 0)
-            
-            scroll_area_style = (
-                f"QScrollArea {{"
-                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-                f"border: 1px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
-                f"border-radius: {input_border_radius}px;"
-                f"}}"
-                f"QScrollArea QWidget {{"
-                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-                f"}}"
-                f"QScrollBar:vertical {{"
-                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-                f"width: {scrollbar_width}px !important;"
-                f"max-width: {scrollbar_width}px !important;"
-                f"min-width: {scrollbar_width}px !important;"
-                f"border: none;"
-                f"}}"
-                f"QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{"
-                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-                f"border: none;"
-                f"height: {scrollbar_add_line_height}px;"
-                f"}}"
-                f"QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{"
-                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-                f"}}"
-                f"QScrollBar::handle:vertical {{"
-                f"background-color: rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
-                f"border-radius: {scrollbar_border_radius}px;"
-                f"min-height: {scrollbar_min_height}px;"
-                f"border: none;"
-                f"}}"
-                f"QScrollBar::handle:vertical:hover {{"
-                f"background-color: rgb({min(255, input_border[0] + scrollbar_hover_offset)}, {min(255, input_border[1] + scrollbar_hover_offset)}, {min(255, input_border[2] + scrollbar_hover_offset)});"
-                f"}}"
+            # Apply scrollbar styling using StyleManager
+            from app.views.style import StyleManager
+            StyleManager.style_scroll_area(
+                self.available_columns_scroll,
+                self.config,
+                input_bg,
+                input_border,
+                input_border_radius
             )
-            self.available_columns_scroll.setStyleSheet(scroll_area_style)
-            # Set palette on scroll area viewport to prevent macOS override
-            viewport = self.available_columns_scroll.viewport()
-            if viewport:
-                viewport_palette = viewport.palette()
-                viewport_palette.setColor(viewport.backgroundRole(), QColor(*input_bg))
-                viewport.setPalette(viewport_palette)
-                viewport.setAutoFillBackground(True)
-            
-            # Apply scrollbar stylesheet directly to scrollbar widget to prevent macOS override
-            scrollbar = self.available_columns_scroll.verticalScrollBar()
-            if scrollbar:
-                scrollbar_stylesheet = (
-                    f"QScrollBar:vertical {{"
-                    f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-                    f"width: {scrollbar_width}px !important;"
-                    f"max-width: {scrollbar_width}px !important;"
-                    f"min-width: {scrollbar_width}px !important;"
-                    f"border: none;"
-                    f"}}"
-                    f"QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{"
-                    f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-                    f"border: none;"
-                    f"height: {scrollbar_add_line_height}px;"
-                    f"}}"
-                    f"QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{"
-                    f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-                    f"}}"
-                    f"QScrollBar::handle:vertical {{"
-                    f"background-color: rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
-                    f"border-radius: {scrollbar_border_radius}px;"
-                    f"min-height: {scrollbar_min_height}px;"
-                    f"border: none;"
-                    f"}}"
-                    f"QScrollBar::handle:vertical:hover {{"
-                    f"background-color: rgb({min(255, input_border[0] + scrollbar_hover_offset)}, {min(255, input_border[1] + scrollbar_hover_offset)}, {min(255, input_border[2] + scrollbar_hover_offset)});"
-                    f"}}"
-                )
-                scrollbar.setStyleSheet(scrollbar_stylesheet)
-                # Set fixed width programmatically to override macOS native styling
-                scrollbar.setFixedWidth(scrollbar_width)
-                # Set palette to prevent macOS override
-                scrollbar_palette = scrollbar.palette()
-                scrollbar_palette.setColor(scrollbar.backgroundRole(), QColor(*input_bg))
-                scrollbar_palette.setColor(scrollbar_palette.ColorRole.Base, QColor(*input_bg))
-                scrollbar_palette.setColor(scrollbar_palette.ColorRole.Window, QColor(*input_bg))
-                scrollbar.setPalette(scrollbar_palette)
-                scrollbar.setAutoFillBackground(True)
         
         # Table widget styling
         table_config = dialog_config.get('table', {})
@@ -1261,88 +1180,20 @@ class MovesListProfileSetupDialog(QDialog):
         self.visible_table.setStyleSheet(table_style)
         
         # Apply scrollbar styling to table widget to match the left scroll area exactly
-        # Get scrollbar config and input colors (same as used for left scroll area)
+        # Use same input colors as left scroll area for exact matching
         inputs_config = dialog_config.get('inputs', {})
         input_bg = inputs_config.get('background_color', [30, 30, 35])
         input_border = inputs_config.get('border_color', [60, 60, 65])
         
-        scrollbar_config = dialog_config.get('scrollbar', {})
-        scrollbar_width = scrollbar_config.get('width', 8)
-        scrollbar_border_radius = scrollbar_config.get('border_radius', 4)
-        scrollbar_min_height = scrollbar_config.get('min_height', 20)
-        scrollbar_hover_offset = scrollbar_config.get('hover_offset', 20)
-        scrollbar_add_line_height = scrollbar_config.get('add_line_height', 0)
-        
-        # Use same input colors as left scroll area for exact matching
-        table_scrollbar_style = (
-            f"QTableWidget QScrollBar:vertical {{"
-            f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-            f"width: {scrollbar_width}px !important;"
-            f"max-width: {scrollbar_width}px !important;"
-            f"min-width: {scrollbar_width}px !important;"
-            f"border: none;"
-            f"}}"
-            f"QTableWidget QScrollBar::add-line:vertical, QTableWidget QScrollBar::sub-line:vertical {{"
-            f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-            f"border: none;"
-            f"height: {scrollbar_add_line_height}px;"
-            f"}}"
-            f"QTableWidget QScrollBar::add-page:vertical, QTableWidget QScrollBar::sub-page:vertical {{"
-            f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-            f"}}"
-            f"QTableWidget QScrollBar::handle:vertical {{"
-            f"background-color: rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
-            f"border-radius: {scrollbar_border_radius}px;"
-            f"min-height: {scrollbar_min_height}px;"
-            f"border: none;"
-            f"}}"
-            f"QTableWidget QScrollBar::handle:vertical:hover {{"
-            f"background-color: rgb({min(255, input_border[0] + scrollbar_hover_offset)}, {min(255, input_border[1] + scrollbar_hover_offset)}, {min(255, input_border[2] + scrollbar_hover_offset)});"
-            f"}}"
+        # Apply table scrollbar styling using StyleManager
+        from app.views.style import StyleManager
+        StyleManager.style_table_scrollbar(
+            self.visible_table,
+            self.config,
+            input_bg,
+            input_border,
+            table_style
         )
-        # Append scrollbar styling to table style
-        combined_table_style = table_style + table_scrollbar_style
-        self.visible_table.setStyleSheet(combined_table_style)
-        
-        # Apply scrollbar stylesheet directly to table scrollbar widget to prevent macOS override
-        table_scrollbar = self.visible_table.verticalScrollBar()
-        if table_scrollbar:
-            table_scrollbar_stylesheet = (
-                f"QScrollBar:vertical {{"
-                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-                f"width: {scrollbar_width}px !important;"
-                f"max-width: {scrollbar_width}px !important;"
-                f"min-width: {scrollbar_width}px !important;"
-                f"border: none;"
-                f"}}"
-                f"QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{"
-                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-                f"border: none;"
-                f"height: {scrollbar_add_line_height}px;"
-                f"}}"
-                f"QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{"
-                f"background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});"
-                f"}}"
-                f"QScrollBar::handle:vertical {{"
-                f"background-color: rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
-                f"border-radius: {scrollbar_border_radius}px;"
-                f"min-height: {scrollbar_min_height}px;"
-                f"border: none;"
-                f"}}"
-                f"QScrollBar::handle:vertical:hover {{"
-                f"background-color: rgb({min(255, input_border[0] + scrollbar_hover_offset)}, {min(255, input_border[1] + scrollbar_hover_offset)}, {min(255, input_border[2] + scrollbar_hover_offset)});"
-                f"}}"
-            )
-            table_scrollbar.setStyleSheet(table_scrollbar_stylesheet)
-            # Set fixed width programmatically to override macOS native styling
-            table_scrollbar.setFixedWidth(scrollbar_width)
-            # Set palette to prevent macOS override (using input colors to match left side)
-            table_scrollbar_palette = table_scrollbar.palette()
-            table_scrollbar_palette.setColor(table_scrollbar.backgroundRole(), QColor(*input_bg))
-            table_scrollbar_palette.setColor(table_scrollbar_palette.ColorRole.Base, QColor(*input_bg))
-            table_scrollbar_palette.setColor(table_scrollbar_palette.ColorRole.Window, QColor(*input_bg))
-            table_scrollbar.setPalette(table_scrollbar_palette)
-            table_scrollbar.setAutoFillBackground(True)
         
         # Set palette on table header to prevent macOS override
         header = self.visible_table.horizontalHeader()
