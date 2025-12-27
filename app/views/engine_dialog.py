@@ -1,6 +1,7 @@
 """Engine dialog for adding UCI chess engines."""
 
 import sys
+import re
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -15,7 +16,7 @@ from PyQt6.QtWidgets import (
     QGroupBox,
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
-from PyQt6.QtGui import QResizeEvent, QShowEvent, QMoveEvent, QPalette, QColor
+from PyQt6.QtGui import QResizeEvent, QShowEvent, QPalette, QColor
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 
@@ -128,20 +129,40 @@ class EngineDialog(QDialog):
         layout.setSpacing(layout_spacing)
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
-        # Engine path selection
+        # Engine path selection group
+        path_group = QGroupBox("Select UCI Engine")
+        path_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        path_group_layout = QVBoxLayout(path_group)
+        # Get group box content margins from config
+        group_box_config = dialog_config.get('group_box', {})
+        group_margins = group_box_config.get('content_margins', [10, 15, 10, 10])
+        path_group_layout.setContentsMargins(
+            group_margins[0], group_margins[1], group_margins[2], group_margins[3]
+        )
+        # Get spacing from config
+        group_content_spacing = group_box_config.get('content_spacing', 8)
+        path_group_layout.setSpacing(group_content_spacing)
+        
+        # Path input and browse button in horizontal layout
         path_layout = QHBoxLayout()
-        path_label = QLabel("Engine Path:")
-        path_label.setMinimumWidth(100)
+        path_layout.setContentsMargins(0, 0, 0, 0)
+        path_layout_spacing = group_box_config.get('path_layout_spacing', 8)
+        path_layout.setSpacing(path_layout_spacing)
+        
         self.path_input = QLineEdit()
         self.path_input.setReadOnly(True)
         self.path_input.setPlaceholderText("Select engine executable...")
-        browse_button = QPushButton("...")
-        browse_button.clicked.connect(self._browse_engine_path)
+        self.path_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
-        path_layout.addWidget(path_label)
+        self.browse_button = QPushButton("...")
+        self.browse_button.clicked.connect(self._browse_engine_path)
+        self.browse_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        
         path_layout.addWidget(self.path_input)
-        path_layout.addWidget(browse_button)
-        layout.addLayout(path_layout)
+        path_layout.addWidget(self.browse_button)
+        path_group_layout.addLayout(path_layout)
+        
+        layout.addWidget(path_group)
         
         # Engine information group box (read-only after validation)
         engine_info_group = QGroupBox("Engine Information")
@@ -159,14 +180,14 @@ class EngineDialog(QDialog):
         name_layout = QHBoxLayout()
         name_layout.setContentsMargins(0, 0, 0, 0)
         name_layout.setSpacing(0)
-        name_label = QLabel("Name:")
-        name_label.setMinimumWidth(100)
-        name_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.name_label = QLabel("Name:")
+        # Minimum width will be set from config in _apply_styling
+        self.name_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.name_input = QLineEdit()
         self.name_input.setReadOnly(True)
         self.name_input.setPlaceholderText("Will be populated after validation...")
         self.name_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        name_layout.addWidget(name_label)
+        name_layout.addWidget(self.name_label)
         name_layout.addWidget(self.name_input)
         engine_info_layout.addLayout(name_layout)
         
@@ -174,14 +195,14 @@ class EngineDialog(QDialog):
         author_layout = QHBoxLayout()
         author_layout.setContentsMargins(0, 0, 0, 0)
         author_layout.setSpacing(0)
-        author_label = QLabel("Author:")
-        author_label.setMinimumWidth(100)
-        author_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.author_label = QLabel("Author:")
+        # Minimum width will be set from config in _apply_styling
+        self.author_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.author_input = QLineEdit()
         self.author_input.setReadOnly(True)
         self.author_input.setPlaceholderText("Will be populated after validation...")
         self.author_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        author_layout.addWidget(author_label)
+        author_layout.addWidget(self.author_label)
         author_layout.addWidget(self.author_input)
         engine_info_layout.addLayout(author_layout)
         
@@ -189,14 +210,14 @@ class EngineDialog(QDialog):
         version_layout = QHBoxLayout()
         version_layout.setContentsMargins(0, 0, 0, 0)
         version_layout.setSpacing(0)
-        version_label = QLabel("Version:")
-        version_label.setMinimumWidth(100)
-        version_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.version_label = QLabel("Version:")
+        # Minimum width will be set from config in _apply_styling
+        self.version_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.version_input = QLineEdit()
         self.version_input.setReadOnly(True)
         self.version_input.setPlaceholderText("Will be populated after validation...")
         self.version_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        version_layout.addWidget(version_label)
+        version_layout.addWidget(self.version_label)
         version_layout.addWidget(self.version_input)
         engine_info_layout.addLayout(version_layout)
         
@@ -218,9 +239,9 @@ class EngineDialog(QDialog):
         self.add_button.clicked.connect(self._add_engine)
         button_layout.addWidget(self.add_button)
         
-        cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)
-        button_layout.addWidget(cancel_button)
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(self.cancel_button)
         
         layout.addLayout(button_layout)
         
@@ -240,35 +261,46 @@ class EngineDialog(QDialog):
         palette.setColor(QPalette.ColorRole.Window, QColor(bg_color[0], bg_color[1], bg_color[2]))
         self.setPalette(palette)
         
-        # Labels styling
+        # Labels styling - apply to specific labels
         labels_config = dialog_config.get('labels', {})
-        label_font_family = labels_config.get('font_family', 'Helvetica Neue')
-        from app.utils.font_utils import scale_font_size
-        label_font_size = scale_font_size(labels_config.get('font_size', 11))
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        label_font_family = resolve_font_family(labels_config.get('font_family', 'Helvetica Neue'))
+        label_font_size = int(scale_font_size(labels_config.get('font_size', 11)))
         label_text_color = labels_config.get('text_color', [200, 200, 200])
         label_min_width = labels_config.get('minimum_width', 100)
         
-        # Apply label styling to all labels
-        for label in self.findChildren(QLabel):
-            label.setStyleSheet(
-                f"font-family: {label_font_family}; "
-                f"font-size: {label_font_size}pt; "
-                f"color: rgb({label_text_color[0]}, {label_text_color[1]}, {label_text_color[2]});"
-                f"margin: 0px;"
-                f"padding: 0px;"
-            )
+        # Apply label styling to specific labels
+        label_style = (
+            f"font-family: {label_font_family}; "
+            f"font-size: {label_font_size}pt; "
+            f"color: rgb({label_text_color[0]}, {label_text_color[1]}, {label_text_color[2]});"
+        )
+        
+        # Style all labels directly
+        labels = [self.name_label, self.author_label, self.version_label]
+        for label in labels:
+            label.setStyleSheet(label_style)
             label.setMinimumWidth(label_min_width)
         
-        # Input widgets styling (QLineEdit)
+        # Input widgets styling (QLineEdit) - use StyleManager approach with direct stylesheet
         input_config = dialog_config.get('input_widgets', {})
         input_bg = input_config.get('background_color', [45, 45, 50])
         input_text = input_config.get('text_color', [200, 200, 200])
         input_border = input_config.get('border_color', [60, 60, 65])
         input_border_width = input_config.get('border_width', 1)
         input_border_radius = input_config.get('border_radius', 3)
-        input_padding = input_config.get('padding', [2, 6, 2, 6])
-        input_font_family = input_config.get('font_family', 'Helvetica Neue')
-        input_font_size = input_config.get('font_size', 11)
+        # Handle both old format [left, top, right, bottom] and new format [horizontal, vertical]
+        input_padding_raw = input_config.get('padding', [8, 6])
+        if len(input_padding_raw) == 4:
+            input_padding = input_padding_raw
+        else:
+            # Convert [horizontal, vertical] to [left, top, right, bottom]
+            input_padding = [input_padding_raw[0], input_padding_raw[1], input_padding_raw[0], input_padding_raw[1]]
+        input_font_family = resolve_font_family(input_config.get('font_family', 'Helvetica Neue'))
+        input_font_size = int(scale_font_size(input_config.get('font_size', 11)))
+        focus_border_color = input_config.get('focus_border_color', [70, 90, 130])
+        hover_border_offset = input_config.get('hover_border_offset', 20)
+        disabled_brightness_factor = input_config.get('disabled_brightness_factor', 0.5)
         
         input_stylesheet = f"""
             QLineEdit {{
@@ -276,31 +308,61 @@ class EngineDialog(QDialog):
                 color: rgb({input_text[0]}, {input_text[1]}, {input_text[2]});
                 border: {input_border_width}px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});
                 border-radius: {input_border_radius}px;
-                padding: {input_padding[0]}px {input_padding[1]}px {input_padding[2]}px {input_padding[3]}px;
+                padding: {input_padding[1]}px {input_padding[0]}px;
                 font-family: {input_font_family};
                 font-size: {input_font_size}pt;
                 margin: 0px;
             }}
             QLineEdit:hover {{
-                border: {input_border_width}px solid rgb({min(255, input_border[0] + 20)}, {min(255, input_border[1] + 20)}, {min(255, input_border[2] + 20)});
+                border: {input_border_width}px solid rgb({min(255, input_border[0] + hover_border_offset)}, {min(255, input_border[1] + hover_border_offset)}, {min(255, input_border[2] + hover_border_offset)});
             }}
             QLineEdit:focus {{
-                border: {input_border_width}px solid rgb(70, 90, 130);
+                border: {input_border_width}px solid rgb({focus_border_color[0]}, {focus_border_color[1]}, {focus_border_color[2]});
+            }}
+            QLineEdit:disabled {{
+                background-color: rgb({int(input_bg[0] * disabled_brightness_factor)}, {int(input_bg[1] * disabled_brightness_factor)}, {int(input_bg[2] * disabled_brightness_factor)});
+                color: rgb({int(input_text[0] * disabled_brightness_factor)}, {int(input_text[1] * disabled_brightness_factor)}, {int(input_text[2] * disabled_brightness_factor)});
             }}
         """
         
-        # Apply input widget styling
-        for line_edit in self.findChildren(QLineEdit):
-            line_edit.setStyleSheet(input_stylesheet)
+        # Apply input widget styling to specific inputs
+        self.path_input.setStyleSheet(input_stylesheet)
+        self.name_input.setStyleSheet(input_stylesheet)
+        self.author_input.setStyleSheet(input_stylesheet)
+        self.version_input.setStyleSheet(input_stylesheet)
+        
+        # Get configured height for path input and browse button from config
+        # This ensures both widgets use the same height
+        configured_height = input_config.get('browse_button_height', 28)
+        # Apply DPI scaling to the configured height using the font size multiplier
+        from app.utils.font_utils import get_font_size_multiplier
+        dpi_multiplier = get_font_size_multiplier()
+        final_height = int(round(configured_height * dpi_multiplier))
+        
+        # Update input stylesheet to include fixed height
+        # Replace the margin line with height constraints
+        # Note: Qt doesn't support box-sizing, so padding is included in the height
+        input_stylesheet_with_height = input_stylesheet.replace(
+            "margin: 0px;",
+            f"margin: 0px; height: {final_height}px; min-height: {final_height}px; max-height: {final_height}px;"
+        )
+        # Apply the modified stylesheet only to path_input
+        self.path_input.setStyleSheet(input_stylesheet_with_height)
+        
+        # Also set fixed height programmatically to ensure it's respected
+        self.path_input.setFixedHeight(final_height)
+        self.path_input.setMinimumHeight(final_height)
+        self.path_input.setMaximumHeight(final_height)
         
         # Group box styling
         group_box_config = dialog_config.get('group_box', {})
         group_border_color = group_box_config.get('border_color', [60, 60, 65])
+        group_border_width = group_box_config.get('border_width', 1)
         group_border_radius = group_box_config.get('border_radius', 5)
         group_bg_color = group_box_config.get('background_color', [40, 40, 45])
         group_title_color = group_box_config.get('title_color', [240, 240, 240])
-        group_title_font_family = group_box_config.get('title_font_family', 'Helvetica Neue')
-        group_title_font_size = group_box_config.get('title_font_size', 11)
+        group_title_font_family = resolve_font_family(group_box_config.get('title_font_family', 'Helvetica Neue'))
+        group_title_font_size = int(scale_font_size(group_box_config.get('title_font_size', 11)))
         group_margin_top = group_box_config.get('margin_top', 10)
         group_padding_top = group_box_config.get('padding_top', 10)
         group_title_left = group_box_config.get('title_left', 10)
@@ -308,7 +370,7 @@ class EngineDialog(QDialog):
         
         group_style = (
             f"QGroupBox {{"
-            f"border: 1px solid rgb({group_border_color[0]}, {group_border_color[1]}, {group_border_color[2]});"
+            f"border: {group_border_width}px solid rgb({group_border_color[0]}, {group_border_color[1]}, {group_border_color[2]});"
             f"border-radius: {group_border_radius}px;"
             f"margin-top: {group_margin_top}px;"
             f"padding-top: {group_padding_top}px;"
@@ -324,8 +386,11 @@ class EngineDialog(QDialog):
             f"}}"
         )
         
-        for group in self.findChildren(QGroupBox):
-            group.setStyleSheet(group_style)
+        # Apply to all group boxes (path_group and engine_info_group)
+        for i in range(self.layout().count()):
+            item = self.layout().itemAt(i)
+            if item and item.widget() and isinstance(item.widget(), QGroupBox):
+                item.widget().setStyleSheet(group_style)
         
         # Apply button styling using StyleManager (uses unified config)
         buttons_config = dialog_config.get('buttons', {})
@@ -335,44 +400,60 @@ class EngineDialog(QDialog):
         # Get colors from dialog background for consistency
         dialog_bg = dialog_config.get('background_color', [40, 40, 45])
         # Use border color from input widgets for consistency
-        input_border = input_config.get('border_color', [60, 60, 65])
         bg_color_list = [dialog_bg[0], dialog_bg[1], dialog_bg[2]]
         border_color_list = [input_border[0], input_border[1], input_border[2]]
         
         from app.views.style import StyleManager
         
-        # Apply button styling to all buttons except Browse button (which is part of file selection control)
-        all_buttons = self.findChildren(QPushButton)
-        main_buttons = [btn for btn in all_buttons if btn.text() != "..."]
-        if main_buttons:
-            StyleManager.style_buttons(
-                main_buttons,
-                self.config,
-                bg_color_list,
-                border_color_list,
-                min_width=button_width,
-                min_height=button_height
-            )
+        # Apply button styling to main buttons
+        main_buttons = [self.validate_button, self.add_button, self.cancel_button]
+        StyleManager.style_buttons(
+            main_buttons,
+            self.config,
+            bg_color_list,
+            border_color_list,
+            min_width=button_width,
+            min_height=button_height
+        )
         
         # Style Browse button separately as a smaller control button that matches input field height
-        # Get input field padding to calculate height
-        input_padding = input_config.get('padding', [2, 6, 2, 6])
-        from app.utils.font_utils import scale_font_size
-        input_font_size = scale_font_size(input_config.get('font_size', 11))
-        # Calculate approximate input field height: font size + top padding + bottom padding + border
-        # We'll use a fixed height that matches typical input field height
-        input_field_height = input_font_size + input_padding[0] + input_padding[2] + (input_border_width * 2) + 4  # +4 for line height
+        # Use the configured height from config.json (same as input)
+        StyleManager.style_buttons(
+            [self.browse_button],
+            self.config,
+            bg_color_list,
+            border_color_list,
+            min_height=final_height,
+            padding=input_padding[1]  # Use vertical padding
+        )
         
-        browse_buttons = [btn for btn in all_buttons if btn.text() == "..."]
-        if browse_buttons:
-            StyleManager.style_buttons(
-                browse_buttons,
-                self.config,
-                bg_color_list,
-                border_color_list,
-                min_height=input_field_height,
-                padding=input_padding[0]  # Use vertical padding from input
+        # Get the button's stylesheet and add fixed height
+        # Qt doesn't support box-sizing, so we need to ensure height is set correctly
+        button_stylesheet = self.browse_button.styleSheet()
+        # Replace min-height with height, min-height, and max-height
+        if "min-height:" in button_stylesheet:
+            # Replace min-height with height, min-height, and max-height
+            button_stylesheet = re.sub(
+                r'min-height: \d+px;',
+                f'height: {final_height}px; min-height: {final_height}px; max-height: {final_height}px;',
+                button_stylesheet
             )
+        else:
+            # If no min-height, add it after the opening brace
+            button_stylesheet = button_stylesheet.replace(
+                "QPushButton {",
+                f"QPushButton {{\nheight: {final_height}px; min-height: {final_height}px; max-height: {final_height}px;"
+            )
+        self.browse_button.setStyleSheet(button_stylesheet)
+        
+        # Also set fixed height programmatically to ensure it's respected
+        self.browse_button.setFixedHeight(final_height)
+        self.browse_button.setMinimumHeight(final_height)
+        self.browse_button.setMaximumHeight(final_height)
+        
+        # Force update to ensure height is applied
+        self.path_input.updateGeometry()
+        self.browse_button.updateGeometry()
         
     
     def _browse_engine_path(self) -> None:

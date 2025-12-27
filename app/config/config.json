@@ -1249,12 +1249,12 @@
         }
       },
       "engine_dialog": {
-        "width": 600,
-        "height": 270,
+        "width": 550,
+        "height": 320,
         "background_color": [40, 40, 45],
         "layout": {
           "spacing": 10,
-          "margins": [10, 0, 10, 10],
+          "margins": [10, 10, 10, 10],
           "engine_info_section_spacing": 8
         },
         "labels": {
@@ -1274,7 +1274,10 @@
           "font_size": 11,
           "selection_background_color": [70, 90, 130],
           "selection_text_color": [240, 240, 240],
-          "focus_border_color": [70, 90, 130]
+          "focus_border_color": [70, 90, 130],
+          "hover_border_offset": 20,
+          "disabled_brightness_factor": 0.5,
+          "browse_button_height": 28
         },
         "buttons": {
           "spacing": 10,
@@ -1283,6 +1286,7 @@
         },
         "group_box": {
           "border_color": [60, 60, 65],
+          "border_width": 1,
           "border_radius": 5,
           "background_color": [40, 40, 45],
           "title_color": [240, 240, 240],
@@ -1292,7 +1296,9 @@
           "padding_top": 0,
           "title_left": 10,
           "title_padding": [0, 5],
-          "content_margins": [10, 15, 10, 10]
+          "content_margins": [10, 15, 10, 10],
+          "content_spacing": 8,
+          "path_layout_spacing": 8
         }
       },
       "bulk_replace": {
