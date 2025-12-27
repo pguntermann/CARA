@@ -144,23 +144,27 @@ class EngineDialog(QDialog):
         path_group_layout.setSpacing(group_content_spacing)
         
         # Path input and browse button in horizontal layout
-        path_layout = QHBoxLayout()
-        path_layout.setContentsMargins(0, 0, 0, 0)
+        self.path_layout = QHBoxLayout()
+        self.path_layout.setContentsMargins(0, 0, 0, 0)
         path_layout_spacing = group_box_config.get('path_layout_spacing', 8)
-        path_layout.setSpacing(path_layout_spacing)
+        self.path_layout.setSpacing(path_layout_spacing)
+        self.path_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         
         self.path_input = QLineEdit()
         self.path_input.setReadOnly(True)
         self.path_input.setPlaceholderText("Select engine executable...")
         self.path_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        # Ensure no margins for proper alignment
+        self.path_input.setContentsMargins(0, 0, 0, 0)
         
         self.browse_button = QPushButton("...")
         self.browse_button.clicked.connect(self._browse_engine_path)
         self.browse_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         
-        path_layout.addWidget(self.path_input)
-        path_layout.addWidget(self.browse_button)
-        path_group_layout.addLayout(path_layout)
+        # Add widgets with explicit vertical alignment
+        self.path_layout.addWidget(self.path_input, alignment=Qt.AlignmentFlag.AlignVCenter)
+        self.path_layout.addWidget(self.browse_button, alignment=Qt.AlignmentFlag.AlignVCenter)
+        path_group_layout.addLayout(self.path_layout)
         
         layout.addWidget(path_group)
         
@@ -312,6 +316,7 @@ class EngineDialog(QDialog):
                 font-family: {input_font_family};
                 font-size: {input_font_size}pt;
                 margin: 0px;
+                vertical-align: middle;
             }}
             QLineEdit:hover {{
                 border: {input_border_width}px solid rgb({min(255, input_border[0] + hover_border_offset)}, {min(255, input_border[1] + hover_border_offset)}, {min(255, input_border[2] + hover_border_offset)});
@@ -331,28 +336,20 @@ class EngineDialog(QDialog):
         self.author_input.setStyleSheet(input_stylesheet)
         self.version_input.setStyleSheet(input_stylesheet)
         
-        # Get configured height for path input and browse button from config
-        # This ensures both widgets use the same height
-        configured_height = input_config.get('browse_button_height', 28)
-        # Apply DPI scaling to the configured height using the font size multiplier
-        from app.utils.font_utils import get_font_size_multiplier
-        dpi_multiplier = get_font_size_multiplier()
-        final_height = int(round(configured_height * dpi_multiplier))
+        # Get the natural height of the input field after styling is applied
+        # This accounts for font size, padding, and DPI scaling automatically
+        self.path_input.updateGeometry()
+        natural_height = self.path_input.sizeHint().height()
+        if natural_height <= 0:
+            # Fallback: calculate from font metrics and padding
+            from PyQt6.QtGui import QFontMetrics, QFont
+            font = QFont(input_font_family, input_font_size)
+            fm = QFontMetrics(font)
+            text_height = fm.height()
+            padding_vertical = input_padding[1] + input_padding[3]  # top + bottom
+            natural_height = text_height + padding_vertical + (input_border_width * 2)
         
-        # Update input stylesheet to include fixed height
-        # Replace the margin line with height constraints
-        # Note: Qt doesn't support box-sizing, so padding is included in the height
-        input_stylesheet_with_height = input_stylesheet.replace(
-            "margin: 0px;",
-            f"margin: 0px; height: {final_height}px; min-height: {final_height}px; max-height: {final_height}px;"
-        )
-        # Apply the modified stylesheet only to path_input
-        self.path_input.setStyleSheet(input_stylesheet_with_height)
-        
-        # Also set fixed height programmatically to ensure it's respected
-        self.path_input.setFixedHeight(final_height)
-        self.path_input.setMinimumHeight(final_height)
-        self.path_input.setMaximumHeight(final_height)
+        final_height = natural_height
         
         # Group box styling
         group_box_config = dialog_config.get('group_box', {})
@@ -416,46 +413,101 @@ class EngineDialog(QDialog):
             min_height=button_height
         )
         
-        # Style Browse button separately as a smaller control button that matches input field height
-        # Use the configured height from config.json (same as input)
+        # Style Browse button FIRST to get its natural size hint
+        # Use the same font, border width, radius, and padding as input field for perfect alignment
+        button_padding = input_padding[1]  # Use vertical padding from input config (same as input field)
+        
         StyleManager.style_buttons(
             [self.browse_button],
             self.config,
             bg_color_list,
             border_color_list,
-            min_height=final_height,
-            padding=input_padding[1]  # Use vertical padding
+            font_family=input_font_family,  # Match input field font family
+            font_size=input_font_size,  # Match input field font size
+            border_radius=input_border_radius,  # Match input field border radius
+            padding=button_padding  # Same vertical padding as input field
         )
         
-        # Get the button's stylesheet and add fixed height
-        # Qt doesn't support box-sizing, so we need to ensure height is set correctly
-        button_stylesheet = self.browse_button.styleSheet()
-        # Replace min-height with height, min-height, and max-height
-        if "min-height:" in button_stylesheet:
-            # Replace min-height with height, min-height, and max-height
-            button_stylesheet = re.sub(
-                r'min-height: \d+px;',
-                f'height: {final_height}px; min-height: {final_height}px; max-height: {final_height}px;',
-                button_stylesheet
-            )
+        # Get size hints from both widgets after styling
+        self.path_input.updateGeometry()
+        self.browse_button.updateGeometry()
+        input_size_hint = self.path_input.sizeHint().height()
+        button_size_hint = self.browse_button.sizeHint().height()
+        
+        # Use the maximum of both size hints to ensure both widgets align properly
+        # This accounts for any differences in how Qt calculates size hints
+        if input_size_hint > 0 and button_size_hint > 0:
+            final_height = max(input_size_hint, button_size_hint)
         else:
-            # If no min-height, add it after the opening brace
+            final_height = input_size_hint if input_size_hint > 0 else button_size_hint
+        
+        if final_height <= 0:
+            # Fallback: use the calculated final_height from earlier
+            pass  # final_height already calculated above
+        
+        # Set fixed height on both widgets using the same calculated height
+        self.path_input.setFixedHeight(final_height)
+        self.path_input.setMinimumHeight(final_height)
+        self.path_input.setMaximumHeight(final_height)
+        
+        # Override the button's stylesheet to match input field border width exactly
+        # and remove any height constraints, ensure margins are zero
+        button_stylesheet = self.browse_button.styleSheet()
+        # Remove any existing height/min-height/max-height constraints from stylesheet
+        button_stylesheet = re.sub(r'(height|min-height|max-height):\s*\d+px;', '', button_stylesheet)
+        # Ensure border width matches input field exactly
+        button_stylesheet = re.sub(
+            r'border:\s*\d+px',
+            f'border: {input_border_width}px',
+            button_stylesheet
+        )
+        # Ensure margins are zero and add vertical alignment
+        if 'margin:' not in button_stylesheet:
             button_stylesheet = button_stylesheet.replace(
                 "QPushButton {",
-                f"QPushButton {{\nheight: {final_height}px; min-height: {final_height}px; max-height: {final_height}px;"
+                "QPushButton {\nmargin: 0px;"
+            )
+        else:
+            button_stylesheet = re.sub(r'margin:\s*[^;]+;', 'margin: 0px;', button_stylesheet)
+        # Add vertical alignment
+        if 'vertical-align:' not in button_stylesheet:
+            button_stylesheet = button_stylesheet.replace(
+                "QPushButton {",
+                "QPushButton {\nvertical-align: middle;"
             )
         self.browse_button.setStyleSheet(button_stylesheet)
         
-        # Also set fixed height programmatically to ensure it's respected
+        # Also ensure button has no margins programmatically
+        self.browse_button.setContentsMargins(0, 0, 0, 0)
+        
+        # Set fixed height programmatically to match input field exactly
+        # Qt's setFixedHeight sets the total widget height, padding is inside
         self.browse_button.setFixedHeight(final_height)
         self.browse_button.setMinimumHeight(final_height)
         self.browse_button.setMaximumHeight(final_height)
         
-        # Force update to ensure height is applied
-        self.path_input.updateGeometry()
-        self.browse_button.updateGeometry()
+        # Ensure both widgets have the same size policy for alignment
+        self.path_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.browse_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         
-    
+        # Ensure button padding matches input field padding exactly in the stylesheet
+        # Input field uses: padding: {input_padding[1]}px {input_padding[0]}px; (vertical horizontal)
+        # Button's StyleManager applies padding as a single value, so we need to override it
+        button_stylesheet_final = self.browse_button.styleSheet()
+        # Replace padding to use same format as input field: vertical horizontal
+        button_stylesheet_final = re.sub(
+            r'padding:\s*\d+px;',
+            f'padding: {input_padding[1]}px {input_padding[0]}px;',
+            button_stylesheet_final
+        )
+        # Ensure text is centered for proper alignment
+        if 'text-align:' not in button_stylesheet_final:
+            button_stylesheet_final = button_stylesheet_final.replace(
+                "QPushButton {",
+                "QPushButton {\ntext-align: center;"
+            )
+        self.browse_button.setStyleSheet(button_stylesheet_final)
+        
     def _browse_engine_path(self) -> None:
         """Browse for engine executable file."""
         # Determine file filter based on platform
