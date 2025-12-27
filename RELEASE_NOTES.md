@@ -1,3 +1,40 @@
+# CARA v2.4.7 - Visual Appearance Streamlining
+
+**Release Date:** 27.12.2025
+
+This release focuses on streamlining the application's visual appearance and fixing visual inconsistencies across dialogs and UI components.
+
+## Visual Appearance Improvements
+
+- **Unified Control Styling**: Implemented application-wide uniform and centralized styling for the following types of controls:
+  - Scrollbars (QScrollArea, QTableWidget, QTableView)
+  - Checkboxes (QCheckBox)
+  - Comboboxes (QComboBox)
+  - Radio Buttons (QRadioButton)
+  - Buttons (QPushButton)
+  - Text Inputs (QLineEdit)
+  - Spin Boxes (QSpinBox, QDoubleSpinBox)
+  - Date/Time Editors (QDateEdit, QTimeEdit, QDateTimeEdit)
+  - Group Boxes (QGroupBox)
+- **Styling Infrastructure**: All styling is centralized through StyleManager for consistent appearance across the entire application. Removed redundant dialog-specific styling definitions. Group boxes now use transparent backgrounds for better visual consistency.
+- **Dialog Consistency**: Standardized spacing, margins, and dimensions across dialogs:
+  - Fixed annotation preferences dialog spacing and dimensions for better compactness
+  - Aligned group box title positioning and padding patterns
+  - Reduced visual inconsistencies between different dialogs
+- **Detail View Consistency**: Fixed and unified visual appearance issues between different detail views:
+  - Standardized styling across all detail panel views (Summary, Metadata, Moves List, Annotations, Manual Analysis, AI Chat, Player Stats)
+  - Aligned control appearance and spacing for consistent user experience
+  - Fixed visual inconsistencies in fonts, colors, and spacing between views
+- **Code Quality**: Improved maintainability by removing hardcoded styling values and consolidating configuration
+
+## Technical Improvements
+
+- **StyleManager Enhancements**: Added unified styling methods for multiple control types, ensuring consistent application of styles throughout the application
+- **Configuration Cleanup**: Removed redundant styling property definitions from dialog configurations
+- **Visual Refinements**: Adjusted dialog dimensions and spacing values to create a more cohesive user interface
+
+---
+
 # CARA v2.4.6 - macOS Compatibility Update
 
 **Release Date:** 25.12.2025
