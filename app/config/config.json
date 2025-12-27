@@ -41,6 +41,19 @@
         "pressed_background_offset": 10,
         "default_height": 30,
         "default_width": 120
+      },
+      "line_edit": {
+        "text_color": [200, 200, 200],
+        "font_family": "Helvetica Neue",
+        "font_size": 11,
+        "background_color": [45, 45, 50],
+        "border_color": [60, 60, 65],
+        "focus_border_color": [70, 90, 130],
+        "border_width": 1,
+        "border_radius": 3,
+        "padding": [8, 6],
+        "hover_border_offset": 20,
+        "disabled_brightness_factor": 0.5
       }
     },
     "window": {

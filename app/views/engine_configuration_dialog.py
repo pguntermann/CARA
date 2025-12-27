@@ -1402,26 +1402,7 @@ class EngineConfigurationDialog(QDialog):
         checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
         checkmark_url = str(checkmark_path).replace("\\", "/") if checkmark_path.exists() else ""
         
-        # Input stylesheet for QLineEdit only (comboboxes use StyleManager)
-        input_stylesheet = f"""
-            QLineEdit {{
-                background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});
-                color: rgb({input_text[0]}, {input_text[1]}, {input_text[2]});
-                border: {input_border_width}px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});
-                border-radius: {input_border_radius}px;
-                padding: {input_padding[0]}px {input_padding[1]}px {input_padding[2]}px {input_padding[3]}px;
-                font-family: {input_font_family};
-                font-size: {input_font_size}pt;
-            }}
-            QLineEdit:hover {{
-                border: {input_border_width}px solid rgb({min(255, input_border[0] + 20)}, {min(255, input_border[1] + 20)}, {min(255, input_border[2] + 20)});
-            }}
-            QLineEdit:focus {{
-                border: {input_border_width}px solid rgb({input_focus_border[0]}, {input_focus_border[1]}, {input_focus_border[2]});
-            }}
-        """
-        
-        # Apply input widget styling to individual widgets only (not to tab widget itself)
+        # Apply unified line edit styling using StyleManager
         from app.views.style import StyleManager
         resolved_font_family = resolve_font_family(input_font_family)
         
@@ -1430,13 +1411,26 @@ class EngineConfigurationDialog(QDialog):
         padding_h = input_padding[1] if len(input_padding) > 1 else 6
         padding_v = input_padding[0] if len(input_padding) > 0 else 2
         combobox_padding = [padding_h, padding_v]
+        line_edit_padding = [padding_h, padding_v]  # Same format for line edits
         
         for i in range(self.tab_widget.count()):
             tab = self.tab_widget.widget(i)
             
-            # Apply to individual widgets to ensure they get styled
-            for lineedit in tab.findChildren(QLineEdit):
-                lineedit.setStyleSheet(input_stylesheet)
+            # Apply unified line edit styling using StyleManager
+            line_edits = list(tab.findChildren(QLineEdit))
+            if line_edits:
+                StyleManager.style_line_edits(
+                    line_edits,
+                    self.config,
+                    font_family=resolved_font_family,  # Match original dialog font
+                    font_size=input_font_size,  # Match original dialog font size
+                    bg_color=input_bg,  # Match combobox background color
+                    border_color=input_border,  # Match combobox border color
+                    focus_border_color=input_focus_border,  # Match combobox focus border color
+                    border_width=input_border_width,  # Match combobox border width
+                    border_radius=input_border_radius,  # Match combobox border radius
+                    padding=line_edit_padding  # Preserve existing padding for alignment
+                )
             
             # Apply combobox styling using StyleManager
             comboboxes = tab.findChildren(QComboBox)

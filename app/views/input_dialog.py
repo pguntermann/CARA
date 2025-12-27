@@ -117,19 +117,65 @@ class InputDialog(QDialog):
         # Make input field expand to fill available width
         from PyQt6.QtWidgets import QSizePolicy
         self.input_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        # Add left margin to align input field with label text (label has padding, so we need margin to match)
-        self.input_field.setStyleSheet(
-            f"QLineEdit {{"
-            f"font-family: {input_font_family};"
-            f"font-size: {input_font_size}pt;"
-            f"color: rgb({input_text_color[0]}, {input_text_color[1]}, {input_text_color[2]});"
-            f"background-color: rgb({input_bg_color[0]}, {input_bg_color[1]}, {input_bg_color[2]});"
-            f"border: 1px solid rgb({input_border_color[0]}, {input_border_color[1]}, {input_border_color[2]});"
-            f"border-radius: {input_border_radius}px;"
-            f"padding: {input_padding[0]}px {input_padding[1]}px {input_padding[2]}px {input_padding[3]}px;"
-            f"margin-left: {label_padding}px;"
-            f"}}"
+        
+        # Apply unified line edit styling using StyleManager
+        from app.views.style import StyleManager
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        
+        # Resolve font family and scale font size
+        resolved_font_family = resolve_font_family(input_font_family)
+        scaled_font_size = scale_font_size(input_font_size)
+        
+        # Convert padding from [left, top, right, bottom] to [horizontal, vertical]
+        if isinstance(input_padding, list) and len(input_padding) == 4:
+            input_padding_h = input_padding[1]  # right (horizontal)
+            input_padding_v = input_padding[0]  # top (vertical)
+        elif isinstance(input_padding, list) and len(input_padding) == 2:
+            input_padding_h = input_padding[0]
+            input_padding_v = input_padding[1]
+        else:
+            input_padding_h = input_padding if isinstance(input_padding, int) else 6
+            input_padding_v = input_padding if isinstance(input_padding, int) else 2
+        
+        line_edit_padding = [input_padding_h, input_padding_v]
+        
+        # Apply styling with margin-left to align with label
+        # We need to override the stylesheet to add margin-left after StyleManager applies its styling
+        StyleManager.style_line_edits(
+            [self.input_field],
+            self.config,
+            font_family=resolved_font_family,  # Match original dialog font
+            font_size=scaled_font_size,  # Match original dialog font size
+            bg_color=input_bg_color,  # Match dialog background color
+            border_color=input_border_color,  # Match dialog border color
+            border_radius=input_border_radius,  # Match dialog border radius
+            padding=line_edit_padding  # Preserve existing padding for alignment
         )
+        
+        # Add left margin to align input field with label text (label has padding, so we need margin to match)
+        # This needs to be applied after StyleManager styling
+        current_stylesheet = self.input_field.styleSheet()
+        # Replace margin: 0px; with margin that includes left margin
+        if 'margin: 0px;' in current_stylesheet:
+            current_stylesheet = current_stylesheet.replace(
+                "margin: 0px;",
+                f"margin: 0px 0px 0px {label_padding}px;"
+            )
+        elif 'margin:' in current_stylesheet and 'margin-left:' not in current_stylesheet:
+            # Replace any existing margin with one that includes left margin
+            import re
+            current_stylesheet = re.sub(
+                r'margin:\s*[^;]+;',
+                f'margin: 0px 0px 0px {label_padding}px;',
+                current_stylesheet
+            )
+        elif 'margin-left:' not in current_stylesheet:
+            # Add margin-left to the existing stylesheet
+            current_stylesheet = current_stylesheet.replace(
+                "QLineEdit {",
+                f"QLineEdit {{\nmargin-left: {label_padding}px;"
+            )
+        self.input_field.setStyleSheet(current_stylesheet)
         layout.addWidget(self.input_field)
         
         # Buttons

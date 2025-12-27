@@ -253,23 +253,35 @@ class DetailAIChatView(QWidget):
         border_radius = input_config.get('border_radius', 3)
         border_width = input_config.get('border_width', 1)
         
-        input_style = f"""
-            QLineEdit {{
-                background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});
-                color: rgb({input_text[0]}, {input_text[1]}, {input_text[2]});
-                border: {border_width}px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});
-                border-radius: {border_radius}px;
-                padding: {self.input_padding}px;
-                font-family: "{self.font_family}";
-                font-size: {self.font_size}pt;
-                min-height: {self.button_height}px;
-                max-height: {self.button_height}px;
-            }}
-            QLineEdit:focus {{
-                border-color: rgb({input_focus[0]}, {input_focus[1]}, {input_focus[2]});
-            }}
-        """
-        self.input_field.setStyleSheet(input_style)
+        # Apply unified line edit styling using StyleManager
+        from app.views.style import StyleManager
+        
+        # Resolve font family (font_size is already scaled in _load_config, don't scale again)
+        resolved_font_family = resolve_font_family(self.font_family)
+        
+        # Convert padding from single value to [horizontal, vertical] format
+        if isinstance(self.input_padding, (int, float)):
+            input_padding = [self.input_padding, self.input_padding]
+        elif isinstance(self.input_padding, list) and len(self.input_padding) == 1:
+            input_padding = [self.input_padding[0], self.input_padding[0]]
+        elif isinstance(self.input_padding, list) and len(self.input_padding) >= 2:
+            input_padding = [self.input_padding[0], self.input_padding[1]]
+        else:
+            input_padding = [5, 5]  # Default fallback
+        
+        # Apply styling
+        StyleManager.style_line_edits(
+            [self.input_field],
+            self.config,
+            font_family=resolved_font_family,  # Match original view font
+            font_size=self.font_size,  # Already scaled in _load_config, don't scale again
+            bg_color=input_bg,  # Match view background color
+            border_color=input_border,  # Match view border color
+            focus_border_color=input_focus,  # Match view focus border color
+            border_width=border_width,  # Match view border width
+            border_radius=border_radius,  # Match view border radius
+            padding=input_padding  # Preserve existing padding
+        )
         
         # Apply button styling using StyleManager
         button_config = self.chat_config.get('button', {})
@@ -295,10 +307,25 @@ class DetailAIChatView(QWidget):
             min_height=self.button_height
         )
         
-        # Set fixed height to match input field exactly
-        self.send_button.setFixedHeight(self.button_height)
-        # Also ensure input field has fixed height for perfect alignment
+        # Set fixed height on both widgets to ensure they match exactly
+        # This must be done after styling to override any stylesheet height constraints
         self.input_field.setFixedHeight(self.button_height)
+        self.input_field.setMinimumHeight(self.button_height)
+        self.input_field.setMaximumHeight(self.button_height)
+        
+        self.send_button.setFixedHeight(self.button_height)
+        self.send_button.setMinimumHeight(self.button_height)
+        self.send_button.setMaximumHeight(self.button_height)
+        
+        # Also add height constraints to stylesheet to ensure they're enforced
+        # This ensures the height is maintained even if stylesheet is reapplied
+        input_stylesheet = self.input_field.styleSheet()
+        if 'height:' not in input_stylesheet and 'min-height:' not in input_stylesheet:
+            input_stylesheet = input_stylesheet.replace(
+                "QLineEdit {",
+                f"QLineEdit {{\nmin-height: {self.button_height}px;\nmax-height: {self.button_height}px;"
+            )
+            self.input_field.setStyleSheet(input_stylesheet)
         
         # Apply combobox styling using StyleManager
         # StyleManager reads combobox-specific settings (like padding) from centralized config automatically

@@ -288,53 +288,34 @@ class EngineDialog(QDialog):
         
         # Input widgets styling (QLineEdit) - use StyleManager approach with direct stylesheet
         input_config = dialog_config.get('input_widgets', {})
-        input_bg = input_config.get('background_color', [45, 45, 50])
-        input_text = input_config.get('text_color', [200, 200, 200])
-        input_border = input_config.get('border_color', [60, 60, 65])
-        input_border_width = input_config.get('border_width', 1)
-        input_border_radius = input_config.get('border_radius', 3)
-        # Handle both old format [left, top, right, bottom] and new format [horizontal, vertical]
-        input_padding_raw = input_config.get('padding', [8, 6])
+        # Get padding from config (preserve existing format for alignment)
+        input_padding_raw = input_config.get('padding', [2, 6, 2, 6])
         if len(input_padding_raw) == 4:
-            input_padding = input_padding_raw
+            # Convert [left, top, right, bottom] to [horizontal, vertical] for StyleManager
+            input_padding = [input_padding_raw[0], input_padding_raw[1]]
         else:
-            # Convert [horizontal, vertical] to [left, top, right, bottom]
-            input_padding = [input_padding_raw[0], input_padding_raw[1], input_padding_raw[0], input_padding_raw[1]]
-        input_font_family = resolve_font_family(input_config.get('font_family', 'Helvetica Neue'))
-        input_font_size = int(scale_font_size(input_config.get('font_size', 11)))
-        focus_border_color = input_config.get('focus_border_color', [70, 90, 130])
-        hover_border_offset = input_config.get('hover_border_offset', 20)
-        disabled_brightness_factor = input_config.get('disabled_brightness_factor', 0.5)
+            input_padding = input_padding_raw
         
-        input_stylesheet = f"""
-            QLineEdit {{
-                background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});
-                color: rgb({input_text[0]}, {input_text[1]}, {input_text[2]});
-                border: {input_border_width}px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});
-                border-radius: {input_border_radius}px;
-                padding: {input_padding[1]}px {input_padding[0]}px;
-                font-family: {input_font_family};
-                font-size: {input_font_size}pt;
-                margin: 0px;
-                vertical-align: middle;
-            }}
-            QLineEdit:hover {{
-                border: {input_border_width}px solid rgb({min(255, input_border[0] + hover_border_offset)}, {min(255, input_border[1] + hover_border_offset)}, {min(255, input_border[2] + hover_border_offset)});
-            }}
-            QLineEdit:focus {{
-                border: {input_border_width}px solid rgb({focus_border_color[0]}, {focus_border_color[1]}, {focus_border_color[2]});
-            }}
-            QLineEdit:disabled {{
-                background-color: rgb({int(input_bg[0] * disabled_brightness_factor)}, {int(input_bg[1] * disabled_brightness_factor)}, {int(input_bg[2] * disabled_brightness_factor)});
-                color: rgb({int(input_text[0] * disabled_brightness_factor)}, {int(input_text[1] * disabled_brightness_factor)}, {int(input_text[2] * disabled_brightness_factor)});
-            }}
-        """
+        # Use dialog-specific background color and font to match combobox styling
+        input_bg = input_config.get('background_color', [45, 45, 50])
+        bg_color = input_bg if isinstance(input_bg, list) else [input_bg[0], input_bg[1], input_bg[2]]
         
-        # Apply input widget styling to specific inputs
-        self.path_input.setStyleSheet(input_stylesheet)
-        self.name_input.setStyleSheet(input_stylesheet)
-        self.author_input.setStyleSheet(input_stylesheet)
-        self.version_input.setStyleSheet(input_stylesheet)
+        # Get dialog-specific font family and size
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        input_font_family_raw = input_config.get('font_family', 'Helvetica Neue')
+        input_font_family = resolve_font_family(input_font_family_raw)
+        input_font_size = scale_font_size(input_config.get('font_size', 11))
+        
+        # Apply unified line edit styling using StyleManager
+        from app.views.style import StyleManager
+        StyleManager.style_line_edits(
+            [self.path_input, self.name_input, self.author_input, self.version_input],
+            self.config,
+            font_family=input_font_family,  # Match original dialog font
+            font_size=input_font_size,  # Match original dialog font size
+            bg_color=bg_color,  # Match combobox background color
+            padding=input_padding  # Preserve existing padding for alignment
+        )
         
         # Get the natural height of the input field after styling is applied
         # This accounts for font size, padding, and DPI scaling automatically
@@ -343,11 +324,18 @@ class EngineDialog(QDialog):
         if natural_height <= 0:
             # Fallback: calculate from font metrics and padding
             from PyQt6.QtGui import QFontMetrics, QFont
-            font = QFont(input_font_family, input_font_size)
+            from app.utils.font_utils import resolve_font_family, scale_font_size
+            styles_config = self.config.get('ui', {}).get('styles', {})
+            line_edit_config = styles_config.get('line_edit', {})
+            font_family = resolve_font_family(line_edit_config.get('font_family', 'Helvetica Neue'))
+            font_size = scale_font_size(line_edit_config.get('font_size', 11))
+            font = QFont(font_family, font_size)
             fm = QFontMetrics(font)
             text_height = fm.height()
-            padding_vertical = input_padding[1] + input_padding[3]  # top + bottom
-            natural_height = text_height + padding_vertical + (input_border_width * 2)
+            # input_padding is now [horizontal, vertical]
+            padding_vertical = input_padding[1] * 2  # vertical padding on both sides
+            border_width = line_edit_config.get('border_width', 1)
+            natural_height = text_height + padding_vertical + (border_width * 2)
         
         final_height = natural_height
         
@@ -396,11 +384,21 @@ class EngineDialog(QDialog):
         
         # Get colors from dialog background for consistency
         dialog_bg = dialog_config.get('background_color', [40, 40, 45])
-        # Use border color from input widgets for consistency
+        # Use border color from unified line edit config for consistency
         bg_color_list = [dialog_bg[0], dialog_bg[1], dialog_bg[2]]
-        border_color_list = [input_border[0], input_border[1], input_border[2]]
+        styles_config = self.config.get('ui', {}).get('styles', {})
+        line_edit_config = styles_config.get('line_edit', {})
+        unified_border_color = line_edit_config.get('border_color', [60, 60, 65])
+        border_color_list = [unified_border_color[0], unified_border_color[1], unified_border_color[2]]
         
         from app.views.style import StyleManager
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        
+        # Get line edit config values for matching font, border radius, and border width
+        line_edit_font_family = resolve_font_family(line_edit_config.get('font_family', 'Helvetica Neue'))
+        line_edit_font_size = scale_font_size(line_edit_config.get('font_size', 11))
+        line_edit_border_radius = line_edit_config.get('border_radius', 3)
+        line_edit_border_width = line_edit_config.get('border_width', 1)
         
         # Apply button styling to main buttons
         main_buttons = [self.validate_button, self.add_button, self.cancel_button]
@@ -422,9 +420,9 @@ class EngineDialog(QDialog):
             self.config,
             bg_color_list,
             border_color_list,
-            font_family=input_font_family,  # Match input field font family
-            font_size=input_font_size,  # Match input field font size
-            border_radius=input_border_radius,  # Match input field border radius
+            font_family=line_edit_font_family,  # Match input field font family
+            font_size=line_edit_font_size,  # Match input field font size
+            border_radius=line_edit_border_radius,  # Match input field border radius
             padding=button_padding  # Same vertical padding as input field
         )
         
@@ -458,7 +456,7 @@ class EngineDialog(QDialog):
         # Ensure border width matches input field exactly
         button_stylesheet = re.sub(
             r'border:\s*\d+px',
-            f'border: {input_border_width}px',
+            f'border: {line_edit_border_width}px',
             button_stylesheet
         )
         # Ensure margins are zero and add vertical alignment

@@ -597,28 +597,26 @@ class BulkReplaceDialog(QDialog):
         selection_bg = inputs_config.get('selection_background_color', [70, 90, 130])
         selection_text = inputs_config.get('selection_text_color', [240, 240, 240])
         
-        # Apply input styling for QLineEdit only
-        input_style = (
-            f"QLineEdit {{"
-            f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
-            f"border: 1px solid rgb({self.input_border_color.red()}, {self.input_border_color.green()}, {self.input_border_color.blue()});"
-            f"border-radius: {self.input_border_radius}px;"
-            f"padding: {self.input_padding[1]}px {self.input_padding[0]}px;"
-            f"color: rgb({self.input_text_color.red()}, {self.input_text_color.green()}, {self.input_text_color.blue()});"
-            f"font-family: {self.input_font_family};"
-            f"font-size: {self.input_font_size}pt;"
-            f"}}"
-            f"QLineEdit:disabled {{"
-            f"background-color: rgb({self.input_bg_color.red() // 2}, {self.input_bg_color.green() // 2}, {self.input_bg_color.blue() // 2});"
-            f"color: rgb({self.input_text_color.red() // 2}, {self.input_text_color.green() // 2}, {self.input_text_color.blue() // 2});"
-            f"}}"
+        # Apply unified line edit styling using StyleManager
+        from app.views.style import StyleManager
+        
+        # Get padding from config (preserve existing format for alignment)
+        # self.input_padding is already in [horizontal, vertical] format from _load_config
+        input_padding = self.input_padding if isinstance(self.input_padding, list) and len(self.input_padding) == 2 else [8, 6]
+        
+        # Use dialog-specific background color and font to match combobox styling
+        bg_color = [self.input_bg_color.red(), self.input_bg_color.green(), self.input_bg_color.blue()]
+        
+        StyleManager.style_line_edits(
+            [self.find_input, self.replace_input],
+            self.config,
+            font_family=self.input_font_family,  # Match original dialog font
+            font_size=self.input_font_size,  # Match original dialog font size
+            bg_color=bg_color,  # Match combobox background color
+            padding=input_padding  # Preserve existing padding for alignment
         )
         
-        self.find_input.setStyleSheet(input_style)
-        self.replace_input.setStyleSheet(input_style)
-        
         # Apply combobox styling using StyleManager
-        from app.views.style import StyleManager
         
         # Get focus border color for combobox
         focus_border_color = inputs_config.get('focus_border_color', [0, 120, 212])

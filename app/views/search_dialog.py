@@ -210,7 +210,6 @@ class CriteriaRowWidget(QWidget):
         selection_bg = inputs_config.get('selection_background_color', [70, 90, 130])
         selection_text = inputs_config.get('selection_text_color', [240, 240, 240])
         
-        from app.views.style import StyleManager
         comboboxes = [self.field_combo, self.operator_combo, self.logic_combo]
         text_color = [self.input_text_color.red(), self.input_text_color.green(), self.input_text_color.blue()]
         bg_color = [self.input_bg_color.red(), self.input_bg_color.green(), self.input_bg_color.blue()]
@@ -234,20 +233,26 @@ class CriteriaRowWidget(QWidget):
             editable=False
         )
         
-        # LineEdit styling
-        input_style = (
-            f"QLineEdit {{"
-            f"font-family: {self.input_font_family};"
-            f"font-size: {self.input_font_size}pt;"
-            f"color: rgb({self.input_text_color.red()}, {self.input_text_color.green()}, {self.input_text_color.blue()});"
-            f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
-            f"border: 1px solid rgb({self.input_border_color.red()}, {self.input_border_color.green()}, {self.input_border_color.blue()});"
-            f"border-radius: {self.input_border_radius}px;"
-            f"padding: {self.input_padding[1]}px {self.input_padding[0]}px;"
-            f"}}"
+        # Apply unified line edit styling using StyleManager
+        # Get padding from config (preserve existing format for alignment)
+        # self.input_padding is already in [horizontal, vertical] format from _load_config
+        input_padding = self.input_padding if isinstance(self.input_padding, list) and len(self.input_padding) == 2 else [8, 6]
+        
+        # Use dialog-specific background color and font to match combobox styling
+        bg_color = [self.input_bg_color.red(), self.input_bg_color.green(), self.input_bg_color.blue()]
+        border_color = [self.input_border_color.red(), self.input_border_color.green(), self.input_border_color.blue()]
+        focus_border_color = [self.input_focus_border_color.red(), self.input_focus_border_color.green(), self.input_focus_border_color.blue()]
+        
+        StyleManager.style_line_edits(
+            [self.value_input, self.custom_tag_input],
+            self.config,
+            font_family=self.input_font_family,  # Match original dialog font
+            font_size=self.input_font_size,  # Match original dialog font size
+            bg_color=bg_color,  # Match combobox background color
+            border_color=border_color,  # Match combobox border color
+            focus_border_color=focus_border_color,  # Match combobox focus border color
+            padding=input_padding  # Preserve existing padding for alignment
         )
-        self.value_input.setStyleSheet(input_style)
-        self.custom_tag_input.setStyleSheet(input_style)
         
         # Set Remove button height to match input field height
         # Use the combo box height as reference since it has the same styling

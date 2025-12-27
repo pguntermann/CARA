@@ -944,28 +944,38 @@ class AddTagDialog(QDialog):
             }}
         """
         
-        # Input styling
-        input_style = f"""
-            QLineEdit {{
-                font-family: '{self.input_font_family}';
-                font-size: {self.input_font_size}pt;
-                color: rgb({self.input_text_color[0]}, {self.input_text_color[1]}, {self.input_text_color[2]});
-                background-color: rgb({self.input_bg_color[0]}, {self.input_bg_color[1]}, {self.input_bg_color[2]});
-                border: 1px solid rgb({self.input_border_color[0]}, {self.input_border_color[1]}, {self.input_border_color[2]});
-                border-radius: {self.input_border_radius}px;
-                padding: {self.input_padding[0]}px {self.input_padding[1]}px;
-            }}
-            QLineEdit:focus {{
-                border: 1px solid rgb(100, 150, 200);
-            }}
-        """
+        # Apply unified line edit styling using StyleManager
+        from app.views.style import StyleManager
+        from app.utils.font_utils import scale_font_size
         
-        # Apply styles
+        # Scale font size
+        scaled_font_size = scale_font_size(self.input_font_size)
+        
+        # Get focus border color (use hardcoded value from original style or get from config)
+        input_focus_border_color = [100, 150, 200]  # From original hardcoded value
+        
+        # Convert padding from [horizontal, vertical] format (already in correct format)
+        input_padding = self.input_padding if isinstance(self.input_padding, list) and len(self.input_padding) == 2 else [8, 6]
+        
+        # Get all QLineEdit widgets
+        line_edits = list(self.findChildren(QLineEdit))
+        
+        if line_edits:
+            StyleManager.style_line_edits(
+                line_edits,
+                self.config,
+                font_family=self.input_font_family,  # Match original dialog font (already resolved)
+                font_size=scaled_font_size,  # Match original dialog font size
+                bg_color=self.input_bg_color,  # Match dialog background color
+                border_color=self.input_border_color,  # Match dialog border color
+                focus_border_color=input_focus_border_color,  # Match original focus border color
+                border_radius=self.input_border_radius,  # Match dialog border radius
+                padding=input_padding  # Preserve existing padding for alignment
+            )
+        
+        # Apply styles to labels
         for label in self.findChildren(QLabel):
             label.setStyleSheet(label_style)
-        
-        for line_edit in self.findChildren(QLineEdit):
-            line_edit.setStyleSheet(input_style)
         
         # Apply button styling using StyleManager
         from app.views.style import StyleManager
