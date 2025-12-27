@@ -412,9 +412,31 @@ class ImportGamesDialog(QDialog):
             padding=input_padding  # Preserve existing padding for alignment
         )
         
-        # Separate styling for QSpinBox and QDateEdit
-        spinbox_dateedit_style = (
-            f"QSpinBox, QDateEdit {{"
+        # Apply unified spinbox styling using StyleManager
+        # Convert padding from [horizontal, vertical] to format expected by StyleManager
+        spinbox_padding = self.input_padding if isinstance(self.input_padding, list) and len(self.input_padding) == 2 else [8, 6]
+        spinbox_bg_color = [self.input_bg_color.red(), self.input_bg_color.green(), self.input_bg_color.blue()]
+        spinbox_border_color = [self.input_border_color.red(), self.input_border_color.green(), self.input_border_color.blue()]
+        spinbox_focus_border_color = [self.input_focus_border_color.red(), self.input_focus_border_color.green(), self.input_focus_border_color.blue()]
+        input_border_width = inputs_config.get('border_width', 1)
+        
+        StyleManager.style_spinboxes(
+            [self.max_games_spin],
+            self.config,
+            text_color=[self.input_text_color.red(), self.input_text_color.green(), self.input_text_color.blue()],
+            font_family=self.input_font_family,  # Match original dialog font
+            font_size=self.input_font_size,  # Match original dialog font size
+            bg_color=spinbox_bg_color,  # Match combobox background color
+            border_color=spinbox_border_color,  # Match input border color
+            focus_border_color=spinbox_focus_border_color,  # Match input focus border color
+            border_width=input_border_width,
+            border_radius=self.input_border_radius,
+            padding=spinbox_padding  # Preserve existing padding for alignment
+        )
+        
+        # Separate styling for QDateEdit (not using StyleManager yet)
+        dateedit_style = (
+            f"QDateEdit {{"
             f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
             f"border: 1px solid rgb({self.input_border_color.red()}, {self.input_border_color.green()}, {self.input_border_color.blue()});"
             f"border-radius: {self.input_border_radius}px;"
@@ -423,18 +445,14 @@ class ImportGamesDialog(QDialog):
             f"font-family: {self.input_font_family};"
             f"font-size: {self.input_font_size}pt;"
             f"}}"
-            f"QSpinBox:disabled, QDateEdit:disabled {{"
+            f"QDateEdit:disabled {{"
             f"background-color: rgb({self.input_bg_color.red() // 2}, {self.input_bg_color.green() // 2}, {self.input_bg_color.blue() // 2});"
             f"color: rgb({self.input_text_color.red() // 2}, {self.input_text_color.green() // 2}, {self.input_text_color.blue() // 2});"
             f"}}"
-            f"QSpinBox::up-button, QSpinBox::down-button {{"
-            f"width: 0px;"
-            f"}}"
         )
         
-        self.max_games_spin.setStyleSheet(spinbox_dateedit_style)
-        self.since_date_edit.setStyleSheet(spinbox_dateedit_style)
-        self.until_date_edit.setStyleSheet(spinbox_dateedit_style)
+        self.since_date_edit.setStyleSheet(dateedit_style)
+        self.until_date_edit.setStyleSheet(dateedit_style)
         
         # Apply combobox styling using StyleManager
         from app.views.style import StyleManager

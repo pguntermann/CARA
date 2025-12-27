@@ -319,26 +319,34 @@ class AnnotationPreferencesDialog(QDialog):
         for label in self.findChildren(QLabel):
             label.setStyleSheet(label_style)
         
-        # Input styling for QSpinBox only (combobox uses StyleManager)
+        # Input styling for QSpinBox - use StyleManager
         # Get inputs config and selection colors
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('annotation_preferences', {})
         inputs_config = dialog_config.get('inputs', {})
         selection_bg = inputs_config.get('selection_background_color', [70, 90, 130])
         selection_text = inputs_config.get('selection_text_color', [240, 240, 240])
+        input_border_width = inputs_config.get('border_width', 1)
         
-        spinbox_style = (
-            f"QSpinBox {{"
-            f"font-family: \"{self.input_font_family}\";"
-            f"font-size: {self.input_font_size}pt;"
-            f"color: rgb({self.input_text_color[0]}, {self.input_text_color[1]}, {self.input_text_color[2]});"
-            f"background-color: rgb({self.input_bg_color[0]}, {self.input_bg_color[1]}, {self.input_bg_color[2]});"
-            f"border: 1px solid rgb({self.input_border_color[0]}, {self.input_border_color[1]}, {self.input_border_color[2]});"
-            f"border-radius: {self.input_border_radius}px;"
-            f"padding: {self.input_padding[1]}px {self.input_padding[0]}px;"
-            f"}}"
+        # Convert padding to [horizontal, vertical] format if needed
+        if isinstance(self.input_padding, list) and len(self.input_padding) == 2:
+            spinbox_padding = self.input_padding
+        else:
+            spinbox_padding = [8, 6]
+        
+        # Apply unified spinbox styling using StyleManager
+        StyleManager.style_spinboxes(
+            [self.font_size_spinbox],
+            self.config,
+            text_color=self.input_text_color,
+            font_family=self.input_font_family,
+            font_size=self.input_font_size,
+            bg_color=self.input_bg_color,
+            border_color=self.input_border_color,
+            focus_border_color=self.input_focus_border_color,
+            border_width=input_border_width,
+            border_radius=self.input_border_radius,
+            padding=spinbox_padding
         )
-        
-        self.font_size_spinbox.setStyleSheet(spinbox_style)
         
         # Apply combobox styling using StyleManager
         from app.views.style import StyleManager

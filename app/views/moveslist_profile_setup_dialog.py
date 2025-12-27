@@ -1164,7 +1164,7 @@ class MovesListProfileSetupDialog(QDialog):
             header.setPalette(header_palette)
             header.setAutoFillBackground(True)
         
-        # Spinbox styling (use input styling from config)
+        # Spinbox styling (use input styling from config) - use StyleManager
         inputs_config = dialog_config.get('inputs', {})
         from app.utils.font_utils import resolve_font_family
         input_font_family_raw = inputs_config.get('font_family', 'Cascadia Mono')
@@ -1173,25 +1173,46 @@ class MovesListProfileSetupDialog(QDialog):
         input_text_color = inputs_config.get('text_color', [240, 240, 240])
         input_bg_color = inputs_config.get('background_color', [30, 30, 35])
         input_border_color = inputs_config.get('border_color', [60, 60, 65])
+        input_focus_border_color = inputs_config.get('focus_border_color', [70, 90, 130])
+        input_border_width = inputs_config.get('border_width', 1)
         input_border_radius = inputs_config.get('border_radius', 3)
         input_padding = inputs_config.get('padding', [8, 6])
         
-        # Store spinbox style for later application
-        self._spinbox_style = (
-            f"QSpinBox {{"
-            f"font-family: {input_font_family};"
-            f"font-size: {input_font_size}pt;"
-            f"color: rgb({input_text_color[0]}, {input_text_color[1]}, {input_text_color[2]});"
-            f"background-color: rgb({input_bg_color[0]}, {input_bg_color[1]}, {input_bg_color[2]});"
-            f"border: 1px solid rgb({input_border_color[0]}, {input_border_color[1]}, {input_border_color[2]});"
-            f"border-radius: {input_border_radius}px;"
-            f"padding: {input_padding[1]}px {input_padding[0]}px;"
-            f"}}"
-        )
+        # Convert padding to [horizontal, vertical] format if needed
+        if isinstance(input_padding, list) and len(input_padding) == 2:
+            spinbox_padding = input_padding
+        else:
+            spinbox_padding = [8, 6]
         
-        # Apply to existing spinboxes
-        for spinbox in self.findChildren(QSpinBox):
-            spinbox.setStyleSheet(self._spinbox_style)
+        # Store spinbox styling parameters for later application
+        self._spinbox_styling_params = {
+            'text_color': input_text_color,
+            'font_family': input_font_family,
+            'font_size': input_font_size,
+            'bg_color': input_bg_color,
+            'border_color': input_border_color,
+            'focus_border_color': input_focus_border_color,
+            'border_width': input_border_width,
+            'border_radius': input_border_radius,
+            'padding': spinbox_padding
+        }
+        
+        # Apply to existing spinboxes using StyleManager
+        spinboxes = list(self.findChildren(QSpinBox))
+        if spinboxes:
+            StyleManager.style_spinboxes(
+                spinboxes,
+                self.config,
+                text_color=input_text_color,
+                font_family=input_font_family,
+                font_size=input_font_size,
+                bg_color=input_bg_color,
+                border_color=input_border_color,
+                focus_border_color=input_focus_border_color,
+                border_width=input_border_width,
+                border_radius=input_border_radius,
+                padding=spinbox_padding
+            )
         
         # Group box styling
         groups_config = dialog_config.get('groups', {})
@@ -1236,6 +1257,11 @@ class MovesListProfileSetupDialog(QDialog):
     
     def _apply_spinbox_styling(self, spinbox: QSpinBox) -> None:
         """Apply styling to a spinbox widget."""
-        if hasattr(self, '_spinbox_style'):
-            spinbox.setStyleSheet(self._spinbox_style)
+        if hasattr(self, '_spinbox_styling_params'):
+            from app.views.style import StyleManager
+            StyleManager.style_spinboxes(
+                [spinbox],
+                self.config,
+                **self._spinbox_styling_params
+            )
 

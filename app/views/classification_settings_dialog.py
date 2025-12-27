@@ -742,35 +742,54 @@ class ClassificationSettingsDialog(QDialog):
             label_palette.setColor(label.backgroundRole(), QColor(0, 0, 0, 0))  # Transparent
             label.setPalette(label_palette)
         
-        # Spin boxes (numeric inputs)
-        # Hide the up/down buttons - users can type values directly
-        disabled_bg_color = fields_config.get('disabled_background_color', [35, 35, 40])
+        # Spin boxes (numeric inputs) - use StyleManager
         input_border_radius = fields_config.get('input_border_radius', 3)
-        input_padding = fields_config.get('input_padding', 3)
+        input_padding_raw = fields_config.get('input_padding', 3)
         input_background_offset = fields_config.get('input_background_offset', 10)
+        input_border_width = fields_config.get('input_border_width', 1)
         
-        input_style = (
-            f"QSpinBox {{"
-            f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
-            f"font-size: {font_size}pt;"
-            f"background-color: rgb({dialog_bg_color[0] + input_background_offset}, {dialog_bg_color[1] + input_background_offset}, {dialog_bg_color[2] + input_background_offset});"
-            f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
-            f"border-radius: {input_border_radius}px;"
-            f"padding: {input_padding}px;"
-            f"}}"
-            f"QSpinBox::up-button, QSpinBox::down-button {{"
-            f"width: 0px;"
-            f"}}"
-            f"QSpinBox:disabled {{"
-            f"background-color: rgb({disabled_bg_color[0]}, {disabled_bg_color[1]}, {disabled_bg_color[2]});"
-            f"color: rgb({text_color[0] // 2 + 64}, {text_color[1] // 2 + 64}, {text_color[2] // 2 + 64});"
-            f"}}"
-        )
+        # Calculate background color with offset
+        spinbox_bg_color = [
+            min(255, dialog_bg_color[0] + input_background_offset),
+            min(255, dialog_bg_color[1] + input_background_offset),
+            min(255, dialog_bg_color[2] + input_background_offset)
+        ]
         
-        for spinbox in self.findChildren(QSpinBox):
-            spinbox.setStyleSheet(input_style)
+        # Convert padding to [horizontal, vertical] format
+        if isinstance(input_padding_raw, (int, float)):
+            spinbox_padding = [input_padding_raw, input_padding_raw]
+        elif isinstance(input_padding_raw, list) and len(input_padding_raw) == 2:
+            spinbox_padding = input_padding_raw
+        else:
+            spinbox_padding = [3, 3]
+        
+        # Get focus border color from config or use default
+        focus_border_color = fields_config.get('focus_border_color', [70, 90, 130])
+        
+        # Get font family from config (resolve_font_family already imported at top of file)
+        font_family_raw = fields_config.get('font_family', 'Helvetica Neue')
+        font_family = resolve_font_family(font_family_raw)
+        
+        # Apply unified spinbox styling using StyleManager
+        from app.views.style import StyleManager
+        spinboxes = list(self.findChildren(QSpinBox))
+        if spinboxes:
+            StyleManager.style_spinboxes(
+                spinboxes,
+                self.config,
+                text_color=text_color,
+                font_family=font_family,
+                font_size=font_size,
+                bg_color=spinbox_bg_color,
+                border_color=border_color,
+                focus_border_color=focus_border_color,
+                border_width=input_border_width,
+                border_radius=input_border_radius,
+                padding=spinbox_padding
+            )
         
         # Store disabled background color for max_eval_before_spinbox updates
+        disabled_bg_color = fields_config.get('disabled_background_color', [35, 35, 40])
         self._disabled_bg_color = disabled_bg_color
         self._enabled_bg_color = [dialog_bg_color[0] + input_background_offset, dialog_bg_color[1] + input_background_offset, dialog_bg_color[2] + input_background_offset]
         self._text_color = text_color

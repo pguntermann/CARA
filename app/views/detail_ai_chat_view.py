@@ -361,26 +361,41 @@ class DetailAIChatView(QWidget):
         token_font_family = tokens_config.get('font_family', self.font_family)
         token_font_size = scale_font_size(tokens_config.get('font_size', self.chat_config.get('font_size', 11)))
         
-        spin_style = f"""
-            QSpinBox {{
-                background-color: rgb({token_bg[0]}, {token_bg[1]}, {token_bg[2]});
-                color: rgb({token_text[0]}, {token_text[1]}, {token_text[2]});
-                border: {token_border_width}px solid rgb({token_border[0]}, {token_border[1]}, {token_border[2]});
-                border-radius: {token_border_radius}px;
-                padding-left: {token_padding[0]}px;
-                padding-right: {token_padding[1]}px;
-                font-family: "{token_font_family}";
-                font-size: {token_font_size}pt;
-            }}
-            QSpinBox:focus {{
-                border-color: rgb({token_focus[0]}, {token_focus[1]}, {token_focus[2]});
-            }}
-            QSpinBox::up-button, QSpinBox::down-button {{
-                width: 0px;
-                height: 0px;
-            }}
-        """
-        self.tokens_spin.setStyleSheet(spin_style)
+        # Convert token_bg and token_text to lists if they're QColor objects
+        if hasattr(token_bg, 'red'):
+            token_bg = [token_bg.red(), token_bg.green(), token_bg.blue()]
+        if hasattr(token_text, 'red'):
+            token_text = [token_text.red(), token_text.green(), token_text.blue()]
+        if hasattr(token_border, 'red'):
+            token_border = [token_border.red(), token_border.green(), token_border.blue()]
+        if hasattr(token_focus, 'red'):
+            token_focus = [token_focus.red(), token_focus.green(), token_focus.blue()]
+        
+        # Resolve font family (already imported at top of file)
+        resolved_token_font_family = resolve_font_family(token_font_family)
+        
+        # Convert padding to [horizontal, vertical] format if needed
+        if isinstance(token_padding, (int, float)):
+            spinbox_padding = [token_padding, token_padding]
+        elif isinstance(token_padding, list) and len(token_padding) == 2:
+            spinbox_padding = token_padding
+        else:
+            spinbox_padding = [6, 8]
+        
+        # Apply unified spinbox styling using StyleManager
+        StyleManager.style_spinboxes(
+            [self.tokens_spin],
+            self.config,
+            text_color=token_text,
+            font_family=resolved_token_font_family,
+            font_size=token_font_size,
+            bg_color=token_bg,
+            border_color=token_border,
+            focus_border_color=token_focus,
+            border_width=token_border_width,
+            border_radius=token_border_radius,
+            padding=spinbox_padding
+        )
         
         # Label styling
         label_style = f"""

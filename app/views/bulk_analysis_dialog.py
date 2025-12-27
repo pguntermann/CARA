@@ -1155,30 +1155,41 @@ class BulkAnalysisDialog(QDialog):
         if radio_buttons:
             StyleManager.style_radio_buttons(radio_buttons, self.config)
         
-        # SpinBox styling (use input widget colors, hide arrows)
+        # SpinBox styling (use input widget colors) - use StyleManager
         input_bg_color = dialog_config.get('background_color', [40, 40, 45])
         input_border = dialog_config.get('border_color', [60, 60, 65])
         input_text_color = dialog_config.get('text_color', [200, 200, 200])
-        spinbox_style = (
-            f"QSpinBox {{"
-            f"font-family: {label_font_family}; "
-            f"font-size: {label_font_size}pt; "
-            f"color: rgb({input_text_color[0]}, {input_text_color[1]}, {input_text_color[2]});"
-            f"background-color: rgb({input_bg_color[0] + 5}, {input_bg_color[1] + 5}, {input_bg_color[2] + 5});"
-            f"border: 1px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
-            f"border-radius: 3px;"
-            f"padding: 4px 6px;"
-            f"}}"
-            f"QSpinBox:focus {{"
-            f"border-color: rgb({input_border[0] + 20}, {input_border[1] + 20}, {input_border[2] + 20});"
-            f"}}"
-            f"QSpinBox::up-button, QSpinBox::down-button {{"
-            f"width: 0px;"
-            f"}}"
-        )
         
-        for spinbox in self.findChildren(QSpinBox):
-            spinbox.setStyleSheet(spinbox_style)
+        # Calculate background color with offset
+        spinbox_bg_color = [
+            min(255, input_bg_color[0] + 5),
+            min(255, input_bg_color[1] + 5),
+            min(255, input_bg_color[2] + 5)
+        ]
+        
+        # Calculate focus border color with offset
+        spinbox_focus_border_color = [
+            min(255, input_border[0] + 20),
+            min(255, input_border[1] + 20),
+            min(255, input_border[2] + 20)
+        ]
+        
+        # Apply unified spinbox styling using StyleManager
+        spinboxes = list(self.findChildren(QSpinBox))
+        if spinboxes:
+            StyleManager.style_spinboxes(
+                spinboxes,
+                self.config,
+                text_color=input_text_color,
+                font_family=label_font_family,
+                font_size=label_font_size,
+                bg_color=spinbox_bg_color,
+                border_color=input_border,
+                focus_border_color=spinbox_focus_border_color,
+                border_width=1,
+                border_radius=3,
+                padding=[6, 4]  # [horizontal, vertical]
+            )
         
         # Apply button styling using StyleManager (uses unified config)
         buttons_config = dialog_config.get('buttons', {})
