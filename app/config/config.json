@@ -19,6 +19,10 @@
         "hover_border_offset": 20,
         "margin_top": 2,
         "margin_bottom": 2
+      },
+      "combobox": {
+        "dropdown_border_radius": 3,
+        "padding": [8, 6]
       }
     },
     "window": {
@@ -464,15 +468,6 @@
             "font_family": "Helvetica Neue",
             "font_size": 10
           },
-          "combo_box": {
-            "background_color": [30, 30, 35],
-            "text_color": [240, 240, 240],
-            "border_color": [60, 60, 65],
-            "focus_border_color": [0, 120, 212],
-            "border_radius": 3,
-            "border_width": 1,
-            "padding": [8, 6]
-          },
           "analysis_coverage": {
             "show_banner": true,
             "banner_background_color": [45, 45, 50],
@@ -754,16 +749,6 @@
               "background_color": [45, 45, 50],
               "text_color": [150, 150, 150]
             }
-        },
-        "combo": {
-          "min_width": 240,
-            "background_color": [45, 45, 50],
-            "text_color": [200, 200, 200],
-            "border_color": [60, 60, 65],
-            "border_width": 1,
-            "border_radius": 3,
-            "padding": 5,
-            "focus_border_color": [0, 120, 212]
         },
         "tokens": {
           "minimum": 256,
@@ -1068,8 +1053,8 @@
           "border_width": 1,
           "border_radius": 3,
           "padding": 5,
-          "font_family": "Helvetica Neue",
-          "font_size": 10,
+          "font_family": "Cascadia Mono, Menlo",
+          "font_size": 11,
           "focus_border_color": [0, 120, 212],
           "selection_background_color": [70, 90, 130],
           "selection_text_color": [240, 240, 240]

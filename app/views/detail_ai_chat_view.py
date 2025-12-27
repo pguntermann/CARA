@@ -71,6 +71,12 @@ class DetailAIChatView(QWidget):
         input_config = self.chat_config.get('input', {})
         self.input_height = input_config.get('height', 30)
         self.input_padding = input_config.get('padding', 5)
+        self.input_bg_color = input_config.get('background_color', [45, 45, 50])
+        self.input_text_color = input_config.get('text_color', [200, 200, 200])
+        self.input_border_color = input_config.get('border_color', [60, 60, 65])
+        self.input_focus_border_color = input_config.get('focus_border_color', [0, 120, 212])
+        self.input_border_radius = input_config.get('border_radius', 3)
+        self.input_border_width = input_config.get('border_width', 1)
         
         # Get button config
         button_config = self.chat_config.get('button', {})
@@ -78,7 +84,6 @@ class DetailAIChatView(QWidget):
         self.button_height = button_config.get('height', 30)
         
         # Control configs
-        self.combo_config = self.chat_config.get('combo', {})
         self.tokens_config = self.chat_config.get('tokens', {})
         self.tokens_collapse_threshold = self.tokens_config.get('collapse_width_threshold', 520)
         self.tokens_animation_duration = self.tokens_config.get('collapse_animation_duration_ms', 200)
@@ -151,7 +156,7 @@ class DetailAIChatView(QWidget):
         self.model_combo.setEditable(False)
         tokens_config = self.tokens_config
         control_height = tokens_config.get('height', self.button_height)
-        combo_min_width = self.combo_config.get('min_width', 200)
+        combo_min_width = 200  # View-specific minimum width
         self.model_combo.setFixedHeight(control_height)
         self.model_combo.setMinimumWidth(combo_min_width)
         self.model_combo.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
@@ -317,57 +322,36 @@ class DetailAIChatView(QWidget):
         """
         self.send_button.setStyleSheet(button_style)
         
-        # Model combo styling
-        combo_config = self.combo_config
-        combo_bg = combo_config.get('background_color', [45, 45, 50])
-        combo_text = combo_config.get('text_color', [200, 200, 200])
-        combo_border = combo_config.get('border_color', [60, 60, 65])
-        combo_focus = combo_config.get('focus_border_color', [0, 120, 212])
-        combo_border_radius = combo_config.get('border_radius', 3)
-        combo_border_width = combo_config.get('border_width', 1)
-        combo_padding = combo_config.get('padding', 5)
-        combo_min_width = combo_config.get('min_width', 200)
+        # Apply combobox styling using StyleManager
+        # StyleManager reads combobox-specific settings (like padding) from centralized config automatically
+        # Selection colors - use focus color for selection background (matching other dialogs)
+        selection_bg = self.input_focus_border_color
+        selection_text = [240, 240, 240]
         
-        combo_style = f"""
-            QComboBox {{
-                background-color: rgb({combo_bg[0]}, {combo_bg[1]}, {combo_bg[2]});
-                color: rgb({combo_text[0]}, {combo_text[1]}, {combo_text[2]});
-                border: {combo_border_width}px solid rgb({combo_border[0]}, {combo_border[1]}, {combo_border[2]});
-                border-radius: {combo_border_radius}px;
-                padding: {combo_padding}px;
-                font-family: "{self.font_family}";
-                font-size: {self.font_size}pt;
-                min-width: {combo_min_width}px;
-            }}
-            QComboBox:focus {{
-                border-color: rgb({combo_focus[0]}, {combo_focus[1]}, {combo_focus[2]});
-            }}
-            QComboBox::drop-down {{
-                width: 0px;
-                height: 0px;
-                image: none;
-            }}
-            QComboBox::down-arrow {{
-                width: 0px;
-                height: 0px;
-                image: none;
-            }}
-            QComboBox QAbstractItemView {{
-                background-color: rgb({combo_bg[0]}, {combo_bg[1]}, {combo_bg[2]});
-                color: rgb({combo_text[0]}, {combo_text[1]}, {combo_text[2]});
-                border: {combo_border_width}px solid rgb({combo_border[0]}, {combo_border[1]}, {combo_border[2]});
-                selection-background-color: rgb({combo_focus[0]}, {combo_focus[1]}, {combo_focus[2]});
-            }}
-        """
-        self.model_combo.setStyleSheet(combo_style)
+        from app.views.style import StyleManager
+        StyleManager.style_comboboxes(
+            [self.model_combo],
+            self.config,
+            self.input_text_color,
+            self.font_family,
+            self.font_size,
+            self.input_bg_color,
+            self.input_border_color,
+            self.input_focus_border_color,
+            selection_bg,
+            selection_text,
+            border_width=self.input_border_width,
+            border_radius=self.input_border_radius,
+            editable=False
+        )
         
         tokens_config = self.tokens_config
-        token_bg = tokens_config.get('background_color', combo_bg)
+        token_bg = tokens_config.get('background_color', self.input_bg_color)
         token_text = tokens_config.get('text_color', self.text_color)
-        token_border = tokens_config.get('border_color', combo_border)
-        token_border_width = tokens_config.get('border_width', combo_border_width)
-        token_border_radius = tokens_config.get('border_radius', combo_border_radius)
-        token_focus = tokens_config.get('focus_border_color', combo_focus)
+        token_border = tokens_config.get('border_color', self.input_border_color)
+        token_border_width = tokens_config.get('border_width', self.input_border_width)
+        token_border_radius = tokens_config.get('border_radius', self.input_border_radius)
+        token_focus = tokens_config.get('focus_border_color', self.input_focus_border_color)
         token_padding = tokens_config.get('padding', [6, 8])
         token_font_family = tokens_config.get('font_family', self.font_family)
         token_font_size = scale_font_size(tokens_config.get('font_size', self.chat_config.get('font_size', 11)))
