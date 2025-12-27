@@ -1823,10 +1823,10 @@
         }
       },
       "annotation_preferences": {
-        "width": 600,
-        "height": 500,
-        "minimum_width": 500,
-        "minimum_height": 400,
+        "width": 520,
+        "height": 400,
+        "minimum_width": 480,
+        "minimum_height": 350,
         "background_color": [40, 40, 45],
         "border_color": [60, 60, 65],
         "text_color": [200, 200, 200],
@@ -1834,7 +1834,7 @@
         "layout": {
           "spacing": 10,
           "margins": [15, 15, 15, 15],
-          "section_spacing": 15
+          "section_spacing": 10
         },
         "buttons": {
           "spacing": 10,
@@ -1861,9 +1861,10 @@
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
           "title_color": [240, 240, 240],
-          "content_margins": [10, 15, 10, 10],
+          "content_margins": [10, 10, 10, 10],
           "margin_top": 10,
-          "padding_top": 5
+          "padding_top": 5,
+          "font_group_spacing": 6
         },
         "color_swatches": {
           "size": 40,

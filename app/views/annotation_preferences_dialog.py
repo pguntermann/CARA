@@ -164,6 +164,7 @@ class AnnotationPreferencesDialog(QDialog):
         self.group_content_margins = groups_config.get('content_margins', [10, 15, 10, 10])
         self.group_margin_top = groups_config.get('margin_top', 10)
         self.group_padding_top = groups_config.get('padding_top', 5)
+        self.font_group_spacing = groups_config.get('font_group_spacing', 6)
         
         # Color swatches
         color_swatches_config = dialog_config.get('color_swatches', {})
@@ -233,7 +234,7 @@ class AnnotationPreferencesDialog(QDialog):
             self.group_content_margins[0], self.group_content_margins[1],
             self.group_content_margins[2], self.group_content_margins[3]
         )
-        font_group_layout.setSpacing(self.layout_spacing)
+        font_group_layout.setSpacing(self.font_group_spacing)
         
         # Font family
         font_family_layout = QHBoxLayout()

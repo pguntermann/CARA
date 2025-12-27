@@ -1147,6 +1147,7 @@ class ConfigLoader:
             'ui.dialogs.annotation_preferences.groups.content_margins',
             'ui.dialogs.annotation_preferences.groups.margin_top',
             'ui.dialogs.annotation_preferences.groups.padding_top',
+            'ui.dialogs.annotation_preferences.groups.font_group_spacing',
             'ui.dialogs.annotation_preferences.color_swatches.size',
             'ui.dialogs.annotation_preferences.color_swatches.spacing',
             'ui.dialogs.annotation_preferences.color_swatches.per_row',
