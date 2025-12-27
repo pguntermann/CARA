@@ -190,29 +190,19 @@ class CriteriaRowWidget(QWidget):
         font_family = dialog_config.get("font_family", "Helvetica Neue")
         font_size = dialog_config.get("font_size", 11)
         
-        # Button styling (standardized pattern, but with reduced padding for inline button)
+        # Apply button styling using StyleManager (uses unified config)
         # Use smaller padding for the Remove button to match input field height better
-        inline_button_padding = 3  # Smaller padding for inline button
-        button_style = (
-            f"QPushButton {{"
-            f"font-family: {font_family};"
-            f"font-size: {font_size}pt;"
-            f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
-            f"background-color: rgb({bg_color[0] + button_bg_offset}, {bg_color[1] + button_bg_offset}, {bg_color[2] + button_bg_offset});"
-            f"border: 1px solid rgb({bg_color[0] + button_bg_offset}, {bg_color[1] + button_bg_offset}, {bg_color[2] + button_bg_offset});"
-            f"border-radius: {button_border_radius}px;"
-            f"padding: {inline_button_padding}px;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"background-color: rgb({bg_color[0] + button_hover_offset}, {bg_color[1] + button_hover_offset}, {bg_color[2] + button_hover_offset});"
-            f"border-color: rgb({bg_color[0] + button_hover_offset}, {bg_color[1] + button_hover_offset}, {bg_color[2] + button_hover_offset});"
-            f"}}"
-            f"QPushButton:pressed {{"
-            f"background-color: rgb({bg_color[0] + button_pressed_offset}, {bg_color[1] + button_pressed_offset}, {bg_color[2] + button_pressed_offset});"
-            f"border-color: rgb({bg_color[0] + button_pressed_offset}, {bg_color[1] + button_pressed_offset}, {bg_color[2] + button_pressed_offset});"
-            f"}}"
+        from app.views.style import StyleManager
+        buttons_config = self.config.get("ui", {}).get("dialogs", {}).get("search", {}).get("buttons", {})
+        border_color = buttons_config.get("border_color", [60, 60, 65])
+        # Use smaller padding (3px) for inline button
+        StyleManager.style_buttons(
+            [self.remove_btn],
+            self.config,
+            bg_color,
+            border_color,
+            padding=3
         )
-        self.remove_btn.setStyleSheet(button_style)
         
         # Apply combobox styling using StyleManager
         # Get selection colors from config (use defaults if not available)
@@ -926,38 +916,25 @@ class SearchDialog(QDialog):
                 viewport.setPalette(viewport_palette)
                 viewport.setAutoFillBackground(True)
         
-        # Button styling (standardized pattern)
+        # Apply button styling using StyleManager (uses unified config)
         buttons_config = self.config.get("ui", {}).get("dialogs", {}).get("search", {}).get("buttons", {})
-        button_bg_offset = buttons_config.get("background_offset", 20)
-        button_hover_offset = buttons_config.get("hover_background_offset", 30)
-        button_pressed_offset = buttons_config.get("pressed_background_offset", 10)
-        button_border_radius = buttons_config.get("border_radius", 3)
-        button_padding = buttons_config.get("padding", 5)
+        border_color = buttons_config.get("border_color", [60, 60, 65])
+        bg_color_list = [self.bg_color.red(), self.bg_color.green(), self.bg_color.blue()]
+        border_color_list = [border_color[0], border_color[1], border_color[2]]
         
-        button_style = (
-            f"QPushButton {{"
-            f"min-width: {self.button_width}px;"
-            f"min-height: {self.button_height}px;"
-            f"font-family: {self.font_family};"
-            f"font-size: {self.font_size}pt;"
-            f"color: rgb({self.text_color.red()}, {self.text_color.green()}, {self.text_color.blue()});"
-            f"background-color: rgb({self.bg_color.red() + button_bg_offset}, {self.bg_color.green() + button_bg_offset}, {self.bg_color.blue() + button_bg_offset});"
-            f"border: 1px solid rgb({self.bg_color.red() + button_bg_offset}, {self.bg_color.green() + button_bg_offset}, {self.bg_color.blue() + button_bg_offset});"
-            f"border-radius: {button_border_radius}px;"
-            f"padding: {button_padding}px;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"background-color: rgb({self.bg_color.red() + button_hover_offset}, {self.bg_color.green() + button_hover_offset}, {self.bg_color.blue() + button_hover_offset});"
-            f"border-color: rgb({self.bg_color.red() + button_hover_offset}, {self.bg_color.green() + button_hover_offset}, {self.bg_color.blue() + button_hover_offset});"
-            f"}}"
-            f"QPushButton:pressed {{"
-            f"background-color: rgb({self.bg_color.red() + button_pressed_offset}, {self.bg_color.green() + button_pressed_offset}, {self.bg_color.blue() + button_pressed_offset});"
-            f"border-color: rgb({self.bg_color.red() + button_pressed_offset}, {self.bg_color.green() + button_pressed_offset}, {self.bg_color.blue() + button_pressed_offset});"
-            f"}}"
+        # Get all main dialog buttons (exclude remove buttons from CriteriaRowWidget)
+        all_buttons = self.findChildren(QPushButton)
+        # Filter out remove buttons (they're styled separately in CriteriaRowWidget with smaller padding)
+        main_buttons = [btn for btn in all_buttons if btn.text() != "Remove"]
+        
+        StyleManager.style_buttons(
+            main_buttons,
+            self.config,
+            bg_color_list,
+            border_color_list,
+            min_width=self.button_width,
+            min_height=self.button_height
         )
-        
-        for button in self.findChildren(QPushButton):
-            button.setStyleSheet(button_style)
     
     def _on_search_clicked(self) -> None:
         """Handle search button click."""

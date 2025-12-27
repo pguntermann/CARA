@@ -400,8 +400,9 @@ class DetailAnnotationView(QWidget):
         self.shadow_button.setChecked(False)  # Default to no shadow
         self.shadow_button.setFixedHeight(self.tool_button_height)  # Match tool button height
         self.shadow_button.setMinimumWidth(100)  # Reasonable width for the button text
+        self.shadow_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.shadow_button.clicked.connect(self._on_shadow_toggled)
-        size_slider_layout.addWidget(self.shadow_button)
+        size_slider_layout.addWidget(self.shadow_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         # Connect slider to update size
         # Connect sliderReleased to snap to nearest tick when dragging ends
@@ -675,37 +676,62 @@ class DetailAnnotationView(QWidget):
         self.save_btn.setStyleSheet(button_style)
         self.clear_all_btn.setStyleSheet(button_style)
         
-        # Style shadow button with checked state (toggle button)
-        shadow_button_style = f"""
-            QPushButton {{
-                background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
-                color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
-                border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
-                border-radius: {button_border_radius}px;
-                padding: {button_padding[0]}px {button_padding[1]}px;
-                min-height: {button_height}px;
-                font-family: "{font_family}";
-                font-size: {font_size}pt;
-            }}
-            QPushButton:checked {{
-                background-color: rgb({active_bg[0]}, {active_bg[1]}, {active_bg[2]});
-                color: rgb({active_text[0]}, {active_text[1]}, {active_text[2]});
-                border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
-            }}
-            QPushButton:hover {{
-                background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});
-                color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});
-            }}
-            QPushButton:pressed {{
-                background-color: rgb({min(255, norm_bg[0] + button_pressed_offset)}, {min(255, norm_bg[1] + button_pressed_offset)}, {min(255, norm_bg[2] + button_pressed_offset)});
-            }}
-            QPushButton:focus {{
-                outline: none;
-            }}
-        """
-        
+        # Style shadow button using StyleManager (toggle button with checked state)
         if hasattr(self, 'shadow_button'):
-            self.shadow_button.setStyleSheet(shadow_button_style)
+            from app.views.style import StyleManager
+            
+            # Get button config values for offsets
+            buttons_config = ui_config.get('buttons', {})
+            button_pressed_offset = buttons_config.get('pressed_background_offset', 10)
+            
+            # Calculate background offset: norm_bg - pane_bg
+            # norm_bg is the target button background, pane_bg is the base
+            bg_offset = norm_bg[0] - pane_bg[0] if norm_bg[0] > pane_bg[0] else 20
+            # Calculate hover offset: hover_bg - pane_bg
+            hover_offset = hover_bg[0] - pane_bg[0] if hover_bg[0] > pane_bg[0] else 30
+            
+            # Convert padding from [horizontal, vertical] to single value (use horizontal for consistency)
+            button_padding_value = button_padding[0] if isinstance(button_padding, list) else button_padding
+            
+            # Apply base styling using StyleManager (use pane_bg as base, offsets will produce norm_bg and hover_bg)
+            bg_color_list = [pane_bg[0], pane_bg[1], pane_bg[2]]
+            border_color_list = [norm_border[0], norm_border[1], norm_border[2]]
+            text_color_list = [norm_text[0], norm_text[1], norm_text[2]]
+            
+            StyleManager.style_buttons(
+                [self.shadow_button],
+                self.config,
+                bg_color_list,
+                border_color_list,
+                text_color=text_color_list,
+                font_family=font_family,
+                font_size=font_size,
+                border_radius=button_border_radius,
+                padding=button_padding_value,
+                background_offset=bg_offset,
+                hover_background_offset=hover_offset,
+                pressed_background_offset=button_pressed_offset,
+                min_height=button_height
+            )
+            
+            # Ensure fixed height matches tool_button_height for alignment
+            self.shadow_button.setFixedHeight(self.tool_button_height)
+            
+            # Add checked state styling (StyleManager doesn't support checked state yet)
+            # Also override hover text color to match original behavior
+            checked_style = f"""
+                QPushButton:checked {{
+                    background-color: rgb({active_bg[0]}, {active_bg[1]}, {active_bg[2]});
+                    color: rgb({active_text[0]}, {active_text[1]}, {active_text[2]});
+                    border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
+                }}
+                QPushButton:hover {{
+                    color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});
+                }}
+            """
+            # Append checked state to existing stylesheet
+            current_style = self.shadow_button.styleSheet()
+            self.shadow_button.setStyleSheet(current_style + checked_style)
         
         # Style labels
         label_style = f"color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});"

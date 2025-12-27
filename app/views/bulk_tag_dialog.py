@@ -428,31 +428,16 @@ class BulkTagDialog(QDialog):
         button_hover_offset = buttons_config.get("hover_background_offset", 30)
         button_pressed_offset = buttons_config.get("pressed_background_offset", 10)
         
-        button_style = (
-            f"QPushButton {{"
-            f"min-width: {button_width}px;"
-            f"min-height: {button_height}px;"
-            f"background-color: rgb({bg_color[0] + button_bg_offset}, {bg_color[1] + button_bg_offset}, {bg_color[2] + button_bg_offset});"
-            f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
-            f"border-radius: {button_border_radius}px;"
-            f"padding: {button_padding}px;"
-            f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
-            f"font-size: {font_size}pt;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"background-color: rgb({bg_color[0] + button_hover_offset}, {bg_color[1] + button_hover_offset}, {bg_color[2] + button_hover_offset});"
-            f"}}"
-            f"QPushButton:pressed {{"
-            f"background-color: rgb({bg_color[0] + button_pressed_offset}, {bg_color[1] + button_pressed_offset}, {bg_color[2] + button_pressed_offset});"
-            f"}}"
-            f"QPushButton:disabled {{"
-            f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
-            f"color: rgb({text_color[0] // 2}, {text_color[1] // 2}, {text_color[2] // 2});"
-            f"}}"
+        # Apply button styling using StyleManager (uses unified config)
+        from app.views.style import StyleManager
+        StyleManager.style_buttons(
+            [self.apply_button, self.cancel_button],
+            self.config,
+            bg_color,
+            border_color,
+            min_width=button_width,
+            min_height=button_height
         )
-        
-        self.apply_button.setStyleSheet(button_style)
-        self.cancel_button.setStyleSheet(button_style)
         
         # Get selection colors from config (use defaults if not available)
         dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("bulk_tag", {})
@@ -918,27 +903,17 @@ class BulkTagDialog(QDialog):
         text_color = buttons_config.get('text_color', [200, 200, 200])
         border_color = buttons_config.get('border_color', [60, 60, 65])
         
-        button_style = (
-            f"QPushButton {{"
-            f"min-width: {button_width}px;"
-            f"min-height: {button_height}px;"
-            f"background-color: rgb({bg_color[0] + button_bg_offset}, {bg_color[1] + button_bg_offset}, {bg_color[2] + button_bg_offset});"
-            f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
-            f"border-radius: {button_border_radius}px;"
-            f"padding: {button_padding}px;"
-            f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
-            f"font-size: {button_font_size}pt;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"background-color: rgb({bg_color[0] + button_hover_offset}, {bg_color[1] + button_hover_offset}, {bg_color[2] + button_hover_offset});"
-            f"}}"
-            f"QPushButton:pressed {{"
-            f"background-color: rgb({bg_color[0] + button_pressed_offset}, {bg_color[1] + button_pressed_offset}, {bg_color[2] + button_pressed_offset});"
-            f"}}"
-        )
-        
+        # Apply button styling using StyleManager (uses unified config)
+        from app.views.style import StyleManager
         ok_button = QPushButton("OK")
-        ok_button.setStyleSheet(button_style)
+        StyleManager.style_buttons(
+            [ok_button],
+            self.config,
+            bg_color,
+            border_color,
+            min_width=button_width,
+            min_height=button_height
+        )
         ok_button.clicked.connect(dialog.accept)
         button_layout.addWidget(ok_button)
         

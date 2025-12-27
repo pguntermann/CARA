@@ -203,12 +203,14 @@ class DetailAIChatView(QWidget):
         self.input_field = QLineEdit()
         self.input_field.setPlaceholderText("Ask about the position...")
         self.input_field.returnPressed.connect(self._on_send_clicked)
-        input_row_layout.addWidget(self.input_field)
+        self.input_field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        input_row_layout.addWidget(self.input_field, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         # Send button
         self.send_button = QPushButton("Send")
         self.send_button.clicked.connect(self._on_send_clicked)
-        input_row_layout.addWidget(self.send_button)
+        self.send_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        input_row_layout.addWidget(self.send_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         input_layout.addLayout(input_row_layout)
         
@@ -269,58 +271,34 @@ class DetailAIChatView(QWidget):
         """
         self.input_field.setStyleSheet(input_style)
         
-        # Button styling
+        # Apply button styling using StyleManager
         button_config = self.chat_config.get('button', {})
         button_bg_offset = button_config.get('background_offset', 20)
         button_hover_offset = button_config.get('hover_background_offset', 30)
         button_pressed_offset = button_config.get('pressed_background_offset', 10)
-        button_text = button_config.get('text_color', [200, 200, 200])
-        border_radius = button_config.get('border_radius', 3)
-        border_width = button_config.get('border_width', 1)
         border_color = button_config.get('border_color', [60, 60, 65])
         
-        # Calculate button colors based on background offset
-        button_bg = [
-            min(255, self.background_color[0] + button_bg_offset),
-            min(255, self.background_color[1] + button_bg_offset),
-            min(255, self.background_color[2] + button_bg_offset)
-        ]
-        button_hover_bg = [
-            min(255, self.background_color[0] + button_hover_offset),
-            min(255, self.background_color[1] + button_hover_offset),
-            min(255, self.background_color[2] + button_hover_offset)
-        ]
-        button_pressed_bg = [
-            max(0, self.background_color[0] + button_pressed_offset),
-            max(0, self.background_color[1] + button_pressed_offset),
-            max(0, self.background_color[2] + button_pressed_offset)
-        ]
+        bg_color_list = [self.background_color[0], self.background_color[1], self.background_color[2]]
+        border_color_list = [border_color[0], border_color[1], border_color[2]]
         
-        button_style = f"""
-            QPushButton {{
-                background-color: rgb({button_bg[0]}, {button_bg[1]}, {button_bg[2]});
-                color: rgb({button_text[0]}, {button_text[1]}, {button_text[2]});
-                border: {border_width}px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});
-                border-radius: {border_radius}px;
-                padding: {self.input_padding}px;
-                font-family: "{self.font_family}";
-                font-size: {self.font_size}pt;
-                min-width: {self.button_width}px;
-                min-height: {self.button_height}px;
-                max-height: {self.button_height}px;
-            }}
-            QPushButton:hover {{
-                background-color: rgb({button_hover_bg[0]}, {button_hover_bg[1]}, {button_hover_bg[2]});
-            }}
-            QPushButton:pressed {{
-                background-color: rgb({button_pressed_bg[0]}, {button_pressed_bg[1]}, {button_pressed_bg[2]});
-            }}
-            QPushButton:disabled {{
-                background-color: rgb({self.background_color[0]}, {self.background_color[1]}, {self.background_color[2]});
-                color: rgb({self.text_color[0] // 2}, {self.text_color[1] // 2}, {self.text_color[2] // 2});
-            }}
-        """
-        self.send_button.setStyleSheet(button_style)
+        # Use same padding as input field to ensure vertical alignment
+        StyleManager.style_buttons(
+            [self.send_button],
+            self.config,
+            bg_color_list,
+            border_color_list,
+            background_offset=button_bg_offset,
+            hover_background_offset=button_hover_offset,
+            pressed_background_offset=button_pressed_offset,
+            padding=self.input_padding,  # Match input field padding
+            min_width=self.button_width,
+            min_height=self.button_height
+        )
+        
+        # Set fixed height to match input field exactly
+        self.send_button.setFixedHeight(self.button_height)
+        # Also ensure input field has fixed height for perfect alignment
+        self.input_field.setFixedHeight(self.button_height)
         
         # Apply combobox styling using StyleManager
         # StyleManager reads combobox-specific settings (like padding) from centralized config automatically

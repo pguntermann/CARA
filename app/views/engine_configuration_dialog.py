@@ -964,37 +964,16 @@ class EngineConfigurationDialog(QDialog):
         buttons_config = dialog_config.get('buttons', {})
         button_width = buttons_config.get('width', 120)
         button_height = buttons_config.get('height', 30)
-        button_border_radius = buttons_config.get('border_radius', 3)
-        button_padding = buttons_config.get('padding', 5)
-        button_bg_offset = buttons_config.get('background_offset', 20)
-        button_hover_offset = buttons_config.get('hover_background_offset', 30)
-        button_pressed_offset = buttons_config.get('pressed_background_offset', 10)
         
         # Get colors for button styling
         groups_config = dialog_config.get('groups', {})
         bg_color = groups_config.get('background_color', [40, 40, 45])
         border_color = buttons_config.get('border_color', groups_config.get('border_color', [60, 60, 65]))
-        text_color = buttons_config.get('text_color', [200, 200, 200])
-        font_size = scale_font_size(buttons_config.get('font_size', 10))
+        bg_color_list = [bg_color[0], bg_color[1], bg_color[2]]
+        border_color_list = [border_color[0], border_color[1], border_color[2]]
         
-        button_style = (
-            f"QPushButton {{"
-            f"min-width: {button_width}px;"
-            f"min-height: {button_height}px;"
-            f"background-color: rgb({bg_color[0] + button_bg_offset}, {bg_color[1] + button_bg_offset}, {bg_color[2] + button_bg_offset});"
-            f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
-            f"border-radius: {button_border_radius}px;"
-            f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
-            f"font-size: {font_size}pt;"
-            f"padding: {button_padding}px;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"background-color: rgb({bg_color[0] + button_hover_offset}, {bg_color[1] + button_hover_offset}, {bg_color[2] + button_hover_offset});"
-            f"}}"
-            f"QPushButton:pressed {{"
-            f"background-color: rgb({bg_color[0] + button_pressed_offset}, {bg_color[1] + button_pressed_offset}, {bg_color[2] + button_pressed_offset});"
-            f"}}"
-        )
+        # Apply button styling using StyleManager (uses unified config)
+        from app.views.style import StyleManager
         
         button_layout = QHBoxLayout()
         button_spacing = buttons_config.get('spacing', 10)
@@ -1002,14 +981,22 @@ class EngineConfigurationDialog(QDialog):
         button_layout.addStretch()
         
         cancel_button = QPushButton("Cancel")
-        cancel_button.setStyleSheet(button_style)
         cancel_button.clicked.connect(dialog.reject)
         button_layout.addWidget(cancel_button)
         
         save_button = QPushButton("Save Anyway")
-        save_button.setStyleSheet(button_style)
         save_button.clicked.connect(dialog.accept)
         button_layout.addWidget(save_button)
+        
+        # Style both buttons using StyleManager
+        StyleManager.style_buttons(
+            [cancel_button, save_button],
+            self.config,
+            bg_color_list,
+            border_color_list,
+            min_width=button_width,
+            min_height=button_height
+        )
         
         layout.addLayout(button_layout)
         
@@ -1485,45 +1472,19 @@ class EngineConfigurationDialog(QDialog):
                     checkmark_path
                 )
         
-        # Buttons styling (match Classification Settings Dialog template)
+        # Apply button styling using StyleManager (uses unified config)
         buttons_config = dialog_config.get('buttons', {})
         button_width = buttons_config.get('width', 120)
         button_height = buttons_config.get('height', 30)
-        button_border_radius = buttons_config.get('border_radius', 3)
-        button_padding = buttons_config.get('padding', 5)
-        button_bg_offset = buttons_config.get('background_offset', 20)
-        button_hover_offset = buttons_config.get('hover_background_offset', 30)
-        button_pressed_offset = buttons_config.get('pressed_background_offset', 10)
         
         # Get background color for button offset calculation
         groups_config = dialog_config.get('groups', {})
         bg_color = groups_config.get('background_color', [40, 40, 45])
         border_color = buttons_config.get('border_color', groups_config.get('border_color', [60, 60, 65]))
-        text_color = buttons_config.get('text_color', [200, 200, 200])
-        font_size = scale_font_size(buttons_config.get('font_size', 10))
+        bg_color_list = [bg_color[0], bg_color[1], bg_color[2]]
+        border_color_list = [border_color[0], border_color[1], border_color[2]]
         
-        button_style = (
-            f"QPushButton {{"
-            f"min-width: {button_width}px;"
-            f"min-height: {button_height}px;"
-            f"background-color: rgb({bg_color[0] + button_bg_offset}, {bg_color[1] + button_bg_offset}, {bg_color[2] + button_bg_offset});"
-            f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
-            f"border-radius: {button_border_radius}px;"
-            f"padding: {button_padding}px;"
-            f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
-            f"font-size: {font_size}pt;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"background-color: rgb({bg_color[0] + button_hover_offset}, {bg_color[1] + button_hover_offset}, {bg_color[2] + button_hover_offset});"
-            f"}}"
-            f"QPushButton:pressed {{"
-            f"background-color: rgb({bg_color[0] + button_pressed_offset}, {bg_color[1] + button_pressed_offset}, {bg_color[2] + button_pressed_offset});"
-            f"}}"
-            f"QPushButton:disabled {{"
-            f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
-            f"color: rgb({text_color[0] // 2}, {text_color[1] // 2}, {text_color[2] // 2});"
-            f"}}"
-        )
+        from app.views.style import StyleManager
         
         # Set dialog background color to match dark theme (apply first)
         tabs_config = dialog_config.get('tabs', {})
@@ -1549,35 +1510,14 @@ class EngineConfigurationDialog(QDialog):
         
         # Apply button styling to all buttons AFTER dialog stylesheet (to ensure it takes precedence)
         # Only style buttons if they exist (they're created in _setup_ui which may call _apply_styling)
-        text_color_qcolor = QColor(text_color[0], text_color[1], text_color[2])
-        
-        # Only style buttons if they exist
-        if hasattr(self, 'ok_button') and self.ok_button is not None:
-            self.ok_button.setStyleSheet(button_style)
-            # Set palette to prevent macOS from overriding text color
-            ok_palette = self.ok_button.palette()
-            ok_palette.setColor(self.ok_button.foregroundRole(), text_color_qcolor)
-            self.ok_button.setPalette(ok_palette)
-            self.ok_button.update()
-        
-        if hasattr(self, 'cancel_button') and self.cancel_button is not None:
-            self.cancel_button.setStyleSheet(button_style)
-            # Set palette to prevent macOS from overriding text color
-            cancel_palette = self.cancel_button.palette()
-            cancel_palette.setColor(self.cancel_button.foregroundRole(), text_color_qcolor)
-            self.cancel_button.setPalette(cancel_palette)
-            self.cancel_button.update()
-        
-        # Then apply to any other buttons (copy buttons, reset buttons, etc.)
         all_buttons = self.findChildren(QPushButton)
-        ok_btn = getattr(self, 'ok_button', None)
-        cancel_btn = getattr(self, 'cancel_button', None)
-        for button in all_buttons:
-            if button not in [ok_btn, cancel_btn]:
-                button.setStyleSheet(button_style)
-                # Set palette to prevent macOS from overriding text color
-                button_palette = button.palette()
-                button_palette.setColor(button.foregroundRole(), text_color_qcolor)
-                button.setPalette(button_palette)
-                button.update()
+        if all_buttons:
+            StyleManager.style_buttons(
+                all_buttons,
+                self.config,
+                bg_color_list,
+                border_color_list,
+                min_width=button_width,
+                min_height=button_height
+            )
 

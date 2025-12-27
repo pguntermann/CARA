@@ -14,21 +14,52 @@
         "indicator_width": 16,
         "indicator_height": 16,
         "indicator_border_radius": 3,
-        "checked_background_color": [70, 90, 130],
-        "checked_border_color": [100, 120, 160],
+        "checked_background_color": [
+          70,
+          90,
+          130
+        ],
+        "checked_border_color": [
+          100,
+          120,
+          160
+        ],
         "hover_border_offset": 20,
         "margin_top": 2,
         "margin_bottom": 2
       },
       "combobox": {
         "dropdown_border_radius": 3,
-        "padding": [8, 6]
+        "padding": [
+          8,
+          6
+        ]
       },
       "radio_button": {
-        "text_color": [200, 200, 200],
+        "text_color": [
+          200,
+          200,
+          200
+        ],
         "font_family": "Helvetica Neue",
         "font_size": 11,
         "spacing": 5
+      },
+      "button": {
+        "text_color": [
+          200,
+          200,
+          200
+        ],
+        "font_family": "Helvetica Neue",
+        "font_size": 11,
+        "border_radius": 3,
+        "padding": 5,
+        "background_offset": 20,
+        "hover_background_offset": 30,
+        "pressed_background_offset": 10,
+        "default_height": 30,
+        "default_width": 120
       }
     },
     "window": {
@@ -41,14 +72,27 @@
       "main": {
         "minimum_width": 200,
         "minimum_height": 200,
-        "background_color": [40, 40, 45],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
         "gameinfo": {
           "font_family": "Helvetica Neue",
           "player_name_size": 16,
           "player_elo_size": 12,
           "opening_size": 14,
-          "text_color": [240, 240, 240],
-          "padding": [10, 10, 10, 10],
+          "text_color": [
+            240,
+            240,
+            240
+          ],
+          "padding": [
+            10,
+            10,
+            10,
+            10
+          ],
           "spacing": 8,
           "separator": {
             "text": " - ",
@@ -56,22 +100,43 @@
           }
         },
         "board": {
-          "padding": [20, 20, 20, 20],
+          "padding": [
+            20,
+            20,
+            20,
+            20
+          ],
           "border": {
             "size": 4,
-            "color": [60, 60, 65]
+            "color": [
+              60,
+              60,
+              65
+            ]
           },
           "coordinates": {
             "show": true,
             "border_width": 25,
             "font_family": "Helvetica Neue",
             "font_size": 10,
-            "color": [200, 200, 200],
+            "color": [
+              200,
+              200,
+              200
+            ],
             "font_style": "normal"
           },
           "squares": {
-            "light_color": [217, 217, 217],
-            "dark_color": [58, 117, 196]
+            "light_color": [
+              217,
+              217,
+              217
+            ],
+            "dark_color": [
+              58,
+              117,
+              196
+            ]
           },
           "pieces": {
             "svg_path": "app/resources/chesspieces/default",
@@ -79,24 +144,57 @@
           },
           "turn_indicator": {
             "size": 16,
-            "padding": [0, 0, 10, 10],
-            "white_color": [250, 250, 250],
-            "black_color": [0, 0, 0]
+            "padding": [
+              0,
+              0,
+              10,
+              10
+            ],
+            "white_color": [
+              250,
+              250,
+              250
+            ],
+            "black_color": [
+              0,
+              0,
+              0
+            ]
           },
           "playedmove_arrow": {
-            "color": [255, 255, 0]
+            "color": [
+              255,
+              255,
+              0
+            ]
           },
           "bestnextmove_arrow": {
-            "color": [0, 0, 255]
+            "color": [
+              0,
+              0,
+              255
+            ]
           },
           "pv2_arrow": {
-            "color": [100, 150, 255]
+            "color": [
+              100,
+              150,
+              255
+            ]
           },
           "pv3_arrow": {
-            "color": [150, 150, 150]
+            "color": [
+              150,
+              150,
+              150
+            ]
           },
           "bestalternativemove_arrow": {
-            "color": [200, 0, 100]
+            "color": [
+              200,
+              0,
+              100
+            ]
           },
           "positional_plans": {
             "use_straight_lines": true,
@@ -105,8 +203,16 @@
               "line_width_end": 6,
               "opacity_start": 0.4,
               "opacity_end": 1.0,
-              "color_start": [100, 150, 255],
-              "color_end": [0, 100, 255],
+              "color_start": [
+                100,
+                150,
+                255
+              ],
+              "color_end": [
+                0,
+                100,
+                255
+              ],
               "curve_factor": 0.3
             },
             "trajectory_2": {
@@ -114,8 +220,16 @@
               "line_width_end": 6,
               "opacity_start": 0.4,
               "opacity_end": 1.0,
-              "color_start": [100, 255, 150],
-              "color_end": [0, 200, 100],
+              "color_start": [
+                100,
+                255,
+                150
+              ],
+              "color_end": [
+                0,
+                200,
+                100
+              ],
               "curve_factor": 0.3
             },
             "trajectory_3": {
@@ -123,8 +237,16 @@
               "line_width_end": 6,
               "opacity_start": 0.4,
               "opacity_end": 1.0,
-              "color_start": [255, 200, 100],
-              "color_end": [255, 150, 0],
+              "color_start": [
+                255,
+                200,
+                100
+              ],
+              "color_end": [
+                255,
+                150,
+                0
+              ],
               "curve_factor": 0.3
             },
             "numbered_markers": {
@@ -132,7 +254,11 @@
               "font_size": 10,
               "font_family": "Helvetica Neue",
               "font_weight": "bold",
-              "background_color": [0, 100, 255],
+              "background_color": [
+                0,
+                100,
+                255
+              ],
               "background_radius": 8,
               "size": 24
             },
@@ -141,7 +267,11 @@
               "font_size": 10,
               "font_family": "Helvetica Neue",
               "font_weight": "bold",
-              "background_color": [0, 200, 100],
+              "background_color": [
+                0,
+                200,
+                100
+              ],
               "background_radius": 8,
               "size": 24
             },
@@ -150,7 +280,11 @@
               "font_size": 10,
               "font_family": "Helvetica Neue",
               "font_weight": "bold",
-              "background_color": [255, 150, 0],
+              "background_color": [
+                255,
+                150,
+                0
+              ],
               "background_radius": 8,
               "size": 24
             },
@@ -164,27 +298,70 @@
             "update_interval_ms": 500,
             "max_threads": 6,
             "colors": {
-              "white": [255, 255, 255],
-              "black": [0, 0, 0]
+              "white": [
+                255,
+                255,
+                255
+              ],
+              "black": [
+                0,
+                0,
+                0
+              ]
             },
             "scale_max": 10.0,
-            "divisions": [1, 2, 3, 5, 10],
+            "divisions": [
+              1,
+              2,
+              3,
+              5,
+              10
+            ],
             "animation_duration_ms": 300
           },
           "material_widget": {
             "width": 110,
             "height": 130,
-            "padding": [12, 12, 10, 14],
-            "background_color": [30, 30, 35],
-            "border_color": [60, 60, 65],
+            "padding": [
+              12,
+              12,
+              10,
+              14
+            ],
+            "background_color": [
+              30,
+              30,
+              35
+            ],
+            "border_color": [
+              60,
+              60,
+              65
+            ],
             "border_radius": 5,
             "font_family": "Cascadia Mono, Menlo",
             "font_size": 10,
             "piece_size": 18,
-            "white_text_color": [240, 240, 240],
-            "black_text_color": [200, 200, 200],
-            "difference_text_color": [255, 255, 100],
-            "separator_color": [100, 100, 105]
+            "white_text_color": [
+              240,
+              240,
+              240
+            ],
+            "black_text_color": [
+              200,
+              200,
+              200
+            ],
+            "difference_text_color": [
+              255,
+              255,
+              100
+            ],
+            "separator_color": [
+              100,
+              100,
+              105
+            ]
           },
           "initial_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
         }
@@ -192,70 +369,142 @@
       "detail": {
         "minimum_width": 200,
         "minimum_height": 200,
-        "background_color": [40, 40, 45],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
         "pgn_notation": {
           "font_family": "Courier New",
           "font_size": 11,
-          "text_color": [220, 220, 220],
-          "background_color": [30, 30, 35],
+          "text_color": [
+            220,
+            220,
+            220
+          ],
+          "background_color": [
+            30,
+            30,
+            35
+          ],
           "placeholder_text": "PGN notation will appear here...",
           "formatting": {
             "headers": {
-              "color": [100, 150, 255],
+              "color": [
+                100,
+                150,
+                255
+              ],
               "bold": true
             },
             "move_numbers": {
-              "color": [255, 255, 255],
+              "color": [
+                255,
+                255,
+                255
+              ],
               "bold": true
             },
             "moves": {
-              "color": [220, 220, 220],
+              "color": [
+                220,
+                220,
+                220
+              ],
               "bold": false
             },
             "annotations": {
               "good": {
-                "color": [100, 255, 100],
+                "color": [
+                  100,
+                  255,
+                  100
+                ],
                 "bold": true
               },
               "bad": {
-                "color": [255, 100, 100],
+                "color": [
+                  255,
+                  100,
+                  100
+                ],
                 "bold": true
               },
               "interesting": {
-                "color": [255, 255, 100],
+                "color": [
+                  255,
+                  255,
+                  100
+                ],
                 "bold": false
               },
               "dubious": {
-                "color": [255, 200, 100],
+                "color": [
+                  255,
+                  200,
+                  100
+                ],
                 "bold": false
               }
             },
             "nags": {
-              "color": [200, 200, 255],
+              "color": [
+                200,
+                200,
+                255
+              ],
               "bold": false,
               "italic": true,
               "show_text": true
             },
             "comments": {
-              "color": [180, 200, 255],
+              "color": [
+                180,
+                200,
+                255
+              ],
               "italic": true
             },
             "variations": {
-              "color": [180, 180, 180],
+              "color": [
+                180,
+                180,
+                180
+              ],
               "italic": true
             },
             "results": {
-              "color": [255, 255, 100],
+              "color": [
+                255,
+                255,
+                100
+              ],
               "bold": true
             },
             "active_move": {
-              "background_color": [100, 120, 180],
-              "text_color": [255, 255, 255],
+              "background_color": [
+                100,
+                120,
+                180
+              ],
+              "text_color": [
+                255,
+                255,
+                255
+              ],
               "bold": true
             },
             "active_move_variation": {
-              "background_color": [60, 60, 65],
-              "text_color": [180, 180, 180],
+              "background_color": [
+                60,
+                60,
+                65
+              ],
+              "text_color": [
+                180,
+                180,
+                180
+              ],
               "bold": false,
               "italic": true
             }
@@ -264,15 +513,47 @@
         "moveslist": {
           "table": {
             "active_move": {
-              "background_color": [100, 120, 180],
-              "text_color": [255, 255, 255]
+              "background_color": [
+                100,
+                120,
+                180
+              ],
+              "text_color": [
+                255,
+                255,
+                255
+              ]
             },
-            "header_background_color": [45, 45, 50],
-            "header_text_color": [200, 200, 200],
-            "header_border_color": [60, 60, 65],
-            "gridline_color": [60, 60, 65],
-            "selection_background_color": [70, 90, 130],
-            "selection_text_color": [240, 240, 240]
+            "header_background_color": [
+              45,
+              45,
+              50
+            ],
+            "header_text_color": [
+              200,
+              200,
+              200
+            ],
+            "header_border_color": [
+              60,
+              60,
+              65
+            ],
+            "gridline_color": [
+              60,
+              60,
+              65
+            ],
+            "selection_background_color": [
+              70,
+              90,
+              130
+            ],
+            "selection_text_color": [
+              240,
+              240,
+              240
+            ]
           }
         },
         "metadata": {
@@ -283,24 +564,61 @@
             }
           },
           "standard_tag": {
-            "background_color": [50, 55, 60],
-            "text_color": [220, 220, 240]
+            "background_color": [
+              50,
+              55,
+              60
+            ],
+            "text_color": [
+              220,
+              220,
+              240
+            ]
           },
           "button": {
             "height": 28,
-            "padding": [6, 4],
+            "padding": [
+              6,
+              4
+            ],
             "border_radius": 4,
             "spacing": 8,
-            "margins": [8, 8, 8, 8],
-            "background_color": [50, 50, 55],
-            "text_color": [200, 200, 200],
-            "border_color": [60, 60, 65],
-            "hover_background_color": [60, 60, 65],
-            "hover_text_color": [240, 240, 240],
-            "active_background_color": [70, 90, 130],
-            "active_text_color": [240, 240, 240],
-            "pressed_background_offset": 10,
-            "font_family": "Helvetica Neue",
+            "margins": [
+              8,
+              8,
+              8,
+              8
+            ],
+            "background_color": [
+              50,
+              50,
+              55
+            ],
+            "border_color": [
+              60,
+              60,
+              65
+            ],
+            "hover_background_color": [
+              60,
+              60,
+              65
+            ],
+            "hover_text_color": [
+              240,
+              240,
+              240
+            ],
+            "active_background_color": [
+              70,
+              90,
+              130
+            ],
+            "active_text_color": [
+              240,
+              240,
+              240
+            ],
             "font_size": 10
           }
         },
@@ -310,18 +628,51 @@
           "evaluation_graph": {
             "height": 200,
             "minimum_height": 100,
-            "background_color": [30, 30, 35],
-            "grid_color": [60, 60, 65],
-            "white_line_color": [255, 255, 255],
-            "black_line_color": [0, 0, 0],
-            "current_move_line_color": [255, 255, 0],
+            "background_color": [
+              30,
+              30,
+              35
+            ],
+            "grid_color": [
+              60,
+              60,
+              65
+            ],
+            "white_line_color": [
+              255,
+              255,
+              255
+            ],
+            "black_line_color": [
+              0,
+              0,
+              0
+            ],
+            "current_move_line_color": [
+              255,
+              255,
+              0
+            ],
             "current_move_line_width": 2,
             "line_width": 2,
             "font_family": "Helvetica Neue",
             "font_size": 10,
-            "text_color": [200, 200, 200],
-            "axis_color": [150, 150, 150],
-            "padding": [40, 20, 20, 40],
+            "text_color": [
+              200,
+              200,
+              200
+            ],
+            "axis_color": [
+              150,
+              150,
+              150
+            ],
+            "padding": [
+              40,
+              20,
+              20,
+              40
+            ],
             "scale_cap_cp": 1000.0,
             "normalized_mode_small_range_threshold": 50,
             "zero_based_mode_small_range_threshold": 100,
@@ -336,28 +687,92 @@
             "min_label_spacing": 40,
             "min_move_labels": 3,
             "x_axis_label_spacing": 5,
-            "phase_transition_line_color": [100, 150, 255],
+            "phase_transition_line_color": [
+              100,
+              150,
+              255
+            ],
             "phase_transition_line_width": 2,
             "phase_transition_line_style": "dashed",
-            "critical_moment_worst_line_color": [255, 0, 0],
-            "critical_moment_best_line_color": [150, 255, 150],
+            "critical_moment_worst_line_color": [
+              255,
+              0,
+              0
+            ],
+            "critical_moment_best_line_color": [
+              150,
+              255,
+              150
+            ],
             "critical_moment_line_width": 1,
             "critical_moment_line_style": "dotted"
           },
           "colors": {
-            "book_move": [150, 150, 150],
-            "brilliant": [255, 215, 0],
-            "best_move": [100, 255, 100],
-            "good_move": [150, 255, 150],
-            "inaccuracy": [255, 255, 100],
-            "mistake": [255, 200, 100],
-            "miss": [200, 100, 255],
-            "blunder": [255, 100, 100],
-            "text": [220, 220, 220],
-            "header_text": [240, 240, 240],
-            "background": [40, 40, 45],
-            "section_background": [35, 35, 40],
-            "border": [60, 60, 65]
+            "book_move": [
+              150,
+              150,
+              150
+            ],
+            "brilliant": [
+              255,
+              215,
+              0
+            ],
+            "best_move": [
+              100,
+              255,
+              100
+            ],
+            "good_move": [
+              150,
+              255,
+              150
+            ],
+            "inaccuracy": [
+              255,
+              255,
+              100
+            ],
+            "mistake": [
+              255,
+              200,
+              100
+            ],
+            "miss": [
+              200,
+              100,
+              255
+            ],
+            "blunder": [
+              255,
+              100,
+              100
+            ],
+            "text": [
+              220,
+              220,
+              220
+            ],
+            "header_text": [
+              240,
+              240,
+              240
+            ],
+            "background": [
+              40,
+              40,
+              45
+            ],
+            "section_background": [
+              35,
+              35,
+              40
+            ],
+            "border": [
+              60,
+              60,
+              65
+            ]
           },
           "fonts": {
             "header_font_family": "Helvetica Neue",
@@ -372,37 +787,79 @@
             "spacing": 15,
             "section_spacing": 20,
             "player_section_spacing": 10,
-            "margins": [10, 10, 10, 10]
+            "margins": [
+              10,
+              10,
+              10,
+              10
+            ]
           },
           "pie_chart": {
-            "minimum_size": [200, 200],
+            "minimum_size": [
+              200,
+              200
+            ],
             "margin": 20
           },
           "widgets": {
             "border_radius": 5,
-            "section_margins": [10, 10, 10, 10],
+            "section_margins": [
+              10,
+              10,
+              10,
+              10
+            ],
             "section_spacing": 8,
             "grid_spacing": 5,
             "classification_widget_spacing": 10,
             "counts_layout_spacing": 3,
             "row_spacing": 5,
-            "color_indicator_size": [12, 12],
+            "color_indicator_size": [
+              12,
+              12
+            ],
             "critical_moments_list_spacing": 3,
             "critical_moments_section_spacing": 10,
             "phase_spacing": 1,
             "player_name_label": {
               "white": {
-                "background_color": [240, 240, 240],
-                "text_color": [30, 30, 30],
+                "background_color": [
+                  240,
+                  240,
+                  240
+                ],
+                "text_color": [
+                  30,
+                  30,
+                  30
+                ],
                 "border_radius": 3,
-                "padding": [6, 4, 6, 4],
+                "padding": [
+                  6,
+                  4,
+                  6,
+                  4
+                ],
                 "font_weight": "bold"
               },
               "black": {
-                "background_color": [30, 30, 30],
-                "text_color": [240, 240, 240],
+                "background_color": [
+                  30,
+                  30,
+                  30
+                ],
+                "text_color": [
+                  240,
+                  240,
+                  240
+                ],
                 "border_radius": 3,
-                "padding": [6, 4, 6, 4],
+                "padding": [
+                  6,
+                  4,
+                  6,
+                  4
+                ],
                 "font_weight": "bold"
               }
             }
@@ -425,14 +882,46 @@
           "placeholder_text_no_player": "Select a player to view statistics",
           "placeholder_text_no_analyzed": "No analyzed games found for this player",
           "colors": {
-            "text_color": [220, 220, 220],
-            "header_text": [240, 240, 240],
-            "background": [40, 40, 45],
-            "section_background": [35, 35, 40],
-            "border": [60, 60, 65],
-            "phase_opening_color": [100, 150, 255],
-            "phase_middlegame_color": [150, 255, 100],
-            "phase_endgame_color": [255, 200, 100]
+            "text_color": [
+              220,
+              220,
+              220
+            ],
+            "header_text": [
+              240,
+              240,
+              240
+            ],
+            "background": [
+              40,
+              40,
+              45
+            ],
+            "section_background": [
+              35,
+              35,
+              40
+            ],
+            "border": [
+              60,
+              60,
+              65
+            ],
+            "phase_opening_color": [
+              100,
+              150,
+              255
+            ],
+            "phase_middlegame_color": [
+              150,
+              255,
+              100
+            ],
+            "phase_endgame_color": [
+              255,
+              200,
+              100
+            ]
           },
           "fonts": {
             "header_font_family": "Helvetica Neue",
@@ -446,11 +935,21 @@
           "layout": {
             "spacing": 15,
             "section_spacing": 20,
-            "margins": [10, 10, 10, 10]
+            "margins": [
+              10,
+              10,
+              10,
+              10
+            ]
           },
           "widgets": {
             "border_radius": 5,
-            "section_margins": [10, 10, 10, 10],
+            "section_margins": [
+              10,
+              10,
+              10,
+              10
+            ],
             "section_spacing": 8,
             "grid_spacing": 5,
             "row_spacing": 5
@@ -464,29 +963,77 @@
           "button": {
             "height": 28,
             "border_radius": 4,
-            "padding": [6, 4],
-            "background_color": [50, 50, 55],
-            "text_color": [200, 200, 200],
-            "border_color": [60, 60, 65],
-            "hover_background_color": [60, 60, 65],
-            "hover_text_color": [240, 240, 240],
-            "pressed_background_offset": 10,
-            "font_family": "Helvetica Neue",
+            "padding": [
+              6,
+              4
+            ],
+            "background_color": [
+              50,
+              50,
+              55
+            ],
+            "border_color": [
+              60,
+              60,
+              65
+            ],
+            "hover_background_color": [
+              60,
+              60,
+              65
+            ],
+            "hover_text_color": [
+              240,
+              240,
+              240
+            ],
             "font_size": 10
           },
           "analysis_coverage": {
             "show_banner": true,
-            "banner_background_color": [45, 45, 50],
-            "banner_border_color": [60, 60, 65],
-            "banner_text_color": [200, 200, 200],
+            "banner_background_color": [
+              45,
+              45,
+              50
+            ],
+            "banner_border_color": [
+              60,
+              60,
+              65
+            ],
+            "banner_text_color": [
+              200,
+              200,
+              200
+            ],
             "banner_font_size": 10,
-            "banner_margins": [10, 8, 10, 8],
+            "banner_margins": [
+              10,
+              8,
+              10,
+              8
+            ],
             "banner_spacing": 5,
-            "indicator_size": [12, 12],
+            "indicator_size": [
+              12,
+              12
+            ],
             "colors": {
-              "good_coverage": [100, 200, 100],
-              "moderate_coverage": [255, 200, 100],
-              "low_coverage": [255, 150, 150]
+              "good_coverage": [
+                100,
+                200,
+                100
+              ],
+              "moderate_coverage": [
+                255,
+                200,
+                100
+              ],
+              "low_coverage": [
+                255,
+                150,
+                150
+              ]
             },
             "thresholds": {
               "good_coverage_percent": 80,
@@ -507,24 +1054,56 @@
               "inaccuracy_rate_threshold": 25.0
             },
             "item_spacing": 8,
-            "item_margins": [8, 6, 8, 6],
+            "item_margins": [
+              8,
+              6,
+              8,
+              6
+            ],
             "truncation": {
               "min_text_width": 50
             },
             "severity_indicator": {
-              "size": [12, 12],
+              "size": [
+                12,
+                12
+              ],
               "border_radius": 6,
               "colors": {
-                "critical": [255, 100, 100],
-                "high": [255, 150, 100],
-                "moderate": [255, 200, 100],
-                "low": [200, 200, 100],
-                "default": [150, 150, 150]
+                "critical": [
+                  255,
+                  100,
+                  100
+                ],
+                "high": [
+                  255,
+                  150,
+                  100
+                ],
+                "moderate": [
+                  255,
+                  200,
+                  100
+                ],
+                "low": [
+                  200,
+                  200,
+                  100
+                ],
+                "default": [
+                  150,
+                  150,
+                  150
+                ]
               }
             }
           },
           "placeholder": {
-            "text_color": [150, 150, 150],
+            "text_color": [
+              150,
+              150,
+              150
+            ],
             "font_size": 14,
             "padding": 20
           },
@@ -552,17 +1131,30 @@
         },
         "manual_analysis": {
           "control_bar": {
-            "margins": [8, 8, 8, 8],
+            "margins": [
+              8,
+              8,
+              8,
+              8
+            ],
             "spacing": 8,
             "button_group_spacing": 16
           },
           "info_bar": {
-            "margins": [8, 4, 8, 4],
+            "margins": [
+              8,
+              4,
+              8,
+              4
+            ],
             "spacing": 16
           },
           "buttons": {
             "height": 28,
-            "padding": [6, 4],
+            "padding": [
+              6,
+              4
+            ],
             "border_radius": 4
           },
           "multipv_buttons": {
@@ -573,7 +1165,11 @@
             "disabled_color_multiplier": 0.5,
             "empty_label_color_multiplier": 0.7,
             "line_highlight_style": {
-              "color": [255, 255, 255],
+              "color": [
+                255,
+                255,
+                255
+              ],
               "font_weight": "bold"
             }
           },
@@ -581,10 +1177,20 @@
             "spacing": 0
           },
           "analysis_area": {
-            "container_margins": [0, 0, 0, 0],
+            "container_margins": [
+              0,
+              0,
+              0,
+              0
+            ],
             "container_spacing": 8,
             "line_spacing": 8,
-            "line_area_padding": [8, 8, 8, 0],
+            "line_area_padding": [
+              8,
+              8,
+              8,
+              0
+            ],
             "empty_label_padding": 20
           },
           "multipv1_indicator": {
@@ -607,24 +1213,53 @@
             "show_time": true,
             "show_nodes": false,
             "font_size": 9,
-            "color": [180, 180, 180],
+            "color": [
+              180,
+              180,
+              180
+            ],
             "format": "compact",
             "separator": " | ",
-            "background_color": [45, 45, 50],
-            "padding": [8, 4, 8, 4]
+            "background_color": [
+              45,
+              45,
+              50
+            ],
+            "padding": [
+              8,
+              4,
+              8,
+              4
+            ]
           },
           "evaluation_difference": {
             "enabled": true,
             "show_delta": true,
             "delta_format": "({delta:+.2f})",
-            "positive_color": [100, 255, 100],
-            "negative_color": [255, 100, 100]
+            "positive_color": [
+              100,
+              255,
+              100
+            ],
+            "negative_color": [
+              255,
+              100,
+              100
+            ]
           },
           "trajectory_highlight": {
             "enabled": true,
-            "color": [100, 200, 255],
+            "color": [
+              100,
+              200,
+              255
+            ],
             "font_weight": "bold",
-            "background_color": [50, 100, 150],
+            "background_color": [
+              50,
+              100,
+              150
+            ],
             "background_alpha": 0.3
           },
           "pv_hover": {
@@ -654,7 +1289,12 @@
             "annotations_section_spacing": 5,
             "annotations_header_spacing": 5,
             "annotations_list_spacing": 3,
-            "annotations_list_margins": [5, 5, 5, 5]
+            "annotations_list_margins": [
+              5,
+              5,
+              5,
+              5
+            ]
           },
           "tool_buttons": {
             "minimum_width": 50,
@@ -663,24 +1303,76 @@
           },
           "color_swatches": {
             "size": 34,
-            "selected_border_color": [120, 150, 200],
+            "selected_border_color": [
+              120,
+              150,
+              200
+            ],
             "selected_border_width": 2,
-            "unselected_border_color": [180, 180, 180],
+            "unselected_border_color": [
+              180,
+              180,
+              180
+            ],
             "unselected_border_width": 1
           },
           "preset_colors": [
-            [255, 100, 100],
-            [100, 220, 100],
-            [150, 200, 255],
-            [255, 200, 100],
-            [200, 100, 255],
-            [100, 220, 255],
-            [255, 150, 200],
-            [150, 150, 255],
-            [200, 200, 100],
-            [240, 240, 240]
+            [
+              255,
+              100,
+              100
+            ],
+            [
+              100,
+              220,
+              100
+            ],
+            [
+              150,
+              200,
+              255
+            ],
+            [
+              255,
+              200,
+              100
+            ],
+            [
+              200,
+              100,
+              255
+            ],
+            [
+              100,
+              220,
+              255
+            ],
+            [
+              255,
+              150,
+              200
+            ],
+            [
+              150,
+              150,
+              255
+            ],
+            [
+              200,
+              200,
+              100
+            ],
+            [
+              240,
+              240,
+              240
+            ]
           ],
-          "default_color": [255, 100, 100],
+          "default_color": [
+            255,
+            100,
+            100
+          ],
           "size_slider": {
             "minimum": 100,
             "maximum": 250,
@@ -705,75 +1397,149 @@
           "text_font_size": 12
         },
         "ai_chat": {
-          "background_color": [40, 40, 45],
-          "text_color": [200, 200, 200],
+          "background_color": [
+            40,
+            40,
+            45
+          ],
+          "text_color": [
+            200,
+            200,
+            200
+          ],
           "font_family": "Helvetica Neue",
           "font_size": 11,
           "separator": {
-            "line_color": [150, 150, 150],
-            "text_color": [180, 180, 180],
+            "line_color": [
+              150,
+              150,
+              150
+            ],
+            "text_color": [
+              180,
+              180,
+              180
+            ],
             "font_size": 10
           },
           "input": {
             "height": 30,
             "padding": 5,
-            "background_color": [45, 45, 50],
-            "text_color": [200, 200, 200],
-            "border_color": [60, 60, 65],
+            "background_color": [
+              45,
+              45,
+              50
+            ],
+            "text_color": [
+              200,
+              200,
+              200
+            ],
+            "border_color": [
+              60,
+              60,
+              65
+            ],
             "border_width": 1,
             "border_radius": 3,
-            "focus_border_color": [0, 120, 212]
+            "focus_border_color": [
+              0,
+              120,
+              212
+            ]
           },
           "button": {
             "width": 80,
             "height": 30,
-            "background_offset": 20,
-            "hover_background_offset": 30,
-            "pressed_background_offset": 10,
-            "text_color": [200, 200, 200],
-            "border_radius": 3,
             "border_width": 1,
-            "border_color": [60, 60, 65]
+            "border_color": [
+              60,
+              60,
+              65
+            ]
           },
           "messages": {
             "padding": 10,
             "border_radius": 5,
             "margin": 5,
             "user": {
-              "background_color": [60, 80, 120],
-              "text_color": [240, 240, 240]
+              "background_color": [
+                60,
+                80,
+                120
+              ],
+              "text_color": [
+                240,
+                240,
+                240
+              ]
             },
             "ai": {
-              "background_color": [50, 50, 55],
-              "text_color": [200, 200, 200]
+              "background_color": [
+                50,
+                50,
+                55
+              ],
+              "text_color": [
+                200,
+                200,
+                200
+              ]
             },
             "typing_indicator": {
               "opacity": 0.6,
               "animation_interval_ms": 500
             },
             "system": {
-              "background_color": [45, 45, 50],
-              "text_color": [150, 150, 150]
+              "background_color": [
+                45,
+                45,
+                50
+              ],
+              "text_color": [
+                150,
+                150,
+                150
+              ]
             }
-        },
-        "tokens": {
-          "minimum": 256,
-          "maximum": 16000,
-          "default": 2000,
-          "step": 100,
-          "width": 100,
-          "height": 30,
-          "collapse_width_threshold": 520,
-          "collapse_animation_duration_ms": 200,
-          "font_family": "Helvetica Neue",
-          "font_size": 11,
-          "text_color": [200, 200, 200],
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
-          "border_width": 1,
-          "border_radius": 3,
-          "focus_border_color": [0, 120, 212],
-          "padding": [6, 8]
+          },
+          "tokens": {
+            "minimum": 256,
+            "maximum": 16000,
+            "default": 2000,
+            "step": 100,
+            "width": 100,
+            "height": 30,
+            "collapse_width_threshold": 520,
+            "collapse_animation_duration_ms": 200,
+            "font_family": "Helvetica Neue",
+            "font_size": 11,
+            "text_color": [
+              200,
+              200,
+              200
+            ],
+            "background_color": [
+              45,
+              45,
+              50
+            ],
+            "border_color": [
+              60,
+              60,
+              65
+            ],
+            "border_width": 1,
+            "border_radius": 3,
+            "focus_border_color": [
+              0,
+              120,
+              212
+            ],
+            "padding": [
+              6,
+              8
+            ]
           }
         },
         "splitter": {
@@ -786,23 +1552,67 @@
           "font_family": "Helvetica Neue",
           "font_size": 10,
           "tab_height": 24,
-          "pane_background": [40, 40, 45],
-          "scroll_button_color": [30, 30, 30],
+          "pane_background": [
+            40,
+            40,
+            45
+          ],
+          "scroll_button_color": [
+            30,
+            30,
+            30
+          ],
           "colors": {
             "normal": {
-              "background": [45, 45, 50],
-              "text": [200, 200, 200],
-              "border": [60, 60, 65]
+              "background": [
+                45,
+                45,
+                50
+              ],
+              "text": [
+                200,
+                200,
+                200
+              ],
+              "border": [
+                60,
+                60,
+                65
+              ]
             },
             "hover": {
-              "background": [55, 55, 60],
-              "text": [230, 230, 230],
-              "border": [80, 80, 85]
+              "background": [
+                55,
+                55,
+                60
+              ],
+              "text": [
+                230,
+                230,
+                230
+              ],
+              "border": [
+                80,
+                80,
+                85
+              ]
             },
             "active": {
-              "background": [70, 90, 130],
-              "text": [240, 240, 240],
-              "border": [100, 120, 160]
+              "background": [
+                70,
+                90,
+                130
+              ],
+              "text": [
+                240,
+                240,
+                240
+              ],
+              "border": [
+                100,
+                120,
+                160
+              ]
             }
           }
         }
@@ -812,7 +1622,11 @@
         "minimum_height": 40,
         "default_height": 240,
         "collapsed_height": 30,
-        "background_color": [35, 35, 40],
+        "background_color": [
+          35,
+          35,
+          40
+        ],
         "collapse_button": {
           "maximum_width": 30,
           "maximum_height": 30
@@ -821,29 +1635,77 @@
           "text": "",
           "font_family": "Arial",
           "font_size": 12,
-          "color": [220, 220, 220]
+          "color": [
+            220,
+            220,
+            220
+          ]
         },
         "tabs": {
           "font_family": "Helvetica Neue",
           "font_size": 10,
           "tab_height": 24,
-          "pane_background": [35, 35, 40],
-          "scroll_button_color": [30, 30, 30],
+          "pane_background": [
+            35,
+            35,
+            40
+          ],
+          "scroll_button_color": [
+            30,
+            30,
+            30
+          ],
           "colors": {
             "normal": {
-              "background": [45, 45, 50],
-              "text": [200, 200, 200],
-              "border": [60, 60, 65]
+              "background": [
+                45,
+                45,
+                50
+              ],
+              "text": [
+                200,
+                200,
+                200
+              ],
+              "border": [
+                60,
+                60,
+                65
+              ]
             },
             "hover": {
-              "background": [55, 55, 60],
-              "text": [230, 230, 230],
-              "border": [80, 80, 85]
+              "background": [
+                55,
+                55,
+                60
+              ],
+              "text": [
+                230,
+                230,
+                230
+              ],
+              "border": [
+                80,
+                80,
+                85
+              ]
             },
             "active": {
-              "background": [70, 90, 130],
-              "text": [240, 240, 240],
-              "border": [100, 120, 160]
+              "background": [
+                70,
+                90,
+                130
+              ],
+              "text": [
+                240,
+                240,
+                240
+              ],
+              "border": [
+                100,
+                120,
+                160
+              ]
             }
           }
         },
@@ -881,27 +1743,63 @@
             "col_annotated": 70,
             "col_source_db": 120
           },
-          "header_background_color": [45, 45, 50],
-          "header_text_color": [200, 200, 200],
-          "header_border_color": [60, 60, 65],
-          "gridline_color": [60, 60, 65],
-          "selection_background_color": [70, 90, 130],
-          "selection_text_color": [240, 240, 240]
+          "header_background_color": [
+            45,
+            45,
+            50
+          ],
+          "header_text_color": [
+            200,
+            200,
+            200
+          ],
+          "header_border_color": [
+            60,
+            60,
+            65
+          ],
+          "gridline_color": [
+            60,
+            60,
+            65
+          ],
+          "selection_background_color": [
+            70,
+            90,
+            130
+          ],
+          "selection_text_color": [
+            240,
+            240,
+            240
+          ]
         }
       },
       "status": {
         "minimum_height": 30,
-        "background_color": [45, 45, 50],
+        "background_color": [
+          45,
+          45,
+          50
+        ],
         "version": {
           "font_family": "Helvetica Neue",
           "font_size": 10,
-          "color": [180, 180, 180],
+          "color": [
+            180,
+            180,
+            180
+          ],
           "width": 80
         },
         "message": {
           "font_family": "Helvetica Neue",
           "font_size": 11,
-          "color": [220, 220, 220]
+          "color": [
+            220,
+            220,
+            220
+          ]
         },
         "resize_grip": {
           "width": 20,
@@ -910,7 +1808,11 @@
       }
     },
     "splitter": {
-      "handle_color": [30, 30, 30],
+      "handle_color": [
+        30,
+        30,
+        30
+      ],
       "top": {
         "main_size": 600,
         "detail_size": 400,
@@ -925,9 +1827,24 @@
       }
     },
     "margins": {
-      "database_panel": [5, 5, 5, 5],
-      "status_panel": [5, 5, 5, 5],
-      "detail_panel": [0, 0, 0, 0]
+      "database_panel": [
+        5,
+        5,
+        5,
+        5
+      ],
+      "status_panel": [
+        5,
+        5,
+        5,
+        5
+      ],
+      "detail_panel": [
+        0,
+        0,
+        0,
+        0
+      ]
     },
     "spacing": {
       "database_panel": 5
@@ -941,12 +1858,28 @@
       "font_size": 10,
       "colors": {
         "normal": {
-          "background": [45, 45, 50],
-          "text": [200, 200, 200]
+          "background": [
+            45,
+            45,
+            50
+          ],
+          "text": [
+            200,
+            200,
+            200
+          ]
         },
         "hover": {
-          "background": [55, 55, 60],
-          "text": [230, 230, 230]
+          "background": [
+            55,
+            55,
+            60
+          ],
+          "text": [
+            230,
+            230,
+            230
+          ]
         }
       }
     },
@@ -956,50 +1889,119 @@
         "height": 650,
         "layout": {
           "spacing": 15,
-          "margins": [20, 20, 20, 20],
+          "margins": [
+            20,
+            20,
+            20,
+            20
+          ],
           "section_spacing": 20
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
+          "background_color": [
+            45,
+            45,
+            50
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
-          "title_color": [240, 240, 240],
+          "title_color": [
+            240,
+            240,
+            240
+          ],
           "margin_top": 10,
           "padding_top": 10,
           "title_left": 10,
-          "title_padding": [0, 5]
+          "title_padding": [
+            0,
+            5
+          ]
         },
         "fields": {
           "label_width": 200,
           "input_width": 100,
           "font_size": 11,
-          "text_color": [220, 220, 220],
+          "text_color": [
+            220,
+            220,
+            220
+          ],
           "spacing": 12,
           "right_padding": 20,
-          "disabled_background_color": [35, 35, 40],
+          "disabled_background_color": [
+            35,
+            35,
+            40
+          ],
           "input_border_radius": 3,
           "input_padding": 3,
           "input_background_offset": 10
         },
-          "cpl_scale": {
-            "height": 120,
-          "padding": [10, 10, 10, 10],
+        "cpl_scale": {
+          "height": 120,
+          "padding": [
+            10,
+            10,
+            10,
+            10
+          ],
           "scale_max": 500,
           "blunder_compression_enabled": true,
           "blunder_compression_factor": 0.4,
-          "background_color": [40, 40, 45],
-          "scale_line_color": [150, 150, 150],
-          "tick_color": [200, 200, 200],
-          "text_color": [220, 220, 220],
+          "background_color": [
+            40,
+            40,
+            45
+          ],
+          "scale_line_color": [
+            150,
+            150,
+            150
+          ],
+          "tick_color": [
+            200,
+            200,
+            200
+          ],
+          "text_color": [
+            220,
+            220,
+            220
+          ],
           "font_family": "Helvetica Neue",
           "font_size": 9,
-          "best_move_color": [100, 255, 100],
-          "good_move_color": [150, 255, 150],
-          "inaccuracy_color": [255, 255, 100],
-          "mistake_color": [255, 200, 100],
-          "blunder_color": [255, 100, 100],
+          "best_move_color": [
+            100,
+            255,
+            100
+          ],
+          "good_move_color": [
+            150,
+            255,
+            150
+          ],
+          "inaccuracy_color": [
+            255,
+            255,
+            100
+          ],
+          "mistake_color": [
+            255,
+            200,
+            100
+          ],
+          "blunder_color": [
+            255,
+            100,
+            100
+          ],
           "number_height_offset": 4,
           "section_height": 12,
           "scale_line_offset": 8,
@@ -1010,35 +2012,59 @@
         "buttons": {
           "spacing": 10,
           "width": 120,
-          "height": 30,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10
+          "height": 30
         }
       },
       "ai_model_settings": {
         "width": 600,
         "height": 400,
-        "background_color": [40, 40, 45],
-        "border_color": [60, 60, 65],
-        "text_color": [200, 200, 200],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
+        "border_color": [
+          60,
+          60,
+          65
+        ],
+        "text_color": [
+          200,
+          200,
+          200
+        ],
         "font_size": 11,
         "layout": {
           "spacing": 15,
-          "margins": [20, 20, 20, 20],
+          "margins": [
+            20,
+            20,
+            20,
+            20
+          ],
           "section_spacing": 20
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
+          "background_color": [
+            45,
+            45,
+            50
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_width": 1,
           "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
           "title_font_weight": "bold",
-          "title_color": [240, 240, 240],
+          "title_color": [
+            240,
+            240,
+            240
+          ],
           "margin_top": 10,
           "padding_top": 20,
           "title_left": 10,
@@ -1050,30 +2076,53 @@
         "labels": {
           "font_family": "Helvetica Neue",
           "font_size": 10,
-          "text_color": [200, 200, 200]
+          "text_color": [
+            200,
+            200,
+            200
+          ]
         },
         "inputs": {
-          "background_color": [45, 45, 50],
-          "text_color": [200, 200, 200],
-          "border_color": [60, 60, 65],
+          "background_color": [
+            45,
+            45,
+            50
+          ],
+          "text_color": [
+            200,
+            200,
+            200
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_width": 1,
           "border_radius": 3,
           "padding": 5,
           "font_family": "Cascadia Mono, Menlo",
           "font_size": 11,
-          "focus_border_color": [0, 120, 212],
-          "selection_background_color": [70, 90, 130],
-          "selection_text_color": [240, 240, 240]
+          "focus_border_color": [
+            0,
+            120,
+            212
+          ],
+          "selection_background_color": [
+            70,
+            90,
+            130
+          ],
+          "selection_text_color": [
+            240,
+            240,
+            240
+          ]
         },
         "buttons": {
           "spacing": 10,
           "width": 120,
-          "height": 30,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10
+          "height": 30
         }
       },
       "engine_configuration": {
@@ -1081,214 +2130,448 @@
         "height": 670,
         "layout": {
           "spacing": 10,
-          "margins": [10, 10, 10, 10]
+          "margins": [
+            10,
+            10,
+            10,
+            10
+          ]
         },
         "tabs_layout": {
           "spacing": 15,
-          "margins": [15, 10, 15, 10],
+          "margins": [
+            15,
+            10,
+            15,
+            10
+          ],
           "top_spacer": 5,
           "copy_layout_spacing": 10,
           "common_layout_spacing": 10,
           "engine_params_layout_spacing": 10,
           "scroll_layout_spacing": 10,
-          "scroll_layout_margins": [10, 5, 10, 10]
+          "scroll_layout_margins": [
+            10,
+            5,
+            10,
+            10
+          ]
         },
         "header": {
-        "background_color": [45, 45, 50],
-        "text_color": [220, 220, 220],
-        "border_color": [60, 60, 65],
-        "border_width": 1,
-        "border_radius": 5,
-        "padding": [10, 10, 10, 10],
-        "font_family": "Helvetica Neue",
-        "font_size": 11,
-        "font_style": "normal"
-      },
-      "tabs": {
-        "font_family": "Helvetica Neue",
-        "font_size": 11,
-        "tab_height": 24,
-        "pane_background": [40, 40, 45],
-        "scroll_button_color": [30, 30, 30],
-        "colors": {
-          "normal": {
-            "background": [45, 45, 50],
-            "text": [200, 200, 200],
-            "border": [60, 60, 65]
-          },
-          "hover": {
-            "background": [55, 55, 60],
-            "text": [230, 230, 230],
-            "border": [80, 80, 85]
-          },
-          "active": {
-            "background": [70, 90, 130],
-            "text": [240, 240, 240],
-            "border": [100, 120, 160]
-          }
-        }
-      },
-      "groups": {
-        "background_color": [40, 40, 45],
-        "border_color": [60, 60, 65],
-        "border_width": 1,
-        "border_radius": 5,
-        "title_font_family": "Helvetica Neue",
-        "title_font_size": 11,
-        "title_font_weight": "bold",
-        "title_color": [220, 220, 220],
-        "spacing": 10,
-        "margin_top": 8,
-        "padding_top": 12
-      },
-      "buttons": {
-        "spacing": 10,
-        "width": 120,
-        "height": 30,
-        "border_radius": 3,
-        "padding": 5,
-        "background_offset": 20,
-        "hover_background_offset": 30,
-        "pressed_background_offset": 10,
-        "font_size": 10,
-        "text_color": [200, 200, 200],
-        "border_color": [60, 60, 65]
-      },
-      "scroll_area": {
-        "min_height": 200,
-        "background_color": [30, 30, 30],
-        "height_calculation": {
-          "header_height": 60,
-          "button_area_height": 50,
-          "common_group_height": 100,
-          "copy_group_height": 50,
-          "spacing_buffer": 30
-        }
-      },
-      "labels": {
-        "font_family": "Helvetica Neue",
-        "font_size": 11,
-        "text_color": [200, 200, 200],
-        "disabled_color": [128, 128, 128],
-        "empty_label_color": [128, 128, 128],
-        "empty_label_font_style": "italic",
-        "empty_label_padding": [20, 20, 20, 20],
-        "form_label_font_size": 11
-      },
-      "form_layout": {
-        "spacing": 10,
-        "label_minimum_width": 100
-      },
-      "input_widgets": {
-        "background_color": [45, 45, 50],
-        "text_color": [200, 200, 200],
-        "border_color": [60, 60, 65],
-        "border_width": 1,
-        "border_radius": 3,
-        "padding": [2, 6, 2, 6],
-        "font_family": "Helvetica Neue",
-        "font_size": 11,
-        "selection_background_color": [70, 90, 130],
-        "selection_text_color": [240, 240, 240],
-        "focus_border_color": [70, 90, 130]
-      },
-      "validation_dialog": {
-        "width": 600,
-        "height": 500,
-        "layout": {
-          "spacing": 15,
-          "margins": [15, 15, 15, 15]
-        },
-        "title": {
-          "font_size": 14,
-          "padding": 5,
-          "text_color": [240, 240, 240]
-        },
-        "description": {
-          "font_size": 11,
-          "padding": 5,
-          "text_color": [200, 200, 200]
-        },
-        "task_header": {
-          "font_size": 12,
-          "padding": 5,
-          "text_color": [220, 220, 220]
-        },
-        "scroll_area": {
-          "min_height": 250
-        },
-        "issue_widget": {
-          "margins": [10, 5, 10, 5],
-          "spacing": 10
-        },
-        "severity_labels": {
-          "width": 80,
-          "font_size": 10,
-          "padding": [2, 8],
-          "border_radius": 3,
-          "colors": {
-            "error": [255, 100, 100],
-            "warning": [255, 200, 100],
-            "info": [150, 200, 255]
-          }
-        },
-        "issue_message": {
-          "font_size": 11,
-          "padding": 2,
-          "text_color": [200, 200, 200]
-        }
-      }
-    },
-    "engine_dialog": {
-        "width": 600,
-        "height": 270,
-        "background_color": [40, 40, 45],
-        "layout": {
-          "spacing": 10,
-          "margins": [10, 0, 10, 10],
-          "engine_info_section_spacing": 8
-        },
-        "labels": {
-          "font_family": "Helvetica Neue",
-          "font_size": 11,
-          "text_color": [200, 200, 200],
-          "minimum_width": 100
-        },
-        "input_widgets": {
-          "background_color": [45, 45, 50],
-          "text_color": [200, 200, 200],
-          "border_color": [60, 60, 65],
+          "background_color": [
+            45,
+            45,
+            50
+          ],
+          "text_color": [
+            220,
+            220,
+            220
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_width": 1,
-          "border_radius": 3,
-          "padding": [2, 6, 2, 6],
+          "border_radius": 5,
+          "padding": [
+            10,
+            10,
+            10,
+            10
+          ],
           "font_family": "Helvetica Neue",
           "font_size": 11,
-          "selection_background_color": [70, 90, 130],
-          "selection_text_color": [240, 240, 240],
-          "focus_border_color": [70, 90, 130]
+          "font_style": "normal"
+        },
+        "tabs": {
+          "font_family": "Helvetica Neue",
+          "font_size": 11,
+          "tab_height": 24,
+          "pane_background": [
+            40,
+            40,
+            45
+          ],
+          "scroll_button_color": [
+            30,
+            30,
+            30
+          ],
+          "colors": {
+            "normal": {
+              "background": [
+                45,
+                45,
+                50
+              ],
+              "text": [
+                200,
+                200,
+                200
+              ],
+              "border": [
+                60,
+                60,
+                65
+              ]
+            },
+            "hover": {
+              "background": [
+                55,
+                55,
+                60
+              ],
+              "text": [
+                230,
+                230,
+                230
+              ],
+              "border": [
+                80,
+                80,
+                85
+              ]
+            },
+            "active": {
+              "background": [
+                70,
+                90,
+                130
+              ],
+              "text": [
+                240,
+                240,
+                240
+              ],
+              "border": [
+                100,
+                120,
+                160
+              ]
+            }
+          }
+        },
+        "groups": {
+          "background_color": [
+            40,
+            40,
+            45
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
+          "border_width": 1,
+          "border_radius": 5,
+          "title_font_family": "Helvetica Neue",
+          "title_font_size": 11,
+          "title_font_weight": "bold",
+          "title_color": [
+            220,
+            220,
+            220
+          ],
+          "spacing": 10,
+          "margin_top": 8,
+          "padding_top": 12
         },
         "buttons": {
           "spacing": 10,
           "width": 120,
           "height": 30,
+          "font_size": 10,
+          "border_color": [
+            60,
+            60,
+            65
+          ]
+        },
+        "scroll_area": {
+          "min_height": 200,
+          "background_color": [
+            30,
+            30,
+            30
+          ],
+          "height_calculation": {
+            "header_height": 60,
+            "button_area_height": 50,
+            "common_group_height": 100,
+            "copy_group_height": 50,
+            "spacing_buffer": 30
+          }
+        },
+        "labels": {
+          "font_family": "Helvetica Neue",
+          "font_size": 11,
+          "text_color": [
+            200,
+            200,
+            200
+          ],
+          "disabled_color": [
+            128,
+            128,
+            128
+          ],
+          "empty_label_color": [
+            128,
+            128,
+            128
+          ],
+          "empty_label_font_style": "italic",
+          "empty_label_padding": [
+            20,
+            20,
+            20,
+            20
+          ],
+          "form_label_font_size": 11
+        },
+        "form_layout": {
+          "spacing": 10,
+          "label_minimum_width": 100
+        },
+        "input_widgets": {
+          "background_color": [
+            45,
+            45,
+            50
+          ],
+          "text_color": [
+            200,
+            200,
+            200
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
+          "border_width": 1,
           "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10
+          "padding": [
+            2,
+            6,
+            2,
+            6
+          ],
+          "font_family": "Helvetica Neue",
+          "font_size": 11,
+          "selection_background_color": [
+            70,
+            90,
+            130
+          ],
+          "selection_text_color": [
+            240,
+            240,
+            240
+          ],
+          "focus_border_color": [
+            70,
+            90,
+            130
+          ]
+        },
+        "validation_dialog": {
+          "width": 600,
+          "height": 500,
+          "layout": {
+            "spacing": 15,
+            "margins": [
+              15,
+              15,
+              15,
+              15
+            ]
+          },
+          "title": {
+            "font_size": 14,
+            "padding": 5,
+            "text_color": [
+              240,
+              240,
+              240
+            ]
+          },
+          "description": {
+            "font_size": 11,
+            "padding": 5,
+            "text_color": [
+              200,
+              200,
+              200
+            ]
+          },
+          "task_header": {
+            "font_size": 12,
+            "padding": 5,
+            "text_color": [
+              220,
+              220,
+              220
+            ]
+          },
+          "scroll_area": {
+            "min_height": 250
+          },
+          "issue_widget": {
+            "margins": [
+              10,
+              5,
+              10,
+              5
+            ],
+            "spacing": 10
+          },
+          "severity_labels": {
+            "width": 80,
+            "font_size": 10,
+            "padding": [
+              2,
+              8
+            ],
+            "border_radius": 3,
+            "colors": {
+              "error": [
+                255,
+                100,
+                100
+              ],
+              "warning": [
+                255,
+                200,
+                100
+              ],
+              "info": [
+                150,
+                200,
+                255
+              ]
+            }
+          },
+          "issue_message": {
+            "font_size": 11,
+            "padding": 2,
+            "text_color": [
+              200,
+              200,
+              200
+            ]
+          }
+        }
+      },
+      "engine_dialog": {
+        "width": 600,
+        "height": 270,
+        "background_color": [
+          40,
+          40,
+          45
+        ],
+        "layout": {
+          "spacing": 10,
+          "margins": [
+            10,
+            0,
+            10,
+            10
+          ],
+          "engine_info_section_spacing": 8
+        },
+        "labels": {
+          "font_family": "Helvetica Neue",
+          "font_size": 11,
+          "text_color": [
+            200,
+            200,
+            200
+          ],
+          "minimum_width": 100
+        },
+        "input_widgets": {
+          "background_color": [
+            45,
+            45,
+            50
+          ],
+          "text_color": [
+            200,
+            200,
+            200
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
+          "border_width": 1,
+          "border_radius": 3,
+          "padding": [
+            2,
+            6,
+            2,
+            6
+          ],
+          "font_family": "Helvetica Neue",
+          "font_size": 11,
+          "selection_background_color": [
+            70,
+            90,
+            130
+          ],
+          "selection_text_color": [
+            240,
+            240,
+            240
+          ],
+          "focus_border_color": [
+            70,
+            90,
+            130
+          ]
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30
         },
         "group_box": {
-          "border_color": [60, 60, 65],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 5,
-          "background_color": [40, 40, 45],
-          "title_color": [240, 240, 240],
+          "background_color": [
+            40,
+            40,
+            45
+          ],
+          "title_color": [
+            240,
+            240,
+            240
+          ],
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
           "margin_top": 10,
           "padding_top": 0,
           "title_left": 10,
-          "title_padding": [0, 5],
-          "content_margins": [10, 15, 10, 10]
+          "title_padding": [
+            0,
+            5
+          ],
+          "content_margins": [
+            10,
+            15,
+            10,
+            10
+          ]
         }
       },
       "bulk_replace": {
@@ -1296,13 +2579,30 @@
         "height": 760,
         "minimum_width": 550,
         "minimum_height": 710,
-        "background_color": [40, 40, 45],
-        "border_color": [60, 60, 65],
-        "text_color": [200, 200, 200],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
+        "border_color": [
+          60,
+          60,
+          65
+        ],
+        "text_color": [
+          200,
+          200,
+          200
+        ],
         "font_size": 11,
         "font_family": "Helvetica Neue",
         "layout": {
-          "margins": [18, 18, 18, 18],
+          "margins": [
+            18,
+            18,
+            18,
+            18
+          ],
           "spacing": 12
         },
         "spacing": {
@@ -1315,52 +2615,99 @@
         "buttons": {
           "spacing": 10,
           "width": 120,
-          "height": 30,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10
+          "height": 30
         },
         "labels": {
           "font_family": "Helvetica Neue",
           "font_size": 11,
-          "text_color": [200, 200, 200],
+          "text_color": [
+            200,
+            200,
+            200
+          ],
           "note_font_size": 10,
           "minimum_width": 90
         },
         "inputs": {
           "font_family": "Cascadia Mono, Menlo",
           "font_size": 11,
-          "text_color": [240, 240, 240],
-          "background_color": [30, 30, 35],
-          "border_color": [60, 60, 65],
+          "text_color": [
+            240,
+            240,
+            240
+          ],
+          "background_color": [
+            30,
+            30,
+            35
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 3,
-          "padding": [8, 6],
+          "padding": [
+            8,
+            6
+          ],
           "minimum_width": 200,
           "minimum_height": 30,
-          "selection_background_color": [70, 90, 130],
-          "selection_text_color": [240, 240, 240]
+          "selection_background_color": [
+            70,
+            90,
+            130
+          ],
+          "selection_text_color": [
+            240,
+            240,
+            240
+          ]
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
+          "background_color": [
+            45,
+            45,
+            50
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
-          "title_color": [240, 240, 240],
-          "content_margins": [10, 14, 10, 10],
+          "title_color": [
+            240,
+            240,
+            240
+          ],
+          "content_margins": [
+            10,
+            14,
+            10,
+            10
+          ],
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
-          "title_padding": [0, 5]
+          "title_padding": [
+            0,
+            5
+          ]
         },
         "tags_list": {
           "height": 160,
           "columns": 2,
           "spacing": 8,
           "row_spacing": 4,
-          "margins": [10, 6, 8, 10]
+          "margins": [
+            10,
+            6,
+            8,
+            10
+          ]
         },
         "quick_select_buttons": {
           "enabled": true,
@@ -1374,13 +2721,30 @@
         "height": 600,
         "minimum_width": 550,
         "minimum_height": 630,
-        "background_color": [40, 40, 45],
-        "border_color": [60, 60, 65],
-        "text_color": [200, 200, 200],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
+        "border_color": [
+          60,
+          60,
+          65
+        ],
+        "text_color": [
+          200,
+          200,
+          200
+        ],
         "font_size": 11,
         "font_family": "Helvetica Neue",
         "layout": {
-          "margins": [25, 25, 25, 25],
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ],
           "spacing": 15
         },
         "spacing": {
@@ -1390,17 +2754,16 @@
         "buttons": {
           "spacing": 10,
           "width": 120,
-          "height": 30,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10
+          "height": 30
         },
         "labels": {
           "font_family": "Helvetica Neue",
           "font_size": 11,
-          "text_color": [200, 200, 200],
+          "text_color": [
+            200,
+            200,
+            200
+          ],
           "minimum_width": 90
         },
         "radio_buttons": {
@@ -1409,28 +2772,71 @@
         "inputs": {
           "font_family": "Cascadia Mono, Menlo",
           "font_size": 11,
-          "text_color": [240, 240, 240],
-          "background_color": [30, 30, 35],
-          "border_color": [60, 60, 65],
+          "text_color": [
+            240,
+            240,
+            240
+          ],
+          "background_color": [
+            30,
+            30,
+            35
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 3,
-          "padding": [8, 6],
+          "padding": [
+            8,
+            6
+          ],
           "minimum_width": 200,
           "minimum_height": 30,
-          "selection_background_color": [70, 90, 130],
-          "selection_text_color": [240, 240, 240]
+          "selection_background_color": [
+            70,
+            90,
+            130
+          ],
+          "selection_text_color": [
+            240,
+            240,
+            240
+          ]
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
+          "background_color": [
+            45,
+            45,
+            50
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
-          "title_color": [240, 240, 240],
-          "content_margins": [10, 20, 10, 15],
+          "title_color": [
+            240,
+            240,
+            240
+          ],
+          "content_margins": [
+            10,
+            20,
+            10,
+            15
+          ],
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
-          "title_padding": [0, 5]
+          "title_padding": [
+            0,
+            5
+          ]
         }
       },
       "search": {
@@ -1438,13 +2844,30 @@
         "height": 600,
         "minimum_width": 700,
         "minimum_height": 500,
-        "background_color": [40, 40, 45],
-        "border_color": [60, 60, 65],
-        "text_color": [200, 200, 200],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
+        "border_color": [
+          60,
+          60,
+          65
+        ],
+        "text_color": [
+          200,
+          200,
+          200
+        ],
         "font_size": 11,
         "font_family": "Helvetica Neue",
         "layout": {
-          "margins": [25, 25, 25, 25],
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ],
           "spacing": 15
         },
         "spacing": {
@@ -1454,53 +2877,112 @@
           "spacing": 10,
           "width": 120,
           "height": 30,
-          "small_width": 100,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10
+          "small_width": 100
         },
         "labels": {
           "font_family": "Helvetica Neue",
           "font_size": 11,
-          "text_color": [200, 200, 200]
+          "text_color": [
+            200,
+            200,
+            200
+          ]
         },
         "inputs": {
           "font_family": "Cascadia Mono, Menlo",
           "font_size": 11,
-          "text_color": [240, 240, 240],
-          "background_color": [30, 30, 35],
-          "border_color": [60, 60, 65],
+          "text_color": [
+            240,
+            240,
+            240
+          ],
+          "background_color": [
+            30,
+            30,
+            35
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 3,
-          "padding": [8, 6],
-          "selection_background_color": [70, 90, 130],
-          "selection_text_color": [240, 240, 240]
+          "padding": [
+            8,
+            6
+          ],
+          "selection_background_color": [
+            70,
+            90,
+            130
+          ],
+          "selection_text_color": [
+            240,
+            240,
+            240
+          ]
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
+          "background_color": [
+            45,
+            45,
+            50
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
-          "title_color": [240, 240, 240],
-          "content_margins": [10, 20, 10, 15],
+          "title_color": [
+            240,
+            240,
+            240
+          ],
+          "content_margins": [
+            10,
+            20,
+            10,
+            15
+          ],
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
-          "title_padding": [0, 5]
+          "title_padding": [
+            0,
+            5
+          ]
         }
       },
       "import_games": {
         "width": 550,
         "height": 600,
-        "background_color": [40, 40, 45],
-        "border_color": [60, 60, 65],
-        "text_color": [200, 200, 200],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
+        "border_color": [
+          60,
+          60,
+          65
+        ],
+        "text_color": [
+          200,
+          200,
+          200
+        ],
         "font_size": 11,
         "font_family": "Helvetica Neue",
         "layout": {
-          "margins": [25, 25, 25, 25],
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ],
           "spacing": 15
         },
         "spacing": {
@@ -1510,56 +2992,115 @@
         "buttons": {
           "spacing": 10,
           "width": 120,
-          "height": 30,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10
+          "height": 30
         },
         "labels": {
           "font_family": "Helvetica Neue",
           "font_size": 11,
-          "text_color": [200, 200, 200],
+          "text_color": [
+            200,
+            200,
+            200
+          ],
           "minimum_width": 120
         },
         "inputs": {
           "font_family": "Cascadia Mono, Menlo",
           "font_size": 11,
-          "text_color": [240, 240, 240],
-          "background_color": [30, 30, 35],
-          "border_color": [60, 60, 65],
+          "text_color": [
+            240,
+            240,
+            240
+          ],
+          "background_color": [
+            30,
+            30,
+            35
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 3,
-          "padding": [8, 6],
+          "padding": [
+            8,
+            6
+          ],
           "minimum_width": 250,
           "minimum_height": 30,
-          "selection_background_color": [70, 90, 130],
-          "selection_text_color": [240, 240, 240]
+          "selection_background_color": [
+            70,
+            90,
+            130
+          ],
+          "selection_text_color": [
+            240,
+            240,
+            240
+          ]
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
+          "background_color": [
+            45,
+            45,
+            50
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
-          "title_color": [240, 240, 240],
-          "content_margins": [10, 20, 10, 15],
+          "title_color": [
+            240,
+            240,
+            240
+          ],
+          "content_margins": [
+            10,
+            20,
+            10,
+            15
+          ],
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
-          "title_padding": [0, 5]
+          "title_padding": [
+            0,
+            5
+          ]
         }
       },
-        "bulk_analysis_dialog": {
-          "width": 600,
-          "height": 450,
-        "background_color": [40, 40, 45],
-        "border_color": [60, 60, 65],
-        "text_color": [200, 200, 200],
+      "bulk_analysis_dialog": {
+        "width": 600,
+        "height": 450,
+        "background_color": [
+          40,
+          40,
+          45
+        ],
+        "border_color": [
+          60,
+          60,
+          65
+        ],
+        "text_color": [
+          200,
+          200,
+          200
+        ],
         "font_size": 11,
         "font_family": "Helvetica Neue",
         "layout": {
-          "margins": [25, 25, 25, 25],
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ],
           "spacing": 15
         },
         "spacing": {
@@ -1568,45 +3109,84 @@
         "buttons": {
           "spacing": 10,
           "width": 120,
-          "height": 30,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10
+          "height": 30
         },
         "labels": {
           "font_family": "Helvetica Neue",
           "font_size": 11,
-          "text_color": [200, 200, 200]
+          "text_color": [
+            200,
+            200,
+            200
+          ]
         },
         "radio_buttons": {
           "first_button_minimum_width": 100
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
+          "background_color": [
+            45,
+            45,
+            50
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
-          "title_color": [240, 240, 240],
-          "content_margins": [10, 20, 10, 15],
+          "title_color": [
+            240,
+            240,
+            240
+          ],
+          "content_margins": [
+            10,
+            20,
+            10,
+            15
+          ],
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
-          "title_padding": [0, 5]
+          "title_padding": [
+            0,
+            5
+          ]
         },
         "progress": {
           "label_font_size": 11,
-          "label_text_color": [200, 200, 200],
+          "label_text_color": [
+            200,
+            200,
+            200
+          ],
           "status_font_size": 10,
-          "status_text_color": [150, 150, 150]
+          "status_text_color": [
+            150,
+            150,
+            150
+          ]
         },
         "progress_bar": {
-          "background_color": [30, 30, 35],
-          "border_color": [60, 60, 65],
+          "background_color": [
+            30,
+            30,
+            35
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 3,
-          "chunk_background_color": [70, 90, 130],
+          "chunk_background_color": [
+            70,
+            90,
+            130
+          ],
           "chunk_border_radius": 2
         }
       },
@@ -1615,13 +3195,30 @@
         "height": 350,
         "minimum_width": 600,
         "minimum_height": 300,
-        "background_color": [40, 40, 45],
-        "border_color": [60, 60, 65],
-        "text_color": [200, 200, 200],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
+        "border_color": [
+          60,
+          60,
+          65
+        ],
+        "text_color": [
+          200,
+          200,
+          200
+        ],
         "font_size": 11,
         "font_family": "Helvetica Neue",
         "layout": {
-          "margins": [25, 25, 25, 25],
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ],
           "spacing": 15
         },
         "spacing": {
@@ -1630,43 +3227,85 @@
         "buttons": {
           "spacing": 10,
           "width": 120,
-          "height": 30,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10
+          "height": 30
         },
         "labels": {
           "font_family": "Helvetica Neue",
           "font_size": 11,
-          "text_color": [200, 200, 200]
+          "text_color": [
+            200,
+            200,
+            200
+          ]
         },
         "inputs": {
           "font_family": "Cascadia Mono, Menlo",
           "font_size": 11,
-          "text_color": [240, 240, 240],
-          "background_color": [30, 30, 35],
-          "border_color": [60, 60, 65],
+          "text_color": [
+            240,
+            240,
+            240
+          ],
+          "background_color": [
+            30,
+            30,
+            35
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 3,
-          "padding": [8, 6],
+          "padding": [
+            8,
+            6
+          ],
           "minimum_width": 200,
           "minimum_height": 30,
-          "selection_background_color": [70, 90, 130],
-          "selection_text_color": [240, 240, 240]
+          "selection_background_color": [
+            70,
+            90,
+            130
+          ],
+          "selection_text_color": [
+            240,
+            240,
+            240
+          ]
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
+          "background_color": [
+            45,
+            45,
+            50
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
-          "title_color": [240, 240, 240],
-          "content_margins": [10, 20, 10, 15],
+          "title_color": [
+            240,
+            240,
+            240
+          ],
+          "content_margins": [
+            10,
+            20,
+            10,
+            15
+          ],
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
-          "title_padding": [0, 5]
+          "title_padding": [
+            0,
+            5
+          ]
         },
         "quick_select_buttons": {
           "enabled": true,
@@ -1678,20 +3317,37 @@
       "confirmation_dialog": {
         "width": 400,
         "height": 150,
-        "background_color": [40, 40, 45],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
         "layout": {
           "spacing": 15,
-          "margins": [15, 15, 15, 15]
+          "margins": [
+            15,
+            15,
+            15,
+            15
+          ]
         },
         "title": {
           "font_size": 14,
           "padding": 5,
-          "text_color": [240, 240, 240]
+          "text_color": [
+            240,
+            240,
+            240
+          ]
         },
         "message": {
           "font_size": 11,
           "padding": 5,
-          "text_color": [200, 200, 200],
+          "text_color": [
+            200,
+            200,
+            200
+          ],
           "line_height": 20,
           "base_height": 150
         },
@@ -1699,33 +3355,48 @@
           "spacing": 10,
           "width": 120,
           "height": 30,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10,
           "font_size": 10,
-          "text_color": [200, 200, 200],
-          "border_color": [60, 60, 65]
+          "border_color": [
+            60,
+            60,
+            65
+          ]
         }
       },
       "message_dialog": {
         "width": 400,
         "height": 150,
-        "background_color": [40, 40, 45],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
         "layout": {
           "spacing": 15,
-          "margins": [15, 15, 15, 15]
+          "margins": [
+            15,
+            15,
+            15,
+            15
+          ]
         },
         "title": {
           "font_size": 14,
           "padding": 5,
-          "text_color": [240, 240, 240]
+          "text_color": [
+            240,
+            240,
+            240
+          ]
         },
         "message": {
           "font_size": 11,
           "padding": 5,
-          "text_color": [200, 200, 200],
+          "text_color": [
+            200,
+            200,
+            200
+          ],
           "line_height": 20,
           "base_height": 150
         },
@@ -1733,44 +3404,76 @@
           "spacing": 10,
           "width": 120,
           "height": 30,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10,
           "font_size": 10,
-          "text_color": [200, 200, 200],
-          "border_color": [60, 60, 65]
+          "border_color": [
+            60,
+            60,
+            65
+          ]
         }
       },
       "input_dialog": {
         "width": 400,
         "height": 220,
-        "background_color": [40, 40, 45],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
         "layout": {
           "spacing": 12,
-          "margins": [15, 20, 15, 15]
+          "margins": [
+            15,
+            20,
+            15,
+            15
+          ]
         },
         "title": {
           "font_size": 14,
           "padding": 5,
           "spacing_after": 5,
-          "text_color": [240, 240, 240]
+          "text_color": [
+            240,
+            240,
+            240
+          ]
         },
         "label": {
           "font_size": 11,
           "padding": 5,
-          "text_color": [200, 200, 200],
+          "text_color": [
+            200,
+            200,
+            200
+          ],
           "spacing_after": 3
         },
         "input": {
           "font_family": "Helvetica Neue",
           "font_size": 11,
-          "text_color": [240, 240, 240],
-          "background_color": [30, 30, 35],
-          "border_color": [60, 60, 65],
+          "text_color": [
+            240,
+            240,
+            240
+          ],
+          "background_color": [
+            30,
+            30,
+            35
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 3,
-          "padding": [2, 6, 2, 5],
+          "padding": [
+            2,
+            6,
+            2,
+            5
+          ],
           "minimum_width": 200,
           "minimum_height": 25
         },
@@ -1778,14 +3481,12 @@
           "spacing": 10,
           "width": 120,
           "height": 30,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10,
           "font_size": 10,
-          "text_color": [200, 200, 200],
-          "border_color": [60, 60, 65]
+          "border_color": [
+            60,
+            60,
+            65
+          ]
         }
       },
       "add_tag_dialog": {
@@ -1793,24 +3494,52 @@
         "height": 180,
         "minimum_width": 350,
         "minimum_height": 150,
-        "background_color": [40, 40, 45],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
         "layout": {
           "spacing": 15,
-          "margins": [15, 15, 15, 15]
+          "margins": [
+            15,
+            15,
+            15,
+            15
+          ]
         },
         "labels": {
           "font_family": "Helvetica Neue",
           "font_size": 11,
-          "text_color": [200, 200, 200]
+          "text_color": [
+            200,
+            200,
+            200
+          ]
         },
         "inputs": {
           "font_family": "Cascadia Mono, Menlo",
           "font_size": 11,
-          "text_color": [240, 240, 240],
-          "background_color": [30, 30, 35],
-          "border_color": [60, 60, 65],
+          "text_color": [
+            240,
+            240,
+            240
+          ],
+          "background_color": [
+            30,
+            30,
+            35
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 3,
-          "padding": [8, 6],
+          "padding": [
+            8,
+            6
+          ],
           "minimum_width": 200,
           "minimum_height": 30
         },
@@ -1818,14 +3547,12 @@
           "spacing": 10,
           "width": 120,
           "height": 30,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10,
           "font_size": 10,
-          "text_color": [200, 200, 200],
-          "border_color": [60, 60, 65]
+          "border_color": [
+            60,
+            60,
+            65
+          ]
         }
       },
       "annotation_preferences": {
@@ -1833,46 +3560,94 @@
         "height": 500,
         "minimum_width": 500,
         "minimum_height": 400,
-        "background_color": [40, 40, 45],
-        "border_color": [60, 60, 65],
-        "text_color": [200, 200, 200],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
+        "border_color": [
+          60,
+          60,
+          65
+        ],
+        "text_color": [
+          200,
+          200,
+          200
+        ],
         "font_size": 11,
         "layout": {
           "spacing": 10,
-          "margins": [15, 15, 15, 15],
+          "margins": [
+            15,
+            15,
+            15,
+            15
+          ],
           "section_spacing": 15
         },
         "buttons": {
           "spacing": 10,
           "width": 120,
-          "height": 30,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10
+          "height": 30
         },
         "labels": {
           "font_family": "Helvetica Neue",
           "font_size": 11,
-          "text_color": [200, 200, 200]
+          "text_color": [
+            200,
+            200,
+            200
+          ]
         },
         "inputs": {
           "font_family": "Cascadia Mono, Menlo",
           "font_size": 11,
-          "text_color": [240, 240, 240],
-          "background_color": [30, 30, 35],
-          "border_color": [60, 60, 65],
+          "text_color": [
+            240,
+            240,
+            240
+          ],
+          "background_color": [
+            30,
+            30,
+            35
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 3,
-          "padding": [8, 6],
-          "selection_background_color": [70, 90, 130],
-          "selection_text_color": [240, 240, 240]
+          "padding": [
+            8,
+            6
+          ],
+          "selection_background_color": [
+            70,
+            90,
+            130
+          ],
+          "selection_text_color": [
+            240,
+            240,
+            240
+          ]
         },
         "groups": {
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
-          "title_color": [240, 240, 240],
-          "content_margins": [10, 15, 10, 10],
+          "title_color": [
+            240,
+            240,
+            240
+          ],
+          "content_margins": [
+            10,
+            15,
+            10,
+            10
+          ],
           "margin_top": 10,
           "padding_top": 5
         },
@@ -1890,61 +3665,125 @@
       "deduplication_criteria": {
         "width": 600,
         "height": 450,
-        "background_color": [40, 40, 45],
-        "border_color": [60, 60, 65],
-        "text_color": [200, 200, 200],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
+        "border_color": [
+          60,
+          60,
+          65
+        ],
+        "text_color": [
+          200,
+          200,
+          200
+        ],
         "font_size": 11,
         "layout": {
           "spacing": 10,
-          "margins": [15, 15, 15, 15],
+          "margins": [
+            15,
+            15,
+            15,
+            15
+          ],
           "section_spacing": 15
         },
         "buttons": {
           "spacing": 10,
           "width": 120,
-          "height": 30,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10
+          "height": 30
         },
         "labels": {
           "font_family": "Helvetica Neue",
           "font_size": 11,
-          "text_color": [200, 200, 200]
+          "text_color": [
+            200,
+            200,
+            200
+          ]
         },
         "description": {
           "font_family": "Helvetica Neue",
           "font_size": 10,
-          "text_color": [180, 180, 180],
+          "text_color": [
+            180,
+            180,
+            180
+          ],
           "margin_top": 8
         },
         "inputs": {
           "font_family": "Cascadia Mono, Menlo",
           "font_size": 11,
-          "text_color": [240, 240, 240],
-          "background_color": [30, 30, 35],
-          "border_color": [60, 60, 65],
+          "text_color": [
+            240,
+            240,
+            240
+          ],
+          "background_color": [
+            30,
+            30,
+            35
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 3,
-          "padding": [8, 6],
-          "selection_background_color": [70, 90, 130],
-          "selection_text_color": [240, 240, 240]
+          "padding": [
+            8,
+            6
+          ],
+          "selection_background_color": [
+            70,
+            90,
+            130
+          ],
+          "selection_text_color": [
+            240,
+            240,
+            240
+          ]
         },
         "groups": {
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
-          "title_color": [240, 240, 240],
-          "content_margins": [10, 15, 10, 10],
+          "title_color": [
+            240,
+            240,
+            240
+          ],
+          "content_margins": [
+            10,
+            15,
+            10,
+            10
+          ],
           "margin_top": 10,
           "padding_top": 5
         },
         "modes": {
           "options": [
-            {"value": "exact_pgn", "label": "Exact PGN Match"},
-            {"value": "moves_only", "label": "Moves Only"},
-            {"value": "normalized_pgn", "label": "Normalized PGN Match"},
-            {"value": "header_based", "label": "Header Based Match"}
+            {
+              "value": "exact_pgn",
+              "label": "Exact PGN Match"
+            },
+            {
+              "value": "moves_only",
+              "label": "Moves Only"
+            },
+            {
+              "value": "normalized_pgn",
+              "label": "Normalized PGN Match"
+            },
+            {
+              "value": "header_based",
+              "label": "Header Based Match"
+            }
           ],
           "descriptions": {
             "exact_pgn": "Match games with identical PGN strings (headers + moves). This is the most strict matching mode.",
@@ -1954,16 +3793,38 @@
           }
         },
         "default_mode": "exact_pgn",
-        "header_fields": ["White", "Black", "Date", "Result", "Event", "Site", "Round"],
-        "default_headers": ["White", "Black", "Date", "Result"]
+        "header_fields": [
+          "White",
+          "Black",
+          "Date",
+          "Result",
+          "Event",
+          "Site",
+          "Round"
+        ],
+        "default_headers": [
+          "White",
+          "Black",
+          "Date",
+          "Result"
+        ]
       },
       "about_dialog": {
         "width": 550,
         "height": 450,
-        "background_color": [40, 40, 45],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
         "layout": {
           "spacing": 25,
-          "margins": [30, 30, 30, 30],
+          "margins": [
+            30,
+            30,
+            30,
+            30
+          ],
           "icon_text_gap": 25,
           "text_element_spacing": 10,
           "button_section_top_margin": 25
@@ -1976,26 +3837,42 @@
           "font_family": "Helvetica Neue",
           "font_size": 26,
           "font_weight": "bold",
-          "color": [240, 240, 240],
+          "color": [
+            240,
+            240,
+            240
+          ],
           "margin_bottom": 6
         },
         "full_name": {
           "font_family": "Helvetica Neue",
           "font_size": 13,
-          "color": [200, 200, 200],
+          "color": [
+            200,
+            200,
+            200
+          ],
           "margin_bottom": 12
         },
         "version": {
           "font_family": "Helvetica Neue",
           "font_size": 11,
-          "color": [180, 180, 180],
+          "color": [
+            180,
+            180,
+            180
+          ],
           "label": "Version",
           "margin_bottom": 12
         },
         "description": {
           "font_family": "Helvetica Neue",
           "font_size": 11,
-          "color": [200, 200, 200],
+          "color": [
+            200,
+            200,
+            200
+          ],
           "line_height": 1.5,
           "text": "A comprehensive chess analysis and review application for studying games and improving your play.",
           "margin_bottom": 15,
@@ -2004,22 +3881,38 @@
         "copyright": {
           "font_family": "Helvetica Neue",
           "font_size": 10,
-          "color": [150, 150, 150],
+          "color": [
+            150,
+            150,
+            150
+          ],
           "text1": "Copyright (C) 2025 Philipp Guntermann",
           "text2": ""
         },
         "license": {
           "font_family": "Helvetica Neue",
           "font_size": 10,
-          "color": [150, 150, 150],
+          "color": [
+            150,
+            150,
+            150
+          ],
           "text": "Licensed under:\nthe GNU General Public License v3.0 (GPL-3.0)",
           "margin_top": 8
         },
         "contact": {
           "font_family": "Helvetica Neue",
           "font_size": 10,
-          "color": [150, 150, 150],
-          "link_color": [100, 150, 255],
+          "color": [
+            150,
+            150,
+            150
+          ],
+          "link_color": [
+            100,
+            150,
+            255
+          ],
           "label": "Contact:",
           "email": "pguntermann@me.com",
           "margin_top": 8
@@ -2028,14 +3921,12 @@
           "spacing": 10,
           "width": 120,
           "height": 30,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10,
           "font_size": 10,
-          "text_color": [200, 200, 200],
-          "border_color": [60, 60, 65],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "alignment": "right"
         }
       },
@@ -2044,23 +3935,55 @@
         "height": 600,
         "minimum_width": 600,
         "minimum_height": 400,
-        "background_color": [40, 40, 45],
-        "border_color": [60, 60, 65],
-        "text_color": [200, 200, 200],
+        "background_color": [
+          40,
+          40,
+          45
+        ],
+        "border_color": [
+          60,
+          60,
+          65
+        ],
+        "text_color": [
+          200,
+          200,
+          200
+        ],
         "font_size": 11,
         "layout": {
           "spacing": 10,
-          "margins": [15, 15, 15, 15],
-          "scroll_area_margins": [10, 10, 10, 10],
+          "margins": [
+            15,
+            15,
+            15,
+            15
+          ],
+          "scroll_area_margins": [
+            10,
+            10,
+            10,
+            10
+          ],
           "scroll_layout_spacing": 10,
           "left_panel_width": 250,
           "right_panel_label_left_padding": 10,
           "left_panel": {
-            "margins": [0, 0, 0, 0],
+            "margins": [
+              0,
+              0,
+              0,
+              0
+            ],
             "spacing": 5
           },
           "right_panel": {
-            "margins": [0, 0, 0, 0],
+            "margins": [
+              0,
+              0,
+              0,
+              0
+            ],
             "spacing": 5
           }
         },
@@ -2068,27 +3991,49 @@
           "spacing": 10,
           "width": 120,
           "height": 30,
-          "border_radius": 3,
-          "padding": 5,
-          "background_offset": 20,
-          "hover_background_offset": 30,
-          "pressed_background_offset": 10,
           "font_size": 10,
-          "text_color": [200, 200, 200],
-          "border_color": [60, 60, 65]
+          "border_color": [
+            60,
+            60,
+            65
+          ]
         },
         "labels": {
           "font_family": "Helvetica Neue",
           "font_size": 11,
-          "text_color": [200, 200, 200]
+          "text_color": [
+            200,
+            200,
+            200
+          ]
         },
         "table": {
-          "background_color": [30, 30, 35],
-          "text_color": [240, 240, 240],
-          "border_color": [60, 60, 65],
+          "background_color": [
+            30,
+            30,
+            35
+          ],
+          "text_color": [
+            240,
+            240,
+            240
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 3,
-          "header_background_color": [45, 45, 50],
-          "header_text_color": [200, 200, 200],
+          "header_background_color": [
+            45,
+            45,
+            50
+          ],
+          "header_text_color": [
+            200,
+            200,
+            200
+          ],
           "item_padding": 5,
           "header_padding": 5,
           "width_column_width": 80
@@ -2096,11 +4041,26 @@
         "inputs": {
           "font_family": "Cascadia Mono, Menlo",
           "font_size": 11,
-          "text_color": [240, 240, 240],
-          "background_color": [30, 30, 35],
-          "border_color": [60, 60, 65],
+          "text_color": [
+            240,
+            240,
+            240
+          ],
+          "background_color": [
+            30,
+            30,
+            35
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ],
           "border_radius": 3,
-          "padding": [8, 6],
+          "padding": [
+            8,
+            6
+          ],
           "spinbox": {
             "min_value": 10,
             "max_value": 1000,
@@ -2110,8 +4070,17 @@
         "groups": {
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
-          "title_color": [240, 240, 240],
-          "content_margins": [10, 15, 10, 10],
+          "title_color": [
+            240,
+            240,
+            240
+          ],
+          "content_margins": [
+            10,
+            15,
+            10,
+            10
+          ],
           "layout_spacing": 8,
           "margin_top": 10,
           "padding_top": 5,
@@ -2127,16 +4096,31 @@
       "enabled": true,
       "cache_enabled": true,
       "max_cache_size": 1000,
-      "score_range": [-100, 100],
+      "score_range": [
+        -100,
+        100
+      ],
       "aggregation": {
         "normalize": true,
         "normalization_method": "soft",
         "soft_scale_factor": 50.0
       },
       "colors": {
-        "positive": [0, 255, 0],
-        "negative": [255, 0, 0],
-        "neutral": [255, 255, 0],
+        "positive": [
+          0,
+          255,
+          0
+        ],
+        "negative": [
+          255,
+          0,
+          0
+        ],
+        "neutral": [
+          255,
+          255,
+          0
+        ],
         "neutral_threshold": -5.0,
         "opacity": 0.9,
         "gradient_radius_ratio": 0.85,
@@ -2150,18 +4134,46 @@
         "padding": 10,
         "spacing": 4,
         "section_spacing": 6,
-        "background_color": [45, 45, 50],
-        "border_color": [60, 60, 65],
+        "background_color": [
+          45,
+          45,
+          50
+        ],
+        "border_color": [
+          60,
+          60,
+          65
+        ],
         "border_width": 1,
         "border_radius": 5,
-        "text_color": [220, 220, 220],
+        "text_color": [
+          220,
+          220,
+          220
+        ],
         "header_font_size": 12,
-        "header_color": [240, 240, 240],
-        "positive_color": [100, 255, 100],
-        "negative_color": [255, 200, 100],
+        "header_color": [
+          240,
+          240,
+          240
+        ],
+        "positive_color": [
+          100,
+          255,
+          100
+        ],
+        "negative_color": [
+          255,
+          200,
+          100
+        ],
         "bullet_indent": 15,
         "calculation_indent": 12,
-        "calculation_background": [35, 35, 40],
+        "calculation_background": [
+          35,
+          35,
+          40
+        ],
         "calculation_padding": 6
       },
       "rules": {
@@ -2243,23 +4255,23 @@
     "model_filters": {
       "openai": {
         "exclude_prefixes": [
-            "o1-pro-",
-            "text-",
-            "davinci",
-            "curie",
-            "babbage",
-            "ada",
-            "whisper",
-            "embedding",
-            "moderation",
-            "gpt-realtime",
-            "gpt-image",
-            "codex",
-            "sora-",
-            "omni-moderation",
-            "dall-e-",
-            "o4-",
-            "tts-"
+          "o1-pro-",
+          "text-",
+          "davinci",
+          "curie",
+          "babbage",
+          "ada",
+          "whisper",
+          "embedding",
+          "moderation",
+          "gpt-realtime",
+          "gpt-image",
+          "codex",
+          "sora-",
+          "omni-moderation",
+          "dall-e-",
+          "o4-",
+          "tts-"
         ],
         "exclude_contains": [
           "audio",
@@ -2284,18 +4296,18 @@
         ]
       },
       "anthropic": {
-          "exclude_prefixes": [
-            "sora-",
-            "omni-moderation",
-            "dall-e-"
-          ],
-          "exclude_contains": [
-            "-tts",
-            "transcribe",
-            "search-preview",
-            "search-api"
-          ],
-          "exclude_exact": []
+        "exclude_prefixes": [
+          "sora-",
+          "omni-moderation",
+          "dall-e-"
+        ],
+        "exclude_contains": [
+          "-tts",
+          "transcribe",
+          "search-preview",
+          "search-api"
+        ],
+        "exclude_exact": []
       }
     }
   },
@@ -2339,10 +4351,25 @@
   "debug": {
     "show_debug_menu": true,
     "enable_debug_backgrounds": false,
-    "background_color_debug_mainpanel": [255, 200, 200],
-    "background_color_debug_detailpanel": [200, 255, 200],
-    "background_color_debug_databasepanel": [200, 200, 255],
-    "background_color_debug_statuspanel": [255, 255, 200]
+    "background_color_debug_mainpanel": [
+      255,
+      200,
+      200
+    ],
+    "background_color_debug_detailpanel": [
+      200,
+      255,
+      200
+    ],
+    "background_color_debug_databasepanel": [
+      200,
+      200,
+      255
+    ],
+    "background_color_debug_statuspanel": [
+      255,
+      255,
+      200
+    ]
   }
 }
-

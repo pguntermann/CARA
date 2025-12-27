@@ -2,7 +2,7 @@
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTableView, 
                              QPushButton, QDialog, QLabel, QLineEdit, QDialogButtonBox,
-                             QFormLayout)
+                             QFormLayout, QSizePolicy)
 from PyQt6.QtCore import Qt, QTimer, QSize
 from PyQt6.QtGui import QPalette, QColor
 from typing import Dict, Any, Optional, List, Tuple
@@ -88,7 +88,15 @@ class DetailMetadataView(QWidget):
         """Setup the metadata view UI."""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        
+        # Get button config to use bottom margin as spacing between button bar and table
+        ui_config = self.config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        metadata_config = panel_config.get('metadata', {})
+        button_config = metadata_config.get('button', {})
+        margins = button_config.get('margins', [8, 8, 8, 8])
+        # Use bottom margin from button config as spacing between button bar and table
+        layout.setSpacing(margins[2] if len(margins) > 2 else 8)
         
         # Create button bar
         button_bar = self._create_button_bar()
@@ -157,7 +165,7 @@ class DetailMetadataView(QWidget):
         return button_bar
 
     def _apply_button_styling(self) -> None:
-        """Apply shared detail-panel button styling to metadata buttons."""
+        """Apply shared detail-panel button styling to metadata buttons using StyleManager."""
         if not hasattr(self, "add_tag_button") or not hasattr(self, "remove_tag_button"):
             return
         
@@ -166,57 +174,33 @@ class DetailMetadataView(QWidget):
         metadata_button_config = detail_config.get('metadata', {}).get('button', {})
         tabs_config = detail_config.get('tabs', {})
         
+        # Get base background color from view (pane_background)
+        pane_bg = tabs_config.get('pane_background', [40, 40, 45])
         button_height = metadata_button_config.get('height', 28)
-        button_border_radius = metadata_button_config.get('border_radius', 4)
-        padding_values = metadata_button_config.get('padding', [6, 4])
-        if not isinstance(padding_values, (list, tuple)) or len(padding_values) < 2:
-            padding_values = [6, 4]
-        button_padding = [padding_values[0], padding_values[1]]
-        
-        background_color = metadata_button_config.get('background_color', [50, 50, 55])
-        text_color = metadata_button_config.get('text_color', [200, 200, 200])
         border_color = metadata_button_config.get('border_color', [60, 60, 65])
-        hover_bg = metadata_button_config.get('hover_background_color', [60, 60, 65])
-        hover_text = metadata_button_config.get('hover_text_color', [240, 240, 240])
-        active_bg = metadata_button_config.get('active_background_color', [70, 90, 130])
-        active_text = metadata_button_config.get('active_text_color', [240, 240, 240])
-        pressed_offset = metadata_button_config.get('pressed_background_offset', 10)
-        from app.utils.font_utils import resolve_font_family, scale_font_size
-        font_family = resolve_font_family(metadata_button_config.get('font_family', tabs_config.get('font_family', 'Helvetica Neue')))
-        font_size = scale_font_size(metadata_button_config.get('font_size', tabs_config.get('font_size', 10)))
         
-        button_stylesheet = f"""
-            QPushButton {{
-                background-color: rgb({background_color[0]}, {background_color[1]}, {background_color[2]});
-                color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});
-                border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});
-                border-radius: {button_border_radius}px;
-                padding: {button_padding[0]}px {button_padding[1]}px;
-                min-height: {button_height}px;
-                max-height: {button_height}px;
-                font-family: "{font_family}";
-                font-size: {font_size}pt;
-            }}
-            QPushButton:hover {{
-                background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});
-                color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});
-            }}
-            QPushButton:pressed {{
-                background-color: rgb({min(255, background_color[0] + pressed_offset)}, {min(255, background_color[1] + pressed_offset)}, {min(255, background_color[2] + pressed_offset)});
-            }}
-            QPushButton:checked {{
-                background-color: rgb({active_bg[0]}, {active_bg[1]}, {active_bg[2]});
-                color: rgb({active_text[0]}, {active_text[1]}, {active_text[2]});
-            }}
-            QPushButton:focus {{
-                outline: none;
-            }}
-        """
+        # Calculate background offset from button_config if available
+        # If button_config has explicit background_color, calculate offset from pane_bg
+        button_bg_color = metadata_button_config.get('background_color', [50, 50, 55])
+        background_offset = button_bg_color[0] - pane_bg[0] if button_bg_color[0] > pane_bg[0] else 20
         
+        bg_color_list = [pane_bg[0], pane_bg[1], pane_bg[2]]
+        border_color_list = [border_color[0], border_color[1], border_color[2]]
+        
+        # Apply button styling using StyleManager
+        from app.views.style import StyleManager
+        StyleManager.style_buttons(
+            [self.add_tag_button, self.remove_tag_button],
+            self.config,
+            bg_color_list,
+            border_color_list,
+            background_offset=background_offset,
+            min_height=button_height
+        )
+        # Set max height manually (StyleManager doesn't support max_height)
         for button in (self.add_tag_button, self.remove_tag_button):
-            button.setMinimumHeight(button_height)
-            button.setStyleSheet(button_stylesheet)
-
+            button.setMaximumHeight(button_height)
+        
         # Ensure consistent width across metadata buttons
         width = max(
             self.add_tag_button.sizeHint().width(),
@@ -976,30 +960,6 @@ class AddTagDialog(QDialog):
             }}
         """
         
-        # Button styling
-        bg_r = self.dialog_bg_color[0]
-        bg_g = self.dialog_bg_color[1]
-        bg_b = self.dialog_bg_color[2]
-        
-        button_style = f"""
-            QPushButton {{
-                font-size: {self.button_font_size}pt;
-                color: rgb({self.button_text_color[0]}, {self.button_text_color[1]}, {self.button_text_color[2]});
-                background-color: rgb({min(255, bg_r + self.button_bg_offset)}, {min(255, bg_g + self.button_bg_offset)}, {min(255, bg_b + self.button_bg_offset)});
-                border: 1px solid rgb({self.button_border_color[0]}, {self.button_border_color[1]}, {self.button_border_color[2]});
-                border-radius: {self.button_border_radius}px;
-                padding: {self.button_padding}px;
-                min-width: {self.button_width}px;
-                min-height: {self.button_height}px;
-            }}
-            QPushButton:hover {{
-                background-color: rgb({min(255, bg_r + self.button_hover_bg_offset)}, {min(255, bg_g + self.button_hover_bg_offset)}, {min(255, bg_b + self.button_hover_bg_offset)});
-            }}
-            QPushButton:pressed {{
-                background-color: rgb({min(255, bg_r + self.button_pressed_bg_offset)}, {min(255, bg_g + self.button_pressed_bg_offset)}, {min(255, bg_b + self.button_pressed_bg_offset)});
-            }}
-        """
-        
         # Apply styles
         for label in self.findChildren(QLabel):
             label.setStyleSheet(label_style)
@@ -1007,8 +967,23 @@ class AddTagDialog(QDialog):
         for line_edit in self.findChildren(QLineEdit):
             line_edit.setStyleSheet(input_style)
         
-        for button in self.findChildren(QPushButton):
-            button.setStyleSheet(button_style)
+        # Apply button styling using StyleManager
+        from app.views.style import StyleManager
+        buttons = list(self.findChildren(QPushButton))
+        if buttons:
+            bg_color_list = [self.dialog_bg_color[0], self.dialog_bg_color[1], self.dialog_bg_color[2]]
+            border_color_list = [self.button_border_color[0], self.button_border_color[1], self.button_border_color[2]]
+            StyleManager.style_buttons(
+                buttons,
+                self.config,
+                bg_color_list,
+                border_color_list,
+                background_offset=self.button_bg_offset,
+                hover_background_offset=self.button_hover_bg_offset,
+                pressed_background_offset=self.button_pressed_bg_offset,
+                min_width=self.button_width,
+                min_height=self.button_height
+            )
     
     def _on_ok_clicked(self) -> None:
         """Handle OK button click."""
