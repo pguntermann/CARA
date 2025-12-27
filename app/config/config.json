@@ -316,6 +316,11 @@
         "summary": {
           "placeholder_text_not_analyzed": "Run Game Analysis to view Game Summary",
           "placeholder_text_to_be_implemented": "to be implemented...",
+          "placeholder": {
+            "text_color": [150, 150, 150],
+            "font_size": 14,
+            "padding": 20
+          },
           "evaluation_graph": {
             "height": 200,
             "minimum_height": 100,
@@ -468,7 +473,8 @@
             "combo_minimum_width": 200,
             "button_width": 80,
             "button_height": 28,
-            "row_spacing": 8
+            "row_spacing": 8,
+            "label_padding": 10
           },
           "button": {
             "height": 28,
@@ -478,7 +484,25 @@
             "border_color": [60, 60, 65],
             "hover_background_color": [60, 60, 65],
             "hover_text_color": [240, 240, 240],
-            "font_size": 10
+            "font_size": 10,
+            "border_width": 1,
+            "background_offset": 20
+          },
+          "input_widgets": {
+            "background_color": [30, 30, 35],
+            "border_color": [60, 60, 65],
+            "focus_border_color": [70, 90, 130],
+            "selection_background_color": [70, 90, 130],
+            "selection_text_color": [240, 240, 240]
+          },
+          "scroll_area": {
+            "border_color_offset": 20
+          },
+          "openings": {
+            "label_column_width": 120,
+            "margins_width": 40,
+            "min_value_width": 150,
+            "min_eco_width": 100
           },
           "analysis_coverage": {
             "show_banner": true,
@@ -514,6 +538,10 @@
             },
             "item_spacing": 8,
             "item_margins": [8, 6, 8, 6],
+            "button": {
+              "height": 28
+            },
+            "button_column_spacing": 8,
             "truncation": {
               "min_text_width": 50
             },
@@ -648,6 +676,11 @@
           "max_depth": null
         },
         "annotations": {
+          "placeholder": {
+            "text_color": [150, 150, 150],
+            "font_size": 14,
+            "padding": 20
+          },
           "layout": {
             "spacing": 8,
             "controls_padding": 5,

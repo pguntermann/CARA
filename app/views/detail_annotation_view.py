@@ -502,17 +502,23 @@ class DetailAnnotationView(QWidget):
         # Add splitter to main layout
         layout.addWidget(self.splitter)
         
-        # Disabled state placeholder (shown when no active game)
-        placeholder_font_size = int(scale_font_size(14))
+        # Disabled state placeholder (uses config values with DPI scaling)
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        annotations_config = panel_config.get('annotations', {})
+        placeholder_config = annotations_config.get('placeholder', {})
+        placeholder_text_color = placeholder_config.get('text_color', [150, 150, 150])
+        placeholder_font_size = int(scale_font_size(placeholder_config.get('font_size', 14)))
+        placeholder_padding = placeholder_config.get('padding', 20)
+        
         self.disabled_placeholder = QLabel("No active game. Load a game to add annotations.")
         self.disabled_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.disabled_placeholder.setWordWrap(True)
         self.disabled_placeholder.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.disabled_placeholder.setStyleSheet(f"""
             QLabel {{
-                color: rgb(150, 150, 150);
+                color: rgb({placeholder_text_color[0]}, {placeholder_text_color[1]}, {placeholder_text_color[2]});
                 font-size: {placeholder_font_size}pt;
-                padding: 20px;
+                padding: {placeholder_padding}px;
             }}
         """)
         self.disabled_placeholder.hide()  # Initially hidden

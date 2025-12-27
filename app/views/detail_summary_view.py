@@ -732,17 +732,22 @@ class DetailSummaryView(QWidget):
         # Store splitter reference for potential future use
         self.splitter = splitter
         
-        # Disabled state placeholder (matches annotation view style)
+        # Disabled state placeholder (uses config values with DPI scaling)
+        placeholder_config = summary_config.get('placeholder', {})
+        placeholder_text_color = placeholder_config.get('text_color', [150, 150, 150])
+        placeholder_font_size = int(scale_font_size(placeholder_config.get('font_size', 14)))
+        placeholder_padding = placeholder_config.get('padding', 20)
+        
         self.disabled_placeholder = QLabel(self.placeholder_text_not_analyzed)
         self.disabled_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.disabled_placeholder.setWordWrap(True)
         self.disabled_placeholder.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.disabled_placeholder.setStyleSheet("""
-            QLabel {
-                color: rgb(150, 150, 150);
-                font-size: 14px;
-                padding: 20px;
-            }
+        self.disabled_placeholder.setStyleSheet(f"""
+            QLabel {{
+                color: rgb({placeholder_text_color[0]}, {placeholder_text_color[1]}, {placeholder_text_color[2]});
+                font-size: {placeholder_font_size}pt;
+                padding: {placeholder_padding}px;
+            }}
         """)
         self.disabled_placeholder.hide()
         layout.addWidget(self.disabled_placeholder)

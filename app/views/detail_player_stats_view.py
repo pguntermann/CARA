@@ -2,11 +2,11 @@
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
-    QGridLayout, QSizePolicy, QComboBox, QPushButton, QRadioButton, QButtonGroup, QApplication,
+    QGridLayout, QSizePolicy, QComboBox, QPushButton, QApplication,
     QGraphicsOpacityEffect
 )
 from PyQt6.QtCore import Qt, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QThread, pyqtSignal, QMutex, QMutexLocker
-from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QPalette, QFontMetrics
+from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QFontMetrics
 from app.views.detail_summary_view import PieChartWidget
 from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 from app.models.database_model import DatabaseModel
@@ -540,7 +540,10 @@ class DetailPlayerStatsView(QWidget):
         pane_bg = tabs_config.get('pane_background', [40, 40, 45])
         # Apply scrollbar styling using StyleManager
         from app.views.style import StyleManager
-        border_color = [min(255, pane_bg[0] + 20), min(255, pane_bg[1] + 20), min(255, pane_bg[2] + 20)]
+        # Get border color offset from config
+        scroll_area_config = player_stats_config.get('scroll_area', {})
+        border_color_offset = scroll_area_config.get('border_color_offset', 20)
+        border_color = [min(255, pane_bg[0] + border_color_offset), min(255, pane_bg[1] + border_color_offset), min(255, pane_bg[2] + border_color_offset)]
         StyleManager.style_scroll_area(
             self.scroll_area,
             self.config,
@@ -911,14 +914,99 @@ class DetailPlayerStatsView(QWidget):
         layout.setContentsMargins(section_margins[0], section_margins[1], section_margins[2], section_margins[3])
         layout.setSpacing(section_spacing)
         
+        # Get styling configuration first (needed for both comboboxes)
+        button_config = player_stats_config.get('button', {})
+        font_config = player_stats_config.get('fonts', {})
+        
+        # Get colors - use text color from view config, input colors from input_widgets config
+        combo_text = list(colors_config.get('text_color', [220, 220, 220]))
+        input_widgets_config = player_stats_config.get('input_widgets', {})
+        combo_bg = input_widgets_config.get('background_color', [30, 30, 35])
+        combo_border = input_widgets_config.get('border_color', [60, 60, 65])
+        combo_focus = input_widgets_config.get('focus_border_color', [70, 90, 130])
+        
+        # Get fonts from view config
+        font_family = resolve_font_family(font_config.get('label_font_family', 'Helvetica Neue'))
+        font_size = scale_font_size(font_config.get('label_font_size', 11))
+        
+        # Get button height to match button styling
+        button_height = button_config.get('height', 28)
+        
+        # Selection colors from input_widgets config
+        selection_bg = input_widgets_config.get('selection_background_color', [70, 90, 130])
+        selection_text = input_widgets_config.get('selection_text_color', [240, 240, 240])
+        
+        from app.views.style import StyleManager
+        
+        # Calculate label width to ensure alignment
+        # Use the longer label text to determine minimum width
+        label_font_metrics = QFontMetrics(label_font)
+        source_label_text = "Data Source:"
+        player_label_text = "Player:"
+        # Get label padding from selection config if available
+        label_padding = selection_config.get('label_padding', 10)
+        label_width = max(
+            label_font_metrics.horizontalAdvance(source_label_text),
+            label_font_metrics.horizontalAdvance(player_label_text)
+        ) + label_padding
+        
+        selection_row_spacing = selection_config.get('row_spacing', 8)
+        
+        # Data source combobox (replacing radio buttons for better styling consistency) - MOVED TO TOP
+        source_row = QHBoxLayout()
+        source_row.setSpacing(selection_row_spacing)
+        
+        source_label = QLabel("Data Source:")
+        source_label.setFont(label_font)
+        source_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
+        source_label.setMinimumWidth(label_width)
+        source_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        source_row.addWidget(source_label)
+        
+        # Create combobox for data source selection
+        self.source_combo = QComboBox()
+        self.source_combo.addItem("Active Database")
+        self.source_combo.addItem("All Open Databases")
+        self.source_combo.setCurrentIndex(0)  # Default to "Active Database"
+        self._use_all_databases = False
+        
+        self.source_combo.currentIndexChanged.connect(self._on_source_changed)
+        
+        # Apply combobox styling using StyleManager (same as player_combo)
+        StyleManager.style_comboboxes(
+            [self.source_combo],
+            self.config,
+            combo_text,
+            font_family,
+            font_size,
+            combo_bg,
+            combo_border,
+            combo_focus,
+            selection_bg,
+            selection_text,
+            border_width=1,
+            border_radius=3,
+            editable=False
+        )
+        
+        # Set button height to match player combo
+        self.source_combo.setMinimumHeight(button_height)
+        self.source_combo.setMaximumHeight(button_height)
+        
+        source_row.addWidget(self.source_combo, 1)  # Use stretch factor like player combo
+        source_row.addStretch()
+        
+        layout.addLayout(source_row)
+        
         # Player dropdown row
         player_row = QHBoxLayout()
-        selection_row_spacing = selection_config.get('row_spacing', 8)
         player_row.setSpacing(selection_row_spacing)
         
         player_label = QLabel("Player:")
         player_label.setFont(label_font)
         player_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
+        player_label.setMinimumWidth(label_width)
+        player_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         player_row.addWidget(player_label)
         
         # Player combo box - make non-editable and clickable anywhere to open dropdown
@@ -929,27 +1017,6 @@ class DetailPlayerStatsView(QWidget):
         
         # Apply combobox styling using StyleManager
         # StyleManager reads combobox-specific settings (like padding) from centralized config automatically
-        button_config = player_stats_config.get('button', {})
-        font_config = player_stats_config.get('fonts', {})
-        
-        # Get colors - use text color from view config, input colors from standard defaults (matching dialogs)
-        combo_text = list(colors_config.get('text_color', [220, 220, 220]))
-        combo_bg = [30, 30, 35]  # Standard input background (matching dialogs)
-        combo_border = [60, 60, 65]  # Standard input border (matching dialogs)
-        combo_focus = [70, 90, 130]  # Standard focus border (matching dialogs)
-        
-        # Get fonts from view config
-        font_family = resolve_font_family(font_config.get('label_font_family', 'Helvetica Neue'))
-        font_size = scale_font_size(font_config.get('label_font_size', 11))
-        
-        # Get button height to match button styling
-        button_height = button_config.get('height', 28)
-        
-        # Selection colors - use standard defaults (matching dialogs)
-        selection_bg = [70, 90, 130]
-        selection_text = [240, 240, 240]
-        
-        from app.views.style import StyleManager
         StyleManager.style_comboboxes(
             [self.player_combo],
             self.config,
@@ -973,41 +1040,6 @@ class DetailPlayerStatsView(QWidget):
         # Refresh button removed - dropdown auto-refreshes when databases change
         
         layout.addLayout(player_row)
-        
-        # Data source radio buttons
-        source_row = QHBoxLayout()
-        source_row.setSpacing(selection_row_spacing)
-        
-        source_label = QLabel("Data Source:")
-        source_label.setFont(label_font)
-        source_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
-        source_row.addWidget(source_label)
-        
-        self.source_button_group = QButtonGroup()
-        self.active_db_radio = QRadioButton("Active Database")
-        self.all_db_radio = QRadioButton("All Open Databases")
-        self.source_button_group.addButton(self.active_db_radio, 0)
-        self.source_button_group.addButton(self.all_db_radio, 1)
-        
-        # Always default to "Active Database"
-        self.active_db_radio.setChecked(True)
-        self._use_all_databases = False
-        
-        self.active_db_radio.toggled.connect(self._on_source_changed)
-        self.all_db_radio.toggled.connect(self._on_source_changed)
-        
-        # Apply radio button styling using StyleManager (uses unified config)
-        from app.views.style import StyleManager
-        StyleManager.style_radio_buttons(
-            [self.active_db_radio, self.all_db_radio],
-            self.config
-        )
-        
-        source_row.addWidget(self.active_db_radio)
-        source_row.addWidget(self.all_db_radio)
-        source_row.addStretch()
-        
-        layout.addLayout(source_row)
         
         # Store reference to widget
         self.player_selection_widget = container
@@ -1089,13 +1121,27 @@ class DetailPlayerStatsView(QWidget):
             self._current_player = player_name
             self._schedule_stats_recalculation()
     
-    def _apply_button_styling(self, button: QPushButton) -> None:
-        """Apply standard button styling from config using StyleManager."""
+    def _apply_button_styling(self, button: QPushButton, error_pattern_button: bool = False) -> None:
+        """Apply standard button styling from config using StyleManager.
+        
+        Args:
+            button: The button to style.
+            error_pattern_button: If True, use error_patterns button config instead of default button config.
+        """
         ui_config = self.config.get('ui', {})
         detail_config = ui_config.get('panels', {}).get('detail', {})
         player_stats_config = detail_config.get('player_stats', {})
-        button_config = player_stats_config.get('button', {})
         tabs_config = detail_config.get('tabs', {})
+        
+        # Get button config - use error_patterns button config if specified, otherwise default button config
+        if error_pattern_button:
+            error_patterns_config = player_stats_config.get('error_patterns', {})
+            button_config = error_patterns_config.get('button', {})
+            # Fallback to default button config if error_patterns button config not found
+            if not button_config:
+                button_config = player_stats_config.get('button', {})
+        else:
+            button_config = player_stats_config.get('button', {})
         
         # Get base background color from view (pane_background)
         pane_bg = tabs_config.get('pane_background', [40, 40, 45])
@@ -1105,7 +1151,8 @@ class DetailPlayerStatsView(QWidget):
         # Calculate background offset from button_config if available
         # If button_config has explicit background_color, calculate offset from pane_bg
         button_bg_color = button_config.get('background_color', [50, 50, 55])
-        background_offset = button_bg_color[0] - pane_bg[0] if button_bg_color[0] > pane_bg[0] else 20
+        default_background_offset = button_config.get('background_offset', 20)
+        background_offset = button_bg_color[0] - pane_bg[0] if button_bg_color[0] > pane_bg[0] else default_background_offset
         
         bg_color_list = [pane_bg[0], pane_bg[1], pane_bg[2]]
         border_color_list = [border_color[0], border_color[1], border_color[2]]
@@ -1123,7 +1170,9 @@ class DetailPlayerStatsView(QWidget):
         max_text = "View 99999 →"
         text_width = font_metrics.horizontalAdvance(max_text)
         padding = button_style_config.get('padding', 5)
-        min_button_width = text_width + (padding * 2) + 10  # Add extra 10px for border and spacing
+        # Get border width from button config if available, otherwise use default
+        border_width = button_config.get('border_width', 1)
+        min_button_width = text_width + (padding * 2) + (border_width * 2)
         
         # Apply button styling using StyleManager (uses unified config)
         from app.views.style import StyleManager
@@ -1144,10 +1193,14 @@ class DetailPlayerStatsView(QWidget):
         """Handle refresh button click."""
         self._populate_player_dropdown()
     
-    def _on_source_changed(self) -> None:
-        """Handle data source radio button change."""
-        # Update flag
-        self._use_all_databases = self.all_db_radio.isChecked()
+    def _on_source_changed(self, index: int = -1) -> None:
+        """Handle data source combobox change."""
+        # Get selected index if not provided
+        if index < 0:
+            index = self.source_combo.currentIndex()
+        
+        # Update flag: index 0 = Active Database, index 1 = All Open Databases
+        self._use_all_databases = (index == 1)
         
         # Reconnect to database changes (different set of databases)
         self._connect_to_database_changes()
@@ -2204,7 +2257,10 @@ class DetailPlayerStatsView(QWidget):
         widget.setMaximumWidth(16777215)  # Will be constrained by parent
         
         layout = QVBoxLayout(widget)
-        layout.setContentsMargins(section_margins[0], section_margins[1], section_margins[2], section_margins[3])
+        # Ensure bottom margin matches top margin for consistent padding
+        # Use top margin value for bottom to ensure equal padding
+        bottom_margin = max(section_margins[1], section_margins[3])  # Use the larger of top or original bottom
+        layout.setContentsMargins(section_margins[0], section_margins[1], section_margins[2], bottom_margin)
         layout.setSpacing(section_spacing)
         
         # Store reference for responsive width handling
@@ -2212,15 +2268,18 @@ class DetailPlayerStatsView(QWidget):
         self._error_pattern_items = []
         
         # Add each pattern
-        for pattern in patterns:
+        for i, pattern in enumerate(patterns):
             pattern_data = self._create_error_pattern_item(
                 pattern, text_color, label_font, value_font, bg_color, border_color, widgets_config
             )
             pattern_widget = pattern_data['item']
             layout.addWidget(pattern_widget)
             self._error_pattern_items.append(pattern_data)
-        
-        layout.addStretch()
+            
+            # Add extra spacing after the last item to ensure bottom padding
+            if i == len(patterns) - 1:
+                # Add explicit spacing to guarantee bottom margin is visible
+                layout.addSpacing(2)
         
         # Update visibility based on initial width
         QTimer.singleShot(0, self._update_error_patterns_visibility)
@@ -2248,12 +2307,18 @@ class DetailPlayerStatsView(QWidget):
         # Get spacing and margins from config
         item_spacing = error_patterns_config.get('item_spacing', 8)
         item_margins = error_patterns_config.get('item_margins', [8, 6, 8, 6])
+        button_column_spacing = error_patterns_config.get('button_column_spacing', 8)  # Spacing between text column and button column
         
+        # Use QHBoxLayout with two columns: text content (left) and button (right)
         layout = QHBoxLayout(item)
-        layout.setSpacing(item_spacing)
+        layout.setSpacing(button_column_spacing)
         layout.setContentsMargins(item_margins[0], item_margins[1], item_margins[2], item_margins[3])
-        # Ensure layout doesn't add extra spacing that prevents shrinking
         layout.setSizeConstraint(QHBoxLayout.SizeConstraint.SetNoConstraint)
+        
+        # Left column: indicator and text content (description + frequency stacked vertically)
+        left_column = QHBoxLayout()
+        left_column.setSpacing(item_spacing)
+        left_column.setContentsMargins(0, 0, 0, 0)
         
         # Severity indicator (colored square)
         severity_indicator_config = error_patterns_config.get('severity_indicator', {})
@@ -2277,7 +2342,13 @@ class DetailPlayerStatsView(QWidget):
                 border-radius: {indicator_border_radius}px;
             }}
         """)
-        layout.addWidget(indicator)
+        left_column.addWidget(indicator)
+        
+        # Text column: description and frequency stacked vertically
+        text_column = QVBoxLayout()
+        text_column.setSpacing(0)  # No spacing between description and frequency
+        text_column.setContentsMargins(0, 0, 0, 0)
+        text_column.setAlignment(Qt.AlignmentFlag.AlignTop)
         
         # Pattern description - allow wrapping and shrinking
         desc_label = QLabel(pattern.description)
@@ -2286,7 +2357,7 @@ class DetailPlayerStatsView(QWidget):
         desc_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
         desc_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         desc_label.setMinimumWidth(0)  # Allow description to shrink
-        layout.addWidget(desc_label, 1)  # Give it stretch factor
+        text_column.addWidget(desc_label)
         
         # Frequency/percentage - compact display
         freq_text = f"({pattern.frequency}, {pattern.percentage:.1f}%)"
@@ -2294,16 +2365,22 @@ class DetailPlayerStatsView(QWidget):
         freq_label.setFont(value_font)
         freq_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
         freq_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
-        layout.addWidget(freq_label, 0)  # No stretch
+        text_column.addWidget(freq_label)
         
-        # View games button (if games available)
+        left_column.addLayout(text_column, 1)  # Give text column stretch factor
+        
+        layout.addLayout(left_column, 1)  # Left column gets stretch factor
+        
+        # Right column: View button (vertically centered, independent of text alignment)
         view_button = None
         if pattern.related_games:
             view_button = QPushButton(f"View {len(pattern.related_games)} →")
-            self._apply_button_styling(view_button)
+            # Apply button styling using error_patterns button config
+            self._apply_button_styling(view_button, error_pattern_button=True)
             view_button.clicked.connect(lambda checked, p=pattern: self._on_view_pattern_games(p))
             view_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
-            layout.addWidget(view_button, 0)  # No stretch
+            # Add button to layout with vertical center alignment
+            layout.addWidget(view_button, 0, Qt.AlignmentFlag.AlignVCenter)  # No stretch, vertically centered
         
         # Return item data for responsive handling
         return {
@@ -2766,9 +2843,14 @@ class DetailPlayerStatsView(QWidget):
                 # Show full text with opening names (now with line breaks for better wrapping)
                 value_label.setText(full_text)
                 # Calculate reasonable max width based on available space
-                # Leave room for label column (~120px) and margins (~40px)
-                # Allow natural wrapping with line breaks - use expanding policy
-                max_value_width = max(150, available_width - 160)
+                # Get width calculation values from config
+                panel_config = self.config.get('ui', {}).get('panels', {}).get('detail', {})
+                player_stats_config = panel_config.get('player_stats', {})
+                openings_config = player_stats_config.get('openings', {})
+                label_column_width = openings_config.get('label_column_width', 120)
+                margins_width = openings_config.get('margins_width', 40)
+                min_value_width = openings_config.get('min_value_width', 150)
+                max_value_width = max(min_value_width, available_width - label_column_width - margins_width)
                 value_label.setMaximumWidth(max_value_width)
                 if opacity_effect:
                     # Animate opacity to 1.0 (fully visible)
@@ -2782,8 +2864,14 @@ class DetailPlayerStatsView(QWidget):
                 # Show ECO-only text (single line, more compact)
                 value_label.setText(eco_only_text if eco_only_text else full_text)
                 # Set maximum width to prevent overflow
-                # Leave room for label column (~120px) and margins (~40px)
-                estimated_available = max(100, available_width - 160)
+                # Get width calculation values from config
+                panel_config = self.config.get('ui', {}).get('panels', {}).get('detail', {})
+                player_stats_config = panel_config.get('player_stats', {})
+                openings_config = player_stats_config.get('openings', {})
+                label_column_width = openings_config.get('label_column_width', 120)
+                margins_width = openings_config.get('margins_width', 40)
+                min_eco_width = openings_config.get('min_eco_width', 100)
+                estimated_available = max(min_eco_width, available_width - label_column_width - margins_width)
                 value_label.setMaximumWidth(estimated_available)
                 if opacity_effect:
                     # Keep opacity at 1.0 for ECO-only text
