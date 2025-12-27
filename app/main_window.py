@@ -1155,6 +1155,67 @@ class MainWindow(QMainWindow):
         
         menu_bar.setStyleSheet(stylesheet)
     
+    def _apply_menu_styling(self, menu: QMenu) -> None:
+        """Apply styling to a QMenu (used for submenus).
+        
+        Args:
+            menu: The QMenu instance to style.
+        """
+        ui_config = self.config.get('ui', {})
+        menu_config = ui_config.get('menu', {})
+        
+        # Get font settings
+        font_family = resolve_font_family(menu_config.get('font_family', 'Helvetica Neue'))
+        font_size = scale_font_size(menu_config.get('font_size', 10))
+        
+        # Get color settings
+        colors_config = menu_config.get('colors', {})
+        normal = colors_config.get('normal', {})
+        hover = colors_config.get('hover', {})
+        
+        # Normal state colors
+        norm_bg = normal.get('background', [45, 45, 50])
+        norm_text = normal.get('text', [200, 200, 200])
+        
+        # Hover state colors
+        hover_bg = hover.get('background', [55, 55, 60])
+        hover_text = hover.get('text', [230, 230, 230])
+        
+        menu_config_obj = menu_config.get('menu', {})
+        menu_border_width = menu_config_obj.get('border_width', 1)
+        menu_border_color = menu_config_obj.get('border_color', [60, 60, 65])
+        menu_item_padding = menu_config_obj.get('item_padding', [4, 20, 4, 8])
+        
+        separator_config = menu_config.get('separator', {})
+        separator_height = separator_config.get('height', 1)
+        separator_bg_color = separator_config.get('background_color', [60, 60, 65])
+        separator_margin = separator_config.get('margin', [2, 4])
+        
+        # Create stylesheet for QMenu (same as in menu bar styling)
+        stylesheet = f"""
+            QMenu {{
+                background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
+                color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
+                border: {menu_border_width}px solid rgb({menu_border_color[0]}, {menu_border_color[1]}, {menu_border_color[2]});
+                font-family: "{font_family}";
+                font-size: {font_size}pt;
+            }}
+            QMenu::item {{
+                padding: {menu_item_padding[0]}px {menu_item_padding[1]}px {menu_item_padding[2]}px {menu_item_padding[3]}px;
+            }}
+            QMenu::item:selected {{
+                background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});
+                color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});
+            }}
+            QMenu::separator {{
+                height: {separator_height}px;
+                background-color: rgb({separator_bg_color[0]}, {separator_bg_color[1]}, {separator_bg_color[2]});
+                margin: {separator_margin[0]}px {separator_margin[1]}px;
+            }}
+        """
+        
+        menu.setStyleSheet(stylesheet)
+    
     def _require_active_database(self) -> Optional[DatabaseModel]:
         """Helper method to validate and return active database.
         
@@ -4043,6 +4104,9 @@ Visibility Settings:
         for engine in engines:
             # Create submenu for this engine
             engine_submenu = QMenu(engine.name, self)
+            
+            # Apply menu styling to submenu (same as menu bar styling)
+            self._apply_menu_styling(engine_submenu)
             
             # Remove Engine action
             remove_action = QAction("Remove Engine", self)
