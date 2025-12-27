@@ -23,6 +23,12 @@
       "combobox": {
         "dropdown_border_radius": 3,
         "padding": [8, 6]
+      },
+      "radio_button": {
+        "text_color": [200, 200, 200],
+        "font_family": "Helvetica Neue",
+        "font_size": 11,
+        "spacing": 5
       }
     },
     "window": {

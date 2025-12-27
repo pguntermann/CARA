@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from typing import Dict, Any, List
-from PyQt6.QtWidgets import QScrollArea, QCheckBox, QComboBox
+from PyQt6.QtWidgets import QScrollArea, QCheckBox, QComboBox, QRadioButton
 
 from app.views.style.scrollbar import (
     apply_scrollbar_styling,
@@ -11,6 +11,7 @@ from app.views.style.scrollbar import (
 )
 from app.views.style.checkbox import apply_checkbox_styling
 from app.views.style.combobox import apply_combobox_styling
+from app.views.style.radio_button import apply_radio_button_styling
 
 
 class StyleManager:
@@ -140,5 +141,45 @@ class StyleManager:
             comboboxes, config, text_color, font_family, font_size,
             bg_color, border_color, focus_border_color, selection_bg_color,
             selection_text_color, border_width, border_radius, padding, editable
+        )
+    
+    @staticmethod
+    def style_radio_buttons(
+        radio_buttons: List[QRadioButton],
+        config: Dict[str, Any],
+        text_color: List[int] = None,
+        font_family: str = None,
+        font_size: float = None,
+        spacing: int = None
+    ) -> None:
+        """Apply radio button styling to a list of radio buttons.
+        
+        Args:
+            radio_buttons: List of QRadioButton widgets to style.
+            config: Configuration dictionary.
+            text_color: Text color as [R, G, B]. If None, reads from centralized config.
+            font_family: Font family name. If None, reads from centralized config.
+            font_size: Font size in points. If None, reads from centralized config (with DPI scaling).
+            spacing: Spacing between indicator and label in pixels. If None, reads from centralized config.
+        """
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        
+        # Get unified config values if parameters are not provided
+        styles_config = config.get('ui', {}).get('styles', {})
+        radio_button_config = styles_config.get('radio_button', {})
+        
+        if text_color is None:
+            text_color = radio_button_config.get('text_color', [200, 200, 200])
+        if font_family is None:
+            font_family_raw = radio_button_config.get('font_family', 'Helvetica Neue')
+            font_family = resolve_font_family(font_family_raw)
+        if font_size is None:
+            font_size_raw = radio_button_config.get('font_size', 11)
+            font_size = scale_font_size(font_size_raw)
+        if spacing is None:
+            spacing = radio_button_config.get('spacing', 5)
+        
+        apply_radio_button_styling(
+            radio_buttons, config, text_color, font_family, font_size, spacing
         )
 

@@ -1149,23 +1149,11 @@ class BulkAnalysisDialog(QDialog):
             checkmark_path
         )
         
-        # Radio button styling (use same as labels)
-        # Get checkbox spacing from global config for radio buttons
-        styles_config = self.config.get('ui', {}).get('styles', {})
-        checkbox_config = styles_config.get('checkbox', {})
-        checkbox_spacing = checkbox_config.get('spacing', 5)
-        
-        radio_style = (
-            f"QRadioButton {{"
-            f"font-family: {label_font_family}; "
-            f"font-size: {label_font_size}pt; "
-            f"color: rgb({label_text_color[0]}, {label_text_color[1]}, {label_text_color[2]});"
-            f"spacing: {checkbox_spacing}px;"
-            f"}}"
-        )
-        
-        for radio in self.findChildren(QRadioButton):
-            radio.setStyleSheet(radio_style)
+        # Apply radio button styling using StyleManager (uses unified config)
+        from app.views.style import StyleManager
+        radio_buttons = list(self.findChildren(QRadioButton))
+        if radio_buttons:
+            StyleManager.style_radio_buttons(radio_buttons, self.config)
         
         # SpinBox styling (use input widget colors, hide arrows)
         input_bg_color = dialog_config.get('background_color', [40, 40, 45])
