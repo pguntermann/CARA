@@ -327,86 +327,52 @@ class EngineDialog(QDialog):
         for group in self.findChildren(QGroupBox):
             group.setStyleSheet(group_style)
         
-        # Buttons styling (match Classification Settings Dialog template)
+        # Apply button styling using StyleManager (uses unified config)
         buttons_config = dialog_config.get('buttons', {})
         button_width = buttons_config.get('width', 120)
         button_height = buttons_config.get('height', 30)
-        button_border_radius = buttons_config.get('border_radius', 3)
-        button_padding = buttons_config.get('padding', 5)
-        button_bg_offset = buttons_config.get('background_offset', 20)
-        button_hover_offset = buttons_config.get('hover_background_offset', 30)
-        button_pressed_offset = buttons_config.get('pressed_background_offset', 10)
         
-        # Get colors from dialog background and labels for consistency
+        # Get colors from dialog background for consistency
         dialog_bg = dialog_config.get('background_color', [40, 40, 45])
-        label_text_color = labels_config.get('text_color', [200, 200, 200])
-        from app.utils.font_utils import scale_font_size
-        label_font_size = scale_font_size(labels_config.get('font_size', 11))
         # Use border color from input widgets for consistency
         input_border = input_config.get('border_color', [60, 60, 65])
+        bg_color_list = [dialog_bg[0], dialog_bg[1], dialog_bg[2]]
+        border_color_list = [input_border[0], input_border[1], input_border[2]]
         
-        button_style = (
-            f"QPushButton {{"
-            f"min-width: {button_width}px;"
-            f"min-height: {button_height}px;"
-            f"background-color: rgb({dialog_bg[0] + button_bg_offset}, {dialog_bg[1] + button_bg_offset}, {dialog_bg[2] + button_bg_offset});"
-            f"border: 1px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
-            f"border-radius: {button_border_radius}px;"
-            f"color: rgb({label_text_color[0]}, {label_text_color[1]}, {label_text_color[2]});"
-            f"font-size: {label_font_size}pt;"
-            f"padding: {button_padding}px;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"background-color: rgb({dialog_bg[0] + button_hover_offset}, {dialog_bg[1] + button_hover_offset}, {dialog_bg[2] + button_hover_offset});"
-            f"}}"
-            f"QPushButton:pressed {{"
-            f"background-color: rgb({dialog_bg[0] + button_pressed_offset}, {dialog_bg[1] + button_pressed_offset}, {dialog_bg[2] + button_pressed_offset});"
-            f"}}"
-            f"QPushButton:disabled {{"
-            f"background-color: rgb({(dialog_bg[0] + button_bg_offset) // 2}, {(dialog_bg[1] + button_bg_offset) // 2}, {(dialog_bg[2] + button_bg_offset) // 2});"
-            f"color: rgb({label_text_color[0] // 2}, {label_text_color[1] // 2}, {label_text_color[2] // 2});"
-            f"}}"
-        )
+        from app.views.style import StyleManager
         
         # Apply button styling to all buttons except Browse button (which is part of file selection control)
-        for button in self.findChildren(QPushButton):
-            # Skip Browse button - it's part of the file selection control, not a main dialog button
-            if button.text() == "...":
-                continue
-            button.setStyleSheet(button_style)
+        all_buttons = self.findChildren(QPushButton)
+        main_buttons = [btn for btn in all_buttons if btn.text() != "..."]
+        if main_buttons:
+            StyleManager.style_buttons(
+                main_buttons,
+                self.config,
+                bg_color_list,
+                border_color_list,
+                min_width=button_width,
+                min_height=button_height
+            )
         
         # Style Browse button separately as a smaller control button that matches input field height
         # Get input field padding to calculate height
         input_padding = input_config.get('padding', [2, 6, 2, 6])
-        input_font_size = input_config.get('font_size', 11)
+        from app.utils.font_utils import scale_font_size
+        input_font_size = scale_font_size(input_config.get('font_size', 11))
         # Calculate approximate input field height: font size + top padding + bottom padding + border
         # We'll use a fixed height that matches typical input field height
         input_field_height = input_font_size + input_padding[0] + input_padding[2] + (input_border_width * 2) + 4  # +4 for line height
         
-        browse_button_style = (
-            f"QPushButton {{"
-            f"background-color: rgb({dialog_bg[0] + button_bg_offset}, {dialog_bg[1] + button_bg_offset}, {dialog_bg[2] + button_bg_offset});"
-            f"border: 1px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});"
-            f"border-radius: {button_border_radius}px;"
-            f"color: rgb({label_text_color[0]}, {label_text_color[1]}, {label_text_color[2]});"
-            f"font-size: {input_font_size}pt;"
-            f"padding: {input_padding[0]}px {input_padding[1]}px {input_padding[2]}px {input_padding[3]}px;"
-            f"min-height: {input_field_height}px;"
-            f"max-height: {input_field_height}px;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"background-color: rgb({dialog_bg[0] + button_hover_offset}, {dialog_bg[1] + button_hover_offset}, {dialog_bg[2] + button_hover_offset});"
-            f"}}"
-            f"QPushButton:pressed {{"
-            f"background-color: rgb({dialog_bg[0] + button_pressed_offset}, {dialog_bg[1] + button_pressed_offset}, {dialog_bg[2] + button_pressed_offset});"
-            f"}}"
-        )
-        
-        # Apply Browse button styling
-        for button in self.findChildren(QPushButton):
-            if button.text() == "...":
-                button.setStyleSheet(browse_button_style)
-                break
+        browse_buttons = [btn for btn in all_buttons if btn.text() == "..."]
+        if browse_buttons:
+            StyleManager.style_buttons(
+                browse_buttons,
+                self.config,
+                bg_color_list,
+                border_color_list,
+                min_height=input_field_height,
+                padding=input_padding[0]  # Use vertical padding from input
+            )
         
     
     def _browse_engine_path(self) -> None:

@@ -809,36 +809,22 @@ class ClassificationSettingsDialog(QDialog):
             checkmark_path
         )
         
-        # Buttons
+        # Apply button styling using StyleManager (uses unified config)
         button_width = buttons_config.get('width', 120)
         button_height = buttons_config.get('height', 30)
-        button_border_radius = buttons_config.get('border_radius', 3)
-        button_padding = buttons_config.get('padding', 5)
-        button_bg_offset = buttons_config.get('background_offset', 20)
-        button_hover_offset = buttons_config.get('hover_background_offset', 30)
-        button_pressed_offset = buttons_config.get('pressed_background_offset', 10)
+        bg_color_list = [dialog_bg_color[0], dialog_bg_color[1], dialog_bg_color[2]]
+        border_color_list = [border_color[0], border_color[1], border_color[2]]
         
-        button_style = (
-            f"QPushButton {{"
-            f"min-width: {button_width}px;"
-            f"min-height: {button_height}px;"
-            f"background-color: rgb({dialog_bg_color[0] + button_bg_offset}, {dialog_bg_color[1] + button_bg_offset}, {dialog_bg_color[2] + button_bg_offset});"
-            f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
-            f"border-radius: {button_border_radius}px;"
-            f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
-            f"font-size: {font_size}pt;"
-            f"padding: {button_padding}px;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"background-color: rgb({dialog_bg_color[0] + button_hover_offset}, {dialog_bg_color[1] + button_hover_offset}, {dialog_bg_color[2] + button_hover_offset});"
-            f"}}"
-            f"QPushButton:pressed {{"
-            f"background-color: rgb({dialog_bg_color[0] + button_pressed_offset}, {dialog_bg_color[1] + button_pressed_offset}, {dialog_bg_color[2] + button_pressed_offset});"
-            f"}}"
+        from app.views.style import StyleManager
+        all_buttons = self.findChildren(QPushButton)
+        StyleManager.style_buttons(
+            all_buttons,
+            self.config,
+            bg_color_list,
+            border_color_list,
+            min_width=button_width,
+            min_height=button_height
         )
-        
-        for button in self.findChildren(QPushButton):
-            button.setStyleSheet(button_style)
     
     def _validate_thresholds(self) -> Tuple[bool, str]:
         """Validate that CPL thresholds are in order.

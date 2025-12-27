@@ -725,37 +725,19 @@ class AIModelSettingsDialog(QDialog):
                 editable=False  # Model comboboxes are non-editable
             )
         
-        # Buttons - using background_offset approach from style guide
+        # Apply button styling using StyleManager (uses unified config)
         button_width = self.buttons_config.get('width', 120)
         button_height = self.buttons_config.get('height', 30)
-        button_border_radius = self.buttons_config.get('border_radius', 3)
-        button_padding = self.buttons_config.get('padding', 5)
-        button_bg_offset = self.buttons_config.get('background_offset', 20)
-        button_hover_offset = self.buttons_config.get('hover_background_offset', 30)
-        button_pressed_offset = self.buttons_config.get('pressed_background_offset', 10)
+        bg_color_list = [self.bg_color[0], self.bg_color[1], self.bg_color[2]]
+        border_color_list = [self.border_color[0], self.border_color[1], self.border_color[2]]
         
-        button_style = (
-            f"QPushButton {{"
-            f"min-width: {button_width}px;"
-            f"min-height: {button_height}px;"
-            f"background-color: rgb({self.bg_color[0] + button_bg_offset}, {self.bg_color[1] + button_bg_offset}, {self.bg_color[2] + button_bg_offset});"
-            f"border: 1px solid rgb({self.border_color[0]}, {self.border_color[1]}, {self.border_color[2]});"
-            f"border-radius: {button_border_radius}px;"
-            f"color: rgb({self.text_color[0]}, {self.text_color[1]}, {self.text_color[2]});"
-            f"font-size: {self.font_size}pt;"
-            f"padding: {button_padding}px;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"background-color: rgb({self.bg_color[0] + button_hover_offset}, {self.bg_color[1] + button_hover_offset}, {self.bg_color[2] + button_hover_offset});"
-            f"}}"
-            f"QPushButton:pressed {{"
-            f"background-color: rgb({self.bg_color[0] + button_pressed_offset}, {self.bg_color[1] + button_pressed_offset}, {self.bg_color[2] + button_pressed_offset});"
-            f"}}"
-            f"QPushButton:disabled {{"
-            f"background-color: rgb({self.bg_color[0]}, {self.bg_color[1]}, {self.bg_color[2]});"
-            f"color: rgb({self.text_color[0] // 2 + 64}, {self.text_color[1] // 2 + 64}, {self.text_color[2] // 2 + 64});"
-            f"}}"
+        from app.views.style import StyleManager
+        all_buttons = self.findChildren(QPushButton)
+        StyleManager.style_buttons(
+            all_buttons,
+            self.config,
+            bg_color_list,
+            border_color_list,
+            min_width=button_width,
+            min_height=button_height
         )
-        
-        for button in self.findChildren(QPushButton):
-            button.setStyleSheet(button_style)

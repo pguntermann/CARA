@@ -305,47 +305,26 @@ class BulkCleanPgnDialog(QDialog):
         self.setPalette(palette)
         self.setAutoFillBackground(True)
         
-        # Apply button styling
+        # Apply button styling using StyleManager (uses unified config)
         buttons_config = self.config.get("ui", {}).get("dialogs", {}).get("bulk_clean_pgn", {}).get("buttons", {})
         bg_color = self.config.get("ui", {}).get("dialogs", {}).get("bulk_clean_pgn", {}).get("background_color", [40, 40, 45])
         border_color = self.config.get("ui", {}).get("dialogs", {}).get("bulk_clean_pgn", {}).get("border_color", [60, 60, 65])
-        text_color = self.config.get("ui", {}).get("dialogs", {}).get("bulk_clean_pgn", {}).get("text_color", [200, 200, 200])
-        from app.utils.font_utils import scale_font_size
-        font_size = scale_font_size(self.config.get("ui", {}).get("dialogs", {}).get("bulk_clean_pgn", {}).get("font_size", 11))
         
         button_width = buttons_config.get("width", 120)
         button_height = buttons_config.get("height", 30)
-        button_border_radius = buttons_config.get("border_radius", 3)
-        button_padding = buttons_config.get("padding", 5)
-        button_bg_offset = buttons_config.get("background_offset", 20)
-        button_hover_offset = buttons_config.get("hover_background_offset", 30)
-        button_pressed_offset = buttons_config.get("pressed_background_offset", 10)
+        bg_color_list = [bg_color[0], bg_color[1], bg_color[2]]
+        border_color_list = [border_color[0], border_color[1], border_color[2]]
         
-        button_style = (
-            f"QPushButton {{"
-            f"min-width: {button_width}px;"
-            f"min-height: {button_height}px;"
-            f"background-color: rgb({bg_color[0] + button_bg_offset}, {bg_color[1] + button_bg_offset}, {bg_color[2] + button_bg_offset});"
-            f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
-            f"border-radius: {button_border_radius}px;"
-            f"padding: {button_padding}px;"
-            f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
-            f"font-size: {font_size}pt;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"background-color: rgb({bg_color[0] + button_hover_offset}, {bg_color[1] + button_hover_offset}, {bg_color[2] + button_hover_offset});"
-            f"}}"
-            f"QPushButton:pressed {{"
-            f"background-color: rgb({bg_color[0] + button_pressed_offset}, {bg_color[1] + button_pressed_offset}, {bg_color[2] + button_pressed_offset});"
-            f"}}"
-            f"QPushButton:disabled {{"
-            f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
-            f"color: rgb({text_color[0] // 2}, {text_color[1] // 2}, {text_color[2] // 2});"
-            f"}}"
+        from app.views.style import StyleManager
+        main_buttons = [self.apply_button, self.cancel_button]
+        StyleManager.style_buttons(
+            main_buttons,
+            self.config,
+            bg_color_list,
+            border_color_list,
+            min_width=button_width,
+            min_height=button_height
         )
-        
-        self.apply_button.setStyleSheet(button_style)
-        self.cancel_button.setStyleSheet(button_style)
         
         # Apply group box styling
         dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("bulk_clean_pgn", {})
@@ -462,39 +441,18 @@ class BulkCleanPgnDialog(QDialog):
         buttons_config = dialog_config.get("buttons", {})
         bg_color = dialog_config.get("background_color", [40, 40, 45])
         border_color = dialog_config.get("border_color", [60, 60, 65])
-        text_color = dialog_config.get("text_color", [200, 200, 200])
-        from app.utils.font_utils import scale_font_size
-        font_size = scale_font_size(dialog_config.get("font_size", 11))
         
-        button_border_radius = buttons_config.get("border_radius", 3)
-        button_padding = buttons_config.get("padding", 5)
-        button_bg_offset = buttons_config.get("background_offset", 20)
-        button_hover_offset = buttons_config.get("hover_background_offset", 30)
-        button_pressed_offset = buttons_config.get("pressed_background_offset", 10)
-        
-        quick_select_style = (
-            f"QPushButton {{"
-            f"background-color: rgb({bg_color[0] + button_bg_offset}, {bg_color[1] + button_bg_offset}, {bg_color[2] + button_bg_offset});"
-            f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
-            f"border-radius: {button_border_radius}px;"
-            f"padding: {button_padding}px;"
-            f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
-            f"font-size: {font_size}pt;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"background-color: rgb({bg_color[0] + button_hover_offset}, {bg_color[1] + button_hover_offset}, {bg_color[2] + button_hover_offset});"
-            f"}}"
-            f"QPushButton:pressed {{"
-            f"background-color: rgb({bg_color[0] + button_pressed_offset}, {bg_color[1] + button_pressed_offset}, {bg_color[2] + button_pressed_offset});"
-            f"}}"
-            f"QPushButton:disabled {{"
-            f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
-            f"color: rgb({text_color[0] // 2}, {text_color[1] // 2}, {text_color[2] // 2});"
-            f"}}"
+        # Apply quick select button styling using StyleManager (uses unified config)
+        from app.views.style import StyleManager
+        bg_color_list = [bg_color[0], bg_color[1], bg_color[2]]
+        border_color_list = [border_color[0], border_color[1], border_color[2]]
+        quick_select_buttons = [self.select_all_button, self.deselect_all_button]
+        StyleManager.style_buttons(
+            quick_select_buttons,
+            self.config,
+            bg_color_list,
+            border_color_list
         )
-        
-        self.select_all_button.setStyleSheet(quick_select_style)
-        self.deselect_all_button.setStyleSheet(quick_select_style)
     
     def _on_apply_clicked(self) -> None:
         """Handle apply button click."""

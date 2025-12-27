@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QGraphicsOpacityEffect
 )
 from PyQt6.QtCore import Qt, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QThread, pyqtSignal, QMutex, QMutexLocker
-from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QPalette
+from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QPalette, QFontMetrics
 from app.views.detail_summary_view import PieChartWidget
 from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 from app.models.database_model import DatabaseModel
@@ -1090,54 +1090,54 @@ class DetailPlayerStatsView(QWidget):
             self._schedule_stats_recalculation()
     
     def _apply_button_styling(self, button: QPushButton) -> None:
-        """Apply standard button styling from config."""
+        """Apply standard button styling from config using StyleManager."""
         ui_config = self.config.get('ui', {})
         detail_config = ui_config.get('panels', {}).get('detail', {})
         player_stats_config = detail_config.get('player_stats', {})
         button_config = player_stats_config.get('button', {})
+        tabs_config = detail_config.get('tabs', {})
         
+        # Get base background color from view (pane_background)
+        pane_bg = tabs_config.get('pane_background', [40, 40, 45])
         button_height = button_config.get('height', 28)
-        button_border_radius = button_config.get('border_radius', 4)
-        padding_values = button_config.get('padding', [6, 4])
-        if not isinstance(padding_values, (list, tuple)) or len(padding_values) < 2:
-            padding_values = [6, 4]
-        button_padding = [padding_values[0], padding_values[1]]
-        
-        background_color = button_config.get('background_color', [50, 50, 55])
-        text_color = button_config.get('text_color', [200, 200, 200])
         border_color = button_config.get('border_color', [60, 60, 65])
-        hover_bg = button_config.get('hover_background_color', [60, 60, 65])
-        hover_text = button_config.get('hover_text_color', [240, 240, 240])
-        pressed_offset = button_config.get('pressed_background_offset', 10)
-        from app.utils.font_utils import resolve_font_family, scale_font_size
-        font_family = resolve_font_family(button_config.get('font_family', 'Helvetica Neue'))
-        font_size = int(scale_font_size(button_config.get('font_size', 10)))
         
-        button_stylesheet = f"""
-            QPushButton {{
-                background-color: rgb({background_color[0]}, {background_color[1]}, {background_color[2]});
-                color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});
-                border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});
-                border-radius: {button_border_radius}px;
-                padding: {button_padding[0]}px {button_padding[1]}px;
-                min-height: {button_height}px;
-                max-height: {button_height}px;
-                font-family: "{font_family}";
-                font-size: {font_size}pt;
-            }}
-            QPushButton:hover {{
-                background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});
-                color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});
-            }}
-            QPushButton:pressed {{
-                background-color: rgb({min(255, background_color[0] + pressed_offset)}, {min(255, background_color[1] + pressed_offset)}, {min(255, background_color[2] + pressed_offset)});
-            }}
-            QPushButton:focus {{
-                outline: none;
-            }}
-        """
-        button.setMinimumHeight(button_height)
-        button.setStyleSheet(button_stylesheet)
+        # Calculate background offset from button_config if available
+        # If button_config has explicit background_color, calculate offset from pane_bg
+        button_bg_color = button_config.get('background_color', [50, 50, 55])
+        background_offset = button_bg_color[0] - pane_bg[0] if button_bg_color[0] > pane_bg[0] else 20
+        
+        bg_color_list = [pane_bg[0], pane_bg[1], pane_bg[2]]
+        border_color_list = [border_color[0], border_color[1], border_color[2]]
+        
+        # Calculate minimum width for "View 99999 →" (5 digits) to ensure consistent button widths
+        # Get font settings from unified config
+        styles_config = ui_config.get('styles', {})
+        button_style_config = styles_config.get('button', {})
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        font_family = resolve_font_family(button_style_config.get('font_family', 'Helvetica Neue'))
+        font_size = scale_font_size(button_style_config.get('font_size', 11))
+        button_font = QFont(font_family, int(font_size))
+        font_metrics = QFontMetrics(button_font)
+        # Calculate width for "View 99999 →" (5 digits) plus padding
+        max_text = "View 99999 →"
+        text_width = font_metrics.horizontalAdvance(max_text)
+        padding = button_style_config.get('padding', 5)
+        min_button_width = text_width + (padding * 2) + 10  # Add extra 10px for border and spacing
+        
+        # Apply button styling using StyleManager (uses unified config)
+        from app.views.style import StyleManager
+        StyleManager.style_buttons(
+            [button],
+            self.config,
+            bg_color_list,
+            border_color_list,
+            background_offset=background_offset,
+            min_height=button_height,
+            min_width=min_button_width
+        )
+        # Set max height manually (StyleManager doesn't support max_height)
+        button.setMaximumHeight(button_height)
     
     
     def _on_refresh_clicked(self) -> None:

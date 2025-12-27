@@ -294,28 +294,18 @@ class AnnotationPreferencesDialog(QDialog):
     
     def _apply_styling(self) -> None:
         """Apply styling from config.json to all UI elements."""
-        # Button styling
-        button_style = (
-            f"QPushButton {{"
-            f"min-width: {self.button_width}px;"
-            f"min-height: {self.button_height}px;"
-            f"background-color: rgb({self.bg_color[0] + self.button_bg_offset}, {self.bg_color[1] + self.button_bg_offset}, {self.bg_color[2] + self.button_bg_offset});"
-            f"border: 1px solid rgb({self.border_color[0]}, {self.border_color[1]}, {self.border_color[2]});"
-            f"border-radius: {self.button_border_radius}px;"
-            f"color: rgb({self.text_color[0]}, {self.text_color[1]}, {self.text_color[2]});"
-            f"font-size: {self.font_size}pt;"
-            f"padding: {self.button_padding}px;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"background-color: rgb({self.bg_color[0] + self.button_hover_offset}, {self.bg_color[1] + self.button_hover_offset}, {self.bg_color[2] + self.button_hover_offset});"
-            f"}}"
-            f"QPushButton:pressed {{"
-            f"background-color: rgb({self.bg_color[0] + self.button_pressed_offset}, {self.bg_color[1] + self.button_pressed_offset}, {self.bg_color[2] + self.button_pressed_offset});"
-            f"}}"
-        )
-        
-        for button in self.findChildren(QPushButton):
-            button.setStyleSheet(button_style)
+        # Apply button styling using StyleManager (uses unified config)
+        from app.views.style import StyleManager
+        buttons = list(self.findChildren(QPushButton))
+        if buttons:
+            StyleManager.style_buttons(
+                buttons,
+                self.config,
+                list(self.bg_color),
+                list(self.border_color),
+                min_width=self.button_width,
+                min_height=self.button_height
+            )
         
         # Label styling
         label_style = (

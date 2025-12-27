@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from typing import Dict, Any, List
-from PyQt6.QtWidgets import QScrollArea, QCheckBox, QComboBox, QRadioButton
+from PyQt6.QtWidgets import QScrollArea, QCheckBox, QComboBox, QRadioButton, QPushButton
 
 from app.views.style.scrollbar import (
     apply_scrollbar_styling,
@@ -12,6 +12,7 @@ from app.views.style.scrollbar import (
 from app.views.style.checkbox import apply_checkbox_styling
 from app.views.style.combobox import apply_combobox_styling
 from app.views.style.radio_button import apply_radio_button_styling
+from app.views.style.button import apply_button_styling
 
 
 class StyleManager:
@@ -181,5 +182,76 @@ class StyleManager:
         
         apply_radio_button_styling(
             radio_buttons, config, text_color, font_family, font_size, spacing
+        )
+    
+    @staticmethod
+    def style_buttons(
+        buttons: List[QPushButton],
+        config: Dict[str, Any],
+        bg_color: List[int],
+        border_color: List[int],
+        text_color: List[int] = None,
+        font_family: str = None,
+        font_size: float = None,
+        border_radius: int = None,
+        padding: int = None,
+        background_offset: int = None,
+        hover_background_offset: int = None,
+        pressed_background_offset: int = None,
+        min_width: int = None,
+        min_height: int = None
+    ) -> None:
+        """Apply button styling to a list of buttons.
+        
+        Args:
+            buttons: List of QPushButton widgets to style.
+            config: Configuration dictionary.
+            bg_color: Base background color as [R, G, B] (from dialog/view config).
+            border_color: Border color as [R, G, B] (from dialog/view config).
+            text_color: Text color as [R, G, B]. If None, reads from centralized config.
+            font_family: Font family name. If None, reads from centralized config (with DPI scaling).
+            font_size: Font size in points. If None, reads from centralized config (with DPI scaling).
+            border_radius: Border radius in pixels. If None, reads from centralized config.
+            padding: Padding in pixels. If None, reads from centralized config.
+            background_offset: Background color offset for normal state. If None, reads from centralized config.
+            hover_background_offset: Background color offset for hover state. If None, reads from centralized config.
+            pressed_background_offset: Background color offset for pressed state. If None, reads from centralized config.
+            min_width: Minimum width in pixels. If None, not included in stylesheet.
+            min_height: Minimum height in pixels. If None, not included in stylesheet.
+        
+        Note:
+            - All buttons use unified font and font size from centralized config
+            - Individual buttons can override height/width after styling via setMinimumHeight()/setMinimumWidth()
+        """
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        
+        # Get unified config values if parameters are not provided
+        styles_config = config.get('ui', {}).get('styles', {})
+        button_config = styles_config.get('button', {})
+        
+        if text_color is None:
+            text_color = button_config.get('text_color', [200, 200, 200])
+        if font_family is None:
+            font_family_raw = button_config.get('font_family', 'Helvetica Neue')
+            font_family = resolve_font_family(font_family_raw)
+        if font_size is None:
+            font_size_raw = button_config.get('font_size', 11)
+            font_size = scale_font_size(font_size_raw)
+        if border_radius is None:
+            border_radius = button_config.get('border_radius', 3)
+        if padding is None:
+            padding = button_config.get('padding', 5)
+        if background_offset is None:
+            background_offset = button_config.get('background_offset', 20)
+        if hover_background_offset is None:
+            hover_background_offset = button_config.get('hover_background_offset', 30)
+        if pressed_background_offset is None:
+            pressed_background_offset = button_config.get('pressed_background_offset', 10)
+        
+        apply_button_styling(
+            buttons, config, text_color, font_family, font_size,
+            bg_color, border_color, background_offset,
+            hover_background_offset, pressed_background_offset,
+            border_radius, padding, min_width, min_height
         )
 

@@ -225,8 +225,9 @@ class DetailManualAnalysisView(QWidget):
         self.start_stop_button = QPushButton("Start Analysis")
         self.start_stop_button.setCheckable(True)
         self.start_stop_button.setChecked(False)
+        self.start_stop_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         # Button styling will be applied in _apply_styling()
-        row1_layout.addWidget(self.start_stop_button)
+        row1_layout.addWidget(self.start_stop_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         # Get button group spacing from config
         button_group_spacing = control_config.get('button_group_spacing', 16)
@@ -241,7 +242,7 @@ class DetailManualAnalysisView(QWidget):
         self.remove_line_button = QPushButton("-")
         self.remove_line_button.setEnabled(False)  # Disabled when only 1 line
         self.remove_line_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        row1_layout.addWidget(self.remove_line_button)
+        row1_layout.addWidget(self.remove_line_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         self.multipv_label = QLabel("2")
         # Width will be set from config in _apply_styling()
@@ -250,7 +251,7 @@ class DetailManualAnalysisView(QWidget):
         
         self.add_line_button = QPushButton("+")
         self.add_line_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        row1_layout.addWidget(self.add_line_button)
+        row1_layout.addWidget(self.add_line_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         row1_layout.addStretch()  # Push buttons to the left
         
@@ -279,7 +280,7 @@ class DetailManualAnalysisView(QWidget):
         self.explore_pv1_button.setChecked(False)
         self.explore_pv1_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.explore_pv1_button.toggled.connect(lambda checked: self._on_explore_pv1_toggled(checked))
-        row2_layout.addWidget(self.explore_pv1_button)
+        row2_layout.addWidget(self.explore_pv1_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         # Explore PV2 button
         self.explore_pv2_button = QPushButton("PV2")
@@ -287,7 +288,7 @@ class DetailManualAnalysisView(QWidget):
         self.explore_pv2_button.setChecked(False)
         self.explore_pv2_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.explore_pv2_button.toggled.connect(lambda checked: self._on_explore_pv2_toggled(checked))
-        row2_layout.addWidget(self.explore_pv2_button)
+        row2_layout.addWidget(self.explore_pv2_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         # Explore PV3 button
         self.explore_pv3_button = QPushButton("PV3")
@@ -295,7 +296,7 @@ class DetailManualAnalysisView(QWidget):
         self.explore_pv3_button.setChecked(False)
         self.explore_pv3_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.explore_pv3_button.toggled.connect(lambda checked: self._on_explore_pv3_toggled(checked))
-        row2_layout.addWidget(self.explore_pv3_button)
+        row2_layout.addWidget(self.explore_pv3_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         # Explore Off button
         self.explore_off_button = QPushButton("Off")
@@ -303,7 +304,7 @@ class DetailManualAnalysisView(QWidget):
         self.explore_off_button.setChecked(True)  # Default to Off
         self.explore_off_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.explore_off_button.toggled.connect(lambda checked: self._on_explore_off_toggled(checked))
-        row2_layout.addWidget(self.explore_off_button)
+        row2_layout.addWidget(self.explore_off_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         row2_layout.addSpacing(button_group_spacing)
         
@@ -319,7 +320,7 @@ class DetailManualAnalysisView(QWidget):
         self.pieces_1_button.setChecked(max_pieces == 1)
         self.pieces_1_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.pieces_1_button.toggled.connect(lambda checked: self._on_pieces_toggled(1, checked))
-        row2_layout.addWidget(self.pieces_1_button)
+        row2_layout.addWidget(self.pieces_1_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         # Pieces 2 button
         self.pieces_2_button = QPushButton("2")
@@ -327,7 +328,7 @@ class DetailManualAnalysisView(QWidget):
         self.pieces_2_button.setChecked(max_pieces == 2)
         self.pieces_2_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.pieces_2_button.toggled.connect(lambda checked: self._on_pieces_toggled(2, checked))
-        row2_layout.addWidget(self.pieces_2_button)
+        row2_layout.addWidget(self.pieces_2_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         # Pieces 3 button
         self.pieces_3_button = QPushButton("3")
@@ -335,7 +336,7 @@ class DetailManualAnalysisView(QWidget):
         self.pieces_3_button.setChecked(max_pieces == 3)
         self.pieces_3_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.pieces_3_button.toggled.connect(lambda checked: self._on_pieces_toggled(3, checked))
-        row2_layout.addWidget(self.pieces_3_button)
+        row2_layout.addWidget(self.pieces_3_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         row2_layout.addSpacing(button_group_spacing)
         
@@ -351,7 +352,7 @@ class DetailManualAnalysisView(QWidget):
         self.depth_2_button.setChecked(max_depth == 2)
         self.depth_2_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.depth_2_button.toggled.connect(lambda checked: self._on_depth_toggled(2, checked))
-        row2_layout.addWidget(self.depth_2_button)
+        row2_layout.addWidget(self.depth_2_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         # Depth 3 button
         self.depth_3_button = QPushButton("3")
@@ -359,7 +360,7 @@ class DetailManualAnalysisView(QWidget):
         self.depth_3_button.setChecked(max_depth == 3)
         self.depth_3_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.depth_3_button.toggled.connect(lambda checked: self._on_depth_toggled(3, checked))
-        row2_layout.addWidget(self.depth_3_button)
+        row2_layout.addWidget(self.depth_3_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         # Depth 4 button
         self.depth_4_button = QPushButton("4")
@@ -367,7 +368,7 @@ class DetailManualAnalysisView(QWidget):
         self.depth_4_button.setChecked(max_depth == 4)
         self.depth_4_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.depth_4_button.toggled.connect(lambda checked: self._on_depth_toggled(4, checked))
-        row2_layout.addWidget(self.depth_4_button)
+        row2_layout.addWidget(self.depth_4_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         row2_layout.addStretch()  # Push buttons to the left
         
@@ -678,78 +679,115 @@ class DetailManualAnalysisView(QWidget):
         multipv_config = manual_analysis_config.get('multipv_buttons', {})
         multipv_button_width = multipv_config.get('width', 30)
         
-        # Set fixed width for multipv buttons
-        self.add_line_button.setFixedWidth(multipv_button_width)
-        self.remove_line_button.setFixedWidth(multipv_button_width)
+        # Set minimum width for multipv label
         self.multipv_label.setMinimumWidth(multipv_button_width)
         
-        button_stylesheet = f"""
-            QPushButton {{
-                background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
-                color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
-                border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
-                border-radius: {button_border_radius}px;
-                padding: {button_padding[0]}px {button_padding[1]}px;
-                min-height: {button_height}px;
-                max-height: {button_height}px;
-                font-family: "{font_family}";
-                font-size: {font_size}pt;
-            }}
-            QPushButton:hover {{
-                background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});
-                color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});
-            }}
-            QPushButton:pressed {{
-                background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
+        # Apply button styling using StyleManager
+        from app.views.style import StyleManager
+        
+        # Get button config values for offsets
+        buttons_config = ui_config.get('buttons', {})
+        button_bg_offset = buttons_config.get('background_offset', 20)
+        button_hover_offset = buttons_config.get('hover_background_offset', 30)
+        button_pressed_offset = buttons_config.get('pressed_background_offset', 10)
+        
+        # Calculate offsets: use pane_bg as base to match StyleManager's offset model
+        bg_offset = max(0, norm_bg[0] - pane_bg[0])
+        hover_offset = max(0, hover_bg[0] - pane_bg[0])
+        
+        # Convert padding from [horizontal, vertical] to single value (use horizontal for consistency)
+        button_padding_value = button_padding[0] if isinstance(button_padding, list) else button_padding
+        
+        # Apply base styling using StyleManager
+        bg_color_list = [pane_bg[0], pane_bg[1], pane_bg[2]]
+        border_color_list = [norm_border[0], norm_border[1], norm_border[2]]
+        text_color_list = [norm_text[0], norm_text[1], norm_text[2]]
+        
+        # Collect all buttons
+        all_buttons = [self.start_stop_button, self.add_line_button, self.remove_line_button]
+        icon_buttons = [self.add_line_button, self.remove_line_button]  # Buttons with single character icons
+        text_buttons = []  # Buttons with text labels
+        
+        # Add exploration buttons if they exist
+        if hasattr(self, 'explore_pv1_button'):
+            explore_buttons = [self.explore_pv1_button, self.explore_pv2_button, 
+                               self.explore_pv3_button, self.explore_off_button]
+            all_buttons.extend(explore_buttons)
+            text_buttons.extend(explore_buttons)
+        if hasattr(self, 'pieces_1_button'):
+            pieces_buttons = [self.pieces_1_button, self.pieces_2_button, self.pieces_3_button]
+            all_buttons.extend(pieces_buttons)
+            text_buttons.extend(pieces_buttons)
+        if hasattr(self, 'depth_2_button'):
+            depth_buttons = [self.depth_2_button, self.depth_3_button, self.depth_4_button]
+            all_buttons.extend(depth_buttons)
+            text_buttons.extend(depth_buttons)
+        
+        # Apply base styling to all buttons
+        StyleManager.style_buttons(
+            all_buttons,
+            self.config,
+            bg_color_list,
+            border_color_list,
+            text_color=text_color_list,
+            font_family=font_family,
+            font_size=font_size,
+            border_radius=button_border_radius,
+            padding=button_padding_value,
+            background_offset=bg_offset,
+            hover_background_offset=hover_offset,
+            pressed_background_offset=button_pressed_offset,
+            min_height=button_height
+        )
+        
+        # Set fixed heights for alignment
+        for button in all_buttons:
+            button.setFixedHeight(button_height)
+        
+        # Set fixed widths for icon buttons (+, -)
+        for button in icon_buttons:
+            button.setFixedWidth(multipv_button_width)
+        
+        # Calculate and set appropriate widths for text buttons based on their content
+        button_font = QFont(font_family, int(font_size))
+        font_metrics = QFontMetrics(button_font)
+        
+        # Calculate width needed for each text button and use the maximum
+        max_text_width = 0
+        for button in text_buttons:
+            text = button.text()
+            text_width = font_metrics.horizontalAdvance(text)
+            # Add padding (horizontal padding * 2) + some extra for borders
+            total_width = text_width + (button_padding_value * 2) + 10  # 10px for borders
+            max_text_width = max(max_text_width, total_width)
+        
+        # Use the calculated width or multipv_button_width, whichever is larger
+        text_button_width = max(max_text_width, multipv_button_width)
+        
+        # Set fixed widths for text buttons
+        for button in text_buttons:
+            button.setFixedWidth(int(text_button_width))
+        
+        # Add checked state styling for toggle buttons (StyleManager doesn't support checked state yet)
+        # Also add disabled state styling
+        checked_disabled_style = f"""
+            QPushButton:checked {{
+                background-color: rgb({active_bg[0]}, {active_bg[1]}, {active_bg[2]});
+                color: rgb({active_text[0]}, {active_text[1]}, {active_text[2]});
             }}
             QPushButton:disabled {{
                 background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
                 color: rgb({int(norm_text[0] * disabled_color_multiplier)}, {int(norm_text[1] * disabled_color_multiplier)}, {int(norm_text[2] * disabled_color_multiplier)});
                 border-color: rgb({int(norm_border[0] * disabled_color_multiplier)}, {int(norm_border[1] * disabled_color_multiplier)}, {int(norm_border[2] * disabled_color_multiplier)});
             }}
-            QPushButton:checked {{
-                background-color: rgb({active_bg[0]}, {active_bg[1]}, {active_bg[2]});
-                color: rgb({active_text[0]}, {active_text[1]}, {active_text[2]});
-            }}
-            QPushButton:focus {{
-                outline: none;
+            QPushButton:hover {{
+                color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});
             }}
         """
-        
-        self.start_stop_button.setStyleSheet(button_stylesheet)
-        
-        # Special styling for multipv buttons to ensure identical width
-        multipv_button_stylesheet = button_stylesheet + f"""
-            QPushButton {{
-                min-width: {multipv_button_width}px;
-                max-width: {multipv_button_width}px;
-                width: {multipv_button_width}px;
-            }}
-        """
-        self.add_line_button.setStyleSheet(multipv_button_stylesheet)
-        self.remove_line_button.setStyleSheet(multipv_button_stylesheet)
-        
-        # Apply styling to exploration control buttons (same width as multipv buttons)
-        if hasattr(self, 'explore_pv1_button'):
-            self.explore_pv1_button.setStyleSheet(multipv_button_stylesheet)
-        if hasattr(self, 'explore_pv2_button'):
-            self.explore_pv2_button.setStyleSheet(multipv_button_stylesheet)
-        if hasattr(self, 'explore_pv3_button'):
-            self.explore_pv3_button.setStyleSheet(multipv_button_stylesheet)
-        if hasattr(self, 'explore_off_button'):
-            self.explore_off_button.setStyleSheet(multipv_button_stylesheet)
-        if hasattr(self, 'pieces_1_button'):
-            self.pieces_1_button.setStyleSheet(multipv_button_stylesheet)
-        if hasattr(self, 'pieces_2_button'):
-            self.pieces_2_button.setStyleSheet(multipv_button_stylesheet)
-        if hasattr(self, 'pieces_3_button'):
-            self.pieces_3_button.setStyleSheet(multipv_button_stylesheet)
-        if hasattr(self, 'depth_2_button'):
-            self.depth_2_button.setStyleSheet(multipv_button_stylesheet)
-        if hasattr(self, 'depth_3_button'):
-            self.depth_3_button.setStyleSheet(multipv_button_stylesheet)
-        if hasattr(self, 'depth_4_button'):
-            self.depth_4_button.setStyleSheet(multipv_button_stylesheet)
+        # Append checked/disabled state to existing stylesheet for all buttons
+        for button in all_buttons:
+            current_style = button.styleSheet()
+            button.setStyleSheet(current_style + checked_disabled_style)
         
         # Label styling
         
