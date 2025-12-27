@@ -964,6 +964,7 @@
     "menu": {
       "font_family": "Helvetica Neue",
       "font_size": 10,
+      "spacing": 4,
       "colors": {
         "normal": {
           "background": [45, 45, 50],
@@ -973,6 +974,19 @@
           "background": [55, 55, 60],
           "text": [230, 230, 230]
         }
+      },
+      "menu_bar": {
+        "item_padding": [4, 8]
+      },
+      "menu": {
+        "border_width": 1,
+        "border_color": [60, 60, 65],
+        "item_padding": [4, 20, 4, 8]
+      },
+      "separator": {
+        "height": 1,
+        "background_color": [60, 60, 65],
+        "margin": [2, 4]
       }
     },
     "dialogs": {

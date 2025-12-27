@@ -29,6 +29,7 @@ from app.views.engine_dialog import EngineDialog
 from app.views.engine_configuration_dialog import EngineConfigurationDialog
 from app.views.classification_settings_dialog import ClassificationSettingsDialog
 from app.views.about_dialog import AboutDialog
+from app.views.message_dialog import MessageDialog
 from app.controllers.app_controller import AppController
 from app.input.shortcut_manager import ShortcutManager
 from app.models.column_profile_model import DEFAULT_PROFILE_NAME
@@ -97,7 +98,23 @@ class MainWindow(QMainWindow):
         # Apply menu bar styling from config
         self._apply_menu_bar_styling(menu_bar)
         
-        # File menu
+        # Setup each menu section
+        self._setup_file_menu(menu_bar)
+        self._setup_edit_menu(menu_bar)
+        self._setup_board_menu(menu_bar)
+        self._setup_pgn_menu(menu_bar)
+        self._setup_moves_list_menu(menu_bar)
+        self._setup_game_analysis_menu(menu_bar)
+        self._setup_manual_analysis_menu(menu_bar)
+        self._setup_annotations_menu(menu_bar)
+        self._setup_engines_menu(menu_bar)
+        self._setup_ai_summary_menu(menu_bar)
+        self._setup_view_menu(menu_bar)
+        self._setup_help_menu(menu_bar)
+        self._setup_debug_menu(menu_bar)
+    
+    def _setup_file_menu(self, menu_bar: QMenuBar) -> None:
+        """Setup the File menu."""
         file_menu = menu_bar.addMenu("File")
         
         # Clear Clipboard Database action
@@ -200,8 +217,9 @@ class MainWindow(QMainWindow):
         close_action.setShortcut("Ctrl+Q")
         close_action.triggered.connect(self._close_application)
         file_menu.addAction(close_action)
-        
-        # Edit menu
+    
+    def _setup_edit_menu(self, menu_bar: QMenuBar) -> None:
+        """Setup the Edit menu."""
         edit_menu = menu_bar.addMenu("Edit")
         
         # Copy FEN action
@@ -251,8 +269,9 @@ class MainWindow(QMainWindow):
         paste_pgn_active_action.setShortcut(QKeySequence("Ctrl+Alt+V"))
         paste_pgn_active_action.triggered.connect(self._paste_pgn_to_active_db)
         edit_menu.addAction(paste_pgn_active_action)
-        
-        # Board menu
+    
+    def _setup_board_menu(self, menu_bar: QMenuBar) -> None:
+        """Setup the Board menu."""
         board_menu = menu_bar.addMenu("Board")
         
         # Rotate Board action (checkable to show toggle state)
@@ -413,8 +432,9 @@ class MainWindow(QMainWindow):
         positional_heatmap_model = self.controller.get_positional_heatmap_controller().get_model()
         positional_heatmap_model.visibility_changed.connect(self._on_positional_heatmap_visibility_changed)
         self._update_positional_heatmap_action_state(positional_heatmap_model.is_visible)
-        
-        # PGN menu
+    
+    def _setup_pgn_menu(self, menu_bar: QMenuBar) -> None:
+        """Setup the PGN menu."""
         pgn_menu = menu_bar.addMenu("PGN")
         
         # Show Metadata action (checkable to show toggle state)
@@ -487,8 +507,9 @@ class MainWindow(QMainWindow):
         self.remove_annotations_action = QAction("Remove Annotations", self)
         self.remove_annotations_action.triggered.connect(self._on_remove_annotations_clicked)
         pgn_menu.addAction(self.remove_annotations_action)
-        
-        # Moves List menu
+    
+    def _setup_moves_list_menu(self, menu_bar: QMenuBar) -> None:
+        """Setup the Moves List menu."""
         moves_list_menu = menu_bar.addMenu("Moves List")
         
         # Get column profile model and controller
@@ -514,8 +535,9 @@ class MainWindow(QMainWindow):
         
         # Initialize menu with current profiles and columns
         self._update_moves_list_menu()
-        
-        # Game Analysis menu
+    
+    def _setup_game_analysis_menu(self, menu_bar: QMenuBar) -> None:
+        """Setup the Game Analysis menu."""
         game_analysis_menu = menu_bar.addMenu("Game Analysis")
         
         # Start Game Analysis action
@@ -599,8 +621,9 @@ class MainWindow(QMainWindow):
         self.store_analysis_results_action.setCheckable(True)
         self.store_analysis_results_action.triggered.connect(self._on_store_analysis_results_toggled)
         game_analysis_menu.addAction(self.store_analysis_results_action)
-        
-        # Manual Analysis menu
+    
+    def _setup_manual_analysis_menu(self, menu_bar: QMenuBar) -> None:
+        """Setup the Manual Analysis menu."""
         manual_analysis_menu = menu_bar.addMenu("Manual Analysis")
         
         # Start/Stop Manual Analysis action (checkable to show toggle state)
@@ -745,8 +768,9 @@ class MainWindow(QMainWindow):
         
         # Set initial action states
         self._update_manual_analysis_action_states(manual_analysis_model.is_analyzing, manual_analysis_model.multipv)
-        
-        # Annotations menu
+    
+    def _setup_annotations_menu(self, menu_bar: QMenuBar) -> None:
+        """Setup the Annotations menu."""
         annotations_menu = menu_bar.addMenu("Annotations")
         
         clear_all_annotations_action = QAction("Clear all Annotations for current game", self)
@@ -770,8 +794,9 @@ class MainWindow(QMainWindow):
         setup_preferences_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         setup_preferences_action.triggered.connect(self._show_annotation_preferences)
         annotations_menu.addAction(setup_preferences_action)
-        
-        # Engines menu
+    
+    def _setup_engines_menu(self, menu_bar: QMenuBar) -> None:
+        """Setup the Engines menu."""
         engines_menu = menu_bar.addMenu("Engines")
         
         # Add Engine action
@@ -800,8 +825,9 @@ class MainWindow(QMainWindow):
         
         # Initialize menu with current engines
         self._update_engines_menu()
-        
-        # AI Summary menu
+    
+    def _setup_ai_summary_menu(self, menu_bar: QMenuBar) -> None:
+        """Setup the AI Summary menu."""
         ai_summary_menu = menu_bar.addMenu("AI Summary")
         
         # AI Model Settings action (top of menu)
@@ -835,8 +861,9 @@ class MainWindow(QMainWindow):
         self.ai_summary_include_metadata_action.setCheckable(True)
         self.ai_summary_include_metadata_action.triggered.connect(self._on_ai_summary_include_metadata_toggled)
         ai_summary_menu.addAction(self.ai_summary_include_metadata_action)
-        
-        # View menu - for switching between detail panel tabs
+    
+    def _setup_view_menu(self, menu_bar: QMenuBar) -> None:
+        """Setup the View menu."""
         view_menu = menu_bar.addMenu("View")
         
         # Moves List action
@@ -908,8 +935,9 @@ class MainWindow(QMainWindow):
             self.view_annotations_action,
             self.view_ai_summary_action
         ]
-        
-        # Help menu (before Debug menu)
+    
+    def _setup_help_menu(self, menu_bar: QMenuBar) -> None:
+        """Setup the Help menu."""
         help_menu = menu_bar.addMenu("Help")
         
         # Open Manual action
@@ -925,8 +953,9 @@ class MainWindow(QMainWindow):
         about_action.setMenuRole(QAction.MenuRole.NoRole)
         about_action.triggered.connect(self._show_about_dialog)
         help_menu.addAction(about_action)
-        
-        # Debug menu (last menu in menu bar) - only if enabled in config
+    
+    def _setup_debug_menu(self, menu_bar: QMenuBar) -> None:
+        """Setup the Debug menu (only if enabled in config)."""
         debug_config = self.config.get('debug', {})
         show_debug_menu = debug_config.get('show_debug_menu', False)
         if show_debug_menu:
@@ -1061,6 +1090,21 @@ class MainWindow(QMainWindow):
         hover_bg = hover.get('background', [55, 55, 60])
         hover_text = hover.get('text', [230, 230, 230])
         
+        # Get spacing and padding from config
+        menu_spacing = menu_config.get('spacing', 4)
+        menu_bar_config = menu_config.get('menu_bar', {})
+        menu_bar_item_padding = menu_bar_config.get('item_padding', [4, 8])
+        
+        menu_config_obj = menu_config.get('menu', {})
+        menu_border_width = menu_config_obj.get('border_width', 1)
+        menu_border_color = menu_config_obj.get('border_color', [60, 60, 65])
+        menu_item_padding = menu_config_obj.get('item_padding', [4, 20, 4, 8])
+        
+        separator_config = menu_config.get('separator', {})
+        separator_height = separator_config.get('height', 1)
+        separator_bg_color = separator_config.get('background_color', [60, 60, 65])
+        separator_margin = separator_config.get('margin', [2, 4])
+        
         # Create stylesheet
         stylesheet = f"""
             QMenuBar {{
@@ -1068,12 +1112,12 @@ class MainWindow(QMainWindow):
                 color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
                 font-family: "{font_family}";
                 font-size: {font_size}pt;
-                spacing: 4px;
+                spacing: {menu_spacing}px;
             }}
             
             QMenuBar::item {{
                 background-color: transparent;
-                padding: 4px 8px;
+                padding: {menu_bar_item_padding[0]}px {menu_bar_item_padding[1]}px;
             }}
             
             QMenuBar::item:selected {{
@@ -1088,13 +1132,13 @@ class MainWindow(QMainWindow):
             QMenu {{
                 background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
                 color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
-                border: 1px solid rgb(60, 60, 65);
+                border: {menu_border_width}px solid rgb({menu_border_color[0]}, {menu_border_color[1]}, {menu_border_color[2]});
                 font-family: "{font_family}";
                 font-size: {font_size}pt;
             }}
             
             QMenu::item {{
-                padding: 4px 20px 4px 8px;
+                padding: {menu_item_padding[0]}px {menu_item_padding[1]}px {menu_item_padding[2]}px {menu_item_padding[3]}px;
             }}
             
             QMenu::item:selected {{
@@ -1103,13 +1147,35 @@ class MainWindow(QMainWindow):
             }}
             
             QMenu::separator {{
-                height: 1px;
-                background-color: rgb(60, 60, 65);
-                margin: 2px 4px;
+                height: {separator_height}px;
+                background-color: rgb({separator_bg_color[0]}, {separator_bg_color[1]}, {separator_bg_color[2]});
+                margin: {separator_margin[0]}px {separator_margin[1]}px;
             }}
         """
         
         menu_bar.setStyleSheet(stylesheet)
+    
+    def _require_active_database(self) -> Optional[DatabaseModel]:
+        """Helper method to validate and return active database.
+        
+        Shows error dialog if no active database is available.
+        
+        Returns:
+            DatabaseModel if active database exists, None otherwise.
+        """
+        database_controller = self.controller.get_database_controller()
+        active_database = database_controller.get_active_database()
+        
+        if not active_database:
+            MessageDialog.show_warning(
+                self.config,
+                "No Database",
+                "No active database selected. Please open or select a database first.",
+                self
+            )
+            return None
+        
+        return active_database
     
     def _clear_clipboard_database(self) -> None:
         """Clear the clipboard database and reset active game."""
@@ -1376,18 +1442,8 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'database_panel'):
             return
         
-        # Get active database
-        database_controller = self.controller.get_database_controller()
-        active_database = database_controller.get_active_database()
-        
+        active_database = self._require_active_database()
         if not active_database:
-            from app.views.message_dialog import MessageDialog
-            MessageDialog.show_warning(
-                self.config,
-                "No Database",
-                "No active database selected. Please open or select a database first.",
-                self
-            )
             return
         
         # Get bulk replace controller
@@ -1411,18 +1467,8 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'database_panel'):
             return
         
-        # Get active database
-        database_controller = self.controller.get_database_controller()
-        active_database = database_controller.get_active_database()
-        
+        active_database = self._require_active_database()
         if not active_database:
-            from app.views.message_dialog import MessageDialog
-            MessageDialog.show_warning(
-                self.config,
-                "No Database",
-                "No active database selected. Please open or select a database first.",
-                self
-            )
             return
         
         # Get bulk tag controller
@@ -1467,10 +1513,12 @@ class MainWindow(QMainWindow):
             return
         
         # Get active database and all databases
-        database_controller = self.controller.get_database_controller()
-        active_database = database_controller.get_active_database()
+        active_database = self._require_active_database()
+        if not active_database:
+            return
         
         # Get all open databases from panel model
+        database_controller = self.controller.get_database_controller()
         panel_model = database_controller.get_panel_model()
         all_databases = []
         for identifier, db_info in panel_model.get_all_databases().items():
@@ -1513,7 +1561,6 @@ class MainWindow(QMainWindow):
                             database_names.append("Unknown Database")
                 
                 if not databases_to_search:
-                    from app.views.message_dialog import MessageDialog
                     MessageDialog.show_warning(
                         self.config,
                         "No Database",
@@ -1664,18 +1711,8 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'database_panel'):
             return
         
-        # Get active database
-        database_controller = self.controller.get_database_controller()
-        active_database = database_controller.get_active_database()
-        
+        active_database = self._require_active_database()
         if not active_database:
-            from app.views.message_dialog import MessageDialog
-            MessageDialog.show_warning(
-                self.config,
-                "No Database",
-                "No active database selected. Please open or select a database first.",
-                self
-            )
             return
         
         # Get bulk clean PGN controller
@@ -1699,24 +1736,13 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'database_panel'):
             return
         
-        # Get active database
-        database_controller = self.controller.get_database_controller()
-        active_database = database_controller.get_active_database()
-        
+        active_database = self._require_active_database()
         if not active_database:
-            from app.views.message_dialog import MessageDialog
-            MessageDialog.show_warning(
-                self.config,
-                "No Database",
-                "No active database selected. Please open or select a database first.",
-                self
-            )
             return
         
         # Get total number of games for confirmation message
         total_games = len(active_database.get_all_games())
         if total_games == 0:
-            from app.views.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Empty Database",
@@ -1737,7 +1763,6 @@ class MainWindow(QMainWindow):
         
         # Show result message if there were errors
         if not result.success:
-            from app.views.message_dialog import MessageDialog
             error_msg = result.error_message or "Unknown error occurred"
             MessageDialog.show_warning(
                 self.config,
@@ -3405,7 +3430,6 @@ Visibility Settings:
         game = game_model.active_game
         
         if not game:
-            from app.views.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "No Active Game", "No game is currently active.", self)
             return
         
@@ -3436,7 +3460,6 @@ Visibility Settings:
             success = PgnCleaningService.remove_annotations_from_game(game)
         
         if not success:
-            from app.views.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "Error", f"Failed to remove {element_name} from PGN.", self)
             return
         
@@ -4097,7 +4120,6 @@ Visibility Settings:
             if success:
                 self.controller.set_status(message)
             else:
-                from app.views.message_dialog import MessageDialog
                 MessageDialog.show_warning(self.config, "Remove Engine Failed", message, self)
     
     def _show_confirmation_dialog(self, title: str, message: str) -> bool:
@@ -4139,7 +4161,6 @@ Visibility Settings:
             self.controller.set_status(message)
             # Menu will update automatically via assignment_changed signal
         else:
-            from app.views.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "Set Engine Assignment Failed", message, self)
     
     def _load_user_settings(self) -> None:
@@ -4504,7 +4525,6 @@ Visibility Settings:
         # Get active database
         database_panel = self.database_panel
         if not database_panel:
-            from app.views.message_dialog import MessageDialog
             dialog = MessageDialog(
                 self.config,
                 "No Database",
@@ -4517,7 +4537,6 @@ Visibility Settings:
         
         active_info = database_panel.get_active_database_info()
         if not active_info:
-            from app.views.message_dialog import MessageDialog
             dialog = MessageDialog(
                 self.config,
                 "No Active Database",
