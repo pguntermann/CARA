@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QFrame,
 )
 from PyQt6.QtCore import Qt, QSize, QTimer
-from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent
+from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent, QFontMetrics
 from typing import Optional, Dict, Any, List
 
 from app.controllers.bulk_replace_controller import BulkReplaceController
@@ -215,26 +215,35 @@ class BulkReplaceDialog(QDialog):
         db_container_layout.addLayout(db_header_layout)
         
         # Path label (smaller font, below name, aligned with database name)
+        # Always create the path widget to reserve space and prevent layout shifts
+        # Create a horizontal layout to align path with database name
+        path_layout = QHBoxLayout()
+        path_layout.setContentsMargins(0, 0, 0, 0)
+        path_layout.setSpacing(0)
+        
+        # Add spacer to match the width of "Target Database:" label + spacing
+        # Calculate approximate width: label text width + spacing (8px)
+        label_font_metrics = db_label.fontMetrics()
+        label_width = label_font_metrics.horizontalAdvance("Target Database:")
+        spacer_width = label_width + 8  # label width + spacing
+        
+        spacer = QWidget()
+        spacer.setFixedWidth(spacer_width)
+        path_layout.addWidget(spacer)
+        
+        # Calculate path label height first (used for both cases)
+        # Use lineSpacing() which includes leading space, or add 1px buffer for exact match
+        path_font_size = max(8, self.label_font_size - 2)
+        path_font = QFont(self.label_font_family, path_font_size)
+        font_metrics = QFontMetrics(path_font)
+        # Use lineSpacing() which accounts for line height including leading
+        path_label_height = font_metrics.lineSpacing()
+        
         if db_path:
-            # Create a horizontal layout to align path with database name
-            path_layout = QHBoxLayout()
-            path_layout.setContentsMargins(0, 0, 0, 0)
-            path_layout.setSpacing(0)
-            
-            # Add spacer to match the width of "Target Database:" label + spacing
-            # Calculate approximate width: label text width + spacing (8px)
-            label_font_metrics = db_label.fontMetrics()
-            label_width = label_font_metrics.horizontalAdvance("Target Database:")
-            spacer_width = label_width + 8  # label width + spacing
-            
-            spacer = QWidget()
-            spacer.setFixedWidth(spacer_width)
-            path_layout.addWidget(spacer)
-            
             self.db_path_label = QLabel(db_path)
-            # Use smaller font size
-            path_font_size = max(8, self.label_font_size - 2)
-            self.db_path_label.setFont(QFont(self.label_font_family, path_font_size))
+            self.db_path_label.setFont(path_font)
+            # Set fixed height to match empty case exactly
+            self.db_path_label.setFixedHeight(path_label_height)
             # Make path text lighter/more subtle
             path_text_color = self.text_color
             self.db_path_label.setStyleSheet(
@@ -242,14 +251,21 @@ class BulkReplaceDialog(QDialog):
                 f"opacity: 0.7;"
             )
             path_layout.addWidget(self.db_path_label)
-            path_layout.addStretch()
-            
-            # Add path layout to container
-            path_widget = QWidget()
-            path_widget.setLayout(path_layout)
-            db_container_layout.addWidget(path_widget)
         else:
-            self.db_path_label = None
+            # Create empty label to reserve space even when no path
+            self.db_path_label = QLabel("")
+            self.db_path_label.setFont(path_font)
+            self.db_path_label.setFixedHeight(path_label_height)
+            path_layout.addWidget(self.db_path_label)
+        
+        path_layout.addStretch()
+        
+        # Add path layout to container (always added to reserve space)
+        # Set fixed height on the widget itself to ensure consistent sizing
+        path_widget = QWidget()
+        path_widget.setLayout(path_layout)
+        path_widget.setFixedHeight(path_label_height)  # Fixed height prevents any size variation
+        db_container_layout.addWidget(path_widget)
         
         main_layout.addWidget(db_container)
         
@@ -315,15 +331,15 @@ class BulkReplaceDialog(QDialog):
         tags_container_layout = QVBoxLayout(tags_container)
         tags_container_layout.setContentsMargins(0, 0, 0, 0)
         tags_container_layout.setSpacing(0)
-        # Ensure container has proper size policy and minimum height
-        tags_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        
-        # Calculate minimum height for container: buttons (if enabled) + spacing + scroll area height
+        # Ensure container has proper size policy and fixed height to prevent growth
+        # Calculate fixed height for container: buttons (if enabled) + spacing + scroll area height
         # Add extra padding to ensure scroll area and scrollbar are fully visible
-        container_min_height = self.tags_list_height + 8  # Add 8px extra for scrollbar clearance
+        container_fixed_height = self.tags_list_height + 8  # Add 8px extra for scrollbar clearance
         if self.quick_select_enabled:
-            container_min_height += self.quick_select_height + 10  # button height + spacing
-        tags_container.setMinimumHeight(container_min_height)
+            container_fixed_height += self.quick_select_height + 10  # button height + spacing
+        # Use setFixedHeight to prevent any growth - form layout cannot override this
+        tags_container.setFixedHeight(container_fixed_height)
+        tags_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)  # Fixed height prevents growth
         
         # Quick selection buttons (ABOVE scroll area)
         if self.quick_select_enabled:
