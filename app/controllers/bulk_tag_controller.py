@@ -1,5 +1,6 @@
 """Bulk tag controller for managing bulk tag operations."""
 
+import re
 from typing import Dict, Any, Optional, List
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -69,6 +70,31 @@ class BulkTagController(QObject):
         
         return self.database_panel.get_selected_game_indices()
     
+    @staticmethod
+    def sanitize_tag_name(tag_name: str) -> str:
+        """Sanitize a tag name to ensure it's valid for PGN format.
+        
+        PGN tag names must:
+        - Start with a letter or digit
+        - Contain only letters, digits, and underscores
+        - Not contain whitespace or other special characters
+        
+        Args:
+            tag_name: Raw tag name from user input.
+            
+        Returns:
+            Sanitized tag name valid for PGN format.
+        """
+        # Remove all whitespace
+        tag_name = re.sub(r'\s+', '', tag_name)
+        # Remove all characters that aren't alphanumeric or underscore
+        tag_name = re.sub(r'[^A-Za-z0-9_]', '', tag_name)
+        # Ensure it starts with a letter or digit (not underscore)
+        if tag_name and not tag_name[0].isalnum():
+            # If it starts with underscore or is empty, prepend 'Tag'
+            tag_name = 'Tag' + tag_name
+        return tag_name
+    
     def add_tag(
         self,
         database: DatabaseModel,
@@ -81,15 +107,20 @@ class BulkTagController(QObject):
         
         Args:
             database: DatabaseModel instance to process.
-            tag_name: PGN tag name to add.
+            tag_name: PGN tag name to add (will be sanitized).
             tag_value: Optional fixed value to set. If None and source_tag is None, tag is added empty.
-            source_tag: Optional source tag to copy value from. If provided, tag_value is ignored.
+            source_tag: Optional source tag to copy value from (will be sanitized). If provided, tag_value is ignored.
             game_indices: Optional list of game indices to process (None = all games).
             
         Returns:
             BulkTagResult with operation statistics.
         """
         self._cancelled = False
+        
+        # Sanitize tag names to ensure they're valid for PGN format
+        tag_name = self.sanitize_tag_name(tag_name)
+        if source_tag:
+            source_tag = self.sanitize_tag_name(source_tag)
         
         # Show progress
         self.progress_service.show_progress()
@@ -153,13 +184,16 @@ class BulkTagController(QObject):
         
         Args:
             database: DatabaseModel instance to process.
-            tag_name: PGN tag name to remove.
+            tag_name: PGN tag name to remove (will be sanitized).
             game_indices: Optional list of game indices to process (None = all games).
             
         Returns:
             BulkTagResult with operation statistics.
         """
         self._cancelled = False
+        
+        # Sanitize tag name to ensure it's valid for PGN format
+        tag_name = self.sanitize_tag_name(tag_name)
         
         # Show progress
         self.progress_service.show_progress()

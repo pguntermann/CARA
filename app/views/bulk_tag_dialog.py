@@ -475,10 +475,27 @@ class BulkTagDialog(QDialog):
         bg_color = [self.input_bg_color.red(), self.input_bg_color.green(), self.input_bg_color.blue()]
         border_color = [self.input_border_color.red(), self.input_border_color.green(), self.input_border_color.blue()]
         
-        # Get all comboboxes and apply styling
-        comboboxes = [self.tag_combo, self.source_tag_combo]
+        # Style comboboxes separately - tag_combo is editable, source_tag_combo is not
+        # Tag combobox (editable)
         StyleManager.style_comboboxes(
-            comboboxes,
+            [self.tag_combo],
+            self.config,
+            text_color,
+            self.input_font_family,
+            self.input_font_size,
+            bg_color,
+            border_color,
+            focus_border_color,
+            selection_bg,
+            selection_text,
+            border_width=1,
+            border_radius=self.input_border_radius,
+            padding=self.input_padding,
+            editable=True
+        )
+        # Source tag combobox (not editable)
+        StyleManager.style_comboboxes(
+            [self.source_tag_combo],
             self.config,
             text_color,
             self.input_font_family,
@@ -721,11 +738,23 @@ class BulkTagDialog(QDialog):
             return
         
         # Get tag name
-        tag_name = self.tag_combo.currentText().strip()
-        if not tag_name:
+        raw_tag_name = self.tag_combo.currentText().strip()
+        if not raw_tag_name:
             from app.views.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "Error", "Please enter a tag name", self)
             return
+        
+        # Sanitize tag name using controller method
+        tag_name = self.controller.sanitize_tag_name(raw_tag_name)
+        if not tag_name:
+            from app.views.message_dialog import MessageDialog
+            MessageDialog.show_warning(self.config, "Error", "Tag name contains only invalid characters", self)
+            return
+        
+        # If the tag name was modified, update the combobox to show the sanitized version
+        if tag_name != raw_tag_name:
+            # Update the combobox to show the sanitized tag name
+            self.tag_combo.setCurrentText(tag_name)
         
         # Get game indices
         game_indices = None
@@ -753,13 +782,26 @@ class BulkTagDialog(QDialog):
                     # This will result in adding tag with empty value
                 elif self.copy_from_tag_radio.isChecked():
                     # Copy from tag
-                    source_tag = self.source_tag_combo.currentText().strip()
-                    if not source_tag:
+                    raw_source_tag = self.source_tag_combo.currentText().strip()
+                    if not raw_source_tag:
                         from app.views.message_dialog import MessageDialog
                         MessageDialog.show_warning(self.config, "Error", "Please enter a source tag name", self)
                         self._set_controls_enabled(True)
                         self._operation_in_progress = False
                         return
+                    
+                    # Sanitize source tag name using controller method
+                    source_tag = self.controller.sanitize_tag_name(raw_source_tag)
+                    if not source_tag:
+                        from app.views.message_dialog import MessageDialog
+                        MessageDialog.show_warning(self.config, "Error", "Source tag name contains only invalid characters", self)
+                        self._set_controls_enabled(True)
+                        self._operation_in_progress = False
+                        return
+                    
+                    # Update combobox if tag name was modified
+                    if source_tag != raw_source_tag:
+                        self.source_tag_combo.setCurrentText(source_tag)
                     
                     if source_tag == tag_name:
                         from app.views.message_dialog import MessageDialog
@@ -843,6 +885,9 @@ class BulkTagDialog(QDialog):
         message_config = dialog_config.get('message', {})
         buttons_config = dialog_config.get('buttons', {})
         
+        # Import scale_font_size at the beginning of the method
+        from app.utils.font_utils import scale_font_size
+        
         # Create dialog
         dialog = QDialog(self)
         dialog.setWindowTitle(title)
@@ -869,7 +914,6 @@ class BulkTagDialog(QDialog):
         layout.addWidget(title_label)
         
         # Message
-        from app.utils.font_utils import scale_font_size
         message_font_size = scale_font_size(message_config.get('font_size', 11))
         message_padding = message_config.get('padding', 5)
         message_text_color = message_config.get('text_color', [200, 200, 200])
@@ -898,7 +942,6 @@ class BulkTagDialog(QDialog):
         button_bg_offset = buttons_config.get('background_offset', 20)
         button_hover_offset = buttons_config.get('hover_background_offset', 30)
         button_pressed_offset = buttons_config.get('pressed_background_offset', 10)
-        from app.utils.font_utils import scale_font_size
         button_font_size = scale_font_size(buttons_config.get('font_size', 10))
         text_color = buttons_config.get('text_color', [200, 200, 200])
         border_color = buttons_config.get('border_color', [60, 60, 65])
@@ -932,4 +975,6 @@ class BulkTagDialog(QDialog):
         
         # Show dialog
         dialog.exec()
+
+
 
