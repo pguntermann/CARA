@@ -13,55 +13,9 @@ from PyQt6.QtWidgets import (
     QSpacerItem,
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QPalette, QWheelEvent
+from PyQt6.QtGui import QColor, QPalette
 from typing import Dict, Any, Optional, Tuple, List
 from enum import Enum
-
-
-class NoWheelComboBox(QComboBox):
-    """QComboBox that ignores mouse wheel events to prevent accidental value changes."""
-    
-    def wheelEvent(self, event: QWheelEvent) -> None:
-        """Override wheel event to ignore it completely."""
-        event.ignore()
-    
-    def showPopup(self) -> None:
-        """Override showPopup to apply styling to popup window on macOS."""
-        super().showPopup()
-        # Access view after popup is shown to ensure it's fully initialized
-        view = self.view()
-        if view:
-            # Get background and text colors from combo box palette (set via stylesheet)
-            combo_palette = self.palette()
-            bg_color = combo_palette.color(self.backgroundRole())
-            text_color = combo_palette.color(self.foregroundRole())
-            
-            # Set viewport background to remove white borders
-            viewport = view.viewport()
-            if viewport:
-                viewport.setAutoFillBackground(True)
-                viewport_palette = viewport.palette()
-                viewport_palette.setColor(viewport.backgroundRole(), bg_color)
-                viewport.setPalette(viewport_palette)
-            
-            # Also set view palette to ensure consistency
-            view_palette = view.palette()
-            view_palette.setColor(view.backgroundRole(), bg_color)
-            view_palette.setColor(view.foregroundRole(), text_color)
-            view.setPalette(view_palette)
-            view.setAutoFillBackground(True)
-            
-            # CRITICAL: Fix the popup window itself (QFrame) - this is where the white borders come from
-            popup_window = view.window()
-            if popup_window and popup_window != self.window():
-                popup_window.setAutoFillBackground(True)
-                popup_palette = popup_window.palette()
-                # Set all background-related roles to the dark color
-                popup_palette.setColor(popup_window.backgroundRole(), bg_color)
-                popup_palette.setColor(popup_palette.ColorRole.Base, bg_color)
-                popup_palette.setColor(popup_palette.ColorRole.Window, bg_color)
-                popup_palette.setColor(popup_palette.ColorRole.Button, bg_color)
-                popup_window.setPalette(popup_palette)
 
 
 class DeduplicationMode(Enum):
@@ -228,7 +182,7 @@ class DeduplicationCriteriaDialog(QDialog):
         )
         
         # Combo box for matching modes
-        self.mode_combo = NoWheelComboBox()
+        self.mode_combo = QComboBox()
         for option in self.mode_options:
             self.mode_combo.addItem(option['label'], option['value'])
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
@@ -356,53 +310,34 @@ class DeduplicationCriteriaDialog(QDialog):
         self.description_label.setPalette(description_palette)
         self.description_label.update()
         
-        # Combo box styling (using input styling)
+        # Apply combobox styling using StyleManager
         # Get selection colors from config (use defaults if not available)
         selection_bg = inputs_config.get('selection_background_color', [70, 90, 130])
         selection_text = inputs_config.get('selection_text_color', [240, 240, 240])
         
-        combo_style = (
-            f"QComboBox {{"
-            f"font-family: \"{self.input_font_family}\";"
-            f"font-size: {self.input_font_size}pt;"
-            f"color: rgb({self.input_text_color[0]}, {self.input_text_color[1]}, {self.input_text_color[2]});"
-            f"background-color: rgb({self.input_bg_color[0]}, {self.input_bg_color[1]}, {self.input_bg_color[2]});"
-            f"border: 1px solid rgb({self.input_border_color[0]}, {self.input_border_color[1]}, {self.input_border_color[2]});"
-            f"border-radius: {self.input_border_radius}px;"
-            f"padding: {self.input_padding[1]}px {self.input_padding[0]}px;"
-            f"}}"
-            f"QComboBox:hover {{"
-            f"border: 1px solid rgb({self.input_border_color[0] + 20}, {self.input_border_color[1] + 20}, {self.input_border_color[2] + 20});"
-            f"}}"
-            f"QComboBox QAbstractItemView {{"
-            f"background-color: rgb({self.input_bg_color[0]}, {self.input_bg_color[1]}, {self.input_bg_color[2]});"
-            f"color: rgb({self.input_text_color[0]}, {self.input_text_color[1]}, {self.input_text_color[2]});"
-            f"selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});"
-            f"selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});"
-            f"border: 1px solid rgb({self.input_border_color[0]}, {self.input_border_color[1]}, {self.input_border_color[2]});"
-            f"}}"
+        from app.views.style import StyleManager
+        
+        # Get focus border color for combobox
+        focus_border_color = inputs_config.get('focus_border_color', [0, 120, 212])
+        
+        # Apply styling to combobox
+        StyleManager.style_comboboxes(
+            [self.mode_combo],
+            self.config,
+            self.input_text_color,
+            self.input_font_family,
+            self.input_font_size,
+            self.input_bg_color,
+            self.input_border_color,
+            focus_border_color,
+            selection_bg,
+            selection_text,
+            border_width=1,
+            border_radius=self.input_border_radius,
+            padding=self.input_padding
         )
-        self.mode_combo.setStyleSheet(combo_style)
-        
-        # Fix combo box palette roles that are white (Base and Button)
-        combo_palette = self.mode_combo.palette()
-        combo_palette.setColor(combo_palette.ColorRole.Base, QColor(self.input_bg_color[0], self.input_bg_color[1], self.input_bg_color[2]))
-        combo_palette.setColor(combo_palette.ColorRole.Button, QColor(self.input_bg_color[0], self.input_bg_color[1], self.input_bg_color[2]))
-        self.mode_combo.setPalette(combo_palette)
-        
-        # Set palette on combo box view to prevent macOS override
-        view = self.mode_combo.view()
-        if view:
-            view_palette = view.palette()
-            view_palette.setColor(view.backgroundRole(), QColor(self.input_bg_color[0], self.input_bg_color[1], self.input_bg_color[2]))
-            view_palette.setColor(view.foregroundRole(), QColor(self.input_text_color[0], self.input_text_color[1], self.input_text_color[2]))
-            view_palette.setColor(QPalette.ColorRole.Highlight, QColor(selection_bg[0], selection_bg[1], selection_bg[2]))
-            view_palette.setColor(QPalette.ColorRole.HighlightedText, QColor(selection_text[0], selection_text[1], selection_text[2]))
-            view.setPalette(view_palette)
-            view.setAutoFillBackground(True)
         
         # Apply checkbox styling using StyleManager
-        from app.views.style import StyleManager
         from pathlib import Path
         
         # Get checkmark icon path

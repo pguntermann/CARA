@@ -437,7 +437,6 @@ class BulkReplaceDialog(QDialog):
         
         # Source tag selection (shown when copy mode is enabled)
         self.source_tag_combo = QComboBox()
-        self.source_tag_combo.setEditable(True)
         # Populate with available tags (will be updated when dialog is shown)
         self.source_tag_combo.setMinimumWidth(self.input_minimum_width)
         self.source_tag_combo.setMinimumHeight(self.input_minimum_height)
@@ -615,9 +614,9 @@ class BulkReplaceDialog(QDialog):
         selection_bg = inputs_config.get('selection_background_color', [70, 90, 130])
         selection_text = inputs_config.get('selection_text_color', [240, 240, 240])
         
-        # Apply input styling
+        # Apply input styling for QLineEdit only
         input_style = (
-            f"QLineEdit, QComboBox {{"
+            f"QLineEdit {{"
             f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
             f"border: 1px solid rgb({self.input_border_color.red()}, {self.input_border_color.green()}, {self.input_border_color.blue()});"
             f"border-radius: {self.input_border_radius}px;"
@@ -630,31 +629,39 @@ class BulkReplaceDialog(QDialog):
             f"background-color: rgb({self.input_bg_color.red() // 2}, {self.input_bg_color.green() // 2}, {self.input_bg_color.blue() // 2});"
             f"color: rgb({self.input_text_color.red() // 2}, {self.input_text_color.green() // 2}, {self.input_text_color.blue() // 2});"
             f"}}"
-            f"QComboBox:disabled {{"
-            f"background-color: rgb({self.input_bg_color.red() // 2}, {self.input_bg_color.green() // 2}, {self.input_bg_color.blue() // 2});"
-            f"color: rgb({self.input_text_color.red() // 2}, {self.input_text_color.green() // 2}, {self.input_text_color.blue() // 2});"
-            f"}}"
-            f"QComboBox QAbstractItemView {{"
-            f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
-            f"color: rgb({self.input_text_color.red()}, {self.input_text_color.green()}, {self.input_text_color.blue()});"
-            f"selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});"
-            f"selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});"
-            f"border: 1px solid rgb({self.input_border_color.red()}, {self.input_border_color.green()}, {self.input_border_color.blue()});"
-            f"}}"
         )
         
         self.find_input.setStyleSheet(input_style)
         self.replace_input.setStyleSheet(input_style)
-        self.source_tag_combo.setStyleSheet(input_style)
         
-        # Set palette on combo box to prevent macOS override
-        view = self.source_tag_combo.view()
-        if view:
-            view_palette = view.palette()
-            view_palette.setColor(view.backgroundRole(), self.input_bg_color)
-            view_palette.setColor(view.foregroundRole(), self.input_text_color)
-            view.setPalette(view_palette)
-            view.setAutoFillBackground(True)
+        # Apply combobox styling using StyleManager
+        from app.views.style import StyleManager
+        
+        # Get focus border color for combobox
+        focus_border_color = inputs_config.get('focus_border_color', [0, 120, 212])
+        
+        # Convert QColor to [R, G, B] lists
+        text_color = [self.input_text_color.red(), self.input_text_color.green(), self.input_text_color.blue()]
+        bg_color = [self.input_bg_color.red(), self.input_bg_color.green(), self.input_bg_color.blue()]
+        border_color = [self.input_border_color.red(), self.input_border_color.green(), self.input_border_color.blue()]
+        
+        # Apply styling to combobox
+        StyleManager.style_comboboxes(
+            [self.source_tag_combo],
+            self.config,
+            text_color,
+            self.input_font_family,
+            self.input_font_size,
+            bg_color,
+            border_color,
+            focus_border_color,
+            selection_bg,
+            selection_text,
+            border_width=1,
+            border_radius=self.input_border_radius,
+            padding=self.input_padding,
+            editable=False
+        )
         
         # Apply scroll area styling using StyleManager
         if hasattr(self, 'tags_scroll_area'):

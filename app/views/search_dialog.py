@@ -25,46 +25,6 @@ from app.models.search_criteria import SearchCriteria, SearchField, SearchOperat
 from app.models.database_model import DatabaseModel
 
 
-class NoWheelComboBox(QComboBox):
-    """QComboBox that ignores mouse wheel events."""
-    
-    def wheelEvent(self, event) -> None:
-        event.ignore()
-    
-    def showPopup(self) -> None:
-        """Override showPopup to apply styling to popup window on macOS."""
-        super().showPopup()
-        view = self.view()
-        if view:
-            combo_palette = self.palette()
-            bg_color = combo_palette.color(self.backgroundRole())
-            text_color = combo_palette.color(self.foregroundRole())
-            
-            # Set viewport background to remove white borders
-            viewport = view.viewport()
-            if viewport:
-                viewport.setAutoFillBackground(True)
-                viewport_palette = viewport.palette()
-                viewport_palette.setColor(viewport.backgroundRole(), bg_color)
-                viewport.setPalette(viewport_palette)
-            
-            # Also set view palette to ensure consistency
-            view_palette = view.palette()
-            view_palette.setColor(view.backgroundRole(), bg_color)
-            view_palette.setColor(view.foregroundRole(), text_color)
-            view.setPalette(view_palette)
-            view.setAutoFillBackground(True)
-            
-            # Fix the popup window itself (QFrame) - this is where the white borders come from
-            popup_window = view.window()
-            if popup_window and popup_window != self.window():
-                popup_window.setAutoFillBackground(True)
-                popup_palette = popup_window.palette()
-                popup_palette.setColor(popup_window.backgroundRole(), bg_color)
-                popup_palette.setColor(popup_palette.ColorRole.Base, bg_color)
-                popup_palette.setColor(popup_palette.ColorRole.Window, bg_color)
-                popup_palette.setColor(popup_palette.ColorRole.Button, bg_color)
-                popup_window.setPalette(popup_palette)
 
 
 class CriteriaRowWidget(QWidget):
@@ -98,6 +58,7 @@ class CriteriaRowWidget(QWidget):
         self.input_text_color = QColor(*inputs_config.get("text_color", [240, 240, 240]))
         self.input_bg_color = QColor(*inputs_config.get("background_color", [30, 30, 35]))
         self.input_border_color = QColor(*inputs_config.get("border_color", [60, 60, 65]))
+        self.input_focus_border_color = QColor(*inputs_config.get("focus_border_color", [70, 90, 130]))
         self.input_border_radius = inputs_config.get("border_radius", 3)
         self.input_padding = inputs_config.get("padding", [8, 6])
         
@@ -120,7 +81,7 @@ class CriteriaRowWidget(QWidget):
         layout.setSpacing(8)
         
         # Logic connector (AND/OR) - hidden for first row
-        self.logic_combo = NoWheelComboBox()
+        self.logic_combo = QComboBox()
         self.logic_combo.addItems(["AND", "OR"])
         self.logic_combo.setCurrentText("AND")
         self.logic_combo.setFixedWidth(70)
@@ -128,7 +89,7 @@ class CriteriaRowWidget(QWidget):
         layout.addWidget(self.logic_combo)
         
         # Field selector
-        self.field_combo = NoWheelComboBox()
+        self.field_combo = QComboBox()
         self.field_combo.addItems([
             "White", "Black", "WhiteElo", "BlackElo", "Result", "Date", 
             "Event", "Site", "ECO", "Analyzed", "Annotated", "Custom PGN Tag"
@@ -138,7 +99,7 @@ class CriteriaRowWidget(QWidget):
         layout.addWidget(self.field_combo)
         
         # Operator selector
-        self.operator_combo = NoWheelComboBox()
+        self.operator_combo = QComboBox()
         self.operator_combo.addItems(["contains", "equals", "starts with", "ends with"])
         self.operator_combo.setFixedWidth(140)  # Increased from 100
         layout.addWidget(self.operator_combo)
@@ -253,59 +214,35 @@ class CriteriaRowWidget(QWidget):
         )
         self.remove_btn.setStyleSheet(button_style)
         
-        # ComboBox styling
+        # Apply combobox styling using StyleManager
         # Get selection colors from config (use defaults if not available)
         inputs_config = self.config.get('ui', {}).get('dialogs', {}).get('search', {}).get('inputs', {})
         selection_bg = inputs_config.get('selection_background_color', [70, 90, 130])
         selection_text = inputs_config.get('selection_text_color', [240, 240, 240])
         
-        combo_style = (
-            f"QComboBox {{"
-            f"font-family: {self.input_font_family};"
-            f"font-size: {self.input_font_size}pt;"
-            f"color: rgb({self.input_text_color.red()}, {self.input_text_color.green()}, {self.input_text_color.blue()});"
-            f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
-            f"border: 1px solid rgb({self.input_border_color.red()}, {self.input_border_color.green()}, {self.input_border_color.blue()});"
-            f"border-radius: {self.input_border_radius}px;"
-            f"padding: {self.input_padding[1]}px {self.input_padding[0]}px;"
-            f"}}"
-            f"QComboBox::drop-down {{"
-            f"width: 0px;"
-            f"height: 0px;"
-            f"}}"
-            f"QComboBox::down-arrow {{"
-            f"width: 0px;"
-            f"height: 0px;"
-            f"}}"
-            f"QComboBox QAbstractItemView {{"
-            f"background-color: rgb({self.input_bg_color.red()}, {self.input_bg_color.green()}, {self.input_bg_color.blue()});"
-            f"color: rgb({self.input_text_color.red()}, {self.input_text_color.green()}, {self.input_text_color.blue()});"
-            f"selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});"
-            f"selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});"
-            f"border: 1px solid rgb({self.input_border_color.red()}, {self.input_border_color.green()}, {self.input_border_color.blue()});"
-            f"}}"
-        )
-        self.field_combo.setStyleSheet(combo_style)
-        self.operator_combo.setStyleSheet(combo_style)
-        self.logic_combo.setStyleSheet(combo_style)
+        from app.views.style import StyleManager
+        comboboxes = [self.field_combo, self.operator_combo, self.logic_combo]
+        text_color = [self.input_text_color.red(), self.input_text_color.green(), self.input_text_color.blue()]
+        bg_color = [self.input_bg_color.red(), self.input_bg_color.green(), self.input_bg_color.blue()]
+        border_color = [self.input_border_color.red(), self.input_border_color.green(), self.input_border_color.blue()]
+        focus_border_color = [self.input_focus_border_color.red(), self.input_focus_border_color.green(), self.input_focus_border_color.blue()]
         
-        # Set palette on combo boxes to prevent macOS override
-        for combo in [self.field_combo, self.operator_combo, self.logic_combo]:
-            # Fix combo box palette roles that are white (Base and Button)
-            combo_palette = combo.palette()
-            combo_palette.setColor(combo_palette.ColorRole.Base, self.input_bg_color)
-            combo_palette.setColor(combo_palette.ColorRole.Button, self.input_bg_color)
-            combo.setPalette(combo_palette)
-            
-            view = combo.view()
-            if view:
-                view_palette = view.palette()
-                view_palette.setColor(view.backgroundRole(), self.input_bg_color)
-                view_palette.setColor(view.foregroundRole(), self.input_text_color)
-                view_palette.setColor(QPalette.ColorRole.Highlight, QColor(*selection_bg))
-                view_palette.setColor(QPalette.ColorRole.HighlightedText, QColor(*selection_text))
-                view.setPalette(view_palette)
-                view.setAutoFillBackground(True)
+        StyleManager.style_comboboxes(
+            comboboxes,
+            self.config,
+            text_color,
+            self.input_font_family,
+            self.input_font_size,
+            bg_color,
+            border_color,
+            focus_border_color,
+            selection_bg,
+            selection_text,
+            border_width=1,
+            border_radius=self.input_border_radius,
+            padding=self.input_padding,
+            editable=False
+        )
         
         # LineEdit styling
         input_style = (
@@ -576,6 +513,12 @@ class SearchDialog(QDialog):
         self._setup_ui()
         self._apply_styling()
         self.setWindowTitle("Search Games")
+        
+        # Add initial criterion row or restore last search query
+        if SearchDialog._last_search_query is not None:
+            self._restore_last_search()
+        else:
+            self._add_criterion_row(is_group_start=True)
     
     def _load_config(self) -> None:
         """Load configuration values from config.json."""
@@ -725,15 +668,6 @@ class SearchDialog(QDialog):
         self.group_starts: List[int] = []  # Track which rows are group starts
         self.group_ends: List[int] = []  # Track which rows are group ends
         self.group_levels: Dict[int, int] = {}  # Track group nesting levels
-        
-        # Add initial group start (which includes a criterion row) after dialog is fully initialized
-        # This ensures proper layout and sizing, and makes combinations work correctly
-        # If there's a last search query, restore it instead
-        from PyQt6.QtCore import QTimer
-        if SearchDialog._last_search_query is not None:
-            QTimer.singleShot(0, self._restore_last_search)
-        else:
-            QTimer.singleShot(0, lambda: self._add_criterion_row(is_group_start=True))
     
     def _add_criterion_row(self, is_group_start: bool = False) -> None:
         """Add a new criterion row.

@@ -152,6 +152,7 @@ class AnnotationPreferencesDialog(QDialog):
         self.input_text_color = inputs_config.get('text_color', [240, 240, 240])
         self.input_bg_color = inputs_config.get('background_color', [30, 30, 35])
         self.input_border_color = inputs_config.get('border_color', [60, 60, 65])
+        self.input_focus_border_color = inputs_config.get('focus_border_color', [70, 90, 130])
         self.input_border_radius = inputs_config.get('border_radius', 3)
         self.input_padding = inputs_config.get('padding', [8, 6])
         
@@ -240,7 +241,6 @@ class AnnotationPreferencesDialog(QDialog):
         font_family_label.setMinimumWidth(100)
         self.font_family_combo = QComboBox()
         self.font_family_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.font_family_combo.setEditable(True)
         
         # Populate with fonts, filtering out problematic ones
         problematic_fonts = {"Small Fonts", "System", "MS Sans Serif", "MS Serif"}
@@ -329,15 +329,15 @@ class AnnotationPreferencesDialog(QDialog):
         for label in self.findChildren(QLabel):
             label.setStyleSheet(label_style)
         
-        # Input styling (font combo and spinbox)
+        # Input styling for QSpinBox only (combobox uses StyleManager)
         # Get inputs config and selection colors
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('annotation_preferences', {})
         inputs_config = dialog_config.get('inputs', {})
         selection_bg = inputs_config.get('selection_background_color', [70, 90, 130])
         selection_text = inputs_config.get('selection_text_color', [240, 240, 240])
         
-        input_style = (
-            f"QComboBox, QSpinBox {{"
+        spinbox_style = (
+            f"QSpinBox {{"
             f"font-family: \"{self.input_font_family}\";"
             f"font-size: {self.input_font_size}pt;"
             f"color: rgb({self.input_text_color[0]}, {self.input_text_color[1]}, {self.input_text_color[2]});"
@@ -346,33 +346,33 @@ class AnnotationPreferencesDialog(QDialog):
             f"border-radius: {self.input_border_radius}px;"
             f"padding: {self.input_padding[1]}px {self.input_padding[0]}px;"
             f"}}"
-            f"QComboBox QAbstractItemView {{"
-            f"background-color: rgb({self.input_bg_color[0]}, {self.input_bg_color[1]}, {self.input_bg_color[2]});"
-            f"color: rgb({self.input_text_color[0]}, {self.input_text_color[1]}, {self.input_text_color[2]});"
-            f"selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});"
-            f"selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});"
-            f"border: 1px solid rgb({self.input_border_color[0]}, {self.input_border_color[1]}, {self.input_border_color[2]});"
-            f"}}"
         )
         
-        self.font_family_combo.setStyleSheet(input_style)
-        self.font_size_spinbox.setStyleSheet(input_style)
+        self.font_size_spinbox.setStyleSheet(spinbox_style)
         
-        # Set palette on combo box to prevent macOS override
-        combo_palette = self.font_family_combo.palette()
-        combo_palette.setColor(combo_palette.ColorRole.Base, QColor(*self.input_bg_color))
-        combo_palette.setColor(combo_palette.ColorRole.Button, QColor(*self.input_bg_color))
-        self.font_family_combo.setPalette(combo_palette)
+        # Apply combobox styling using StyleManager
+        from app.views.style import StyleManager
+        text_color = list(self.input_text_color)
+        bg_color = list(self.input_bg_color)
+        border_color = list(self.input_border_color)
+        focus_border_color = list(self.input_focus_border_color)
         
-        view = self.font_family_combo.view()
-        if view:
-            view_palette = view.palette()
-            view_palette.setColor(view.backgroundRole(), QColor(*self.input_bg_color))
-            view_palette.setColor(view.foregroundRole(), QColor(*self.input_text_color))
-            view_palette.setColor(QPalette.ColorRole.Highlight, QColor(*selection_bg))
-            view_palette.setColor(QPalette.ColorRole.HighlightedText, QColor(*selection_text))
-            view.setPalette(view_palette)
-            view.setAutoFillBackground(True)
+        StyleManager.style_comboboxes(
+            [self.font_family_combo],
+            self.config,
+            text_color,
+            self.input_font_family,
+            self.input_font_size,
+            bg_color,
+            border_color,
+            focus_border_color,
+            selection_bg,
+            selection_text,
+            border_width=1,
+            border_radius=self.input_border_radius,
+            padding=self.input_padding,
+            editable=False  # This combobox is non-editable
+        )
         
         # Group box styling
         group_style = (

@@ -544,6 +544,7 @@ class EngineConfigurationDialog(QDialog):
         
         elif option_type == "combo":
             combo = NoWheelComboBox()
+            combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             if var_values:
                 combo.addItems(var_values)
                 if default is not None and str(default) in var_values:
@@ -1414,6 +1415,7 @@ class EngineConfigurationDialog(QDialog):
         checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
         checkmark_url = str(checkmark_path).replace("\\", "/") if checkmark_path.exists() else ""
         
+        # Input stylesheet for QLineEdit only (comboboxes use StyleManager)
         input_stylesheet = f"""
             QLineEdit {{
                 background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});
@@ -1430,65 +1432,48 @@ class EngineConfigurationDialog(QDialog):
             QLineEdit:focus {{
                 border: {input_border_width}px solid rgb({input_focus_border[0]}, {input_focus_border[1]}, {input_focus_border[2]});
             }}
-            QComboBox {{
-                background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});
-                color: rgb({input_text[0]}, {input_text[1]}, {input_text[2]});
-                border: {input_border_width}px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});
-                border-radius: {input_border_radius}px;
-                padding: {input_padding[0]}px {input_padding[1]}px {input_padding[2]}px {input_padding[3]}px;
-                font-family: {input_font_family};
-                font-size: {input_font_size}pt;
-            }}
-            QComboBox:hover {{
-                border: {input_border_width}px solid rgb({min(255, input_border[0] + 20)}, {min(255, input_border[1] + 20)}, {min(255, input_border[2] + 20)});
-            }}
-            QComboBox:focus {{
-                border: {input_border_width}px solid rgb({input_focus_border[0]}, {input_focus_border[1]}, {input_focus_border[2]});
-            }}
-            QComboBox::drop-down {{
-                border: none;
-                background-color: transparent;
-                width: 0px;
-            }}
-            QComboBox::down-arrow {{
-                image: none;
-                width: 0px;
-                height: 0px;
-            }}
-            QComboBox QAbstractItemView {{
-                background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]});
-                color: rgb({input_text[0]}, {input_text[1]}, {input_text[2]});
-                selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});
-                selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});
-                border: {input_border_width}px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]});
-            }}
         """
         
         # Apply input widget styling to individual widgets only (not to tab widget itself)
+        from app.views.style import StyleManager
+        resolved_font_family = resolve_font_family(input_font_family)
+        
+        # Convert padding from [top, right, bottom, left] to [horizontal, vertical]
+        # input_padding = [2, 6, 2, 6] -> horizontal = 6, vertical = 2
+        padding_h = input_padding[1] if len(input_padding) > 1 else 6
+        padding_v = input_padding[0] if len(input_padding) > 0 else 2
+        combobox_padding = [padding_h, padding_v]
+        
         for i in range(self.tab_widget.count()):
             tab = self.tab_widget.widget(i)
             
             # Apply to individual widgets to ensure they get styled
             for lineedit in tab.findChildren(QLineEdit):
                 lineedit.setStyleSheet(input_stylesheet)
-            for combobox in tab.findChildren(QComboBox):
-                combobox.setStyleSheet(input_stylesheet)
-                # Set palette on combo box view to prevent macOS override
-                view = combobox.view()
-                if view:
-                    input_bg_qcolor = QColor(input_bg[0], input_bg[1], input_bg[2])
-                    input_text_qcolor = QColor(input_text[0], input_text[1], input_text[2])
-                    view_palette = view.palette()
-                    view_palette.setColor(view.backgroundRole(), input_bg_qcolor)
-                    view_palette.setColor(view.foregroundRole(), input_text_qcolor)
-                    view.setPalette(view_palette)
-                    view.setAutoFillBackground(True)
+            
+            # Apply combobox styling using StyleManager
+            comboboxes = tab.findChildren(QComboBox)
+            if comboboxes:
+                StyleManager.style_comboboxes(
+                    comboboxes,
+                    self.config,
+                    input_text,
+                    resolved_font_family,
+                    input_font_size,
+                    input_bg,
+                    input_border,
+                    input_focus_border,
+                    selection_bg,
+                    selection_text,
+                    border_width=input_border_width,
+                    border_radius=input_border_radius,
+                    padding=combobox_padding,
+                    editable=True
+                )
+            
             # Apply checkbox styling using StyleManager
-            from app.views.style import StyleManager
             checkboxes = tab.findChildren(QCheckBox)
             if checkboxes:
-                from app.utils.font_utils import resolve_font_family
-                resolved_font_family = resolve_font_family(input_font_family)
                 StyleManager.style_checkboxes(
                     checkboxes,
                     self.config,
