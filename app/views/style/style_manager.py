@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from typing import Dict, Any, List
-from PyQt6.QtWidgets import QScrollArea, QCheckBox, QComboBox, QRadioButton, QPushButton, QLineEdit
+from PyQt6.QtWidgets import QScrollArea, QCheckBox, QComboBox, QRadioButton, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox, QDateEdit, QTimeEdit, QDateTimeEdit
 
 from app.views.style.scrollbar import (
     apply_scrollbar_styling,
@@ -15,6 +15,7 @@ from app.views.style.radio_button import apply_radio_button_styling
 from app.views.style.button import apply_button_styling
 from app.views.style.line_edit import apply_line_edit_styling
 from app.views.style.spinbox import apply_spinbox_styling
+from app.views.style.date_edit import apply_date_edit_styling
 
 
 class StyleManager:
@@ -395,5 +396,71 @@ class StyleManager:
             spinboxes, config, text_color, font_family, font_size,
             bg_color, border_color, focus_border_color, border_width,
             border_radius, padding, disabled_brightness_factor, hide_buttons
+        )
+    
+    @staticmethod
+    def style_date_edits(
+        date_edits: List,
+        config: Dict[str, Any],
+        text_color: List[int] = None,
+        font_family: str = None,
+        font_size: float = None,
+        bg_color: List[int] = None,
+        border_color: List[int] = None,
+        focus_border_color: List[int] = None,
+        border_width: int = None,
+        border_radius: int = None,
+        padding: List[int] = None,
+        disabled_brightness_factor: float = None
+    ) -> None:
+        """Apply date edit styling to a list of QDateEdit, QTimeEdit, and QDateTimeEdit widgets.
+        
+        Args:
+            date_edits: List of QDateEdit, QTimeEdit, or QDateTimeEdit widgets to style.
+            config: Configuration dictionary.
+            text_color: Text color as [R, G, B]. If None, reads from centralized config.
+            font_family: Font family name. If None, reads from centralized config (with font resolution).
+            font_size: Font size in points. If None, reads from centralized config (with DPI scaling).
+            bg_color: Background color as [R, G, B]. If None, reads from centralized config.
+            border_color: Border color as [R, G, B]. If None, reads from centralized config.
+            focus_border_color: Focus border color as [R, G, B]. If None, reads from centralized config.
+            border_width: Border width in pixels. If None, reads from centralized config.
+            border_radius: Border radius in pixels. If None, reads from centralized config.
+            padding: Padding as [horizontal, vertical] or [left, top, right, bottom]. If None, reads from centralized config.
+            disabled_brightness_factor: Brightness factor for disabled state. If None, reads from centralized config.
+        """
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        
+        # Get unified config values if parameters are not provided
+        styles_config = config.get('ui', {}).get('styles', {})
+        date_edit_config = styles_config.get('date_edit', {})
+        
+        if text_color is None:
+            text_color = date_edit_config.get('text_color', [200, 200, 200])
+        if font_family is None:
+            font_family_raw = date_edit_config.get('font_family', 'Helvetica Neue')
+            font_family = resolve_font_family(font_family_raw)
+        if font_size is None:
+            font_size_raw = date_edit_config.get('font_size', 11)
+            font_size = scale_font_size(font_size_raw)
+        if bg_color is None:
+            bg_color = date_edit_config.get('background_color', [45, 45, 50])
+        if border_color is None:
+            border_color = date_edit_config.get('border_color', [60, 60, 65])
+        if focus_border_color is None:
+            focus_border_color = date_edit_config.get('focus_border_color', [70, 90, 130])
+        if border_width is None:
+            border_width = date_edit_config.get('border_width', 1)
+        if border_radius is None:
+            border_radius = date_edit_config.get('border_radius', 3)
+        if padding is None:
+            padding = date_edit_config.get('padding', [8, 6])
+        if disabled_brightness_factor is None:
+            disabled_brightness_factor = date_edit_config.get('disabled_brightness_factor', 0.5)
+        
+        apply_date_edit_styling(
+            date_edits, config, text_color, font_family, font_size,
+            bg_color, border_color, focus_border_color, border_width,
+            border_radius, padding, disabled_brightness_factor
         )
 
