@@ -585,7 +585,7 @@ class AIModelSettingsDialog(QDialog):
             )
         
         # Group boxes
-        group_bg_color = self.groups_config.get('background_color', [45, 45, 50])
+        group_bg_color = self.groups_config.get('background_color')  # None = use unified default
         border_color = self.groups_config.get('border_color', [60, 60, 65])
         border_radius = self.groups_config.get('border_radius', 5)
         title_color = self.groups_config.get('title_color', [240, 240, 240])
@@ -597,43 +597,34 @@ class AIModelSettingsDialog(QDialog):
         title_left = self.groups_config.get('title_left', 10)
         title_padding = self.groups_config.get('title_padding', 5)
         
-        # Handle title_padding as int or list
+        # Handle title_padding as int or list - convert to array format (Pattern 1)
         if isinstance(title_padding, list):
-            title_padding_left = title_padding[0] if len(title_padding) > 0 else 0
-            title_padding_right = title_padding[1] if len(title_padding) > 1 else 5
+            title_padding_array = title_padding if len(title_padding) >= 2 else [title_padding[0] if len(title_padding) > 0 else 0, 5]
         else:
-            title_padding_left = 0
-            title_padding_right = title_padding
+            title_padding_array = [0, title_padding]
         
-        group_style = (
-            f"QGroupBox {{"
-            f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
-            f"border-radius: {border_radius}px;"
-            f"margin-top: {margin_top}px;"
-            f"padding-top: {padding_top}px;"
-            f"background-color: rgb({group_bg_color[0]}, {group_bg_color[1]}, {group_bg_color[2]});"
-            f"}}"
-            f"QGroupBox::title {{"
-            f"font-family: \"{title_font_family}\";"
-            f"font-size: {title_font_size}pt;"
-            f"color: rgb({title_color[0]}, {title_color[1]}, {title_color[2]});"
-            f"subcontrol-origin: margin;"
-            f"left: {title_left}px;"
-            f"padding: {title_padding_left} {title_padding_right}px;"
-            f"}}"
-        )
+        border_width = self.groups_config.get('border_width', 1)
         
-        for group in self.findChildren(QGroupBox):
-            group.setStyleSheet(group_style)
-            # Set content margins if specified
+        group_boxes = list(self.findChildren(QGroupBox))
+        if group_boxes:
+            from app.views.style import StyleManager
             content_margins = self.groups_config.get('content_margins')
-            if content_margins:
-                layout = group.layout()
-                if layout:
-                    layout.setContentsMargins(
-                        content_margins[0], content_margins[1], 
-                        content_margins[2], content_margins[3]
-                    )
+            StyleManager.style_group_boxes(
+                group_boxes,
+                self.config,
+                border_color=border_color,
+                border_width=border_width,
+                border_radius=border_radius,
+                bg_color=group_bg_color,
+                margin_top=margin_top,
+                padding_top=padding_top,
+                title_font_family=title_font_family,
+                title_font_size=title_font_size,
+                title_color=title_color,
+                title_left=title_left,
+                title_padding=title_padding_array,
+                content_margins=content_margins
+            )
         
         # Labels
         label_font_family = self.labels_config.get('font_family', 'Helvetica Neue')

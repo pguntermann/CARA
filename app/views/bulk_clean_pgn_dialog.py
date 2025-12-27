@@ -332,7 +332,7 @@ class BulkCleanPgnDialog(QDialog):
         bg_color = dialog_config.get("background_color", [40, 40, 45])
         border_color = dialog_config.get("border_color", [60, 60, 65])
         
-        group_bg_color = groups_config.get("background_color", bg_color) if "background_color" in groups_config else bg_color
+        group_bg_color = groups_config.get("background_color")  # None = use unified default
         group_border_color = groups_config.get("border_color", border_color) if "border_color" in groups_config else border_color
         group_border_radius = groups_config.get("border_radius", 5)
         from app.utils.font_utils import resolve_font_family, scale_font_size
@@ -343,38 +343,28 @@ class BulkCleanPgnDialog(QDialog):
         group_margin_top = groups_config.get("margin_top", 10)
         group_padding_top = groups_config.get("padding_top", 5)
         
+        group_border_width = groups_config.get("border_width", 1)
         group_title_left = groups_config.get("title_left", 10)
         group_title_padding = groups_config.get("title_padding", [0, 5])
         
-        group_style = (
-            f"QGroupBox {{"
-            f"background-color: rgb({group_bg_color[0]}, {group_bg_color[1]}, {group_bg_color[2]});"
-            f"border: 1px solid rgb({group_border_color[0]}, {group_border_color[1]}, {group_border_color[2]});"
-            f"border-radius: {group_border_radius}px;"
-            f"margin-top: {group_margin_top}px;"
-            f"padding-top: {group_padding_top}px;"
-            f"}}"
-            f"QGroupBox::title {{"
-            f"subcontrol-origin: margin;"
-            f"subcontrol-position: top left;"
-            f"left: {group_title_left}px;"
-            f"padding: {group_title_padding[0]} {group_title_padding[1]}px;"
-            f"font-family: {group_title_font_family};"
-            f"font-size: {group_title_font_size}pt;"
-            f"color: rgb({group_title_color[0]}, {group_title_color[1]}, {group_title_color[2]});"
-            f"}}"
-        )
-        
-        for group in self.findChildren(QGroupBox):
-            group.setStyleSheet(group_style)
-            layout = group.layout()
-            if layout:
-                layout.setContentsMargins(
-                    group_content_margins[0],
-                    group_content_margins[1],
-                    group_content_margins[2],
-                    group_content_margins[3]
-                )
+        group_boxes = list(self.findChildren(QGroupBox))
+        if group_boxes:
+            StyleManager.style_group_boxes(
+                group_boxes,
+                self.config,
+                border_color=group_border_color,
+                border_width=group_border_width,
+                border_radius=group_border_radius,
+                bg_color=group_bg_color,
+                margin_top=group_margin_top,
+                padding_top=group_padding_top,
+                title_font_family=group_title_font_family,
+                title_font_size=group_title_font_size,
+                title_color=group_title_color,
+                title_left=group_title_left,
+                title_padding=group_title_padding,
+                content_margins=group_content_margins
+            )
         
         # Apply label styling - apply to ALL labels to prevent macOS theme override
         label_style = (

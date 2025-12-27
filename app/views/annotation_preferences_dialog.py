@@ -372,28 +372,28 @@ class AnnotationPreferencesDialog(QDialog):
             editable=False  # This combobox is non-editable
         )
         
-        # Group box styling
-        group_style = (
-            f"QGroupBox {{"
-            f"border: 1px solid rgb({self.border_color[0]}, {self.border_color[1]}, {self.border_color[2]});"
-            f"border-radius: 3px;"
-            f"margin-top: {self.group_margin_top}px;"
-            f"padding-top: {self.group_padding_top}px;"
-            f"}}"
-            f"QGroupBox::title {{"
-            f"subcontrol-origin: margin;"
-            f"subcontrol-position: top left;"
-            f"padding-left: 5px;"
-            f"padding-right: 5px;"
-            f"padding-top: {self.group_padding_top}px;"
-            f"font-family: \"{self.group_title_font_family}\";"
-            f"font-size: {self.group_title_font_size}pt;"
-            f"color: rgb({self.group_title_color[0]}, {self.group_title_color[1]}, {self.group_title_color[2]});"
-            f"}}"
-        )
+        # Group box styling - use StyleManager
+        # Read values from dialog's groups config, or use unified defaults (pass None)
+        groups_config = dialog_config.get('groups', {})
         
-        for group in self.findChildren(QGroupBox):
-            group.setStyleSheet(group_style)
+        group_boxes = list(self.findChildren(QGroupBox))
+        if group_boxes:
+            from app.views.style import StyleManager
+            StyleManager.style_group_boxes(
+                group_boxes,
+                self.config,
+                border_color=self.border_color,
+                border_width=groups_config.get('border_width'),  # None = use unified default
+                border_radius=groups_config.get('border_radius'),  # None = use unified default
+                bg_color=groups_config.get('background_color'),  # None = use unified default
+                margin_top=self.group_margin_top,
+                padding_top=self.group_padding_top,
+                title_font_family=self.group_title_font_family,
+                title_font_size=self.group_title_font_size,
+                title_color=self.group_title_color,
+                title_left=groups_config.get('title_left'),  # None = use unified default
+                title_padding=groups_config.get('title_padding')  # None = use unified default
+            )
     
     def _load_user_settings(self) -> None:
         """Load current user settings and apply to UI."""

@@ -79,6 +79,20 @@
         "border_radius": 3,
         "padding": [8, 6],
         "disabled_brightness_factor": 0.5
+      },
+      "group_box": {
+        "border_color": [60, 60, 65],
+        "border_width": 1,
+        "border_radius": 5,
+        "background_color": null,
+        "margin_top": 10,
+        "padding_top": 5,
+        "title_font_family": "Helvetica Neue",
+        "title_font_size": 11,
+        "title_font_weight": null,
+        "title_color": [240, 240, 240],
+        "title_left": 10,
+        "title_padding": [0, 5]
       }
     },
     "window": {
@@ -1037,9 +1051,6 @@
           "section_spacing": 20
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
-          "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
           "title_color": [240, 240, 240],
@@ -1103,10 +1114,7 @@
           "section_spacing": 20
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
           "border_width": 1,
-          "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
           "title_font_weight": "bold",
@@ -1196,10 +1204,7 @@
           }
         },
         "groups": {
-          "background_color": [40, 40, 45],
-          "border_color": [60, 60, 65],
           "border_width": 1,
-          "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
           "title_font_weight": "bold",
@@ -1340,7 +1345,6 @@
           "border_color": [60, 60, 65],
           "border_width": 1,
           "border_radius": 5,
-          "background_color": [40, 40, 45],
           "title_color": [240, 240, 240],
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
@@ -1400,9 +1404,6 @@
           "selection_text_color": [240, 240, 240]
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
-          "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
           "title_color": [240, 240, 240],
@@ -1472,9 +1473,6 @@
           "selection_text_color": [240, 240, 240]
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
-          "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
           "title_color": [240, 240, 240],
@@ -1525,9 +1523,6 @@
           "selection_text_color": [240, 240, 240]
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
-          "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
           "title_color": [240, 240, 240],
@@ -1579,9 +1574,6 @@
           "selection_text_color": [240, 240, 240]
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
-          "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
           "title_color": [240, 240, 240],
@@ -1621,9 +1613,6 @@
           "first_button_minimum_width": 100
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
-          "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
           "title_color": [240, 240, 240],
@@ -1688,9 +1677,6 @@
           "selection_text_color": [240, 240, 240]
         },
         "groups": {
-          "background_color": [45, 45, 50],
-          "border_color": [60, 60, 65],
-          "border_radius": 5,
           "title_font_family": "Helvetica Neue",
           "title_font_size": 11,
           "title_color": [240, 240, 240],

@@ -1287,42 +1287,47 @@ class EngineConfigurationDialog(QDialog):
         
         # Group box styling
         groups_config = dialog_config.get('groups', {})
-        group_bg = groups_config.get('background_color', [40, 40, 45])
+        group_bg = groups_config.get('background_color')  # None = use unified default
         group_border = groups_config.get('border_color', [60, 60, 65])
         group_border_width = groups_config.get('border_width', 1)
         group_border_radius = groups_config.get('border_radius', 5)
-        group_title_font_family = groups_config.get('title_font_family', 'Helvetica Neue')
+        group_title_font_family_raw = groups_config.get('title_font_family', 'Helvetica Neue')
+        from app.utils.font_utils import resolve_font_family
+        group_title_font_family = resolve_font_family(group_title_font_family_raw)
         group_title_font_size = scale_font_size(groups_config.get('title_font_size', 11))
         group_title_font_weight = groups_config.get('title_font_weight', 'bold')
         group_title_color = groups_config.get('title_color', [220, 220, 220])
         group_spacing = groups_config.get('spacing', 10)
         group_margin_top = groups_config.get('margin_top', 8)
         group_padding_top = groups_config.get('padding_top', 12)
+        group_title_left = groups_config.get('title_left', 10)  # Standard left offset
+        # Convert from fixed "0 4px" to array format [0, 4] (Pattern 1)
+        group_title_padding = [0, 4]
         
-        group_stylesheet = f"""
-            QGroupBox {{
-                background-color: rgb({group_bg[0]}, {group_bg[1]}, {group_bg[2]});
-                border: {group_border_width}px solid rgb({group_border[0]}, {group_border[1]}, {group_border[2]});
-                border-radius: {group_border_radius}px;
-                margin-top: {group_margin_top}px;
-                padding-top: {group_padding_top}px;
-            }}
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                subcontrol-position: top left;
-                padding: 0 4px;
-                font-family: {group_title_font_family};
-                font-size: {group_title_font_size}pt;
-                font-weight: {group_title_font_weight};
-                color: rgb({group_title_color[0]}, {group_title_color[1]}, {group_title_color[2]});
-            }}
-        """
-        
-        # Apply group box styling to all group boxes
+        # Collect all group boxes from all tabs
+        group_boxes = []
         for i in range(self.tab_widget.count()):
             tab = self.tab_widget.widget(i)
-            for child in tab.findChildren(QGroupBox):
-                child.setStyleSheet(group_stylesheet)
+            group_boxes.extend(tab.findChildren(QGroupBox))
+        
+        if group_boxes:
+            from app.views.style import StyleManager
+            StyleManager.style_group_boxes(
+                group_boxes,
+                self.config,
+                border_color=group_border,
+                border_width=group_border_width,
+                border_radius=group_border_radius,
+                bg_color=group_bg,
+                margin_top=group_margin_top,
+                padding_top=group_padding_top,
+                title_font_family=group_title_font_family,
+                title_font_size=group_title_font_size,
+                title_font_weight=group_title_font_weight,
+                title_color=group_title_color,
+                title_left=group_title_left,
+                title_padding=group_title_padding
+            )
         
         # Labels styling
         labels_config = dialog_config.get('labels', {})

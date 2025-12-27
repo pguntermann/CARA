@@ -684,8 +684,9 @@ class ClassificationSettingsDialog(QDialog):
         palette.setColor(QPalette.ColorRole.Window, QColor(dialog_bg_color[0], dialog_bg_color[1], dialog_bg_color[2]))
         self.setPalette(palette)
         
-        # Group boxes - use transparent background to match dialog background
+        # Group boxes - use transparent background to match dialog background - use StyleManager
         border_color = groups_config.get('border_color', [60, 60, 65])
+        border_width = groups_config.get('border_width', 1)
         border_radius = groups_config.get('border_radius', 5)
         title_color = groups_config.get('title_color', [240, 240, 240])
         title_font_family = resolve_font_family(groups_config.get('title_font_family', 'Helvetica Neue'))
@@ -695,31 +696,25 @@ class ClassificationSettingsDialog(QDialog):
         title_left = groups_config.get('title_left', 10)
         title_padding = groups_config.get('title_padding', [0, 5])
         
-        group_style = (
-            f"QGroupBox {{"
-            f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
-            f"border-radius: {border_radius}px;"
-            f"margin-top: {margin_top}px;"
-            f"padding-top: {padding_top}px;"
-            f"background-color: transparent;"
-            f"}}"
-            f"QGroupBox::title {{"
-            f"font-family: \"{title_font_family}\";"
-            f"font-size: {title_font_size}pt;"
-            f"color: rgb({title_color[0]}, {title_color[1]}, {title_color[2]});"
-            f"subcontrol-origin: margin;"
-            f"left: {title_left}px;"
-            f"padding: {title_padding[0]} {title_padding[1]}px;"
-            f"}}"
-        )
-        
-        for group in self.findChildren(QGroupBox):
-            group.setStyleSheet(group_style)
-            # Set palette to ensure transparent background on macOS
-            group_palette = group.palette()
-            group_palette.setColor(group.backgroundRole(), QColor(0, 0, 0, 0))  # Transparent
-            group_palette.setColor(QPalette.ColorRole.Window, QColor(0, 0, 0, 0))  # Transparent
-            group.setPalette(group_palette)
+        group_boxes = list(self.findChildren(QGroupBox))
+        if group_boxes:
+            from app.views.style import StyleManager
+            StyleManager.style_group_boxes(
+                group_boxes,
+                self.config,
+                border_color=border_color,
+                border_width=border_width,
+                border_radius=border_radius,
+                bg_color=groups_config.get('background_color'),  # None = use unified default
+                margin_top=margin_top,
+                padding_top=padding_top,
+                title_font_family=title_font_family,
+                title_font_size=title_font_size,
+                title_color=title_color,
+                title_left=title_left,
+                title_padding=title_padding,
+                use_transparent_palette=True  # Set palette for macOS
+            )
         
         # Labels
         text_color = fields_config.get('text_color', [220, 220, 220])

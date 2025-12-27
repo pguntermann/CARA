@@ -339,43 +339,43 @@ class EngineDialog(QDialog):
         
         final_height = natural_height
         
-        # Group box styling
+        # Group box styling - use StyleManager
         group_box_config = dialog_config.get('group_box', {})
         group_border_color = group_box_config.get('border_color', [60, 60, 65])
         group_border_width = group_box_config.get('border_width', 1)
         group_border_radius = group_box_config.get('border_radius', 5)
-        group_bg_color = group_box_config.get('background_color', [40, 40, 45])
+        group_bg_color = group_box_config.get('background_color')  # None = use unified default
         group_title_color = group_box_config.get('title_color', [240, 240, 240])
         group_title_font_family = resolve_font_family(group_box_config.get('title_font_family', 'Helvetica Neue'))
-        group_title_font_size = int(scale_font_size(group_box_config.get('title_font_size', 11)))
+        group_title_font_size = scale_font_size(group_box_config.get('title_font_size', 11))
         group_margin_top = group_box_config.get('margin_top', 10)
         group_padding_top = group_box_config.get('padding_top', 10)
         group_title_left = group_box_config.get('title_left', 10)
         group_title_padding = group_box_config.get('title_padding', [0, 5])
         
-        group_style = (
-            f"QGroupBox {{"
-            f"border: {group_border_width}px solid rgb({group_border_color[0]}, {group_border_color[1]}, {group_border_color[2]});"
-            f"border-radius: {group_border_radius}px;"
-            f"margin-top: {group_margin_top}px;"
-            f"padding-top: {group_padding_top}px;"
-            f"background-color: rgb({group_bg_color[0]}, {group_bg_color[1]}, {group_bg_color[2]});"
-            f"}}"
-            f"QGroupBox::title {{"
-            f"font-family: \"{group_title_font_family}\";"
-            f"font-size: {group_title_font_size}pt;"
-            f"color: rgb({group_title_color[0]}, {group_title_color[1]}, {group_title_color[2]});"
-            f"subcontrol-origin: margin;"
-            f"left: {group_title_left}px;"
-            f"padding: {group_title_padding[0]} {group_title_padding[1]}px;"
-            f"}}"
-        )
-        
-        # Apply to all group boxes (path_group and engine_info_group)
+        # Get all group boxes from layout
+        group_boxes = []
         for i in range(self.layout().count()):
             item = self.layout().itemAt(i)
             if item and item.widget() and isinstance(item.widget(), QGroupBox):
-                item.widget().setStyleSheet(group_style)
+                group_boxes.append(item.widget())
+        
+        if group_boxes:
+            StyleManager.style_group_boxes(
+                group_boxes,
+                self.config,
+                border_color=group_border_color,
+                border_width=group_border_width,
+                border_radius=group_border_radius,
+                bg_color=group_bg_color,
+                margin_top=group_margin_top,
+                padding_top=group_padding_top,
+                title_font_family=group_title_font_family,
+                title_font_size=group_title_font_size,
+                title_color=group_title_color,
+                title_left=group_title_left,
+                title_padding=group_title_padding
+            )
         
         # Apply button styling using StyleManager (uses unified config)
         buttons_config = dialog_config.get('buttons', {})

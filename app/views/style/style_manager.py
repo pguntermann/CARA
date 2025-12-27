@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from typing import Dict, Any, List
-from PyQt6.QtWidgets import QScrollArea, QCheckBox, QComboBox, QRadioButton, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox, QDateEdit, QTimeEdit, QDateTimeEdit
+from PyQt6.QtWidgets import QScrollArea, QCheckBox, QComboBox, QRadioButton, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox, QDateEdit, QTimeEdit, QDateTimeEdit, QGroupBox
 
 from app.views.style.scrollbar import (
     apply_scrollbar_styling,
@@ -16,6 +16,7 @@ from app.views.style.button import apply_button_styling
 from app.views.style.line_edit import apply_line_edit_styling
 from app.views.style.spinbox import apply_spinbox_styling
 from app.views.style.date_edit import apply_date_edit_styling
+from app.views.style.group_box import apply_group_box_styling
 
 
 class StyleManager:
@@ -462,5 +463,86 @@ class StyleManager:
             date_edits, config, text_color, font_family, font_size,
             bg_color, border_color, focus_border_color, border_width,
             border_radius, padding, disabled_brightness_factor
+        )
+    
+    @staticmethod
+    def style_group_boxes(
+        group_boxes: List[QGroupBox],
+        config: Dict[str, Any],
+        border_color: List[int] = None,
+        border_width: int = None,
+        border_radius: int = None,
+        bg_color: List[int] = None,
+        margin_top: int = None,
+        padding_top: int = None,
+        title_font_family: str = None,
+        title_font_size: float = None,
+        title_font_weight: str = None,
+        title_color: List[int] = None,
+        title_left: int = None,
+        title_padding: List[int] = None,
+        content_margins: List[int] = None,
+        use_transparent_palette: bool = False
+    ) -> None:
+        """Apply group box styling to a list of QGroupBox widgets.
+        
+        Args:
+            group_boxes: List of QGroupBox widgets to style.
+            config: Configuration dictionary.
+            border_color: Border color as [R, G, B]. If None, reads from centralized config.
+            border_width: Border width in pixels. If None, reads from centralized config.
+            border_radius: Border radius in pixels. If None, reads from centralized config.
+            bg_color: Background color as [R, G, B]. If None, reads from centralized config (may be transparent).
+            margin_top: Top margin in pixels. If None, reads from centralized config.
+            padding_top: Top padding in pixels. If None, reads from centralized config.
+            title_font_family: Title font family name. If None, reads from centralized config (with font resolution).
+            title_font_size: Title font size in points. If None, reads from centralized config (with DPI scaling).
+            title_font_weight: Title font weight (e.g., 'bold', 'normal'). If None, reads from centralized config.
+            title_color: Title text color as [R, G, B]. If None, reads from centralized config.
+            title_left: Left offset for title in pixels. If None, reads from centralized config.
+            title_padding: Title padding as [left, right] in pixels. If None, reads from centralized config.
+            content_margins: Content margins as [left, top, right, bottom] for layout. If None, not set.
+            use_transparent_palette: If True and bg_color is None/transparent, sets palette for transparent background (macOS).
+        """
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+        
+        # Get unified config values if parameters are not provided
+        styles_config = config.get('ui', {}).get('styles', {})
+        group_box_config = styles_config.get('group_box', {})
+        
+        if border_color is None:
+            border_color = group_box_config.get('border_color', [60, 60, 65])
+        if border_width is None:
+            border_width = group_box_config.get('border_width', 1)
+        if border_radius is None:
+            border_radius = group_box_config.get('border_radius', 5)
+        if bg_color is None:
+            bg_color_raw = group_box_config.get('background_color')
+            # If None in config, use None (transparent), otherwise use the color
+            bg_color = bg_color_raw if bg_color_raw is not None else None
+        if margin_top is None:
+            margin_top = group_box_config.get('margin_top', 10)
+        if padding_top is None:
+            padding_top = group_box_config.get('padding_top', 5)
+        if title_font_family is None:
+            title_font_family_raw = group_box_config.get('title_font_family', 'Helvetica Neue')
+            title_font_family = resolve_font_family(title_font_family_raw)
+        if title_font_size is None:
+            title_font_size_raw = group_box_config.get('title_font_size', 11)
+            title_font_size = scale_font_size(title_font_size_raw)
+        if title_font_weight is None:
+            title_font_weight = group_box_config.get('title_font_weight')
+        if title_color is None:
+            title_color = group_box_config.get('title_color', [240, 240, 240])
+        if title_left is None:
+            title_left = group_box_config.get('title_left', 10)
+        if title_padding is None:
+            title_padding = group_box_config.get('title_padding', [0, 5])
+        
+        apply_group_box_styling(
+            group_boxes, config, border_color, border_width, border_radius,
+            bg_color, margin_top, padding_top, title_font_family, title_font_size,
+            title_font_weight, title_color, title_left, title_padding,
+            content_margins, use_transparent_palette
         )
 

@@ -1225,35 +1225,34 @@ class MovesListProfileSetupDialog(QDialog):
         padding_top = groups_config.get('padding_top', 5)
         
         # Get group box border radius and title padding from config
+        group_border_width = groups_config.get('border_width', 1)
         group_border_radius = groups_config.get('border_radius', 3)
         title_config = groups_config.get('title', {})
         title_padding_left = title_config.get('padding_left', 5)
         title_padding_right = title_config.get('padding_right', 5)
+        title_left = groups_config.get('title_left', 10)  # Standard left offset
         
-        group_style = (
-            f"QGroupBox {{"
-            f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
-            f"border-radius: {group_border_radius}px;"
-            f"margin-top: {margin_top}px;"
-            f"padding-top: {padding_top}px;"
-            f"}}"
-            f"QGroupBox::title {{"
-            f"subcontrol-origin: margin;"
-            f"subcontrol-position: top left;"
-            f"padding-left: {title_padding_left}px;"
-            f"padding-right: {title_padding_right}px;"
-            f"padding-top: {padding_top}px;"
-            f"font-family: {group_title_font};"
-            f"font-size: {group_title_size}pt;"
-            f"color: rgb({group_title_color[0]}, {group_title_color[1]}, {group_title_color[2]});"
-            f"}}"
-        )
+        # Convert from individual padding-left/right to array format (Pattern 1)
+        title_padding = [title_padding_left, title_padding_right]
         
-        for group in self.findChildren(QGroupBox):
-            group.setStyleSheet(group_style)
-            layout = group.layout()
-            if layout:
-                layout.setContentsMargins(content_margins[0], content_margins[1], content_margins[2], content_margins[3])
+        group_boxes = list(self.findChildren(QGroupBox))
+        if group_boxes:
+            StyleManager.style_group_boxes(
+                group_boxes,
+                self.config,
+                border_color=border_color,
+                border_width=group_border_width,
+                border_radius=group_border_radius,
+                bg_color=groups_config.get('background_color'),  # None = use unified default
+                margin_top=margin_top,
+                padding_top=padding_top,
+                title_font_family=group_title_font,
+                title_font_size=group_title_size,
+                title_color=group_title_color,
+                title_left=title_left,
+                title_padding=title_padding,
+                content_margins=content_margins
+            )
     
     def _apply_spinbox_styling(self, spinbox: QSpinBox) -> None:
         """Apply styling to a spinbox widget."""
