@@ -1,7 +1,7 @@
 """Right-hand Detail-Panel containing different Views/Tabs."""
 
 from PyQt6.QtWidgets import (
-    QWidget, QTabWidget, QVBoxLayout, QSplitter
+    QWidget, QTabWidget, QVBoxLayout, QSplitter, QSizePolicy
 )
 from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt
@@ -90,6 +90,12 @@ class DetailPanel(QWidget):
         # Tab widget for different detail views (bottom)
         self.tab_widget = QTabWidget()
         self.tab_widget.setDocumentMode(False)  # Disable document mode for better control
+        
+        # Set minimum height and size policy from config
+        tabs_config = panel_config.get('tabs', {})
+        minimum_height = tabs_config.get('minimum_height', 200)
+        self.tab_widget.setMinimumHeight(minimum_height)
+        self.tab_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         # Apply tab styling from config
         self._apply_tab_styling()

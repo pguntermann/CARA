@@ -774,6 +774,7 @@
           "tabs_stretch_factor": 3
         },
         "tabs": {
+          "minimum_height": 200,
           "font_family": "Helvetica Neue",
           "font_size": 10,
           "tab_height": 24,
