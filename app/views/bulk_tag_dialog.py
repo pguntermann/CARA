@@ -581,18 +581,11 @@ class BulkTagDialog(QDialog):
             # Force update to ensure styling is applied
             label.update()
         
-        # Apply radio button styling to match import games dialog (simple styling, no custom indicator)
-        radio_button_style = (
-            f"QRadioButton {{"
-            f"color: rgb({self.label_text_color.red()}, {self.label_text_color.green()}, {self.label_text_color.blue()});"
-            f"font-family: {self.label_font_family};"
-            f"font-size: {self.label_font_size}pt;"
-            f"spacing: 5px;"
-            f"}}"
-        )
-        
-        for radio_button in self.findChildren(QRadioButton):
-            radio_button.setStyleSheet(radio_button_style)
+        # Apply radio button styling using StyleManager (uses unified config)
+        from app.views.style import StyleManager
+        radio_buttons = list(self.findChildren(QRadioButton))
+        if radio_buttons:
+            StyleManager.style_radio_buttons(radio_buttons, self.config)
         
         # Apply checkbox styling to ensure consistent font size and style
         self._apply_checkbox_styling()

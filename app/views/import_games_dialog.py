@@ -539,18 +539,11 @@ class ImportGamesDialog(QDialog):
         
         # Note: Checkbox styling is already applied by _apply_checkbox_styling() above
         
-        # Radio button styling
-        radio_style = (
-            f"QRadioButton {{"
-            f"color: rgb({self.label_text_color.red()}, {self.label_text_color.green()}, {self.label_text_color.blue()});"
-            f"font-family: {self.label_font_family};"
-            f"font-size: {self.label_font_size}pt;"
-            f"spacing: 5px;"
-            f"}}"
-        )
-        
-        for radio in self.findChildren(QRadioButton):
-            radio.setStyleSheet(radio_style)
+        # Apply radio button styling using StyleManager (uses unified config)
+        from app.views.style import StyleManager
+        radio_buttons = list(self.findChildren(QRadioButton))
+        if radio_buttons:
+            StyleManager.style_radio_buttons(radio_buttons, self.config)
     
     def _on_import_clicked(self) -> None:
         """Handle import button click."""
