@@ -41,9 +41,20 @@ class RuleExplanationFormatter:
             is_attacked = False
             is_defended = False
         
+        # Convert piece type to full piece name
+        piece_name_map = {
+            chess.PAWN: 'Pawn',
+            chess.ROOK: 'Rook',
+            chess.KNIGHT: 'Knight',
+            chess.BISHOP: 'Bishop',
+            chess.QUEEN: 'Queen',
+            chess.KING: 'King'
+        }
+        piece_name = piece_name_map.get(piece_type, piece_symbol.capitalize()) if piece_type else piece_symbol.capitalize()
+        
         # Build structured data for tooltip
         tooltip_data = {
-            'header': f"{color.capitalize()} {piece_symbol} on {square_name}",
+            'header': f"{color.capitalize()} {piece_name} on {square_name}",
             'positional_assessment': [],  # List of items: {'symbol': '•'|'✓'|'⚠', 'text': str, 'color': str}
             'position_status': [],  # List of items: {'symbol': '•', 'text': str}
             'combined_evaluation': None,  # {'summary': str, 'total': float} or None
@@ -516,12 +527,24 @@ class RuleExplanationFormatter:
         line_height = tooltip_config.get('line_height', 1.5)
         padding = tooltip_config.get('padding', 10)
         spacing = tooltip_config.get('spacing', 4)
-        section_spacing = tooltip_config.get('section_spacing', 6)
+        section_spacing = tooltip_config.get('section_spacing', 12)
+        section_bottom_spacing = tooltip_config.get('section_bottom_spacing', 8)
+        item_spacing = tooltip_config.get('item_spacing', 2)
+        header_bottom_margin = tooltip_config.get('header_bottom_margin', 8)
+        calculation_margin_bottom = tooltip_config.get('calculation_margin_bottom', 8)
+        overall_section_spacing = tooltip_config.get('overall_section_spacing', 12)
+        separator_enabled = tooltip_config.get('separator_enabled', True)
+        separator_color = tooltip_config.get('separator_color', [70, 70, 75])
+        separator_height = tooltip_config.get('separator_height', 1)
+        separator_margin = tooltip_config.get('separator_margin', [8, 8])
         bg_color = tooltip_config.get('background_color', [45, 45, 50])
         border_color = tooltip_config.get('border_color', [60, 60, 65])
         border_width = tooltip_config.get('border_width', 1)
         border_radius = tooltip_config.get('border_radius', 5)
         text_color = tooltip_config.get('text_color', [220, 220, 220])
+        title_font_size = tooltip_config.get('title_font_size', 13)
+        title_color = tooltip_config.get('title_color', [255, 255, 255])
+        title_font_weight = tooltip_config.get('title_font_weight', 'bold')
         header_font_size = tooltip_config.get('header_font_size', 12)
         header_color = tooltip_config.get('header_color', [240, 240, 240])
         positive_color = tooltip_config.get('positive_color', [100, 255, 100])
@@ -529,6 +552,19 @@ class RuleExplanationFormatter:
         calculation_indent = tooltip_config.get('calculation_indent', 12)
         calc_bg = tooltip_config.get('calculation_background', [35, 35, 40])
         calc_padding = tooltip_config.get('calculation_padding', 6)
+        
+        # Helper function to create separator line
+        def create_separator() -> str:
+            """Create a separator line HTML element."""
+            if not separator_enabled:
+                return ''
+            return (
+                f'<div style="height: {separator_height}px; '
+                f'margin-top: {separator_margin[0]}px; '
+                f'margin-bottom: {separator_margin[1]}px; '
+                f'background-color: rgb({separator_color[0]}, {separator_color[1]}, {separator_color[2]}); '
+                f'border: none;"></div>'
+            )
         
         # Escape HTML special characters
         def escape_html(text: str) -> str:
@@ -556,12 +592,18 @@ class RuleExplanationFormatter:
         )
         html_lines.append(f'<div style="{container_style}">')
         
-        # Header
-        html_lines.append(f'<div style="margin-bottom: {spacing}px; background: transparent;">{escape_html(tooltip_data["header"])}</div>')
-        html_lines.append(f'<div style="height: {spacing}px; background: transparent;"></div>')
+        # Header (title) - styled for prominence
+        html_lines.append(
+            f'<div style="font-weight: {title_font_weight}; '
+            f'font-size: {title_font_size}pt; '
+            f'color: rgb({title_color[0]}, {title_color[1]}, {title_color[2]}); '
+            f'margin-bottom: {header_bottom_margin}px; '
+            f'background: transparent;">{escape_html(tooltip_data["header"])}</div>'
+        )
         
         # Positional Assessment section
         if tooltip_data['positional_assessment']:
+            html_lines.append(create_separator())
             html_lines.append(
                 f'<div style="font-weight: bold; '
                 f'font-size: {header_font_size}pt; '
@@ -575,7 +617,7 @@ class RuleExplanationFormatter:
                 '<table style="width: 100%; border-collapse: collapse; margin-bottom: 0px; background: transparent;">'
             )
             
-            for item in tooltip_data['positional_assessment']:
+            for i, item in enumerate(tooltip_data['positional_assessment']):
                 symbol = item.get('symbol')
                 text = item.get('text', '')
                 color_type = item.get('color', 'text')
@@ -591,18 +633,21 @@ class RuleExplanationFormatter:
                 # Determine text color
                 text_color_rgb = f'rgb({text_color[0]}, {text_color[1]}, {text_color[2]})'
                 
+                # Add item spacing (margin-bottom) except for last item
+                item_margin_bottom = item_spacing if i < len(tooltip_data['positional_assessment']) - 1 else 0
+                
                 html_lines.append('<tr>')
                 if symbol:
                     # Item with symbol
                     html_lines.append(
-                        f'<td style="width: 25px; text-align: center; vertical-align: top; padding: 0; padding-right: 4px; background: transparent;">'
+                        f'<td style="width: 25px; text-align: center; vertical-align: top; padding: 0; padding-right: 4px; padding-bottom: {item_margin_bottom}px; background: transparent;">'
                         f'<span style="color: {symbol_color};">{symbol}</span>'
                         f'</td>'
                     )
                 else:
                     # Item without symbol (full width)
                     html_lines.append(
-                        f'<td colspan="2" style="text-align: left; vertical-align: top; padding: 0; background: transparent;">'
+                        f'<td colspan="2" style="text-align: left; vertical-align: top; padding: 0; padding-bottom: {item_margin_bottom}px; background: transparent;">'
                         f'<span style="color: {text_color_rgb};">{escape_html(text)}</span>'
                         f'</td>'
                     )
@@ -610,17 +655,18 @@ class RuleExplanationFormatter:
                     continue
                 
                 html_lines.append(
-                    f'<td style="text-align: left; vertical-align: top; padding: 0; background: transparent;">'
+                    f'<td style="text-align: left; vertical-align: top; padding: 0; padding-bottom: {item_margin_bottom}px; background: transparent;">'
                     f'<span style="color: {text_color_rgb};">{escape_html(text)}</span>'
                     f'</td>'
                 )
                 html_lines.append('</tr>')
             
             html_lines.append('</table>')
-            html_lines.append(f'<div style="height: {spacing}px; background: transparent;"></div>')
+            html_lines.append(f'<div style="height: {section_bottom_spacing}px; background: transparent;"></div>')
         
         # Position Status section
         if tooltip_data['position_status']:
+            html_lines.append(create_separator())
             html_lines.append(
                 f'<div style="font-weight: bold; '
                 f'font-size: {header_font_size}pt; '
@@ -634,28 +680,32 @@ class RuleExplanationFormatter:
                 '<table style="width: 100%; border-collapse: collapse; margin-bottom: 0px; background: transparent;">'
             )
             
-            for item in tooltip_data['position_status']:
+            for i, item in enumerate(tooltip_data['position_status']):
                 symbol = item.get('symbol', '•')
                 text = item.get('text', '')
                 
+                # Add item spacing (margin-bottom) except for last item
+                item_margin_bottom = item_spacing if i < len(tooltip_data['position_status']) - 1 else 0
+                
                 html_lines.append('<tr>')
                 html_lines.append(
-                    f'<td style="width: 25px; text-align: center; vertical-align: top; padding: 0; padding-right: 4px; background: transparent;">'
+                    f'<td style="width: 25px; text-align: center; vertical-align: top; padding: 0; padding-right: 4px; padding-bottom: {item_margin_bottom}px; background: transparent;">'
                     f'<span style="color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});">{symbol}</span>'
                     f'</td>'
                 )
                 html_lines.append(
-                    f'<td style="text-align: left; vertical-align: top; padding: 0; background: transparent;">'
+                    f'<td style="text-align: left; vertical-align: top; padding: 0; padding-bottom: {item_margin_bottom}px; background: transparent;">'
                     f'<span style="color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});">{escape_html(text)}</span>'
                     f'</td>'
                 )
                 html_lines.append('</tr>')
             
             html_lines.append('</table>')
-            html_lines.append(f'<div style="height: {spacing}px; background: transparent;"></div>')
+            html_lines.append(f'<div style="height: {section_bottom_spacing}px; background: transparent;"></div>')
         
         # Combined Evaluation section
         if tooltip_data['combined_evaluation']:
+            html_lines.append(create_separator())
             html_lines.append(
                 f'<div style="font-weight: bold; '
                 f'font-size: {header_font_size}pt; '
@@ -673,7 +723,7 @@ class RuleExplanationFormatter:
                 f'background-color: rgb({calc_bg[0]}, {calc_bg[1]}, {calc_bg[2]}); '
                 f'border-radius: 3px; '
                 f'font-family: monospace; '
-                f'margin-bottom: {spacing}px; background: transparent;">'
+                f'margin-bottom: {calculation_margin_bottom}px; background: transparent;">'
                 f'<div style="background: transparent;">{escape_html(summary)}</div>'
                 f'<div style="background: transparent;">= {total:.1f}</div>'
                 f'</div>'
@@ -681,7 +731,8 @@ class RuleExplanationFormatter:
         
         # Overall evaluation
         if tooltip_data['overall']:
-            html_lines.append(f'<div style="height: {spacing}px; background: transparent;"></div>')
+            html_lines.append(create_separator())
+            html_lines.append(f'<div style="height: {overall_section_spacing}px; background: transparent;"></div>')
             html_lines.append(
                 f'<div style="margin-bottom: {spacing}px; background: transparent;">'
                 f'Overall: {escape_html(tooltip_data["overall"])}'

@@ -67,6 +67,7 @@ class MainWindow(QMainWindow):
         self._ai_debug_inbound = False
         
         self._setup_window()
+        self._setup_tooltip_styling()
         self._setup_menu_bar()
         self._setup_ui()
         self._setup_shortcuts()
@@ -88,6 +89,40 @@ class MainWindow(QMainWindow):
         width = self.config.get('ui', {}).get('window', {}).get('width', 1200)
         height = self.config.get('ui', {}).get('window', {}).get('height', 800)
         self.setGeometry(x, y, width, height)
+    
+    def _setup_tooltip_styling(self) -> None:
+        """Setup QToolTip styling to ensure proper colors regardless of OS theme."""
+        # Get tooltip configuration
+        tooltip_config = self.config.get('ui', {}).get('positional_heatmap', {}).get('tooltip', {})
+        
+        # Extract colors with defaults
+        bg_color = tooltip_config.get('background_color', [45, 45, 50])
+        text_color = tooltip_config.get('text_color', [220, 220, 220])
+        border_color = tooltip_config.get('border_color', [60, 60, 65])
+        border_width = tooltip_config.get('border_width', 1)
+        border_radius = tooltip_config.get('border_radius', 5)
+        padding = tooltip_config.get('padding', 10)
+        
+        # Create QToolTip stylesheet
+        tooltip_stylesheet = f"""
+            QToolTip {{
+                background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});
+                color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});
+                border: {border_width}px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});
+                border-radius: {border_radius}px;
+                padding: {padding}px;
+            }}
+        """
+        
+        # Apply stylesheet to QApplication instance (tooltips are application-wide)
+        app = QApplication.instance()
+        if app:
+            # Get existing stylesheet and append tooltip styling
+            existing_stylesheet = app.styleSheet()
+            if existing_stylesheet:
+                app.setStyleSheet(existing_stylesheet + "\n" + tooltip_stylesheet)
+            else:
+                app.setStyleSheet(tooltip_stylesheet)
     
     def _setup_menu_bar(self) -> None:
         """Setup the menu bar with menu items."""
