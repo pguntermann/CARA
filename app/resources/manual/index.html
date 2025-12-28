@@ -273,6 +273,9 @@
         <!-- 3. INSTALLATION -->
         <section id="installation">
             <h2>3. Installation</h2>
+            <div class="tip-box" style="margin-bottom: 20px;">
+                <strong>Note:</strong> Pre-built application bundles are available for Windows and macOS, which include all dependencies and can be run directly without Python installation. See the <a href="https://github.com/pguntermann/CARA/releases" target="_blank">releases page</a> for download options. The following instructions are for manual installation.
+            </div>
             <div class="outline-item">
                 <h4 id="system-requirements">3.1 System Requirements</h4>
                 <p>Before installing CARA, ensure your system meets the following requirements:</p>
@@ -401,15 +404,34 @@
                 <p><strong>Note:</strong> On macOS, you may need to use <code>python3</code> instead of <code>python</code>.</p>
                 
                 <h5>Configuration Files</h5>
-                <p>CARA uses several configuration files to manage settings and preferences:</p>
+                <p>CARA uses three configuration files to manage settings and preferences:</p>
                 
                 <ul>
-                    <li><strong>config.json:</strong> This file contains all UI styling, layout dimensions, colors, fonts, and application-wide default settings. It is located in the CARA root directory and defines the visual appearance and behavior of the application. You can customize CARA's appearance by modifying this file without changing any source code.</li>
+                    <li><strong>config.json:</strong> Contains all UI styling, layout dimensions, colors, fonts, and application-wide default settings. This file is always located in the CARA root directory and defines the visual appearance and behavior of the application. You can customize CARA's appearance by modifying this file without changing any source code.</li>
                     
-                    <li><strong>user_settings.json:</strong> This file stores your personal preferences and settings, including moves list column profiles, board visibility settings, PGN display options, and other user-specific configurations. The file is automatically created in the CARA root directory when you first save settings, and it persists your preferences between application sessions.</li>
+                    <li><strong>user_settings.json:</strong> Stores your personal preferences and settings, including moves list column profiles, board visibility settings, PGN display options, engine configurations, and other user-specific settings. The file is automatically created when you first save settings and persists your preferences between application sessions.</li>
                     
-                    <li><strong>engine_parameters.json:</strong> This file stores engine-specific parameters and options for each configured chess engine. Engine settings are automatically saved to this file when you configure engines through the application interface.</li>
+                    <li><strong>engine_parameters.json:</strong> Stores engine-specific parameters and options for each configured chess engine. Engine settings are automatically saved to this file when you configure engines through the application interface.</li>
                 </ul>
+                
+                <h5>Where Configuration Files Are Stored</h5>
+                <p>The file location for <code>user_settings.json</code> and <code>engine_parameters.json</code> is determined by CARA's configuration settings. By default, these files are stored in the CARA root directory.</p>
+                
+                <p>However, when running CARA as an app bundle, the files are stored in different locations:</p>
+                
+                <ul>
+                    <li><strong>Windows:</strong> Files are stored in your user data directory: <code>%APPDATA%\CARA\</code> (usually <code>C:\Users\YourUsername\AppData\Roaming\CARA\</code>).</li>
+                    
+                    <li><strong>macOS:</strong> Files are stored in <code>~/Library/Application Support/CARA/</code>.</li>
+                </ul>
+                
+                <div class="tip-box">
+                    <strong>Finding Your Configuration Files:</strong> If you're using an app bundle and need to locate your configuration files:
+                    <ul style="margin-top: 10px;">
+                        <li><strong>Windows:</strong> Press <code>Win+R</code>, type <code>%APPDATA%\CARA</code>, and press Enter to open the folder in File Explorer.</li>
+                        <li><strong>macOS:</strong> Open Finder, press <code>⌘+Shift+G</code> (Go to Folder), type <code>~/Library/Application Support/CARA</code>, and press Enter.</li>
+                    </ul>
+                </div>
             </div>
         </section>
 
@@ -477,6 +499,8 @@
                 
                 <h5 id="evaluation-bar">4.3.3 Evaluation Bar</h5>
                 <p>The evaluation bar appears on the left side of the chessboard and shows the engine's evaluation of the current position. The bar uses white and black colors: positive values (White advantage) are shown in white extending upward from the center, negative values (Black advantage) are shown in black extending downward from the center. The scale ranges from -1000 to +1000 centipawns, with division marks at 100, 200, 300, 500, and 1000 centipawns to help gauge the evaluation magnitude. Toggle with <code>Alt+E</code> / <code>⌥+E</code> or <span class="menu-item">Board → Show Evaluation Bar</span>. When the evaluation bar is shown, the status bar displays detailed engine information including the engine name, search depth, evaluation score, principal variation, and performance metrics such as nodes per second and hash table usage.</p>
+                
+                <p><strong>Note:</strong> The evaluation bar requires a chess engine to be assigned to the evaluation task. See <a href="#configuring-engines">section 5.1</a> for instructions on configuring engines.</p>
                 
                 <div class="tip-box">
                     <strong>Quick Tip:</strong> The evaluation bar normally uses the engine assigned to the evaluation task. However, if manual analysis is currently running, the evaluation bar automatically switches to use the manual analysis engine's data instead. This ensures efficient resource usage by avoiding simultaneous analysis of the same position by two concurrent engines.
@@ -653,6 +677,8 @@
                 
                 <h5 id="manual-analysis">4.5.3 Manual Analysis</h5>
                 <p>The Manual Analysis tab provides continuous engine analysis of the current position with MultiPV (Multiple Principal Variations) support. Access this tab using <span class="menu-item">View → Manual Analysis</span> or press <code>F3</code>.</p>
+                
+                <p><strong>Note:</strong> Manual analysis requires a chess engine to be assigned to the manual analysis task. See <a href="#configuring-engines">section 5.1</a> for instructions on configuring engines.</p>
                 
                 <img src="screenshots/manual_analysis.png" alt="CARA Manual Analysis View - MultiPV analysis display showing principal variation lines with evaluations, depths, and move sequences" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
@@ -919,7 +945,7 @@
                     CARA will automatically validate that the engine supports the UCI protocol. The engine name, author, and version will be detected automatically.</li>
                     
                     <li><strong>Add the engine:</strong><br>
-                    Click "Add" to add the engine. The first engine you add will automatically be assigned to all analysis tasks (game analysis, evaluation, and manual analysis), so you can start analyzing games immediately.</li>
+                    Click "Add" to add the engine. The first engine you add will automatically be assigned to all analysis tasks (game analysis, evaluation, and manual analysis), so you can start analyzing games immediately. You can reassign this engine or add additional engines later (see <a href="#adding-additional-engines">section 5.1.2</a>).</li>
                 </ol>
                 
                 <img src="screenshots/add_engine_dialog.png" alt="CARA Add Engine Dialog - Dialog for adding UCI chess engines with browse button, validation, and engine information fields" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
@@ -933,13 +959,16 @@
                 <ul>
                     <li><strong>Multiple engines:</strong> You can add multiple engines and assign different engines to different tasks. For example, you might use a fast engine for continuous evaluation and a stronger engine for deep game analysis.</li>
                     
-                    <li><strong>Task assignment:</strong> Assign engines to specific tasks using <span class="menu-item">Engines → [Engine Name] → Assign to [Task]</span>. This allows you to use different engines optimized for different analysis types.<br>
+                    <li><strong>Task assignment:</strong> Assign engines to specific tasks using <span class="menu-item">Engines → [Engine Name] → Assign to [Task]</span>. You can reassign engines between tasks at any time—only one engine can be assigned to each task at a time.<br>
                     <img src="screenshots/set_engine_task.png" alt="CARA Engine Task Assignment - Menu showing engine assignment options for different analysis tasks" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                     </li>
                     
-                    <li><strong>Per-task configuration:</strong> Each engine can have different parameters for different tasks. Configure these settings using <span class="menu-item">Engines → [Engine Name] → Engine Configuration...</span> to set thread count, depth limits, time limits, and engine-specific options for evaluation, game analysis, and manual analysis tasks.<br>
+                    <li><strong>Per-task configuration:</strong> Each engine can have separate settings for each task (evaluation, game analysis, and manual analysis). Configure these settings using <span class="menu-item">Engines → [Engine Name] → Engine Configuration...</span> to configure engine options for each task independently. This allows you to optimize the same engine differently for different analysis types.<br>
                     <img src="screenshots/engine_settings_dialog.png" alt="CARA Engine Configuration Dialog - Dialog for configuring per-engine per-task parameters including thread count, depth limits, time limits, and engine-specific options" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                     <p>The dialog includes "Copy..." buttons for each task that allow you to copy settings from one task to another, making it easy to duplicate configurations. The "Reset" button restores the recommended default settings for the selected task.</p>
+                    <div class="tip-box" style="margin-top: 15px;">
+                        <strong>Quick Tip:</strong> Per-task engine configuration is an advanced setting. For most users, the default configurations will work fine and no manual configuration is necessary.
+                    </div>
                     </li>
                 </ul>
             </div>
@@ -1128,7 +1157,7 @@
                     Open a game from your database or paste a PGN game. The game must be active (displayed in the main panel).</li>
                     
                     <li><strong>Verify engine configuration:</strong><br>
-                    Make sure you have at least one UCI-compatible chess engine configured and assigned to the game analysis task. See <a href="#configuring-engines">section 5.1</a> for engine setup instructions.</li>
+                    Make sure you have at least one UCI-compatible chess engine configured and assigned to the game analysis task. If you haven't configured an engine yet, see <a href="#adding-first-engine">section 5.1.1</a> for step-by-step instructions. For information about assigning engines to specific tasks, see <a href="#adding-additional-engines">section 5.1.2</a>.</li>
                     
                     <li><strong>Start the analysis:</strong><br>
                     Use <span class="menu-item">Game Analysis → Start Game Analysis</span> (<code>Ctrl+G</code> / <code>⌘+G</code>) to begin analyzing the game. CARA will automatically switch to the Moves List tab if configured to do so (see <a href="#analysis-settings">section 5.5.3</a>).</li>
