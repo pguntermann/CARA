@@ -824,9 +824,12 @@ class DetailManualAnalysisView(QWidget):
             label.update()
         
         # Control bar and info bar styling
+        # Use control_bar background_color if available, otherwise fall back to pane_bg
+        control_bar_config = manual_analysis_config.get('control_bar', {})
+        control_bar_bg = control_bar_config.get('background_color', pane_bg)
         control_bar_stylesheet = f"""
             QFrame {{
-                background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
+                background-color: rgb({control_bar_bg[0]}, {control_bar_bg[1]}, {control_bar_bg[2]});
                 border-bottom: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
             }}
         """

@@ -98,6 +98,14 @@ class DetailMetadataView(QWidget):
         # Use bottom margin from button config as spacing between button bar and table
         layout.setSpacing(margins[2] if len(margins) > 2 else 8)
         
+        # Set view background color (lighter than table)
+        view_bg = metadata_config.get('background_color', [40, 40, 45])
+        from PyQt6.QtGui import QColor, QPalette
+        palette = self.palette()
+        palette.setColor(QPalette.ColorRole.Window, QColor(*view_bg))
+        self.setPalette(palette)
+        self.setAutoFillBackground(True)
+        
         # Create button bar
         button_bar = self._create_button_bar()
         layout.addWidget(button_bar)
@@ -143,6 +151,14 @@ class DetailMetadataView(QWidget):
         spacing = button_config.get('spacing', 8)
         layout.setContentsMargins(margins[0], margins[1], margins[2], margins[3])
         layout.setSpacing(spacing)
+        
+        # Set button bar background color
+        button_bar_bg = metadata_config.get('button_bar_background_color', [40, 40, 45])
+        from PyQt6.QtGui import QColor, QPalette
+        palette = button_bar.palette()
+        palette.setColor(QPalette.ColorRole.Window, QColor(*button_bar_bg))
+        button_bar.setPalette(palette)
+        button_bar.setAutoFillBackground(True)
         
         # Add button
         self.add_tag_button = QPushButton("Add")

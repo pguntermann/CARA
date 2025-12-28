@@ -340,6 +340,7 @@
           }
         },
         "metadata": {
+          "background_color": [40, 40, 45],
           "table": {
             "column_widths": {
               "col_name": 150,
@@ -350,6 +351,7 @@
             "background_color": [50, 55, 60],
             "text_color": [220, 220, 240]
           },
+          "button_bar_background_color": [40, 40, 45],
           "button": {
             "height": 28,
             "padding": [6, 4],
@@ -640,7 +642,8 @@
           "control_bar": {
             "margins": [8, 8, 8, 8],
             "spacing": 8,
-            "button_group_spacing": 16
+            "button_group_spacing": 16,
+            "background_color": [40, 40, 45]
           },
           "info_bar": {
             "margins": [8, 4, 8, 4],
@@ -786,7 +789,7 @@
           "text_font_size": 12
         },
         "ai_chat": {
-          "background_color": [40, 40, 45],
+          "background_color": [30, 30, 35],
           "text_color": [200, 200, 200],
           "font_family": "Helvetica Neue",
           "font_size": 11,
@@ -863,11 +866,11 @@
           "font_family": "Helvetica Neue",
           "font_size": 10,
           "tab_height": 24,
-          "pane_background": [40, 40, 45],
+          "pane_background": [30, 30, 35],
           "scroll_button_color": [30, 30, 30],
           "colors": {
             "normal": {
-              "background": [45, 45, 50],
+              "background": [30, 30, 35],
               "text": [200, 200, 200],
               "border": [60, 60, 65]
             },
