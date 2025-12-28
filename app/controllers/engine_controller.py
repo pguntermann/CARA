@@ -188,6 +188,31 @@ class EngineController:
         """
         return self.engine_model.get_assignments()
     
+    def is_engine_configured_for_task(self, task: str) -> Tuple[bool, Optional[str]]:
+        """Check if an engine is configured and assigned for a task.
+        
+        Args:
+            task: Task constant (TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS).
+            
+        Returns:
+            Tuple of (is_configured: bool, error_message: Optional[str]).
+            If is_configured is True, error_message is None.
+            If is_configured is False, error_message contains the reason:
+            - "no_engines" if no engines are configured
+            - "no_assignment" if no engine is assigned to the task
+        """
+        # Check if any engines are configured
+        engines = self.engine_model.get_engines()
+        if not engines:
+            return (False, "no_engines")
+        
+        # Check if an engine is assigned to the task
+        engine_assignment = self.engine_model.get_assignment(task)
+        if engine_assignment is None:
+            return (False, "no_assignment")
+        
+        return (True, None)
+    
     def _get_task_display_name(self, task: str) -> str:
         """Get display name for a task.
         

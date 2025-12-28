@@ -1222,7 +1222,7 @@ class MainWindow(QMainWindow):
         Shows error dialog if no active database is available.
         
         Returns:
-            DatabaseModel if active database exists, None otherwise.
+            DatabaseModel if active database exists, None otherwise.Kjjjjjlllllkllljlkjlljlkjljlllkjllkjklkkljllljkkl
         """
         database_controller = self.controller.get_database_controller()
         active_database = database_controller.get_active_database()
@@ -3684,6 +3684,20 @@ Visibility Settings:
         manual_analysis_controller = self.controller.get_manual_analysis_controller()
         
         if checked:
+            # Check if engine is configured and assigned for manual analysis
+            is_configured, error_type = self.controller.is_engine_configured_for_task(TASK_MANUAL_ANALYSIS)
+            if not is_configured:
+                # Uncheck the button first (before showing dialog) to prevent UI state issues
+                if hasattr(self, 'start_manual_analysis_action'):
+                    self.start_manual_analysis_action.blockSignals(True)
+                    self.start_manual_analysis_action.setChecked(False)
+                    self.start_manual_analysis_action.blockSignals(False)
+                
+                # Show warning message from config
+                title, message = self.controller.get_engine_validation_message(error_type, TASK_MANUAL_ANALYSIS)
+                MessageDialog.show_warning(self.config, title, message, self)
+                return
+            
             # Switch to Manual Analysis tab FIRST for immediate visual feedback
             # Do this before calling start_analysis() to ensure tab switches immediately
             if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'tab_widget'):
@@ -4527,6 +4541,13 @@ Visibility Settings:
     
     def _start_game_analysis(self) -> None:
         """Handle start game analysis from menu."""
+        # Check if engine is configured and assigned for game analysis
+        is_configured, error_type = self.controller.is_engine_configured_for_task(TASK_GAME_ANALYSIS)
+        if not is_configured:
+            title, message = self.controller.get_engine_validation_message(error_type, TASK_GAME_ANALYSIS)
+            MessageDialog.show_warning(self.config, title, message, self)
+            return
+        
         game_analysis_controller = self.controller.get_game_analysis_controller()
         
         # Check if moves list model is set

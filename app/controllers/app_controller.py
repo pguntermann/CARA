@@ -1,6 +1,6 @@
 """Central application controller for orchestrating business logic."""
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 from app.models.progress_model import ProgressModel
 from app.services.progress_service import ProgressService
@@ -8,7 +8,7 @@ from app.controllers.board_controller import BoardController
 from app.controllers.database_controller import DatabaseController
 from app.controllers.game_controller import GameController
 from app.controllers.column_profile_controller import ColumnProfileController
-from app.controllers.engine_controller import EngineController
+from app.controllers.engine_controller import EngineController, TASK_EVALUATION, TASK_GAME_ANALYSIS, TASK_MANUAL_ANALYSIS
 from app.controllers.evaluation_controller import EvaluationController
 from app.controllers.manual_analysis_controller import ManualAnalysisController
 from app.controllers.game_analysis_controller import GameAnalysisController
@@ -578,6 +578,66 @@ class AppController:
         """
         return self.engine_controller
     
+    def is_engine_configured_for_task(self, task: str) -> Tuple[bool, Optional[str]]:
+        """Check if an engine is configured and assigned for a task.
+        
+        This is a convenience method that delegates to the engine controller.
+        
+        Args:
+            task: Task constant (TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS).
+            
+        Returns:
+            Tuple of (is_configured: bool, error_message: Optional[str]).
+            If is_configured is True, error_message is None.
+            If is_configured is False, error_message contains the reason:
+            - "no_engines" if no engines are configured
+            - "no_assignment" if no engine is assigned to the task
+        """
+        return self.engine_controller.is_engine_configured_for_task(task)
+    
+    def get_engine_validation_message(self, error_type: str, task: str) -> Tuple[str, str]:
+        """Get validation message title and text from config for engine validation errors.
+        
+        Args:
+            error_type: Error type ("no_engines" or "no_assignment").
+            task: Task constant (TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS).
+            
+        Returns:
+            Tuple of (title: str, message: str).
+        """
+        messages_config = self.config.get('ui', {}).get('dialogs', {}).get('engine_validation_messages', {})
+        
+        # Map task constants to config keys
+        task_key_map = {
+            TASK_GAME_ANALYSIS: "game_analysis",
+            TASK_MANUAL_ANALYSIS: "manual_analysis",
+            TASK_EVALUATION: "evaluation"
+        }
+        action_key_map = {
+            TASK_GAME_ANALYSIS: "game_analysis",
+            TASK_MANUAL_ANALYSIS: "manual_analysis",
+            TASK_EVALUATION: "evaluation_bar"
+        }
+        
+        task_key = task_key_map.get(task, task)
+        action_key = action_key_map.get(task, task)
+        
+        # Get error config
+        error_config = messages_config.get(error_type, {})
+        title = error_config.get('title', 'Error')
+        message_template = error_config.get('message_template', '')
+        
+        # Get action and task display names
+        actions = messages_config.get('actions', {})
+        tasks = messages_config.get('tasks', {})
+        action = actions.get(action_key, action_key)
+        task_display = tasks.get(task_key, task_key)
+        
+        # Format message
+        message = message_template.format(action=action, task=task_display)
+        
+        return (title, message)
+    
     def get_evaluation_controller(self) -> EvaluationController:
         """Get the evaluation controller.
         
@@ -730,7 +790,9 @@ class AppController:
                     self.evaluation_controller._switch_to_manual_analysis()
                     return
             
-            # Manual analysis not running - start evaluation engine
+            # Engine validation is already done in toggle_evaluation_bar_visibility()
+            # If we reach here, the bar is being shown and engine is configured
+            # Start evaluation engine
             board_model = self.board_controller.get_board_model()
             fen = board_model.get_fen()
             self.evaluation_controller.start_evaluation(fen)
@@ -743,6 +805,24 @@ class AppController:
         
         This is a convenience method that goes through the board controller.
         """
+        board_model = self.board_controller.get_board_model()
+        current_visibility = board_model.show_evaluation_bar
+        
+        # If we're trying to show the bar, validate engine configuration first
+        if not current_visibility:
+            # Check if engine is configured and assigned for evaluation
+            is_configured, error_type = self.is_engine_configured_for_task(TASK_EVALUATION)
+            if not is_configured:
+                # Don't toggle - show warning message instead
+                from PyQt6.QtWidgets import QApplication
+                from app.views.message_dialog import MessageDialog
+                parent = QApplication.activeWindow()
+                
+                title, message = self.get_engine_validation_message(error_type, TASK_EVALUATION)
+                MessageDialog.show_warning(self.config, title, message, parent)
+                return
+        
+        # Toggle visibility (either hiding or showing with valid engine)
         self.board_controller.toggle_evaluation_bar_visibility()
         
         # Show status message

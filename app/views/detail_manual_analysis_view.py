@@ -11,6 +11,8 @@ from app.models.game_model import GameModel
 from app.models.engine_model import EngineModel
 from app.models.manual_analysis_model import ManualAnalysisModel
 from app.controllers.manual_analysis_controller import ManualAnalysisController
+from app.controllers.engine_controller import TASK_MANUAL_ANALYSIS
+from app.views.message_dialog import MessageDialog
 
 
 class DetailManualAnalysisView(QWidget):
@@ -1049,6 +1051,43 @@ class DetailManualAnalysisView(QWidget):
             return
         
         if checked:
+            # Check if engine is configured and assigned for manual analysis
+            engine_controller = self._analysis_controller.engine_controller
+            is_configured, error_type = engine_controller.is_engine_configured_for_task(TASK_MANUAL_ANALYSIS)
+            if not is_configured:
+                # Uncheck the button first
+                self.start_stop_button.blockSignals(True)
+                self.start_stop_button.setChecked(False)
+                self.start_stop_button.blockSignals(False)
+                
+                # Get validation message from app controller if available, otherwise use fallback
+                try:
+                    # Try to get app controller through the controller chain
+                    # This is a bit of a workaround, but we need the validation message helper
+                    from PyQt6.QtWidgets import QApplication
+                    main_window = QApplication.activeWindow()
+                    if main_window and hasattr(main_window, 'controller'):
+                        title, message = main_window.controller.get_engine_validation_message(error_type, TASK_MANUAL_ANALYSIS)
+                    else:
+                        # Fallback if we can't get app controller
+                        if error_type == "no_engines":
+                            title = "No Engine Configured"
+                            message = "Please add at least one UCI chess engine before starting manual analysis.\n\nGo to Engines → Add Engine... to configure an engine."
+                        else:
+                            title = "No Engine Assigned"
+                            message = "Please assign an engine to the Manual Analysis task before starting analysis.\n\nGo to Engines → [Engine Name] → Assign to Manual Analysis."
+                    MessageDialog.show_warning(self.config, title, message, self)
+                except Exception:
+                    # Fallback message if something goes wrong
+                    if error_type == "no_engines":
+                        title = "No Engine Configured"
+                        message = "Please add at least one UCI chess engine before starting manual analysis.\n\nGo to Engines → Add Engine... to configure an engine."
+                    else:
+                        title = "No Engine Assigned"
+                        message = "Please assign an engine to the Manual Analysis task before starting analysis.\n\nGo to Engines → [Engine Name] → Assign to Manual Analysis."
+                    MessageDialog.show_warning(self.config, title, message, self)
+                return
+            
             # Start analysis (FEN will be retrieved from board controller)
             success = self._analysis_controller.start_analysis()
             if not success:
