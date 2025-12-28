@@ -1,3 +1,25 @@
+# CARA v2.4.8 - Quality of Life Improvements
+
+**Release Date:** 28.12.2025
+
+This release focuses on quality of life improvements with better visual defaults and minor enhancements.
+
+## Visual Improvements
+
+- **Positional Heatmap Tooltip Enhancements**: Improved tooltip appearance with better spacing, visual separators, enhanced title styling, and full piece names for better readability
+- **PGN Pane Scrollbar Styling**: Applied consistent scrollbar styling to the PGN notation pane to match the rest of the application
+- **Detail View Color Defaults**: Improved default background colors for detail views for better visual clarity
+
+## User Experience Improvements
+
+- **Engine Configuration Validation**: Added warning messages when users attempt to use engine-dependent features (game analysis, manual analysis, evaluation bar) without having an engine configured
+
+## Code Cleanup
+
+- **Removed Unused Debug Functions**: Cleaned up codebase by removing obsolete debug functions (trajectory debug and brilliant debug toggle) that were no longer needed
+
+---
+
 # CARA v2.4.7 - Visual Appearance Streamlining
 
 **Release Date:** 27.12.2025
