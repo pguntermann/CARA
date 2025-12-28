@@ -21,29 +21,6 @@ from app.services.move_analysis_service import MoveAnalysisService
 from app.utils.material_tracker import (calculate_material_loss, calculate_material_balance,
                                          get_captured_piece_letter, calculate_material_count, count_pieces)
 
-# Module-level debug flag (thread-safe)
-_debug_brilliant_enabled = False
-
-
-# Global reference to GameAnalysisController instance for printing settings
-_debug_controller_instance = None
-
-def set_debug_brilliant(enabled: bool, controller_instance: Optional['GameAnalysisController'] = None) -> None:
-    """Set thread-safe debug flag for brilliant move calculation.
-    
-    Args:
-        enabled: True if brilliant debug output is enabled, False otherwise.
-        controller_instance: Optional GameAnalysisController instance to print settings.
-    """
-    global _debug_brilliant_enabled, _debug_controller_instance
-    _debug_brilliant_enabled = enabled
-    if controller_instance is not None:
-        _debug_controller_instance = controller_instance
-    
-    # Print confirmation and current settings when enabled
-    if enabled and _debug_controller_instance is not None:
-        _debug_controller_instance._print_brilliant_debug_settings()
-
 
 class GameAnalysisController(QObject):
     """Controller for managing game analysis operations.
@@ -1323,14 +1300,6 @@ class GameAnalysisController(QObject):
         if not self._moves_to_analyze:
             return
         
-        # Print debug header if brilliancy debug is enabled
-        if _debug_brilliant_enabled:
-            print("\n" + "=" * 80, file=sys.stderr)
-            print("POST-GAME BRILLIANCY REFINEMENT PASS", file=sys.stderr)
-            print("=" * 80, file=sys.stderr)
-            print("Re-checking all moves with 2-3 ply look-ahead for material sacrifice detection.", file=sys.stderr)
-            print("=" * 80 + "\n", file=sys.stderr)
-        
         from app.services.progress_service import ProgressService
         from PyQt6.QtCore import QModelIndex, Qt
         progress_service = ProgressService.get_instance()
@@ -1417,93 +1386,6 @@ class GameAnalysisController(QObject):
             progress_service.set_status(f"Post-game refinement: {brilliant_count} additional brilliant move(s) detected")
         else:
             progress_service.set_status("Post-game refinement: No additional brilliant moves detected")
-    
-    def _print_brilliant_debug_settings(self) -> None:
-        """Print current brilliancy criteria settings when debug is enabled."""
-        print("\n" + "=" * 80, file=sys.stderr)
-        print("BRILLIANT MOVE DEBUG ENABLED", file=sys.stderr)
-        print("=" * 80, file=sys.stderr)
-        print("Current Brilliancy Criteria Settings:", file=sys.stderr)
-        print(f"  Min Eval Swing:        {self.min_eval_swing} centipawns", file=sys.stderr)
-        print(f"  Min Material Sacrifice: {self.min_material_sacrifice} centipawns", file=sys.stderr)
-        print(f"  Max Eval Before:       {self.max_eval_before} centipawns", file=sys.stderr)
-        print(f"  Exclude Already Winning: {self.exclude_already_winning}", file=sys.stderr)
-        print(f"  Material Sacrifice Lookahead: {self.material_sacrifice_lookahead_plies} plies", file=sys.stderr)
-        print("=" * 80, file=sys.stderr)
-        print("Debug output will be printed for each move evaluated for brilliancy.\n", file=sys.stderr)
-    
-    def _debug_brilliant_output(self, move_info: Dict[str, Any], eval_before: float, 
-                               eval_after: float, eval_swing: float, material_loss: int, 
-                               cpl: float, best_move_san: str, is_white_move: bool, 
-                               result: str) -> None:
-        """Output debug information for brilliancy calculation.
-        
-        Args:
-            move_info: Move information dictionary.
-            eval_before: Evaluation before move.
-            eval_after: Evaluation after move.
-            eval_swing: Evaluation swing.
-            material_loss: Material loss in centipawns.
-            cpl: Centipawn loss.
-            best_move_san: Best move suggestion.
-            is_white_move: True if white move, False if black.
-            result: Result string (PASS or FAIL with reason).
-        """
-        move_number = move_info.get("move_number", "?")
-        move_san = move_info.get("move_san", "?")
-        side = "White" if is_white_move else "Black"
-        
-        # Calculate net improvement
-        if is_white_move:
-            net_improvement = eval_swing - material_loss
-        else:
-            net_improvement = -eval_swing - material_loss
-        
-        # Format evaluation values
-        eval_before_str = f"{eval_before:.1f}"
-        eval_after_str = f"{eval_after:.1f}"
-        eval_swing_str = f"{eval_swing:+.1f}"
-        
-        # Check results with clear pass/fail indicators
-        eval_check_passed = (eval_swing >= self.min_eval_swing) if is_white_move else (eval_swing <= -self.min_eval_swing)
-        material_check_passed = material_loss >= self.min_material_sacrifice
-        already_winning_check_passed = True
-        if self.exclude_already_winning:
-            if is_white_move:
-                already_winning_check_passed = eval_before <= self.max_eval_before
-            else:
-                already_winning_check_passed = eval_before >= -self.max_eval_before
-        
-        # Format check results
-        eval_check = "✓" if eval_check_passed else "✗"
-        material_check = "✓" if material_check_passed else "✗"
-        already_winning_check = "✓" if already_winning_check_passed else "✗" if self.exclude_already_winning else "N/A"
-        
-        # Print formatted output
-        print(f"\n{'─' * 80}", file=sys.stderr)
-        print(f"Move {move_number} ({side}): {move_san}", file=sys.stderr)
-        print(f"{'─' * 80}", file=sys.stderr)
-        print(f"Evaluation:  {eval_before_str:>8} → {eval_after_str:>8}  (Swing: {eval_swing_str:>8})", file=sys.stderr)
-        print(f"Material:    Sacrifice: {material_loss:>4} cp  |  CPL: {cpl:>6.1f} cp", file=sys.stderr)
-        print(f"Best Move:   {best_move_san}", file=sys.stderr)
-        print(f"", file=sys.stderr)
-        print(f"Checks:", file=sys.stderr)
-        if is_white_move:
-            print(f"  {eval_check}  Eval Swing:     {eval_swing:>6.1f} >= {self.min_eval_swing:>4} cp", file=sys.stderr)
-        else:
-            print(f"  {eval_check}  Eval Swing:     {eval_swing:>6.1f} <= {-self.min_eval_swing:>4} cp", file=sys.stderr)
-        print(f"  {material_check}  Material Sac:   {material_loss:>6} >= {self.min_material_sacrifice:>4} cp", file=sys.stderr)
-        if self.exclude_already_winning:
-            if is_white_move:
-                print(f"  {already_winning_check}  Not Winning:   {eval_before:>6.1f} <= {self.max_eval_before:>4} cp", file=sys.stderr)
-            else:
-                print(f"  {already_winning_check}  Not Winning:   {eval_before:>6.1f} >= {-self.max_eval_before:>4} cp", file=sys.stderr)
-        else:
-            print(f"  {already_winning_check}  Not Winning:   (disabled)", file=sys.stderr)
-        print(f"", file=sys.stderr)
-        print(f"Result: {result}", file=sys.stderr)
-        print(f"{'─' * 80}", file=sys.stderr, flush=True)
-    
     
     def _find_database_model_for_game(self, game) -> Optional[DatabaseModel]:
         """Find the database model that contains the given game.

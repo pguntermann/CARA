@@ -61,7 +61,6 @@ class MainWindow(QMainWindow):
         self._uci_debug_outbound = False
         self._uci_debug_inbound = False
         self._uci_debug_lifecycle = False
-        self._brilliant_debug_enabled = False
         
         # AI debug flags (for console output)
         self._ai_debug_outbound = False
@@ -71,7 +70,6 @@ class MainWindow(QMainWindow):
         self._setup_menu_bar()
         self._setup_ui()
         self._setup_shortcuts()
-        self._setup_brilliant_debug()
         
         # Load user settings after UI is set up (so detail_panel is available)
         self._load_user_settings()
@@ -966,11 +964,6 @@ class MainWindow(QMainWindow):
             debug_copy_pgn_html_action.triggered.connect(self._debug_copy_pgn_html)
             debug_menu.addAction(debug_copy_pgn_html_action)
             
-            # Copy Trajectory Debug Info action
-            debug_copy_trajectory_info_action = QAction("Copy Trajectory Debug Info", self)
-            debug_copy_trajectory_info_action.triggered.connect(self._debug_copy_trajectory_info)
-            debug_menu.addAction(debug_copy_trajectory_info_action)
-            
             # Copy Deserialize Analysis Tag action
             debug_copy_deserialize_analysis_action = QAction("Copy Deserialize Analysis Tag", self)
             debug_copy_deserialize_analysis_action.triggered.connect(self._debug_copy_deserialize_analysis_tag)
@@ -1038,16 +1031,6 @@ class MainWindow(QMainWindow):
             self.debug_ai_inbound_action.setChecked(self._ai_debug_inbound)
             self.debug_ai_inbound_action.triggered.connect(self._toggle_ai_debug_inbound)
             debug_menu.addAction(self.debug_ai_inbound_action)
-            
-            # Separator
-            debug_menu.addSeparator()
-            
-            # Debug Brilliancy Calculation toggle
-            self.debug_brilliant_action = QAction("Debug Brilliancy Calculation", self)
-            self.debug_brilliant_action.setCheckable(True)
-            self.debug_brilliant_action.setChecked(self._brilliant_debug_enabled)
-            self.debug_brilliant_action.triggered.connect(self._toggle_brilliant_debug)
-            debug_menu.addAction(self.debug_brilliant_action)
             
             # Separator
             debug_menu.addSeparator()
@@ -2632,74 +2615,6 @@ class MainWindow(QMainWindow):
         success, status_message = self.controller.paste_fen_from_clipboard()
         self.controller.set_status(status_message)
     
-    def _debug_copy_trajectory_info(self) -> None:
-        """DEBUG: Copy trajectory debug information to clipboard as JSON."""
-        from PyQt6.QtWidgets import QApplication
-        import json
-        
-        try:
-            # Get board model for current FEN and trajectories
-            board_model = self.controller.get_board_controller().get_board_model()
-            current_fen = board_model.get_fen()
-            positional_plans = board_model.positional_plans
-            
-            # Get manual analysis controller and model
-            manual_analysis_controller = self.controller.get_manual_analysis_controller()
-            if not manual_analysis_controller:
-                clipboard = QApplication.clipboard()
-                clipboard.setText(json.dumps({"error": "Manual analysis controller not available"}, indent=2))
-                return
-            
-            manual_analysis_model = manual_analysis_controller.get_analysis_model()
-            
-            # Get trajectory settings
-            active_pv_plan = manual_analysis_controller._active_pv_plan
-            max_pieces_to_explore = manual_analysis_controller._max_pieces_to_explore
-            max_exploration_depth = manual_analysis_controller._max_exploration_depth
-            
-            # Get PV lines
-            pv_lines = []
-            for line in manual_analysis_model.lines:
-                pv_lines.append({
-                    "multipv": line.multipv,
-                    "pv": line.pv,
-                    "centipawns": line.centipawns,
-                    "depth": line.depth,
-                    "is_mate": line.is_mate,
-                    "mate_moves": line.mate_moves
-                })
-            
-            # Get trajectory results
-            trajectories = []
-            for plan in positional_plans:
-                trajectories.append({
-                    "piece_type": plan.piece_type,
-                    "piece_color": "white" if plan.piece_color else "black",
-                    "starting_square": chess.square_name(plan.starting_square) if plan.starting_square is not None else None,
-                    "squares": [chess.square_name(sq) for sq in plan.squares],
-                    "ply_indices": plan.ply_indices
-                })
-            
-            # Build debug info
-            debug_info = {
-                "current_fen": current_fen,
-                "trajectory_settings": {
-                    "active_pv_plan": active_pv_plan,
-                    "max_pieces_to_explore": max_pieces_to_explore,
-                    "max_exploration_depth": max_exploration_depth
-                },
-                "pv_lines": pv_lines,
-                "trajectories": trajectories
-            }
-            
-            # Copy to clipboard
-            clipboard = QApplication.clipboard()
-            clipboard.setText(json.dumps(debug_info, indent=2))
-            
-        except Exception as e:
-            clipboard = QApplication.clipboard()
-            clipboard.setText(json.dumps({"error": str(e)}, indent=2))
-    
     def _debug_copy_pgn_html(self) -> None:
         """DEBUG: Copy PGN HTML and current visibility settings to clipboard."""
         from PyQt6.QtWidgets import QApplication
@@ -3169,28 +3084,6 @@ Visibility Settings:
             True if lifecycle debugging is enabled, False otherwise.
         """
         return self._uci_debug_lifecycle
-    
-    def _toggle_brilliant_debug(self) -> None:
-        """Toggle brilliant move calculation debug output."""
-        self._brilliant_debug_enabled = self.debug_brilliant_action.isChecked()
-        # Update thread-safe flag
-        from app.controllers.game_analysis_controller import set_debug_brilliant
-        game_analysis_controller = self.controller.get_game_analysis_controller()
-        set_debug_brilliant(self._brilliant_debug_enabled, game_analysis_controller)
-    
-    def get_brilliant_debug(self) -> bool:
-        """Get current brilliant debug state.
-        
-        Returns:
-            True if brilliant debugging is enabled, False otherwise.
-        """
-        return self._brilliant_debug_enabled
-    
-    def _setup_brilliant_debug(self) -> None:
-        """Set up brilliant debug flag in GameAnalysisController."""
-        from app.controllers.game_analysis_controller import set_debug_brilliant
-        game_analysis_controller = self.controller.get_game_analysis_controller()
-        set_debug_brilliant(self._brilliant_debug_enabled, game_analysis_controller)
     
     def _toggle_game_analysis_state(self) -> None:
         """Toggle game analysis state (for debugging)."""
