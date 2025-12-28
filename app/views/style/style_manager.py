@@ -2,12 +2,13 @@
 
 from pathlib import Path
 from typing import Dict, Any, List
-from PyQt6.QtWidgets import QScrollArea, QCheckBox, QComboBox, QRadioButton, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox, QDateEdit, QTimeEdit, QDateTimeEdit, QGroupBox
+from PyQt6.QtWidgets import QScrollArea, QCheckBox, QComboBox, QRadioButton, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox, QDateEdit, QTimeEdit, QDateTimeEdit, QGroupBox, QTextEdit
 
 from app.views.style.scrollbar import (
     apply_scrollbar_styling,
     apply_table_scrollbar_styling,
-    apply_table_view_scrollbar_styling
+    apply_table_view_scrollbar_styling,
+    apply_text_edit_scrollbar_styling
 )
 from app.views.style.checkbox import apply_checkbox_styling
 from app.views.style.combobox import apply_combobox_styling
@@ -78,6 +79,25 @@ class StyleManager:
             table_style: Existing table stylesheet to append scrollbar styles to.
         """
         apply_table_view_scrollbar_styling(table_view, config, bg_color, border_color, table_style)
+    
+    @staticmethod
+    def style_text_edit_scrollbar(
+        text_edit: QTextEdit,
+        config: Dict[str, Any],
+        bg_color: List[int],
+        border_color: List[int],
+        text_edit_style: str
+    ) -> None:
+        """Apply scrollbar styling to a QTextEdit.
+        
+        Args:
+            text_edit: The QTextEdit to style.
+            config: Configuration dictionary.
+            bg_color: Background color as [R, G, B].
+            border_color: Border color as [R, G, B].
+            text_edit_style: Existing text edit stylesheet to append scrollbar styles to.
+        """
+        apply_text_edit_scrollbar_styling(text_edit, config, bg_color, border_color, text_edit_style)
     
     @staticmethod
     def style_checkboxes(

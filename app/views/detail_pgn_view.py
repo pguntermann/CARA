@@ -9,6 +9,7 @@ import re
 from app.services.pgn_formatter_service import PgnFormatterService
 from app.models.game_model import GameModel
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.views.style.style_manager import StyleManager
 
 if TYPE_CHECKING:
     from app.controllers.game_controller import GameController
@@ -161,14 +162,23 @@ class DetailPgnView(QWidget):
         # Set background and text colors via stylesheet
         pgn_bg_rgb = f"rgb({pgn_background_color[0]}, {pgn_background_color[1]}, {pgn_background_color[2]})"
         pgn_text_rgb = f"rgb({pgn_text_color[0]}, {pgn_text_color[1]}, {pgn_text_color[2]})"
-        self.pgn_text.setStyleSheet(f"""
+        text_edit_style = f"""
             QTextEdit {{
                 background-color: {pgn_bg_rgb};
                 color: {pgn_text_rgb};
                 border: 1px solid rgb(60, 60, 65);
                 padding: 5px;
             }}
-        """)
+        """
+        
+        # Apply scrollbar styling using StyleManager
+        StyleManager.style_text_edit_scrollbar(
+            self.pgn_text,
+            self.config,
+            pgn_background_color,
+            [60, 60, 65],  # Border color (matches the border in stylesheet)
+            text_edit_style
+        )
         
         # Set placeholder text
         placeholder = pgn_config.get('placeholder_text', 'PGN notation will appear here...')

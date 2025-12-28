@@ -317,3 +317,74 @@ def apply_table_view_scrollbar_styling(
         horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Window, QColor(*bg_color))
         horizontal_scrollbar.setPalette(horizontal_scrollbar_palette)
         horizontal_scrollbar.setAutoFillBackground(True)
+
+
+def apply_text_edit_scrollbar_styling(
+    text_edit,
+    config: Dict[str, Any],
+    bg_color: List[int],
+    border_color: List[int],
+    text_edit_style: str
+) -> None:
+    """Apply scrollbar styling to a QTextEdit.
+    
+    Args:
+        text_edit: The QTextEdit to style.
+        config: Configuration dictionary.
+        bg_color: Background color as [R, G, B].
+        border_color: Border color as [R, G, B].
+        text_edit_style: Existing text edit stylesheet to append scrollbar styles to.
+    """
+    # Generate text edit scrollbar stylesheet with QTextEdit selector
+    text_edit_scrollbar_style = generate_scrollbar_stylesheet(
+        config, bg_color, border_color, widget_selector="QTextEdit QScrollBar"
+    )
+    
+    # Append scrollbar styling to text edit style
+    combined_text_edit_style = text_edit_style + text_edit_scrollbar_style
+    text_edit.setStyleSheet(combined_text_edit_style)
+    
+    # Apply scrollbar stylesheet directly to text edit scrollbar widgets to prevent macOS override
+    # Style vertical scrollbar
+    vertical_scrollbar = text_edit.verticalScrollBar()
+    if vertical_scrollbar:
+        scrollbar_stylesheet = generate_scrollbar_stylesheet(config, bg_color, border_color)
+        vertical_scrollbar.setStyleSheet(scrollbar_stylesheet)
+        
+        # Get scrollbar width from config
+        styles_config = config.get('ui', {}).get('styles', {})
+        scrollbar_config = styles_config.get('scrollbar', {})
+        scrollbar_width = scrollbar_config.get('width', 8)
+        
+        # Set fixed width programmatically to override macOS native styling
+        vertical_scrollbar.setFixedWidth(scrollbar_width)
+        
+        # Set palette to prevent macOS override
+        vertical_scrollbar_palette = vertical_scrollbar.palette()
+        vertical_scrollbar_palette.setColor(vertical_scrollbar.backgroundRole(), QColor(*bg_color))
+        vertical_scrollbar_palette.setColor(vertical_scrollbar_palette.ColorRole.Base, QColor(*bg_color))
+        vertical_scrollbar_palette.setColor(vertical_scrollbar_palette.ColorRole.Window, QColor(*bg_color))
+        vertical_scrollbar.setPalette(vertical_scrollbar_palette)
+        vertical_scrollbar.setAutoFillBackground(True)
+    
+    # Style horizontal scrollbar
+    horizontal_scrollbar = text_edit.horizontalScrollBar()
+    if horizontal_scrollbar:
+        scrollbar_stylesheet = generate_scrollbar_stylesheet(config, bg_color, border_color)
+        horizontal_scrollbar.setStyleSheet(scrollbar_stylesheet)
+        
+        # Get scrollbar width from config (use same width for height of horizontal scrollbar)
+        styles_config = config.get('ui', {}).get('styles', {})
+        scrollbar_config = styles_config.get('scrollbar', {})
+        scrollbar_width = scrollbar_config.get('width', 8)
+        
+        # Set fixed height programmatically to override macOS native styling
+        horizontal_scrollbar.setFixedHeight(scrollbar_width)
+        
+        # Set palette to prevent macOS override
+        horizontal_scrollbar_palette = horizontal_scrollbar.palette()
+        horizontal_scrollbar_palette.setColor(horizontal_scrollbar.backgroundRole(), QColor(*bg_color))
+        horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Base, QColor(*bg_color))
+        horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Window, QColor(*bg_color))
+        horizontal_scrollbar.setPalette(horizontal_scrollbar_palette)
+        horizontal_scrollbar.setAutoFillBackground(True)
