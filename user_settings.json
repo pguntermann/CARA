@@ -941,7 +941,7 @@
     "show_variations": true,
     "show_annotations": true,
     "show_results": true,
-    "show_non_standard_tags": true
+    "show_non_standard_tags": false
   },
   "engines": [],
   "engine_assignments": {
