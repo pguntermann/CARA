@@ -65,7 +65,9 @@ CARA was built in large part by an AI model under the author's direction. The au
 >
 > After completing these steps, you can launch the app normally.
 
-**Manual Installation**: The following sections describe how to manually install Python and CARA dependencies, if you don't want to use the pre-built application bundles.
+---
+
+**Manual Installation**: The following subsections describe how to manually install Python and CARA dependencies, if you don't want to use the pre-built application bundles.
 
 ### 1. Install Python
 
@@ -145,6 +147,8 @@ python cara.py
 
 ### Quick Start
 
+For detailed instructions, see the [user manual](https://pguntermann.github.io/CARA/manual.html).
+
 1. **Ensure you have a chess engine configured**: Before starting, make sure you have at least one UCI-compatible chess engine added to CARA. Go to **Engines → Add Engine...** and select your UCI engine. If you're unsure which engine to choose, [Stockfish](https://stockfishchess.org/download/) is an excellent free option to get started.
 
 2. **Open a game or paste PGN**: Open a PGN database using **File → Open PGN Database** (`Ctrl+O` / `⌘+O`), or paste PGN text into the Clipboard database using **Edit → Paste PGN to Clipboard DB** (`Ctrl+V` / `⌘+V`)—the pasted game gets loaded automatically.
@@ -167,10 +171,38 @@ CARA uses three configuration files, all located in the CARA root directory:
 
 ## Documentation
 
-- **User Manual**: 
-  - [Online version](https://pguntermann.github.io/CARA/manual.html) (GitHub Pages)
-  - Access from **Help → Open Manual** in the application
-- **Architecture**: See `doc/architecture_outline.md` for technical architecture details
+### User Manual
+
+[Online version](https://pguntermann.github.io/CARA/manual.html) (GitHub Pages) | Access from **Help → Open Manual** in the application
+
+Technical documentation for developers:
+
+### Technical Documentation
+
+- **Architecture**: [`doc/architecture_outline.md`](doc/architecture_outline.md)
+- **Dialog Style Guide**: [`doc/dialog_style_guide.md`](doc/dialog_style_guide.md)
+
+### Core Systems
+
+- **Engine Implementation**: [`doc/engine_implementation.md`](doc/engine_implementation.md)
+- **PGN Database Management**: [`doc/pgn_database_management.md`](doc/pgn_database_management.md)
+- **User Settings Persistence**: [`doc/user_settings_persistence.md`](doc/user_settings_persistence.md)
+
+### Analysis Features
+
+- **Game Highlights**: [`doc/game_highlights_implementation.md`](doc/game_highlights_implementation.md)
+- **Move Classification**: [`doc/move_classification_analysis.md`](doc/move_classification_analysis.md)
+- **Phase Detection**: [`doc/phase_detection_implementation.md`](doc/phase_detection_implementation.md)
+- **Positional Heatmap**: [`doc/positional_heatmap_implementation.md`](doc/positional_heatmap_implementation.md)
+
+### UI Features
+
+- **Moves List Columns**: [`doc/moveslist_columns_implementation.md`](doc/moveslist_columns_implementation.md)
+- **PV Hover Board Preview**: [`doc/pv_hover_board_preview.md`](doc/pv_hover_board_preview.md)
+
+### Operations
+
+- **Bulk Operations**: [`doc/bulk_operations_system.md`](doc/bulk_operations_system.md)
 
 ## Keyboard Shortcuts
 
