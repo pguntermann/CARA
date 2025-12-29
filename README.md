@@ -55,7 +55,17 @@ CARA was built in large part by an AI model under the author's direction. The au
 
 ## Installation
 
-> **Note**: Pre-built application bundles are available for Windows and macOS, which include all dependencies and can be run directly without Python installation. See the [releases page](https://github.com/pguntermann/CARA/releases) for download options. The following instructions are for installing from source code.
+> **App Bundles (Recommended)**: Pre-built application bundles are available for Windows and macOS, which include all dependencies and can be run directly without Python installation. See the [releases page](https://github.com/pguntermann/CARA/releases) for download options.
+>
+> **macOS users**: Due to macOS security settings, you may need to allow the app to run. If you see a security warning when trying to open the app, follow these steps:
+> 1. Right-click the app and select "Open"
+> 2. When the warning dialog appears, click "OK"
+> 3. Open System Settings → Privacy & Security
+> 4. Scroll down to find the blocked app notification and click "Open Anyway"
+>
+> After completing these steps, you can launch the app normally.
+
+**Manual Installation**: The following sections describe how to manually install Python and CARA dependencies, if you don't want to use the pre-built application bundles.
 
 ### 1. Install Python
 
