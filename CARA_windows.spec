@@ -15,6 +15,7 @@ a = Analysis(
         ('THIRD_PARTY_LICENSES.md', '.'),
         ('engine_parameters.json', '.'),
         ('user_settings.json', '.'),
+        ('user_settings.json.template', '.'),
     ],
     hiddenimports=[],
     hookspath=[],
