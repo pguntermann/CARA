@@ -2377,7 +2377,7 @@
     }
   },
   "debug": {
-    "show_debug_menu": true,
+    "show_debug_menu": false,
     "enable_debug_backgrounds": false,
     "background_color_debug_mainpanel": [255, 200, 200],
     "background_color_debug_detailpanel": [200, 255, 200],
