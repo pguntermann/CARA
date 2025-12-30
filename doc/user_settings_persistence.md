@@ -7,13 +7,19 @@ The application uses a persistent user settings system that stores user preferen
 - Moves List column profiles (visibility, width, order)
 - Board visibility settings (coordinates, turn indicator, game info)
 - PGN visibility settings (metadata display)
+- Game analysis settings
+- Manual analysis settings
+- Engine configuration and assignments
+- AI model settings
+- Annotation preferences
 - Active profile selection
 
 ## Architecture
 
 The system follows PyQt's Model/View architecture with Controllers:
 
-- **UserSettingsService** (`app/services/user_settings_service.py`): Handles file I/O, provides default settings structure, validates and ensures required sections exist
+- **UserSettingsService** (`app/services/user_settings_service.py`): Handles file I/O, loads settings into memory, manages migration from template file
+- **UserSettingsModel** (`app/models/user_settings_model.py`): Manages settings state in memory, emits signals when settings change, provides typed accessors for all settings sections
 - **ColumnProfileModel** (`app/models/column_profile_model.py`): Manages column profile data and state, emits signals for profile changes, defines column name constants
 - **ColumnProfileController** (`app/controllers/column_profile_controller.py`): Orchestrates profile operations, bridges between UI and model/service layers
 - **MainWindow** (`app/main_window.py`): Loads and saves board/PGN visibility settings, manages menu bar integration, handles application lifecycle (save on exit)
@@ -32,6 +38,18 @@ The file location is determined by `resolve_data_file_path()`:
 
 The file is created automatically on first save. Format: JSON with UTF-8 encoding, 2-space indentation.
 
+### Template File
+
+The application uses a template file (`user_settings.json.template`) located in the app root directory:
+
+- **Purpose**: Source of truth for default settings structure
+- **Location**: Always in app root directory (read-only)
+- **Usage**: 
+  - Used when `user_settings.json` doesn't exist (first run)
+  - Used for migration to add missing settings/columns from new versions
+  - Never modified by the application
+- **Configuration**: Filename defined in `config.json` under `user_settings.template_filename`
+
 ### JSON Structure
 
 ```json
@@ -46,6 +64,7 @@ The file is created automatically on first save. Format: JSON with UTF-8 encodin
     }
   },
   "active_profile": "Default",
+  "profile_order": ["Default", "Profile 2", ...],
   "board_visibility": {
     "show_coordinates": true,
     "show_turn_indicator": true,
@@ -53,9 +72,40 @@ The file is created automatically on first save. Format: JSON with UTF-8 encodin
   },
   "pgn_visibility": {
     "show_metadata": true
-  }
+  },
+  "game_analysis": {...},
+  "game_analysis_settings": {...},
+  "manual_analysis": {...},
+  "annotations": {...},
+  "engines": [],
+  "engine_assignments": {...},
+  "ai_models": {...},
+  "ai_summary": {...}
 }
 ```
+
+## Memory-Based Access Pattern
+
+### Startup (One-Time Disk Read)
+
+1. `UserSettingsService.get_instance()` is called (singleton pattern)
+2. On first access:
+   - `load()` reads `user_settings.json` from disk (or empty dict if missing)
+   - Creates `UserSettingsModel` with loaded data
+   - `migrate()` runs once to check for missing settings from template
+   - If migration adds settings, saves to disk
+3. All settings are now in memory via `UserSettingsModel`
+
+### Runtime (Memory Access Only)
+
+- All `get_settings()` calls return from model (no disk access)
+- All `update_*()` methods modify model in memory
+- `save()` writes to disk only when explicitly called (e.g., on exit, after profile save)
+
+**Benefits:**
+- Fast access (no repeated disk I/O)
+- Efficient (single read at startup)
+- Reactive (model signals notify UI of changes)
 
 ## Column Profiles System
 
@@ -66,13 +116,15 @@ All column names are defined as constants in `app/models/column_profile_model.py
 - `COL_NUM = "col_num"`
 - `COL_WHITE = "col_white"`
 - `COL_BLACK = "col_black"`
+- `COL_FEN_WHITE = "col_fen_white"`
+- `COL_FEN_BLACK = "col_fen_black"`
 - (and others...)
 
 These constants must be used consistently across:
 - `ColumnProfileModel._column_names` list
 - `MovesListModel` column index mapping
 - `DetailMovesListView` column name mappings
-- `UserSettingsService.DEFAULT_SETTINGS`
+- Template file structure
 
 ### Profile Structure
 
@@ -80,7 +132,7 @@ Each profile contains:
 
 - **columns**: Dictionary mapping column names to configuration
   - `"visible"`: bool - Column visibility
-  - `"width"`: int - Column width in pixels (optional)
+  - `"width"`: int - Column width in pixels (required)
 - **column_order**: List of column names in display order (optional)
   - If not present, uses default order from `ColumnProfileModel._column_names`
   - Must include all columns (visible and hidden)
@@ -89,7 +141,7 @@ Each profile contains:
 
 The "Default" profile:
 
-- Always exists (created if missing)
+- Always exists (created if missing during migration)
 - Cannot be removed
 - Cannot be updated via "Save Profile" (must use "Save Profile as...")
 - Always appears first in menu
@@ -106,13 +158,20 @@ The "Default" profile:
 
 ### Loading Settings (Application Startup)
 
-1. `UserSettingsService.load()` reads `user_settings.json`
-2. Validates and ensures all required sections exist
-3. `ColumnProfileController._load_settings()` loads profiles
-4. `ColumnProfileModel.load_profiles()` initializes profiles
-5. `MainWindow._load_user_settings()` loads board/PGN visibility
-6. Settings applied to models
-7. Views observe model signals and update UI
+1. `UserSettingsService.get_instance()` called (first access)
+2. `load()` reads `user_settings.json` from disk (or empty dict if missing)
+3. Creates `UserSettingsModel` with loaded data
+4. `migrate()` runs once:
+   - Loads template file
+   - Checks what settings are missing
+   - Merges missing sections from template
+   - Migrates column profiles (ensures all columns exist)
+   - Saves if changes were made
+5. `ColumnProfileController._load_settings()` loads profiles from model
+6. `ColumnProfileModel.load_profiles()` initializes profiles
+7. `MainWindow._load_user_settings()` loads board/PGN visibility from model
+8. Settings applied to domain models (BoardModel, etc.)
+9. Views observe model signals and update UI
 
 ### Saving Settings (Application Exit)
 
@@ -122,7 +181,7 @@ The "Default" profile:
    - PGN visibility from `DetailPgnView`
 3. `ColumnProfileController.save_settings()` saves profiles:
    - Column visibility, widths, order from `ColumnProfileModel`
-4. `UserSettingsService.save()` writes to `user_settings.json`
+4. `UserSettingsService.save()` writes model state to `user_settings.json`
 
 ### Profile Changes (Runtime)
 
@@ -131,27 +190,80 @@ The "Default" profile:
 3. View updates immediately via signals
 4. User clicks "Save Profile" or "Save Profile as..."
 5. `ColumnProfileController.save_settings()` or `update_current_profile()`
-6. `UserSettingsService.save()` persists to file
+6. Updates `UserSettingsModel` via `update_moves_list_profiles()`
+7. `UserSettingsService.save()` persists to file
+
+### Accessing Settings (Runtime)
+
+```python
+# Get settings service (singleton - returns existing instance)
+settings_service = UserSettingsService.get_instance()
+
+# Option 1: Get all settings (from memory)
+all_settings = settings_service.get_settings()
+
+# Option 2: Get model and use typed accessors (from memory)
+model = settings_service.get_model()
+board_vis = model.get_board_visibility()
+show_coords = board_vis["show_coordinates"]
+
+# Option 3: Update a setting (modifies model in memory)
+settings_service.update_board_visibility({"show_coordinates": False})
+# Model emits signals → UI updates reactively
+```
 
 ## Migration
+
+### Template-Based Migration
+
+Migration runs **once** on first access to `UserSettingsService.get_instance()`:
+
+1. Loads template file (`user_settings.json.template`) from app root
+2. Compares current settings with template
+3. Adds missing top-level sections from template
+4. Recursively merges missing sub-keys within existing sections
+5. Migrates column profiles (ensures all columns exist with proper structure)
+6. Saves if any changes were made
+
+**Key Points:**
+- Migration is separate from loading (clean separation of concerns)
+- Only runs once (`_migration_done` flag prevents re-running)
+- Template is the source of truth for defaults
+- User customizations are preserved (only missing keys are added)
 
 ### Adding New Columns
 
 When adding columns to existing installations:
 
-- Existing profiles will have the new column added with:
-  - Visibility: False (hidden by default for existing profiles)
-  - Width: Default width from `default_widths` (if specified)
-  - Order: Appended to end (or uses default order)
+1. Add column to template file (`user_settings.json.template`)
+2. On next app start:
+   - Migration detects missing column in existing profiles
+   - Adds column with values from template (or reasonable defaults)
+   - Saves updated profiles to `user_settings.json`
 
-The `load_profiles()` method in `ColumnProfileModel` handles migration automatically. `UserSettingsService.load()` also ensures new columns are added to all existing profiles.
+The `_migrate_column_profiles()` method handles this automatically by:
+- Extracting all column names from template (from all profiles)
+- Ensuring each profile has all columns
+- Using template defaults when available, or reasonable fallbacks
+
+### Adding New Settings Sections
+
+When adding new settings sections:
+
+1. Add section to template file (`user_settings.json.template`)
+2. Add corresponding getter/setter methods to `UserSettingsModel`
+3. On next app start:
+   - Migration detects missing section
+   - Adds entire section from template
+   - Saves to `user_settings.json`
 
 ### Missing Settings Sections
 
 If required sections are missing:
 
-- Default values inserted automatically
+- Migration adds them from template automatically
 - Settings file updated on next save
+- Application continues normally
 
 ## Error Handling
 
@@ -159,14 +271,21 @@ If required sections are missing:
 
 - If `user_settings.json` is corrupted or unreadable:
   - Warning printed to stderr
-  - Default settings used
+  - Starts with empty settings
+  - Migration populates from template
   - Application continues normally
+
+- If template file is missing:
+  - Error printed to stderr
+  - Migration cannot run
+  - Application continues with loaded settings (or empty if file was missing)
 
 ### Missing Columns in Profiles
 
 - If profile is missing columns:
-  - Default profile: Missing columns added with defaults
-  - Other profiles: Missing columns added with default visibility (False) and default width
+  - Migration adds missing columns from template
+  - Uses template defaults when available
+  - Falls back to reasonable defaults (visible: False, width: 100)
 
 ## Best Practices
 
@@ -178,44 +297,81 @@ If required sections are missing:
 
 ### Default Values
 
-- Define defaults in `UserSettingsService.DEFAULT_SETTINGS`
-- Define default widths in `ColumnProfileModel.load_profiles()`
-- Ensure defaults are applied when loading missing data
+- Define defaults in template file (`user_settings.json.template`)
+- Template is the single source of truth
+- Migration automatically applies template defaults
+- No hardcoded defaults in code
 
 ### Signal Emission
 
-- Emit signals when state changes
+- `UserSettingsModel` emits signals when settings change
 - Connect views to model signals (not direct attribute access)
 - Use signals for all state changes to maintain MVVM pattern
+- Model signals: `settings_changed`, `moves_list_profiles_changed`, `board_visibility_changed`, etc.
 
 ### Profile Persistence
 
 - Changes are saved to model in memory immediately
-- Persistence only happens on explicit "Save Profile" action
+- Persistence only happens on explicit "Save Profile" action or app exit
 - Switching profiles does not save current changes
 - Application exit saves all settings
+
+### Settings Access
+
+- Always use `UserSettingsService.get_instance()` (singleton pattern)
+- Access settings through model for typed accessors
+- Use `get_settings()` for simple dictionary access
+- Updates go through `update_*()` methods (not direct dict manipulation)
 
 ## Code Location
 
 Implementation files:
 
-- `app/services/user_settings_service.py`: File I/O and settings management
+- `app/services/user_settings_service.py`: File I/O, loading, migration, singleton management
+- `app/models/user_settings_model.py`: Settings state model with signals and typed accessors
 - `app/models/column_profile_model.py`: Profile data model and column constants
 - `app/controllers/column_profile_controller.py`: Profile operations orchestration
 - `app/views/detail_moveslist_view.py`: Column visibility and order application
 - `app/main_window.py`: Board/PGN visibility settings loading and saving
 - `app/utils/path_resolver.py`: File path resolution logic
+- `app/config/config.json`: Configuration for settings filenames
 
 ## Adding New Columns
 
 For detailed instructions on adding new columns, see `moveslist_columns_implementation.md`.
 
-## Adding New Visibility Settings
+## Adding New Settings Sections
 
-When adding new visibility settings (e.g., board features, PGN features):
+When adding new settings sections:
 
-1. **Define setting in UserSettingsService**: Add to `DEFAULT_SETTINGS` and ensure it exists in `load()`
-2. **Add model support**: Add attribute, property, setter, and signal in appropriate model
-3. **Update MainWindow**: Add menu item, load/save setting, connect to model signal
-4. **Update controller**: Add toggle method if needed
-5. **Update view**: Connect to model signal and use in rendering
+1. **Add to template file**: Add section to `user_settings.json.template` with default values
+2. **Add model support**: Add getter/setter methods to `UserSettingsModel`:
+   ```python
+   def get_new_section(self) -> Dict[str, Any]:
+       return self._settings.get("new_section", {}).copy()
+   
+   def set_new_section(self, settings: Dict[str, Any]) -> None:
+       self._settings["new_section"] = settings.copy()
+       self.new_section_changed.emit()  # Add signal if needed
+       self.settings_changed.emit()
+   ```
+3. **Add service method**: Add `update_new_section()` to `UserSettingsService`
+4. **Update migration**: Migration will automatically add missing section from template
+5. **Update MainWindow**: Add menu items, load/save setting, connect to model signal
+6. **Update controller**: Add toggle method if needed
+7. **Update view**: Connect to model signal and use in rendering
+
+## Configuration
+
+Settings filenames are configurable via `config.json`:
+
+```json
+{
+  "user_settings": {
+    "filename": "user_settings.json",
+    "template_filename": "user_settings.json.template"
+  }
+}
+```
+
+This allows customization of filenames without code changes.
