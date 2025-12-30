@@ -1,3 +1,20 @@
+# CARA v2.4.9 - Improved User Settings Persistence and Migration
+
+**Release Date:** 30.12.2025
+
+This minor release improves the handling and migration of user settings persistence and updates default configuration settings.
+
+## User Settings Improvements
+
+- **Enhanced User Settings Persistence**: Improved handling and migration of user settings files, ensuring better reliability when settings are stored in different locations (portable mode vs. user data directory)
+- **Template File Support**: Added `user_settings.json.template` file, providing a reference template for default settings that is used when creating a new user settings file
+
+## Configuration Changes
+
+- **Debug Menu Disabled by Default**: The debug menu is now hidden by default in `config.json`. It can be enabled by setting `"show_debug_menu": true` in the configuration file
+
+---
+
 # CARA v2.4.8 - Quality of Life Improvements
 
 **Release Date:** 28.12.2025
