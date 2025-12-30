@@ -157,5 +157,6 @@ Desktop.ini
 
 # Release preparation helpers
 prepare_for_release.py
+update_version.py
 *.json.backup
 
