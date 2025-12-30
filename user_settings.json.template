@@ -1,0 +1,893 @@
+{
+  "moves_list_profiles": {
+    "Default": {
+      "columns": {
+        "col_num": {
+          "visible": true,
+          "width": 41
+        },
+        "col_white": {
+          "visible": true,
+          "width": 94
+        },
+        "col_black": {
+          "visible": true,
+          "width": 98
+        },
+        "col_eval_white": {
+          "visible": false,
+          "width": 0
+        },
+        "col_eval_black": {
+          "visible": false,
+          "width": 0
+        },
+        "col_assess_white": {
+          "visible": false,
+          "width": 0
+        },
+        "col_assess_black": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_white": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_black": {
+          "visible": false,
+          "width": 0
+        },
+        "col_comment": {
+          "visible": true,
+          "width": 200
+        },
+        "col_eco": {
+          "visible": false,
+          "width": 0
+        },
+        "col_opening": {
+          "visible": false,
+          "width": 0
+        },
+        "col_cpl_white": {
+          "visible": false,
+          "width": 0
+        },
+        "col_cpl_black": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_white_2": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_white_3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_black_2": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_black_3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_white_is_top3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_is_top3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_white_depth": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_depth": {
+          "visible": false,
+          "width": 0
+        },
+        "col_white_capture": {
+          "visible": false,
+          "width": 80
+        },
+        "col_black_capture": {
+          "visible": false,
+          "width": 80
+        },
+        "col_white_material": {
+          "visible": false,
+          "width": 100
+        },
+        "col_black_material": {
+          "visible": false,
+          "width": 100
+        },
+        "col_fen_white": {
+          "visible": false,
+          "width": 200
+        },
+        "col_fen_black": {
+          "visible": false,
+          "width": 200
+        },
+        "col_cpl_white_2": {
+          "visible": false,
+          "width": 90
+        },
+        "col_cpl_white_3": {
+          "visible": false,
+          "width": 90
+        },
+        "col_cpl_black_2": {
+          "visible": false,
+          "width": 90
+        },
+        "col_cpl_black_3": {
+          "visible": false,
+          "width": 90
+        }
+      }
+    },
+    "Moves and Opening Info": {
+      "columns": {
+        "col_num": {
+          "visible": true,
+          "width": 41
+        },
+        "col_white": {
+          "visible": true,
+          "width": 61
+        },
+        "col_black": {
+          "visible": true,
+          "width": 58
+        },
+        "col_eval_white": {
+          "visible": false,
+          "width": 0
+        },
+        "col_eval_black": {
+          "visible": false,
+          "width": 0
+        },
+        "col_assess_white": {
+          "visible": false,
+          "width": 0
+        },
+        "col_assess_black": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_white": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_black": {
+          "visible": false,
+          "width": 0
+        },
+        "col_eco": {
+          "visible": true,
+          "width": 51
+        },
+        "col_opening": {
+          "visible": true,
+          "width": 290
+        },
+        "col_comment": {
+          "visible": true,
+          "width": 200
+        },
+        "col_cpl_white": {
+          "width": 0,
+          "visible": false
+        },
+        "col_cpl_black": {
+          "width": 0,
+          "visible": false
+        },
+        "col_best_white_2": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_white_3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_black_2": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_black_3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_white_is_top3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_is_top3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_white_depth": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_depth": {
+          "visible": false,
+          "width": 0
+        },
+        "col_white_capture": {
+          "visible": false,
+          "width": 80
+        },
+        "col_black_capture": {
+          "visible": false,
+          "width": 80
+        },
+        "col_white_material": {
+          "visible": false,
+          "width": 100
+        },
+        "col_black_material": {
+          "visible": false,
+          "width": 100
+        },
+        "col_fen_white": {
+          "visible": false,
+          "width": 200
+        },
+        "col_fen_black": {
+          "visible": false,
+          "width": 200
+        },
+        "col_cpl_white_2": {
+          "visible": false,
+          "width": 0
+        },
+        "col_cpl_white_3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_cpl_black_2": {
+          "visible": false,
+          "width": 0
+        },
+        "col_cpl_black_3": {
+          "visible": false,
+          "width": 0
+        }
+      }
+    },
+    "Game Analysis - Full": {
+      "columns": {
+        "col_num": {
+          "visible": true,
+          "width": 41
+        },
+        "col_white": {
+          "visible": true,
+          "width": 61
+        },
+        "col_black": {
+          "visible": true,
+          "width": 58
+        },
+        "col_eval_white": {
+          "visible": true,
+          "width": 70
+        },
+        "col_eval_black": {
+          "visible": true,
+          "width": 73
+        },
+        "col_cpl_white": {
+          "visible": true,
+          "width": 74
+        },
+        "col_cpl_black": {
+          "visible": true,
+          "width": 72
+        },
+        "col_assess_white": {
+          "visible": true,
+          "width": 100
+        },
+        "col_assess_black": {
+          "visible": true,
+          "width": 100
+        },
+        "col_best_white": {
+          "visible": true,
+          "width": 75
+        },
+        "col_best_black": {
+          "visible": true,
+          "width": 80
+        },
+        "col_eco": {
+          "visible": false,
+          "width": 0
+        },
+        "col_opening": {
+          "visible": false,
+          "width": 0
+        },
+        "col_comment": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_white_2": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_white_3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_black_2": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_black_3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_white_is_top3": {
+          "visible": true,
+          "width": 94
+        },
+        "col_black_is_top3": {
+          "visible": true,
+          "width": 101
+        },
+        "col_white_depth": {
+          "visible": true,
+          "width": 125
+        },
+        "col_black_depth": {
+          "visible": true,
+          "width": 0
+        },
+        "col_white_capture": {
+          "visible": false,
+          "width": 80
+        },
+        "col_black_capture": {
+          "visible": false,
+          "width": 80
+        },
+        "col_white_material": {
+          "visible": false,
+          "width": 100
+        },
+        "col_black_material": {
+          "visible": false,
+          "width": 100
+        },
+        "col_fen_white": {
+          "visible": false,
+          "width": 200
+        },
+        "col_fen_black": {
+          "visible": false,
+          "width": 200
+        },
+        "col_cpl_white_2": {
+          "visible": false,
+          "width": 0
+        },
+        "col_cpl_white_3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_cpl_black_2": {
+          "visible": false,
+          "width": 0
+        },
+        "col_cpl_black_3": {
+          "visible": false,
+          "width": 0
+        }
+      },
+      "column_order": [
+        "col_num",
+        "col_white",
+        "col_black",
+        "col_eval_white",
+        "col_eval_black",
+        "col_cpl_white",
+        "col_cpl_black",
+        "col_assess_white",
+        "col_assess_black",
+        "col_best_white",
+        "col_best_black",
+        "col_white_is_top3",
+        "col_black_is_top3",
+        "col_white_depth",
+        "col_black_depth",
+        "col_best_white_2",
+        "col_best_white_3",
+        "col_best_black_2",
+        "col_best_black_3",
+        "col_eco",
+        "col_opening",
+        "col_comment"
+      ]
+    },
+    "Game Analysis - White Side": {
+      "columns": {
+        "col_num": {
+          "visible": true,
+          "width": 40
+        },
+        "col_white": {
+          "visible": true,
+          "width": 60
+        },
+        "col_black": {
+          "visible": true,
+          "width": 60
+        },
+        "col_eval_white": {
+          "visible": true,
+          "width": 70
+        },
+        "col_eval_black": {
+          "visible": false,
+          "width": 0
+        },
+        "col_cpl_white": {
+          "visible": true,
+          "width": 85
+        },
+        "col_cpl_black": {
+          "visible": false,
+          "width": 0
+        },
+        "col_assess_white": {
+          "visible": true,
+          "width": 100
+        },
+        "col_assess_black": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_white": {
+          "visible": true,
+          "width": 85
+        },
+        "col_best_black": {
+          "visible": false,
+          "width": 0
+        },
+        "col_eco": {
+          "visible": false,
+          "width": 0
+        },
+        "col_opening": {
+          "visible": false,
+          "width": 0
+        },
+        "col_comment": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_white_2": {
+          "visible": true,
+          "width": 85
+        },
+        "col_best_white_3": {
+          "visible": true,
+          "width": 85
+        },
+        "col_best_black_2": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_black_3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_white_is_top3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_is_top3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_white_depth": {
+          "visible": true,
+          "width": 100
+        },
+        "col_black_depth": {
+          "visible": false,
+          "width": 0
+        },
+        "col_white_capture": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_capture": {
+          "visible": false,
+          "width": 0
+        },
+        "col_white_material": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_material": {
+          "visible": false,
+          "width": 0
+        },
+        "col_fen_white": {
+          "visible": false,
+          "width": 0
+        },
+        "col_fen_black": {
+          "visible": false,
+          "width": 0
+        },
+        "col_cpl_white_2": {
+          "visible": true,
+          "width": 85
+        },
+        "col_cpl_white_3": {
+          "visible": true,
+          "width": 85
+        },
+        "col_cpl_black_2": {
+          "visible": false,
+          "width": 0
+        },
+        "col_cpl_black_3": {
+          "visible": false,
+          "width": 0
+        }
+      },
+      "column_order": [
+        "col_num",
+        "col_white",
+        "col_black",
+        "col_eval_white",
+        "col_assess_white",
+        "col_cpl_white",
+        "col_cpl_white_2",
+        "col_cpl_white_3",
+        "col_best_white",
+        "col_best_white_2",
+        "col_best_white_3",
+        "col_white_depth",
+        "col_eval_black",
+        "col_cpl_black",
+        "col_cpl_black_2",
+        "col_cpl_black_3",
+        "col_assess_black",
+        "col_best_black",
+        "col_best_black_2",
+        "col_best_black_3",
+        "col_white_is_top3",
+        "col_black_is_top3",
+        "col_black_depth",
+        "col_eco",
+        "col_opening",
+        "col_comment",
+        "col_white_capture",
+        "col_black_capture",
+        "col_white_material",
+        "col_black_material",
+        "col_fen_white",
+        "col_fen_black"
+      ]
+    },
+    "Game Analysis - Black Side": {
+      "columns": {
+        "col_num": {
+          "visible": true,
+          "width": 40
+        },
+        "col_white": {
+          "visible": true,
+          "width": 60
+        },
+        "col_black": {
+          "visible": true,
+          "width": 60
+        },
+        "col_eval_white": {
+          "visible": false,
+          "width": 0
+        },
+        "col_eval_black": {
+          "visible": true,
+          "width": 70
+        },
+        "col_cpl_white": {
+          "visible": false,
+          "width": 0
+        },
+        "col_cpl_black": {
+          "visible": true,
+          "width": 85
+        },
+        "col_assess_white": {
+          "visible": false,
+          "width": 0
+        },
+        "col_assess_black": {
+          "visible": true,
+          "width": 100
+        },
+        "col_best_white": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_black": {
+          "visible": true,
+          "width": 85
+        },
+        "col_eco": {
+          "visible": false,
+          "width": 0
+        },
+        "col_opening": {
+          "visible": false,
+          "width": 0
+        },
+        "col_comment": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_white_2": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_white_3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_best_black_2": {
+          "visible": true,
+          "width": 85
+        },
+        "col_best_black_3": {
+          "visible": true,
+          "width": 85
+        },
+        "col_white_is_top3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_is_top3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_white_depth": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_depth": {
+          "visible": true,
+          "width": 100
+        },
+        "col_white_capture": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_capture": {
+          "visible": false,
+          "width": 0
+        },
+        "col_white_material": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_material": {
+          "visible": false,
+          "width": 0
+        },
+        "col_fen_white": {
+          "visible": false,
+          "width": 0
+        },
+        "col_fen_black": {
+          "visible": false,
+          "width": 0
+        },
+        "col_cpl_white_2": {
+          "visible": false,
+          "width": 0
+        },
+        "col_cpl_white_3": {
+          "visible": false,
+          "width": 0
+        },
+        "col_cpl_black_2": {
+          "visible": true,
+          "width": 85
+        },
+        "col_cpl_black_3": {
+          "visible": true,
+          "width": 85
+        }
+      },
+      "column_order": [
+        "col_num",
+        "col_white",
+        "col_black",
+        "col_eval_black",
+        "col_assess_black",
+        "col_cpl_black",
+        "col_cpl_black_2",
+        "col_cpl_black_3",
+        "col_best_black",
+        "col_best_black_2",
+        "col_best_black_3",
+        "col_black_depth",
+        "col_eval_white",
+        "col_cpl_white",
+        "col_cpl_white_2",
+        "col_cpl_white_3",
+        "col_assess_white",
+        "col_best_white",
+        "col_best_white_2",
+        "col_best_white_3",
+        "col_white_is_top3",
+        "col_black_is_top3",
+        "col_white_depth",
+        "col_eco",
+        "col_opening",
+        "col_comment",
+        "col_white_capture",
+        "col_black_capture",
+        "col_white_material",
+        "col_black_material",
+        "col_fen_white",
+        "col_fen_black"
+      ]
+    }
+  },
+  "active_profile": "Game Analysis - Full",
+  "board_visibility": {
+    "show_coordinates": true,
+    "show_turn_indicator": true,
+    "show_game_info": true,
+    "show_playedmove_arrow": true,
+    "show_bestnextmove_arrow": true,
+    "show_bestalternativemove_arrow": true,
+    "show_evaluation_bar": false,
+    "show_material_widget": true,
+    "hide_other_arrows_during_plan_exploration": true,
+    "use_straight_lines": true,
+    "show_pv2_arrow": true,
+    "show_pv3_arrow": true,
+    "show_annotations_layer": true
+  },
+  "pgn_visibility": {
+    "show_metadata": true,
+    "show_comments": true,
+    "show_variations": true,
+    "show_annotations": true,
+    "show_results": true,
+    "show_non_standard_tags": false
+  },
+  "engines": [],
+  "engine_assignments": {
+    "game_analysis": null,
+    "evaluation": null,
+    "manual_analysis": null
+  },
+  "profile_order": [
+    "Moves and Opening Info",
+    "Game Analysis - Full",
+    "Game Analysis - White Side",
+    "Game Analysis - Black Side"
+  ],
+  "game_analysis": {
+    "return_to_first_move_after_analysis": true,
+    "switch_to_summary_after_analysis": true,
+    "normalized_evaluation_graph": true,
+    "post_game_brilliancy_refinement": true,
+    "store_analysis_results_in_pgn_tag": true,
+    "switch_to_moves_list_at_start_of_analysis": true
+  },
+  "game_analysis_settings": {
+    "assessment_thresholds": {
+      "good_move_max_cpl": 50,
+      "inaccuracy_max_cpl": 100,
+      "mistake_max_cpl": 200
+    },
+    "brilliant_criteria": {
+      "min_eval_swing": 50,
+      "min_material_sacrifice": 300,
+      "max_eval_before": 500,
+      "exclude_already_winning": false,
+      "material_sacrifice_lookahead_plies": 3
+    }
+  },
+  "manual_analysis": {
+    "max_pieces_to_explore": 3,
+    "max_exploration_depth": 3,
+    "enable_miniature_preview": true
+  },
+  "annotations": {
+    "preset_colors": [
+      [
+        255,
+        100,
+        100
+      ],
+      [
+        100,
+        220,
+        100
+      ],
+      [
+        150,
+        200,
+        255
+      ],
+      [
+        255,
+        200,
+        100
+      ],
+      [
+        200,
+        100,
+        255
+      ],
+      [
+        100,
+        220,
+        255
+      ],
+      [
+        255,
+        150,
+        200
+      ],
+      [
+        150,
+        150,
+        255
+      ],
+      [
+        200,
+        200,
+        100
+      ],
+      [
+        240,
+        240,
+        240
+      ]
+    ],
+    "text_font_family": "Arial",
+    "text_font_size": 12
+  },
+  "ai_models": {
+    "openai": {
+      "api_key": "",
+      "model": "",
+      "models": []
+    },
+    "anthropic": {
+      "api_key": "",
+      "model": "",
+      "models": []
+    }
+  },
+  "ai_summary": {
+    "use_openai_models": true,
+    "use_anthropic_models": false,
+    "include_analysis_data_in_preprompt": true,
+    "include_metadata_in_preprompt": true
+  }
+}

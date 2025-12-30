@@ -2340,6 +2340,10 @@
     "opening_books_path": "app/resources/openingbooks/lpb",
     "opening_repeat_indicator": "*"
   },
+  "user_settings": {
+    "filename": "user_settings.json",
+    "template_filename": "user_settings.json.template"
+  },
   "game_analysis": {
     "max_depth": 0,
     "time_limit_per_move_ms": 300,

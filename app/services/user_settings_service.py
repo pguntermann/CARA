@@ -12,7 +12,7 @@ from app.models.column_profile_model import (DEFAULT_PROFILE_NAME, COL_NUM, COL_
                                              COL_WHITE_IS_TOP3, COL_BLACK_IS_TOP3, COL_WHITE_DEPTH, COL_BLACK_DEPTH, 
                                              COL_COMMENT, COL_ECO, COL_OPENING, COL_WHITE_CAPTURE, COL_BLACK_CAPTURE,
                                              COL_WHITE_MATERIAL, COL_BLACK_MATERIAL)
-from app.utils.path_resolver import resolve_data_file_path
+from app.utils.path_resolver import resolve_data_file_path, get_app_root, get_app_resource_path
 
 
 class UserSettingsService:
@@ -135,13 +135,98 @@ class UserSettingsService:
             settings_path: Path to user_settings.json. If None, uses smart path resolution
                           (app root if writable, otherwise user data directory).
         """
+        # Load filenames from config.json
+        self._load_config_filenames()
+        
         if settings_path is None:
             # Use smart path resolution: check write access to app root,
             # fall back to user data directory if needed
-            settings_path, _ = resolve_data_file_path("user_settings.json")
+            settings_path, _ = resolve_data_file_path(self._settings_filename)
         
         self.settings_path = settings_path
         self._settings: Dict[str, Any] = {}
+    
+    def _load_config_filenames(self) -> None:
+        """Load settings filenames from config.json.
+        
+        Falls back to defaults if config.json is unavailable or doesn't contain the settings.
+        """
+        try:
+            config_path = get_app_resource_path("app/config/config.json")
+            if config_path.exists():
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                
+                user_settings_config = config.get("user_settings", {})
+                self._settings_filename = user_settings_config.get("filename", "user_settings.json")
+                self._template_filename = user_settings_config.get("template_filename", "user_settings.json.template")
+            else:
+                # Config file doesn't exist, use defaults
+                self._settings_filename = "user_settings.json"
+                self._template_filename = "user_settings.json.template"
+        except (json.JSONDecodeError, IOError, KeyError):
+            # Config is corrupted or missing, use defaults
+            self._settings_filename = "user_settings.json"
+            self._template_filename = "user_settings.json.template"
+    
+    def _get_template_path(self) -> Path:
+        """Get the path to the template file (always in app root).
+        
+        Returns:
+            Path to template file in app root directory.
+        """
+        app_root = get_app_root()
+        return app_root / self._template_filename
+    
+    def _load_template(self) -> Optional[Dict[str, Any]]:
+        """Load template file as reference defaults.
+        
+        Returns:
+            Template settings dict if template exists, None otherwise.
+        """
+        template_path = self._get_template_path()
+        if not template_path.exists():
+            return None
+        
+        try:
+            with open(template_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            # Template is corrupted or unreadable, ignore it
+            return None
+    
+    def _merge_template_defaults(self, template_settings: Dict[str, Any]) -> None:
+        """Merge missing keys from template into current settings.
+        
+        Only adds missing top-level keys and missing sub-keys within existing sections.
+        Does not overwrite existing user settings.
+        
+        Args:
+            template_settings: Settings loaded from template file.
+        """
+        for key, template_value in template_settings.items():
+            if key not in self._settings:
+                # Entire section missing - add from template
+                self._settings[key] = self._deep_copy(template_value)
+            elif isinstance(template_value, dict) and isinstance(self._settings[key], dict):
+                # Section exists - merge missing sub-keys recursively
+                self._merge_dict_defaults(self._settings[key], template_value)
+    
+    def _merge_dict_defaults(self, target: Dict[str, Any], source: Dict[str, Any]) -> None:
+        """Recursively merge missing keys from source into target.
+        
+        Args:
+            target: Target dictionary to merge into.
+            source: Source dictionary to merge from.
+        """
+        for key, source_value in source.items():
+            if key not in target:
+                # Key missing - add from source
+                target[key] = self._deep_copy(source_value)
+            elif isinstance(source_value, dict) and isinstance(target[key], dict):
+                # Both are dicts - recurse
+                self._merge_dict_defaults(target[key], source_value)
+            # If key exists and is not a dict, don't overwrite existing user settings
     
     @classmethod
     def get_instance(cls, settings_path: Optional[Path] = None) -> 'UserSettingsService':
@@ -162,18 +247,43 @@ class UserSettingsService:
     def load(self) -> Dict[str, Any]:
         """Load user settings from file.
         
+        If user_settings.json doesn't exist, attempts to load from template file.
+        If template exists, merges missing keys from template into existing settings
+        to ensure new settings are added when the application is updated.
+        
         Returns:
-            Loaded settings dictionary. If file doesn't exist, returns default settings.
+            Loaded settings dictionary. If file doesn't exist and template doesn't exist,
+            returns default settings.
         """
         if not self.settings_path.exists():
-            # File doesn't exist, return default settings
-            self._settings = self._deep_copy(self.DEFAULT_SETTINGS)
-            return self._settings
+            # File doesn't exist, try to load from template
+            template_settings = self._load_template()
+            if template_settings:
+                # Use template as base settings
+                self._settings = self._deep_copy(template_settings)
+            else:
+                # Neither file exists, use default settings
+                self._settings = self._deep_copy(self.DEFAULT_SETTINGS)
+        else:
+            try:
+                with open(self.settings_path, "r", encoding="utf-8") as f:
+                    self._settings = json.load(f)
+                
+                # Merge missing keys from template to ensure new settings are added
+                template_settings = self._load_template()
+                if template_settings:
+                    self._merge_template_defaults(template_settings)
+            except (json.JSONDecodeError, IOError) as e:
+                # File is corrupted or unreadable, try template as fallback
+                template_settings = self._load_template()
+                if template_settings:
+                    self._settings = self._deep_copy(template_settings)
+                else:
+                    # Template also unavailable, use defaults
+                    print(f"Warning: Failed to load user settings: {e}. Using defaults.", file=sys.stderr)
+                    self._settings = self._deep_copy(self.DEFAULT_SETTINGS)
         
         try:
-            with open(self.settings_path, "r", encoding="utf-8") as f:
-                self._settings = json.load(f)
-            
             # Ensure default profile exists
             if "moves_list_profiles" not in self._settings:
                 self._settings["moves_list_profiles"] = {}
@@ -191,6 +301,10 @@ class UserSettingsService:
                               COL_BEST_BLACK_2, COL_BEST_BLACK_3, COL_WHITE_IS_TOP3, COL_BLACK_IS_TOP3,
                               COL_WHITE_DEPTH, COL_BLACK_DEPTH, COL_ECO, COL_OPENING, COL_COMMENT,
                               COL_WHITE_CAPTURE, COL_BLACK_CAPTURE, COL_WHITE_MATERIAL, COL_BLACK_MATERIAL]
+            
+            # Remove "Debug - All Columns" profile if it exists - it should not be processed or saved
+            if "moves_list_profiles" in self._settings:
+                self._settings["moves_list_profiles"].pop("Debug - All Columns", None)
             
             for profile_name, profile_data in self._settings["moves_list_profiles"].items():
                 if "columns" not in profile_data:
