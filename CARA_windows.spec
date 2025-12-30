@@ -9,6 +9,7 @@ a = Analysis(
         ('app/config/config.json', 'app/config'),
         ('app/resources', 'app/resources'),
         ('appicon.svg', '.'),
+        ('manual.html', '.'),
         ('LICENSE', '.'),
         ('README.md', '.'),
         ('RELEASE_NOTES.md', '.'),
