@@ -160,3 +160,6 @@ prepare_for_release.py
 update_version.py
 *.json.backup
 
+# Video script folder
+.VideoScript/
+
