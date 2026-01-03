@@ -117,6 +117,19 @@ class DatabaseModel(QAbstractTableModel):
         """
         return 16
     
+    def flags(self, index: QModelIndex) -> Qt.ItemFlag:
+        """Get item flags for the given index.
+        
+        Args:
+            index: Model index (row, column).
+            
+        Returns:
+            Item flags indicating the item's state (enabled, selectable, etc.).
+        """
+        if not index.isValid():
+            return Qt.ItemFlag.NoItemFlags
+        return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+    
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         """Get data for a given index and role.
         
