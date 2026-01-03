@@ -103,7 +103,6 @@ class ConfigLoader:
             'ui.panels.main.board.coordinates.color',
             'ui.panels.main.board.coordinates.font_style',
             'ui.panels.main.board.pieces.svg_path',
-            'ui.panels.main.board.pieces.miniature_pieces_path',
             'ui.panels.main.board.turn_indicator.size',
             'ui.panels.main.board.turn_indicator.padding',
             'ui.panels.main.board.turn_indicator.white_color',

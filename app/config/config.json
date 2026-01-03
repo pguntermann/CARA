@@ -259,8 +259,7 @@
             ]
           },
           "pieces": {
-            "svg_path": "app/resources/chesspieces/default",
-            "miniature_pieces_path": "app/resources/chesspieces_miniatures"
+            "svg_path": "app/resources/chesspieces/default"
           },
           "turn_indicator": {
             "size": 16,
