@@ -416,7 +416,7 @@
                 <p>CARA uses three configuration files to manage settings and preferences:</p>
                 
                 <ul>
-                    <li><strong>config.json:</strong> Contains all UI styling, layout dimensions, colors, fonts, and application-wide default settings. This file is always located in the CARA root directory and defines the visual appearance and behavior of the application. You can customize CARA's appearance by modifying this file without changing any source code.</li>
+                    <li><strong>config.json:</strong> Contains all UI styling, layout dimensions, colors, fonts, and application-wide default settings. This file is located in the <code>app/config/</code> directory and defines the visual appearance and behavior of the application. You can customize CARA's appearance by modifying this file without changing any source code.</li>
                     
                     <li><strong>user_settings.json:</strong> Stores your personal preferences and settings, including moves list column profiles, board visibility settings, PGN display options, engine configurations, and other user-specific settings. The file is automatically created when you first save settings and persists your preferences between application sessions.</li>
                     
@@ -520,13 +520,13 @@
                 
                 <img src="screenshots/material_widget.png" alt="CARA Material Widget - Widget showing captured pieces and material difference displayed in the upper right corner of the chessboard" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
-                <p>The widget is divided into three sections:</p>
+                <p>The widget is divided into three distinct sections, reading from top to bottom:</p>
                 <ul>
-                    <li><strong>White section (top):</strong> Displays pieces that White has captured from Black. The piece letters (P, N, B, R, Q) are always visible in light/white text color. The numbers after each letter (shown as "P:2", "R:1", etc.) indicate how many of that piece type White has captured. For example, "R:1" means White has captured one Black rook, while "R:" (with no number) means no rooks have been captured yet.</li>
-                    <li><strong>Black section (middle):</strong> Same as the White section, but from Black's perspective—displays pieces that Black has captured from White. The piece letters are shown in dark/gray text color.</li>
-                    <li><strong>Material difference (bottom):</strong> Shows the material balance using the notation "Δ: ±X.X" where the value represents the material advantage in pawns. Positive values indicate White's material advantage, negative values indicate Black's material advantage. The calculation uses standard piece values: Pawn = 1.0, Knight/Bishop = 3.0, Rook = 5.0, Queen = 9.0.</li>
+                    <li><strong>Top section (White's captures):</strong> Displays pieces that White has captured from Black. The piece letters (P, N, B, R, Q) are always visible in light/white text color. Each letter is followed by a colon and a number indicating how many of that piece type have been captured. For example, "R:1" means White has captured one rook from Black, while "R:" (with no number after the colon) means no rooks have been captured yet.</li>
+                    <li><strong>Middle section (Black's captures):</strong> Displays pieces that Black has captured from White, using the same notation format as the top section. The piece letters are shown in dark/gray text color to distinguish them from White's captures. For example, if you see "Q:1" in this section, it means Black has captured one queen from White.</li>
+                    <li><strong>Bottom section (Material difference):</strong> Shows the material balance using the delta symbol (Δ) followed by a value in pawns. The notation appears as "Δ: ±X.X" where the value represents the material advantage. Positive values (e.g., "Δ: +2.0") indicate White has a material advantage, while negative values (e.g., "Δ: -1.0") indicate Black has the advantage. The calculation uses standard piece values: Pawn = 1.0, Knight/Bishop = 3.0 each, Rook = 5.0, and Queen = 9.0. This gives you a quick visual reference to see who's ahead in material at any point in the game.</li>
                 </ul>
-                <p>Pieces are displayed using standard chess notation letters (P for Pawn, N for Knight, B for Bishop, R for Rook, Q for Queen).</p>
+                <p>Pieces are displayed using standard chess notation letters: <strong>P</strong> for Pawn, <strong>N</strong> for Knight, <strong>B</strong> for Bishop, <strong>R</strong> for Rook, and <strong>Q</strong> for Queen.</p>
                 
                 <h5 id="turn-indicator">4.3.5 Turn Indicator</h5>
                 <p>The turn indicator shows which side is to move in the current position. Toggle with <code>Alt+T</code> / <code>⌥+T</code> or <span class="menu-item">Board → Show Turn Indicator</span>.</p>
@@ -575,7 +575,7 @@
                 <h5 id="database-tabs">4.4.1 Database Tabs</h5>
                 <p>The panel uses tabs to organize multiple databases:</p>
                 <ul>
-                    <li><strong>Clipboard Tab:</strong> Always appears first and contains games that have been pasted or imported temporarily. This tab is useful for quick analysis of individual games or small collections that haven't been saved to a file yet.</li>
+                    <li><strong>Clipboard Tab:</strong> Always appears first and contains games that have been pasted or imported temporarily. Unlike regular database tabs that are linked to PGN files on your computer, the Clipboard database itself does not exist as a file on disk. It's a special temporary database perfect for quickly pasting PGN games into the app. You can save its contents to a new PGN file at any time using <span class="menu-item">File → Save PGN Database as...</span> (<code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>), or clear it at any time using <span class="menu-item">File → Clear Clipboard Database</span> (<code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code>).</li>
                     <li><strong>File-Based Database Tabs:</strong> Each opened PGN file appears as a separate tab, labeled with the filename (without extension). You can open multiple PGN files simultaneously, each in its own tab.</li>
                     <li><strong>Search Results Tab:</strong> When you perform a search across databases, the results appear in a dedicated "Search Results" tab. This tab includes an additional "Source DB" column showing which database each game came from.</li>
                     <li><strong>"+" Tab:</strong> Always appears last. Clicking this tab opens the file dialog to add a new PGN database to the panel.</li>
@@ -621,7 +621,7 @@
                 <h5 id="common-database-actions">4.4.5 Common Database Actions</h5>
                 <p>You can perform common database operations using the File menu or keyboard shortcuts:</p>
                 <ul>
-                    <li><strong>Open PGN Database:</strong> Use <span class="menu-item">File → Open PGN Database</span> (<code>Ctrl+O</code> / <code>⌘+O</code>) to open one or multiple PGN files. Each file appears as a separate tab in the Database Panel.</li>
+                    <li><strong>Open PGN Database:</strong> Use <span class="menu-item">File → Open PGN Database</span> (<code>Ctrl+O</code> / <code>⌘+O</code>) to open one or multiple PGN files. In the file dialog, you can select multiple files by clicking and dragging, holding <code>Ctrl</code> / <code>⌘</code> for individual selection, or <code>Shift</code> for range selection. Each file appears as a separate tab in the Database Panel.</li>
                     <li><strong>Save PGN Database:</strong> Use <span class="menu-item">File → Save PGN Database</span> (<code>Ctrl+S</code> / <code>⌘+S</code>) to save the active database. This overwrites the existing database file with the current contents.</li>
                     <li><strong>Save PGN Database as...</strong>: Use <span class="menu-item">File → Save PGN Database as...</span> (<code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>) to save the active database as a new copy.</li>
                     <li><strong>Close PGN Database:</strong> Use <span class="menu-item">File → Close PGN Database</span> (<code>Ctrl+W</code> / <code>⌘+W</code>) to close the active database tab.</li>
@@ -635,7 +635,17 @@
                 <h4 id="detail-panel">4.5 Detail Panel</h4>
                 <p>The Detail Panel contains the PGN Notation Pane at the top and a set of tabbed views below for detailed analysis.</p>
                 
-                <p>The PGN Notation Pane displays the complete PGN notation for the current game, including metadata tags, move notation, comments, variations, annotations, and the game result. The content is displayed in a formatted, color-coded view with syntax highlighting to distinguish between different elements.</p>
+                <p>The PGN Notation Pane displays the complete PGN notation for the current game. The PGN notation contains several different types of elements:</p>
+                <ul>
+                    <li><strong>Moves:</strong> The actual chess moves displayed in standard algebraic notation (e.g., e4, Nf3, O-O). These are the main-line moves that make up the game sequence.</li>
+                    <li><strong>Comments:</strong> Text annotations that explain moves or positions. Comments can appear after moves or at the beginning of variations to provide additional context or analysis.</li>
+                    <li><strong>Variations:</strong> Also called branches, these show alternative lines of play. Variations are enclosed in parentheses and represent moves that could have been played instead of the main-line moves.</li>
+                    <li><strong>Annotations:</strong> Move quality assessments that include symbol-based annotations (!, !!, ?, ??, !?, ?!) and NAGs (Numeric Annotation Glyphs). When PGN files are loaded, symbol-based annotations are automatically converted to NAGs (Numeric Annotation Glyphs) by the PGN parser, and both are displayed as readable text descriptions in parentheses (e.g., "good move", "poor move", "very good move", "very poor move", "speculative move", "questionable move", "White has a slight advantage").</li>
+                    <li><strong>Non-standard tags:</strong> Special tags that some chess software uses to encode additional information within comments, such as clock times, position evaluations, or material balance data. These appear as codes like [%evp] and [%mdl] within comment text.</li>
+                    <li><strong>Metadata tags:</strong> PGN header tags (Event, Site, Date, White, Black, Result, ECO, etc.) that provide information about the game, players, and tournament details.</li>
+                    <li><strong>Game result:</strong> The final outcome of the game (1-0 for White wins, 0-1 for Black wins, 1/2-1/2 for a draw).</li>
+                </ul>
+                <p>The content is displayed in a formatted, color-coded view with syntax highlighting to distinguish between different elements.</p>
                 
                 <p>As you navigate through the game using the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys, the active move is highlighted in the PGN notation. Alternatively, you can click on any main-line move in the PGN notation to jump directly to that position in the game. Note that clicking on variation moves, comments, or metadata tags does not trigger navigation—only main-line moves are clickable.</p>
                 
@@ -647,7 +657,7 @@
                     <li><span class="menu-item">PGN → Show Comments</span> (<code>Ctrl+Shift+M</code> / <code>⌘+Shift+M</code>): Toggle display of move comments</li>
                     <li><span class="menu-item">PGN → Show Variations</span> (<code>Ctrl+Shift+V</code> / <code>⌘+Shift+V</code>): Toggle display of move variations</li>
                     <li><span class="menu-item">PGN → Show Non-Standard Tags</span> (<code>Ctrl+Shift+T</code> / <code>⌘+Shift+T</code>): Toggle display of non-standard tags like [%evp] and [%mdl] within comments</li>
-                    <li><span class="menu-item">PGN → Show Annotations</span> (<code>Ctrl+Shift+A</code> / <code>⌘+Shift+A</code>): Toggle display of move annotations, including symbol-based annotations (!, !!, ?, ??, !?, ?!) and NAGs (Numeric Annotation Glyphs). NAGs are numeric codes (stored as $1, $2, etc. in PGN) that represent standardized chess annotations and are displayed as readable text descriptions (e.g., "good move", "poor move", "White has a slight advantage").</li>
+                    <li><span class="menu-item">PGN → Show Annotations</span> (<code>Ctrl+Shift+A</code> / <code>⌘+Shift+A</code>): Toggle display of move annotations, including symbol-based annotations (!, !!, ?, ??, !?, ?!) and NAGs (Numeric Annotation Glyphs).</li>
                     <li><span class="menu-item">PGN → Show Results</span> (<code>Ctrl+R</code> / <code>⌘+R</code>): Toggle display of game results (1-0, 0-1, 1/2-1/2)</li>
                 </ul>
                 
@@ -941,6 +951,13 @@
                 <h4 id="configuring-engines">5.1 Configuring Engines</h4>
                 <p>CARA requires at least one UCI-compatible chess engine to perform game analysis. Adding your first engine is straightforward and doesn't require any special configuration—default settings are usually sufficient to get started.</p>
                 
+                <p>There are two general types of chess engines you can use with CARA:</p>
+                <ul>
+                    <li><strong>Conventional alpha-beta search engines</strong> (e.g., Stockfish, Berserk, Komodo): These engines use traditional search algorithms and are typically faster, making them ideal for quick analysis and when you need responsive performance. They work well on standard CPUs and don't require specialized hardware.</li>
+                    <li><strong>Neural network-based engines</strong> (e.g., Leela Chess Zero, Maia): These engines use machine learning models and often provide different evaluation perspectives compared to conventional engines. They are generally slower than conventional engines and may benefit from a powerful graphics card (GPU) for optimal performance. They can be useful when you want alternative analysis perspectives on positions. For example, with sufficient hardware, you can use neural network-based engines with the <a href="#manual-analysis-task">manual analysis function</a> to get a different perspective than you would from using a conventional engine.</li>
+                </ul>
+                <p>For most users, starting with a conventional engine like Stockfish is recommended due to its speed and strength. You can always add additional engines later to compare different analysis approaches.</p>
+                
                 <h5 id="adding-first-engine">5.1.1 Adding Your First Engine</h5>
                 <p>To add your first engine:</p>
                 <ol>
@@ -1007,7 +1024,7 @@
                     Use <span class="menu-item">File → Open PGN Database</span> (<code>Ctrl+O</code> / <code>⌘+O</code>) to open the file selection dialog.</li>
                     
                     <li><strong>Select files:</strong><br>
-                    Select one or multiple PGN files from your computer. You can select multiple files by holding <code>Ctrl</code> (individual selection) or <code>Shift</code> (range selection) while clicking.</li>
+                    Select one or multiple PGN files from your computer. You can select multiple files using several methods: click and drag with your mouse to select a range of files, hold <code>Ctrl</code> on Windows or <code>⌘</code> on macOS while clicking to select individual files, or hold <code>Shift</code> while clicking to select a range of files.</li>
                     
                     <li><strong>Load games:</strong><br>
                     Each selected file opens as a separate tab in the Database Panel. The first game from the first file automatically becomes the active game.</li>
@@ -1953,7 +1970,7 @@
                 <p>The <code>config.json</code> file controls all UI styling, layout dimensions, colors, fonts, and application-wide default settings. While the file is read-only from the application's perspective, you can manually edit it to customize CARA's appearance without modifying any source code.</p>
                 
                 <h5>7.1.1 File Structure</h5>
-                <p>The <code>config.json</code> file is located in the CARA root directory and uses a hierarchical JSON structure. Colors are specified as RGB arrays with values from 0 to 255 (e.g., <code>[217, 217, 217]</code> for light gray). Font sizes are specified in points, and dimensions are in pixels.</p>
+                <p>The <code>config.json</code> file is located in the <code>app/config/</code> directory and uses a hierarchical JSON structure. Colors are specified as RGB arrays with values from 0 to 255 (e.g., <code>[217, 217, 217]</code> for light gray). Font sizes are specified in points, and dimensions are in pixels.</p>
                 
                 <h5>7.1.2 Example: Changing Chessboard Square Colors</h5>
                 <p>To change the colors of the chessboard squares:</p>
