@@ -21,6 +21,7 @@ from typing import Dict, Any, Optional, List, Tuple
 from pathlib import Path
 import threading
 import time
+import os
 
 from app.models.database_model import DatabaseModel, GameData
 from app.models.engine_model import EngineModel
@@ -179,7 +180,8 @@ class BulkAnalysisThread(QThread):
     def __init__(self, games: List[GameData], config: Dict[str, Any],
                  engine_model: EngineModel, analysis_controller,
                  opening_service, book_move_service, classification_model,
-                 re_analyze: bool = False, movetime_override: Optional[int] = None) -> None:
+                 re_analyze: bool = False, movetime_override: Optional[int] = None,
+                 max_threads_override: Optional[int] = None) -> None:
         """Initialize bulk analysis thread.
         
         Args:
@@ -192,6 +194,7 @@ class BulkAnalysisThread(QThread):
             classification_model: Optional MoveClassificationModel instance.
             re_analyze: Whether to re-analyze already analyzed games.
             movetime_override: Optional override for movetime in milliseconds.
+            max_threads_override: Optional override for maximum total threads (None = unlimited).
         """
         super().__init__()
         self.games = games
@@ -203,6 +206,7 @@ class BulkAnalysisThread(QThread):
         self.classification_model = classification_model
         self.re_analyze = re_analyze
         self.movetime_override = movetime_override
+        self.max_threads_override = max_threads_override
         self._cancelled = False
         self._workers: List[GameAnalysisWorker] = []
         self._progress_lock = threading.Lock()
@@ -214,7 +218,9 @@ class BulkAnalysisThread(QThread):
         self._active_workers: Dict[int, GameAnalysisWorker] = {}  # game_idx -> worker (for tracking active games)
         self._completed_game_indices: set = set()  # Track completed game indices
         self._last_status_update_time = 0.0
-        self._status_update_interval = 0.1  # Update status at most every 100ms
+        # Get status update interval from config
+        threading_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {}).get('threading', {})
+        self._status_update_interval = threading_config.get('status_update_interval', 0.1)
         self._game_queue: List[Tuple[GameData, int]] = []  # Queue of (game, original_idx) tuples
         self._queue_mutex = QMutex()
         self._queue_condition = QWaitCondition()
@@ -226,6 +232,10 @@ class BulkAnalysisThread(QThread):
         self._cumulative_depth_count = 0
         self._cumulative_seldepth_sum = 0
         self._cumulative_seldepth_count = 0
+        # Thread information for status bar display
+        self._total_threads_used = 0
+        self._parallel_games = 0
+        self._threads_per_engine = 0
     
     def _get_next_game(self) -> Optional[Tuple[GameData, int]]:
         """Get next game from queue (thread-safe).
@@ -247,32 +257,6 @@ class BulkAnalysisThread(QThread):
         self._cancelled = True
         for worker in self._workers:
             worker.cancel()
-    
-    def _get_normal_thread_setting(self) -> int:
-        """Get the normal thread setting for game analysis.
-        
-        Returns:
-            Number of threads normally used for game analysis.
-        """
-        # Get engine assignment
-        engine_assignment = self.engine_model.get_assignment(EngineModel.TASK_GAME_ANALYSIS)
-        if engine_assignment is None:
-            return 6  # Default fallback
-        
-        engine = self.engine_model.get_engine(engine_assignment)
-        if engine is None or not engine.is_valid:
-            return 6  # Default fallback
-        
-        # Get task-specific parameters
-        engine_path = Path(engine.path) if not isinstance(engine.path, Path) else engine.path
-        
-        task_params = EngineParametersService.get_task_parameters_for_engine(
-            engine_path,
-            "game_analysis",
-            self.config
-        )
-        
-        return task_params.get("threads", 6)
     
     def _on_worker_progress(self, game_idx: int, game_move_index: int, total_moves: int,
                            is_white_move: bool, status_message: str, engine_info: dict) -> None:
@@ -324,7 +308,10 @@ class BulkAnalysisThread(QThread):
         games_being_analyzed = total_games - skipped_count
         if games_being_analyzed == 0:
             dialog_status = f"All games already analyzed ({skipped_count} skipped)"
-            self.progress_updated.emit(100.0, dialog_status)
+            progress_display_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {}).get('progress_display', {})
+            decimal_precision = progress_display_config.get('decimal_precision', 4)
+            progress_percent_str = f"100.{'0' * decimal_precision}%"
+            self.progress_updated.emit(100.0, dialog_status, progress_percent_str)
             return
         
         # Find currently active games (games with progress but not completed)
@@ -349,13 +336,15 @@ class BulkAnalysisThread(QThread):
                         active_progress_sum += game_progress
                         active_count += 1
         
-        # Calculate average progress of active games (with 4 decimal places)
+        # Calculate average progress of active games (with configurable decimal precision)
+        progress_display_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {}).get('progress_display', {})
+        decimal_precision = progress_display_config.get('decimal_precision', 4)
         if active_count > 0:
             avg_active_progress = (active_progress_sum / active_count) * 100.0
-            avg_active_progress_str = f"{avg_active_progress:.4f}"
+            avg_active_progress_str = f"{avg_active_progress:.{decimal_precision}f}"
         else:
             avg_active_progress = 0.0
-            avg_active_progress_str = "0.0000"
+            avg_active_progress_str = f"0.{'0' * decimal_precision}"
         
         # Calculate average depth/seldepth from cumulative data (all analyzed moves across all games)
         with self._progress_lock:
@@ -412,9 +401,12 @@ class BulkAnalysisThread(QThread):
         else:
             overall_progress = 100.0
         
-        # Use floating point progress with 4 decimal places
-        progress_value = min(overall_progress, 99.9999)
-        progress_percent_str = f"{progress_value:.4f}%"
+        # Use floating point progress with configurable decimal precision
+        progress_display_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {}).get('progress_display', {})
+        max_progress_cap = progress_display_config.get('max_progress_cap', 99.9999)
+        decimal_precision = progress_display_config.get('decimal_precision', 4)
+        progress_value = min(overall_progress, max_progress_cap)
+        progress_percent_str = f"{progress_value:.{decimal_precision}f}%"
         self.progress_updated.emit(progress_value, dialog_status, progress_percent_str)
         
         # Update status bar with estimated time remaining
@@ -441,8 +433,10 @@ class BulkAnalysisThread(QThread):
                     minutes = int((estimated_remaining % 3600) // 60)
                     time_str = f"{hours}h {minutes}m"
                 
+                threads_info = f"{self._total_threads_used} threads ({self._parallel_games}×{self._threads_per_engine})" if self._total_threads_used > 0 else ""
                 status_parts = [
                     f"Bulk Analysis: Analyzing {active_count} game{'s' if active_count != 1 else ''} ({avg_active_progress_str}%) from total {total_games} games, {completed_count} completed",
+                    threads_info,
                     avg_depth_str,
                     avg_seldepth_str,
                     f"Estimated time remaining: {time_str}"
@@ -451,12 +445,18 @@ class BulkAnalysisThread(QThread):
             else:
                 status_parts = [
                     f"Bulk Analysis: Analyzing {active_count} game{'s' if active_count != 1 else ''} ({avg_active_progress_str}%) from total {total_games} games, {completed_count} completed",
+                    f"{self._total_threads_used} threads ({self._parallel_games}×{self._threads_per_engine})",
                     avg_depth_str,
                     avg_seldepth_str
                 ]
                 status_bar_message = " | ".join([p for p in status_parts if p])
         else:
-            status_bar_message = f"Bulk Analysis: Preparing analysis of {games_being_analyzed} game{'s' if games_being_analyzed != 1 else ''} from total {total_games} games, {completed_count} completed."
+            threads_info = f"{self._total_threads_used} threads ({self._parallel_games}×{self._threads_per_engine})" if self._total_threads_used > 0 else ""
+            status_parts = [
+                f"Bulk Analysis: Preparing analysis of {games_being_analyzed} game{'s' if games_being_analyzed != 1 else ''} from total {total_games} games, {completed_count} completed",
+                threads_info
+            ]
+            status_bar_message = " | ".join([p for p in status_parts if p]) + "."
         
         progress_service.set_status(status_bar_message)
         
@@ -466,8 +466,13 @@ class BulkAnalysisThread(QThread):
     def run(self) -> None:
         """Run bulk analysis with parallel execution."""
         try:
+            # Get progress display config for formatting
+            progress_display_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {}).get('progress_display', {})
+            decimal_precision = progress_display_config.get('decimal_precision', 4)
+            initial_progress_str = f"0.{'0' * decimal_precision}%"
+            
             # Emit initial progress to show thread has started
-            self.progress_updated.emit(0.0, "Initializing bulk analysis...", "0.0000%")
+            self.progress_updated.emit(0.0, "Initializing bulk analysis...", initial_progress_str)
             
             total_games = len(self.games)
             if total_games == 0:
@@ -489,13 +494,19 @@ class BulkAnalysisThread(QThread):
                 return
             
             # Emit progress update
-            self.progress_updated.emit(0.0, f"Preparing to analyze {len(games_to_analyze)} games...", "0.0000%")
+            self.progress_updated.emit(0.0, f"Preparing to analyze {len(games_to_analyze)} games...", initial_progress_str)
             
-            # Get normal thread setting and calculate parallel resources
-            normal_threads = self._get_normal_thread_setting()
+            # Calculate parallel resources based only on max_threads_override (ignores engine's normal thread setting)
+            threading_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {}).get('threading', {})
+            max_parallel_games = threading_config.get('max_parallel_games', 4)
             parallel_games, threads_per_engine = BulkAnalysisService.calculate_parallel_resources(
-                normal_threads, max_parallel_games=4
+                max_parallel_games=max_parallel_games, max_total_threads=self.max_threads_override
             )
+            
+            # Store thread information for status bar display
+            self._parallel_games = parallel_games
+            self._threads_per_engine = threads_per_engine
+            self._total_threads_used = parallel_games * threads_per_engine
             
             # Limit parallel games to actual number of games
             parallel_games = min(parallel_games, len(games_to_analyze))
@@ -509,7 +520,7 @@ class BulkAnalysisThread(QThread):
             self._next_game_idx = 0
             
             # Emit progress update
-            self.progress_updated.emit(0.0, f"Creating {parallel_games} analysis service(s)...", "0.0000%")
+            self.progress_updated.emit(0.0, f"Creating {parallel_games} analysis service(s)...", initial_progress_str)
             
             # Create BulkAnalysisService instances (one per parallel game)
             analysis_services: List[BulkAnalysisService] = []
@@ -526,7 +537,7 @@ class BulkAnalysisThread(QThread):
                 analysis_services.append(service)
             
             # Emit progress update
-            self.progress_updated.emit(0.0, f"Starting {parallel_games} worker thread(s)...", "0.0000%")
+            self.progress_updated.emit(0.0, f"Starting {parallel_games} worker thread(s)...", initial_progress_str)
             
             # Create worker threads that will continuously pick up games
             self._workers = []
@@ -546,7 +557,7 @@ class BulkAnalysisThread(QThread):
                 self._workers.append(worker)
             
             # Emit progress update - analysis is starting
-            self.progress_updated.emit(0.0, f"Analysis started: {len(games_to_analyze)} games, {parallel_games} parallel worker(s)...", "0.0000%")
+            self.progress_updated.emit(0.0, f"Analysis started: {len(games_to_analyze)} games, {parallel_games} parallel worker(s)...", initial_progress_str)
             
             # Wait for all workers to finish (they'll stop when queue is empty)
             for worker in self._workers:
@@ -719,25 +730,22 @@ class BulkAnalysisDialog(QDialog):
         options_layout.setContentsMargins(group_margins[0], group_margins[1], group_margins[2], group_margins[3])
         options_layout.setSpacing(section_spacing)
         
-        # Options row: checkbox on left, movetime on right
-        options_row_layout = QHBoxLayout()
-        options_row_layout.setSpacing(20)  # Space between checkbox and movetime
-        
-        # Re-analyze checkbox (left side)
+        # Re-analyze checkbox row
         self.re_analyze_checkbox = QCheckBox("Re-analyze already analyzed games")
         self.re_analyze_checkbox.setChecked(False)
         self.re_analyze_checkbox.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-        options_row_layout.addWidget(self.re_analyze_checkbox)
+        options_layout.addWidget(self.re_analyze_checkbox)
         
-        # Add stretch to push movetime to the right
-        options_row_layout.addStretch()
-        
-        # Movetime input (right side)
-        movetime_row_layout = QHBoxLayout()
-        movetime_row_layout.setSpacing(8)  # Space between label and spinbox
+        # Controls row: movetime and max_threads on same row (below checkbox)
+        from app.utils.font_utils import scale_font_size
+        spacing_config = dialog_config.get('spacing', {})
+        controls_row_layout = QHBoxLayout()
+        controls_row_layout.setSpacing(spacing_config.get('controls_row', 20))
         
         # Movetime input
-        from app.utils.font_utils import scale_font_size
+        movetime_row_layout = QHBoxLayout()
+        movetime_row_layout.setSpacing(spacing_config.get('label_spinbox', 8))
+        
         movetime_label = QLabel("Time per move:")
         movetime_label.setStyleSheet(
             f"font-size: {scale_font_size(dialog_config.get('labels', {}).get('font_size', 11))}pt; "
@@ -747,8 +755,16 @@ class BulkAnalysisDialog(QDialog):
         )
         movetime_row_layout.addWidget(movetime_label)
         
+        # Get movetime spinbox config
+        movetime_config = dialog_config.get('movetime_spinbox', {})
+        movetime_min = movetime_config.get('min_value', 100)
+        movetime_max = movetime_config.get('max_value', 60000)
+        movetime_step = movetime_config.get('single_step', 100)
+        movetime_suffix = movetime_config.get('suffix', ' ms')
+        movetime_fallback_default = movetime_config.get('fallback_default', 1000)
+        
         # Get default movetime from engine parameters
-        default_movetime = 1000  # Fallback default
+        default_movetime = movetime_fallback_default
         if self.analysis_controller and hasattr(self.analysis_controller, 'engine_model'):
             engine_model = self.analysis_controller.engine_model
             engine_assignment = engine_model.get_assignment(EngineModel.TASK_GAME_ANALYSIS)
@@ -761,18 +777,66 @@ class BulkAnalysisDialog(QDialog):
                         "game_analysis",
                         self.config
                     )
-                    default_movetime = task_params.get("movetime", 1000)
+                    default_movetime = task_params.get("movetime", movetime_fallback_default)
         
         self.movetime_spinbox = QSpinBox()
-        self.movetime_spinbox.setMinimum(100)
-        self.movetime_spinbox.setMaximum(60000)
-        self.movetime_spinbox.setSingleStep(100)
+        self.movetime_spinbox.setMinimum(movetime_min)
+        self.movetime_spinbox.setMaximum(movetime_max)
+        self.movetime_spinbox.setSingleStep(movetime_step)
         self.movetime_spinbox.setValue(default_movetime)
-        self.movetime_spinbox.setSuffix(" ms")
+        self.movetime_spinbox.setSuffix(movetime_suffix)
         movetime_row_layout.addWidget(self.movetime_spinbox)
         
-        options_row_layout.addLayout(movetime_row_layout)
-        options_layout.addLayout(options_row_layout)
+        controls_row_layout.addLayout(movetime_row_layout, 0)  # Stretch factor 0 to prevent stretching
+        
+        # Max threads input (on same row as movetime)
+        max_threads_row_layout = QHBoxLayout()
+        max_threads_row_layout.setSpacing(spacing_config.get('label_spinbox', 8))
+        
+        # Get max threads config
+        max_threads_config = dialog_config.get('max_threads_spinbox', {})
+        max_threads_min = max_threads_config.get('min_value', 0)
+        max_threads_max = max_threads_config.get('max_value', 128)
+        max_threads_default = max_threads_config.get('default_value', 0)
+        max_threads_step = max_threads_config.get('single_step', 1)
+        max_threads_suffix = max_threads_config.get('suffix', '')
+        max_threads_special_text = max_threads_config.get('special_value_text', 'Unlimited')
+        
+        # Use available cores as maximum if not specified or if specified max is too high
+        threading_config = dialog_config.get('threading', {})
+        cpu_count_fallback = threading_config.get('cpu_count_fallback', 4)
+        available_cores = os.cpu_count() or cpu_count_fallback
+        if max_threads_max > available_cores:
+            max_threads_max = available_cores
+        
+        # Max threads label
+        max_threads_label = QLabel("Max threads:")
+        max_threads_label.setStyleSheet(
+            f"font-size: {scale_font_size(dialog_config.get('labels', {}).get('font_size', 11))}pt; "
+            f"color: rgb({dialog_config.get('labels', {}).get('text_color', [200, 200, 200])[0]}, "
+            f"{dialog_config.get('labels', {}).get('text_color', [200, 200, 200])[1]}, "
+            f"{dialog_config.get('labels', {}).get('text_color', [200, 200, 200])[2]});"
+        )
+        max_threads_row_layout.addWidget(max_threads_label)
+        
+        # Max threads spinbox
+        self.max_threads_spinbox = QSpinBox()
+        self.max_threads_spinbox.setMinimum(max_threads_min)
+        self.max_threads_spinbox.setMaximum(max_threads_max)
+        self.max_threads_spinbox.setSingleStep(max_threads_step)
+        self.max_threads_spinbox.setValue(max_threads_default)
+        if max_threads_suffix:
+            self.max_threads_spinbox.setSuffix(max_threads_suffix)
+        if max_threads_special_text and max_threads_min == 0:
+            self.max_threads_spinbox.setSpecialValueText(max_threads_special_text)
+        max_threads_row_layout.addWidget(self.max_threads_spinbox)
+        
+        controls_row_layout.addLayout(max_threads_row_layout, 0)  # Stretch factor 0 to prevent stretching
+        
+        # Add stretch to prevent layouts from stretching to fill space
+        controls_row_layout.addStretch()
+        
+        options_layout.addLayout(controls_row_layout)
         
         layout.addWidget(options_group)
         
@@ -790,7 +854,7 @@ class BulkAnalysisDialog(QDialog):
         
         # Progress bar with percentage label
         progress_bar_layout = QHBoxLayout()
-        progress_bar_layout.setSpacing(8)
+        progress_bar_layout.setSpacing(spacing_config.get('progress_bar', 8))
         
         self.progress_bar = QProgressBar()
         self.progress_bar.setMinimum(0)
@@ -800,12 +864,16 @@ class BulkAnalysisDialog(QDialog):
         progress_bar_layout.addWidget(self.progress_bar)
         
         # Percentage label
-        self.progress_percent_label = QLabel("0.0000%")
+        progress_display_config = dialog_config.get('progress_display', {})
+        decimal_precision = progress_display_config.get('decimal_precision', 4)
+        percent_label_min_width = progress_display_config.get('percent_label_min_width', 80)
+        initial_progress_str = f"0.{'0' * decimal_precision}%"
+        self.progress_percent_label = QLabel(initial_progress_str)
         self.progress_percent_label.setStyleSheet(
             f"font-size: {status_font_size}pt; "
             f"color: rgb({status_text_color[0]}, {status_text_color[1]}, {status_text_color[2]});"
         )
-        self.progress_percent_label.setMinimumWidth(80)  # Reserve space for "100.0000%"
+        self.progress_percent_label.setMinimumWidth(percent_label_min_width)
         progress_bar_layout.addWidget(self.progress_percent_label)
         
         progress_layout.addLayout(progress_bar_layout)
@@ -865,6 +933,55 @@ class BulkAnalysisDialog(QDialog):
     
     def _start_analysis(self) -> None:
         """Start the bulk analysis."""
+        # Check if engine is configured and assigned for game analysis
+        engine_model = self.analysis_controller.engine_model
+        engine_assignment = engine_model.get_assignment(EngineModel.TASK_GAME_ANALYSIS)
+        if engine_assignment is None:
+            # No engine assigned - show error message
+            from app.views.message_dialog import MessageDialog
+            
+            # Try to get app controller for validation message
+            engines = engine_model.get_engines()
+            if not engines:
+                error_type = "no_engines"
+            else:
+                error_type = "no_assignment"
+            
+            main_window = QApplication.activeWindow()
+            if main_window and hasattr(main_window, 'controller'):
+                # Get validation message from config
+                messages_config = self.config.get('ui', {}).get('dialogs', {}).get('engine_validation_messages', {})
+                error_config = messages_config.get(error_type, {})
+                title = error_config.get('title', 'Error')
+                message_template = error_config.get('message_template', '')
+                
+                # Use bulk_analysis action
+                actions = messages_config.get('actions', {})
+                tasks = messages_config.get('tasks', {})
+                action = actions.get('bulk_analysis', 'starting bulk analysis')
+                task_display = tasks.get('game_analysis', 'Game Analysis')
+                
+                # Format message
+                message = message_template.format(action=action, task=task_display)
+            else:
+                # Fallback message
+                if not engines:
+                    title = "No Engine Configured"
+                    message = "Please add at least one UCI chess engine before starting bulk analysis.\n\nGo to Engines → Add Engine... to configure an engine."
+                else:
+                    title = "No Engine Assigned"
+                    message = "Please assign an engine to the Game Analysis task before starting bulk analysis.\n\nGo to Engines → [Engine Name] → Assign to Game Analysis."
+            
+            dialog = MessageDialog(
+                self.config,
+                title,
+                message,
+                message_type="warning",
+                parent=self
+            )
+            dialog.exec()
+            return
+        
         # Get games to analyze
         if self.selected_games_radio.isChecked():
             if not self.selected_games:
@@ -899,8 +1016,11 @@ class BulkAnalysisDialog(QDialog):
             return
         
         # Update progress group (always visible)
+        progress_display_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {}).get('progress_display', {})
+        decimal_precision = progress_display_config.get('decimal_precision', 4)
+        initial_progress_str = f"0.{'0' * decimal_precision}%"
         self.progress_bar.setValue(0)
-        self.progress_percent_label.setText("0.0000%")
+        self.progress_percent_label.setText(initial_progress_str)
         self.status_label.setText(f"Preparing to analyze {len(games_to_analyze)} games...")
         
         # Disable controls
@@ -908,6 +1028,7 @@ class BulkAnalysisDialog(QDialog):
         self.all_games_radio.setEnabled(False)
         self.re_analyze_checkbox.setEnabled(False)
         self.movetime_spinbox.setEnabled(False)
+        self.max_threads_spinbox.setEnabled(False)
         self.start_button.setEnabled(False)
         self.cancel_button.setText("Cancel")
         
@@ -960,6 +1081,11 @@ class BulkAnalysisDialog(QDialog):
         # Start analysis thread (it will create its own BulkAnalysisService instances for parallel execution)
         re_analyze = self.re_analyze_checkbox.isChecked()
         movetime_override = self.movetime_spinbox.value()  # Get value from spinbox
+        
+        # Get max_threads_override (0 means unlimited, convert to None)
+        max_threads_value = self.max_threads_spinbox.value()
+        max_threads_override = None if max_threads_value == 0 else max_threads_value
+        
         self.analysis_thread = BulkAnalysisThread(
             games_to_analyze,
             self.config,
@@ -969,7 +1095,8 @@ class BulkAnalysisDialog(QDialog):
             book_move_service,
             classification_model,
             re_analyze,
-            movetime_override=movetime_override
+            movetime_override=movetime_override,
+            max_threads_override=max_threads_override
         )
         self.analysis_thread.progress_updated.connect(self._on_progress_updated)
         self.analysis_thread.status_update_requested.connect(self._on_status_update_requested)
@@ -1016,19 +1143,33 @@ class BulkAnalysisDialog(QDialog):
         progress_service.hide_progress()
         
         if success:
+            progress_display_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {}).get('progress_display', {})
+            decimal_precision = progress_display_config.get('decimal_precision', 4)
+            final_progress_str = f"100.{'0' * decimal_precision}%"
             self.progress_bar.setValue(100)
-            self.progress_percent_label.setText("100.0000%")
+            self.progress_percent_label.setText(final_progress_str)
             self.status_label.setText(message)
+            # Update status bar
+            progress_service.set_status(f"Bulk Analysis: {message}")
             self.cancel_button.setText("Close")
             self.cancel_button.clicked.disconnect()
             self.cancel_button.clicked.connect(self.accept)
         else:
+            # Check if this is a cancellation
+            if "cancelled" in message.lower():
+                status_message = "Bulk Analysis: Cancelled by user"
+            else:
+                status_message = f"Bulk Analysis: Error - {message}"
+            
+            # Update status bar
+            progress_service.set_status(status_message)
             self.status_label.setText(f"Error: {message}")
             # Re-enable controls for retry
             self.selected_games_radio.setEnabled(True)
             self.all_games_radio.setEnabled(True)
             self.re_analyze_checkbox.setEnabled(True)
             self.movetime_spinbox.setEnabled(True)
+            self.max_threads_spinbox.setEnabled(True)
             self.start_button.setEnabled(True)
             self.cancel_button.setText("Cancel")
     

@@ -70,15 +70,17 @@ class BulkAnalysisService(QObject):
         self._load_classification_thresholds()
     
     @staticmethod
-    def calculate_parallel_resources(normal_threads: int, max_parallel_games: int = 4) -> Tuple[int, int]:
+    def calculate_parallel_resources(max_parallel_games: int = 4, 
+                                     max_total_threads: Optional[int] = None) -> Tuple[int, int]:
         """Calculate optimal number of parallel games and threads per engine.
         
         This method intelligently splits available CPU resources across multiple
-        engine instances for parallel game analysis.
+        engine instances for parallel game analysis. It uses only the max_total_threads
+        setting from the bulk analysis dialog, ignoring the engine's normal thread configuration.
         
         Args:
-            normal_threads: Normal thread setting for single engine (e.g., 16).
             max_parallel_games: Maximum number of parallel games to allow (default: 4).
+            max_total_threads: Optional maximum total threads to use across all parallel games (None = unlimited).
             
         Returns:
             Tuple of (parallel_games, threads_per_engine).
@@ -86,15 +88,11 @@ class BulkAnalysisService(QObject):
             - threads_per_engine: Number of threads to use per engine instance
         """
         # Get available CPU cores
-        available_cores = os.cpu_count() or 4  # Fallback to 4 if detection fails
-        
-        # Calculate optimal parallel games
-        # We want to use most of available cores, but leave some headroom
-        # Formula: parallel_games = min(available_cores / (normal_threads / 2), max_parallel_games)
-        # The "/ 2" ensures we don't oversubscribe threads
-        
-        if normal_threads <= 0:
-            normal_threads = 1
+        # If max_total_threads is provided, use it instead of available cores
+        if max_total_threads is not None:
+            available_cores = max_total_threads
+        else:
+            available_cores = os.cpu_count() or 4  # Fallback to 4 if detection fails
         
         # Calculate how many parallel games we can support
         # Each engine should get at least 2 threads for efficiency
@@ -104,23 +102,16 @@ class BulkAnalysisService(QObject):
         if max_parallel < 1:
             max_parallel = 1
         
-        # Calculate threads per engine
-        # Try to distribute threads evenly, but ensure each engine gets at least 2 threads
-        threads_per_engine = max(min_threads_per_engine, normal_threads // max_parallel)
+        # Distribute available cores evenly across parallel games
+        threads_per_engine = available_cores // max_parallel
         
-        # If threads_per_engine is too low, reduce parallel games
-        while threads_per_engine < min_threads_per_engine and max_parallel > 1:
-            max_parallel -= 1
-            threads_per_engine = max(min_threads_per_engine, normal_threads // max_parallel)
-        
-        # Ensure we don't exceed available cores
-        total_threads_needed = max_parallel * threads_per_engine
-        if total_threads_needed > available_cores:
-            # Reduce parallel games to fit within available cores
-            max_parallel = available_cores // threads_per_engine
+        # Ensure each engine gets at least 2 threads
+        if threads_per_engine < min_threads_per_engine:
+            # Reduce parallel games to ensure minimum threads per engine
+            max_parallel = available_cores // min_threads_per_engine
             if max_parallel < 1:
                 max_parallel = 1
-                threads_per_engine = min(available_cores, normal_threads)
+            threads_per_engine = available_cores // max_parallel if max_parallel > 0 else available_cores
         
         return (max_parallel, threads_per_engine)
     

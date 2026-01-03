@@ -3229,7 +3229,7 @@
       },
       "bulk_analysis_dialog": {
         "width": 600,
-        "height": 450,
+        "height": 520,
         "background_color": [
           40,
           40,
@@ -3257,7 +3257,10 @@
           "spacing": 15
         },
         "spacing": {
-          "section": 15
+          "section": 15,
+          "controls_row": 20,
+          "label_spinbox": 8,
+          "progress_bar": 8
         },
         "buttons": {
           "spacing": 10,
@@ -3330,6 +3333,33 @@
             130
           ],
           "chunk_border_radius": 2
+        },
+        "max_threads_spinbox": {
+          "min_value": 0,
+          "max_value": 128,
+          "default_value": 0,
+          "single_step": 1,
+          "suffix": "",
+          "special_value_text": "Unlimited"
+        },
+        "movetime_spinbox": {
+          "min_value": 100,
+          "max_value": 60000,
+          "default_value": 1000,
+          "single_step": 100,
+          "suffix": " ms",
+          "fallback_default": 1000
+        },
+        "threading": {
+          "status_update_interval": 0.1,
+          "default_thread_count": 6,
+          "max_parallel_games": 4,
+          "cpu_count_fallback": 4
+        },
+        "progress_display": {
+          "max_progress_cap": 99.9999,
+          "decimal_precision": 4,
+          "percent_label_min_width": 80
         }
       },
       "bulk_clean_pgn": {
@@ -3555,7 +3585,8 @@
         "actions": {
           "game_analysis": "starting game analysis",
           "manual_analysis": "starting manual analysis",
-          "evaluation_bar": "showing the evaluation bar"
+          "evaluation_bar": "showing the evaluation bar",
+          "bulk_analysis": "starting bulk analysis"
         },
         "tasks": {
           "game_analysis": "Game Analysis",
