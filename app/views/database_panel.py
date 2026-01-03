@@ -957,6 +957,14 @@ class DatabasePanel(QWidget):
                 selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});
                 selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});
             }}
+            QTableView::item {{
+                selection-background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});
+                selection-color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});
+            }}
+            QTableView::item:selected {{
+                background-color: rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]});
+                color: rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]});
+            }}
             QHeaderView {{
                 background-color: rgb({header_bg[0]}, {header_bg[1]}, {header_bg[2]});
             }}
@@ -1001,6 +1009,26 @@ class DatabasePanel(QWidget):
             vertical_header_palette.setColor(vertical_header.foregroundRole(), header_text_color)
             vertical_header.setPalette(vertical_header_palette)
             vertical_header.setAutoFillBackground(True)
+        
+        # Set palette on table itself and viewport to prevent Windows override of selection colors
+        # This ensures selection highlighting works correctly on Windows (especially in VMs)
+        selection_bg_color = QColor(selection_bg[0], selection_bg[1], selection_bg[2])
+        selection_text_color = QColor(selection_text[0], selection_text[1], selection_text[2])
+        
+        # Set palette on table widget itself
+        table_palette = table.palette()
+        table_palette.setColor(QPalette.ColorRole.Highlight, selection_bg_color)
+        table_palette.setColor(QPalette.ColorRole.HighlightedText, selection_text_color)
+        table.setPalette(table_palette)
+        
+        # Also set palette on viewport (the scrollable content area)
+        viewport = table.viewport()
+        if viewport:
+            viewport_palette = viewport.palette()
+            viewport_palette.setColor(QPalette.ColorRole.Highlight, selection_bg_color)
+            viewport_palette.setColor(QPalette.ColorRole.HighlightedText, selection_text_color)
+            viewport.setPalette(viewport_palette)
+            viewport.setAutoFillBackground(True)
         
         # Style corner button widget directly (it's a child widget of the table)
         # The corner button is created by QAbstractScrollArea and can be accessed
