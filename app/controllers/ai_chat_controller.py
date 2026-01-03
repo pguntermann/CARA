@@ -18,7 +18,7 @@ class AIRequestThread(QThread):
     
     def __init__(self, provider: str, model: str, api_key: str, 
                  messages: List[Dict[str, str]], system_prompt: Optional[str] = None,
-                 token_limit: Optional[int] = None) -> None:
+                 token_limit: Optional[int] = None, config: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the AI request thread.
         
         Args:
@@ -27,6 +27,8 @@ class AIRequestThread(QThread):
             api_key: API key for the provider.
             messages: List of message dicts.
             system_prompt: Optional system prompt.
+            token_limit: Optional token limit.
+            config: Configuration dictionary.
         """
         super().__init__()
         self.provider = provider
@@ -35,10 +37,11 @@ class AIRequestThread(QThread):
         self.messages = messages
         self.system_prompt = system_prompt
         self.token_limit = token_limit
+        self.config = config
     
     def run(self) -> None:
         """Execute the AI request in the background thread."""
-        ai_service = AIService()
+        ai_service = AIService(self.config)
         success, response = ai_service.send_message(
             self.provider,
             self.model,
@@ -77,7 +80,7 @@ class AIChatController(QObject):
         self.game_controller = game_controller
         self.app_controller = app_controller
         self.user_settings_service = UserSettingsService.get_instance()
-        self.ai_service = AIService()
+        self.ai_service = AIService(config)
         
         # Conversation state
         self._conversation: List[Dict[str, str]] = []
@@ -513,7 +516,8 @@ Please provide a brief analysis of this position, including:
             api_key,
             self._conversation,
             system_prompt,
-            token_limit=self._token_limit
+            token_limit=self._token_limit,
+            config=self.config
         )
         self._request_thread.response_received.connect(self._on_ai_response)
         self._request_thread.finished.connect(self._on_request_finished)

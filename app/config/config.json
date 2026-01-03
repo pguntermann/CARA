@@ -4485,6 +4485,16 @@
         ],
         "exclude_exact": []
       }
+    },
+    "api_endpoints": {
+      "openai": {
+        "chat": "https://api.openai.com/v1/chat/completions",
+        "models": "https://api.openai.com/v1/models"
+      },
+      "anthropic": {
+        "messages": "https://api.anthropic.com/v1/messages",
+        "models": "https://api.anthropic.com/v1/models"
+      }
     }
   },
   "resources": {

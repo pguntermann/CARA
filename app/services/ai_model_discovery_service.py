@@ -13,10 +13,6 @@ class AIModelDiscoveryService:
     # Cache duration: 24 hours (in seconds)
     CACHE_DURATION = 24 * 60 * 60
     
-    # API endpoints
-    OPENAI_MODELS_URL = "https://api.openai.com/v1/models"
-    ANTHROPIC_MODELS_URL = "https://api.anthropic.com/v1/models"
-    
     DEFAULT_FILTERS: Dict[str, Dict[str, List[str]]] = {
         "openai": {
             "exclude_prefixes": [
@@ -68,6 +64,15 @@ class AIModelDiscoveryService:
         self._openai_cache_path = self.cache_dir / "openai_models.json"
         self._anthropic_cache_path = self.cache_dir / "anthropic_models.json"
         self._filters = self._load_filter_config()
+        
+        # Load API endpoints from config
+        ai_config = self.config.get("ai", {}).get("api_endpoints", {})
+        openai_config = ai_config.get("openai", {})
+        anthropic_config = ai_config.get("anthropic", {})
+        
+        # Use config values or fall back to defaults
+        self.OPENAI_MODELS_URL = openai_config.get("models", "https://api.openai.com/v1/models")
+        self.ANTHROPIC_MODELS_URL = anthropic_config.get("models", "https://api.anthropic.com/v1/models")
     
     def get_openai_models(self, api_key: Optional[str] = None) -> List[str]:
         """Get list of available OpenAI models.

@@ -50,10 +50,6 @@ class AIProvider(str, Enum):
 class AIService:
     """Service for making API calls to AI providers."""
     
-    # API endpoints
-    OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
-    ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages"
-    
     # Cache for models that require max_completion_tokens instead of max_tokens
     # This is a class-level cache so it persists across all instances
     _models_requiring_max_completion_tokens: set = set()
@@ -62,9 +58,21 @@ class AIService:
     # This is a class-level cache so it persists across all instances
     _models_not_supporting_temperature: set = set()
     
-    def __init__(self) -> None:
-        """Initialize the AI service."""
-        pass
+    def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
+        """Initialize the AI service.
+        
+        Args:
+            config: Configuration dictionary. If None, uses default endpoints.
+        """
+        self.config = config or {}
+        # Load API endpoints from config
+        ai_config = self.config.get("ai", {}).get("api_endpoints", {})
+        openai_config = ai_config.get("openai", {})
+        anthropic_config = ai_config.get("anthropic", {})
+        
+        # Use config values or fall back to defaults
+        self.OPENAI_CHAT_URL = openai_config.get("chat", "https://api.openai.com/v1/chat/completions")
+        self.ANTHROPIC_MESSAGES_URL = anthropic_config.get("messages", "https://api.anthropic.com/v1/messages")
     
     def _debug_console(self, message: str, direction: str) -> None:
         """Log debug message to console if console debugging is enabled.
