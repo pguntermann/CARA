@@ -128,6 +128,7 @@ class DetailAnnotationView(QWidget):
         # Annotations list config
         annotations_list_config = annotations_config.get('annotations_list', {})
         self.annotations_list_min_height = annotations_list_config.get('minimum_height', 100)
+        self.annotations_list_text_color = annotations_list_config.get('text_color', [200, 200, 200])
         wrapping_config = annotations_list_config.get('wrapping', {})
         self.color_buffer = wrapping_config.get('color_buffer', 0)
         self.tool_buffer = wrapping_config.get('tool_buffer', 10)
@@ -593,6 +594,8 @@ class DetailAnnotationView(QWidget):
     
     def _apply_styling(self) -> None:
         """Apply styling from config."""
+        from app.views.style import StyleManager
+        
         ui_config = self.config.get('ui', {})
         tabs_config = ui_config.get('panels', {}).get('detail', {}).get('tabs', {})
         colors_config = tabs_config.get('colors', {})
@@ -621,10 +624,48 @@ class DetailAnnotationView(QWidget):
         font_family = resolve_font_family(tabs_config.get('font_family', 'Helvetica Neue'))
         font_size = scale_font_size(tabs_config.get('font_size', 10))
         
-        # Style tool buttons (with rounded corners)
+        # Get button config values for offsets
+        buttons_config = ui_config.get('buttons', {})
+        button_pressed_offset = buttons_config.get('pressed_background_offset', 10)
+        
+        # Calculate background offsets using pane_bg as base (consistent with StyleManager approach)
+        # This ensures all buttons use the same color calculation method
+        bg_offset = norm_bg[0] - pane_bg[0] if norm_bg[0] > pane_bg[0] else 20
+        hover_offset = hover_bg[0] - pane_bg[0] if hover_bg[0] > pane_bg[0] else 30
+        
+        # Calculate actual background colors using same method as StyleManager
+        # Normal state: pane_bg + bg_offset
+        normal_bg_calc = [
+            min(255, pane_bg[0] + bg_offset),
+            min(255, pane_bg[1] + bg_offset),
+            min(255, pane_bg[2] + bg_offset)
+        ]
+        # Hover state: pane_bg + hover_offset
+        hover_bg_calc = [
+            min(255, pane_bg[0] + hover_offset),
+            min(255, pane_bg[1] + hover_offset),
+            min(255, pane_bg[2] + hover_offset)
+        ]
+        # Pressed state: pane_bg + bg_offset + button_pressed_offset
+        pressed_bg_calc = [
+            min(255, pane_bg[0] + bg_offset + button_pressed_offset),
+            min(255, pane_bg[1] + bg_offset + button_pressed_offset),
+            min(255, pane_bg[2] + bg_offset + button_pressed_offset)
+        ]
+        
+        # Convert padding from [horizontal, vertical] to single value (use horizontal for consistency)
+        button_padding_value = button_padding[0] if isinstance(button_padding, list) else button_padding
+        
+        # Prepare color lists for StyleManager
+        bg_color_list = [pane_bg[0], pane_bg[1], pane_bg[2]]
+        border_color_list = [norm_border[0], norm_border[1], norm_border[2]]
+        text_color_list = [norm_text[0], norm_text[1], norm_text[2]]
+        
+        # Style tool buttons (QToolButton) - use same color calculation but with checked state
+        # Note: QToolButton:checked:hover must come after QToolButton:hover to override hover when checked
         tool_style = f"""
             QToolButton {{
-                background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
+                background-color: rgb({normal_bg_calc[0]}, {normal_bg_calc[1]}, {normal_bg_calc[2]});
                 color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
                 border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
                 border-radius: {button_border_radius}px;
@@ -634,14 +675,19 @@ class DetailAnnotationView(QWidget):
                 font-family: "{font_family}";
                 font-size: {font_size}pt;
             }}
+            QToolButton:hover {{
+                background-color: rgb({hover_bg_calc[0]}, {hover_bg_calc[1]}, {hover_bg_calc[2]});
+                color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});
+            }}
             QToolButton:checked {{
                 background-color: rgb({active_bg[0]}, {active_bg[1]}, {active_bg[2]});
                 color: rgb({active_text[0]}, {active_text[1]}, {active_text[2]});
                 border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
             }}
-            QToolButton:hover {{
-                background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});
-                color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});
+            QToolButton:checked:hover {{
+                background-color: rgb({active_bg[0]}, {active_bg[1]}, {active_bg[2]});
+                color: rgb({active_text[0]}, {active_text[1]}, {active_text[2]});
+                border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
             }}
             QToolButton:focus {{
                 outline: none;
@@ -651,59 +697,25 @@ class DetailAnnotationView(QWidget):
         for btn in [self.arrow_btn, self.square_btn, self.circle_btn, self.text_btn]:
             btn.setStyleSheet(tool_style)
         
-        # Style regular buttons (with rounded corners, matching manual analysis)
-        # Get pressed background offset from config
-        buttons_config = ui_config.get('buttons', {})
-        button_pressed_offset = buttons_config.get('pressed_background_offset', 10)
-        
-        button_style = f"""
-            QPushButton {{
-                background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
-                color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
-                border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
-                border-radius: {button_border_radius}px;
-                padding: {button_padding[0]}px {button_padding[1]}px;
-                min-height: {button_height}px;
-                font-family: "{font_family}";
-                font-size: {font_size}pt;
-            }}
-            QPushButton:hover {{
-                background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});
-                color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});
-            }}
-            QPushButton:pressed {{
-                background-color: rgb({min(255, norm_bg[0] + button_pressed_offset)}, {min(255, norm_bg[1] + button_pressed_offset)}, {min(255, norm_bg[2] + button_pressed_offset)});
-            }}
-            QPushButton:focus {{
-                outline: none;
-            }}
-        """
-        
-        self.save_btn.setStyleSheet(button_style)
-        self.clear_all_btn.setStyleSheet(button_style)
+        # Style regular QPushButton buttons using StyleManager (consistent color calculation)
+        StyleManager.style_buttons(
+            [self.save_btn, self.clear_all_btn],
+            self.config,
+            bg_color_list,
+            border_color_list,
+            text_color=text_color_list,
+            font_family=font_family,
+            font_size=font_size,
+            border_radius=button_border_radius,
+            padding=button_padding_value,
+            background_offset=bg_offset,
+            hover_background_offset=hover_offset,
+            pressed_background_offset=button_pressed_offset,
+            min_height=button_height
+        )
         
         # Style shadow button using StyleManager (toggle button with checked state)
         if hasattr(self, 'shadow_button'):
-            from app.views.style import StyleManager
-            
-            # Get button config values for offsets
-            buttons_config = ui_config.get('buttons', {})
-            button_pressed_offset = buttons_config.get('pressed_background_offset', 10)
-            
-            # Calculate background offset: norm_bg - pane_bg
-            # norm_bg is the target button background, pane_bg is the base
-            bg_offset = norm_bg[0] - pane_bg[0] if norm_bg[0] > pane_bg[0] else 20
-            # Calculate hover offset: hover_bg - pane_bg
-            hover_offset = hover_bg[0] - pane_bg[0] if hover_bg[0] > pane_bg[0] else 30
-            
-            # Convert padding from [horizontal, vertical] to single value (use horizontal for consistency)
-            button_padding_value = button_padding[0] if isinstance(button_padding, list) else button_padding
-            
-            # Apply base styling using StyleManager (use pane_bg as base, offsets will produce norm_bg and hover_bg)
-            bg_color_list = [pane_bg[0], pane_bg[1], pane_bg[2]]
-            border_color_list = [norm_border[0], norm_border[1], norm_border[2]]
-            text_color_list = [norm_text[0], norm_text[1], norm_text[2]]
-            
             StyleManager.style_buttons(
                 [self.shadow_button],
                 self.config,
@@ -738,6 +750,17 @@ class DetailAnnotationView(QWidget):
             # Append checked state to existing stylesheet
             current_style = self.shadow_button.styleSheet()
             self.shadow_button.setStyleSheet(current_style + checked_style)
+        
+        # Store button styling values for use in annotation list items
+        # These will be used to style delete buttons in list items
+        self._list_item_button_bg = bg_color_list
+        self._list_item_button_border = border_color_list
+        self._list_item_button_text = text_color_list
+        self._list_item_button_bg_offset = bg_offset
+        self._list_item_button_hover_offset = hover_offset
+        self._list_item_button_pressed_offset = button_pressed_offset
+        self._list_item_button_border_radius = button_border_radius
+        self._list_item_button_padding = 3  # Small padding for small buttons
         
         # Style labels
         label_style = f"color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});"
@@ -1328,7 +1351,13 @@ class DetailAnnotationView(QWidget):
             # Show empty state message
             empty_label = QLabel("No annotations for this move")
             empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            empty_label.setStyleSheet("color: rgb(150, 150, 150); padding: 10px;")
+            # Use a dimmed version of the text color for empty state
+            empty_text_color = [int(c * 0.75) for c in self.annotations_list_text_color]
+            empty_label.setStyleSheet(f"color: rgb({empty_text_color[0]}, {empty_text_color[1]}, {empty_text_color[2]}); padding: 10px;")
+            # Set palette to prevent macOS override
+            empty_label_palette = empty_label.palette()
+            empty_label_palette.setColor(empty_label.foregroundRole(), QColor(empty_text_color[0], empty_text_color[1], empty_text_color[2]))
+            empty_label.setPalette(empty_label_palette)
             self.annotation_list_layout.addWidget(empty_label)
             self.annotation_list_layout.addStretch()
             return
@@ -1372,6 +1401,12 @@ class DetailAnnotationView(QWidget):
         desc_label = QLabel(desc_text)
         desc_label.setWordWrap(True)
         desc_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        # Apply text color from config
+        desc_label.setStyleSheet(f"color: rgb({self.annotations_list_text_color[0]}, {self.annotations_list_text_color[1]}, {self.annotations_list_text_color[2]});")
+        # Set palette to prevent macOS override
+        desc_label_palette = desc_label.palette()
+        desc_label_palette.setColor(desc_label.foregroundRole(), QColor(self.annotations_list_text_color[0], self.annotations_list_text_color[1], self.annotations_list_text_color[2]))
+        desc_label.setPalette(desc_label_palette)
         item_layout.addWidget(desc_label)
         
         # Delete button
@@ -1380,6 +1415,25 @@ class DetailAnnotationView(QWidget):
         delete_btn.setToolTip("Delete annotation")
         delete_btn.clicked.connect(lambda checked, ann_id=annotation.annotation_id: 
                                    self._on_delete_annotation(ann_id, ply_index))
+        
+        # Style delete button using StyleManager (if styling values are available)
+        if hasattr(self, '_list_item_button_bg'):
+            from app.views.style import StyleManager
+            StyleManager.style_buttons(
+                [delete_btn],
+                self.config,
+                self._list_item_button_bg,
+                self._list_item_button_border,
+                text_color=self._list_item_button_text,
+                border_radius=self._list_item_button_border_radius,
+                padding=self._list_item_button_padding,
+                background_offset=self._list_item_button_bg_offset,
+                hover_background_offset=self._list_item_button_hover_offset,
+                pressed_background_offset=self._list_item_button_pressed_offset,
+                min_width=24,
+                min_height=24
+            )
+        
         item_layout.addWidget(delete_btn)
         
         return item_frame

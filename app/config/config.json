@@ -1618,6 +1618,11 @@
           },
           "annotations_list": {
             "minimum_height": 100,
+            "text_color": [
+              200,
+              200,
+              200
+            ],
             "wrapping": {
               "color_buffer": 0,
               "tool_buffer": 10,
