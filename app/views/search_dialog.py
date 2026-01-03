@@ -579,7 +579,8 @@ class SearchDialog(QDialog):
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
         main_layout = QVBoxLayout(self)
-        main_layout.setSpacing(self.layout_spacing)
+        # Set spacing to 0 to disable automatic spacing - we'll use explicit spacing instead
+        main_layout.setSpacing(0)
         main_layout.setContentsMargins(
             self.layout_margins[0],
             self.layout_margins[1],
@@ -636,6 +637,7 @@ class SearchDialog(QDialog):
         
         # Buttons for managing criteria
         criteria_buttons_layout = QHBoxLayout()
+        criteria_buttons_layout.setSpacing(self.button_spacing)
         criteria_buttons_layout.addStretch()
         
         self.start_group_btn = QPushButton("Start Group")
@@ -659,6 +661,7 @@ class SearchDialog(QDialog):
         
         # Buttons at bottom
         buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(self.button_spacing)
         buttons_layout.addStretch()
         
         self.search_btn = QPushButton("Search")
@@ -669,6 +672,8 @@ class SearchDialog(QDialog):
         self.cancel_btn.clicked.connect(self.reject)
         buttons_layout.addWidget(self.cancel_btn)
         
+        # Add spacing before buttons
+        main_layout.addSpacing(self.section_spacing)
         main_layout.addLayout(buttons_layout)
         
         # Track criteria rows

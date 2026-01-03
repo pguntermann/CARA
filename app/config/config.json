@@ -2952,7 +2952,7 @@
       },
       "bulk_tag": {
         "width": 600,
-        "height": 600,
+        "height": 550,
         "minimum_width": 550,
         "minimum_height": 630,
         "background_color": [
@@ -3277,7 +3277,7 @@
       },
       "bulk_analysis_dialog": {
         "width": 600,
-        "height": 520,
+        "height": 480,
         "background_color": [
           40,
           40,
@@ -3895,7 +3895,7 @@
       },
       "deduplication_criteria": {
         "width": 600,
-        "height": 450,
+        "height": 430,
         "background_color": [
           40,
           40,

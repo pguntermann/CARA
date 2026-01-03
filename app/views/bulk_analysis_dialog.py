@@ -677,7 +677,8 @@ class BulkAnalysisDialog(QDialog):
         section_spacing = spacing_config.get('section', 15)
         
         layout = QVBoxLayout(self)
-        layout.setSpacing(layout_spacing)
+        # Set spacing to 0 to disable automatic spacing - we'll use explicit spacing instead
+        layout.setSpacing(0)
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
         # Game selection group
@@ -907,6 +908,8 @@ class BulkAnalysisDialog(QDialog):
         self.cancel_button.clicked.connect(self._on_cancel)
         button_layout.addWidget(self.cancel_button)
         
+        # Add spacing before buttons
+        layout.addSpacing(section_spacing)
         layout.addLayout(button_layout)
     
     def _on_selection_changed(self) -> None:

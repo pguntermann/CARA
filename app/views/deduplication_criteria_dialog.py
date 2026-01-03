@@ -169,10 +169,9 @@ class DeduplicationCriteriaDialog(QDialog):
         
         # Main layout
         layout = QVBoxLayout(self)
-        layout.setSpacing(self.layout_spacing)
+        # Set spacing to 0 to disable automatic spacing - we'll use explicit spacing instead
+        layout.setSpacing(0)
         layout.setContentsMargins(self.layout_margins[0], self.layout_margins[1], self.layout_margins[2], self.layout_margins[3])
-        
-        layout.addSpacing(self.section_spacing)
         
         # Matching Mode group
         mode_group = QGroupBox("Matching Mode")
@@ -244,6 +243,8 @@ class DeduplicationCriteriaDialog(QDialog):
         self.ok_button.clicked.connect(self._on_ok_clicked)
         button_layout.addWidget(self.ok_button)
         
+        # Add spacing before buttons
+        layout.addSpacing(self.section_spacing)
         layout.addLayout(button_layout)
     
     def _apply_styling(self) -> None:

@@ -126,7 +126,8 @@ class EngineDialog(QDialog):
         buttons_config = dialog_config.get('buttons', {})
         
         layout = QVBoxLayout(self)
-        layout.setSpacing(layout_spacing)
+        # Set spacing to 0 to disable automatic spacing - we'll use explicit spacing instead
+        layout.setSpacing(0)
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
         layout.addSpacing(layout_spacing)
@@ -251,6 +252,8 @@ class EngineDialog(QDialog):
         self.cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_button)
         
+        # Add spacing before buttons
+        layout.addSpacing(layout_spacing)
         layout.addLayout(button_layout)
         
         # Connect path input changes

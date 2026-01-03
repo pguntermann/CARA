@@ -145,7 +145,8 @@ class ImportGamesDialog(QDialog):
         
         # Main layout
         main_layout = QVBoxLayout(self)
-        main_layout.setSpacing(self.layout_spacing)
+        # Set spacing to 0 to disable automatic spacing - we'll use explicit spacing instead
+        main_layout.setSpacing(0)
         main_layout.setContentsMargins(
             self.layout_margins[0],
             self.layout_margins[1],
@@ -304,6 +305,7 @@ class ImportGamesDialog(QDialog):
         
         # Buttons
         buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(self.button_spacing)
         buttons_layout.addStretch()
         
         self.import_button = QPushButton("Import")
@@ -315,6 +317,8 @@ class ImportGamesDialog(QDialog):
         self.cancel_button.clicked.connect(self.reject)
         buttons_layout.addWidget(self.cancel_button)
         
+        # Add spacing before buttons
+        main_layout.addSpacing(self.section_spacing)
         main_layout.addLayout(buttons_layout)
     
     def _on_platform_changed(self, platform: str) -> None:
