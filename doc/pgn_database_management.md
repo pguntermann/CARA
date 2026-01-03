@@ -6,14 +6,45 @@ The PGN database management system handles loading, parsing, storing, searching,
 
 ## Architecture
 
-The system consists of:
+The PGN database management system follows a **Model-Controller-Service** pattern, with clear separation of concerns:
 
-- **DatabaseModel**: Qt table model (`QAbstractTableModel`) for game data storage
-- **GameData**: Data class representing a single game's metadata and PGN
-- **PgnService**: PGN parsing service using python-chess
-- **DatabaseSearchService**: Search functionality with complex criteria evaluation
-- **DatabaseController**: Orchestrates database operations
-- **DatabasePanelModel**: Manages multiple database tabs and active database state
+### Component Responsibilities
+
+- **DatabaseModel** (`QAbstractTableModel`): Represents a single database containing multiple games. Provides Qt table model interface for views, handles game storage, sorting, and per-game unsaved change tracking. Emits `dataChanged` and `layoutChanged` signals for view updates.
+
+- **DatabasePanelModel** (`QObject`): Manages multiple databases simultaneously. Tracks which databases are open, which is active, and which have unsaved changes. Emits signals when active database changes or databases are added/removed. The clipboard database is always present and cannot be closed.
+
+- **DatabaseController**: Orchestrates database operations by coordinating between models and services. Handles file I/O, delegates PGN parsing to `PgnService`, creates and manages `DatabaseModel` instances, and updates `DatabasePanelModel` state. Acts as the primary interface for database operations.
+
+- **PgnService**: Stateless service for parsing PGN text into structured game data. Handles format normalization, validation, and extraction of metadata and CARA-specific tags.
+
+- **DatabaseSearchService**: Stateless service for evaluating search criteria against games. Supports complex queries with AND/OR logic, grouping, and custom tag searches.
+
+### Component Interactions
+
+**Database Lifecycle**:
+1. `DatabaseController` creates a `DatabaseModel` instance for each database (clipboard or file-based)
+2. `DatabaseController` registers each database with `DatabasePanelModel` using a unique identifier
+3. `DatabasePanelModel` tracks active database and emits signals when it changes
+4. Views observe `DatabasePanelModel` signals to update UI (tabs, active selection)
+
+**Loading Games**:
+1. `DatabaseController` reads PGN file or receives PGN text
+2. `DatabaseController` calls `PgnService` to parse PGN text
+3. `PgnService` returns parsed game data
+4. `DatabaseController` creates `GameData` instances and adds them to `DatabaseModel`
+5. `DatabaseModel` emits `dataChanged` signals for view updates
+
+**Unsaved Changes**:
+- `DatabaseModel` tracks per-game unsaved changes via `_unsaved_games` set
+- When games are updated, `DatabaseModel` automatically adds them to `_unsaved_games`
+- `DatabaseController` notifies `DatabasePanelModel` when database-level changes occur
+- `DatabasePanelModel` tracks which databases have unsaved changes and emits signals for tab indicators
+
+**Search Operations**:
+- Search criteria are built using `SearchCriteria` model classes
+- `DatabaseSearchService` evaluates criteria against games from one or more `DatabaseModel` instances
+- Search results include games with their source database identifiers
 
 ## Data Model
 
@@ -45,14 +76,13 @@ class GameData:
 `DatabaseModel` (`app/models/database_model.py`) extends `QAbstractTableModel`:
 
 - **Columns**: 16 columns including game number, unsaved indicator, metadata fields, and PGN
-- **Unsaved tracking**: Tracks games with unsaved changes via `_unsaved_games` set
 - **Signals**: Emits `dataChanged` when games are updated, `layoutChanged` when sorted
-- **Sorting**: Supports sorting by any column with proper date parsing
+- **Sorting**: Supports sorting by any column with proper date parsing (see "Date Parsing and Sorting" section)
 - **Batch operations**: `batch_update_games()` for efficient bulk updates
 
 Key methods:
-- `add_game()`: Add game to model
-- `update_game()`: Update existing game and mark as unsaved
+- `add_game()`: Add game to model (optionally mark as unsaved)
+- `update_game()`: Update existing game (see "Unsaved Changes Tracking" section)
 - `batch_update_games()`: Update multiple games with single signal
 - `remove_games()`: Remove games from model
 - `clear_all_unsaved()`: Clear unsaved change indicators
@@ -132,38 +162,38 @@ Uses `DateMatcher` (`app/services/date_matcher.py`) for PGN date comparison:
 
 ### Opening Databases
 
-`DatabaseController.open_pgn_database()`:
-1. Read PGN file from disk
-2. Parse PGN text using `PgnService`
-3. Convert parsed games to `GameData` instances
-4. Create new `DatabaseModel` and add games
-5. Add database to `DatabasePanelModel`
-6. Set as active database
+`DatabaseController.open_pgn_database()` orchestrates loading a PGN file:
+- Reads PGN file from disk
+- Delegates parsing to `PgnService` to extract game data
+- Creates a new `DatabaseModel` instance and populates it with `GameData` objects
+- Registers the new database with `DatabasePanelModel` using the file path as identifier
+- Sets the new database as the active database
+
+Games loaded from files are not marked as unsaved (they match the file state).
 
 ### Saving Databases
 
-`DatabaseController.save_pgn_to_file()`:
-1. Get all games from model
-2. Write games incrementally to file (avoids memory issues)
-3. Write blank lines between games
-4. Clear unsaved change indicators
-5. Mark database as saved
+`DatabaseController.save_pgn_to_file()` handles persisting database changes:
+- Retrieves all games from the `DatabaseModel`
+- Writes games incrementally to file (avoids memory issues with large databases)
+- Formats PGN with blank lines between games
+- Clears unsaved change indicators from the model
+- Notifies `DatabasePanelModel` that the database is saved
 
 **Save As** (`save_pgn_database_as()`):
-1. Save to new file path
-2. Create new database model with copied data
-3. Add new database to panel model
-4. Reload original database from disk (discards unsaved changes)
-5. Set new database as active
+- Creates a new `DatabaseModel` with copied game data
+- Saves the new model to a different file path
+- Registers the new database with `DatabasePanelModel`
+- Reloads the original database from disk (discarding unsaved changes)
+- Sets the new database as active
 
 ### Reloading Databases
 
-`DatabaseController.reload_database_from_file()`:
-1. Read file from disk
-2. Parse PGN text
-3. Clear existing model
-4. Repopulate with parsed games
-5. Discards all unsaved changes
+`DatabaseController.reload_database_from_file()` discards unsaved changes:
+- Reads the original file from disk
+- Parses PGN text using `PgnService`
+- Clears the existing `DatabaseModel` and repopulates with fresh data from file
+- All unsaved changes are lost
 
 ## Multiple Database Management
 
@@ -174,7 +204,7 @@ Uses `DateMatcher` (`app/services/date_matcher.py`) for PGN date comparison:
 - **Clipboard database**: Default database for temporary storage (cannot be closed)
 - **File databases**: Databases loaded from PGN files
 - **Active database**: Currently selected database
-- **Unsaved tracking**: Tracks which databases have unsaved changes
+- **Unsaved tracking**: Tracks which databases have unsaved changes (see "Unsaved Changes Tracking" section)
 
 **Database identifiers**:
 - `"clipboard"`: Clipboard database
@@ -183,7 +213,7 @@ Uses `DateMatcher` (`app/services/date_matcher.py`) for PGN date comparison:
 **Operations**:
 - `add_database()`: Add database with file path
 - `remove_database()`: Remove database (cannot remove clipboard)
-- `set_active_database()`: Set active database
+- `set_active_database()`: Set active database and emit signal
 - `get_active_database()`: Get active database
 - `mark_database_unsaved()`: Mark database as having unsaved changes
 - `mark_database_saved()`: Clear unsaved flag
@@ -197,6 +227,8 @@ When closing a database:
 4. Clipboard cannot be closed
 
 ## Date Parsing and Sorting
+
+`DatabaseModel` includes date parsing functionality for sorting the date column:
 
 ### Date Format Detection
 
@@ -253,7 +285,7 @@ Implementation files:
 ### Updating Games
 
 - Always use `update_game()` or `batch_update_games()` (not direct attribute modification)
-- Updates automatically mark games as unsaved
+- See "Unsaved Changes Tracking" section for details on how updates are tracked
 
 ### Searching
 

@@ -6,11 +6,24 @@ The move classification system evaluates chess moves and assigns quality assessm
 
 ## Architecture
 
-The system consists of:
+The move classification system follows a stateless service pattern with a configuration model:
 
-- **MoveAnalysisService**: Core calculation logic for CPL, move assessment, and classification
-- **MoveClassificationModel**: Model holding classification thresholds and brilliancy criteria
-- **Integration**: Used by `GameAnalysisEngineService` and `BulkAnalysisService` during game analysis
+- **MoveAnalysisService**: Stateless utility class providing pure calculation functions (all methods are static)
+  - No instance state; all methods are `@staticmethod`
+  - Provides CPL calculation, move assessment, classification, and formatting functions
+  - Designed for reusability and testability without UI dependencies
+
+- **MoveClassificationModel**: QObject-based model holding configurable classification thresholds
+  - Stores thresholds for move quality assessment (good_move_max_cpl, inaccuracy_max_cpl, etc.)
+  - Stores brilliancy criteria (min_eval_swing, min_material_sacrifice, etc.)
+  - Emits `settings_changed` signal when thresholds are modified
+  - Can be initialized from `config.json` or modified at runtime
+
+- **Integration Pattern**: Analysis services use MoveAnalysisService statically during game analysis
+  - `GameAnalysisEngineService` calls static methods after engine evaluation
+  - `BulkAnalysisService` uses the same static methods for batch processing
+  - Both services pass `MoveClassificationModel` settings to classification functions
+  - Classification happens after engine analysis completes (no additional engine calls)
 
 ## Centipawn Loss (CPL) Calculation
 

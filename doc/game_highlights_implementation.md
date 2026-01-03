@@ -16,27 +16,67 @@ The highlight system serves to:
 
 ## Architecture
 
-### Core Components
+The game highlights detection system follows a **rule-based service pattern** with **stateless service integration**:
 
-The highlight system consists of three main components:
+### Component Responsibilities
 
-- **HighlightDetector** (`app/services/game_highlights/highlight_detector.py`)
-  - Main orchestrator that coordinates rule evaluation
-  - Handles post-processing: deduplication, filtering, sorting, limiting
-  - Manages cross-phase priority adjustments
-  - Groups highlights by game phase
+**HighlightDetector** (`app/services/game_highlights/highlight_detector.py`):
+- Stateless service that orchestrates rule evaluation
+- Iterates through moves and evaluates all enabled rules
+- Handles post-processing: deduplication, filtering, sorting, limiting
+- Manages cross-phase priority adjustments
+- Groups highlights by game phase (opening, middlegame, endgame)
+- Uses shared state dictionary for cross-move tracking
 
-- **RuleRegistry** (`app/services/game_highlights/rule_registry.py`)
-  - Manages all highlight detection rules
-  - Handles rule discovery and registration
-  - Provides enabled/disabled rule filtering
-  - Loads rules from configuration
+**RuleRegistry** (`app/services/game_highlights/rule_registry.py`):
+- Manages all highlight detection rules
+- Handles rule discovery and registration from configuration
+- Provides enabled/disabled rule filtering
+- Loads rules from `config.json` under `ui.panels.detail.summary.highlights.rules`
 
-- **HighlightRule** (`app/services/game_highlights/base_rule.py`)
-  - Abstract base class for all highlight rules
-  - Defines the rule interface (evaluate method)
-  - Provides configuration support
-  - Each rule is independent and testable
+**HighlightRule** (`app/services/game_highlights/base_rule.py`):
+- Abstract base class for all highlight rules
+- Defines the rule interface (`evaluate()` method)
+- Provides configuration support
+- Each rule is independent and testable
+
+**GameSummaryService** (`app/services/game_summary_service.py`):
+- Integrates highlight detection into game summary calculation
+- Creates `RuleRegistry` and `HighlightDetector` instances
+- Passes CPL thresholds from `MoveClassificationModel` to detector
+- Includes highlights in `GameSummary` object
+
+### Component Interactions
+
+**Highlight Detection Flow**:
+1. `GameSummaryService.calculate_summary()` is called with moves and phase boundaries
+2. Service creates `RuleRegistry` with rule configurations from `config.json`
+3. Service creates `HighlightDetector` with:
+   - Rule registry instance
+   - CPL thresholds from `MoveClassificationModel`
+   - Configuration (highlights per phase limit)
+4. Service calls `detect_highlights()` with moves, total moves, and phase boundaries
+5. `HighlightDetector` iterates through moves:
+   - Creates `RuleContext` for each move (with previous/next moves, material counts, phase info)
+   - Gets enabled rules from registry
+   - Evaluates each rule with move and context
+   - Collects all highlights from all rules
+6. Detector applies post-processing (deduplication, filtering, sorting, limiting)
+7. Returns list of `GameHighlight` instances
+8. Highlights included in `GameSummary` object
+9. UI displays highlights grouped by phase
+
+**Rule Evaluation Flow**:
+1. For each move, `HighlightDetector` creates `RuleContext` with:
+   - Previous/next move references
+   - Material counts from previous move
+   - Phase information (opening/middlegame/endgame)
+   - Classification thresholds (CPL limits)
+   - Shared state dictionary for cross-move tracking
+2. Detector gets enabled rules from `RuleRegistry`
+3. Each rule's `evaluate()` method is called with move and context
+4. Rules return list of `GameHighlight` instances (empty list if no highlight)
+5. All highlights collected and passed to post-processing
 
 ### Data Structures
 
@@ -147,40 +187,17 @@ Each rule can have:
 
 ## Processing Pipeline
 
-### Detection Flow
+The highlight detection process is described in the "Component Interactions" section of Architecture. The post-processing steps:
 
-The highlight detection process follows this sequence:
-
-1. **Initialization**
-   - Create RuleRegistry and load all rules from config
-   - Initialize HighlightDetector with CPL thresholds
-   - Set up shared_state for cross-move tracking
-   - Initialize material tracking variables
-
-2. **Rule Evaluation (per move)**
-   - Iterate through all moves in the game
-   - For each move, create RuleContext with:
-     * Previous/next move references
-     * Material counts from previous move
-     * Phase information
-     * Classification thresholds
-     * Shared state dictionary
-   - Evaluate all enabled rules
-   - Collect all highlights from all rules
-
-3. **Post-Processing**
-   - Filter delayed mating sequences
-   - Add evaluation swing highlights (special handling)
-   - Combine highlights on same move (max 2 per move)
-   - Group by phase (opening, middlegame, endgame)
-   - Sort by priority (descending), then move number
-   - Apply cross-phase priority penalties
-   - Deduplicate within each phase
-   - Limit per phase (default: 10 highlights per phase)
-
-4. **Final Output**
-   - Combine highlights from all phases
-   - Sort by move number for chronological display
+1. **Filter delayed mating sequences**: Suppress individual "missed mate" highlights within delayed mating ranges
+2. **Add evaluation swing highlights**: Special handling for evaluation swings (see "Deduplication Logic")
+3. **Combine highlights on same move**: Maximum 2 highlights per move (selected by priority)
+4. **Group by phase**: Separate highlights into opening, middlegame, endgame
+5. **Sort by priority**: Descending priority, then move number for ties
+6. **Apply cross-phase priority penalties**: See "Cross-Phase Priority Adjustment"
+7. **Deduplicate within each phase**: See "Deduplication Logic"
+8. **Limit per phase**: Default 10 highlights per phase (configurable)
+9. **Final output**: Combine highlights from all phases, sort by move number for chronological display
 
 ### Cross-Phase Priority Adjustment
 
@@ -310,16 +327,6 @@ Many rules use FEN (Forsyth-Edwards Notation) for precise positional analysis:
   - BishopPairRule: Counts bishops on board accurately
   - PawnStormRule: Tracks pawn positions across multiple moves
 
-## Integration with GameSummaryService
-
-The highlight system is integrated into GameSummaryService:
-
-1. `GameSummaryService.calculate_summary()` calls highlight detection
-2. Creates RuleRegistry with rule configurations
-3. Creates HighlightDetector with CPL thresholds from MoveClassificationModel
-4. Calls `detect_highlights()` with moves, phase boundaries
-5. Highlights are included in GameSummary object
-6. UI displays highlights grouped by phase
 
 ## Adding New Rules
 

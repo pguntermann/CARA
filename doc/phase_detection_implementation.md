@@ -6,6 +6,14 @@ CARA implements a three-phase game classification system (Opening, Middlegame, E
 
 ## Architecture
 
+The phase detection system follows a **stateless service pattern**:
+
+- **GameSummaryService**: Stateless service that calculates phase boundaries and endgame classification from move data. Accepts configuration and optional `MoveClassificationModel` for assessment thresholds. Returns `GameSummary` objects with calculated statistics.
+
+- **GameSummaryController**: Orchestrates summary calculations by observing `GameModel` and `MovesListModel` changes. Calls `GameSummaryService.calculate_summary()` when games are analyzed and emits signals for view updates.
+
+- **Integration**: The service receives `MoveData` instances from `MovesListModel` (which contains piece counts, captures, and assessments). Phase detection results are used by views for statistics display, evaluation graphs, and game highlights.
+
 ### Phase Boundaries
 
 The game is divided into three phases:
@@ -19,13 +27,14 @@ Phase boundaries are determined at the game level (same for both players) and st
 - `opening_end`: Move number where the opening phase ends
 - `middlegame_end`: Move number where the middlegame phase ends (endgame begins)
 
-### Implementation Flow
+### Calculation Process
 
-1. `calculate_summary()` is called with a list of moves and total move count
-2. `_determine_phase_boundaries()` calculates `opening_end` and `middlegame_end`
-3. For endgame classification, all moves from `middlegame_end` onwards are checked
-4. The most specific endgame type found is used (specific rules override catch-all)
-5. Phase statistics are calculated for each player based on these boundaries
+The phase detection process:
+
+1. `GameSummaryService.calculate_summary()` receives move data and total move count
+2. `_determine_phase_boundaries()` calculates `opening_end` and `middlegame_end` using opening detection and endgame detection logic
+3. For endgame classification, all moves from `middlegame_end` onwards are evaluated to find the most specific endgame type (see "Endgame Type Selection" in Implementation Details)
+4. Phase statistics are calculated for each player based on these boundaries
 
 ## Opening Phase Detection
 
@@ -97,18 +106,10 @@ Minor pieces are counted as:
 - `w_minors = w_b + w_n`
 - `b_minors = b_b + b_n`
 
-### Endgame Type Selection
-
-After determining `middlegame_end`, the system checks all moves from that point onwards to find the most specific endgame type:
-
-1. All moves from `middlegame_end` to the end of the game are evaluated
-2. The most specific type found is used (specific rules override catch-all)
-3. If a specific type is found, it is kept even if later moves only match the catch-all
-4. This ensures classification for the endgame phase
 
 ## Endgame Classification Rules
 
-The following rules are checked in order of specificity (most specific first). Each rule returns immediately when matched, so order is critical.
+The following rules are checked in order of specificity (most specific first). Each rule returns immediately when matched, so order is critical. See "Rule Hierarchy and Order of Application" section for the complete ordered list.
 
 ### Rule 1: Pawn-Only Endgame
 **Priority**: Highest | **Returns**: "Pawn"
@@ -187,7 +188,7 @@ The following rules are checked in order of specificity (most specific first). E
 
 ## Rule Hierarchy and Order of Application
 
-The rules are checked in the following order (most specific to least specific):
+The endgame classification rules are checked in the following order (most specific to least specific). This order is critical because rules return immediately when matched, so more specific rules must be checked before general ones:
 
 1. Rule 1: Pawn-Only Endgame
 2. Rule 2: Minor Piece Endgame
@@ -229,15 +230,15 @@ The phase detection system requires MoveData instances with the following fields
 
 ### Endgame Type Selection Algorithm
 
-After determining `middlegame_end`, the system uses a selection algorithm:
+After determining `middlegame_end`, the system uses a selection algorithm to classify the endgame phase:
 
 1. Scan all moves from `middlegame_end` onwards
-2. For each move, classify its endgame type
+2. For each move, classify its endgame type using `_classify_endgame_type()`
 3. Track the most specific type found:
    - If no type found yet, use the first one found
    - If current type is catch-all ("Endgame" or "Transitional") and new type is specific, upgrade to specific
    - If current type is specific and new type is catch-all, keep the specific type
-4. This ensures classification for the entire endgame phase
+4. This ensures the most specific classification for the entire endgame phase, even if later moves only match the catch-all rule
 
 ### Configuration
 

@@ -16,13 +16,76 @@ The application uses a persistent user settings system that stores user preferen
 
 ## Architecture
 
-The system follows PyQt's Model/View architecture with Controllers:
+The user settings persistence system follows a **singleton service pattern** with **Model-Controller-Service** integration:
 
-- **UserSettingsService** (`app/services/user_settings_service.py`): Handles file I/O, loads settings into memory, manages migration from template file
-- **UserSettingsModel** (`app/models/user_settings_model.py`): Manages settings state in memory, emits signals when settings change, provides typed accessors for all settings sections
-- **ColumnProfileModel** (`app/models/column_profile_model.py`): Manages column profile data and state, emits signals for profile changes, defines column name constants
-- **ColumnProfileController** (`app/controllers/column_profile_controller.py`): Orchestrates profile operations, bridges between UI and model/service layers
-- **MainWindow** (`app/main_window.py`): Loads and saves board/PGN visibility settings, manages menu bar integration, handles application lifecycle (save on exit)
+### Component Responsibilities
+
+**UserSettingsService** (`app/services/user_settings_service.py`):
+- Singleton service managing file I/O and persistence
+- Handles loading `user_settings.json` from disk (one-time at startup)
+- Manages template-based migration to add missing settings
+- Provides `update_*()` methods that modify model in memory
+- Writes to disk only when `save()` is explicitly called
+- Uses smart path resolution (app root if writable, otherwise user data directory)
+
+**UserSettingsModel** (`app/models/user_settings_model.py`):
+- `QObject`-based model managing settings state in memory
+- Emits signals when settings change (`settings_changed`, `board_visibility_changed`, etc.)
+- Provides typed accessor methods for all settings sections
+- All runtime access is from memory (no disk I/O)
+
+**ColumnProfileModel** (`app/models/column_profile_model.py`):
+- Manages column profile data and state
+- Emits signals for profile changes (`active_profile_changed`, `profiles_changed`)
+- Defines column name constants (must be used consistently across codebase)
+- Handles profile operations (create, update, delete, switch)
+
+**ColumnProfileController** (`app/controllers/column_profile_controller.py`):
+- Orchestrates profile operations
+- Bridges between UI and model/service layers
+- Loads profiles from `UserSettingsService` at startup
+- Saves profiles through service when user explicitly saves
+
+**MainWindow** (`app/main_window.py`):
+- Loads and saves board/PGN visibility settings at startup/exit
+- Manages menu bar integration for settings
+- Handles application lifecycle (saves all settings on exit)
+
+### Component Interactions
+
+**Initialization Flow (Application Startup)**:
+1. `UserSettingsService.get_instance()` is called (singleton pattern - returns existing or creates new)
+2. On first access, service:
+   - Calls `load()` to read `user_settings.json` from disk (or empty dict if missing)
+   - Creates `UserSettingsModel` with loaded data
+   - Runs `migrate()` once to check for missing settings from template
+   - Saves to disk if migration added settings
+3. `ColumnProfileController` is initialized and calls `_load_settings()`
+4. Controller gets settings from service (from memory) and loads into `ColumnProfileModel`
+5. `MainWindow._load_user_settings()` loads board/PGN visibility from model
+6. Settings applied to domain models (`BoardModel`, etc.)
+7. Views observe model signals and update UI
+
+**Settings Update Flow (Runtime)**:
+1. User modifies settings (e.g., toggles board visibility, changes column profile)
+2. Changes saved to model in memory (`UserSettingsModel` or `ColumnProfileModel`)
+3. Model emits signals (e.g., `board_visibility_changed`, `active_profile_changed`)
+4. Views observe signals and update UI reactively
+5. Settings remain in memory until explicit save
+
+**Persistence Flow (Explicit Save)**:
+1. User clicks "Save Profile" or application exits
+2. `ColumnProfileController.save_settings()` or `MainWindow._save_user_settings()` called
+3. Controller/Window collects current state from models/views
+4. Calls `UserSettingsService.update_*()` methods to update model
+5. Calls `UserSettingsService.save()` to write model state to disk
+6. File is written to `user_settings.json` (UTF-8, 2-space indentation)
+
+**Design Pattern: Singleton Service**:
+- `UserSettingsService` uses singleton pattern to ensure single instance across application
+- All components access settings via `UserSettingsService.get_instance()`
+- Service manages single `UserSettingsModel` instance
+- Prevents multiple file reads and ensures consistent state
 
 ## File Structure
 
@@ -86,18 +149,15 @@ The application uses a template file (`user_settings.json.template`) located in 
 
 ## Memory-Based Access Pattern
 
-### Startup (One-Time Disk Read)
+The system uses a **load-once, access-from-memory** pattern:
 
-1. `UserSettingsService.get_instance()` is called (singleton pattern)
-2. On first access:
-   - `load()` reads `user_settings.json` from disk (or empty dict if missing)
-   - Creates `UserSettingsModel` with loaded data
-   - `migrate()` runs once to check for missing settings from template
-   - If migration adds settings, saves to disk
-3. All settings are now in memory via `UserSettingsModel`
+**Startup (One-Time Disk Read)**:
+- `UserSettingsService.get_instance()` loads settings from disk once
+- Creates `UserSettingsModel` with loaded data
+- Runs migration to add missing settings from template
+- All settings are now in memory
 
-### Runtime (Memory Access Only)
-
+**Runtime (Memory Access Only)**:
 - All `get_settings()` calls return from model (no disk access)
 - All `update_*()` methods modify model in memory
 - `save()` writes to disk only when explicitly called (e.g., on exit, after profile save)
@@ -156,42 +216,13 @@ The "Default" profile:
 
 ## Data Flow
 
-### Loading Settings (Application Startup)
+The data flow is described in the "Component Interactions" section of Architecture. Key flows:
 
-1. `UserSettingsService.get_instance()` called (first access)
-2. `load()` reads `user_settings.json` from disk (or empty dict if missing)
-3. Creates `UserSettingsModel` with loaded data
-4. `migrate()` runs once:
-   - Loads template file
-   - Checks what settings are missing
-   - Merges missing sections from template
-   - Migrates column profiles (ensures all columns exist)
-   - Saves if changes were made
-5. `ColumnProfileController._load_settings()` loads profiles from model
-6. `ColumnProfileModel.load_profiles()` initializes profiles
-7. `MainWindow._load_user_settings()` loads board/PGN visibility from model
-8. Settings applied to domain models (BoardModel, etc.)
-9. Views observe model signals and update UI
+**Loading Settings (Application Startup)**: See "Initialization Flow" in Architecture section.
 
-### Saving Settings (Application Exit)
+**Saving Settings (Application Exit)**: See "Persistence Flow" in Architecture section.
 
-1. `MainWindow.closeEvent()` or `_close_application()` called
-2. `MainWindow._save_user_settings()` collects current state:
-   - Board visibility from `BoardModel`
-   - PGN visibility from `DetailPgnView`
-3. `ColumnProfileController.save_settings()` saves profiles:
-   - Column visibility, widths, order from `ColumnProfileModel`
-4. `UserSettingsService.save()` writes model state to `user_settings.json`
-
-### Profile Changes (Runtime)
-
-1. User modifies column visibility/order/width
-2. Changes saved to `ColumnProfileModel` (in memory only)
-3. View updates immediately via signals
-4. User clicks "Save Profile" or "Save Profile as..."
-5. `ColumnProfileController.save_settings()` or `update_current_profile()`
-6. Updates `UserSettingsModel` via `update_moves_list_profiles()`
-7. `UserSettingsService.save()` persists to file
+**Profile Changes (Runtime)**: See "Settings Update Flow" in Architecture section.
 
 ### Accessing Settings (Runtime)
 

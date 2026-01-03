@@ -187,9 +187,14 @@ Technical documentation for developers:
 - **Engine Implementation**: [`doc/engine_implementation.md`](doc/engine_implementation.md)
 - **PGN Database Management**: [`doc/pgn_database_management.md`](doc/pgn_database_management.md)
 - **User Settings Persistence**: [`doc/user_settings_persistence.md`](doc/user_settings_persistence.md)
+- **Online Import**: [`doc/online_import_implementation.md`](doc/online_import_implementation.md)
 
 ### Analysis Features
 
+- **Game Analysis**: [`doc/game_analysis_implementation.md`](doc/game_analysis_implementation.md)
+- **Manual Analysis**: [`doc/manual_analysis_implementation.md`](doc/manual_analysis_implementation.md)
+- **Evaluation Bar**: [`doc/evaluation_bar_implementation.md`](doc/evaluation_bar_implementation.md)
+- **AI Chat Integration**: [`doc/ai_chat_integration.md`](doc/ai_chat_integration.md)
 - **Game Highlights**: [`doc/game_highlights_implementation.md`](doc/game_highlights_implementation.md)
 - **Move Classification**: [`doc/move_classification_analysis.md`](doc/move_classification_analysis.md)
 - **Phase Detection**: [`doc/phase_detection_implementation.md`](doc/phase_detection_implementation.md)
@@ -198,6 +203,7 @@ Technical documentation for developers:
 ### UI Features
 
 - **Moves List Columns**: [`doc/moveslist_columns_implementation.md`](doc/moveslist_columns_implementation.md)
+- **Annotation System**: [`doc/annotation_system_implementation.md`](doc/annotation_system_implementation.md)
 - **PV Hover Board Preview**: [`doc/pv_hover_board_preview.md`](doc/pv_hover_board_preview.md)
 
 ### Operations

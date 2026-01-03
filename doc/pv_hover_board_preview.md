@@ -6,15 +6,55 @@ This feature displays a miniature chessboard preview when hovering over moves in
 
 ## Architecture
 
-### Components
+The PV hover board preview feature follows a **view-based widget composition pattern**:
 
-- **HoverablePvLabel** (`app/views/hoverable_pv_label.py`): A QLabel subclass representing a single move in a PV line. Shows a miniature board popup on hover.
-- **MiniChessBoardWidget** (`app/views/mini_chessboard_widget.py`): A miniature chessboard widget displayed as a popup tooltip.
-- **DetailManualAnalysisView**: Creates separate HoverablePvLabel instances for each move in the PV when the feature is enabled.
+### Component Responsibilities
 
-### Implementation Approach
+**HoverablePvLabel** (`app/views/hoverable_pv_label.py`):
+- `QLabel` subclass representing a single move in a PV line
+- Tracks hover state and manages debounce timer
+- Creates and positions `MiniChessBoardWidget` popup on hover
+- Calculates position by applying moves from PV start to hovered move
+- Applies underline styling when hovered
 
-The implementation uses separate QLabel widgets for each move in the PV line, rather than a single label with position mapping. This simplifies hover detection and avoids complex HTML parsing.
+**MiniChessBoardWidget** (`app/views/mini_chessboard_widget.py`):
+- Popup widget displaying a miniature chessboard
+- Displays pieces only (no coordinates, arrows by default)
+- Matches main board orientation (flipped state)
+- Positioned near cursor with screen boundary detection
+- Uses ToolTip window flags for popup behavior
+
+**DetailManualAnalysisView** (`app/views/detail_manual_analysis_view.py`):
+- Creates and manages `HoverablePvLabel` instances for each move in PV lines
+- Splits PV moves into individual labels in `_create_analysis_line_widget()`
+- Tracks hovered labels to prevent multiple popups
+- Provides current FEN and board controller to labels
+
+### Component Interactions
+
+**PV Line Creation Flow**:
+1. `DetailManualAnalysisView._create_analysis_line_widget()` is called for each analysis line
+2. View checks if PV hover feature is enabled via configuration
+3. If enabled, PV moves are split into individual move strings
+4. A `HoverablePvLabel` is created for each move with:
+   - Move text, index, and complete PV moves list
+   - Current FEN from analysis position
+   - BoardController for orientation
+   - Configuration settings
+5. Labels are added to horizontal layout with proper spacing
+
+**Hover Interaction Flow**:
+1. User hovers over a `HoverablePvLabel`
+2. Label's `mouseMoveEvent()` detects hover and starts debounce timer
+3. After delay period, `_on_hover_timeout()` is called
+4. Label calculates position by applying moves from PV start to hovered move
+5. Label creates `MiniChessBoardWidget` (if not exists) and calls `_show_mini_board()`
+6. Mini board positions itself near cursor with screen boundary checks
+7. Label applies underline styling
+8. When mouse leaves, `leaveEvent()` hides mini board and removes underline
+
+**Design Decision**:
+The implementation uses separate `QLabel` widgets for each move, rather than a single label with position mapping. This simplifies hover detection and avoids complex HTML parsing.
 
 ## Core Functionality
 
@@ -26,10 +66,9 @@ The implementation uses separate QLabel widgets for each move in the PV line, ra
 
 ## User Experience
 
-- **Debouncing**: Board updates are debounced (configurable delay, default 50ms) to prevent excessive updates during rapid mouse movement
 - **Visual feedback**: Hovered moves are underlined, and a miniature board popup appears
 - **Non-move exclusion**: Only hovering over move text triggers the preview (not spaces or prefixes)
-- **Performance**: Updates are smooth and do not cause UI lag
+- **Performance**: Updates are smooth and do not cause UI lag (see "Debouncing" in Implementation Details)
 - **Configuration**: Hover delay and miniature board appearance are configurable via config.json
 
 ## Technical Constraints
@@ -70,14 +109,14 @@ A popup widget that displays a miniature chessboard:
 
 ### Integration with DetailManualAnalysisView
 
-In `_create_analysis_line_widget()`, when PV hover is enabled:
+In `_create_analysis_line_widget()`, when PV hover is enabled (see "Component Interactions" in Architecture section):
 
-1. PV moves are split into individual move strings
-2. A horizontal layout is created for the PV section
-3. A " | PV: " prefix label is added
-4. A `HoverablePvLabel` is created for each move
-5. Labels are added to the layout with proper spacing
-6. Truncation is handled if PV exceeds available width
+- PV moves are split into individual move strings
+- A horizontal layout is created for the PV section
+- A " | PV: " prefix label is added
+- A `HoverablePvLabel` is created for each move with required parameters
+- Labels are added to the layout with proper spacing
+- Truncation is handled if PV exceeds available width
 
 ### Position Calculation
 
@@ -91,10 +130,13 @@ When a move is hovered:
 
 ### Debouncing
 
+Board updates are debounced to prevent excessive updates during rapid mouse movement:
+
 - Hover delay is configurable via `pv_hover.hover_delay_ms` (default: 50ms)
+- `QTimer` is started when hover is detected
 - Timer is cancelled if mouse moves to a different move
 - Only updates after mouse stays over the same move for the delay period
-- Prevents excessive updates during rapid mouse movement
+- Prevents UI lag during rapid mouse movement
 
 ## Configuration
 

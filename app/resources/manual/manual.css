@@ -428,6 +428,65 @@
             border: 1px solid rgb(60, 60, 65);
         }
         
+        /* Column table styling */
+        .column-table-wrapper {
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        
+        .column-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid rgb(60, 60, 65);
+            background-color: rgb(35, 35, 40);
+            font-size: 0.95em;
+        }
+        
+        .column-table thead tr {
+            background-color: rgb(50, 50, 55);
+        }
+        
+        .column-table th {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid rgb(60, 60, 65);
+            color: rgb(240, 240, 240);
+            font-weight: bold;
+        }
+        
+        .column-table th.column-name-header {
+            width: 180px;
+            min-width: 180px;
+        }
+        
+        .column-table tbody tr {
+            border-bottom: 1px solid rgb(50, 50, 55);
+        }
+        
+        .column-table tbody tr.column-category-row {
+            border-bottom: 1px solid rgb(60, 60, 65);
+        }
+        
+        .column-table td {
+            padding: 10px 12px;
+            color: rgb(220, 220, 220);
+            vertical-align: top;
+        }
+        
+        .column-table td.column-name-cell {
+            color: rgb(240, 240, 240);
+            white-space: nowrap;
+            width: 180px;
+            min-width: 180px;
+        }
+        
+        .column-table td.column-category-cell {
+            padding: 8px 12px;
+            background-color: rgb(45, 45, 50);
+            color: rgb(240, 240, 240);
+            font-weight: bold;
+        }
+        
         /* Responsive container padding for small screens */
         @media (max-width: 768px) {
             .container {

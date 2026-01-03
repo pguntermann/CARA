@@ -14,7 +14,9 @@
 
 CARA follows PyQt's Model/View architecture with additional separation of business logic using Controllers:
 
-- **Models**: Qt data models (QAbstractItemModel subclasses) that hold application data
+- **Models**: Qt data models that hold application data
+  - Table models (DatabaseModel, MovesListModel, MetadataModel) inherit from QAbstractTableModel for tabular data displayed in QTableView
+  - State models (BoardModel, GameModel, EvaluationModel, etc.) inherit from QObject and emit custom signals
   - Models emit signals when data changes
   - Views observe models through Qt's signal/slot mechanism
   - Models are independent of UI and can be tested in isolation
@@ -46,7 +48,7 @@ app/
 │   └── config_loader.py         # Loads and validates config
 ├── views/                      # UI components (display only)
 │   └── [panels, widgets, dialogs]
-├── models/                     # Qt data models (QAbstractItemModel)
+├── models/                     # Qt data models (QAbstractTableModel for tables, QObject for state)
 │   └── [data models for board, game, database, etc.]
 ├── controllers/                # Business logic orchestration
 │   └── [feature-specific controllers]
@@ -114,7 +116,9 @@ app/
   - Services provide backend functionality
 
 - **Qt-native patterns**:
-  - Uses QAbstractItemModel for data models
+  - Table models use QAbstractTableModel for tabular data (DatabaseModel, MovesListModel, MetadataModel)
+  - State models use QObject with custom signals (BoardModel, GameModel, EvaluationModel, etc.)
+  - Views are QWidget/QDialog subclasses that observe models via signals/slots
   - Uses signals/slots for communication
   - Uses QThread for async operations
   - Follows Qt's recommended patterns
@@ -140,7 +144,8 @@ app/
 The application uses Qt's signal/slot mechanism extensively:
 
 - **Model → View**: Models emit signals when data changes, views connect to these signals
-  - Example: DatabaseModel emits `game_selected` signal, DatabasePanel connects and updates UI
+  - Example: QAbstractTableModel models emit `dataChanged` signal, QTableView automatically updates
+  - Example: QObject models emit custom signals (e.g., `position_changed`), views connect and update UI
 
 - **View → Controller**: Views call controller methods directly
   - Example: User clicks button, view calls `controller.handle_button_click()`

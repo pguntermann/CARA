@@ -6,12 +6,18 @@ The bulk operations system provides efficient batch processing of games in datab
 
 ## Architecture
 
-The system consists of four main operations:
+The bulk operations system follows a Service-Controller-Model pattern consistent with the application's architecture:
 
-- **Bulk Tag Operations**: Add or remove PGN tags from games
-- **Bulk Replace Operations**: Replace text in metadata tags, copy tags, update Result/ECO tags
-- **Bulk Clean PGN Operations**: Remove comments, variations, annotations, non-standard tags, results
-- **Bulk Analysis Operations**: Analyze multiple games without making them active
+- **Services**: Handle the business logic for bulk operations (`BulkTagService`, `BulkReplaceService`, etc.)
+- **Controllers**: Orchestrate operations, handle UI concerns (progress, cancellation), and coordinate with models
+- **Models**: Store game data; operations update `DatabaseModel` via batch updates
+
+### Component Structure
+
+Each bulk operation consists of:
+- A **Service** class that implements the core operation logic
+- A **Controller** class that orchestrates the operation, handles progress reporting, and manages UI integration
+- Integration with `DatabaseModel` for efficient batch updates
 
 ### Common Pattern
 
@@ -38,6 +44,15 @@ class BulkOperationResult:
     games_skipped: int
     error_message: Optional[str] = None
 ```
+
+## Available Operations
+
+The system provides four main bulk operations:
+
+- **Bulk Tag Operations**: Add or remove PGN tags from games
+- **Bulk Replace Operations**: Replace text in metadata tags, copy tags, update Result/ECO tags
+- **Bulk Clean PGN Operations**: Remove comments, variations, annotations, non-standard tags, results
+- **Bulk Analysis Operations**: Analyze multiple games without making them active
 
 ## Bulk Tag Operations
 

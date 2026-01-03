@@ -6,18 +6,13 @@ The positional heatmap system provides visual feedback on chess positions by eva
 
 ## Architecture
 
-The system consists of four main components:
-
-- **PositionalAnalyzer**: Coordinates rule evaluation, score aggregation, and caching
-- **RuleRegistry**: Manages rule discovery, registration, and configuration
-- **ScoreAggregator**: Combines scores from multiple rules using weighted summation with normalization
-- **PositionalRule**: Abstract base class for all positional evaluation rules
+The positional heatmap system follows a **rule-based service pattern** with **Model-Controller-Service** integration:
 
 ### Component Responsibilities
 
 **PositionalAnalyzer** (`app/services/positional_heatmap/positional_analyzer.py`):
-- Evaluates positions by running all enabled rules
-- Aggregates rule scores using `ScoreAggregator`
+- Evaluates positions by running all enabled rules from `RuleRegistry`
+- Aggregates rule scores using `ScoreAggregator` with weighted summation and normalization
 - Caches results for performance (FIFO cache with configurable size limit)
 - Provides detailed evaluation breakdowns for debugging
 - Isolates errors: one failing rule doesn't break the entire system
@@ -37,6 +32,43 @@ The system consists of four main components:
 - Each rule implements `evaluate()` method returning `Dict[chess.Square, float]`
 - Rules are independent, testable, and configurable
 - Supports per-rule weights and enable/disable flags
+
+**PositionalHeatmapModel** (`app/models/positional_heatmap_model.py`):
+- Holds current scores and visibility state
+- Emits `scores_changed` signal when scores update
+- Emits `visibility_changed` signal when visibility toggles
+- Analyzes positions from both perspectives (White and Black) and combines scores
+
+**PositionalHeatmapController** (`app/controllers/positional_heatmap_controller.py`):
+- Initializes `RuleRegistry`, `PositionalAnalyzer`, and `PositionalHeatmapModel`
+- Connects to `BoardModel` position changes
+- Handles visibility toggling
+- Clears cache when position changes or visibility is toggled
+
+### Component Interactions
+
+**Initialization Flow**:
+1. `PositionalHeatmapController` creates `RuleRegistry` from configuration
+2. Controller creates `PositionalAnalyzer` with the registry
+3. Controller creates `PositionalHeatmapModel` with the analyzer
+4. Controller connects to `BoardModel.position_changed` signal
+
+**Position Evaluation Flow**:
+1. `BoardModel` emits `position_changed` signal
+2. `PositionalHeatmapController` receives signal and clears analyzer cache
+3. Controller calls `model.update_position()` with current board
+4. Model calls `analyzer.analyze_position()` for both White and Black perspectives
+5. Analyzer retrieves enabled rules from registry, evaluates each rule, aggregates scores
+6. Model combines perspective-specific scores (White pieces use White perspective, Black pieces use Black perspective)
+7. Model emits `scores_changed` signal with combined scores
+8. View observes signal and updates visual overlay
+
+**Visibility Toggle Flow**:
+1. User toggles visibility via controller
+2. Controller calls `model.set_visible()`
+3. Model emits `visibility_changed` signal
+4. If enabling, controller clears cache and triggers position evaluation
+5. View observes signal and shows/hides overlay
 
 ## Rule System
 
@@ -138,32 +170,14 @@ The system uses a FIFO (First-In-First-Out) cache to avoid re-evaluating identic
 - Cache can be disabled via `cache_enabled` configuration
 
 Cache is cleared when:
-- Position changes (via `PositionalHeatmapController._on_position_changed()`)
+- Position changes (controller receives `BoardModel.position_changed` signal)
 - Visibility is toggled (to ensure fresh evaluation with updated rules)
 
-## Model/View/Controller Integration
-
-### Model
-
-**PositionalHeatmapModel** (`app/models/positional_heatmap_model.py`):
-- Holds current scores and visibility state
-- Emits `scores_changed` signal when scores update
-- Emits `visibility_changed` signal when visibility toggles
-- Analyzes positions from both perspectives (White and Black) and combines scores
-
-### Controller
-
-**PositionalHeatmapController** (`app/controllers/positional_heatmap_controller.py`):
-- Initializes `RuleRegistry`, `PositionalAnalyzer`, and `PositionalHeatmapModel`
-- Connects to board position changes
-- Handles visibility toggling
-- Clears cache when position changes or visibility is toggled
-
-### View
+## View Integration
 
 **PositionalHeatmapOverlay** (`app/views/positional_heatmap_overlay.py`):
 - Transparent overlay widget that displays heatmap on chessboard
-- Observes model signals for scores and visibility changes
+- Observes `PositionalHeatmapModel` signals (`scores_changed`, `visibility_changed`)
 - Renders circular radial gradients for each scored square
 - Color mapping:
   - Positive scores: Green (good for the piece)

@@ -126,6 +126,7 @@
                         <li><a href="#pgn-metadata-tags">7.4 PGN Metadata Tags Used by CARA</a></li>
                         <li><a href="#troubleshooting">7.5 Troubleshooting</a></li>
                         <li><a href="#performance-optimization">7.6 Performance Optimization</a></li>
+                        <li><a href="#moves-list-columns-reference">7.7 Moves List Columns Reference</a></li>
                     </ul>
                 </li>
             </ul>
@@ -686,6 +687,8 @@
                     <li><strong>Game Analysis - Black Side</strong> (<code>5</code>): Focuses exclusively on Black's moves and their analysis. All Black-related columns are visible, while White's analysis columns are hidden. Use this profile when you played Black and want to concentrate on your own moves.</li>
                 </ul>
                 <p>You can modify any of these default profiles or create your own custom profiles. For smaller adjustments, you can reorder columns by dragging and dropping column headers in the moves list, resize columns by dragging column borders, and show or hide columns using the <span class="menu-item">Moves List</span> menu. For configuring multiple columns at once, use <span class="menu-item">Moves List → Setup Profile...</span> which provides a convenient dialog for managing all column settings. After making changes, save them with <span class="menu-item">Moves List → Save Profile</span> (to update the current profile) or <span class="menu-item">Moves List → Save Profile as...</span> (to create a new profile with a custom name). Custom profiles you create will also be accessible via number keys <code>1</code> through <code>9</code> based on their position in the profile list.</p>
+                
+                <p>For a complete reference of all available columns and their descriptions, see <a href="#moves-list-columns-reference">section 7.7 "Moves List Columns Reference"</a>.</p>
                 
                 <h5 id="metadata">4.5.2 Metadata</h5>
                 <p>The Metadata tab displays all PGN header tags (metadata) for the current game in an editable table format. You can view, edit, add, and remove tags. Common tags include Event, Site, Date, Round, White, Black, Result, ECO, WhiteElo, and BlackElo. Changes to metadata are applied to the game's PGN data in memory. The database is marked as having unsaved changes, and your modifications will be persisted to the database file when you save it. Access this tab using <span class="menu-item">View → Metadata</span> or press <code>F2</code>.</p>
@@ -2157,6 +2160,170 @@
                     <li><strong>Disable unnecessary features:</strong> Turn off features you're not using (e.g., positional heatmap, evaluation bar) during analysis to reduce overhead</li>
                     <li><strong>Store analysis results:</strong> Enable "Store Analysis results in PGN Tag" to avoid re-analyzing games, but be aware this increases PGN file size</li>
                 </ul>
+            </div>
+            
+            <div class="outline-item">
+                <h4 id="moves-list-columns-reference">7.7 Moves List Columns Reference</h4>
+                <p>The following table describes all available columns:</p>
+                
+                <div class="column-table-wrapper">
+                    <table class="column-table">
+                        <thead>
+                            <tr>
+                                <th class="column-name-header">Column Name</th>
+                                <th style="min-width: 200px;">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="column-category-row">
+                                <td colspan="2" class="column-category-cell">Basic Columns</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">#</td>
+                                <td>Move number (1, 2, 3, ...)</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">White</td>
+                                <td>White's move in SAN notation</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Black</td>
+                                <td>Black's move in SAN notation</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Comment</td>
+                                <td>Move comments from PGN</td>
+                            </tr>
+                            <tr class="column-category-row">
+                                <td colspan="2" class="column-category-cell">Evaluation Columns</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Eval White</td>
+                                <td>Evaluation after white's move (formatted as "+X.X" or "M{N}")</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Eval Black</td>
+                                <td>Evaluation after black's move (formatted as "-X.X" or "-M{N}")</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">CPL White</td>
+                                <td>Centipawn loss for white's move. CPL measures evaluation lost by playing a move instead of the best move: <code style="background-color: rgb(30, 30, 35); padding: 2px 6px; border-radius: 3px;">CPL = |eval_after_best_move - eval_after_played_move|</code></td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">CPL Black</td>
+                                <td>Centipawn loss for black's move</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">CPL White 2</td>
+                                <td>CPL for white's move vs. PV2 (second-best engine move)</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">CPL White 3</td>
+                                <td>CPL for white's move vs. PV3 (third-best engine move)</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">CPL Black 2</td>
+                                <td>CPL for black's move vs. PV2 (second-best engine move)</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">CPL Black 3</td>
+                                <td>CPL for black's move vs. PV3 (third-best engine move)</td>
+                            </tr>
+                            <tr class="column-category-row">
+                                <td colspan="2" class="column-category-cell">Best Moves Columns</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Best White</td>
+                                <td>Engine's best move suggestion for white (SAN notation)</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Best Black</td>
+                                <td>Engine's best move suggestion for black (SAN notation)</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Best White 2</td>
+                                <td>Engine's second-best move (PV2) for white</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Best White 3</td>
+                                <td>Engine's third-best move (PV3) for white</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Best Black 2</td>
+                                <td>Engine's second-best move (PV2) for black</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Best Black 3</td>
+                                <td>Engine's third-best move (PV3) for black</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">White Is Top 3</td>
+                                <td>"✓" if white's move matches any top 3 engine moves, empty otherwise</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Black Is Top 3</td>
+                                <td>"✓" if black's move matches any top 3 engine moves, empty otherwise</td>
+                            </tr>
+                            <tr class="column-category-row">
+                                <td colspan="2" class="column-category-cell">Analysis Columns</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Assess White</td>
+                                <td>Move quality assessment for white's move (Brilliant, Best Move, Good Move, Inaccuracy, Mistake, Blunder, Miss, or Book Move). Assessment thresholds are configurable in the classification settings.</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Assess Black</td>
+                                <td>Move quality assessment for black's move. Assessment thresholds are configurable in the classification settings.</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">White Depth</td>
+                                <td>Engine search depth for white's move analysis</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Black Depth</td>
+                                <td>Engine search depth for black's move analysis</td>
+                            </tr>
+                            <tr class="column-category-row">
+                                <td colspan="2" class="column-category-cell">Material Columns</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">White Capture</td>
+                                <td>Piece captured by white's move (e.g., "P", "N", "R")</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Black Capture</td>
+                                <td>Piece captured by black's move (e.g., "P", "N", "R")</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">White Material</td>
+                                <td>White's material balance in centipawns after move (calculated using piece values: Pawn: 100, Knight/Bishop: 300, Rook: 500, Queen: 900)</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Black Material</td>
+                                <td>Black's material balance in centipawns after move</td>
+                            </tr>
+                            <tr class="column-category-row">
+                                <td colspan="2" class="column-category-cell">Position Columns</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Eco</td>
+                                <td>ECO code (opening classification, e.g., "B20")</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Opening Name</td>
+                                <td>Opening name from ECO database</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">FEN White</td>
+                                <td>FEN string of position after white's move</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">FEN Black</td>
+                                <td>FEN string of position after black's move</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
 
