@@ -87,21 +87,22 @@ class DatabaseController:
         """
         return f"Error: {error_message}"
     
-    def parse_pgn_from_text(self, pgn_text: str) -> tuple[bool, str, Optional[int]]:
+    def parse_pgn_from_text(self, pgn_text: str) -> tuple[bool, str, Optional[int], int]:
         """Parse PGN text and add games to the database model.
         
         Args:
             pgn_text: PGN text string (can contain multiple games).
             
         Returns:
-            Tuple of (success: bool, message: str, first_game_index: Optional[int]).
-            If success is True, message contains number of games parsed, and first_game_index
-            is the row index of the first game added.
-            If success is False, message contains error description and first_game_index is None.
+            Tuple of (success: bool, message: str, first_game_index: Optional[int], games_added: int).
+            If success is True, message contains number of games parsed, first_game_index
+            is the row index of the first game added, and games_added is the count.
+            If success is False, message contains error description, first_game_index is None,
+            and games_added is 0.
         """
         return self.parse_pgn_to_model(pgn_text, self.database_model)
     
-    def parse_pgn_to_model(self, pgn_text: str, model: DatabaseModel) -> tuple[bool, str, Optional[int]]:
+    def parse_pgn_to_model(self, pgn_text: str, model: DatabaseModel) -> tuple[bool, str, Optional[int], int]:
         """Parse PGN text and add games to a specific database model.
         
         Args:
@@ -109,16 +110,17 @@ class DatabaseController:
             model: DatabaseModel instance to add games to.
             
         Returns:
-            Tuple of (success: bool, message: str, first_game_index: Optional[int]).
-            If success is True, message contains number of games parsed, and first_game_index
-            is the row index of the first game added.
-            If success is False, message contains error description and first_game_index is None.
+            Tuple of (success: bool, message: str, first_game_index: Optional[int], games_added: int).
+            If success is True, message contains number of games parsed, first_game_index
+            is the row index of the first game added, and games_added is the count.
+            If success is False, message contains error description, first_game_index is None,
+            and games_added is 0.
         """
         # Parse PGN text using service
         result = PgnService.parse_pgn_text(pgn_text)
         
         if not result.success:
-            return (False, result.error_message, None)
+            return (False, result.error_message, None, 0)
         
         # Track the starting count to determine which games were just added
         start_count = model.rowCount()
@@ -157,13 +159,13 @@ class DatabaseController:
         else:
             message = f"Parsed {games_added} games from PGN"
         
-        return (True, message, first_game_index)
+        return (True, message, first_game_index, games_added)
     
     def clear_database(self) -> None:
         """Clear all games from the database model."""
         self.database_model.clear()
-        # Mark database as having unsaved changes
-        self.panel_model.mark_database_unsaved(self.database_model)
+        # Mark database as saved (no unsaved changes when database is empty)
+        self.panel_model.mark_database_saved(self.database_model)
     
     def get_game_count(self) -> int:
         """Get the number of games in the database.
@@ -287,7 +289,8 @@ class DatabaseController:
         # Create new model
         model = DatabaseModel()
         for game in games:
-            model.add_game(game)
+            # Don't mark as unsaved when loading from file (games are already saved)
+            model.add_game(game, mark_unsaved=False)
         
         # Add to panel model
         self.panel_model.add_database(model, file_path=file_path)
@@ -598,7 +601,8 @@ class DatabaseController:
                     analyzed=game_dict.get("analyzed", False),
                     annotated=game_dict.get("annotated", False),
                 )
-                model.add_game(game_data)
+                # Don't mark as unsaved when reloading from file (games are already saved)
+                model.add_game(game_data, mark_unsaved=False)
             
             # Create success message
             if len(parse_result.games) == 1:
@@ -988,7 +992,7 @@ class DatabaseController:
             pgn_text = "\n\n".join(pgn_list)
             
             # Parse and add to model
-            parse_success, parse_message, first_game_index = self.parse_pgn_to_model(pgn_text, model)
+            parse_success, parse_message, first_game_index, _ = self.parse_pgn_to_model(pgn_text, model)
             
             progress_service.hide_progress()
             QApplication.processEvents()

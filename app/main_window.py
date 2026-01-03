@@ -2612,13 +2612,13 @@ class MainWindow(QMainWindow):
     def _paste_pgn_to_clipboard_db(self) -> None:
         """Paste PGN from clipboard to clipboard database."""
         # Parse PGN from clipboard through controller
-        success, status_message, first_game_index = self.controller.paste_pgn_to_clipboard_db()
+        success, status_message, first_game_index, games_added = self.controller.paste_pgn_to_clipboard_db()
         
         # Display formatted message from controller
         self.controller.set_status(status_message)
         
-        # If successful, set clipboard database as active and highlight the row
-        if success and first_game_index is not None:
+        # If successful, set clipboard database as active and highlight all added rows
+        if success and first_game_index is not None and games_added > 0:
             # Get clipboard database model
             database_controller = self.controller.get_database_controller()
             clipboard_database = database_controller.get_database_model()
@@ -2626,21 +2626,24 @@ class MainWindow(QMainWindow):
             # Set clipboard database as active (view will update automatically)
             database_controller.set_active_database(clipboard_database)
             
-            # Highlight the first added row
-            self.database_panel.highlight_row(clipboard_database, first_game_index)
+            # Calculate all indices for pasted games and highlight them all
+            pasted_indices = list(range(first_game_index, first_game_index + games_added))
+            self.database_panel.highlight_rows(clipboard_database, pasted_indices)
     
     def _paste_pgn_to_active_db(self) -> None:
         """Paste PGN from clipboard to the currently active database."""
         # Delegate to controller for business logic
-        success, message, first_game_index = self.controller.paste_pgn_to_active_database()
+        success, message, first_game_index, games_added = self.controller.paste_pgn_to_active_database()
         
         if success:
-            # If successful, highlight the first added row
-            if first_game_index is not None:
+            # If successful, highlight all added rows
+            if first_game_index is not None and games_added > 0:
                 database_controller = self.controller.get_database_controller()
                 active_database = database_controller.get_active_database()
                 if active_database:
-                    self.database_panel.highlight_row(active_database, first_game_index)
+                    # Calculate all indices for pasted games
+                    pasted_indices = list(range(first_game_index, first_game_index + games_added))
+                    self.database_panel.highlight_rows(active_database, pasted_indices)
         
         # Display status message
         self.controller.set_status(message)

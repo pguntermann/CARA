@@ -875,7 +875,7 @@ class AppController:
             return (False, "Clipboard is empty")
         
         # Parse and add games to database through controller
-        success, message, first_game_index = self.database_controller.parse_pgn_from_text(pgn_text)
+        success, message, first_game_index, _ = self.database_controller.parse_pgn_from_text(pgn_text)
         
         # If successful, set the first game as active
         if success and first_game_index is not None:
@@ -891,19 +891,19 @@ class AppController:
         
         return (success, status_message)
     
-    def paste_pgn_to_clipboard_db(self) -> tuple[bool, str, Optional[int]]:
+    def paste_pgn_to_clipboard_db(self) -> tuple[bool, str, Optional[int], int]:
         """Parse PGN from clipboard and add to clipboard database.
         
         This method reads PGN text from the clipboard, parses it, and
         adds the games to the clipboard database model. Returns the first
-        game index for highlighting.
+        game index and count for highlighting.
         
         Returns:
-            Tuple of (success: bool, status_message: str, first_game_index: Optional[int]).
-            If success is True, status_message contains formatted success message and
-            first_game_index is the row index of the first game added.
-            If success is False, status_message contains formatted error message and
-            first_game_index is None.
+            Tuple of (success: bool, status_message: str, first_game_index: Optional[int], games_added: int).
+            If success is True, status_message contains formatted success message,
+            first_game_index is the row index of the first game added, and games_added is the count.
+            If success is False, status_message contains formatted error message,
+            first_game_index is None, and games_added is 0.
         """
         from PyQt6.QtWidgets import QApplication
         
@@ -911,11 +911,11 @@ class AppController:
         pgn_text = clipboard.text().strip()
         
         if not pgn_text:
-            return (False, "Clipboard is empty", None)
+            return (False, "Clipboard is empty", None, 0)
         
         # Parse and add games to clipboard database model
         database_model = self.database_controller.get_database_model()
-        success, message, first_game_index = self.database_controller.parse_pgn_to_model(pgn_text, database_model)
+        success, message, first_game_index, games_added = self.database_controller.parse_pgn_to_model(pgn_text, database_model)
         
         if success:
             # If successful, set the first game as active
@@ -929,21 +929,21 @@ class AppController:
             # Format error message
             status_message = self.database_controller.format_pgn_error_message(message)
         
-        return (success, status_message, first_game_index)
+        return (success, status_message, first_game_index, games_added)
     
-    def paste_pgn_to_active_database(self) -> tuple[bool, str, Optional[int]]:
+    def paste_pgn_to_active_database(self) -> tuple[bool, str, Optional[int], int]:
         """Parse PGN from clipboard and add to the currently active database.
         
         This method reads PGN text from the clipboard, parses it, and
         adds the games to the active database model. Returns the first
-        game index for highlighting.
+        game index and count for highlighting.
         
         Returns:
-            Tuple of (success: bool, status_message: str, first_game_index: Optional[int]).
-            If success is True, status_message contains formatted success message and
-            first_game_index is the row index of the first game added.
-            If success is False, status_message contains formatted error message and
-            first_game_index is None.
+            Tuple of (success: bool, status_message: str, first_game_index: Optional[int], games_added: int).
+            If success is True, status_message contains formatted success message,
+            first_game_index is the row index of the first game added, and games_added is the count.
+            If success is False, status_message contains formatted error message,
+            first_game_index is None, and games_added is 0.
         """
         from PyQt6.QtWidgets import QApplication
         
@@ -960,7 +960,7 @@ class AppController:
             return (False, "Clipboard is empty", None)
         
         # Parse and add games to the active database model
-        success, message, first_game_index = self.database_controller.parse_pgn_to_model(pgn_text, active_database)
+        success, message, first_game_index, games_added = self.database_controller.parse_pgn_to_model(pgn_text, active_database)
         
         if success:
             # If successful, set the first game as active
@@ -974,7 +974,7 @@ class AppController:
             # Format error message
             status_message = self.database_controller.format_pgn_error_message(message)
         
-        return (success, status_message, first_game_index)
+        return (success, status_message, first_game_index, games_added)
     
     def set_active_game_by_row(self, row: int) -> tuple[bool, Optional[str]]:
         """Set the active game by database table row index.

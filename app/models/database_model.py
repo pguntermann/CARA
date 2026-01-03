@@ -214,19 +214,35 @@ class DatabaseModel(QAbstractTableModel):
         
         return None
     
-    def add_game(self, game: GameData) -> None:
+    def add_game(self, game: GameData, mark_unsaved: bool = True) -> None:
         """Add a game to the model.
         
         Args:
             game: GameData instance to add.
+            mark_unsaved: If True, mark the game as having unsaved changes.
+                         Set to False when loading games from a file (they're already saved).
+                         Default is True for newly added games (import, paste, etc.).
         """
         # Set game number based on current row count
         game.game_number = len(self._games) + 1
         
         # Insert the new row
-        self.beginInsertRows(self.index(len(self._games), 0).parent(), len(self._games), len(self._games))
+        row = len(self._games)
+        self.beginInsertRows(self.index(row, 0).parent(), row, row)
         self._games.append(game)
+        # Mark game as having unsaved changes if requested (newly added games are unsaved by default)
+        if mark_unsaved:
+            self._unsaved_games.add(game)
         self.endInsertRows()
+        
+        # Emit dataChanged for the unsaved column to ensure the indicator is displayed
+        # This is needed because endInsertRows() may not trigger a refresh of the DecorationRole
+        # Only emit if we marked it as unsaved (otherwise no indicator needed)
+        if mark_unsaved:
+            parent = QModelIndex()
+            unsaved_index = self.index(row, self.COL_UNSAVED, parent)
+            self.dataChanged.emit(unsaved_index, unsaved_index,
+                                 [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole])
     
     def clear(self) -> None:
         """Clear all games from the model."""
