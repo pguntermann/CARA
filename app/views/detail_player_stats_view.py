@@ -3,10 +3,10 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
     QGridLayout, QSizePolicy, QComboBox, QPushButton, QApplication,
-    QGraphicsOpacityEffect
+    QGraphicsOpacityEffect, QMenu
 )
-from PyQt6.QtCore import Qt, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QThread, pyqtSignal, QMutex, QMutexLocker
-from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QFontMetrics
+from PyQt6.QtCore import Qt, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QThread, pyqtSignal, QMutex, QMutexLocker, QPoint
+from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QFontMetrics, QContextMenuEvent
 from app.views.detail_summary_view import PieChartWidget
 from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 from app.models.database_model import DatabaseModel
@@ -826,6 +826,7 @@ class DetailPlayerStatsView(QWidget):
             self.current_stats, text_color, label_font, value_font,
             section_bg_color, border_color, widgets_config
         )
+        overview_widget.setProperty("section_name", "Overview")
         self.content_layout.addWidget(overview_widget)
         self.content_layout.addSpacing(section_spacing_val)
         
@@ -837,6 +838,7 @@ class DetailPlayerStatsView(QWidget):
         )
         # Store reference for responsive width handling
         self._move_accuracy_widget = move_accuracy_widget
+        move_accuracy_widget.setProperty("section_name", "Move Accuracy")
         self.content_layout.addWidget(move_accuracy_widget)
         self.content_layout.addSpacing(section_spacing_val)
         
@@ -846,6 +848,7 @@ class DetailPlayerStatsView(QWidget):
             self.current_stats, text_color, label_font, value_font,
             section_bg_color, border_color, widgets_config
         )
+        phase_widget.setProperty("section_name", "Performance by Phase")
         self.content_layout.addWidget(phase_widget)
         self.content_layout.addSpacing(section_spacing_val)
         
@@ -858,6 +861,7 @@ class DetailPlayerStatsView(QWidget):
                 self.current_stats, text_color, label_font, value_font,
                 section_bg_color, border_color, widgets_config
             )
+            openings_widget.setProperty("section_name", "Openings")
             self.content_layout.addWidget(openings_widget)
             self.content_layout.addSpacing(section_spacing_val)
         
@@ -868,6 +872,7 @@ class DetailPlayerStatsView(QWidget):
                 self.current_patterns, text_color, label_font, value_font,
                 section_bg_color, border_color, widgets_config
             )
+            patterns_widget.setProperty("section_name", "Error Patterns")
             self.content_layout.addWidget(patterns_widget)
             self.content_layout.addSpacing(section_spacing_val)
         
@@ -2890,4 +2895,108 @@ class DetailPlayerStatsView(QWidget):
             QTimer.singleShot(0, self._update_error_patterns_visibility)
             QTimer.singleShot(0, self._update_openings_visibility)
         return super().eventFilter(obj, event)
+    
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        """Handle context menu event for copying sections or full stats.
+        
+        Args:
+            event: Context menu event.
+        """
+        if not self.current_stats:
+            return
+        
+        # Find which section was clicked by checking widget geometries
+        section_name = None
+        
+        try:
+            if hasattr(self, 'content_widget') and self.content_widget:
+                # Get global position
+                global_pos = event.globalPos()
+                
+                # Check all section containers to see if click is within their bounds
+                for i in range(self.content_layout.count()):
+                    item = self.content_layout.itemAt(i)
+                    if item and item.widget():
+                        widget = item.widget()
+                        section = widget.property("section_name")
+                        if section:
+                            # Get widget's global geometry
+                            widget_global_pos = widget.mapToGlobal(QPoint(0, 0))
+                            widget_global_rect = widget.geometry()
+                            widget_global_rect.moveTopLeft(widget_global_pos)
+                            
+                            # Check if click is within this widget's bounds
+                            if widget_global_rect.contains(global_pos):
+                                section_name = section
+                                break
+        except (RuntimeError, AttributeError, TypeError):
+            # If detection fails, just show full stats option
+            pass
+        
+        # Create context menu
+        menu = QMenu(self)
+        
+        # Get config for styling
+        ui_config = self.config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        player_stats_config = panel_config.get('player_stats', {})
+        colors_config = player_stats_config.get('colors', {})
+        bg_color = colors_config.get('background', [40, 40, 45])
+        
+        # Style the menu
+        from app.views.style import StyleManager
+        StyleManager.style_context_menu(menu, self.config, bg_color)
+        
+        # Add actions
+        if section_name:
+            copy_section_action = menu.addAction("Copy section to clipboard")
+            copy_section_action.triggered.connect(lambda checked=False, name=section_name: self._copy_section_to_clipboard(name))
+        
+        copy_full_action = menu.addAction("Copy stats to clipboard")
+        copy_full_action.triggered.connect(self._copy_full_stats_to_clipboard)
+        
+        # Show menu
+        menu.exec(event.globalPos())
+    
+    def _copy_section_to_clipboard(self, section_name: str) -> None:
+        """Copy a specific section to clipboard.
+        
+        Args:
+            section_name: Name of the section to copy.
+        """
+        if not self.current_stats:
+            return
+        
+        from app.utils.player_stats_text_formatter import PlayerStatsTextFormatter
+        text = PlayerStatsTextFormatter.format_section(
+            self.current_stats, self.current_patterns, section_name, self._current_player or "Player"
+        )
+        
+        if text:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(text)
+            
+            # Update status bar
+            from app.services.progress_service import ProgressService
+            progress_service = ProgressService.get_instance()
+            progress_service.set_status(f"Copied '{section_name}' section to clipboard")
+    
+    def _copy_full_stats_to_clipboard(self) -> None:
+        """Copy the full stats to clipboard."""
+        if not self.current_stats:
+            return
+        
+        from app.utils.player_stats_text_formatter import PlayerStatsTextFormatter
+        text = PlayerStatsTextFormatter.format_full_stats(
+            self.current_stats, self.current_patterns, self._current_player or "Player"
+        )
+        
+        if text:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(text)
+            
+            # Update status bar
+            from app.services.progress_service import ProgressService
+            progress_service = ProgressService.get_instance()
+            progress_service.set_status("Copied player statistics to clipboard")
 

@@ -2,10 +2,10 @@
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
-    QGridLayout, QSizePolicy, QSplitter
+    QGridLayout, QSizePolicy, QSplitter, QMenu, QApplication
 )
-from PyQt6.QtCore import Qt, QRect, QPointF
-from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QFontMetrics, QMouseEvent
+from PyQt6.QtCore import Qt, QRect, QPointF, QPoint
+from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QFontMetrics, QMouseEvent, QContextMenuEvent
 from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 import math
 
@@ -1005,6 +1005,7 @@ class DetailSummaryView(QWidget):
         
         stats_container = QWidget()
         stats_container.setLayout(stats_layout)
+        stats_container.setProperty("section_name", "Key Statistics")
         self.content_layout.addWidget(stats_container)
         
         self.content_layout.addSpacing(section_spacing)
@@ -1054,6 +1055,7 @@ class DetailSummaryView(QWidget):
         
         classification_container = QWidget()
         classification_container.setLayout(classification_layout)
+        classification_container.setProperty("section_name", "Move Classification")
         self.content_layout.addWidget(classification_container)
         
         self.content_layout.addSpacing(section_spacing)
@@ -1107,6 +1109,7 @@ class DetailSummaryView(QWidget):
         
         phase_container = QWidget()
         phase_container.setLayout(phase_layout)
+        phase_container.setProperty("section_name", "Phase Analysis")
         self.content_layout.addWidget(phase_container)
         
         self.content_layout.addSpacing(section_spacing)
@@ -1136,6 +1139,7 @@ class DetailSummaryView(QWidget):
             highlights_widget.setMinimumWidth(0)
             
             highlights_container_layout.addWidget(highlights_widget)
+            highlights_container.setProperty("section_name", "Game Highlights")
             
             self.content_layout.addWidget(highlights_container)
             self.content_layout.addSpacing(section_spacing)
@@ -1173,6 +1177,7 @@ class DetailSummaryView(QWidget):
         
         critical_container = QWidget()
         critical_container.setLayout(critical_layout)
+        critical_container.setProperty("section_name", "Critical Moments")
         self.content_layout.addWidget(critical_container)
         
         self.content_layout.addSpacing(section_spacing)
@@ -2039,4 +2044,122 @@ class DetailSummaryView(QWidget):
         layout.setColumnStretch(2, 1)
         
         return container
+    
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        """Handle context menu event for copying sections or full summary.
+        
+        Args:
+            event: Context menu event.
+        """
+        if not self.current_summary:
+            return
+        
+        # Find which section was clicked by checking widget geometries
+        section_name = None
+        
+        try:
+            if hasattr(self, 'content_widget') and self.content_widget:
+                # Get global position
+                global_pos = event.globalPos()
+                
+                # Check all section containers to see if click is within their bounds
+                for i in range(self.content_layout.count()):
+                    item = self.content_layout.itemAt(i)
+                    if item and item.widget():
+                        widget = item.widget()
+                        section = widget.property("section_name")
+                        if section:
+                            # Get widget's global geometry
+                            widget_global_rect = widget.geometry()
+                            widget_global_pos = widget.mapToGlobal(QPoint(0, 0))
+                            widget_global_rect.moveTopLeft(widget_global_pos)
+                            
+                            # Check if click is within this widget's bounds
+                            if widget_global_rect.contains(global_pos):
+                                section_name = section
+                                break
+        except (RuntimeError, AttributeError, TypeError):
+            # If detection fails, just show full summary option
+            pass
+        
+        # Create context menu
+        menu = QMenu(self)
+        
+        # Get config for styling
+        ui_config = self.config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        summary_config = panel_config.get('summary', {})
+        colors_config = summary_config.get('colors', {})
+        bg_color = colors_config.get('background', [40, 40, 45])
+        
+        # Style the menu
+        from app.views.style import StyleManager
+        StyleManager.style_context_menu(menu, self.config, bg_color)
+        
+        # Add actions
+        if section_name:
+            copy_section_action = menu.addAction("Copy section to clipboard")
+            copy_section_action.triggered.connect(lambda checked=False, name=section_name: self._copy_section_to_clipboard(name))
+        
+        copy_full_action = menu.addAction("Copy summary to clipboard")
+        copy_full_action.triggered.connect(self._copy_full_summary_to_clipboard)
+        
+        # Show menu
+        menu.exec(event.globalPos())
+    
+    def _copy_section_to_clipboard(self, section_name: str) -> None:
+        """Copy a specific section to clipboard.
+        
+        Args:
+            section_name: Name of the section to copy.
+        """
+        if not self.current_summary:
+            return
+        
+        # Get player names
+        if self._game_model and self._game_model.active_game:
+            game = self._game_model.active_game
+            white_name = game.white if (game.white and game.white.strip()) else 'White'
+            black_name = game.black if (game.black and game.black.strip()) else 'Black'
+        else:
+            white_name = "White"
+            black_name = "Black"
+        
+        from app.utils.summary_text_formatter import SummaryTextFormatter
+        text = SummaryTextFormatter.format_section(self.current_summary, section_name, white_name, black_name)
+        
+        if text:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(text)
+            
+            # Update status bar
+            from app.services.progress_service import ProgressService
+            progress_service = ProgressService.get_instance()
+            progress_service.set_status(f"Copied '{section_name}' section to clipboard")
+    
+    def _copy_full_summary_to_clipboard(self) -> None:
+        """Copy the full summary to clipboard."""
+        if not self.current_summary:
+            return
+        
+        # Get player names
+        if self._game_model and self._game_model.active_game:
+            game = self._game_model.active_game
+            white_name = game.white if (game.white and game.white.strip()) else 'White'
+            black_name = game.black if (game.black and game.black.strip()) else 'Black'
+        else:
+            white_name = "White"
+            black_name = "Black"
+        
+        from app.utils.summary_text_formatter import SummaryTextFormatter
+        text = SummaryTextFormatter.format_full_summary(self.current_summary, white_name, black_name)
+        
+        if text:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(text)
+            
+            # Update status bar
+            from app.services.progress_service import ProgressService
+            progress_service = ProgressService.get_instance()
+            progress_service.set_status("Copied game summary to clipboard")
 

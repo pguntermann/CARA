@@ -180,6 +180,48 @@
           0,
           5
         ]
+      },
+      "context_menu": {
+        "text_color": [
+          200,
+          200,
+          200
+        ],
+        "font_family": "Helvetica Neue",
+        "font_size": 11,
+        "border_color": [
+          60,
+          60,
+          65
+        ],
+        "border_width": 1,
+        "border_radius": 3,
+        "hover_background_color": [
+          55,
+          55,
+          60
+        ],
+        "hover_text_color": [
+          230,
+          230,
+          230
+        ],
+        "item_padding": [
+          4,
+          20,
+          4,
+          8
+        ],
+        "separator_height": 1,
+        "separator_color": [
+          60,
+          60,
+          65
+        ],
+        "separator_margin": [
+          2,
+          4
+        ]
       }
     },
     "window": {

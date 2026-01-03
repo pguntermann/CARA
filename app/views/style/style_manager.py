@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from typing import Dict, Any, List
-from PyQt6.QtWidgets import QScrollArea, QCheckBox, QComboBox, QRadioButton, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox, QDateEdit, QTimeEdit, QDateTimeEdit, QGroupBox, QTextEdit
+from PyQt6.QtWidgets import QScrollArea, QCheckBox, QComboBox, QRadioButton, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox, QDateEdit, QTimeEdit, QDateTimeEdit, QGroupBox, QTextEdit, QMenu
 
 from app.views.style.scrollbar import (
     apply_scrollbar_styling,
@@ -18,6 +18,7 @@ from app.views.style.line_edit import apply_line_edit_styling
 from app.views.style.spinbox import apply_spinbox_styling
 from app.views.style.date_edit import apply_date_edit_styling
 from app.views.style.group_box import apply_group_box_styling
+from app.views.style.context_menu import apply_context_menu_styling
 
 
 class StyleManager:
@@ -564,5 +565,49 @@ class StyleManager:
             bg_color, margin_top, padding_top, title_font_family, title_font_size,
             title_font_weight, title_color, title_left, title_padding,
             content_margins, use_transparent_palette
+        )
+    
+    @staticmethod
+    def style_context_menu(
+        menu: QMenu,
+        config: Dict[str, Any],
+        bg_color: List[int],
+        text_color: List[int] = None,
+        font_family: str = None,
+        font_size: float = None,
+        border_color: List[int] = None,
+        border_width: int = None,
+        border_radius: int = None,
+        hover_bg_color: List[int] = None,
+        hover_text_color: List[int] = None,
+        item_padding: List[int] = None,
+        separator_height: int = None,
+        separator_color: List[int] = None,
+        separator_margin: List[int] = None
+    ) -> None:
+        """Apply styling to a context menu.
+        
+        Args:
+            menu: The QMenu instance to style.
+            config: Configuration dictionary.
+            bg_color: Base background color as [R, G, B] (from view/dialog config).
+            text_color: Text color as [R, G, B]. If None, reads from centralized config.
+            font_family: Font family name. If None, reads from centralized config.
+            font_size: Font size in points. If None, reads from centralized config (with DPI scaling).
+            border_color: Border color as [R, G, B]. If None, reads from centralized config.
+            border_width: Border width in pixels. If None, reads from centralized config.
+            border_radius: Border radius in pixels. If None, reads from centralized config.
+            hover_bg_color: Hover background color as [R, G, B]. If None, reads from centralized config.
+            hover_text_color: Hover text color as [R, G, B]. If None, reads from centralized config.
+            item_padding: Item padding as [top, right, bottom, left]. If None, reads from centralized config.
+            separator_height: Separator height in pixels. If None, reads from centralized config.
+            separator_color: Separator color as [R, G, B]. If None, reads from centralized config.
+            separator_margin: Separator margin as [vertical, horizontal]. If None, reads from centralized config.
+        """
+        apply_context_menu_styling(
+            menu, config, bg_color, text_color, font_family, font_size,
+            border_color, border_width, border_radius, hover_bg_color,
+            hover_text_color, item_padding, separator_height, separator_color,
+            separator_margin
         )
 
