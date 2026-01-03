@@ -1,3 +1,39 @@
+# CARA v2.5.0 - Cross-Platform UI Improvements and Bug Fixes
+
+**Release Date:** 03.01.2026
+
+This release introduces new features including the ability to copy game analysis and player stats to the clipboard, improves bulk analysis and multi-game import/paste operations, fixes Windows- and macOS-specific issues, enhances UI consistency across platforms, and includes updated documentation.
+
+## Bug Fixes
+
+- **Fixed Database Panel Row Selection Highlighting**: Fixed missing explicit row-highlighting in the database panel when selecting games on Windows systems
+- **Windows Row Selection Fix**: Fixed potential issue where rows in the database panel may not be selectable on some Windows configurations
+- **macOS Deduplication Dialog Layout**: Fixed the deduplication criteria layout on macOS
+
+## UI Improvements
+
+- **Annotation View Appearance**: Improved appearance of the Annotation view
+- **Dialog Layout Standardization**: Further improvements to dialog layouts in order to improve unified cross-platform appearance, including consistent button spacing and layout margins
+- **macOS UI Enhancements**: Several UI improvements for macOS
+
+## New Features
+
+- **Copy to Clipboard from Views**: Implemented ability to right-click and copy information from the Game Summary and Player Stats views to the clipboard
+- **Bulk Analysis Improvements**: Improved bulk analysis thread utilization and implemented optional limiting
+- **Multi-Game Import/Paste**: Improved behaviour when pasting or importing multiple games
+
+## Configuration and Code Improvements
+
+- **Configuration Cleanup**: Removed unused setting `ui.panels.main.board.pieces.miniature_pieces_path` from config.json
+- **AI API Endpoints Configuration**: Moved hardcoded AI API endpoints to config.json for easier maintenance
+
+## Documentation
+
+- **Technical Documentation**: Updated and expanded the technical documentation
+- **HTML Manual**: Performed some minor improvements to the HTML manual
+
+---
+
 # CARA v2.4.9 - Improved User Settings Persistence and Migration
 
 **Release Date:** 30.12.2025
