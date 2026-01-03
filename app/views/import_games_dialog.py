@@ -183,6 +183,8 @@ class ImportGamesDialog(QDialog):
         destination_group.setLayout(destination_layout)
         main_layout.addWidget(destination_group)
         
+        main_layout.addSpacing(self.section_spacing)
+        
         # Platform selection group
         platform_group = QGroupBox("Platform")
         platform_layout = QFormLayout()
@@ -219,6 +221,8 @@ class ImportGamesDialog(QDialog):
         
         platform_group.setLayout(platform_layout)
         main_layout.addWidget(platform_group)
+        
+        main_layout.addSpacing(self.section_spacing)
         
         # Filters group
         filters_group = QGroupBox("Filters")

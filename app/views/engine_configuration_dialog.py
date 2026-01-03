@@ -203,19 +203,42 @@ class EngineConfigurationDialog(QDialog):
             if tab_height <= 0:
                 continue
 
-            used_height = (
-                tab_layout_margins[1]  # top margin
-                + top_spacer
-                + copy_group.sizeHint().height()
-                + tab_layout_spacing
-                + common_group.sizeHint().height()
-                + tab_layout_spacing
-                + group_margin_top
-                + group_padding_top
-                + (group_border_width * 2)
-                + tab_layout_spacing  # spacing before bottom margin
-                + tab_layout_margins[3]  # bottom margin
-            )
+            # Get the actual height of engine_params_group (including title, margins, padding, border)
+            # We need to account for the group box's full height, not just margin/padding
+            engine_params_group = None
+            for widget in tab.findChildren(QGroupBox):
+                if widget.title() == "Engine-Specific Parameters":
+                    engine_params_group = widget
+                    break
+            
+            # Calculate used height more accurately
+            if engine_params_group:
+                # Use actual group box height instead of just margin/padding/border
+                engine_params_group_height = engine_params_group.sizeHint().height()
+                used_height = (
+                    tab_layout_margins[1]  # top margin
+                    + top_spacer
+                    + copy_group.sizeHint().height()
+                    + tab_layout_spacing  # spacing after copy_group
+                    + common_group.sizeHint().height()
+                    + tab_layout_spacing  # spacing after common_group (before engine_params_group)
+                    + engine_params_group_height  # full height of engine_params_group (includes title, margins, padding, border, content)
+                    + tab_layout_margins[3]  # bottom margin
+                )
+            else:
+                # Fallback if group not found (shouldn't happen, but be safe)
+                used_height = (
+                    tab_layout_margins[1]  # top margin
+                    + top_spacer
+                    + copy_group.sizeHint().height()
+                    + tab_layout_spacing  # spacing after copy_group
+                    + common_group.sizeHint().height()
+                    + tab_layout_spacing  # spacing after common_group (before engine_params_group)
+                    + group_margin_top  # margin_top for engine_params_group
+                    + group_padding_top  # padding_top for engine_params_group
+                    + (group_border_width * 2)  # border top and bottom
+                    + tab_layout_margins[3]  # bottom margin
+                )
 
             available = tab_height - used_height
             available = max(available, min_height)
@@ -284,6 +307,7 @@ class EngineConfigurationDialog(QDialog):
         tabs_config = dialog_config.get('tabs', {})
         tabs_layout_config = dialog_config.get('tabs_layout', {})
         groups_config = dialog_config.get('groups', {})
+        group_margin_top = groups_config.get('margin_top', 8)
         pane_bg = tabs_config.get('pane_background', [40, 40, 45])
         from PyQt6.QtGui import QPalette, QColor
         tab.setAutoFillBackground(True)
@@ -332,6 +356,12 @@ class EngineConfigurationDialog(QDialog):
         copy_layout.addWidget(reset_button)
         copy_group.setLayout(copy_layout)
         tab_layout.addWidget(copy_group)
+        
+        # Add spacing between group boxes (accounting for group box margin_top)
+        # The group box has margin_top, so we subtract it from explicit spacing to avoid double spacing
+        spacing_between_groups = max(0, tab_layout_spacing - group_margin_top)
+        if spacing_between_groups > 0:
+            tab_layout.addSpacing(spacing_between_groups)
         
         # Common parameters section
         common_group = QGroupBox("Common Parameters")
@@ -390,6 +420,12 @@ class EngineConfigurationDialog(QDialog):
         
         common_group.setLayout(common_layout)
         tab_layout.addWidget(common_group)
+        
+        # Add spacing between group boxes (accounting for group box margin_top)
+        # The group box has margin_top, so we subtract it from explicit spacing to avoid double spacing
+        spacing_between_groups = max(0, tab_layout_spacing - group_margin_top)
+        if spacing_between_groups > 0:
+            tab_layout.addSpacing(spacing_between_groups)
         
         # Engine-specific parameters section
         if self.engine_options:
@@ -1300,6 +1336,7 @@ class EngineConfigurationDialog(QDialog):
         group_spacing = groups_config.get('spacing', 10)
         group_margin_top = groups_config.get('margin_top', 8)
         group_padding_top = groups_config.get('padding_top', 12)
+        group_content_margins = groups_config.get('content_margins', [10, 15, 10, 10])
         group_title_left = groups_config.get('title_left', 10)  # Standard left offset
         # Convert from fixed "0 4px" to array format [0, 4] (Pattern 1)
         group_title_padding = [0, 4]
@@ -1326,8 +1363,20 @@ class EngineConfigurationDialog(QDialog):
                 title_font_weight=group_title_font_weight,
                 title_color=group_title_color,
                 title_left=group_title_left,
-                title_padding=group_title_padding
+                title_padding=group_title_padding,
+                content_margins=group_content_margins
             )
+            
+            # Force layout recalculation by accessing layout properties
+            # This ensures margins are properly applied and spacing is consistent across tabs
+            for group_box in group_boxes:
+                layout = group_box.layout()
+                if layout:
+                    # Access margins to force layout calculation (similar to debug code)
+                    _ = layout.getContentsMargins()
+                    # Access size hints to force geometry calculation
+                    _ = group_box.sizeHint()
+                    _ = group_box.size()
         
         # Labels styling
         labels_config = dialog_config.get('labels', {})

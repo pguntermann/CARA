@@ -203,6 +203,8 @@ class AnnotationPreferencesDialog(QDialog):
         layout.setSpacing(self.layout_spacing)
         layout.setContentsMargins(self.layout_margins[0], self.layout_margins[1], self.layout_margins[2], self.layout_margins[3])
         
+        layout.addSpacing(self.section_spacing)
+        
         # Color Palette group
         color_group = QGroupBox("Color Palette")
         color_group_layout = QGridLayout(color_group)
@@ -226,6 +228,8 @@ class AnnotationPreferencesDialog(QDialog):
                 row += 1
         
         layout.addWidget(color_group)
+        
+        layout.addSpacing(self.section_spacing)
         
         # Text Font group
         font_group = QGroupBox("Text Annotation Font")

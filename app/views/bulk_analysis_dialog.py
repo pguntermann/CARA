@@ -723,6 +723,8 @@ class BulkAnalysisDialog(QDialog):
         
         layout.addWidget(selection_group)
         
+        layout.addSpacing(section_spacing)
+        
         # Options group
         options_group = QGroupBox("Options")
         options_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
@@ -839,6 +841,8 @@ class BulkAnalysisDialog(QDialog):
         options_layout.addLayout(controls_row_layout)
         
         layout.addWidget(options_group)
+        
+        layout.addSpacing(section_spacing)
         
         # Progress group (always visible)
         self.progress_group = QGroupBox("Progress")

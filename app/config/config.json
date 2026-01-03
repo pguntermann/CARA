@@ -2376,7 +2376,7 @@
       },
       "engine_configuration": {
         "width": 600,
-        "height": 670,
+        "height": 700,
         "layout": {
           "spacing": 10,
           "margins": [
@@ -2387,7 +2387,7 @@
           ]
         },
         "tabs_layout": {
-          "spacing": 15,
+          "spacing": 10,
           "margins": [
             15,
             10,
@@ -2514,7 +2514,13 @@
           ],
           "spacing": 10,
           "margin_top": 8,
-          "padding_top": 12
+          "padding_top": 12,
+          "content_margins": [
+            10,
+            15,
+            10,
+            10
+          ]
         },
         "buttons": {
           "spacing": 10,
@@ -2705,7 +2711,7 @@
       },
       "engine_dialog": {
         "width": 550,
-        "height": 320,
+        "height": 360,
         "background_color": [
           40,
           40,

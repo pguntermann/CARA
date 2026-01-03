@@ -611,6 +611,8 @@ class SearchDialog(QDialog):
         scope_group.setLayout(scope_layout)
         main_layout.addWidget(scope_group)
         
+        main_layout.addSpacing(self.section_spacing)
+        
         # Search Criteria section
         criteria_group = QGroupBox("Search Criteria")
         criteria_layout = QVBoxLayout()

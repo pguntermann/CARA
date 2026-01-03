@@ -134,6 +134,10 @@ def apply_group_box_styling(
                     content_margins[2],
                     content_margins[3]
                 )
+                # Force layout update to ensure margins are applied consistently
+                # This prevents spacing inconsistencies between tabs/widgets
+                group_box.updateGeometry()
+                layout.update()
         
         # Set palette for transparent background on macOS if needed
         if use_transparent_palette and bg_color is None:

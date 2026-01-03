@@ -129,6 +129,8 @@ class EngineDialog(QDialog):
         layout.setSpacing(layout_spacing)
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
+        layout.addSpacing(layout_spacing)
+        
         # Engine path selection group
         path_group = QGroupBox("Select UCI Engine")
         path_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -167,6 +169,8 @@ class EngineDialog(QDialog):
         path_group_layout.addLayout(self.path_layout)
         
         layout.addWidget(path_group)
+        
+        layout.addSpacing(layout_spacing)
         
         # Engine information group box (read-only after validation)
         engine_info_group = QGroupBox("Engine Information")

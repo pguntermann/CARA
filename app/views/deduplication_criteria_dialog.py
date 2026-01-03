@@ -172,6 +172,8 @@ class DeduplicationCriteriaDialog(QDialog):
         layout.setSpacing(self.layout_spacing)
         layout.setContentsMargins(self.layout_margins[0], self.layout_margins[1], self.layout_margins[2], self.layout_margins[3])
         
+        layout.addSpacing(self.section_spacing)
+        
         # Matching Mode group
         mode_group = QGroupBox("Matching Mode")
         mode_group_layout = QVBoxLayout(mode_group)
@@ -195,6 +197,8 @@ class DeduplicationCriteriaDialog(QDialog):
         mode_group_layout.addWidget(self.description_label)
         
         layout.addWidget(mode_group)
+        
+        layout.addSpacing(self.section_spacing)
         
         # Customization area (for header-based mode)
         self.customization_group = QGroupBox("Options")
