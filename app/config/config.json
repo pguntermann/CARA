@@ -3895,7 +3895,7 @@
       },
       "deduplication_criteria": {
         "width": 600,
-        "height": 430,
+        "height": 480,
         "background_color": [
           40,
           40,
@@ -3916,7 +3916,7 @@
           "spacing": 10,
           "margins": [
             15,
-            15,
+            25,
             15,
             15
           ],
