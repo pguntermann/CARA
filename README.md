@@ -161,9 +161,9 @@ For detailed instructions, see the [user manual](https://pguntermann.github.io/C
 
 ### Configuration Files
 
-CARA uses three configuration files, all located in the CARA root directory:
+CARA uses three configuration files:
 
-- **`config.json`**: This file contains all UI styling, layout dimensions, colors, fonts, and application-wide default settings. It defines the visual appearance and behavior of the application. You can customize CARA's appearance by modifying this file without changing any source code. The configuration system follows a strict structure with no hardcoded values in the application code, allowing you to completely customize the application's appearance.
+- **`app/config/config.json`**: This file contains all UI styling, layout dimensions, colors, fonts, and application-wide default settings. It defines the visual appearance and behavior of the application. You can customize CARA's appearance by modifying this file without changing any source code. The configuration system follows a strict structure with no hardcoded values in the application code, allowing you to completely customize the application's appearance.
 
 - **`user_settings.json`**: This file stores your personal preferences and settings, including moves list column profiles, board visibility settings, PGN display options, engine configurations, AI model settings, and other user-specific configurations. The file is automatically created in the CARA root directory when you first save settings, and it persists your preferences between application sessions.
 
@@ -173,11 +173,15 @@ CARA uses three configuration files, all located in the CARA root directory:
 
 ### User Manual
 
-[Online version](https://pguntermann.github.io/CARA/manual.html) (GitHub Pages) | Access from **Help → Open Manual** in the application
+[Online version](https://pguntermann.github.io/CARA/manual.html), or access from **Help → Open Manual** in the application
+
+### Video Tutorials
+
+[YouTube Playlist](https://www.youtube.com/playlist?list=PLvHVh9RRAd6berWo4__KW43LVX0KbndOx)
 
 Technical documentation for developers:
 
-### Technical Documentation
+### Architecture & UI
 
 - **Architecture**: [`doc/architecture_outline.md`](doc/architecture_outline.md)
 - **Dialog Style Guide**: [`doc/dialog_style_guide.md`](doc/dialog_style_guide.md)
