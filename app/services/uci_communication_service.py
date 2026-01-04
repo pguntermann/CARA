@@ -217,14 +217,17 @@ class UCICommunicationService:
         """
         try:
             self._debug_log(f"Spawning engine process: {self.engine_path}", "INFO")
+            # Use binary mode to avoid Windows text mode blocking issues
             self.process = subprocess.Popen(
                 [str(self.engine_path)],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1
+                text=False,  # Binary mode
+                bufsize=0  # Unbuffered for immediate data availability
             )
+            # Initialize binary read buffer for manual line splitting
+            self._read_buffer = b''
             self._debug_log(f"Engine process spawned (PID: {self.process.pid})", "INFO")
             self._crash_logged = False  # Reset crash flag when engine starts
             self._debug_lifecycle("STARTED", "PID:" + str(self.process.pid))
@@ -302,18 +305,22 @@ class UCICommunicationService:
         try:
             self._debug_log(command, "SEND")
             self._debug_console(command, "SEND")
-            self.process.stdin.write(f"{command}\n")
+            # Encode string to bytes for binary mode
+            self.process.stdin.write(f"{command}\n".encode('utf-8'))
             self.process.stdin.flush()
             return True
         except Exception as e:
             self._debug_log(f"Error sending command '{command}': {str(e)}", "INFO")
             return False
     
-    def read_line(self, timeout: Optional[float] = None) -> Optional[str]:
-        """Read a line from engine stdout.
+    def read_line(self, timeout: float) -> Optional[str]:
+        """Read a line from engine stdout using binary mode with manual line buffering.
+        
+        This avoids Windows text mode blocking issues while maintaining zero latency
+        when data is available.
         
         Args:
-            timeout: Optional timeout in seconds. If None, blocks until line available.
+            timeout: Timeout in seconds (required). Returns None if no line received within timeout.
             
         Returns:
             Line string (stripped) or None if timeout/error.
@@ -321,28 +328,57 @@ class UCICommunicationService:
         if not self.process or self.process.poll() is not None:
             return None
         
+        # Ensure buffer exists
+        if not hasattr(self, '_read_buffer'):
+            self._read_buffer = b''
+        
         try:
-            if timeout is not None:
-                # Non-blocking read with timeout
-                start_time = time.time()
-                while (time.time() - start_time) < timeout:
-                    line = self.process.stdout.readline()
+            # Fast path: check buffer first (zero latency if line already buffered)
+            if b'\n' in self._read_buffer:
+                newline_pos = self._read_buffer.find(b'\n')
+                line_bytes = self._read_buffer[:newline_pos]
+                self._read_buffer = self._read_buffer[newline_pos + 1:]
+                try:
+                    line = line_bytes.decode('utf-8', errors='replace').rstrip('\r').strip()
                     if line:
-                        line = line.strip()
                         self._debug_log(line, "RECV")
                         self._debug_console(line, "RECV")
                         return line
-                    time.sleep(0.01)
-                return None
-            else:
-                # Blocking read
-                line = self.process.stdout.readline()
-                if line:
-                    line = line.strip()
-                    self._debug_log(line, "RECV")
-                    self._debug_console(line, "RECV")
-                    return line
-                return None
+                except Exception as e:
+                    self._debug_log(f"Error decoding line: {str(e)}", "INFO")
+                    return None
+            
+            # Non-blocking read with timeout
+            # Note: timeout is required - all callers provide a timeout value
+            if timeout is None:
+                raise ValueError("read_line() requires a timeout value")
+            
+            start_time = time.time()
+            while (time.time() - start_time) < timeout:
+                # Read chunk (returns immediately, empty bytes if no data)
+                chunk = self.process.stdout.read(1024)
+                if chunk:
+                    self._read_buffer += chunk
+                    # Check if we now have a complete line
+                    if b'\n' in self._read_buffer:
+                        newline_pos = self._read_buffer.find(b'\n')
+                        line_bytes = self._read_buffer[:newline_pos]
+                        self._read_buffer = self._read_buffer[newline_pos + 1:]
+                        try:
+                            line = line_bytes.decode('utf-8', errors='replace').rstrip('\r').strip()
+                            if line:
+                                self._debug_log(line, "RECV")
+                                self._debug_console(line, "RECV")
+                                return line
+                        except Exception as e:
+                            self._debug_log(f"Error decoding line: {str(e)}", "INFO")
+                            return None
+                else:
+                    # No data available - check timeout immediately (no sleep)
+                    if (time.time() - start_time) >= timeout:
+                        return None
+                    # Continue loop immediately - timeout check limits iterations
+            return None
         except Exception as e:
             self._debug_log(f"Error reading line: {str(e)}", "INFO")
             return None
