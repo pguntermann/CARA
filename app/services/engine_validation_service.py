@@ -41,14 +41,13 @@ class EngineValidationService:
     VALIDATION_TIMEOUT = 5.0
     
     @staticmethod
-    def validate_engine(engine_path: Path, enable_debug: bool = False, 
+    def validate_engine(engine_path: Path, 
                        debug_callback: Optional[Callable[[str], None]] = None,
                        save_to_file: bool = True) -> EngineValidationResult:
         """Validate an engine executable via UCI protocol.
         
         Args:
             engine_path: Path to engine executable.
-            enable_debug: Whether to enable debug output.
             debug_callback: Optional callback for debug messages.
             save_to_file: Whether to save the parsed options to engine_parameters.json.
                          If False, only validates the engine without saving options.
@@ -80,7 +79,6 @@ class EngineValidationService:
             # Create UCI communication service instance
             uci = UCICommunicationService(
                 engine_path, 
-                enable_debug=enable_debug, 
                 debug_callback=debug_callback,
                 identifier="Validation"
             )
@@ -314,7 +312,7 @@ class EngineValidationService:
         return option
     
     @staticmethod
-    def refresh_engine_options(engine_path: Path, enable_debug: bool = False,
+    def refresh_engine_options(engine_path: Path,
                               debug_callback: Optional[Callable[[str], None]] = None,
                               save_to_file: bool = True) -> Tuple[bool, List[Dict[str, Any]]]:
         """Refresh engine options by re-querying the engine via UCI.
@@ -325,7 +323,6 @@ class EngineValidationService:
         
         Args:
             engine_path: Path to engine executable.
-            enable_debug: Whether to enable debug output.
             debug_callback: Optional callback for debug messages.
             save_to_file: Whether to save the refreshed options to engine_parameters.json.
                          If False, only returns the parsed options without saving.
@@ -342,7 +339,6 @@ class EngineValidationService:
             # Create UCI communication service instance
             uci = UCICommunicationService(
                 engine_path,
-                enable_debug=enable_debug,
                 debug_callback=debug_callback,
                 identifier="RefreshOptions"
             )

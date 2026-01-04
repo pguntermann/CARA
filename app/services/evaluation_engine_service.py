@@ -188,7 +188,6 @@ class EvaluationEngineThread(QThread):
             # Create UCI communication service
             self.uci = UCICommunicationService(
                 self.engine_path, 
-                enable_debug=False,
                 identifier="Evaluation"
             )
             

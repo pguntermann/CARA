@@ -652,7 +652,6 @@ class EngineDialog(QDialog):
         validation_service = self.engine_controller.validation_service
         options_saved, options = validation_service.refresh_engine_options(
             self.engine_path,
-            enable_debug=False,
             save_to_file=True  # Save to file when user adds the engine
         )
         

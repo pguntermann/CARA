@@ -111,7 +111,6 @@ class GameAnalysisEngineThread(QThread):
             # Create UCI communication service
             self.uci = UCICommunicationService(
                 self.engine_path, 
-                enable_debug=False,
                 identifier=f"GameAnalysis-{self.engine_name or 'Unknown'}"
             )
             
@@ -500,7 +499,7 @@ class GameAnalysisEngineService(QObject):
     """Service for managing game analysis engine operations."""
     
     def __init__(self, engine_path: Path, max_depth: int, time_limit_ms: int,
-                 max_threads: Optional[int] = None, engine_name: str = "", engine_options: Optional[Dict[str, Any]] = None) -> None:
+                 max_threads: Optional[int] = None, engine_name: str = "", engine_options: Optional[Dict[str, Any]] = None, config: Optional[Dict[str, Any]] = None) -> None:
         """Initialize game analysis engine service.
         
         Args:
@@ -510,6 +509,7 @@ class GameAnalysisEngineService(QObject):
             max_threads: Maximum number of CPU threads/cores to use.
             engine_name: Name of the engine.
             engine_options: Dictionary of engine-specific options to set (e.g., {"Hash": 64, "Ponder": False}).
+            config: Optional configuration dictionary.
         """
         super().__init__()
         self.engine_path = engine_path
@@ -518,6 +518,7 @@ class GameAnalysisEngineService(QObject):
         self.max_threads = max_threads
         self.engine_name = engine_name
         self.engine_options = engine_options or {}
+        self.config = config
         self.analysis_thread: Optional[GameAnalysisEngineThread] = None
     
     def start_engine(self) -> bool:
