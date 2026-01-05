@@ -589,9 +589,10 @@ class GameAnalysisEngineService(QObject):
     def shutdown(self) -> None:
         """Shutdown engine process and thread."""
         if self.analysis_thread:
+            # Set flags to stop the thread, it will exit naturally and cleanup in finally block
             if self.analysis_thread.isRunning():
                 self.analysis_thread.shutdown()
-                self.analysis_thread.wait(5000)  # Wait up to 5 seconds for thread to finish
+            # Don't wait - let thread exit naturally, cleanup will happen in finally block
             self.analysis_thread = None
     
     def cleanup(self) -> None:

@@ -10,14 +10,6 @@ from PyQt6.QtCore import QObject, QThread, pyqtSignal, QTimer
 
 from app.services.uci_communication_service import UCICommunicationService
 
-# Try to import psutil for process tree killing (optional dependency)
-try:
-    import psutil
-    PSUTIL_AVAILABLE = True
-except ImportError:
-    PSUTIL_AVAILABLE = False
-    psutil = None
-
 
 class ManualAnalysisEngineThread(QThread):
     """Thread for communicating with UCI engine for manual analysis with multipv support."""
@@ -69,73 +61,12 @@ class ManualAnalysisEngineThread(QThread):
         self._search_just_started = False  # Flag to prevent bestmove handler from restarting immediately after position update
         self._search_start_time: Optional[float] = None  # Timestamp when search was last started (for ignoring stale bestmove messages)
         self._info_lines_received_after_start = 0  # Counter for info lines received after starting search (for multipv change)
+        self._keep_engine_alive = False  # Flag to prevent cleanup when engine should be kept alive for reuse
     
     def _thread_info(self) -> str:
         """Get thread identification string for debugging."""
         os_id = f"os={self._os_thread_id}" if self._os_thread_id is not None else "os=?"
         return f"inst={self._thread_id} {os_id}"
-    
-    def _kill_process_tree(self, pid: int) -> bool:
-        """Kill the full process tree for a given PID using psutil.
-        
-        Args:
-            pid: Process ID to kill.
-            
-        Returns:
-            True if successful, False otherwise.
-        """
-        if not PSUTIL_AVAILABLE:
-            return False
-        
-        try:
-            parent = psutil.Process(pid)
-            # Get all children recursively
-            children = parent.children(recursive=True)
-            
-            if not children:
-                # Fallback: Try to find processes by name (in case children are detached)
-                try:
-                    parent_name = parent.name()
-                    for proc in psutil.process_iter(['pid', 'name']):
-                        try:
-                            proc_info = proc.info
-                            if proc_info['name'] == parent_name and proc_info['pid'] != pid:
-                                try:
-                                    proc.kill()
-                                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                                    pass
-                        except (psutil.NoSuchProcess, psutil.AccessDenied):
-                            pass  # Process may have exited between iterations
-                except Exception:
-                    pass
-            
-            # Kill all children first
-            for child in children:
-                try:
-                    child.kill()
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    pass
-            
-            # Wait a bit for children to die
-            gone, still_alive = psutil.wait_procs(children, timeout=1.0)
-            if still_alive:
-                # Force kill any remaining children
-                for child in still_alive:
-                    try:
-                        child.kill()
-                    except Exception:
-                        pass
-            
-            # Kill the parent process
-            try:
-                parent.kill()
-                return True
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                return False
-        except psutil.NoSuchProcess:
-            return False
-        except Exception:
-            return False
     
     def start_analysis(self, fen: str) -> None:
         """Start analysis for a position.
@@ -163,39 +94,27 @@ class ManualAnalysisEngineThread(QThread):
         if not self.uci:
             return
         
-        stored_pid = self.uci.get_process_pid()
         self._readyok_event.clear()
         
         # Stop search and attempt graceful shutdown
         if self.uci and self.uci.is_process_alive():
             self.uci.stop_search()
         
-        # Kill process tree while parent is still alive (to find child processes)
-        tree_killed = False
-        if stored_pid and self.uci and self.uci.is_process_alive():
-            if self._kill_process_tree(stored_pid):
-                tree_killed = True
-        
-        # Send isready to confirm engine is idle (skip if already killed)
-        if not tree_killed and self.uci and self.uci.is_process_alive():
+        # Send isready to confirm engine is idle
+        if self.uci and self.uci.is_process_alive():
             try:
                 self.uci.send_command("isready")
                 self._readyok_event.wait(timeout=5.0)
             except Exception:
                 pass
         
-        # Send quit for graceful shutdown (skip if already killed)
-        if not tree_killed and self.uci and self.uci.is_process_alive():
+        # Send quit for graceful shutdown
+        if self.uci and self.uci.is_process_alive():
             try:
                 self.uci.quit_engine()
                 self.uci.wait_for_process(timeout=3.0)
             except Exception:
                 pass
-        
-        # Fallback: kill process tree if still running
-        if not tree_killed and stored_pid and self.uci:
-            if self.uci.is_process_alive():
-                self._kill_process_tree(stored_pid)
         
         if self.uci:
             self.uci.cleanup()
@@ -534,41 +453,46 @@ class ManualAnalysisEngineThread(QThread):
                                 self._last_update_time[multipv] = current_time
                                 del self._pending_updates[multipv]
                 
+                # elif line.startswith("bestmove"):
+                #     # Restart search for continuous analysis, but ignore bestmove from old searches
+                #     current_time = time.time()
+                #     time_since_search_start = (current_time - self._search_start_time) if self._search_start_time else float('inf')
+                #     ignore_bestmove = time_since_search_start < 0.05
+                #     
+                #     should_restart = (self.running and not self._stop_requested and not self._updating_multipv 
+                #                      and not self._updating_position and not self._search_just_started 
+                #                      and not ignore_bestmove)
+                #     
+                #     # Clear flags if this is a valid bestmove (not from old search, 100ms+ elapsed)
+                #     if not ignore_bestmove and time_since_search_start >= 0.1:
+                #         if self._search_just_started:
+                #             self._search_just_started = False
+                #         if self._updating_multipv:
+                #             self._updating_multipv = False
+                #         self._search_start_time = None
+                #         self._info_lines_received_after_start = 0
+                #     
+                #     if should_restart:
+                #         if self.current_fen and self.uci:
+                #             if not self.uci.is_process_alive():
+                #                 self.error_occurred.emit("Engine process terminated unexpectedly")
+                #                 break
+                #             try:
+                #                 if not self.uci.start_search(depth=self.max_depth, movetime=self.movetime):
+                #                     self.error_occurred.emit("Failed to restart search")
+                #                     break
+                #                 self._last_update_time.clear()
+                #                 self._pending_updates.clear()
+                #                 self._current_nps = -1
+                #                 self._current_hashfull = -1
+                #             except Exception as e:
+                #                 self.error_occurred.emit(f"Error writing to engine: {str(e)}")
+                #                 break
+                
                 elif line.startswith("bestmove"):
-                    # Restart search for continuous analysis, but ignore bestmove from old searches
-                    current_time = time.time()
-                    time_since_search_start = (current_time - self._search_start_time) if self._search_start_time else float('inf')
-                    ignore_bestmove = time_since_search_start < 0.05
-                    
-                    should_restart = (self.running and not self._stop_requested and not self._updating_multipv 
-                                     and not self._updating_position and not self._search_just_started 
-                                     and not ignore_bestmove)
-                    
-                    # Clear flags if this is a valid bestmove (not from old search, 100ms+ elapsed)
-                    if not ignore_bestmove and time_since_search_start >= 0.1:
-                        if self._search_just_started:
-                            self._search_just_started = False
-                        if self._updating_multipv:
-                            self._updating_multipv = False
-                        self._search_start_time = None
-                        self._info_lines_received_after_start = 0
-                    
-                    if should_restart:
-                        if self.current_fen and self.uci:
-                            if not self.uci.is_process_alive():
-                                self.error_occurred.emit("Engine process terminated unexpectedly")
-                                break
-                            try:
-                                if not self.uci.start_search(depth=self.max_depth, movetime=self.movetime):
-                                    self.error_occurred.emit("Failed to restart search")
-                                    break
-                                self._last_update_time.clear()
-                                self._pending_updates.clear()
-                                self._current_nps = -1
-                                self._current_hashfull = -1
-                            except Exception as e:
-                                self.error_occurred.emit(f"Error writing to engine: {str(e)}")
-                                break
+
+                    # Just continue reading - position updates will restart search if needed
+                    pass
                 
                 elif line.strip() == "readyok":
                     self._readyok_event.set()
@@ -577,8 +501,8 @@ class ManualAnalysisEngineThread(QThread):
             self.error_occurred.emit(f"Engine communication error: {str(e)}")
         finally:
             self.running = False
-            # Clean up UCI communication service
-            if self.uci:
+            # Clean up UCI communication service (unless engine should be kept alive)
+            if self.uci and not self._keep_engine_alive:
                 self.uci.cleanup()
     
     def _parse_multipv(self, line: str) -> Optional[int]:
@@ -876,30 +800,21 @@ class ManualAnalysisEngineService(QObject):
             
             if keep_engine_alive:
                 # Stop thread but keep engine process alive
+                self.analysis_thread._keep_engine_alive = True
                 self.analysis_thread.running = False
                 self.analysis_thread._stop_requested = True
                 if self.analysis_thread.uci and self.analysis_thread.uci.is_process_alive():
                     self.analysis_thread.uci.stop_search()
-                finished = self.analysis_thread.wait(3000)
-                if finished or (self.analysis_thread and self.analysis_thread.isFinished()):
-                    self.analysis_thread = None
-                else:
-                    if self.analysis_thread and self.analysis_thread.isRunning():
-                        self.analysis_thread.terminate()
-                        self.analysis_thread.wait(2000)
-                    self.analysis_thread = None
+                # Don't wait - let thread exit naturally, cleanup will be skipped due to flag
+                self.analysis_thread = None
             else:
                 # Normal shutdown - terminate engine process
-                self.analysis_thread.stop_analysis()
-                self.analysis_thread.shutdown()
-                finished = self.analysis_thread.wait(3000)
-                
-                if not finished and self.analysis_thread and self.analysis_thread.isRunning():
-                    self.analysis_thread.terminate()
-                    finished = self.analysis_thread.wait(2000)
-                
-                if finished or (self.analysis_thread and self.analysis_thread.isFinished()):
-                    self.analysis_thread = None
-                else:
-                    self.analysis_thread = None
+                # Set flags to stop the thread, it will exit naturally and cleanup in finally block
+                self.analysis_thread._keep_engine_alive = False
+                self.analysis_thread.running = False
+                self.analysis_thread._stop_requested = True
+                if self.analysis_thread.uci and self.analysis_thread.uci.is_process_alive():
+                    self.analysis_thread.uci.stop_search()
+                # Don't wait - let thread exit naturally, cleanup will happen in finally block
+                self.analysis_thread = None
 

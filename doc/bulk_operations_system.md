@@ -183,6 +183,7 @@ When standard tags are modified, corresponding `GameData` fields are updated:
 - Distributes CPU cores across multiple engine instances
 - Each engine instance analyzes one game
 - Ensures each engine gets at least 2 threads
+- Thread information updates dynamically as workers finish (e.g., "2 threads (1×2)" when only 1 worker remains)
 
 **Analysis process** (`analyze_game()`):
 1. Extract moves from game PGN
@@ -200,6 +201,15 @@ When standard tags are modified, corresponding `GameData` fields are updated:
 **Progress reporting**:
 - Reports progress per move: `(game_move_index, total_moves, current_move_number, is_white_move, status_message, engine_info)`
 - `engine_info` includes: depth, centipawns, engine_name, threads, elapsed_ms
+- Thread information in status bar updates dynamically: shows active workers × threads per engine
+- Example: Starts with "12 threads (6×2)", updates to "2 threads (1×2)" as workers finish
+
+**Cleanup**:
+- `cleanup()`: Cleans up engine service after analysis completes normally
+- Called automatically in `BulkAnalysisThread`'s `finally` block
+- Ensures all engine processes are terminated when bulk analysis completes
+- Handles cleanup even if workers finish normally (not just on cancel)
+- Non-blocking shutdown (no UI freezing during cleanup)
 
 ## Common Implementation Details
 

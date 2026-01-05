@@ -145,6 +145,12 @@ class BulkAnalysisService(QObject):
             self._engine_service.stop_analysis()
             self._engine_service.cleanup()
     
+    def cleanup(self) -> None:
+        """Cleanup engine service after analysis completes normally."""
+        if self._engine_service:
+            self._engine_service.cleanup()
+            self._engine_service = None
+    
     def analyze_game(self, game: GameData, progress_callback=None) -> bool:
         """Analyze a single game without making it active.
         
