@@ -547,13 +547,18 @@ class GameAnalysisEngineService(QObject):
         self.analysis_thread.start()
         
         # Wait for thread to initialize engine (check if running flag is set)
-        # Give it some time to spawn process and initialize UCI
-        import time
+        # Use processEvents() to keep UI responsive while waiting
+        from PyQt6.QtWidgets import QApplication
         start_time = time.time()
-        while not self.analysis_thread.running and (time.time() - start_time) < 5.0:
+        timeout = 10.0  # Increased timeout for slow host environments
+        
+        while not self.analysis_thread.running and (time.time() - start_time) < timeout:
             if not self.analysis_thread.isRunning():
                 return False
-            time.sleep(0.1)
+            
+            # Process Qt events to keep UI responsive
+            QApplication.processEvents()
+            time.sleep(0.05)  # Reduced sleep time, events are processed above
         
         return self.analysis_thread.running
     
