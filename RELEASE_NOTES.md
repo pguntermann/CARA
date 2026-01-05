@@ -1,3 +1,39 @@
+# CARA v2.5.1 - Engine Service Improvements and Customizable Formulas
+
+**Release Date:** 05.01.2026
+
+This release includes significant improvements to the UCI layer and engine services for better performance and responsiveness, introduces customizable ELO and accuracy calculation formulas, and includes various bug fixes and documentation updates.
+
+## New Features
+
+- **Customizable ELO and Accuracy Formulas**: Users can now customize the formulas used to calculate estimated ELO ratings and accuracy percentages through `config.json`. The formulas support a wide range of variables including move statistics, CPL metrics, error rates, and game results. See the user manual (section 7.8) for details on available variables, functions, and examples.
+
+## Engine and Analysis Service Improvements
+
+- **UCI Layer Refactoring**: Improved and simplified UCI layer implementation for better reliability and maintainability
+- **Manual Analysis Service**: 
+  - Removed blocking waits during shutdown to improve UI responsiveness
+  - Removed optional `psutil` dependency handling for simpler deployment
+- **Evaluation Service**: Removed blocking waits during shutdown for better UI responsiveness
+- **Bulk Analysis Service**:
+  - Improved thread distribution and utilization with dynamic scaling to use all available CPU cores
+  - Enhanced cleanup to ensure proper engine thread termination after analysis completion
+  - Improved status reporting with dynamic thread information that reflects actual active threads
+  - Better cancellation status handling with clear user feedback
+
+## Bug Fixes
+
+- **Bulk Analysis Cleanup**: Fixed issue where engine processes were not always terminated after bulk analysis completion
+- **UI Responsiveness**: Fixed UI unresponsiveness during manual analysis and evaluation service shutdown
+
+## Documentation
+
+- **Formula Customization Guide**: Added documentation section (7.8) in the user manual covering customizable ELO and accuracy formulas
+- **Engine Implementation Documentation**: Updated technical documentation to reflect UCI layer and engine service improvements
+- **Dependency Documentation**: Updated README, THIRD_PARTY_LICENSES, and manual to include `asteval` dependency
+
+---
+
 # CARA v2.5.0 - Cross-Platform UI Improvements and Bug Fixes
 
 **Release Date:** 03.01.2026

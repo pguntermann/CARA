@@ -646,7 +646,7 @@
                     </div>
                     <div class="header-right">
                         <p class="header-manual-label">User Manual</p>
-                        <p class="header-version">Version 2.5.0</p>
+                        <p class="header-version">Version 2.5.1</p>
                     </div>
                 </div>
             </div>
@@ -755,6 +755,7 @@
                         <li><a href="#troubleshooting">7.5 Troubleshooting</a></li>
                         <li><a href="#performance-optimization">7.6 Performance Optimization</a></li>
                         <li><a href="#moves-list-columns-reference">7.7 Moves List Columns Reference</a></li>
+                        <li><a href="#customizing-formulas">7.8 Customizing ELO and Accuracy Formulas</a></li>
                     </ul>
                 </li>
             </ul>
@@ -837,6 +838,7 @@
                     <li><strong><a href="https://www.riverbankcomputing.com/software/pyqt/" target="_blank">PyQt6</a></strong> (>= 6.6.0) — licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank">GNU GPL v3.0</a>.</li>
                     <li><strong><a href="https://github.com/niklasf/python-chess" target="_blank">python-chess</a></strong> (>= 1.999) — licensed under <a href="https://github.com/niklasf/python-chess/blob/master/LICENSE" target="_blank">GNU GPL v3.0</a>.</li>
                     <li><strong><a href="https://requests.readthedocs.io/" target="_blank">requests</a></strong> (>= 2.31.0) — licensed under the <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank">Apache License 2.0</a>.</li>
+                    <li><strong><a href="https://github.com/newville/asteval" target="_blank">asteval</a></strong> (>= 0.9.31) — licensed under the <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a>.</li>
                 </ul>
                 <p>The author would like to express sincere appreciation to the developers and maintainers of these open-source projects. Their dedication and excellent work have made this application possible, and their contributions to the open-source community are invaluable.</p>
             </div>
@@ -995,7 +997,7 @@
                     <li><strong>Verify installation:</strong><br>
                     After installation completes, verify that the libraries were installed correctly:<br>
                     <code class="command">pip list</code><br>
-                    You should see <strong>PyQt6</strong>, <strong>python-chess</strong>, and <strong>requests</strong> in the list of installed packages.</li>
+                    You should see <strong>PyQt6</strong>, <strong>python-chess</strong>, <strong>requests</strong>, and <strong>asteval</strong> in the list of installed packages.</li>
                 </ol>
             </div>
             <div class="outline-item">
@@ -1031,6 +1033,10 @@
                     
                     <li><strong>Install requests:</strong><br>
                     <code class="command">pip install requests>=2.31.0</code><br>
+                    </li>
+                    
+                    <li><strong>Install asteval:</strong><br>
+                    <code class="command">pip install asteval>=0.9.31</code><br>
                     </li>
                 </ol>
                 <p>After installing all dependencies, verify they are installed correctly using <code class="command">pip list</code>.</p>
@@ -1378,6 +1384,10 @@
                     <li><strong>Average Centipawn Loss (CPL):</strong> Average deviation from optimal play measured in centipawns</li>
                     <li><strong>Estimated ELO:</strong> An estimated playing strength rating based on the player's move quality in this specific game. This is a best-effort approximation that may not accurately reflect a player's true rating, especially since it's calculated from a single game rather than a statistical sample across many games. The estimate considers average move quality, blunders, and mistakes to provide a rough indication of playing strength, but should be interpreted with caution.</li>
                 </ul>
+                
+                <div class="tip-box">
+                    <strong>Quick Tip:</strong> You can customize the formulas used to calculate accuracy percentage and estimated ELO to match your preferences. See <a href="#customizing-formulas">section 7.8 "Customizing ELO and Accuracy Formulas"</a> for details on available variables, functions, and examples.
+                </div>
                 
                 <p><strong>Move Classification:</strong> The view displays pie charts showing the distribution of move quality throughout the game for each player. You can see how many moves were strong (Best Move, Good Move, Brilliant) versus how many were errors (Inaccuracy, Mistake, Blunder), giving you a quick visual overview of each player's performance. The charts also show book moves and missed opportunities.</p>
                 
@@ -2953,10 +2963,134 @@
                     </table>
                 </div>
             </div>
+            
+            <div class="outline-item">
+                <h4 id="customizing-formulas">7.8 Customizing ELO and Accuracy Formulas</h4>
+                <p>CARA allows you to customize the formulas used to calculate estimated ELO ratings and accuracy percentages for players. These formulas are defined in <code>config.json</code>.</p>
+                
+                <h5>7.8.1 Configuration Location</h5>
+                <p>The formula configurations are located in <code>config.json</code> under the <code>game_analysis</code> section:</p>
+                <ul>
+                    <li><code>game_analysis → elo_estimation</code> - Formula for estimating player ELO</li>
+                    <li><code>game_analysis → accuracy_formula</code> - Formula for calculating player accuracy</li>
+                </ul>
+                
+                <h5>7.8.2 Formula Structure</h5>
+                <p>Each formula configuration contains the following fields:</p>
+                <ul>
+                    <li><strong><code>formula</code>:</strong> A string containing the mathematical expression to evaluate. If omitted or empty, CARA uses the default formula.</li>
+                    <li><strong><code>value_on_error</code>:</strong> The value to return if the formula evaluation fails (default: <code>0</code> for ELO, <code>0.0</code> for accuracy).</li>
+                    <li><strong><code>_examples</code>:</strong> (Optional) A dictionary of example formulas for reference. These are not used by the application but serve as documentation.</li>
+                </ul>
+                
+                <div class="tip-box">
+                    <strong>Important:</strong> Always make a backup copy of <code>config.json</code> before making changes. Invalid JSON syntax will prevent CARA from loading the configuration file. Formula evaluation errors will cause CARA to use the <code>value_on_error</code> value. If the <code>formula</code> field is missing or empty, CARA will use the default formula.
+                </div>
+                
+                <h5>7.8.3 Available Variables</h5>
+                <p>The following variables are available for use in both ELO and accuracy formulas:</p>
+                <ul>
+                    <li><strong><code>total_moves</code>:</strong> Total number of moves in the game (integer)</li>
+                    <li><strong><code>non_book_moves</code>:</strong> Number of moves analyzed (excluding book moves) (integer)</li>
+                    <li><strong><code>book_moves</code>:</strong> Number of book moves (moves found in opening books) (integer)</li>
+                    <li><strong><code>blunders</code>:</strong> Number of blunders made by the player (integer)</li>
+                    <li><strong><code>mistakes</code>:</strong> Number of mistakes made by the player (integer)</li>
+                    <li><strong><code>inaccuracies</code>:</strong> Number of inaccuracies made by the player (integer)</li>
+                    <li><strong><code>misses</code>:</strong> Number of missed opportunities (brilliant moves not played) (integer)</li>
+                    <li><strong><code>best_moves</code>:</strong> Number of best moves played (integer)</li>
+                    <li><strong><code>good_moves</code>:</strong> Number of good moves played (integer)</li>
+                    <li><strong><code>brilliant_moves</code>:</strong> Number of brilliant moves played (integer)</li>
+                    <li><strong><code>average_cpl</code>:</strong> Average centipawn loss across all analyzed moves (float)</li>
+                    <li><strong><code>median_cpl</code>:</strong> Median centipawn loss across all analyzed moves (float)</li>
+                    <li><strong><code>min_cpl</code>:</strong> Minimum centipawn loss (best move) (float)</li>
+                    <li><strong><code>max_cpl</code>:</strong> Maximum centipawn loss (worst move) (float)</li>
+                    <li><strong><code>blunder_rate</code>:</strong> Blunder rate as a decimal (0.0 to 1.0) (float)</li>
+                    <li><strong><code>mistake_rate</code>:</strong> Mistake rate as a decimal (0.0 to 1.0) (float)</li>
+                    <li><strong><code>accuracy</code>:</strong> Calculated accuracy percentage (0.0 to 100.0) (float) - <em>Note: This variable is only available in the ELO formula, not in the accuracy formula itself (to avoid circular dependency)</em></li>
+                    <li><strong><code>has_won</code>:</strong> <code>1</code> if the player won the game, <code>0</code> otherwise (integer)</li>
+                    <li><strong><code>has_drawn</code>:</strong> <code>1</code> if the game was a draw or had an undefined result, <code>0</code> otherwise (integer)</li>
+                </ul>
+                
+                <h5>7.8.4 Available Functions</h5>
+                <p>The following functions are available in formulas:</p>
+                <ul>
+                    <li><strong><code>min(x, y)</code>:</strong> Returns the minimum of two values</li>
+                    <li><strong><code>max(x, y)</code>:</strong> Returns the maximum of two values</li>
+                    <li><strong><code>int(x)</code>:</strong> Converts a value to an integer (useful for ELO formulas)</li>
+                </ul>
+                <p>Standard mathematical operators are also supported: <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>**</code> (exponentiation), and parentheses for grouping.</p>
+                
+                <h5>7.8.5 ELO Estimation Formula</h5>
+                <p>The ELO estimation formula calculates an estimated ELO rating based on player performance. The result is automatically clamped to a minimum of 0 (negative ELO values are not allowed).</p>
+                
+                <p><strong>Default Formula:</strong></p>
+                <pre><code>"formula": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40)))"</code></pre>
+                <p></p>
+                <p><strong>Example Custom Formulas:</strong></p>
+                
+                <p>A simplified formula that only considers average centipawn loss:</p>
+                <pre><code>"formula": "max(0, int(2800 - (average_cpl * 10)))"</code></pre>
+                <p></p>
+                
+                <p>Add a bonus for wins and a penalty for losses (when the player has not won and has not drawn):</p>
+                <pre><code>"formula": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) + (has_won * 50) - ((1 - has_won) * (1 - has_drawn) * 30)))"</code></pre>
+                <p></p>
+                
+                <p>Directly converts accuracy percentage to ELO (e.g., 90% accuracy ≈ 2520 ELO):</p>
+                <pre><code>"formula": "max(0, int(accuracy * 28))"</code></pre>
+                
+                <h5>7.8.6 Accuracy Formula</h5>
+                <p>The accuracy formula calculates a player's accuracy percentage (0.0 to 100.0). The result is automatically clamped to the range 0.0 to 100.0.</p>
+                
+                <p><strong>Default Formula:</strong></p>
+                <pre><code>"formula": "max(5.0, min(100.0, 100.0 - (average_cpl / 3.5)))"</code></pre>
+                <p></p>
+                <p><strong>Example Custom Formulas:</strong></p>
+                
+                <p>A simplified formula with a different scaling factor:</p>
+                <pre><code>"formula": "100.0 - (average_cpl / 2.0)"</code></pre>
+                <p></p>
+                
+                <p>Ensures accuracy never drops below 10%:</p>
+                <pre><code>"formula": "max(10.0, 100.0 - (average_cpl / 3.0))"</code></pre>
+                <p></p>
+                
+                <p>Applies an additional penalty based on blunder rate:</p>
+                <pre><code>"formula": "max(0.0, 100.0 - (average_cpl / 3.5) - (blunder_rate * 100))"</code></pre>
+                
+                <h5>7.8.7 Editing Formulas</h5>
+                <p>To customize a formula:</p>
+                
+                <p><strong>Locate the formula configuration:</strong><br>
+                Open <code>config.json</code> in a text editor and navigate to: <code>game_analysis → elo_estimation</code> or <code>game_analysis → accuracy_formula</code></p>
+                
+                <p><strong>Modify the formula string:</strong><br>
+                Edit the <code>"formula"</code> field with your desired expression. For example:</p>
+                <pre><code>"elo_estimation": {
+    "formula": "max(0, int(2800 - (average_cpl * 10)))",
+    "value_on_error": 0
+}</code></pre>
+                <p></p>
+                
+                <p><strong>Set error handling (optional):</strong><br>
+                Adjust <code>"value_on_error"</code> to specify what value should be returned if the formula evaluation fails. This is useful for debugging or providing fallback values.</p>
+                
+                <p><strong>Save and restart:</strong><br>
+                Save the file and restart CARA for the changes to take effect. The new formulas will be used for all game summaries and player statistics calculations.</p>
+                
+                <div class="tip-box">
+                    <strong>Testing Formulas:</strong> After modifying formulas, analyze a few games and check the Game Summary panel to verify the results match your expectations. If values seem incorrect, check the formula syntax and ensure all variable names are spelled correctly. Invalid formulas will fall back to the <code>value_on_error</code> value.
+                </div>
+                
+                <h5>7.8.8 Player Statistics</h5>
+                <p>When calculating player statistics across multiple games, CARA calculates ELO and accuracy for each individual game using the configured formulas, then averages these values. This approach ensures that each game contributes equally to the final statistics, regardless of game length or number of moves analyzed.</p>
+                
+                <p>For example, if a player has three games with ELO estimates of 1800, 1900, and 2000, the player's average ELO will be 1900, not a single calculation based on all moves combined.</p>
+            </div>
         </section>
 
         <footer style="margin-top: 50px; padding-top: 20px; border-top: 2px solid rgb(60, 60, 65); color: rgb(180, 180, 180); text-align: center;">
-            <p>CARA - Chess Analysis and Review Application v2.5.0</p>
+            <p>CARA - Chess Analysis and Review Application v2.5.1</p>
             <p>Copyright (C) 2025 Philipp Guntermann</p>
             <p>This program is free software: you can redistribute it and/or modify it under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" style="color: rgb(100, 150, 255);">GNU General Public License version 3</a> (GPL-3.0) or any later version.</p>
             <p>This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.</p>
