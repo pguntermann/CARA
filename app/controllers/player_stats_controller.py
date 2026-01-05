@@ -189,7 +189,7 @@ class PlayerStatsController(QObject):
                 
                 moves = self._game_controller.extract_moves_from_game(game)
                 if moves:
-                    summary = self.summary_service.calculate_summary(moves, len(moves))
+                    summary = self.summary_service.calculate_summary(moves, len(moves), game_result=game.result)
                     if summary:
                         game_summaries.append(summary)
             

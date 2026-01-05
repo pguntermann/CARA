@@ -3,6 +3,8 @@
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 
+from asteval import Interpreter
+
 from app.models.moveslist_model import MoveData
 from app.models.move_classification_model import MoveClassificationModel
 from app.services.game_highlights.base_rule import GameHighlight
@@ -119,7 +121,88 @@ class GameSummaryService:
         highlights_config = summary_config.get('highlights', {})
         self.highlights_per_phase_limit = highlights_config.get('max_per_phase', 7)
     
-    def calculate_summary(self, moves: List[MoveData], total_moves: int) -> GameSummary:
+    def _evaluate_accuracy_formula(self, **kwargs) -> float:
+        """Evaluate accuracy formula using asteval.
+        
+        Args:
+            **kwargs: All available variables for the formula.
+            
+        Returns:
+            Calculated accuracy value (0.0 to 100.0).
+        """
+        game_analysis_config = self.config.get('game_analysis', {})
+        accuracy_config = game_analysis_config.get('accuracy_formula', {})
+        formula = accuracy_config.get('formula', None)
+        value_on_error = accuracy_config.get('value_on_error', 0.0)
+        
+        # Default formula (current hardcoded one)
+        default_formula = "max(5.0, min(100.0, 100.0 - (average_cpl / 3.5)))"
+        
+        formula_to_use = formula if formula else default_formula
+        
+        try:
+            aeval = Interpreter()
+            # Set variables in the symtable
+            for key, value in kwargs.items():
+                aeval.symtable[key] = value
+            # Add built-in functions
+            aeval.symtable['min'] = min
+            aeval.symtable['max'] = max
+            # Evaluate the formula
+            result = aeval(formula_to_use)
+            if result is None:
+                return float(value_on_error)
+            accuracy = float(result)
+            # Clamp to reasonable range
+            return max(0.0, min(100.0, accuracy))
+        except Exception as e:
+            # Log error for debugging
+            import sys
+            print(f"Error evaluating accuracy formula: {e}", file=sys.stderr)
+            return float(value_on_error)
+    
+    def _evaluate_elo_formula(self, **kwargs) -> int:
+        """Evaluate ELO formula using asteval.
+        
+        Args:
+            **kwargs: All available variables for the formula.
+            
+        Returns:
+            Calculated ELO value (clamped to >= 0).
+        """
+        game_analysis_config = self.config.get('game_analysis', {})
+        elo_config = game_analysis_config.get('elo_estimation', {})
+        formula = elo_config.get('formula', None)
+        value_on_error = elo_config.get('value_on_error', 0)
+        
+        # Default formula (current hardcoded one)
+        default_formula = "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40)))"
+        
+        formula_to_use = formula if formula else default_formula
+        
+        try:
+            aeval = Interpreter()
+            # Set variables in the symtable
+            for key, value in kwargs.items():
+                aeval.symtable[key] = value
+            # Add built-in functions
+            aeval.symtable['min'] = min
+            aeval.symtable['max'] = max
+            aeval.symtable['int'] = int
+            # Evaluate the formula
+            result = aeval(formula_to_use)
+            if result is None:
+                return int(value_on_error)
+            estimated_elo = int(result)
+            # Clamp to >= 0 
+            return max(0, estimated_elo)
+        except Exception as e:
+            # Log error for debugging
+            import sys
+            print(f"Error evaluating ELO formula: {e}", file=sys.stderr)
+            return int(value_on_error)
+    
+    def calculate_summary(self, moves: List[MoveData], total_moves: int, game_result: Optional[str] = None) -> GameSummary:
         """Calculate complete game summary from moves data.
         
         Args:
@@ -130,8 +213,8 @@ class GameSummaryService:
             GameSummary instance with all calculated statistics.
         """
         # Calculate player statistics
-        white_stats = self._calculate_player_statistics(moves, is_white=True)
-        black_stats = self._calculate_player_statistics(moves, is_white=False)
+        white_stats = self._calculate_player_statistics(moves, is_white=True, game_result=game_result)
+        black_stats = self._calculate_player_statistics(moves, is_white=False, game_result=game_result)
         
         # Determine phase boundaries (same for both players - game-level concept)
         opening_end, middlegame_end = self._determine_phase_boundaries(moves, total_moves)
@@ -212,12 +295,13 @@ class GameSummaryService:
             highlights=highlights
         )
     
-    def _calculate_player_statistics(self, moves: List[MoveData], is_white: bool) -> PlayerStatistics:
+    def _calculate_player_statistics(self, moves: List[MoveData], is_white: bool, game_result: Optional[str] = None) -> PlayerStatistics:
         """Calculate statistics for a single player.
         
         Args:
             moves: List of MoveData instances.
             is_white: True for White, False for Black.
+            game_result: Optional game result string ("1-0", "0-1", "1/2-1/2", "", "*", or None).
             
         Returns:
             PlayerStatistics instance.
@@ -236,7 +320,7 @@ class GameSummaryService:
         
         # Count moves and classifications
         total_moves = 0
-        analyzed_moves = 0
+        non_book_moves = 0  # All moves except book moves (renamed from analyzed_moves)
         book_moves = 0
         brilliant_moves = 0
         best_moves = 0
@@ -268,25 +352,25 @@ class GameSummaryService:
                 book_moves += 1
             elif assessment == "Brilliant":
                 brilliant_moves += 1
-                analyzed_moves += 1
+                non_book_moves += 1
             elif assessment == "Best Move":
                 best_moves += 1
-                analyzed_moves += 1
+                non_book_moves += 1
             elif assessment == "Good Move":
                 good_moves += 1
-                analyzed_moves += 1
+                non_book_moves += 1
             elif assessment == "Inaccuracy":
                 inaccuracies += 1
-                analyzed_moves += 1
+                non_book_moves += 1
             elif assessment == "Mistake":
                 mistakes += 1
-                analyzed_moves += 1
+                non_book_moves += 1
             elif assessment == "Miss":
                 misses += 1
-                analyzed_moves += 1
+                non_book_moves += 1
             elif assessment == "Blunder":
                 blunders += 1
-                analyzed_moves += 1
+                non_book_moves += 1
             
             # Parse CPL (exclude book moves)
             if cpl_str and assessment != "Book Move":
@@ -319,36 +403,75 @@ class GameSummaryService:
             min_cpl = 0.0
             max_cpl = 0.0
         
-        # Calculate accuracy (improved formula: uses larger divisor and minimum floor)
-        # Formula: max(5.0, 100.0 - ACPL/3.5) ensures minimum 5% accuracy for reasonable play
-        # This prevents 0% accuracy even for high ACPL values like 500
-        accuracy = max(5.0, min(100.0, 100.0 - (average_cpl / 3.5)))
+        # Calculate game result variables
+        if is_white:
+            has_won = 1 if game_result == "1-0" else 0
+            has_drawn = 1 if (game_result == "1/2-1/2" or not game_result or game_result == "*") else 0
+        else:
+            has_won = 1 if game_result == "0-1" else 0
+            has_drawn = 1 if (game_result == "1/2-1/2" or not game_result or game_result == "*") else 0
         
-        # Calculate estimated Elo (2800 - ACPL×8.5 - penalties)
-        # Penalty is normalized per move to work correctly for both single games and aggregated statistics
-        base_elo = 2800 - (average_cpl * 8.5)
-        # Normalize penalty by total moves to get rate-based penalty
-        # Original formula: (blunders * 50) + (mistakes * 20) assumes ~40 moves per game
-        # For aggregated stats, we normalize: penalty_per_move = (blunders * 50 + mistakes * 20) / total_moves
-        # Then scale back: penalty = penalty_per_move * 40 (assuming 40 moves per game as baseline)
+        # Calculate rates
         if total_moves > 0:
             blunder_rate = blunders / total_moves
             mistake_rate = mistakes / total_moves
-            # Scale penalty based on rates (original formula assumes ~40 moves per game)
-            BASELINE_MOVES_PER_GAME = 40.0
-            penalty = (blunder_rate * 50 + mistake_rate * 20) * BASELINE_MOVES_PER_GAME
         else:
-            penalty = 0.0
-        estimated_elo = max(0, min(3000, int(base_elo - penalty)))
+            blunder_rate = 0.0
+            mistake_rate = 0.0
+        
+        # Calculate accuracy using customizable formula
+        accuracy = self._evaluate_accuracy_formula(
+            average_cpl=average_cpl,
+            total_moves=total_moves,
+            non_book_moves=non_book_moves,
+            book_moves=book_moves,
+            blunders=blunders,
+            mistakes=mistakes,
+            inaccuracies=inaccuracies,
+            misses=misses,
+            best_moves=best_moves,
+            good_moves=good_moves,
+            brilliant_moves=brilliant_moves,
+            median_cpl=median_cpl,
+            min_cpl=min_cpl,
+            max_cpl=max_cpl,
+            blunder_rate=blunder_rate,
+            mistake_rate=mistake_rate,
+            has_won=has_won,
+            has_drawn=has_drawn
+        )
+        
+        # Calculate estimated ELO using customizable formula
+        estimated_elo = self._evaluate_elo_formula(
+            average_cpl=average_cpl,
+            total_moves=total_moves,
+            non_book_moves=non_book_moves,
+            book_moves=book_moves,
+            blunders=blunders,
+            mistakes=mistakes,
+            inaccuracies=inaccuracies,
+            misses=misses,
+            best_moves=best_moves,
+            good_moves=good_moves,
+            brilliant_moves=brilliant_moves,
+            median_cpl=median_cpl,
+            min_cpl=min_cpl,
+            max_cpl=max_cpl,
+            blunder_rate=blunder_rate,
+            mistake_rate=mistake_rate,
+            accuracy=accuracy,
+            has_won=has_won,
+            has_drawn=has_drawn
+        )
         
         # Calculate percentages
         best_move_percentage = (best_moves / total_moves * 100) if total_moves > 0 else 0.0
         top3_move_percentage = (top3_moves / total_moves * 100) if total_moves > 0 else 0.0
-        blunder_rate = (blunders / total_moves * 100) if total_moves > 0 else 0.0
+        blunder_rate_percentage = (blunders / total_moves * 100) if total_moves > 0 else 0.0
         
         return PlayerStatistics(
             total_moves=total_moves,
-            analyzed_moves=analyzed_moves,
+            analyzed_moves=non_book_moves,  # Keep field name for backward compatibility
             book_moves=book_moves,
             brilliant_moves=brilliant_moves,
             best_moves=best_moves,
@@ -365,7 +488,7 @@ class GameSummaryService:
             estimated_elo=estimated_elo,
             best_move_percentage=best_move_percentage,
             top3_move_percentage=top3_move_percentage,
-            blunder_rate=blunder_rate
+            blunder_rate=blunder_rate_percentage
         )
     
     def _determine_phase_boundaries(self, moves: List[MoveData], total_moves: int) -> Tuple[int, int]:

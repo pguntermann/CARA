@@ -4599,6 +4599,25 @@
       "inaccuracy_max_cpl": 100,
       "mistake_max_cpl": 200
     },
+    "accuracy_formula": {
+      "formula": "max(5.0, min(100.0, 100.0 - (average_cpl / 3.5)))",
+      "value_on_error": 0.0,
+      "_examples": {
+        "default": "max(5.0, min(100.0, 100.0 - (average_cpl / 3.5)))",
+        "simple": "100.0 - (average_cpl / 2.0)",
+        "with_minimum": "max(10.0, 100.0 - (average_cpl / 3.0))"
+      }
+    },
+    "elo_estimation": {
+      "formula": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40)))",
+      "value_on_error": 0,
+      "_examples": {
+        "default": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40)))",
+        "simple": "max(0, int(2800 - (average_cpl * 10)))",
+        "with_result_bonus": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) + (has_won * 50) - ((1 - has_won) * (1 - has_drawn) * 30)))",
+        "accuracy_based": "max(0, int(accuracy * 28))"
+      }
+    },
     "brilliant_criteria": {
       "min_eval_swing": 50,
       "min_material_sacrifice": 300,

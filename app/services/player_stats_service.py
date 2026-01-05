@@ -193,8 +193,42 @@ class PlayerStatsService:
         if not all_moves:
             return None
         
-        # Calculate aggregated player statistics
-        aggregated_stats = self.summary_service._calculate_player_statistics(all_moves, use_white)
+        # Calculate per-game statistics, then average ELO and accuracy
+        # This ensures formulas work correctly with has_won/has_drawn per game
+        elo_values = []
+        accuracy_values = []
+        
+        for game in analyzed_games:
+            moves = controller.extract_moves_from_game(game)
+            if not moves:
+                continue
+            
+            is_white_game = (game.white == player_name)
+            game_result = game.result
+            
+            # Calculate stats for this game (same code as single-game)
+            game_stats = self.summary_service._calculate_player_statistics(
+                moves, is_white_game, game_result=game_result
+            )
+            
+            elo_values.append(game_stats.estimated_elo)
+            accuracy_values.append(game_stats.accuracy)
+        
+        # Average the results
+        if elo_values:
+            averaged_elo = sum(elo_values) / len(elo_values)
+            averaged_accuracy = sum(accuracy_values) / len(accuracy_values)
+        else:
+            averaged_elo = 0
+            averaged_accuracy = 0.0
+        
+        # Still calculate aggregated stats for other metrics (CPL, move counts, etc.)
+        # But we'll replace ELO and accuracy with averaged values
+        aggregated_stats = self.summary_service._calculate_player_statistics(all_moves, use_white, game_result=None)
+        
+        # Override with averaged values
+        aggregated_stats.estimated_elo = int(averaged_elo)
+        aggregated_stats.accuracy = averaged_accuracy
         
         # Calculate aggregated phase statistics
         opening_stats = self.summary_service._calculate_phase_stats(all_opening_moves, cpl_field, assess_field)
