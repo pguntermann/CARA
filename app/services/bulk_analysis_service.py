@@ -71,21 +71,22 @@ class BulkAnalysisService(QObject):
     
     @staticmethod
     def calculate_parallel_resources(max_parallel_games: int = 4, 
-                                     max_total_threads: Optional[int] = None) -> Tuple[int, int]:
-        """Calculate optimal number of parallel games and threads per engine.
+                                     max_total_threads: Optional[int] = None) -> Tuple[int, List[int]]:
+        """Calculate optimal number of parallel games and thread distribution per engine.
         
         This method intelligently splits available CPU resources across multiple
-        engine instances for parallel game analysis. It uses only the max_total_threads
-        setting from the bulk analysis dialog, ignoring the engine's normal thread configuration.
+        engine instances for parallel game analysis. It distributes threads dynamically
+        to maximize utilization, using only the max_total_threads setting from the
+        bulk analysis dialog, ignoring the engine's normal thread configuration.
         
         Args:
             max_parallel_games: Maximum number of parallel games to allow (default: 4).
             max_total_threads: Optional maximum total threads to use across all parallel games (None = unlimited).
             
         Returns:
-            Tuple of (parallel_games, threads_per_engine).
-            - parallel_games: Number of games to analyze in parallel (1-4)
-            - threads_per_engine: Number of threads to use per engine instance
+            Tuple of (parallel_games, threads_per_engine_list).
+            - parallel_games: Number of games to analyze in parallel
+            - threads_per_engine_list: List of thread counts, one per parallel game (may vary to use all threads)
         """
         # Get available CPU cores
         # If max_total_threads is provided, use it instead of available cores
@@ -94,26 +95,28 @@ class BulkAnalysisService(QObject):
         else:
             available_cores = os.cpu_count() or 4  # Fallback to 4 if detection fails
         
-        # Calculate how many parallel games we can support
-        # Each engine should get at least 2 threads for efficiency
-        min_threads_per_engine = 2
-        max_parallel = min(available_cores // min_threads_per_engine, max_parallel_games)
+        # Determine number of parallel games (limited by max_parallel_games)
+        max_parallel = min(max_parallel_games, available_cores)
         
+        # Ensure at least 1 parallel game
         if max_parallel < 1:
             max_parallel = 1
         
-        # Distribute available cores evenly across parallel games
-        threads_per_engine = available_cores // max_parallel
+        # Distribute threads dynamically to use all available cores
+        # Some games may get more threads than others if cores don't divide evenly
+        threads_per_engine_list = []
+        base_threads = available_cores // max_parallel
+        remainder = available_cores % max_parallel
         
-        # Ensure each engine gets at least 2 threads
-        if threads_per_engine < min_threads_per_engine:
-            # Reduce parallel games to ensure minimum threads per engine
-            max_parallel = available_cores // min_threads_per_engine
-            if max_parallel < 1:
-                max_parallel = 1
-            threads_per_engine = available_cores // max_parallel if max_parallel > 0 else available_cores
+        # Distribute base threads to all games
+        for i in range(max_parallel):
+            threads = base_threads
+            # Distribute remainder threads to first 'remainder' games
+            if i < remainder:
+                threads += 1
+            threads_per_engine_list.append(threads)
         
-        return (max_parallel, threads_per_engine)
+        return (max_parallel, threads_per_engine_list)
     
     def _load_classification_thresholds(self) -> None:
         """Load classification thresholds from model or config."""
@@ -144,6 +147,12 @@ class BulkAnalysisService(QObject):
         if self._engine_service:
             self._engine_service.stop_analysis()
             self._engine_service.cleanup()
+    
+    def cleanup(self) -> None:
+        """Cleanup engine service after analysis completes normally."""
+        if self._engine_service:
+            self._engine_service.cleanup()
+            self._engine_service = None
     
     def analyze_game(self, game: GameData, progress_callback=None) -> bool:
         """Analyze a single game without making it active.

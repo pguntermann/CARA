@@ -62,7 +62,11 @@ class GameSummaryController(QObject):
             return
 
         try:
-            summary = self.summary_service.calculate_summary(moves, len(moves))
+            # Get game result from active game if available
+            game_result = None
+            if self._game_model and self._game_model.active_game:
+                game_result = self._game_model.active_game.result
+            summary = self.summary_service.calculate_summary(moves, len(moves), game_result=game_result)
         except Exception:
             # Avoid crashing the UI; surface a generic error state
             self._emit_unavailable("error")

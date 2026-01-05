@@ -105,6 +105,10 @@ class ContinuousGameAnalysisWorker(QThread):
                 self._game_finished_callback(game, success)
             except Exception as e:
                 self._game_finished_callback(game, False)
+            finally:
+                # Cleanup is handled by BulkAnalysisThread's finally block
+                # This ensures cleanup happens even if worker finishes normally
+                pass
 
 
 class GameAnalysisWorker(QThread):
@@ -236,6 +240,7 @@ class BulkAnalysisThread(QThread):
         self._total_threads_used = 0
         self._parallel_games = 0
         self._threads_per_engine = 0
+        self._analysis_services: List[BulkAnalysisService] = []  # Store for cleanup
     
     def _get_next_game(self) -> Optional[Tuple[GameData, int]]:
         """Get next game from queue (thread-safe).
@@ -293,6 +298,10 @@ class BulkAnalysisThread(QThread):
         
         This method should be called from the main thread to avoid UI blocking.
         """
+        # Don't update status if analysis has been cancelled
+        if self._cancelled:
+            return
+        
         # Get data from thread-safe storage (quick lock)
         with self._progress_lock:
             game_progress_copy = self._game_progress.copy()
@@ -370,6 +379,33 @@ class BulkAnalysisThread(QThread):
         # Count completed games
         completed_count = analyzed_count + skipped_count
         
+        # Calculate active workers and thread information dynamically
+        active_workers_count = 0
+        active_parallel_games = 0
+        active_total_threads = 0
+        
+        if hasattr(self, '_workers') and self._workers:
+            active_workers_count = sum(1 for w in self._workers if w.isRunning())
+            if active_workers_count > 0 and hasattr(self, '_threads_per_engine_list'):
+                active_parallel_games = active_workers_count
+                # Sum actual thread counts for active workers (dynamic distribution)
+                active_total_threads = sum(
+                    self._threads_per_engine_list[i] 
+                    for i in range(min(active_workers_count, len(self._threads_per_engine_list)))
+                )
+            elif active_workers_count > 0 and hasattr(self, '_threads_per_engine') and self._threads_per_engine > 0:
+                # Fallback for backward compatibility
+                active_parallel_games = active_workers_count
+                active_total_threads = active_workers_count * self._threads_per_engine
+            else:
+                # Fall back to initial values if threads_per_engine not set or no active workers
+                active_parallel_games = self._parallel_games if hasattr(self, '_parallel_games') else 0
+                active_total_threads = self._total_threads_used if hasattr(self, '_total_threads_used') else 0
+        else:
+            # Workers not initialized yet, use initial values
+            active_parallel_games = self._parallel_games if hasattr(self, '_parallel_games') else 0
+            active_total_threads = self._total_threads_used if hasattr(self, '_total_threads_used') else 0
+        
         # Format dialog status message (without percentage - that goes in progress bar label)
         if active_count > 0:
             dialog_status = f"Analyzing {active_count} game{'s' if active_count != 1 else ''} from total {total_games} games, {completed_count} game{'s' if completed_count != 1 else ''} completed."
@@ -433,7 +469,20 @@ class BulkAnalysisThread(QThread):
                     minutes = int((estimated_remaining % 3600) // 60)
                     time_str = f"{hours}h {minutes}m"
                 
-                threads_info = f"{self._total_threads_used} threads ({self._parallel_games}×{self._threads_per_engine})" if self._total_threads_used > 0 else ""
+                # Format thread info - show distribution if threads vary, otherwise show simple format
+                if active_total_threads > 0 and hasattr(self, '_threads_per_engine_list') and active_parallel_games <= len(self._threads_per_engine_list):
+                    thread_counts = [self._threads_per_engine_list[i] for i in range(active_parallel_games)]
+                    if len(set(thread_counts)) == 1:
+                        # All same - show simple format
+                        threads_info = f"{active_total_threads} threads ({active_parallel_games}×{thread_counts[0]})"
+                    else:
+                        # Varying - show distribution
+                        thread_dist = "+".join(map(str, thread_counts))
+                        threads_info = f"{active_total_threads} threads ({thread_dist})"
+                elif active_total_threads > 0 and hasattr(self, '_threads_per_engine') and self._threads_per_engine > 0:
+                    threads_info = f"{active_total_threads} threads ({active_parallel_games}×{self._threads_per_engine})"
+                else:
+                    threads_info = ""
                 status_parts = [
                     f"Bulk Analysis: Analyzing {active_count} game{'s' if active_count != 1 else ''} ({avg_active_progress_str}%) from total {total_games} games, {completed_count} completed",
                     threads_info,
@@ -443,15 +492,42 @@ class BulkAnalysisThread(QThread):
                 ]
                 status_bar_message = " | ".join([p for p in status_parts if p])
             else:
+                # Format thread info - show distribution if threads vary, otherwise show simple format
+                if active_total_threads > 0 and hasattr(self, '_threads_per_engine_list') and active_parallel_games <= len(self._threads_per_engine_list):
+                    thread_counts = [self._threads_per_engine_list[i] for i in range(active_parallel_games)]
+                    if len(set(thread_counts)) == 1:
+                        # All same - show simple format
+                        threads_info = f"{active_total_threads} threads ({active_parallel_games}×{thread_counts[0]})"
+                    else:
+                        # Varying - show distribution
+                        thread_dist = "+".join(map(str, thread_counts))
+                        threads_info = f"{active_total_threads} threads ({thread_dist})"
+                elif active_total_threads > 0 and hasattr(self, '_threads_per_engine') and self._threads_per_engine > 0:
+                    threads_info = f"{active_total_threads} threads ({active_parallel_games}×{self._threads_per_engine})"
+                else:
+                    threads_info = ""
                 status_parts = [
                     f"Bulk Analysis: Analyzing {active_count} game{'s' if active_count != 1 else ''} ({avg_active_progress_str}%) from total {total_games} games, {completed_count} completed",
-                    f"{self._total_threads_used} threads ({self._parallel_games}×{self._threads_per_engine})",
+                    threads_info,
                     avg_depth_str,
                     avg_seldepth_str
                 ]
                 status_bar_message = " | ".join([p for p in status_parts if p])
         else:
-            threads_info = f"{self._total_threads_used} threads ({self._parallel_games}×{self._threads_per_engine})" if self._total_threads_used > 0 else ""
+            # Format thread info - show distribution if threads vary, otherwise show simple format
+            if active_total_threads > 0 and hasattr(self, '_threads_per_engine_list') and active_parallel_games <= len(self._threads_per_engine_list):
+                thread_counts = [self._threads_per_engine_list[i] for i in range(active_parallel_games)]
+                if len(set(thread_counts)) == 1:
+                    # All same - show simple format
+                    threads_info = f"{active_total_threads} threads ({active_parallel_games}×{thread_counts[0]})"
+                else:
+                    # Varying - show distribution
+                    thread_dist = "+".join(map(str, thread_counts))
+                    threads_info = f"{active_total_threads} threads ({thread_dist})"
+            elif active_total_threads > 0 and hasattr(self, '_threads_per_engine') and self._threads_per_engine > 0:
+                threads_info = f"{active_total_threads} threads ({active_parallel_games}×{self._threads_per_engine})"
+            else:
+                threads_info = ""
             status_parts = [
                 f"Bulk Analysis: Preparing analysis of {games_being_analyzed} game{'s' if games_being_analyzed != 1 else ''} from total {total_games} games, {completed_count} completed",
                 threads_info
@@ -499,14 +575,15 @@ class BulkAnalysisThread(QThread):
             # Calculate parallel resources based only on max_threads_override (ignores engine's normal thread setting)
             threading_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {}).get('threading', {})
             max_parallel_games = threading_config.get('max_parallel_games', 4)
-            parallel_games, threads_per_engine = BulkAnalysisService.calculate_parallel_resources(
+            parallel_games, threads_per_engine_list = BulkAnalysisService.calculate_parallel_resources(
                 max_parallel_games=max_parallel_games, max_total_threads=self.max_threads_override
             )
             
             # Store thread information for status bar display
             self._parallel_games = parallel_games
-            self._threads_per_engine = threads_per_engine
-            self._total_threads_used = parallel_games * threads_per_engine
+            self._threads_per_engine_list = threads_per_engine_list  # Store full list for dynamic distribution
+            self._threads_per_engine = threads_per_engine_list[0] if threads_per_engine_list else 0  # For backward compatibility
+            self._total_threads_used = sum(threads_per_engine_list)
             
             # Limit parallel games to actual number of games
             parallel_games = min(parallel_games, len(games_to_analyze))
@@ -523,18 +600,20 @@ class BulkAnalysisThread(QThread):
             self.progress_updated.emit(0.0, f"Creating {parallel_games} analysis service(s)...", initial_progress_str)
             
             # Create BulkAnalysisService instances (one per parallel game)
-            analysis_services: List[BulkAnalysisService] = []
+            self._analysis_services = []
             for i in range(parallel_games):
+                # Use dynamic thread distribution - each game may get different thread count
+                threads_for_this_game = threads_per_engine_list[i] if i < len(threads_per_engine_list) else threads_per_engine_list[0]
                 service = BulkAnalysisService(
                     self.config,
                     self.engine_model,
                     self.opening_service,
                     self.book_move_service,
                     self.classification_model,
-                    threads_override=threads_per_engine,
+                    threads_override=threads_for_this_game,
                     movetime_override=self.movetime_override
                 )
-                analysis_services.append(service)
+                self._analysis_services.append(service)
             
             # Emit progress update
             self.progress_updated.emit(0.0, f"Starting {parallel_games} worker thread(s)...", initial_progress_str)
@@ -545,7 +624,7 @@ class BulkAnalysisThread(QThread):
                 worker = ContinuousGameAnalysisWorker(
                     i,
                     total_games,
-                    analysis_services[i],
+                    self._analysis_services[i],
                     self.re_analyze,
                     self._get_next_game,
                     self._on_game_finished,
@@ -573,11 +652,17 @@ class BulkAnalysisThread(QThread):
         except Exception as e:
             self.finished.emit(False, f"Error during analysis: {str(e)}")
         finally:
-            # Cleanup
+            # Cleanup workers
             for worker in self._workers:
                 if worker.isRunning():
                     worker.cancel()
                     worker.wait()
+            
+            # Cleanup all analysis services (even if workers finished normally)
+            for service in self._analysis_services:
+                if service:
+                    service.cleanup()
+            self._analysis_services = []
     
     def _on_game_finished(self, game: GameData, success: bool) -> None:
         """Handle game analysis completion."""
@@ -1129,7 +1214,20 @@ class BulkAnalysisDialog(QDialog):
     def _on_status_update_requested(self) -> None:
         """Handle status update request from analysis thread (called from main thread)."""
         if self.analysis_thread:
-            self.analysis_thread._update_status_messages()
+            # Check if cancelled and update status accordingly
+            if self.analysis_thread._cancelled:
+                from app.services.progress_service import ProgressService
+                progress_service = ProgressService.get_instance()
+                # Show "Cancelling..." only if thread is still running
+                # Once thread finishes, _on_analysis_finished will show "Cancelled by user"
+                if self.analysis_thread.isRunning():
+                    progress_service.set_status("Bulk Analysis: Cancelling...")
+                    self.status_label.setText("Cancelling...")
+                else:
+                    progress_service.set_status("Bulk Analysis: Cancelled by user")
+                    self.status_label.setText("Cancelled by user")
+            else:
+                self.analysis_thread._update_status_messages()
     
     def _on_game_analyzed(self, game: GameData) -> None:
         """Handle game analyzed signal."""

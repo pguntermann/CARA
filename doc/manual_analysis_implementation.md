@@ -31,6 +31,8 @@ The manual analysis system follows a **Model-Controller-Service-View** pattern w
 - Emits `line_update` signals with analysis data
 - Updates position without restarting thread
 - Supports dynamic MultiPV changes
+- Throttles UI updates to prevent flooding (configurable via `update_interval_ms`)
+- Implements race condition prevention for position and MultiPV updates
 
 **PvPlanParserService** (`app/services/pv_plan_parser_service.py`):
 - Stateless service for parsing PV strings and extracting piece trajectories
@@ -71,15 +73,18 @@ The manual analysis system follows a **Model-Controller-Service-View** pattern w
 
 **Analysis Update Flow**:
 1. `ManualAnalysisEngineThread` receives UCI info output
-2. Thread parses evaluation, depth, PV, and emits `line_update` signal
-3. Controller's `_on_line_update()` receives signal
-4. Controller validates update matches expected FEN (filters stale updates)
-5. Controller calls `model.update_line()` to update `AnalysisLine`
-6. Model emits `analysis_changed` signal
-7. Controller's `_on_analysis_changed()` extracts first moves from PV1, PV2, PV3
-8. Controller updates `BoardModel` with best moves for arrows (only PV1-PV3 are integrated with board)
-9. Controller calls `_update_positional_plan()` if trajectory exploration is active (only works with PV1-PV3)
-10. View observes `analysis_changed` and updates display (debounced)
+2. Thread parses evaluation, depth, PV, and applies update throttling
+3. Thread checks if `update_interval_ms` (default: 100ms) has elapsed since last update
+4. If throttled, update is stored in `_pending_updates` for later emission
+5. If not throttled, thread emits `line_update` signal with analysis data
+6. Controller's `_on_line_update()` receives signal
+7. Controller validates update matches expected FEN (filters stale updates)
+8. Controller calls `model.update_line()` to update `AnalysisLine`
+9. Model emits `analysis_changed` signal
+10. Controller's `_on_analysis_changed()` extracts first moves from PV1, PV2, PV3
+11. Controller updates `BoardModel` with best moves for arrows (only PV1-PV3 are integrated with board)
+12. Controller calls `_update_positional_plan()` if trajectory exploration is active (only works with PV1-PV3)
+13. View observes `analysis_changed` and updates display (debounced)
 
 **Position Update Flow**:
 1. User navigates to different position in game
@@ -90,8 +95,11 @@ The manual analysis system follows a **Model-Controller-Service-View** pattern w
 6. After debounce, controller calls `_do_position_update()`
 7. Controller clears old lines and sets expected FEN
 8. Controller calls `service.update_position()` with new FEN
-9. Service thread updates position without restarting engine
-10. New analysis data arrives and updates model
+9. Service thread sets `_search_just_started` flag and `_search_start_time` timestamp
+10. Thread updates position without restarting engine (sends stop → position fen → go infinite)
+11. Thread ignores `bestmove` messages (infinite search never completes naturally)
+12. Thread clears flags only after search is established (depth >= 1 or 2+ info lines after 100ms)
+13. New analysis data arrives and updates model
 
 **Trajectory Exploration Flow**:
 1. User enables trajectory exploration via menu (e.g., "Explore PV1 Positional Plans")
@@ -141,6 +149,27 @@ Position updates are debounced to prevent excessive engine restarts:
 - Clears old lines before updating position
 - Filters stale updates using expected FEN tracking
 - Engine thread updates position without restart (efficient)
+
+**Bestmove Handling**:
+- Uses infinite search (`go infinite`) when depth=0 and movetime=0 (default configuration)
+- Ignores `bestmove` messages (similar to evaluation service)
+- `bestmove` messages only occur after `stop` command or when movetime expires
+- Position updates handle restarting the search when needed
+- No automatic restart on `bestmove` (infinite search never completes naturally)
+
+**Race Condition Prevention**:
+- Thread uses `_search_just_started` flag and `_search_start_time` timestamp for tracking search state
+- Flags are cleared only after search is established (depth >= 1 or 2+ info lines received after 100ms elapsed)
+- Prevents handling stale messages from previous searches
+
+**Update Throttling**:
+- Engine thread throttles `line_update` signal emissions using `update_interval_ms` (default: 100ms, configurable in config.json)
+- Updates are only emitted if at least `update_interval_ms` milliseconds have passed since last update for that MultiPV line
+- Pending updates are stored in `_pending_updates` and the latest update is emitted when throttling period expires
+- Prevents excessive signal emissions when engines send many info lines rapidly (some engines can send 50-100+ info lines per second)
+- Without throttling, each info line would trigger: signal emission → model update → controller processing (PV parsing, BoardModel updates, trajectory parsing) → board redraws
+- The view also has its own debounce timer, but controller work (including board updates) happens on every signal
+- Configurable via `ui.panels.detail.manual_analysis.update_interval_ms` in config.json
 
 ## Piece Trajectory Exploration System
 

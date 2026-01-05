@@ -80,7 +80,7 @@ class UCICommunicationService:
     search operations.
     """
     
-    def __init__(self, engine_path: Path, enable_debug: bool = False, 
+    def __init__(self, engine_path: Path, 
                  debug_callback: Optional[Callable[[str], None]] = None,
                  identifier: Optional[str] = None,
                  debug_outbound_callback: Optional[Callable[[], bool]] = None,
@@ -89,7 +89,6 @@ class UCICommunicationService:
         
         Args:
             engine_path: Path to UCI engine executable.
-            enable_debug: If True, log all UCI commands and responses.
             debug_callback: Optional callback function for debug messages.
                            Called with debug message string.
             identifier: Optional identifier for this UCI communication instance
@@ -101,7 +100,6 @@ class UCICommunicationService:
                                     Returns True if inbound debugging should be active.
         """
         self.engine_path = engine_path
-        self.enable_debug = enable_debug
         self.debug_callback = debug_callback
         self.identifier = identifier
         self.debug_outbound_callback = debug_outbound_callback
@@ -110,19 +108,6 @@ class UCICommunicationService:
         self._initialized = False
         self._uciok_received = False
         self._crash_logged = False  # Track if crash has been logged to avoid duplicates
-    
-    def _debug_log(self, message: str, direction: str = "INFO") -> None:
-        """Log debug message if debugging is enabled.
-        
-        Args:
-            message: Debug message to log.
-            direction: Direction of communication: "SEND", "RECV", or "INFO".
-        """
-        if self.enable_debug and self.debug_callback:
-            timestamp = time.strftime("%H:%M:%S.%f")[:-3]  # milliseconds
-            identifier_str = f"[{self.identifier}] " if self.identifier else ""
-            formatted = f"[UCI {direction}] {identifier_str}{timestamp}: {message}"
-            self.debug_callback(formatted)
     
     def _debug_lifecycle(self, event: str, details: str = "") -> None:
         """Log lifecycle event to console if lifecycle debugging is enabled.
@@ -216,21 +201,22 @@ class UCICommunicationService:
             True if process spawned successfully, False otherwise.
         """
         try:
-            self._debug_log(f"Spawning engine process: {self.engine_path}", "INFO")
+            # Use binary mode to avoid Windows text mode blocking issues
             self.process = subprocess.Popen(
                 [str(self.engine_path)],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1
+                text=False,  # Binary mode
+                bufsize=0  # Unbuffered for immediate data availability
             )
-            self._debug_log(f"Engine process spawned (PID: {self.process.pid})", "INFO")
+            # Initialize binary read buffer for manual line splitting
+            self._read_buffer = b''
             self._crash_logged = False  # Reset crash flag when engine starts
             self._debug_lifecycle("STARTED", "PID:" + str(self.process.pid))
             return True
         except Exception as e:
-            self._debug_log(f"Failed to spawn engine process: {str(e)}", "INFO")
+            self._debug_lifecycle("ERROR", f"Failed to spawn engine process: {str(e)}")
             return False
     
     def initialize_uci(self, timeout: float = 5.0, collect_lines: bool = False) -> tuple[bool, list[str]]:
@@ -244,7 +230,7 @@ class UCICommunicationService:
             Tuple of (success: bool, lines: list[str]). If collect_lines is False, lines is empty.
         """
         if not self.process:
-            self._debug_log("Cannot initialize UCI: process not spawned", "INFO")
+            self._debug_lifecycle("ERROR", "Cannot initialize UCI: process not spawned")
             return (False, [])
         
         try:
@@ -258,7 +244,7 @@ class UCICommunicationService:
             
             while (time.time() - start_time) < timeout:
                 if self.process.poll() is not None:
-                    self._debug_log("Engine process terminated during UCI initialization", "INFO")
+                    self._debug_lifecycle("ERROR", "Engine process terminated during UCI initialization")
                     return (False, lines_collected if collect_lines else [])
                 
                 # Use read_line with short timeout to get debug console output
@@ -274,16 +260,15 @@ class UCICommunicationService:
                     uciok_received = True
                     self._uciok_received = True
                     self._initialized = True
-                    self._debug_log("UCI initialization complete", "INFO")
                     break
             
             if not uciok_received:
-                self._debug_log(f"UCI initialization timeout (no uciok received within {timeout}s)", "INFO")
+                self._debug_lifecycle("ERROR", f"UCI initialization timeout (no uciok received within {timeout}s)")
                 return (False, lines_collected if collect_lines else [])
             
             return (True, lines_collected if collect_lines else [])
         except Exception as e:
-            self._debug_log(f"Error during UCI initialization: {str(e)}", "INFO")
+            self._debug_lifecycle("ERROR", f"Error during UCI initialization: {str(e)}")
             return (False, [])
     
     def send_command(self, command: str) -> bool:
@@ -296,24 +281,27 @@ class UCICommunicationService:
             True if command sent successfully, False otherwise.
         """
         if not self.process or self.process.poll() is not None:
-            self._debug_log(f"Cannot send command '{command}': process not available", "INFO")
+            self._debug_lifecycle("ERROR", f"Cannot send command '{command}': process not available")
             return False
         
         try:
-            self._debug_log(command, "SEND")
             self._debug_console(command, "SEND")
-            self.process.stdin.write(f"{command}\n")
+            # Encode string to bytes for binary mode
+            self.process.stdin.write(f"{command}\n".encode('utf-8'))
             self.process.stdin.flush()
             return True
         except Exception as e:
-            self._debug_log(f"Error sending command '{command}': {str(e)}", "INFO")
+            self._debug_lifecycle("ERROR", f"Error sending command '{command}': {str(e)}")
             return False
     
-    def read_line(self, timeout: Optional[float] = None) -> Optional[str]:
-        """Read a line from engine stdout.
+    def read_line(self, timeout: float) -> Optional[str]:
+        """Read a line from engine stdout using binary mode with manual line buffering.
+        
+        This avoids Windows text mode blocking issues while maintaining zero latency
+        when data is available.
         
         Args:
-            timeout: Optional timeout in seconds. If None, blocks until line available.
+            timeout: Timeout in seconds (required). Returns None if no line received within timeout.
             
         Returns:
             Line string (stripped) or None if timeout/error.
@@ -321,30 +309,57 @@ class UCICommunicationService:
         if not self.process or self.process.poll() is not None:
             return None
         
+        # Ensure buffer exists
+        if not hasattr(self, '_read_buffer'):
+            self._read_buffer = b''
+        
         try:
-            if timeout is not None:
-                # Non-blocking read with timeout
-                start_time = time.time()
-                while (time.time() - start_time) < timeout:
-                    line = self.process.stdout.readline()
+            # Fast path: check buffer first (zero latency if line already buffered)
+            if b'\n' in self._read_buffer:
+                newline_pos = self._read_buffer.find(b'\n')
+                line_bytes = self._read_buffer[:newline_pos]
+                self._read_buffer = self._read_buffer[newline_pos + 1:]
+                try:
+                    line = line_bytes.decode('utf-8', errors='replace').rstrip('\r').strip()
                     if line:
-                        line = line.strip()
-                        self._debug_log(line, "RECV")
                         self._debug_console(line, "RECV")
                         return line
-                    time.sleep(0.01)
-                return None
-            else:
-                # Blocking read
-                line = self.process.stdout.readline()
-                if line:
-                    line = line.strip()
-                    self._debug_log(line, "RECV")
-                    self._debug_console(line, "RECV")
-                    return line
-                return None
+                except Exception as e:
+                    self._debug_lifecycle("ERROR", f"Error decoding line: {str(e)}")
+                    return None
+            
+            # Non-blocking read with timeout
+            # Note: timeout is required - all callers provide a timeout value
+            if timeout is None:
+                raise ValueError("read_line() requires a timeout value")
+            
+            start_time = time.time()
+            while (time.time() - start_time) < timeout:
+                # Read chunk (returns immediately, empty bytes if no data)
+                chunk = self.process.stdout.read(1024)
+                if chunk:
+                    self._read_buffer += chunk
+                    # Check if we now have a complete line
+                    if b'\n' in self._read_buffer:
+                        newline_pos = self._read_buffer.find(b'\n')
+                        line_bytes = self._read_buffer[:newline_pos]
+                        self._read_buffer = self._read_buffer[newline_pos + 1:]
+                        try:
+                            line = line_bytes.decode('utf-8', errors='replace').rstrip('\r').strip()
+                            if line:
+                                self._debug_console(line, "RECV")
+                                return line
+                        except Exception as e:
+                            self._debug_lifecycle("ERROR", f"Error decoding line: {str(e)}")
+                            return None
+                else:
+                    # No data available - check timeout immediately (no sleep)
+                    if (time.time() - start_time) >= timeout:
+                        return None
+                    # Continue loop immediately - timeout check limits iterations
+            return None
         except Exception as e:
-            self._debug_log(f"Error reading line: {str(e)}", "INFO")
+            self._debug_lifecycle("ERROR", f"Error reading line: {str(e)}")
             return None
     
     def wait_for_readyok(self, timeout: float = 5.0) -> bool:
@@ -559,9 +574,9 @@ class UCICommunicationService:
             try:
                 self.process.kill()
                 self.process.wait()
-                self._debug_log("Engine process killed", "INFO")
+                self._debug_lifecycle("KILLED", "Engine process killed")
             except Exception as e:
-                self._debug_log(f"Error killing process: {str(e)}", "INFO")
+                self._debug_lifecycle("ERROR", f"Error killing process: {str(e)}")
     
     def cleanup(self) -> None:
         """Clean up resources."""
@@ -605,5 +620,4 @@ class UCICommunicationService:
         
         self._initialized = False
         self._uciok_received = False
-        self._debug_log("UCI communication cleaned up", "INFO")
 

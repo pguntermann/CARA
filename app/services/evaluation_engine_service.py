@@ -188,7 +188,6 @@ class EvaluationEngineThread(QThread):
             # Create UCI communication service
             self.uci = UCICommunicationService(
                 self.engine_path, 
-                enable_debug=False,
                 identifier="Evaluation"
             )
             
@@ -670,9 +669,10 @@ class EvaluationEngineService(QObject):
     def stop_evaluation(self) -> None:
         """Stop current evaluation."""
         if self.evaluation_thread:
+            # Set flags to stop the thread, it will exit naturally and cleanup in finally block
             self.evaluation_thread.stop_evaluation()
             self.evaluation_thread.shutdown()
-            self.evaluation_thread.wait(3000)  # Wait up to 3 seconds (milliseconds)
+            # Don't wait - let thread exit naturally, cleanup will happen in finally block
             self.evaluation_thread = None
     
     def suspend_evaluation(self) -> None:

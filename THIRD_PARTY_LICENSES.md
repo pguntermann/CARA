@@ -18,6 +18,11 @@ CARA relies on the third-party components listed below. End users normally insta
 - Source: https://requests.readthedocs.io/
 - License: Apache License 2.0
 
+### asteval (>= 0.9.31)
+- Source: https://github.com/newville/asteval
+- License: MIT License
+- Notes: The MIT License text is provided below in the "ECO Database" section.
+
 #### Apache License 2.0
 ```
 Apache License

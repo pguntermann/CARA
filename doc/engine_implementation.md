@@ -45,6 +45,9 @@ The UCICommunicationService provides a unified interface for UCI protocol commun
 
 - **Process Management**
   - `spawn_process()`: Spawns engine process as subprocess
+    - Uses binary mode (`text=False`) to avoid Windows text mode blocking issues
+    - Uses unbuffered mode (`bufsize=0`) for immediate data availability
+    - Initializes binary read buffer for manual line splitting
   - `is_process_alive()`: Checks if process is running
   - `get_process_pid()`: Returns process PID for debugging
   - `cleanup()`: Terminates process and cleans up resources
@@ -56,6 +59,14 @@ The UCICommunicationService provides a unified interface for UCI protocol commun
   - `start_search()`: Starts search with depth/movetime parameters
   - `stop_search()`: Sends "stop" command
   - `quit_engine()`: Sends "quit" command
+  - `read_line(timeout)`: Reads a line from engine stdout
+    - Uses binary mode with manual line buffering
+    - Reads chunks from stdout and buffers them
+    - Splits on newline characters (`\n`) to extract complete lines
+    - Decodes bytes to UTF-8 strings
+    - Implements fast path for already-buffered lines (zero latency)
+    - Non-blocking read with timeout support
+    - Required timeout parameter ensures responsive behavior
 
 - **Search Command Logic**
   - `start_search(depth=0, movetime=0, **kwargs)`
@@ -151,16 +162,18 @@ Service for managing recommended defaults and validation:
 
 EngineValidationService handles engine discovery and option parsing:
 
-- **validate_engine(engine_path, save_to_file=True)**:
+- **validate_engine(engine_path, debug_callback=None, save_to_file=True)**:
   - Spawns engine and sends "uci" command
   - Parses "id name", "id author", and "option" lines
   - Stores parsed options to engine_parameters.json if save_to_file=True
   - Returns EngineValidationResult with validation status
+  - Optional debug_callback for custom debug message handling
 
-- **refresh_engine_options(engine_path, save_to_file=True)**:
+- **refresh_engine_options(engine_path, debug_callback=None, save_to_file=True)**:
   - Re-connects to engine and re-parses options
   - Useful for refreshing defaults or when options may have changed
   - Can update UI without saving to file (save_to_file=False)
+  - Optional debug_callback for custom debug message handling
 
 - **Option Parsing**:
   - Parses UCI option strings: "option name Threads type spin default 1 min 1 max 1024"
@@ -192,7 +205,9 @@ Provides continuous position evaluation for the evaluation bar:
 - **Lifecycle**:
   - `start_evaluation(engine_path, fen)`: Creates thread and starts evaluation
   - `update_position(fen)`: Updates position without restarting thread
-  - `stop_evaluation()`: Stops and cleans up thread
+  - `stop_evaluation()`: Stops and cleans up thread (non-blocking, cleanup happens asynchronously)
+  - `suspend_evaluation()`: Suspends search but keeps engine process alive for reuse
+  - `resume(fen)`: Resumes evaluation with new position (requires engine process still alive)
 
 ### GameAnalysisEngineService
 
@@ -210,7 +225,9 @@ Analyzes all moves in a game sequentially:
   - `start_engine()`: Creates and starts persistent thread
   - `analyze_position(fen, move_number)`: Queues position for analysis
   - Thread processes queue sequentially
-  - `stop()`: Stops thread and cleans up
+  - `stop_analysis()`: Stops current analysis and clears queue
+  - `shutdown()`: Shuts down engine process and thread (non-blocking, cleanup happens asynchronously)
+  - `cleanup()`: Calls shutdown to clean up resources
 
 ### ManualAnalysisEngineService
 
@@ -223,12 +240,38 @@ Provides continuous analysis with MultiPV support:
   - Supports MultiPV for showing multiple analysis lines
   - Continuously analyzes current position
   - Respects configured depth and movetime (even if not recommended)
+  - Throttles UI updates (default: 100ms interval)
+  - Implements race condition prevention for position and MultiPV updates
+
+- **Bestmove Handling**:
+  - Uses infinite search (`go infinite`) when depth=0 and movetime=0
+  - Ignores `bestmove` messages (similar to evaluation service)
+  - `bestmove` messages only occur after `stop` command or when movetime expires
+  - Position updates handle restarting the search when needed
+  - No automatic restart on `bestmove` (infinite search never completes naturally)
+
+- **Race Condition Prevention**:
+  - Uses `_search_just_started` flag and `_search_start_time` timestamp for tracking search state
+  - Flags are cleared after search is established (depth >= 1 or 2+ info lines after 100ms)
+  - Prevents handling stale messages from previous searches
+
+- **Update Throttling**:
+  - Engine thread throttles `line_update` signal emissions using `update_interval_ms` (default: 100ms)
+  - Updates are only emitted if at least `update_interval_ms` milliseconds have passed since last update for that MultiPV line
+  - Pending updates are stored in `_pending_updates` and the latest update is emitted when throttling period expires
+  - Prevents excessive signal emissions when engines send many info lines rapidly (some engines can send 50-100+ info lines per second)
+  - Without throttling, each info line would trigger: signal emission → model update → controller processing (PV parsing, BoardModel updates, trajectory parsing) → board redraws
+  - The view also has its own debounce timer, but controller work (including board updates) happens on every signal
+  - Configurable via `config.json` under `ui.panels.detail.manual_analysis.update_interval_ms`
 
 - **Lifecycle**:
   - `start_analysis(engine_path, fen, multipv)`: Creates thread and starts analysis
   - `update_position(fen)`: Updates position without restarting thread
-  - `update_multipv(multipv)`: Changes number of analysis lines
-  - `stop_analysis()`: Stops and cleans up thread
+  - `set_multipv(multipv)`: Changes number of analysis lines
+  - `stop_analysis(keep_engine_alive=False)`: Stops and cleans up thread
+    - If `keep_engine_alive=True`: Stops analysis but keeps engine process alive for reuse by other services
+    - If `keep_engine_alive=False`: Normal shutdown, engine process is terminated
+    - Shutdown is non-blocking (cleanup happens asynchronously in thread's `finally` block)
 
 ## Configuration Flow
 
@@ -271,6 +314,31 @@ When an engine is used for a task:
 4. Service passes parameters to engine thread constructor
 5. Thread passes depth and movetime to `UCICommunicationService.start_search()`
 6. UCI layer filters out zero values and sends appropriate "go" command
+
+### Engine Shutdown
+
+All engine services use **non-blocking shutdown** to keep the UI responsive:
+
+- **Service shutdown methods** (`stop_analysis()`, `stop_evaluation()`, `shutdown()`):
+  - Set flags to stop the thread (`running = False`, `_stop_requested = True`)
+  - Send `stop_search()` command to engine
+  - Disconnect signals to prevent pending updates
+  - Return immediately without waiting for thread completion
+  - Thread reference is set to `None` immediately
+
+- **Thread cleanup**:
+  - Thread's `run()` method checks stop flags and exits loop naturally
+  - Thread's `finally` block handles cleanup automatically:
+    - Calls `uci.cleanup()` which sends `quit` and terminates process
+    - Cleanup happens asynchronously in background thread
+    - No blocking waits on UI thread
+
+- **Engine reuse** (`keep_engine_alive=True`):
+  - Manual analysis service supports `stop_analysis(keep_engine_alive=True)`
+  - Sets `_keep_engine_alive` flag in thread
+  - Thread's `finally` block skips cleanup when flag is set
+  - Allows evaluation service to reuse the same engine process
+  - Used when switching between manual analysis and evaluation with same engine
 
 ## Parameter Application
 

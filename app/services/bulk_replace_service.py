@@ -382,7 +382,6 @@ class BulkReplaceService:
             # Create UCI communication service
             uci = UCICommunicationService(
                 engine_path,
-                enable_debug=False,
                 identifier="BulkReplace"
             )
             
