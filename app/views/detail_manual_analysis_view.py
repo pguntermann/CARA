@@ -1089,6 +1089,10 @@ class DetailManualAnalysisView(QWidget):
                 return
             
             # Start analysis (FEN will be retrieved from board controller)
+            # Check if already analyzing to prevent duplicate calls
+            if self._analysis_model and self._analysis_model.is_analyzing:
+                # Already analyzing, don't call again
+                return
             success = self._analysis_controller.start_analysis()
             if not success:
                 # Failed to start - uncheck button
@@ -1275,6 +1279,8 @@ class DetailManualAnalysisView(QWidget):
         self._is_analyzing = is_analyzing
         
         # Update button text and state
+        # Block signals when setting button programmatically to prevent recursive calls
+        self.start_stop_button.blockSignals(True)
         if is_analyzing:
             self.start_stop_button.setText("Stop Analysis")
             self.start_stop_button.setChecked(True)
@@ -1286,6 +1292,7 @@ class DetailManualAnalysisView(QWidget):
             # Hide statistics bar when analysis stops
             if self.statistics_bar:
                 self.statistics_bar.setVisible(False)
+        self.start_stop_button.blockSignals(False)
     
     def _on_lines_changed(self) -> None:
         """Handle lines count change from model."""
