@@ -104,20 +104,12 @@ class PlayerStatsService:
         draws = 0
         losses = 0
         
-        # Collect all moves for aggregation
+        # Collect all moves for aggregation (needed for overall aggregated stats)
         # Note: We need to track which color the player was in each game
         # For aggregation, we'll use the majority color to determine which fields to use
         all_moves_white: List[MoveData] = []
         all_moves_black: List[MoveData] = []
-        all_opening_moves_white: List[MoveData] = []
-        all_middlegame_moves_white: List[MoveData] = []
-        all_endgame_moves_white: List[MoveData] = []
-        all_opening_moves_black: List[MoveData] = []
-        all_middlegame_moves_black: List[MoveData] = []
-        all_endgame_moves_black: List[MoveData] = []
         
-        opening_end = 0
-        middlegame_end = 0
         white_games_count = 0
         black_games_count = 0
         
@@ -143,32 +135,12 @@ class PlayerStatsService:
             else:
                 black_games_count += 1
             
-            # Get phase boundaries from first game
-            if opening_end == 0:
-                game_summary = self.summary_service.calculate_summary(moves, len(moves))
-                if game_summary:
-                    opening_end = game_summary.opening_end
-                    middlegame_end = game_summary.middlegame_end
-            
-            # Collect moves for this player (filter by color)
+            # Collect moves for this player (filter by color) - needed for aggregated overall stats
             for move in moves:
-                move_num = move.move_number
                 if is_white and move.white_move:
                     all_moves_white.append(move)
-                    if move_num <= opening_end:
-                        all_opening_moves_white.append(move)
-                    elif move_num < middlegame_end:
-                        all_middlegame_moves_white.append(move)
-                    else:
-                        all_endgame_moves_white.append(move)
                 elif not is_white and move.black_move:
                     all_moves_black.append(move)
-                    if move_num <= opening_end:
-                        all_opening_moves_black.append(move)
-                    elif move_num < middlegame_end:
-                        all_middlegame_moves_black.append(move)
-                    else:
-                        all_endgame_moves_black.append(move)
         
         # Determine which color to use for aggregation (majority)
         # If player played both colors, we'll aggregate white moves separately
@@ -177,26 +149,62 @@ class PlayerStatsService:
         
         if use_white:
             all_moves = all_moves_white
-            all_opening_moves = all_opening_moves_white
-            all_middlegame_moves = all_middlegame_moves_white
-            all_endgame_moves = all_endgame_moves_white
             cpl_field = 'cpl_white'
             assess_field = 'assess_white'
         else:
             all_moves = all_moves_black
-            all_opening_moves = all_opening_moves_black
-            all_middlegame_moves = all_middlegame_moves_black
-            all_endgame_moves = all_endgame_moves_black
             cpl_field = 'cpl_black'
             assess_field = 'assess_black'
         
         if not all_moves:
             return None
         
-        # Calculate per-game statistics, then average ELO and accuracy
+        # Calculate per-game statistics, then average ELO, accuracy, and phase accuracies
         # This ensures formulas work correctly with has_won/has_drawn per game
         elo_values = []
         accuracy_values = []
+        opening_accuracy_values = []
+        middlegame_accuracy_values = []
+        endgame_accuracy_values = []
+        
+        # Also collect phase statistics for aggregation (moves, CPL, move counts, etc.)
+        opening_moves_total = 0
+        middlegame_moves_total = 0
+        endgame_moves_total = 0
+        opening_cpl_sum = 0.0
+        middlegame_cpl_sum = 0.0
+        endgame_cpl_sum = 0.0
+        opening_cpl_count = 0
+        middlegame_cpl_count = 0
+        endgame_cpl_count = 0
+        
+        # Aggregate move classification counts for each phase
+        opening_book_moves = 0
+        opening_brilliant_moves = 0
+        opening_best_moves = 0
+        opening_good_moves = 0
+        opening_inaccuracies = 0
+        opening_mistakes = 0
+        opening_misses = 0
+        opening_blunders = 0
+        
+        middlegame_book_moves = 0
+        middlegame_brilliant_moves = 0
+        middlegame_best_moves = 0
+        middlegame_good_moves = 0
+        middlegame_inaccuracies = 0
+        middlegame_mistakes = 0
+        middlegame_misses = 0
+        middlegame_blunders = 0
+        
+        endgame_book_moves = 0
+        endgame_brilliant_moves = 0
+        endgame_best_moves = 0
+        endgame_good_moves = 0
+        endgame_inaccuracies = 0
+        endgame_mistakes = 0
+        endgame_misses = 0
+        endgame_blunders = 0
         
         for game in analyzed_games:
             moves = controller.extract_moves_from_game(game)
@@ -206,13 +214,73 @@ class PlayerStatsService:
             is_white_game = (game.white == player_name)
             game_result = game.result
             
-            # Calculate stats for this game (same code as single-game)
-            game_stats = self.summary_service._calculate_player_statistics(
-                moves, is_white_game, game_result=game_result
-            )
+            # Calculate complete game summary for this game
+            game_summary = self.summary_service.calculate_summary(moves, len(moves), game_result)
+            if not game_summary:
+                continue
             
+            # Get player statistics for this game
+            if is_white_game:
+                game_stats = game_summary.white_stats
+                game_opening = game_summary.white_opening
+                game_middlegame = game_summary.white_middlegame
+                game_endgame = game_summary.white_endgame
+            else:
+                game_stats = game_summary.black_stats
+                game_opening = game_summary.black_opening
+                game_middlegame = game_summary.black_middlegame
+                game_endgame = game_summary.black_endgame
+            
+            # Collect per-game values for averaging
             elo_values.append(game_stats.estimated_elo)
             accuracy_values.append(game_stats.accuracy)
+            opening_accuracy_values.append(game_opening.accuracy)
+            middlegame_accuracy_values.append(game_middlegame.accuracy)
+            endgame_accuracy_values.append(game_endgame.accuracy)
+            
+            # Collect phase statistics for aggregation (moves, CPL, move counts, etc.)
+            opening_moves_total += game_opening.moves
+            middlegame_moves_total += game_middlegame.moves
+            endgame_moves_total += game_endgame.moves
+            
+            # Accumulate CPL for weighted average (weighted by number of moves in phase)
+            if game_opening.moves > 0:
+                opening_cpl_sum += game_opening.average_cpl * game_opening.moves
+                opening_cpl_count += game_opening.moves
+            if game_middlegame.moves > 0:
+                middlegame_cpl_sum += game_middlegame.average_cpl * game_middlegame.moves
+                middlegame_cpl_count += game_middlegame.moves
+            if game_endgame.moves > 0:
+                endgame_cpl_sum += game_endgame.average_cpl * game_endgame.moves
+                endgame_cpl_count += game_endgame.moves
+            
+            # Aggregate move classification counts for each phase
+            opening_book_moves += game_opening.book_moves
+            opening_brilliant_moves += game_opening.brilliant_moves
+            opening_best_moves += game_opening.best_moves
+            opening_good_moves += game_opening.good_moves
+            opening_inaccuracies += game_opening.inaccuracies
+            opening_mistakes += game_opening.mistakes
+            opening_misses += game_opening.misses
+            opening_blunders += game_opening.blunders
+            
+            middlegame_book_moves += game_middlegame.book_moves
+            middlegame_brilliant_moves += game_middlegame.brilliant_moves
+            middlegame_best_moves += game_middlegame.best_moves
+            middlegame_good_moves += game_middlegame.good_moves
+            middlegame_inaccuracies += game_middlegame.inaccuracies
+            middlegame_mistakes += game_middlegame.mistakes
+            middlegame_misses += game_middlegame.misses
+            middlegame_blunders += game_middlegame.blunders
+            
+            endgame_book_moves += game_endgame.book_moves
+            endgame_brilliant_moves += game_endgame.brilliant_moves
+            endgame_best_moves += game_endgame.best_moves
+            endgame_good_moves += game_endgame.good_moves
+            endgame_inaccuracies += game_endgame.inaccuracies
+            endgame_mistakes += game_endgame.mistakes
+            endgame_misses += game_endgame.misses
+            endgame_blunders += game_endgame.blunders
         
         # Average the results
         if elo_values:
@@ -222,6 +290,27 @@ class PlayerStatsService:
             averaged_elo = 0
             averaged_accuracy = 0.0
         
+        # Average phase accuracies
+        if opening_accuracy_values:
+            averaged_opening_accuracy = sum(opening_accuracy_values) / len(opening_accuracy_values)
+        else:
+            averaged_opening_accuracy = 0.0
+        
+        if middlegame_accuracy_values:
+            averaged_middlegame_accuracy = sum(middlegame_accuracy_values) / len(middlegame_accuracy_values)
+        else:
+            averaged_middlegame_accuracy = 0.0
+        
+        if endgame_accuracy_values:
+            averaged_endgame_accuracy = sum(endgame_accuracy_values) / len(endgame_accuracy_values)
+        else:
+            averaged_endgame_accuracy = 0.0
+        
+        # Calculate weighted average CPL for each phase
+        average_cpl_opening = (opening_cpl_sum / opening_cpl_count) if opening_cpl_count > 0 else 0.0
+        average_cpl_middlegame = (middlegame_cpl_sum / middlegame_cpl_count) if middlegame_cpl_count > 0 else 0.0
+        average_cpl_endgame = (endgame_cpl_sum / endgame_cpl_count) if endgame_cpl_count > 0 else 0.0
+        
         # Still calculate aggregated stats for other metrics (CPL, move counts, etc.)
         # But we'll replace ELO and accuracy with averaged values
         aggregated_stats = self.summary_service._calculate_player_statistics(all_moves, use_white, game_result=None)
@@ -230,10 +319,49 @@ class PlayerStatsService:
         aggregated_stats.estimated_elo = int(averaged_elo)
         aggregated_stats.accuracy = averaged_accuracy
         
-        # Calculate aggregated phase statistics
-        opening_stats = self.summary_service._calculate_phase_stats(all_opening_moves, cpl_field, assess_field)
-        middlegame_stats = self.summary_service._calculate_phase_stats(all_middlegame_moves, cpl_field, assess_field)
-        endgame_stats = self.summary_service._calculate_phase_stats(all_endgame_moves, cpl_field, assess_field)
+        # Create phase statistics with averaged accuracy values
+        # Use aggregated move counts and CPL from per-game phase statistics
+        opening_stats = PhaseStatistics(
+            moves=opening_moves_total,
+            average_cpl=average_cpl_opening,
+            accuracy=averaged_opening_accuracy,
+            book_moves=opening_book_moves,
+            brilliant_moves=opening_brilliant_moves,
+            best_moves=opening_best_moves,
+            good_moves=opening_good_moves,
+            inaccuracies=opening_inaccuracies,
+            mistakes=opening_mistakes,
+            misses=opening_misses,
+            blunders=opening_blunders
+        )
+        
+        middlegame_stats = PhaseStatistics(
+            moves=middlegame_moves_total,
+            average_cpl=average_cpl_middlegame,
+            accuracy=averaged_middlegame_accuracy,
+            book_moves=middlegame_book_moves,
+            brilliant_moves=middlegame_brilliant_moves,
+            best_moves=middlegame_best_moves,
+            good_moves=middlegame_good_moves,
+            inaccuracies=middlegame_inaccuracies,
+            mistakes=middlegame_mistakes,
+            misses=middlegame_misses,
+            blunders=middlegame_blunders
+        )
+        
+        endgame_stats = PhaseStatistics(
+            moves=endgame_moves_total,
+            average_cpl=average_cpl_endgame,
+            accuracy=averaged_endgame_accuracy,
+            book_moves=endgame_book_moves,
+            brilliant_moves=endgame_brilliant_moves,
+            best_moves=endgame_best_moves,
+            good_moves=endgame_good_moves,
+            inaccuracies=endgame_inaccuracies,
+            mistakes=endgame_mistakes,
+            misses=endgame_misses,
+            blunders=endgame_blunders
+        )
         
         # Calculate win rate
         total_games = len(analyzed_games)

@@ -121,6 +121,57 @@ class GameSummaryService:
         highlights_config = summary_config.get('highlights', {})
         self.highlights_per_phase_limit = highlights_config.get('max_per_phase', 7)
     
+    def _evaluate_formula(self, formula: Optional[str], default_formula: str, value_on_error: Any,
+                          clamp_min: Optional[float] = None, clamp_max: Optional[float] = None,
+                          additional_functions: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
+        """Generic formula evaluation method using asteval.
+        
+        Args:
+            formula: Formula string to evaluate. If None, uses default_formula.
+            default_formula: Default formula to use if formula is None or empty.
+            value_on_error: Value to return if evaluation fails.
+            clamp_min: Optional minimum value to clamp result to.
+            clamp_max: Optional maximum value to clamp result to.
+            additional_functions: Optional dict of additional functions to add to symtable.
+            **kwargs: All available variables for the formula.
+            
+        Returns:
+            Calculated result (clamped if specified).
+        """
+        formula_to_use = formula if formula else default_formula
+        
+        try:
+            aeval = Interpreter()
+            # Set variables in the symtable
+            for key, value in kwargs.items():
+                aeval.symtable[key] = value
+            # Add built-in functions
+            aeval.symtable['min'] = min
+            aeval.symtable['max'] = max
+            aeval.symtable['abs'] = abs
+            aeval.symtable['int'] = int
+            # Add not() function for logical negation
+            aeval.symtable['not'] = lambda x: not x
+            # Add additional functions if provided
+            if additional_functions:
+                for func_name, func in additional_functions.items():
+                    aeval.symtable[func_name] = func
+            # Evaluate the formula
+            result = aeval(formula_to_use)
+            if result is None:
+                return value_on_error
+            # Clamp if specified
+            if clamp_min is not None:
+                result = max(clamp_min, result)
+            if clamp_max is not None:
+                result = min(clamp_max, result)
+            return result
+        except Exception as e:
+            # Log error for debugging
+            import sys
+            print(f"Error evaluating formula: {e}", file=sys.stderr)
+            return value_on_error
+    
     def _evaluate_accuracy_formula(self, **kwargs) -> float:
         """Evaluate accuracy formula using asteval.
         
@@ -138,28 +189,12 @@ class GameSummaryService:
         # Default formula (current hardcoded one)
         default_formula = "max(5.0, min(100.0, 100.0 - (average_cpl / 3.5)))"
         
-        formula_to_use = formula if formula else default_formula
-        
-        try:
-            aeval = Interpreter()
-            # Set variables in the symtable
-            for key, value in kwargs.items():
-                aeval.symtable[key] = value
-            # Add built-in functions
-            aeval.symtable['min'] = min
-            aeval.symtable['max'] = max
-            # Evaluate the formula
-            result = aeval(formula_to_use)
-            if result is None:
-                return float(value_on_error)
-            accuracy = float(result)
-            # Clamp to reasonable range
-            return max(0.0, min(100.0, accuracy))
-        except Exception as e:
-            # Log error for debugging
-            import sys
-            print(f"Error evaluating accuracy formula: {e}", file=sys.stderr)
-            return float(value_on_error)
+        return float(self._evaluate_formula(
+            formula=formula,
+            default_formula=default_formula,
+            value_on_error=value_on_error,
+            **kwargs
+        ))
     
     def _evaluate_elo_formula(self, **kwargs) -> int:
         """Evaluate ELO formula using asteval.
@@ -178,29 +213,59 @@ class GameSummaryService:
         # Default formula (current hardcoded one)
         default_formula = "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40)))"
         
-        formula_to_use = formula if formula else default_formula
+        return int(self._evaluate_formula(
+            formula=formula,
+            default_formula=default_formula,
+            value_on_error=value_on_error,
+            **kwargs
+        ))
+    
+    def _evaluate_phase_accuracy_formula(self, phase: str, average_cpl_overall: float,
+                                       average_cpl_opening: float, average_cpl_middlegame: float,
+                                       average_cpl_endgame: float, **kwargs) -> float:
+        """Evaluate phase-specific accuracy formula using asteval.
         
-        try:
-            aeval = Interpreter()
-            # Set variables in the symtable
-            for key, value in kwargs.items():
-                aeval.symtable[key] = value
-            # Add built-in functions
-            aeval.symtable['min'] = min
-            aeval.symtable['max'] = max
-            aeval.symtable['int'] = int
-            # Evaluate the formula
-            result = aeval(formula_to_use)
-            if result is None:
-                return int(value_on_error)
-            estimated_elo = int(result)
-            # Clamp to >= 0 
-            return max(0, estimated_elo)
-        except Exception as e:
-            # Log error for debugging
-            import sys
-            print(f"Error evaluating ELO formula: {e}", file=sys.stderr)
-            return int(value_on_error)
+        Args:
+            phase: Phase name ("opening", "middlegame", or "endgame").
+            average_cpl_overall: Overall game average CPL.
+            average_cpl_opening: Opening phase average CPL.
+            average_cpl_middlegame: Middlegame phase average CPL.
+            average_cpl_endgame: Endgame phase average CPL.
+            **kwargs: All other available variables for the formula.
+            
+        Returns:
+            Calculated accuracy value (0.0 to 100.0).
+        """
+        game_analysis_config = self.config.get('game_analysis', {})
+        phase_formulas_config = game_analysis_config.get('phase_accuracy_formulas', {})
+        
+        # Get phase-specific config, fallback to overall accuracy formula if not found
+        phase_config = phase_formulas_config.get(phase, {})
+        formula = phase_config.get('formula', None)
+        value_on_error = phase_config.get('value_on_error', 0.0)
+        
+        # If no phase-specific formula, fallback to overall accuracy formula
+        if not formula:
+            accuracy_config = game_analysis_config.get('accuracy_formula', {})
+            formula = accuracy_config.get('formula', None)
+            if not value_on_error:
+                value_on_error = accuracy_config.get('value_on_error', 0.0)
+        
+        # Default formula (current hardcoded one)
+        default_formula = "max(5.0, min(100.0, 100.0 - (average_cpl / 3.5)))"
+        
+        # Add all CPL variables to kwargs
+        kwargs['average_cpl'] = average_cpl_overall  # Overall game CPL
+        kwargs['average_cpl_opening'] = average_cpl_opening
+        kwargs['average_cpl_middlegame'] = average_cpl_middlegame
+        kwargs['average_cpl_endgame'] = average_cpl_endgame
+        
+        return float(self._evaluate_formula(
+            formula=formula,
+            default_formula=default_formula,
+            value_on_error=value_on_error,
+            **kwargs
+        ))
     
     def calculate_summary(self, moves: List[MoveData], total_moves: int, game_result: Optional[str] = None) -> GameSummary:
         """Calculate complete game summary from moves data.
@@ -212,12 +277,86 @@ class GameSummaryService:
         Returns:
             GameSummary instance with all calculated statistics.
         """
-        # Calculate player statistics
-        white_stats = self._calculate_player_statistics(moves, is_white=True, game_result=game_result)
-        black_stats = self._calculate_player_statistics(moves, is_white=False, game_result=game_result)
-        
-        # Determine phase boundaries (same for both players - game-level concept)
+        # Determine phase boundaries first (needed for phase statistics and overall formulas)
         opening_end, middlegame_end = self._determine_phase_boundaries(moves, total_moves)
+        
+        # Count moves per phase (for overall formulas)
+        opening_moves_count = 0
+        middlegame_moves_count = 0
+        endgame_moves_count = 0
+        
+        for move in moves:
+            if not move.white_move and not move.black_move:
+                continue
+            move_num = move.move_number
+            if move_num <= opening_end:
+                opening_moves_count += 1
+            elif move_num < middlegame_end:
+                middlegame_moves_count += 1
+            else:
+                endgame_moves_count += 1
+        
+        # Calculate phase-specific CPLs first (needed for overall formulas)
+        # Get relevant fields for white
+        white_cpl_field = 'cpl_white'
+        white_assess_field = 'assess_white'
+        # Get relevant fields for black
+        black_cpl_field = 'cpl_black'
+        black_assess_field = 'assess_black'
+        
+        # Collect moves for each phase (for both players)
+        white_opening_moves: List[MoveData] = []
+        white_middlegame_moves: List[MoveData] = []
+        white_endgame_moves: List[MoveData] = []
+        black_opening_moves: List[MoveData] = []
+        black_middlegame_moves: List[MoveData] = []
+        black_endgame_moves: List[MoveData] = []
+        
+        for move in moves:
+            move_num = move.move_number
+            if move.white_move:
+                if move_num <= opening_end:
+                    white_opening_moves.append(move)
+                elif move_num < middlegame_end:
+                    white_middlegame_moves.append(move)
+                else:
+                    white_endgame_moves.append(move)
+            if move.black_move:
+                if move_num <= opening_end:
+                    black_opening_moves.append(move)
+                elif move_num < middlegame_end:
+                    black_middlegame_moves.append(move)
+                else:
+                    black_endgame_moves.append(move)
+        
+        # Calculate phase-specific CPLs for white and black
+        white_average_cpl_opening = self._calculate_phase_average_cpl(white_opening_moves, white_cpl_field, white_assess_field)
+        white_average_cpl_middlegame = self._calculate_phase_average_cpl(white_middlegame_moves, white_cpl_field, white_assess_field)
+        white_average_cpl_endgame = self._calculate_phase_average_cpl(white_endgame_moves, white_cpl_field, white_assess_field)
+        
+        black_average_cpl_opening = self._calculate_phase_average_cpl(black_opening_moves, black_cpl_field, black_assess_field)
+        black_average_cpl_middlegame = self._calculate_phase_average_cpl(black_middlegame_moves, black_cpl_field, black_assess_field)
+        black_average_cpl_endgame = self._calculate_phase_average_cpl(black_endgame_moves, black_cpl_field, black_assess_field)
+        
+        # Calculate player statistics with all phase information (phase move counts and phase CPLs)
+        white_stats = self._calculate_player_statistics(
+            moves, is_white=True, game_result=game_result,
+            opening_moves=opening_moves_count,
+            middlegame_moves=middlegame_moves_count,
+            endgame_moves=endgame_moves_count,
+            average_cpl_opening=white_average_cpl_opening,
+            average_cpl_middlegame=white_average_cpl_middlegame,
+            average_cpl_endgame=white_average_cpl_endgame
+        )
+        black_stats = self._calculate_player_statistics(
+            moves, is_white=False, game_result=game_result,
+            opening_moves=opening_moves_count,
+            middlegame_moves=middlegame_moves_count,
+            endgame_moves=endgame_moves_count,
+            average_cpl_opening=black_average_cpl_opening,
+            average_cpl_middlegame=black_average_cpl_middlegame,
+            average_cpl_endgame=black_average_cpl_endgame
+        )
         
         # Classify endgame type - check all moves in the endgame phase to find the most specific type
         endgame_type: Optional[str] = None
@@ -240,12 +379,16 @@ class GameSummaryService:
                             # Keep the more specific type we already found
                             pass
         
-        # Calculate phase statistics for each player
+        # Calculate phase statistics for each player (pass overall stats for formulas)
         white_opening, white_middlegame, white_endgame = self._calculate_phase_statistics(
-            moves, total_moves, is_white=True, opening_end=opening_end, middlegame_end=middlegame_end
+            moves, total_moves, is_white=True, opening_end=opening_end, middlegame_end=middlegame_end,
+            average_cpl_overall=white_stats.average_cpl,
+            overall_stats=white_stats
         )
         black_opening, black_middlegame, black_endgame = self._calculate_phase_statistics(
-            moves, total_moves, is_white=False, opening_end=opening_end, middlegame_end=middlegame_end
+            moves, total_moves, is_white=False, opening_end=opening_end, middlegame_end=middlegame_end,
+            average_cpl_overall=black_stats.average_cpl,
+            overall_stats=black_stats
         )
         
         # Find critical moves
@@ -275,7 +418,7 @@ class GameSummaryService:
         )
         highlights = highlight_detector.detect_highlights(moves, total_moves, opening_end, middlegame_end)
         
-        return GameSummary(
+        summary = GameSummary(
             white_stats=white_stats,
             black_stats=black_stats,
             white_opening=white_opening,
@@ -294,14 +437,24 @@ class GameSummaryService:
             endgame_type=endgame_type,
             highlights=highlights
         )
+        return summary
     
-    def _calculate_player_statistics(self, moves: List[MoveData], is_white: bool, game_result: Optional[str] = None) -> PlayerStatistics:
+    def _calculate_player_statistics(self, moves: List[MoveData], is_white: bool, game_result: Optional[str] = None,
+                                     opening_moves: int = 0, middlegame_moves: int = 0, endgame_moves: int = 0,
+                                     average_cpl_opening: float = 0.0, average_cpl_middlegame: float = 0.0,
+                                     average_cpl_endgame: float = 0.0) -> PlayerStatistics:
         """Calculate statistics for a single player.
         
         Args:
             moves: List of MoveData instances.
             is_white: True for White, False for Black.
             game_result: Optional game result string ("1-0", "0-1", "1/2-1/2", "", "*", or None).
+            opening_moves: Total number of moves in opening phase.
+            middlegame_moves: Total number of moves in middlegame phase.
+            endgame_moves: Total number of moves in endgame phase.
+            average_cpl_opening: Opening phase average CPL.
+            average_cpl_middlegame: Middlegame phase average CPL.
+            average_cpl_endgame: Endgame phase average CPL.
             
         Returns:
             PlayerStatistics instance.
@@ -419,9 +572,12 @@ class GameSummaryService:
             blunder_rate = 0.0
             mistake_rate = 0.0
         
-        # Calculate accuracy using customizable formula
+        # Calculate accuracy using customizable formula (with phase variables)
         accuracy = self._evaluate_accuracy_formula(
             average_cpl=average_cpl,
+            average_cpl_opening=average_cpl_opening,
+            average_cpl_middlegame=average_cpl_middlegame,
+            average_cpl_endgame=average_cpl_endgame,
             total_moves=total_moves,
             non_book_moves=non_book_moves,
             book_moves=book_moves,
@@ -437,13 +593,19 @@ class GameSummaryService:
             max_cpl=max_cpl,
             blunder_rate=blunder_rate,
             mistake_rate=mistake_rate,
+            opening_moves=opening_moves,
+            middlegame_moves=middlegame_moves,
+            endgame_moves=endgame_moves,
             has_won=has_won,
             has_drawn=has_drawn
         )
         
-        # Calculate estimated ELO using customizable formula
+        # Calculate estimated ELO using customizable formula (with phase variables)
         estimated_elo = self._evaluate_elo_formula(
             average_cpl=average_cpl,
+            average_cpl_opening=average_cpl_opening,
+            average_cpl_middlegame=average_cpl_middlegame,
+            average_cpl_endgame=average_cpl_endgame,
             total_moves=total_moves,
             non_book_moves=non_book_moves,
             book_moves=book_moves,
@@ -460,6 +622,9 @@ class GameSummaryService:
             blunder_rate=blunder_rate,
             mistake_rate=mistake_rate,
             accuracy=accuracy,
+            opening_moves=opening_moves,
+            middlegame_moves=middlegame_moves,
+            endgame_moves=endgame_moves,
             has_won=has_won,
             has_drawn=has_drawn
         )
@@ -773,7 +938,9 @@ class GameSummaryService:
         return None
     
     def _calculate_phase_statistics(self, moves: List[MoveData], total_moves: int, 
-                                    is_white: bool, opening_end: int, middlegame_end: int) -> Tuple[PhaseStatistics, PhaseStatistics, PhaseStatistics]:
+                                    is_white: bool, opening_end: int, middlegame_end: int,
+                                    average_cpl_overall: float,
+                                    overall_stats: Optional[PlayerStatistics] = None) -> Tuple[PhaseStatistics, PhaseStatistics, PhaseStatistics]:
         """Calculate statistics for each game phase.
         
         Args:
@@ -782,6 +949,7 @@ class GameSummaryService:
             is_white: True for White, False for Black.
             opening_end: Move number where opening phase ends.
             middlegame_end: Move number where middlegame phase ends.
+            average_cpl_overall: Overall game average CPL (for use in phase formulas).
             
         Returns:
             Tuple of (opening, middlegame, endgame) PhaseStatistics.
@@ -814,21 +982,109 @@ class GameSummaryService:
             else:
                 endgame_moves.append(move)
         
-        # Calculate statistics for each phase
-        opening = self._calculate_phase_stats(opening_moves, cpl_field, assess_field)
-        middlegame = self._calculate_phase_stats(middlegame_moves, cpl_field, assess_field)
-        endgame = self._calculate_phase_stats(endgame_moves, cpl_field, assess_field)
+        # Calculate phase-specific CPLs first (needed for all phase formulas)
+        average_cpl_opening = self._calculate_phase_average_cpl(opening_moves, cpl_field, assess_field)
+        average_cpl_middlegame = self._calculate_phase_average_cpl(middlegame_moves, cpl_field, assess_field)
+        average_cpl_endgame = self._calculate_phase_average_cpl(endgame_moves, cpl_field, assess_field)
+        
+        # Calculate statistics for each phase (pass all CPL values and overall stats for formulas)
+        opening = self._calculate_phase_stats(
+            opening_moves, cpl_field, assess_field,
+            phase="opening",
+            average_cpl_overall=average_cpl_overall,
+            average_cpl_opening=average_cpl_opening,
+            average_cpl_middlegame=average_cpl_middlegame,
+            average_cpl_endgame=average_cpl_endgame,
+            opening_moves=len(opening_moves),
+            middlegame_moves=len(middlegame_moves),
+            endgame_moves=len(endgame_moves),
+            overall_stats=overall_stats
+        )
+        middlegame = self._calculate_phase_stats(
+            middlegame_moves, cpl_field, assess_field,
+            phase="middlegame",
+            average_cpl_overall=average_cpl_overall,
+            average_cpl_opening=average_cpl_opening,
+            average_cpl_middlegame=average_cpl_middlegame,
+            average_cpl_endgame=average_cpl_endgame,
+            opening_moves=len(opening_moves),
+            middlegame_moves=len(middlegame_moves),
+            endgame_moves=len(endgame_moves),
+            overall_stats=overall_stats
+        )
+        endgame = self._calculate_phase_stats(
+            endgame_moves, cpl_field, assess_field,
+            phase="endgame",
+            average_cpl_overall=average_cpl_overall,
+            average_cpl_opening=average_cpl_opening,
+            average_cpl_middlegame=average_cpl_middlegame,
+            average_cpl_endgame=average_cpl_endgame,
+            opening_moves=len(opening_moves),
+            middlegame_moves=len(middlegame_moves),
+            endgame_moves=len(endgame_moves),
+            overall_stats=overall_stats
+        )
         
         return (opening, middlegame, endgame)
     
+    def _calculate_phase_average_cpl(self, phase_moves: List[MoveData], cpl_field: str, assess_field: str) -> float:
+        """Calculate average CPL for a phase (helper method).
+        
+        Args:
+            phase_moves: List of MoveData instances for this phase.
+            cpl_field: Field name for CPL ('cpl_white' or 'cpl_black').
+            assess_field: Field name for assessment ('assess_white' or 'assess_black').
+            
+        Returns:
+            Average CPL for this phase (capped at 500.0).
+        """
+        cpl_values: List[float] = []
+        
+        for move in phase_moves:
+            assessment = getattr(move, assess_field)
+            cpl_str = getattr(move, cpl_field)
+            
+            # Parse CPL (exclude book moves)
+            if cpl_str and assessment != "Book Move":
+                try:
+                    cpl = float(cpl_str)
+                    cpl_values.append(cpl)
+                except (ValueError, TypeError):
+                    pass
+        
+        # Calculate average CPL (cap at 500.0)
+        CPL_CAP_FOR_AVERAGE = 500.0
+        if cpl_values:
+            capped_cpl_values = [min(cpl, CPL_CAP_FOR_AVERAGE) for cpl in cpl_values]
+            return sum(capped_cpl_values) / len(capped_cpl_values)
+        else:
+            return 0.0
+    
     def _calculate_phase_stats(self, phase_moves: List[MoveData], 
-                               cpl_field: str, assess_field: str) -> PhaseStatistics:
+                               cpl_field: str, assess_field: str,
+                               phase: str = "opening",
+                               average_cpl_overall: float = 0.0,
+                               average_cpl_opening: float = 0.0,
+                               average_cpl_middlegame: float = 0.0,
+                               average_cpl_endgame: float = 0.0,
+                               opening_moves: int = 0,
+                               middlegame_moves: int = 0,
+                               endgame_moves: int = 0,
+                               overall_stats: Optional[PlayerStatistics] = None) -> PhaseStatistics:
         """Calculate statistics for a single phase.
         
         Args:
             phase_moves: List of MoveData instances for this phase.
             cpl_field: Field name for CPL ('cpl_white' or 'cpl_black').
             assess_field: Field name for assessment ('assess_white' or 'assess_black').
+            phase: Phase name ("opening", "middlegame", or "endgame").
+            average_cpl_overall: Overall game average CPL.
+            average_cpl_opening: Opening phase average CPL.
+            average_cpl_middlegame: Middlegame phase average CPL.
+            average_cpl_endgame: Endgame phase average CPL.
+            opening_moves: Total number of moves in opening phase.
+            middlegame_moves: Total number of moves in middlegame phase.
+            endgame_moves: Total number of moves in endgame phase.
             
         Returns:
             PhaseStatistics instance.
@@ -875,7 +1131,7 @@ class GameSummaryService:
                 except (ValueError, TypeError):
                     pass
         
-        # Calculate average CPL
+        # Calculate average CPL for this phase
         # Cap very high CPL values (e.g., from blunders leading to mate) to prevent skewing the average
         CPL_CAP_FOR_AVERAGE = 500.0  # Cap CPL at 500 centipawns for average calculation
         if cpl_values:
@@ -885,9 +1141,62 @@ class GameSummaryService:
         else:
             average_cpl = 0.0
         
-        # Calculate accuracy (improved formula: uses larger divisor and minimum floor)
-        # Formula: max(5.0, 100.0 - ACPL/3.5) ensures minimum 5% accuracy for reasonable play
-        accuracy = max(5.0, min(100.0, 100.0 - (average_cpl / 3.5)))
+        # Calculate rates for this phase
+        non_book_moves = moves_count - book_moves
+        if moves_count > 0:
+            blunder_rate = blunders / moves_count
+            mistake_rate = mistakes / moves_count
+        else:
+            blunder_rate = 0.0
+            mistake_rate = 0.0
+        
+        # Calculate accuracy using phase-specific customizable formula
+        # Pass phase-specific stats and overall game stats for comparison
+        formula_kwargs = {
+            'total_moves': moves_count,  # Phase-specific: moves in this phase
+            'non_book_moves': non_book_moves,  # Phase-specific
+            'book_moves': book_moves,  # Phase-specific
+            'blunders': blunders,  # Phase-specific
+            'mistakes': mistakes,  # Phase-specific
+            'inaccuracies': inaccuracies,  # Phase-specific
+            'misses': misses,  # Phase-specific
+            'best_moves': best_moves,  # Phase-specific
+            'good_moves': good_moves,  # Phase-specific
+            'brilliant_moves': brilliant_moves,  # Phase-specific
+            'blunder_rate': blunder_rate,  # Phase-specific
+            'mistake_rate': mistake_rate,  # Phase-specific
+            'opening_moves': opening_moves,
+            'middlegame_moves': middlegame_moves,
+            'endgame_moves': endgame_moves,
+            'has_won': 0,  # Phase stats don't have game result context
+            'has_drawn': 0  # Phase stats don't have game result context
+        }
+        
+        # Add overall game statistics if available (for comparison in formulas)
+        if overall_stats:
+            formula_kwargs['total_moves_overall'] = overall_stats.total_moves
+            formula_kwargs['non_book_moves_overall'] = overall_stats.analyzed_moves
+            formula_kwargs['book_moves_overall'] = overall_stats.book_moves
+            formula_kwargs['blunders_overall'] = overall_stats.blunders
+            formula_kwargs['mistakes_overall'] = overall_stats.mistakes
+            formula_kwargs['inaccuracies_overall'] = overall_stats.inaccuracies
+            formula_kwargs['misses_overall'] = overall_stats.misses
+            formula_kwargs['best_moves_overall'] = overall_stats.best_moves
+            formula_kwargs['good_moves_overall'] = overall_stats.good_moves
+            formula_kwargs['brilliant_moves_overall'] = overall_stats.brilliant_moves
+            formula_kwargs['blunder_rate_overall'] = overall_stats.blunder_rate
+            # Calculate mistake_rate from overall_stats (not stored as attribute)
+            mistake_rate_overall = (overall_stats.mistakes / overall_stats.total_moves) if overall_stats.total_moves > 0 else 0.0
+            formula_kwargs['mistake_rate_overall'] = mistake_rate_overall
+        
+        accuracy = self._evaluate_phase_accuracy_formula(
+            phase=phase,
+            average_cpl_overall=average_cpl_overall,
+            average_cpl_opening=average_cpl_opening,
+            average_cpl_middlegame=average_cpl_middlegame,
+            average_cpl_endgame=average_cpl_endgame,
+            **formula_kwargs
+        )
         
         return PhaseStatistics(
             moves=moves_count,

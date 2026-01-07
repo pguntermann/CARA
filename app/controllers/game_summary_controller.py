@@ -67,8 +67,13 @@ class GameSummaryController(QObject):
             if self._game_model and self._game_model.active_game:
                 game_result = self._game_model.active_game.result
             summary = self.summary_service.calculate_summary(moves, len(moves), game_result=game_result)
-        except Exception:
+        except Exception as e:
             # Avoid crashing the UI; surface a generic error state
+            # Log the exception to console for debugging
+            import sys
+            import traceback
+            print(f"Error calculating game summary: {e}", file=sys.stderr)
+            print(f"Traceback: {traceback.format_exc()}", file=sys.stderr)
             self._emit_unavailable("error")
             return
 
