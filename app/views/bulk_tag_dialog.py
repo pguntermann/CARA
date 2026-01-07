@@ -902,8 +902,13 @@ class BulkTagDialog(QDialog):
         # Title
         title_font_size = scale_font_size(title_config.get('font_size', 14))
         title_padding = title_config.get('padding', 5)
+        title_text_color = title_config.get('text_color', [240, 240, 240])
         title_label = QLabel(f"<b>{title}</b>")
-        title_label.setStyleSheet(f"font-size: {title_font_size}pt; padding: {title_padding}px;")
+        title_label.setStyleSheet(
+            f"font-size: {title_font_size}pt; "
+            f"padding: {title_padding}px; "
+            f"color: rgb({title_text_color[0]}, {title_text_color[1]}, {title_text_color[2]});"
+        )
         layout.addWidget(title_label)
         
         # Message
