@@ -3282,7 +3282,7 @@
       },
       "bulk_analysis_dialog": {
         "width": 600,
-        "height": 480,
+        "height": 520,
         "background_color": [
           40,
           40,
@@ -3327,7 +3327,8 @@
             200,
             200,
             200
-          ]
+          ],
+          "fixed_width": 110
         },
         "radio_buttons": {
           "first_button_minimum_width": 100
@@ -3406,8 +3407,18 @@
         "threading": {
           "status_update_interval": 0.1,
           "default_thread_count": 6,
-          "max_parallel_games": 4,
+          "default_parallel_games": 4,
           "cpu_count_fallback": 4
+        },
+        "parallel_games_spinbox": {
+          "min_value": 1,
+          "max_value": 16,
+          "default_value": 4,
+          "single_step": 1,
+          "suffix": ""
+        },
+        "spinboxes": {
+          "fixed_width": 120
         },
         "progress_display": {
           "max_progress_cap": 99.9999,

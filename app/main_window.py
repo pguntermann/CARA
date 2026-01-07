@@ -4567,14 +4567,14 @@ Visibility Settings:
         if not database_model:
             return
         
-        # Get analysis controller
-        analysis_controller = self.controller.get_game_analysis_controller()
+        # Get bulk analysis controller
+        bulk_analysis_controller = self.controller.get_bulk_analysis_controller()
         
         # Create and show dialog
         dialog = BulkAnalysisDialog(
             self.config,
             database_model,
-            analysis_controller,
+            bulk_analysis_controller,
             database_panel=database_panel,
             parent=self
         )
