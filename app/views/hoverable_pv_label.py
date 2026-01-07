@@ -261,10 +261,23 @@ class HoverablePvLabel(QLabel):
             move: Optional move to show with arrow.
             show_arrow: Whether to show the arrow (if "Show best move arrow" is enabled).
         """
+        # Get scale factor from analysis model
+        scale_factor = 1.0
+        if self._analysis_model:
+            scale_factor = self._analysis_model.miniature_preview_scale_factor
+        
         if self._mini_board is None:
-            # Create mini-board
-            self._mini_board = MiniChessBoardWidget(self.config, fen, is_flipped)
+            # Create mini-board with scale factor
+            self._mini_board = MiniChessBoardWidget(self.config, fen, is_flipped, scale_factor)
             self._mini_board.hide()
+        else:
+            # Update scale factor if it changed (recreate widget to apply new size)
+            current_scale = getattr(self._mini_board, '_scale_factor', 1.0)
+            if abs(current_scale - scale_factor) > 0.01:  # Use small epsilon for float comparison
+                # Recreate widget with new scale factor
+                self._mini_board.hide()
+                self._mini_board = MiniChessBoardWidget(self.config, fen, is_flipped, scale_factor)
+                self._mini_board.hide()
         
         # Update position and orientation
         self._mini_board.set_position(fen)

@@ -12,13 +12,14 @@ from typing import Dict, Any, Optional, List
 class MiniChessBoardWidget(QWidget):
     """Mini chessboard widget displaying only pieces (no arrows, coordinates, etc.)."""
     
-    def __init__(self, config: Dict[str, Any], fen: str, is_flipped: bool = False) -> None:
+    def __init__(self, config: Dict[str, Any], fen: str, is_flipped: bool = False, scale_factor: float = 1.0) -> None:
         """Initialize the mini chessboard widget.
         
         Args:
             config: Configuration dictionary.
             fen: FEN string representing the position to display.
             is_flipped: Whether the board should be displayed flipped (matching main board).
+            scale_factor: Scale factor for board size (1.0 = default, 1.25 = 1.25x, etc.).
         """
         super().__init__()
         self.config = config
@@ -26,6 +27,7 @@ class MiniChessBoardWidget(QWidget):
         self._is_flipped = is_flipped
         self._move_to_show: Optional[chess.Move] = None
         self._show_arrow = False
+        self._scale_factor = scale_factor
         self._load_config()
         self._setup_board()
         self._load_position_from_fen(fen)
@@ -62,8 +64,9 @@ class MiniChessBoardWidget(QWidget):
         pv_hover_config = manual_analysis_config.get('pv_hover', {})
         mini_board_config = pv_hover_config.get('mini_board', {})
         
-        # Size (default 120x120)
-        self.board_size = mini_board_config.get('size', 120)
+        # Size (default 120x120) - apply scale factor
+        base_size = mini_board_config.get('size', 120)
+        self.board_size = base_size * self._scale_factor
         self.square_size = self.board_size / 8
         
         # Get best next move arrow color (same as main board)
@@ -195,8 +198,8 @@ class MiniChessBoardWidget(QWidget):
         if self.border_size > 0:
             border_rect = QRect(
                 0, 0,
-                self.board_size + self.border_size * 2,
-                self.board_size + self.border_size * 2
+                int(self.board_size + self.border_size * 2),
+                int(self.board_size + self.border_size * 2)
             )
             border_color = QColor(self.border_color[0], self.border_color[1], self.border_color[2])
             painter.fillRect(border_rect, QBrush(border_color))

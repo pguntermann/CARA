@@ -1094,7 +1094,8 @@ class AppController:
             manual_analysis_model = manual_analysis_controller.get_analysis_model()
             if manual_analysis_model:
                 self.user_settings_service.update_manual_analysis({
-                    "enable_miniature_preview": manual_analysis_model.enable_miniature_preview
+                    "enable_miniature_preview": manual_analysis_model.enable_miniature_preview,
+                    "miniature_preview_scale_factor": manual_analysis_model.miniature_preview_scale_factor
                 })
         
         # Tell UserSettingsService to persist all settings to file
