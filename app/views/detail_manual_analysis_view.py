@@ -1104,25 +1104,19 @@ class DetailManualAnalysisView(QWidget):
     
     def _on_add_line_clicked(self) -> None:
         """Handle add line button click."""
-        if not self._analysis_controller or not self._analysis_model:
+        if not self._analysis_controller:
             return
         
-        # Increase multipv (model will handle the rest)
-        current_multipv = self._analysis_model.multipv
-        new_multipv = current_multipv + 1
-        self._analysis_controller.set_multipv(new_multipv)
+        self._analysis_controller.add_pv_line()
         # UI will update via _on_lines_changed signal
     
     def _on_remove_line_clicked(self) -> None:
         """Handle remove line button click."""
-        if not self._analysis_controller or not self._analysis_model:
+        if not self._analysis_controller:
             return
         
-        # Decrease multipv (minimum 1, model will handle the rest)
-        if self._analysis_model.multipv > 1:
-            new_multipv = self._analysis_model.multipv - 1
-            self._analysis_controller.set_multipv(new_multipv)
-            # UI will update via _on_lines_changed signal
+        self._analysis_controller.remove_pv_line()
+        # UI will update via _on_lines_changed signal
     
     def _on_explore_pv1_toggled(self, checked: bool) -> None:
         """Handle explore PV1 button toggle.

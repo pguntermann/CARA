@@ -3668,19 +3668,12 @@ Visibility Settings:
         if not manual_analysis_controller:
             return
         
-        manual_analysis_model = manual_analysis_controller.get_analysis_model()
-        if not manual_analysis_model:
-            return
-        
-        current_multipv = manual_analysis_model.multipv
-        new_multipv = current_multipv + 1
-        manual_analysis_controller.set_multipv(new_multipv)
+        manual_analysis_controller.add_pv_line()
     
     def _on_remove_pv_line(self) -> None:
         """Handle remove PV line from menu."""
         manual_analysis_controller = self.controller.get_manual_analysis_controller()
-        manual_analysis_model = manual_analysis_controller.get_analysis_model()
-        if not manual_analysis_model:
+        if not manual_analysis_controller:
             return
         
         manual_analysis_controller.remove_pv_line()

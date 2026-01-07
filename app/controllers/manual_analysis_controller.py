@@ -492,6 +492,23 @@ class ManualAnalysisController:
             # Update service - this will trigger engine restart with new multipv
             self.analysis_service.set_multipv(multipv)
     
+    def add_pv_line(self) -> None:
+        """Add an additional PV line by incrementing multipv."""
+        if not self.analysis_model:
+            return
+        current_multipv = self.analysis_model.multipv
+        new_multipv = current_multipv + 1
+        self.set_multipv(new_multipv)
+    
+    def remove_pv_line(self) -> None:
+        """Remove the last PV line by decrementing multipv (minimum 1)."""
+        if not self.analysis_model:
+            return
+        # Decrease multipv (minimum 1, model will handle the rest)
+        if self.analysis_model.multipv > 1:
+            new_multipv = self.analysis_model.multipv - 1
+            self.set_multipv(new_multipv)
+    
     def _on_line_update(self, multipv: int, centipawns: float, is_mate: bool, mate_moves: int, depth: int, nps: int, hashfull: int, pv: str) -> None:
         """Handle analysis line update from service.
         
