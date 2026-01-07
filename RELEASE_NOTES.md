@@ -1,3 +1,49 @@
+# CARA v2.5.2 - Bulk Analysis Improvements and Enhanced Formula Support
+
+**Release Date:** 07.01.2026
+
+This release includes major improvements to the bulk analysis feature, enhanced custom formula support with phase-specific accuracy calculations, manual analysis miniature board scaling, and various bug fixes and UI improvements.
+
+## New Features
+
+- **Bulk Analysis Parallel Games Control**: Added a new spinbox in the bulk analysis dialog to allow users to set the number of parallel games, providing better control over resource utilization
+- **Phase-Specific Accuracy Formulas**: Introduced separate customizable formulas for opening, middlegame, and endgame phases, allowing users to fine-tune accuracy calculations for each game phase independently
+- **Manual Analysis Miniature Board Scaling**: Added optional scaling for the miniature board preview (1x, 1.25x, 1.5x, 1.75x, 2x) with persistent settings across sessions
+
+## Enhancements
+
+### Bulk Analysis
+- **UI Layout Improvements**: Reorganized bulk analysis dialog layout for better usability
+- **Dynamic UI Control**: Parallel games spinbox automatically limits to the number of selected games when "Selected games only" is enabled
+- **Architecture Refactoring**: Moved bulk analysis coordination logic to a dedicated `BulkAnalysisController`, improving code organization and maintainability
+- **Consistent Styling**: All spinboxes now use the same fixed width from configuration
+
+### Custom Formula Support
+- **Extended Variable Access**: 
+  - Phase-specific formulas have access to phase-specific move counts and CPLs (`opening_moves`, `middlegame_moves`, `endgame_moves`, `average_cpl_opening`, `average_cpl_middlegame`, `average_cpl_endgame`)
+  - All formulas have access to overall game statistics with `_overall` suffix variables (e.g., `blunders_overall`, `total_moves_overall`)
+- **Additional Functions**: Made `abs()`, `int()`, and `not()` functions available in all formulas
+- **Removed Hardcoded Clamping**: Formulas now handle their own clamping using `min()` and `max()`, giving users full control
+- **Code Refactoring**: Reduced duplication in formula evaluation logic and improved service consistency
+
+## Bug Fixes
+
+- **Windows Console Window Suppression**: Fixed issue where engine processes would open an empty command line window on Windows app bundles (Issue #25)
+- **Manual Analysis PV Line Removal**: Fixed crash when using "Remove PV Line" menu item by implementing proper controller methods (Issue #26)
+- **Status Bar Progress Percentage**: Fixed black text color issue on Windows and restored percentage display to the right of the progress bar
+- **Bulk Tag Complete Dialog**: Fixed black text color for dialog title on Windows
+- **Status Panel Text Truncation**: Fixed issue where status panel would grow instead of truncating text when window is too small
+
+## Documentation
+
+- **Updated User Manual**: The HTML manual (section 7.8) has been updated to reflect the extended formula capabilities, including:
+  - Phase-specific accuracy formulas with their configuration and available variables
+  - New variables available for all formulas (phase-specific CPLs, move counts, and `_overall` suffix variables)
+  - Additional functions (`abs()`, `int()`, `not()`) available in all formulas
+  - Updated examples demonstrating the use of new variables and functions
+
+---
+
 # CARA v2.5.1 - Engine Service Improvements and Customizable Formulas
 
 **Release Date:** 05.01.2026

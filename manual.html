@@ -646,7 +646,7 @@
                     </div>
                     <div class="header-right">
                         <p class="header-manual-label">User Manual</p>
-                        <p class="header-version">Version 2.5.1</p>
+                        <p class="header-version">Version 2.5.2</p>
                     </div>
                 </div>
             </div>
@@ -2972,7 +2972,8 @@
                 <p>The formula configurations are located in <code>config.json</code> under the <code>game_analysis</code> section:</p>
                 <ul>
                     <li><code>game_analysis → elo_estimation</code> - Formula for estimating player ELO</li>
-                    <li><code>game_analysis → accuracy_formula</code> - Formula for calculating player accuracy</li>
+                    <li><code>game_analysis → accuracy_formula</code> - Formula for calculating overall player accuracy</li>
+                    <li><code>game_analysis → phase_accuracy_formulas</code> - Formulas for calculating phase-specific accuracy (opening, middlegame, endgame)</li>
                 </ul>
                 
                 <h5>7.8.2 Formula Structure</h5>
@@ -2988,7 +2989,7 @@
                 </div>
                 
                 <h5>7.8.3 Available Variables</h5>
-                <p>The following variables are available for use in both ELO and accuracy formulas:</p>
+                <p><strong>Variables for Overall Accuracy and ELO Formulas:</strong> The following variables are available for use in overall accuracy and ELO estimation formulas:</p>
                 <ul>
                     <li><strong><code>total_moves</code>:</strong> Total number of moves in the game (integer)</li>
                     <li><strong><code>non_book_moves</code>:</strong> Number of moves analyzed (excluding book moves) (integer)</li>
@@ -3009,19 +3010,60 @@
                     <li><strong><code>accuracy</code>:</strong> Calculated accuracy percentage (0.0 to 100.0) (float) - <em>Note: This variable is only available in the ELO formula, not in the accuracy formula itself (to avoid circular dependency)</em></li>
                     <li><strong><code>has_won</code>:</strong> <code>1</code> if the player won the game, <code>0</code> otherwise (integer)</li>
                     <li><strong><code>has_drawn</code>:</strong> <code>1</code> if the game was a draw or had an undefined result, <code>0</code> otherwise (integer)</li>
+                    <li><strong><code>opening_moves</code>:</strong> Total number of moves in the opening phase (integer)</li>
+                    <li><strong><code>middlegame_moves</code>:</strong> Total number of moves in the middlegame phase (integer)</li>
+                    <li><strong><code>endgame_moves</code>:</strong> Total number of moves in the endgame phase (integer)</li>
+                    <li><strong><code>average_cpl_opening</code>:</strong> Average centipawn loss in the opening phase (float)</li>
+                    <li><strong><code>average_cpl_middlegame</code>:</strong> Average centipawn loss in the middlegame phase (float)</li>
+                    <li><strong><code>average_cpl_endgame</code>:</strong> Average centipawn loss in the endgame phase (float)</li>
                 </ul>
+                <p><strong>Variables for Phase-Specific Accuracy Formulas:</strong> Phase-specific accuracy formulas (opening, middlegame, endgame) have access to all the variables above, plus the following phase-specific and overall comparison variables:</p>
+                <ul>
+                    <li><strong><code>total_moves</code>:</strong> Number of moves in this specific phase (integer) - <em>Note: In phase formulas, this refers to the phase-specific move count, not the overall game</em></li>
+                    <li><strong><code>blunders</code>:</strong> Number of blunders in this specific phase (integer)</li>
+                    <li><strong><code>mistakes</code>:</strong> Number of mistakes in this specific phase (integer)</li>
+                    <li><strong><code>inaccuracies</code>:</strong> Number of inaccuracies in this specific phase (integer)</li>
+                    <li><strong><code>misses</code>:</strong> Number of misses in this specific phase (integer)</li>
+                    <li><strong><code>best_moves</code>:</strong> Number of best moves in this specific phase (integer)</li>
+                    <li><strong><code>good_moves</code>:</strong> Number of good moves in this specific phase (integer)</li>
+                    <li><strong><code>brilliant_moves</code>:</strong> Number of brilliant moves in this specific phase (integer)</li>
+                    <li><strong><code>blunder_rate</code>:</strong> Blunder rate for this specific phase (0.0 to 1.0) (float)</li>
+                    <li><strong><code>mistake_rate</code>:</strong> Mistake rate for this specific phase (0.0 to 1.0) (float)</li>
+                    <li><strong><code>average_cpl</code>:</strong> Average centipawn loss for this specific phase (float) - <em>Note: In phase formulas, this refers to the phase-specific CPL</em></li>
+                    <li><strong><code>total_moves_overall</code>:</strong> Total number of moves in the entire game (integer)</li>
+                    <li><strong><code>non_book_moves_overall</code>:</strong> Total number of analyzed moves in the entire game (integer)</li>
+                    <li><strong><code>book_moves_overall</code>:</strong> Total number of book moves in the entire game (integer)</li>
+                    <li><strong><code>blunders_overall</code>:</strong> Total number of blunders in the entire game (integer)</li>
+                    <li><strong><code>mistakes_overall</code>:</strong> Total number of mistakes in the entire game (integer)</li>
+                    <li><strong><code>inaccuracies_overall</code>:</strong> Total number of inaccuracies in the entire game (integer)</li>
+                    <li><strong><code>misses_overall</code>:</strong> Total number of misses in the entire game (integer)</li>
+                    <li><strong><code>best_moves_overall</code>:</strong> Total number of best moves in the entire game (integer)</li>
+                    <li><strong><code>good_moves_overall</code>:</strong> Total number of good moves in the entire game (integer)</li>
+                    <li><strong><code>brilliant_moves_overall</code>:</strong> Total number of brilliant moves in the entire game (integer)</li>
+                    <li><strong><code>blunder_rate_overall</code>:</strong> Overall blunder rate for the entire game (0.0 to 1.0) (float)</li>
+                    <li><strong><code>mistake_rate_overall</code>:</strong> Overall mistake rate for the entire game (0.0 to 1.0) (float)</li>
+                    <li><strong><code>average_cpl</code> (overall context):</strong> Overall average centipawn loss for the entire game (float) - <em>Note: This is also available as a separate variable for comparison</em></li>
+                </ul>
+                <div class="tip-box">
+                    <strong>Variable Context:</strong> In phase-specific formulas, variables without the <code>_overall</code> suffix refer to statistics for that specific phase, while variables with the <code>_overall</code> suffix refer to statistics for the entire game. This allows you to compare phase performance against overall game performance.
+                </div>
                 
                 <h5>7.8.4 Available Functions</h5>
-                <p>The following functions are available in formulas:</p>
+                <p>The following functions are available in all formulas:</p>
                 <ul>
                     <li><strong><code>min(x, y)</code>:</strong> Returns the minimum of two values</li>
                     <li><strong><code>max(x, y)</code>:</strong> Returns the maximum of two values</li>
-                    <li><strong><code>int(x)</code>:</strong> Converts a value to an integer (useful for ELO formulas)</li>
+                    <li><strong><code>abs(x)</code>:</strong> Returns the absolute value of a number</li>
+                    <li><strong><code>int(x)</code>:</strong> Converts a value to an integer</li>
+                    <li><strong><code>not(x)</code>:</strong> Returns the logical negation of a value (1 if x is 0/false, 0 if x is non-zero/true)</li>
                 </ul>
                 <p>Standard mathematical operators are also supported: <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>**</code> (exponentiation), and parentheses for grouping.</p>
+                <div class="tip-box">
+                    <strong>Clamping Values:</strong> CARA does not automatically clamp formula results. You must use <code>min()</code> and <code>max()</code> functions in your formulas to ensure values stay within desired ranges. For example, to clamp accuracy between 5.0 and 100.0, use: <code>max(5.0, min(100.0, your_formula))</code>
+                </div>
                 
                 <h5>7.8.5 ELO Estimation Formula</h5>
-                <p>The ELO estimation formula calculates an estimated ELO rating based on player performance. The result is automatically clamped to a minimum of 0 (negative ELO values are not allowed).</p>
+                <p>The ELO estimation formula calculates an estimated ELO rating based on player performance. You should use <code>max(0, ...)</code> in your formula to ensure negative ELO values are not returned.</p>
                 
                 <p><strong>Default Formula:</strong></p>
                 <pre><code>"formula": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40)))"</code></pre>
@@ -3040,7 +3082,7 @@
                 <pre><code>"formula": "max(0, int(accuracy * 28))"</code></pre>
                 
                 <h5>7.8.6 Accuracy Formula</h5>
-                <p>The accuracy formula calculates a player's accuracy percentage (0.0 to 100.0). The result is automatically clamped to the range 0.0 to 100.0.</p>
+                <p>The accuracy formula calculates a player's accuracy percentage. You should use <code>max(min_value, min(100.0, your_formula))</code> in your formula to ensure the result stays within the desired range (typically 0.0 to 100.0, though the default formula uses 5.0 as the minimum).</p>
                 
                 <p><strong>Default Formula:</strong></p>
                 <pre><code>"formula": "max(5.0, min(100.0, 100.0 - (average_cpl / 3.5)))"</code></pre>
@@ -3058,11 +3100,38 @@
                 <p>Applies an additional penalty based on blunder rate:</p>
                 <pre><code>"formula": "max(0.0, 100.0 - (average_cpl / 3.5) - (blunder_rate * 100))"</code></pre>
                 
-                <h5>7.8.7 Editing Formulas</h5>
+                <h5>7.8.7 Phase-Specific Accuracy Formulas</h5>
+                <p>CARA supports separate accuracy formulas for each game phase (opening, middlegame, and endgame). These formulas are configured under <code>game_analysis → phase_accuracy_formulas</code> in <code>config.json</code>.</p>
+                <p>Each phase has its own formula configuration with the same structure as the overall accuracy formula:</p>
+                <ul>
+                    <li><code>phase_accuracy_formulas → opening → formula</code> - Formula for opening phase accuracy</li>
+                    <li><code>phase_accuracy_formulas → middlegame → formula</code> - Formula for middlegame phase accuracy</li>
+                    <li><code>phase_accuracy_formulas → endgame → formula</code> - Formula for endgame phase accuracy</li>
+                </ul>
+                <p><strong>Default Phase Formulas:</strong></p>
+                <pre><code>"opening": {
+    "formula": "max(5.0, min(100.0, 100.0 - (average_cpl_opening / 3.5)))",
+    "value_on_error": 0.0
+},
+"middlegame": {
+    "formula": "max(5.0, min(100.0, 100.0 - (average_cpl_middlegame / 3.5)))",
+    "value_on_error": 0.0
+},
+"endgame": {
+    "formula": "max(5.0, min(100.0, 100.0 - (average_cpl_endgame / 3.5)))",
+    "value_on_error": 0.0
+}</code></pre>
+                <p></p>
+                <p><strong>Example: Comparing Phase Performance to Overall Game:</strong></p>
+                <pre><code>"formula": "max(5.0, min(100.0, 100.0 - (average_cpl_opening / 3.5) - ((blunder_rate - blunder_rate_overall) * 30.0)))"</code></pre>
+                <p>This formula penalizes the opening phase accuracy if the opening blunder rate is higher than the overall game blunder rate.</p>
+                <p></p>
+                
+                <h5>7.8.8 Editing Formulas</h5>
                 <p>To customize a formula:</p>
                 
                 <p><strong>Locate the formula configuration:</strong><br>
-                Open <code>config.json</code> in a text editor and navigate to: <code>game_analysis → elo_estimation</code> or <code>game_analysis → accuracy_formula</code></p>
+                Open <code>config.json</code> in a text editor and navigate to: <code>game_analysis → elo_estimation</code>, <code>game_analysis → accuracy_formula</code>, or <code>game_analysis → phase_accuracy_formulas</code> (for phase-specific formulas)</p>
                 
                 <p><strong>Modify the formula string:</strong><br>
                 Edit the <code>"formula"</code> field with your desired expression. For example:</p>
@@ -3082,7 +3151,7 @@
                     <strong>Testing Formulas:</strong> After modifying formulas, analyze a few games and check the Game Summary panel to verify the results match your expectations. If values seem incorrect, check the formula syntax and ensure all variable names are spelled correctly. Invalid formulas will fall back to the <code>value_on_error</code> value.
                 </div>
                 
-                <h5>7.8.8 Player Statistics</h5>
+                <h5>7.8.9 Player Statistics</h5>
                 <p>When calculating player statistics across multiple games, CARA calculates ELO and accuracy for each individual game using the configured formulas, then averages these values. This approach ensures that each game contributes equally to the final statistics, regardless of game length or number of moves analyzed.</p>
                 
                 <p>For example, if a player has three games with ELO estimates of 1800, 1900, and 2000, the player's average ELO will be 1900, not a single calculation based on all moves combined.</p>
@@ -3090,7 +3159,7 @@
         </section>
 
         <footer style="margin-top: 50px; padding-top: 20px; border-top: 2px solid rgb(60, 60, 65); color: rgb(180, 180, 180); text-align: center;">
-            <p>CARA - Chess Analysis and Review Application v2.5.1</p>
+            <p>CARA - Chess Analysis and Review Application v2.5.2</p>
             <p>Copyright (C) 2025 Philipp Guntermann</p>
             <p>This program is free software: you can redistribute it and/or modify it under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" style="color: rgb(100, 150, 255);">GNU General Public License version 3</a> (GPL-3.0) or any later version.</p>
             <p>This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.</p>
