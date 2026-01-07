@@ -185,7 +185,8 @@ class BulkAnalysisThread(QThread):
                  engine_model: EngineModel, analysis_controller,
                  opening_service, book_move_service, classification_model,
                  re_analyze: bool = False, movetime_override: Optional[int] = None,
-                 max_threads_override: Optional[int] = None) -> None:
+                 max_threads_override: Optional[int] = None,
+                 parallel_games_override: Optional[int] = None) -> None:
         """Initialize bulk analysis thread.
         
         Args:
@@ -199,6 +200,7 @@ class BulkAnalysisThread(QThread):
             re_analyze: Whether to re-analyze already analyzed games.
             movetime_override: Optional override for movetime in milliseconds.
             max_threads_override: Optional override for maximum total threads (None = unlimited).
+            parallel_games_override: Optional override for number of parallel games (None = use config default).
         """
         super().__init__()
         self.games = games
@@ -211,6 +213,7 @@ class BulkAnalysisThread(QThread):
         self.re_analyze = re_analyze
         self.movetime_override = movetime_override
         self.max_threads_override = max_threads_override
+        self.parallel_games_override = parallel_games_override
         self._cancelled = False
         self._workers: List[GameAnalysisWorker] = []
         self._progress_lock = threading.Lock()
@@ -572,9 +575,12 @@ class BulkAnalysisThread(QThread):
             # Emit progress update
             self.progress_updated.emit(0.0, f"Preparing to analyze {len(games_to_analyze)} games...", initial_progress_str)
             
-            # Calculate parallel resources based only on max_threads_override (ignores engine's normal thread setting)
+            # Calculate parallel resources based on parallel_games_override or config default
             threading_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {}).get('threading', {})
-            max_parallel_games = threading_config.get('max_parallel_games', 4)
+            if self.parallel_games_override is not None:
+                max_parallel_games = self.parallel_games_override
+            else:
+                max_parallel_games = threading_config.get('default_parallel_games', 4)
             parallel_games, threads_per_engine_list = BulkAnalysisService.calculate_parallel_resources(
                 max_parallel_games=max_parallel_games, max_total_threads=self.max_threads_override
             )
@@ -689,24 +695,32 @@ class BulkAnalysisDialog(QDialog):
     """Dialog for bulk game analysis."""
     
     def __init__(self, config: Dict[str, Any], database_model: Optional[DatabaseModel],
-                 analysis_controller, database_panel=None, parent=None) -> None:
+                 bulk_analysis_controller, database_panel=None, parent=None) -> None:
         """Initialize the bulk analysis dialog.
         
         Args:
             config: Configuration dictionary.
             database_model: DatabaseModel instance for the active database.
-            analysis_controller: GameAnalysisController instance.
+            bulk_analysis_controller: BulkAnalysisController instance.
             database_panel: Optional DatabasePanel instance for getting selected games.
             parent: Parent widget.
         """
         super().__init__(parent)
         self.config = config
         self.database_model = database_model
-        self.analysis_controller = analysis_controller
+        self.controller = bulk_analysis_controller
         self.database_panel = database_panel
-        self.analysis_thread: Optional[BulkAnalysisThread] = None
+        
+        # Set database panel in controller
+        if database_panel:
+            self.controller.set_database_panel(database_panel)
         self.selected_games: List[GameData] = []
-        self.bulk_analysis_service: Optional[BulkAnalysisService] = None
+        
+        # Connect to controller signals
+        self.controller.progress_updated.connect(self._on_progress_updated)
+        self.controller.status_update_requested.connect(self._on_status_update_requested)
+        self.controller.game_analyzed.connect(self._on_game_analyzed)
+        self.controller.finished.connect(self._on_analysis_finished)
         
         # Store fixed size
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {})
@@ -754,6 +768,8 @@ class BulkAnalysisDialog(QDialog):
     
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
+        from app.utils.font_utils import scale_font_size
+        
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {})
         layout_config = dialog_config.get('layout', {})
         layout_spacing = layout_config.get('spacing', 15)
@@ -824,60 +840,56 @@ class BulkAnalysisDialog(QDialog):
         self.re_analyze_checkbox.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         options_layout.addWidget(self.re_analyze_checkbox)
         
-        # Controls row: movetime and max_threads on same row (below checkbox)
-        from app.utils.font_utils import scale_font_size
-        spacing_config = dialog_config.get('spacing', {})
+        # Controls row: parallel games and max_threads on same row
         controls_row_layout = QHBoxLayout()
         controls_row_layout.setSpacing(spacing_config.get('controls_row', 20))
         
-        # Movetime input
-        movetime_row_layout = QHBoxLayout()
-        movetime_row_layout.setSpacing(spacing_config.get('label_spinbox', 8))
+        # Parallel games input
+        parallel_games_row_layout = QHBoxLayout()
+        parallel_games_row_layout.setSpacing(spacing_config.get('label_spinbox', 8))
         
-        movetime_label = QLabel("Time per move:")
-        movetime_label.setStyleSheet(
-            f"font-size: {scale_font_size(dialog_config.get('labels', {}).get('font_size', 11))}pt; "
-            f"color: rgb({dialog_config.get('labels', {}).get('text_color', [200, 200, 200])[0]}, "
-            f"{dialog_config.get('labels', {}).get('text_color', [200, 200, 200])[1]}, "
-            f"{dialog_config.get('labels', {}).get('text_color', [200, 200, 200])[2]});"
+        # Get parallel games config
+        parallel_games_config = dialog_config.get('parallel_games_spinbox', {})
+        parallel_games_min = parallel_games_config.get('min_value', 1)
+        parallel_games_max = parallel_games_config.get('max_value', 16)
+        threading_config = dialog_config.get('threading', {})
+        parallel_games_default = threading_config.get('default_parallel_games', 4)
+        parallel_games_step = parallel_games_config.get('single_step', 1)
+        parallel_games_suffix = parallel_games_config.get('suffix', '')
+        
+        # Store original max for "all games" mode
+        self._parallel_games_max_all = parallel_games_max
+        
+        # Parallel games label (set fixed width to align with time per move)
+        labels_config = dialog_config.get('labels', {})
+        parallel_games_label = QLabel("Parallel games:")
+        parallel_games_label.setStyleSheet(
+            f"font-size: {scale_font_size(labels_config.get('font_size', 11))}pt; "
+            f"color: rgb({labels_config.get('text_color', [200, 200, 200])[0]}, "
+            f"{labels_config.get('text_color', [200, 200, 200])[1]}, "
+            f"{labels_config.get('text_color', [200, 200, 200])[2]});"
         )
-        movetime_row_layout.addWidget(movetime_label)
+        # Set fixed width to match "Time per move:" label for vertical alignment
+        label_fixed_width = labels_config.get('fixed_width', 110)
+        parallel_games_label.setFixedWidth(label_fixed_width)
+        parallel_games_row_layout.addWidget(parallel_games_label)
         
-        # Get movetime spinbox config
-        movetime_config = dialog_config.get('movetime_spinbox', {})
-        movetime_min = movetime_config.get('min_value', 100)
-        movetime_max = movetime_config.get('max_value', 60000)
-        movetime_step = movetime_config.get('single_step', 100)
-        movetime_suffix = movetime_config.get('suffix', ' ms')
-        movetime_fallback_default = movetime_config.get('fallback_default', 1000)
+        # Parallel games spinbox
+        self.parallel_games_spinbox = QSpinBox()
+        self.parallel_games_spinbox.setMinimum(parallel_games_min)
+        self.parallel_games_spinbox.setMaximum(parallel_games_max)
+        self.parallel_games_spinbox.setSingleStep(parallel_games_step)
+        self.parallel_games_spinbox.setValue(parallel_games_default)
+        if parallel_games_suffix:
+            self.parallel_games_spinbox.setSuffix(parallel_games_suffix)
+        parallel_games_row_layout.addWidget(self.parallel_games_spinbox)
         
-        # Get default movetime from engine parameters
-        default_movetime = movetime_fallback_default
-        if self.analysis_controller and hasattr(self.analysis_controller, 'engine_model'):
-            engine_model = self.analysis_controller.engine_model
-            engine_assignment = engine_model.get_assignment(EngineModel.TASK_GAME_ANALYSIS)
-            if engine_assignment:
-                engine = engine_model.get_engine(engine_assignment)
-                if engine and engine.is_valid:
-                    engine_path = Path(engine.path) if not isinstance(engine.path, Path) else engine.path
-                    task_params = EngineParametersService.get_task_parameters_for_engine(
-                        engine_path,
-                        "game_analysis",
-                        self.config
-                    )
-                    default_movetime = task_params.get("movetime", movetime_fallback_default)
+        controls_row_layout.addLayout(parallel_games_row_layout, 0)  # Stretch factor 0 to prevent stretching
         
-        self.movetime_spinbox = QSpinBox()
-        self.movetime_spinbox.setMinimum(movetime_min)
-        self.movetime_spinbox.setMaximum(movetime_max)
-        self.movetime_spinbox.setSingleStep(movetime_step)
-        self.movetime_spinbox.setValue(default_movetime)
-        self.movetime_spinbox.setSuffix(movetime_suffix)
-        movetime_row_layout.addWidget(self.movetime_spinbox)
+        # Add stretch to push max threads to the right
+        controls_row_layout.addStretch()
         
-        controls_row_layout.addLayout(movetime_row_layout, 0)  # Stretch factor 0 to prevent stretching
-        
-        # Max threads input (on same row as movetime)
+        # Max threads input (on same row as parallel games, aligned to the right)
         max_threads_row_layout = QHBoxLayout()
         max_threads_row_layout.setSpacing(spacing_config.get('label_spinbox', 8))
         
@@ -891,7 +903,6 @@ class BulkAnalysisDialog(QDialog):
         max_threads_special_text = max_threads_config.get('special_value_text', 'Unlimited')
         
         # Use available cores as maximum if not specified or if specified max is too high
-        threading_config = dialog_config.get('threading', {})
         cpu_count_fallback = threading_config.get('cpu_count_fallback', 4)
         available_cores = os.cpu_count() or cpu_count_fallback
         if max_threads_max > available_cores:
@@ -900,10 +911,10 @@ class BulkAnalysisDialog(QDialog):
         # Max threads label
         max_threads_label = QLabel("Max threads:")
         max_threads_label.setStyleSheet(
-            f"font-size: {scale_font_size(dialog_config.get('labels', {}).get('font_size', 11))}pt; "
-            f"color: rgb({dialog_config.get('labels', {}).get('text_color', [200, 200, 200])[0]}, "
-            f"{dialog_config.get('labels', {}).get('text_color', [200, 200, 200])[1]}, "
-            f"{dialog_config.get('labels', {}).get('text_color', [200, 200, 200])[2]});"
+            f"font-size: {scale_font_size(labels_config.get('font_size', 11))}pt; "
+            f"color: rgb({labels_config.get('text_color', [200, 200, 200])[0]}, "
+            f"{labels_config.get('text_color', [200, 200, 200])[1]}, "
+            f"{labels_config.get('text_color', [200, 200, 200])[2]});"
         )
         max_threads_row_layout.addWidget(max_threads_label)
         
@@ -921,10 +932,64 @@ class BulkAnalysisDialog(QDialog):
         
         controls_row_layout.addLayout(max_threads_row_layout, 0)  # Stretch factor 0 to prevent stretching
         
-        # Add stretch to prevent layouts from stretching to fill space
-        controls_row_layout.addStretch()
-        
         options_layout.addLayout(controls_row_layout)
+        
+        # Time per move row (below parallel games and max threads)
+        movetime_row_layout = QHBoxLayout()
+        movetime_row_layout.setSpacing(spacing_config.get('label_spinbox', 8))
+        
+        movetime_label = QLabel("Time per move:")
+        movetime_label.setStyleSheet(
+            f"font-size: {scale_font_size(labels_config.get('font_size', 11))}pt; "
+            f"color: rgb({labels_config.get('text_color', [200, 200, 200])[0]}, "
+            f"{labels_config.get('text_color', [200, 200, 200])[1]}, "
+            f"{labels_config.get('text_color', [200, 200, 200])[2]});"
+        )
+        # Set same fixed width as parallel games label for vertical alignment
+        movetime_label.setFixedWidth(label_fixed_width)
+        movetime_row_layout.addWidget(movetime_label)
+        
+        # Get movetime spinbox config
+        movetime_config = dialog_config.get('movetime_spinbox', {})
+        movetime_min = movetime_config.get('min_value', 100)
+        movetime_max = movetime_config.get('max_value', 60000)
+        movetime_step = movetime_config.get('single_step', 100)
+        movetime_suffix = movetime_config.get('suffix', ' ms')
+        movetime_fallback_default = movetime_config.get('fallback_default', 1000)
+        
+        # Get default movetime from engine parameters
+        default_movetime = movetime_fallback_default
+        engine_model = self.controller.engine_model
+        engine_assignment = engine_model.get_assignment(EngineModel.TASK_GAME_ANALYSIS)
+        if engine_assignment:
+            engine = engine_model.get_engine(engine_assignment)
+            if engine and engine.is_valid:
+                engine_path = Path(engine.path) if not isinstance(engine.path, Path) else engine.path
+                task_params = EngineParametersService.get_task_parameters_for_engine(
+                    engine_path,
+                    "game_analysis",
+                    self.config
+                )
+                default_movetime = task_params.get("movetime", movetime_fallback_default)
+        
+        self.movetime_spinbox = QSpinBox()
+        self.movetime_spinbox.setMinimum(movetime_min)
+        self.movetime_spinbox.setMaximum(movetime_max)
+        self.movetime_spinbox.setSingleStep(movetime_step)
+        self.movetime_spinbox.setValue(default_movetime)
+        self.movetime_spinbox.setSuffix(movetime_suffix)
+        movetime_row_layout.addWidget(self.movetime_spinbox)
+        
+        # Set fixed width for all spinboxes (after all are created)
+        spinboxes_config = dialog_config.get('spinboxes', {})
+        spinbox_fixed_width = spinboxes_config.get('fixed_width', 80)
+        self.parallel_games_spinbox.setFixedWidth(spinbox_fixed_width)
+        self.max_threads_spinbox.setFixedWidth(spinbox_fixed_width)
+        self.movetime_spinbox.setFixedWidth(spinbox_fixed_width)
+        
+        movetime_row_layout.addStretch()
+        
+        options_layout.addLayout(movetime_row_layout)
         
         layout.addWidget(options_group)
         
@@ -996,6 +1061,9 @@ class BulkAnalysisDialog(QDialog):
         # Add spacing before buttons
         layout.addSpacing(section_spacing)
         layout.addLayout(button_layout)
+        
+        # Initialize parallel games limit based on current selection
+        self._update_parallel_games_limit()
     
     def _on_selection_changed(self) -> None:
         """Handle selection radio button change."""
@@ -1006,102 +1074,72 @@ class BulkAnalysisDialog(QDialog):
                 self.start_button.setEnabled(False)
             else:
                 self.start_button.setEnabled(True)
+            # Update parallel games max limit
+            self._update_parallel_games_limit()
         else:
             self.start_button.setEnabled(True)
+            # Reset parallel games max to config value
+            self._update_parallel_games_limit()
     
     def _update_selected_games(self) -> None:
         """Update the list of selected games."""
-        self.selected_games = []
-        if self.database_model and self.database_panel:
-            # Get selected rows from the database panel (only works if this is the active database)
-            # Check if the active database matches our database model
-            active_info = self.database_panel.get_active_database_info()
-            if active_info and active_info.get('model') == self.database_model:
-                selected_indices = self.database_panel.get_selected_game_indices()
-                for idx in selected_indices:
-                    game = self.database_model.get_game(idx)
-                    if game:
-                        self.selected_games.append(game)
+        if self.database_model:
+            self.selected_games = self.controller.get_selected_games(self.database_model)
+            # Update parallel games limit if in selected games mode
+            if self.selected_games_radio.isChecked():
+                self._update_parallel_games_limit()
+    
+    def _update_parallel_games_limit(self) -> None:
+        """Update the maximum value of the parallel games spinbox based on selection mode."""
+        # Check if spinbox exists (may be called during initialization)
+        if not hasattr(self, 'parallel_games_spinbox'):
+            return
+        
+        if self.selected_games_radio.isChecked():
+            # Limit to number of selected games (but not less than minimum)
+            num_selected = len(self.selected_games)
+            current_min = self.parallel_games_spinbox.minimum()
+            new_max = max(current_min, num_selected)
+            self.parallel_games_spinbox.setMaximum(new_max)
+            # If current value exceeds new max, adjust it
+            if self.parallel_games_spinbox.value() > new_max:
+                self.parallel_games_spinbox.setValue(new_max)
+        else:
+            # Use config max value for "all games" mode
+            self.parallel_games_spinbox.setMaximum(self._parallel_games_max_all)
     
     def _start_analysis(self) -> None:
         """Start the bulk analysis."""
-        # Check if engine is configured and assigned for game analysis
-        engine_model = self.analysis_controller.engine_model
-        engine_assignment = engine_model.get_assignment(EngineModel.TASK_GAME_ANALYSIS)
-        if engine_assignment is None:
-            # No engine assigned - show error message
+        # Validate engine using controller
+        is_valid, error_title, error_message = self.controller.validate_engine_for_analysis()
+        if not is_valid:
             from app.views.message_dialog import MessageDialog
-            
-            # Try to get app controller for validation message
-            engines = engine_model.get_engines()
-            if not engines:
-                error_type = "no_engines"
-            else:
-                error_type = "no_assignment"
-            
-            main_window = QApplication.activeWindow()
-            if main_window and hasattr(main_window, 'controller'):
-                # Get validation message from config
-                messages_config = self.config.get('ui', {}).get('dialogs', {}).get('engine_validation_messages', {})
-                error_config = messages_config.get(error_type, {})
-                title = error_config.get('title', 'Error')
-                message_template = error_config.get('message_template', '')
-                
-                # Use bulk_analysis action
-                actions = messages_config.get('actions', {})
-                tasks = messages_config.get('tasks', {})
-                action = actions.get('bulk_analysis', 'starting bulk analysis')
-                task_display = tasks.get('game_analysis', 'Game Analysis')
-                
-                # Format message
-                message = message_template.format(action=action, task=task_display)
-            else:
-                # Fallback message
-                if not engines:
-                    title = "No Engine Configured"
-                    message = "Please add at least one UCI chess engine before starting bulk analysis.\n\nGo to Engines → Add Engine... to configure an engine."
-                else:
-                    title = "No Engine Assigned"
-                    message = "Please assign an engine to the Game Analysis task before starting bulk analysis.\n\nGo to Engines → [Engine Name] → Assign to Game Analysis."
-            
             dialog = MessageDialog(
                 self.config,
-                title,
-                message,
+                error_title,
+                error_message,
                 message_type="warning",
                 parent=self
             )
             dialog.exec()
             return
         
-        # Get games to analyze
-        if self.selected_games_radio.isChecked():
-            if not self.selected_games:
-                # Show error message
-                from app.views.message_dialog import MessageDialog
-                dialog = MessageDialog(
-                    self.config,
-                    "No Games Selected",
-                    "Please select games in the database view to analyze, or choose 'All games'.",
-                    message_type="warning",
-                    parent=self
-                )
-                dialog.exec()
-                return
-            games_to_analyze = self.selected_games
-        else:
-            # All games
-            if not self.database_model:
-                return
-            games_to_analyze = self.database_model.get_all_games()
+        # Get games to analyze using controller
+        selection_mode = "selected" if self.selected_games_radio.isChecked() else "all"
+        games_to_analyze, error_title, error_message = self.controller.get_games_to_analyze(
+            selection_mode,
+            self.database_model,
+            self.selected_games
+        )
         
-        if not games_to_analyze:
+        if games_to_analyze is None:
             from app.views.message_dialog import MessageDialog
+            message_type = "warning" if error_title == "No Games Selected" else "information"
             dialog = MessageDialog(
                 self.config,
-                "No Games",
-                "No games found in the database.",
-                message_type="information",
+                error_title,
+                error_message,
+                message_type=message_type,
                 parent=self
             )
             dialog.exec()
@@ -1120,57 +1158,19 @@ class BulkAnalysisDialog(QDialog):
         self.all_games_radio.setEnabled(False)
         self.re_analyze_checkbox.setEnabled(False)
         self.movetime_spinbox.setEnabled(False)
+        self.parallel_games_spinbox.setEnabled(False)
         self.max_threads_spinbox.setEnabled(False)
         self.start_button.setEnabled(False)
         self.cancel_button.setText("Cancel")
         
-        # Get required services from analysis controller
-        engine_model = self.analysis_controller.engine_model
-        opening_service = self.analysis_controller.opening_service
-        book_move_service = self.analysis_controller.book_move_service
-        classification_model = self.analysis_controller.classification_model
-        
-        # Ensure opening service is loaded before starting analysis (to avoid blocking during analysis)
-        # This must happen in the main thread before creating worker threads
-        if opening_service and not opening_service.is_loaded():
-            # Update status to show we're loading opening database
-            self.status_label.setText("Loading opening database...")
-            QApplication.processEvents()  # Allow UI to update
-            
-            try:
-                opening_service.load()
-            except Exception as e:
-                # If loading fails, continue anyway (opening info will just be missing)
-                import sys
-                print(f"Warning: Failed to load opening service: {e}", file=sys.stderr)
-            
-            # Clear status
-            self.status_label.setText("Ready")
+        # Prepare services using controller (with status updates)
+        def status_callback(message: str) -> None:
+            self.status_label.setText(message)
             QApplication.processEvents()  # Allow UI to update
         
-        # Pre-load engine parameters to avoid blocking in worker thread
-        self.status_label.setText("Loading engine parameters...")
-        QApplication.processEvents()  # Allow UI to update
-        try:
-            # Pre-load by calling get_task_parameters_for_engine (it will load if needed)
-            engine_assignment = engine_model.get_assignment(EngineModel.TASK_GAME_ANALYSIS)
-            if engine_assignment:
-                engine = engine_model.get_engine(engine_assignment)
-                if engine and engine.is_valid:
-                    engine_path = Path(engine.path) if not isinstance(engine.path, Path) else engine.path
-                    EngineParametersService.get_task_parameters_for_engine(
-                        engine_path,
-                        "game_analysis",
-                        self.config
-                    )
-        except Exception as e:
-            import sys
-            print(f"Warning: Failed to pre-load engine parameters: {e}", file=sys.stderr)
+        self.controller.prepare_services_for_analysis(status_callback)
         
-        self.status_label.setText("Ready")
-        QApplication.processEvents()  # Allow UI to update
-        
-        # Start analysis thread (it will create its own BulkAnalysisService instances for parallel execution)
+        # Get analysis parameters from UI
         re_analyze = self.re_analyze_checkbox.isChecked()
         movetime_override = self.movetime_spinbox.value()  # Get value from spinbox
         
@@ -1178,22 +1178,8 @@ class BulkAnalysisDialog(QDialog):
         max_threads_value = self.max_threads_spinbox.value()
         max_threads_override = None if max_threads_value == 0 else max_threads_value
         
-        self.analysis_thread = BulkAnalysisThread(
-            games_to_analyze,
-            self.config,
-            engine_model,
-            self.analysis_controller,
-            opening_service,
-            book_move_service,
-            classification_model,
-            re_analyze,
-            movetime_override=movetime_override,
-            max_threads_override=max_threads_override
-        )
-        self.analysis_thread.progress_updated.connect(self._on_progress_updated)
-        self.analysis_thread.status_update_requested.connect(self._on_status_update_requested)
-        self.analysis_thread.game_analyzed.connect(self._on_game_analyzed)
-        self.analysis_thread.finished.connect(self._on_analysis_finished)
+        # Get parallel_games_override (use value from spinbox)
+        parallel_games_override = self.parallel_games_spinbox.value()
         
         # Show progress service in status bar
         from app.services.progress_service import ProgressService
@@ -1201,7 +1187,14 @@ class BulkAnalysisDialog(QDialog):
         progress_service.show_progress()
         progress_service.set_progress(0)
         
-        self.analysis_thread.start()
+        # Start analysis via controller
+        self.controller.start_analysis(
+            games_to_analyze,
+            re_analyze=re_analyze,
+            movetime_override=movetime_override,
+            max_threads_override=max_threads_override,
+            parallel_games_override=parallel_games_override
+        )
     
     def _on_progress_updated(self, progress_percent: float, status_message: str, progress_percent_str: str) -> None:
         """Handle progress update from analysis thread."""
@@ -1213,21 +1206,22 @@ class BulkAnalysisDialog(QDialog):
     
     def _on_status_update_requested(self) -> None:
         """Handle status update request from analysis thread (called from main thread)."""
-        if self.analysis_thread:
+        analysis_thread = self.controller.get_analysis_thread()
+        if analysis_thread:
             # Check if cancelled and update status accordingly
-            if self.analysis_thread._cancelled:
+            if analysis_thread._cancelled:
                 from app.services.progress_service import ProgressService
                 progress_service = ProgressService.get_instance()
                 # Show "Cancelling..." only if thread is still running
                 # Once thread finishes, _on_analysis_finished will show "Cancelled by user"
-                if self.analysis_thread.isRunning():
+                if analysis_thread.isRunning():
                     progress_service.set_status("Bulk Analysis: Cancelling...")
                     self.status_label.setText("Cancelling...")
                 else:
                     progress_service.set_status("Bulk Analysis: Cancelled by user")
                     self.status_label.setText("Cancelled by user")
             else:
-                self.analysis_thread._update_status_messages()
+                analysis_thread._update_status_messages()
     
     def _on_game_analyzed(self, game: GameData) -> None:
         """Handle game analyzed signal."""
@@ -1242,10 +1236,8 @@ class BulkAnalysisDialog(QDialog):
     
     def _on_analysis_finished(self, success: bool, message: str) -> None:
         """Handle analysis finished signal."""
-        # Hide progress service
         from app.services.progress_service import ProgressService
         progress_service = ProgressService.get_instance()
-        progress_service.hide_progress()
         
         if success:
             progress_display_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {}).get('progress_display', {})
@@ -1263,44 +1255,57 @@ class BulkAnalysisDialog(QDialog):
             # Check if this is a cancellation
             if "cancelled" in message.lower():
                 status_message = "Bulk Analysis: Cancelled by user"
+                self.status_label.setText("Cancelled by user")
             else:
                 status_message = f"Bulk Analysis: Error - {message}"
+                self.status_label.setText(f"Error: {message}")
             
-            # Update status bar
+            # Update status bar - ALWAYS set status BEFORE hiding progress
+            # This ensures the status is visible even if this is called after _on_cancel
             progress_service.set_status(status_message)
-            self.status_label.setText(f"Error: {message}")
+            QApplication.processEvents()  # Ensure status bar updates
+            
             # Re-enable controls for retry
             self.selected_games_radio.setEnabled(True)
             self.all_games_radio.setEnabled(True)
             self.re_analyze_checkbox.setEnabled(True)
             self.movetime_spinbox.setEnabled(True)
+            self.parallel_games_spinbox.setEnabled(True)
             self.max_threads_spinbox.setEnabled(True)
             self.start_button.setEnabled(True)
             self.cancel_button.setText("Cancel")
+        
+        # Hide progress service at the end (after status is set and processed)
+        progress_service.hide_progress()
     
     def _on_cancel(self) -> None:
         """Handle cancel button click."""
         from app.services.progress_service import ProgressService
         progress_service = ProgressService.get_instance()
         
-        if self.analysis_thread and self.analysis_thread.isRunning():
-            self.analysis_thread.cancel()
-            if self.bulk_analysis_service:
-                self.bulk_analysis_service.cancel()
+        if self.controller.is_analysis_running():
+            self.controller.cancel_analysis()
             self.status_label.setText("Cancelling...")
             self.cancel_button.setEnabled(False)
             
-            # Update status bar
+            # Update status bar immediately
             progress_service.set_status("Bulk Analysis: Cancelling...")
+            QApplication.processEvents()  # Ensure UI updates
             
             # Wait for thread to finish
-            self.analysis_thread.wait()
+            self.controller.wait_for_analysis()
             
-            # Update status bar with cancellation message
+            # Ensure status bar is updated with cancellation message
+            # Set status BEFORE hiding progress to ensure it's visible
             progress_service.set_status("Bulk Analysis: Cancelled by user")
-        
-        # Hide progress service
-        progress_service.hide_progress()
+            self.status_label.setText("Cancelled by user")
+            QApplication.processEvents()  # Ensure UI updates
+            
+            # Hide progress service AFTER setting status
+            progress_service.hide_progress()
+        else:
+            # Thread not running, just hide progress
+            progress_service.hide_progress()
         
         self.reject()
     

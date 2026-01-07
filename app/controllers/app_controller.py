@@ -16,6 +16,7 @@ from app.controllers.move_classification_controller import MoveClassificationCon
 from app.controllers.bulk_replace_controller import BulkReplaceController
 from app.controllers.bulk_tag_controller import BulkTagController
 from app.controllers.bulk_clean_pgn_controller import BulkCleanPgnController
+from app.controllers.bulk_analysis_controller import BulkAnalysisController
 from app.controllers.deduplication_controller import DeduplicationController
 from app.controllers.positional_heatmap_controller import PositionalHeatmapController
 from app.controllers.annotation_controller import AnnotationController
@@ -116,6 +117,13 @@ class AppController:
             config,
             self.database_controller,
             self.game_controller
+        )
+        
+        # Initialize bulk analysis controller (depends on engine controller and game analysis controller)
+        self.bulk_analysis_controller = BulkAnalysisController(
+            config,
+            self.engine_controller.get_engine_model(),
+            self.game_analysis_controller
         )
         
         # Initialize deduplication controller (depends on database controller and game controller)
@@ -702,6 +710,14 @@ class AppController:
         """
         return self.bulk_clean_pgn_controller
     
+    def get_bulk_analysis_controller(self) -> BulkAnalysisController:
+        """Get the bulk analysis controller.
+        
+        Returns:
+            The BulkAnalysisController instance for managing bulk game analysis operations.
+        """
+        return self.bulk_analysis_controller
+    
     def get_positional_heatmap_controller(self) -> PositionalHeatmapController:
         """Get the positional heat-map controller.
         
@@ -1078,7 +1094,8 @@ class AppController:
             manual_analysis_model = manual_analysis_controller.get_analysis_model()
             if manual_analysis_model:
                 self.user_settings_service.update_manual_analysis({
-                    "enable_miniature_preview": manual_analysis_model.enable_miniature_preview
+                    "enable_miniature_preview": manual_analysis_model.enable_miniature_preview,
+                    "miniature_preview_scale_factor": manual_analysis_model.miniature_preview_scale_factor
                 })
         
         # Tell UserSettingsService to persist all settings to file

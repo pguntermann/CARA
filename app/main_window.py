@@ -691,6 +691,20 @@ class MainWindow(QMainWindow):
         self.enable_miniature_preview_action.triggered.connect(self._on_enable_miniature_preview_toggled)
         manual_analysis_menu.addAction(self.enable_miniature_preview_action)
         
+        # Set miniature preview scale factor menu (submenu)
+        self.miniature_preview_scale_menu = manual_analysis_menu.addMenu("Set miniature preview scale factor")
+        # Apply menu styling to submenu (same as other submenus)
+        self._apply_menu_styling(self.miniature_preview_scale_menu)
+        scale_factors = [1.0, 1.25, 1.5, 1.75, 2.0]
+        self.miniature_preview_scale_actions = {}
+        for scale in scale_factors:
+            action = QAction(f"{scale}x", self)
+            action.setCheckable(True)
+            action.setData(scale)
+            action.triggered.connect(lambda checked, s=scale: self._on_miniature_preview_scale_factor_selected(s))
+            self.miniature_preview_scale_menu.addAction(action)
+            self.miniature_preview_scale_actions[scale] = action
+        
         # Separator
         manual_analysis_menu.addSeparator()
         
@@ -3654,19 +3668,12 @@ Visibility Settings:
         if not manual_analysis_controller:
             return
         
-        manual_analysis_model = manual_analysis_controller.get_analysis_model()
-        if not manual_analysis_model:
-            return
-        
-        current_multipv = manual_analysis_model.multipv
-        new_multipv = current_multipv + 1
-        manual_analysis_controller.set_multipv(new_multipv)
+        manual_analysis_controller.add_pv_line()
     
     def _on_remove_pv_line(self) -> None:
         """Handle remove PV line from menu."""
         manual_analysis_controller = self.controller.get_manual_analysis_controller()
-        manual_analysis_model = manual_analysis_controller.get_analysis_model()
-        if not manual_analysis_model:
+        if not manual_analysis_controller:
             return
         
         manual_analysis_controller.remove_pv_line()
@@ -3679,6 +3686,23 @@ Visibility Settings:
             manual_analysis_model = manual_analysis_controller.get_analysis_model()
             if manual_analysis_model:
                 manual_analysis_model.enable_miniature_preview = enabled
+    
+    def _on_miniature_preview_scale_factor_selected(self, scale_factor: float) -> None:
+        """Handle miniature preview scale factor selection from menu.
+        
+        Args:
+            scale_factor: Selected scale factor (1.0, 1.25, 1.5, 1.75, or 2.0).
+        """
+        # Uncheck all other scale factor actions
+        for scale, action in self.miniature_preview_scale_actions.items():
+            action.setChecked(scale == scale_factor)
+        
+        # Update model
+        manual_analysis_controller = self.controller.get_manual_analysis_controller()
+        if manual_analysis_controller:
+            manual_analysis_model = manual_analysis_controller.get_analysis_model()
+            if manual_analysis_model:
+                manual_analysis_model.miniature_preview_scale_factor = scale_factor
     
     def _on_explore_pv1_plans_toggled(self) -> None:
         """Handle PV1 positional plans toggle."""
@@ -4366,6 +4390,17 @@ Visibility Settings:
         if hasattr(self, 'enable_miniature_preview_action'):
             self.enable_miniature_preview_action.setChecked(enable_miniature_preview)
         
+        # Miniature preview scale factor
+        scale_factor = manual_analysis_settings.get("miniature_preview_scale_factor", 1.0)
+        if manual_analysis_controller:
+            manual_analysis_model = manual_analysis_controller.get_analysis_model()
+            if manual_analysis_model:
+                manual_analysis_model.miniature_preview_scale_factor = scale_factor
+        if hasattr(self, 'miniature_preview_scale_actions'):
+            # Check the appropriate scale factor action
+            for scale, action in self.miniature_preview_scale_actions.items():
+                action.setChecked(abs(scale - scale_factor) < 0.01)  # Use small epsilon for float comparison
+        
         # Max number of pieces to explore
         max_pieces = manual_analysis_settings.get("max_pieces_to_explore", 1)
         if manual_analysis_controller:
@@ -4567,14 +4602,14 @@ Visibility Settings:
         if not database_model:
             return
         
-        # Get analysis controller
-        analysis_controller = self.controller.get_game_analysis_controller()
+        # Get bulk analysis controller
+        bulk_analysis_controller = self.controller.get_bulk_analysis_controller()
         
         # Create and show dialog
         dialog = BulkAnalysisDialog(
             self.config,
             database_model,
-            analysis_controller,
+            bulk_analysis_controller,
             database_panel=database_panel,
             parent=self
         )

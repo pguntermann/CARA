@@ -6,6 +6,7 @@ enabling easier debugging of UCI interactions.
 """
 
 import subprocess
+import sys
 import time
 import threading
 from datetime import datetime
@@ -202,13 +203,20 @@ class UCICommunicationService:
         """
         try:
             # Use binary mode to avoid Windows text mode blocking issues
+            # On Windows, suppress console window creation for GUI applications
+            popen_kwargs = {
+                'stdin': subprocess.PIPE,
+                'stdout': subprocess.PIPE,
+                'stderr': subprocess.PIPE,
+                'text': False,  # Binary mode
+                'bufsize': 0  # Unbuffered for immediate data availability
+            }
+            if sys.platform == 'win32':
+                popen_kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
             self.process = subprocess.Popen(
                 [str(self.engine_path)],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=False,  # Binary mode
-                bufsize=0  # Unbuffered for immediate data availability
+                **popen_kwargs
             )
             # Initialize binary read buffer for manual line splitting
             self._read_buffer = b''

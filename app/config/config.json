@@ -3282,7 +3282,7 @@
       },
       "bulk_analysis_dialog": {
         "width": 600,
-        "height": 480,
+        "height": 520,
         "background_color": [
           40,
           40,
@@ -3327,7 +3327,8 @@
             200,
             200,
             200
-          ]
+          ],
+          "fixed_width": 110
         },
         "radio_buttons": {
           "first_button_minimum_width": 100
@@ -3406,8 +3407,18 @@
         "threading": {
           "status_update_interval": 0.1,
           "default_thread_count": 6,
-          "max_parallel_games": 4,
+          "default_parallel_games": 4,
           "cpu_count_fallback": 4
+        },
+        "parallel_games_spinbox": {
+          "min_value": 1,
+          "max_value": 16,
+          "default_value": 4,
+          "single_step": 1,
+          "suffix": ""
+        },
+        "spinboxes": {
+          "fixed_width": 120
         },
         "progress_display": {
           "max_progress_cap": 99.9999,
@@ -4605,7 +4616,45 @@
       "_examples": {
         "default": "max(5.0, min(100.0, 100.0 - (average_cpl / 3.5)))",
         "simple": "100.0 - (average_cpl / 2.0)",
-        "with_minimum": "max(10.0, 100.0 - (average_cpl / 3.0))"
+        "with_minimum": "max(10.0, 100.0 - (average_cpl / 3.0))",
+        "penalize_poor_opening": "max(5.0, min(100.0, 100.0 - (average_cpl / 3.5) - ((average_cpl_opening - average_cpl) * 0.15)))",
+        "weight_by_phase_distribution": "max(5.0, min(100.0, 100.0 - ((average_cpl_opening * opening_moves + average_cpl_middlegame * middlegame_moves + average_cpl_endgame * endgame_moves) / max(total_moves, 1) / 3.5)))",
+        "bonus_for_consistent_phases": "max(5.0, min(100.0, 100.0 - (average_cpl / 3.5) + (10.0 - abs(average_cpl_opening - average_cpl) - abs(average_cpl_middlegame - average_cpl) - abs(average_cpl_endgame - average_cpl)) * 0.5))"
+      }
+    },
+    "phase_accuracy_formulas": {
+      "opening": {
+        "formula": "max(5.0, min(100.0, 100.0 - (average_cpl_opening / 3.5)))",
+        "value_on_error": 0.0,
+        "_examples": {
+          "default": "max(5.0, min(100.0, 100.0 - (average_cpl_opening / 3.5)))",
+          "compare_to_overall_cpl": "max(5.0, min(100.0, 100.0 - (average_cpl_opening / 3.5) - ((average_cpl_opening - average_cpl) * 0.15)))",
+          "penalize_worse_than_overall": "max(5.0, min(100.0, 100.0 - (average_cpl_opening / 3.5) - max(0, (average_cpl_opening - average_cpl) * 0.2)))",
+          "compare_blunder_rate": "max(5.0, min(100.0, 100.0 - (average_cpl_opening / 3.5) - ((blunder_rate - blunder_rate_overall) * 30.0)))",
+          "weight_by_opening_length": "max(5.0, min(100.0, 100.0 - (average_cpl_opening / 3.5) * (opening_moves / max(total_moves_overall, 1))))"
+        }
+      },
+      "middlegame": {
+        "formula": "max(5.0, min(100.0, 100.0 - (average_cpl_middlegame / 3.5)))",
+        "value_on_error": 0.0,
+        "_examples": {
+          "default": "max(5.0, min(100.0, 100.0 - (average_cpl_middlegame / 3.5)))",
+          "compare_to_overall_cpl": "max(5.0, min(100.0, 100.0 - (average_cpl_middlegame / 3.5) - ((average_cpl_middlegame - average_cpl) * 0.15)))",
+          "bonus_if_better_than_opening": "max(5.0, min(100.0, 100.0 - (average_cpl_middlegame / 3.5) + max(0, (average_cpl_opening - average_cpl_middlegame) * 0.1)))",
+          "compare_mistake_rate": "max(5.0, min(100.0, 100.0 - (average_cpl_middlegame / 3.5) - ((mistake_rate - mistake_rate_overall) * 25.0)))",
+          "weight_by_middlegame_length": "max(5.0, min(100.0, 100.0 - (average_cpl_middlegame / 3.5) * (middlegame_moves / max(total_moves_overall, 1))))"
+        }
+      },
+      "endgame": {
+        "formula": "max(5.0, min(100.0, 100.0 - (average_cpl_endgame / 3.5)))",
+        "value_on_error": 0.0,
+        "_examples": {
+          "default": "max(5.0, min(100.0, 100.0 - (average_cpl_endgame / 3.5)))",
+          "compare_to_overall_cpl": "max(5.0, min(100.0, 100.0 - (average_cpl_endgame / 3.5) - ((average_cpl_endgame - average_cpl) * 0.15)))",
+          "stricter_for_long_endgames": "max(5.0, min(100.0, 100.0 - (average_cpl_endgame / (3.5 - min(endgame_moves / 20.0, 1.0)))))",
+          "penalize_endgame_blunders": "max(5.0, min(100.0, 100.0 - (average_cpl_endgame / 3.5) - (blunders / max(total_moves, 1) * 20.0)))",
+          "compare_to_other_phases": "max(5.0, min(100.0, 100.0 - (average_cpl_endgame / 3.5) - max(0, (average_cpl_endgame - (average_cpl_opening + average_cpl_middlegame) / 2.0) * 0.1)))"
+        }
       }
     },
     "elo_estimation": {
@@ -4615,7 +4664,10 @@
         "default": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40)))",
         "simple": "max(0, int(2800 - (average_cpl * 10)))",
         "with_result_bonus": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) + (has_won * 50) - ((1 - has_won) * (1 - has_drawn) * 30)))",
-        "accuracy_based": "max(0, int(accuracy * 28))"
+        "accuracy_based": "max(0, int(accuracy * 28))",
+        "penalize_weak_opening": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) - max(0, (average_cpl_opening - average_cpl) * 5)))",
+        "consider_phase_balance": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) - (abs(average_cpl_opening - average_cpl_middlegame) + abs(average_cpl_middlegame - average_cpl_endgame)) * 2))",
+        "weight_by_phase_importance": "max(0, int(2800 - ((average_cpl_opening * opening_moves + average_cpl_middlegame * middlegame_moves + average_cpl_endgame * endgame_moves) / max(total_moves, 1) * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40)))"
       }
     },
     "brilliant_criteria": {

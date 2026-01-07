@@ -32,6 +32,7 @@ class ManualAnalysisModel(QObject):
     lines_changed = pyqtSignal()  # Emitted when number of lines changes
     is_analyzing_changed = pyqtSignal(bool)  # Emitted when analysis state changes (is_analyzing)
     enable_miniature_preview_changed = pyqtSignal(bool)  # Emitted when miniature preview setting changes
+    miniature_preview_scale_factor_changed = pyqtSignal(float)  # Emitted when miniature preview scale factor changes
     
     def __init__(self) -> None:
         """Initialize the manual analysis model."""
@@ -41,6 +42,7 @@ class ManualAnalysisModel(QObject):
         self._multipv: int = 2  # Number of lines to analyze
         self._start_time: Optional[float] = None  # Timestamp when analysis started (None if not analyzing)
         self._enable_miniature_preview: bool = True  # Enable miniature board preview on PV hover
+        self._miniature_preview_scale_factor: float = 1.0  # Scale factor for miniature board preview (1.0 = default size)
     
     @property
     def lines(self) -> List[AnalysisLine]:
@@ -216,6 +218,26 @@ class ManualAnalysisModel(QObject):
         if self._enable_miniature_preview != value:
             self._enable_miniature_preview = value
             self.enable_miniature_preview_changed.emit(value)
+    
+    @property
+    def miniature_preview_scale_factor(self) -> float:
+        """Get miniature preview scale factor.
+        
+        Returns:
+            Scale factor (1.0 = default size, 1.25 = 1.25x, etc.).
+        """
+        return self._miniature_preview_scale_factor
+    
+    @miniature_preview_scale_factor.setter
+    def miniature_preview_scale_factor(self, value: float) -> None:
+        """Set miniature preview scale factor.
+        
+        Args:
+            value: Scale factor (1.0, 1.25, 1.5, 1.75, or 2.0).
+        """
+        if self._miniature_preview_scale_factor != value:
+            self._miniature_preview_scale_factor = value
+            self.miniature_preview_scale_factor_changed.emit(value)
     
     def reset(self) -> None:
         """Reset analysis to default state."""
