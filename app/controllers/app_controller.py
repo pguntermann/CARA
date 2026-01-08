@@ -23,6 +23,7 @@ from app.controllers.annotation_controller import AnnotationController
 from app.controllers.ai_chat_controller import AIChatController
 from app.controllers.game_summary_controller import GameSummaryController
 from app.controllers.player_stats_controller import PlayerStatsController
+from app.controllers.metadata_controller import MetadataController
 
 
 class AppController:
@@ -160,6 +161,12 @@ class AppController:
             self.database_controller,
             self.game_controller,
             self.game_controller.get_game_model()
+        )
+        
+        # Initialize metadata controller (depends on game controller and database controller)
+        self.metadata_controller = MetadataController(
+            self.game_controller.get_game_model(),
+            self.database_controller
         )
         
         # Connect evaluation to board position changes
@@ -745,6 +752,14 @@ class AppController:
     def get_game_summary_controller(self) -> GameSummaryController:
         """Get the game summary controller."""
         return self.game_summary_controller
+    
+    def get_metadata_controller(self) -> MetadataController:
+        """Get the metadata controller.
+        
+        Returns:
+            The MetadataController instance.
+        """
+        return self.metadata_controller
     
     def get_player_stats_controller(self) -> PlayerStatsController:
         """Get the player stats controller.

@@ -37,7 +37,8 @@ class DetailPanel(QWidget):
                  board_widget = None,
                  ai_chat_controller = None,
                  game_summary_controller = None,
-                 player_stats_controller = None) -> None:
+                 player_stats_controller = None,
+                 metadata_controller = None) -> None:
         """Initialize the detail panel.
         
         Args:
@@ -61,6 +62,7 @@ class DetailPanel(QWidget):
         self._ai_chat_controller = ai_chat_controller
         self._game_summary_controller = game_summary_controller
         self._player_stats_controller = player_stats_controller
+        self._metadata_controller = metadata_controller
         self._database_panel = None  # Will be set from MainWindow after database_panel is created
         self._setup_ui()
         
@@ -287,9 +289,8 @@ class DetailPanel(QWidget):
         # Metadata tab - initialize with empty model for now
         # Game model will be connected in set_game_model
         self.metadata_model = MetadataModel(self.config)
-        self.metadata_view = DetailMetadataView(self.config, self.metadata_model, 
-                                                 database_model=self._database_model,
-                                                 database_panel=self._database_panel)
+        self.metadata_view = DetailMetadataView(self.config, self.metadata_model,
+                                                 metadata_controller=self._metadata_controller)
         self.tab_widget.addTab(self.metadata_view, "Metadata")
         
         # Manual Analysis tab

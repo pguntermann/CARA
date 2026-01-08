@@ -2318,10 +2318,12 @@ class MainWindow(QMainWindow):
         ai_chat_controller = self.controller.get_ai_chat_controller()
         game_summary_controller = self.controller.get_game_summary_controller()
         player_stats_controller = self.controller.get_player_stats_controller()
+        metadata_controller = self.controller.get_metadata_controller()
         self.detail_panel = DetailPanel(self.config, game_model, game_controller, engine_model, 
                                         manual_analysis_controller, database_model, classification_model,
                                         annotation_controller, board_widget, ai_chat_controller,
-                                        game_summary_controller, player_stats_controller)
+                                        game_summary_controller, player_stats_controller,
+                                        metadata_controller)
         top_splitter.addWidget(self.detail_panel)
         
         # Connect column profile model to moves list view

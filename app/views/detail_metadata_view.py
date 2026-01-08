@@ -9,45 +9,7 @@ from typing import Dict, Any, Optional, List, Tuple
 
 from app.models.metadata_model import MetadataModel
 from app.models.game_model import GameModel
-from app.models.database_model import DatabaseModel
-from app.services.pgn_service import PgnService
-import chess.pgn
-import io
-
-# Standard PGN tags in order of importance
-# These are the most commonly used and important tags in PGN format
-STANDARD_TAGS_ORDER = [
-    # Core game identification (most important)
-    "Event",
-    "Site",
-    "Date",
-    "Round",
-    "White",
-    "Black",
-    "Result",
-    # Game characteristics
-    "ECO",
-    "WhiteElo",
-    "BlackElo",
-    "TimeControl",
-    # Player information
-    "WhiteTitle",
-    "BlackTitle",
-    "WhiteFideId",
-    "BlackFideId",
-    "WhiteTeam",
-    "BlackTeam",
-    # Game metadata
-    "PlyCount",
-    "EventDate",
-    "SetUp",
-    "FEN",
-    # Common additional tags
-    "Termination",
-    "Annotator",
-    "UTCDate",
-    "UTCTime",
-]
+from app.controllers.metadata_controller import MetadataController
 
 
 class DetailMetadataView(QWidget):
@@ -55,8 +17,7 @@ class DetailMetadataView(QWidget):
     
     def __init__(self, config: Dict[str, Any], metadata_model: Optional[MetadataModel] = None,
                  game_model: Optional[GameModel] = None,
-                 database_model: Optional[DatabaseModel] = None,
-                 database_panel = None) -> None:
+                 metadata_controller: Optional[MetadataController] = None) -> None:
         """Initialize the metadata view.
         
         Args:
@@ -64,15 +25,13 @@ class DetailMetadataView(QWidget):
             metadata_model: Optional MetadataModel to observe.
                           If provided, view will automatically update when model changes.
             game_model: Optional GameModel to observe for active game changes.
-            database_model: Optional DatabaseModel to update when metadata changes.
-            database_panel: Optional DatabasePanel instance to refresh views after updates.
+            metadata_controller: Optional MetadataController for business logic operations.
         """
         super().__init__()
         self.config = config
         self._metadata_model: Optional[MetadataModel] = None
         self._game_model: Optional[GameModel] = None
-        self._database_model: Optional[DatabaseModel] = None
-        self._database_panel = database_panel
+        self._metadata_controller: Optional[MetadataController] = metadata_controller
         self._setup_ui()
         
         # Connect to models if provided
@@ -82,8 +41,8 @@ class DetailMetadataView(QWidget):
         if game_model:
             self.set_game_model(game_model)
         
-        if database_model:
-            self.set_database_model(database_model)
+        if metadata_controller:
+            self.set_metadata_controller(metadata_controller)
     
     def _setup_ui(self) -> None:
         """Setup the metadata view UI."""
@@ -359,37 +318,13 @@ class DetailMetadataView(QWidget):
         if model.active_game:
             self._on_active_game_changed(model.active_game)
     
-    def set_database_model(self, model: Optional[DatabaseModel]) -> None:
-        """Set the database model to update when metadata changes.
+    def set_metadata_controller(self, controller: MetadataController) -> None:
+        """Set the metadata controller for business logic operations.
         
         Args:
-            model: The DatabaseModel instance to update.
+            controller: The MetadataController instance.
         """
-        self._database_model = model
-    
-    def _find_database_model_for_game(self, game) -> Optional[DatabaseModel]:
-        """Find the database model that contains the given game.
-        
-        Args:
-            game: GameData instance to find.
-            
-        Returns:
-            DatabaseModel that contains the game, or None if not found.
-        """
-        # First try the stored database model
-        if self._database_model and self._database_model.find_game(game) is not None:
-            return self._database_model
-        
-        # If not found, search through all databases in the panel model
-        if self._database_panel and hasattr(self._database_panel, '_panel_model'):
-            panel_model = self._database_panel._panel_model
-            if panel_model:
-                all_databases = panel_model.get_all_databases()
-                for identifier, info in all_databases.items():
-                    if info.model.find_game(game) is not None:
-                        return info.model
-        
-        return None
+        self._metadata_controller = controller
     
     def _on_active_game_changed(self, game) -> None:
         """Handle active game change from model.
@@ -405,8 +340,11 @@ class DetailMetadataView(QWidget):
             self._metadata_model.clear()
             return
         
-        # Extract headers from game's PGN
-        metadata = self._extract_metadata_from_game(game)
+        # Extract headers from game's PGN using controller
+        if self._metadata_controller:
+            metadata = self._metadata_controller.extract_metadata_from_game(game)
+        else:
+            metadata = []
         
         # Update model with metadata
         self._metadata_model.set_metadata(metadata)
@@ -417,60 +355,15 @@ class DetailMetadataView(QWidget):
         This is called when metadata tags are added, edited, or removed.
         """
         if self._game_model and self._game_model.active_game:
-            # Re-extract metadata from the updated game
-            metadata = self._extract_metadata_from_game(self._game_model.active_game)
+            # Re-extract metadata from the updated game using controller
+            if self._metadata_controller:
+                metadata = self._metadata_controller.extract_metadata_from_game(self._game_model.active_game)
+            else:
+                metadata = []
             # Update model with refreshed metadata
             if self._metadata_model:
                 self._metadata_model.set_metadata(metadata)
     
-    def _extract_metadata_from_game(self, game) -> list:
-        """Extract metadata (headers) from a game.
-        
-        Args:
-            game: GameData instance.
-            
-        Returns:
-            List of (name, value) tuples sorted by importance:
-            - Standard tags first (in predefined order)
-            - Non-standard tags alphabetically after
-        """
-        metadata = []
-        standard_tags = []
-        non_standard_tags = []
-        
-        try:
-            # Parse PGN to extract headers
-            pgn_io = io.StringIO(game.pgn)
-            chess_game = chess.pgn.read_game(pgn_io)
-            
-            if chess_game:
-                headers = chess_game.headers
-                
-                # Convert headers dict to list of (name, value) tuples
-                # Separate standard and non-standard tags
-                standard_tags_set = set(STANDARD_TAGS_ORDER)
-                for name, value in headers.items():
-                    if name in standard_tags_set:
-                        standard_tags.append((name, value))
-                    else:
-                        non_standard_tags.append((name, value))
-                
-                # Sort standard tags by predefined order
-                standard_tags.sort(key=lambda x: (
-                    STANDARD_TAGS_ORDER.index(x[0]) if x[0] in STANDARD_TAGS_ORDER 
-                    else len(STANDARD_TAGS_ORDER)
-                ))
-                
-                # Sort non-standard tags alphabetically
-                non_standard_tags.sort(key=lambda x: x[0])
-                
-                # Combine: standard tags first, then non-standard
-                metadata = standard_tags + non_standard_tags
-        except Exception:
-            # On any error, return empty list
-            pass
-        
-        return metadata
     
     def _on_metadata_value_changed(self, tag_name: str, new_value: str) -> None:
         """Handle metadata value change from model.
@@ -496,75 +389,16 @@ class DetailMetadataView(QWidget):
             tag_name: Name of the tag that was edited.
             new_value: New value for the tag.
         """
-        if not self._game_model or not self._game_model.active_game:
+        if not self._metadata_controller:
             return
         
-        # Update the game's PGN with the new metadata value
-        try:
-            import chess.pgn
-            from io import StringIO
-            
-            game = self._game_model.active_game
-            
-            # Parse the current PGN
-            pgn_io = StringIO(game.pgn)
-            chess_game = chess.pgn.read_game(pgn_io)
-            
-            if chess_game:
-                # Update the header
-                chess_game.headers[tag_name] = new_value
-                
-                # Regenerate the PGN text
-                new_pgn = PgnService.export_game_to_pgn(chess_game)
-                
-                # Update the game's PGN
-                game.pgn = new_pgn
-                
-                # Update corresponding GameData fields if this tag corresponds to a database column
-                tag_to_field_mapping = {
-                    "White": "white",
-                    "Black": "black",
-                    "Result": "result",
-                    "Date": "date",
-                    "ECO": "eco",
-                    "Event": "event",
-                    "Site": "site",
-                    "WhiteElo": "white_elo",
-                    "BlackElo": "black_elo",
-                }
-                
-                # Special handling for CARAAnalysisData and CARAAnnotations tags (boolean fields)
-                if tag_name == "CARAAnalysisData":
-                    game.analyzed = bool(new_value) if new_value else False
-                elif tag_name == "CARAAnnotations":
-                    game.annotated = bool(new_value) if new_value else False
-                elif tag_name in tag_to_field_mapping:
-                    field_name = tag_to_field_mapping[tag_name]
-                    setattr(game, field_name, new_value)
-                
-                # Find the database model that contains this game and update it
-                # This ensures the PGN update is persisted when saving
-                database_model = self._find_database_model_for_game(game)
-                if database_model:
-                    database_model.update_game(game)
-                    # Mark database as having unsaved changes
-                    if self._database_panel:
-                        self._database_panel.mark_database_unsaved(database_model)
-                
-                # Emit metadata_updated signal to notify views (e.g., PGN view) that metadata changed
-                self._game_model.metadata_updated.emit()
-                
-                # Refresh active game to update game info display (e.g., player names above chessboard)
-                # This re-emits active_game_changed signal without resetting the move position
-                self._game_model.refresh_active_game()
-                
-                # Note: We don't call set_metadata() again here because:
-                # 1. The model already has the correct value (we just edited it)
-                # 2. Calling set_metadata() would clear and re-insert all rows, which is unnecessary
-                # 3. It could cause editor conflicts if called while editing
-        except Exception:
-            # On any error, silently ignore (don't break the UI)
-            pass
+        # Use controller to update the metadata tag
+        self._metadata_controller.update_metadata_tag(tag_name, new_value)
+        
+        # Note: We don't call set_metadata() again here because:
+        # 1. The model already has the correct value (we just edited it)
+        # 2. Calling set_metadata() would clear and re-insert all rows, which is unnecessary
+        # 3. It could cause editor conflicts if called while editing
     
     def _on_add_tag_clicked(self) -> None:
         """Handle Add Tag button click."""
@@ -676,64 +510,11 @@ class DetailMetadataView(QWidget):
             tag_name: Name of the tag that was added.
             tag_value: Value of the tag that was added.
         """
-        if not self._game_model or not self._game_model.active_game:
+        if not self._metadata_controller:
             return
         
-        # Update the game's PGN with the new tag
-        try:
-            import chess.pgn
-            from io import StringIO
-            
-            game = self._game_model.active_game
-            
-            # Parse the current PGN
-            pgn_io = StringIO(game.pgn)
-            chess_game = chess.pgn.read_game(pgn_io)
-            
-            if chess_game:
-                # Add the new header
-                chess_game.headers[tag_name] = tag_value
-                
-                # Regenerate the PGN text
-                new_pgn = PgnService.export_game_to_pgn(chess_game)
-                
-                # Update the game's PGN
-                game.pgn = new_pgn
-                
-                # Update corresponding GameData fields if this tag corresponds to a database column
-                tag_to_field_mapping = {
-                    "White": "white",
-                    "Black": "black",
-                    "Result": "result",
-                    "Date": "date",
-                    "ECO": "eco",
-                    "Event": "event",
-                    "Site": "site",
-                    "WhiteElo": "white_elo",
-                    "BlackElo": "black_elo",
-                }
-                
-                # Special handling for CARAAnalysisData tag (boolean field)
-                if tag_name == "CARAAnalysisData":
-                    game.analyzed = bool(tag_value) if tag_value else False
-                elif tag_name in tag_to_field_mapping:
-                    field_name = tag_to_field_mapping[tag_name]
-                    setattr(game, field_name, tag_value)
-                
-                # Find the database model that contains this game and update it
-                # This ensures the PGN update is persisted when saving
-                database_model = self._find_database_model_for_game(game)
-                if database_model:
-                    database_model.update_game(game)
-                    # Mark database as having unsaved changes
-                    if self._database_panel:
-                        self._database_panel.mark_database_unsaved(database_model)
-                
-                # Emit metadata_updated signal to notify views (e.g., PGN view) that metadata changed
-                self._game_model.metadata_updated.emit()
-        except Exception:
-            # On any error, silently ignore (don't break the UI)
-            pass
+        # Use controller to add the metadata tag
+        self._metadata_controller.add_metadata_tag(tag_name, tag_value)
     
     def _on_tag_removed(self, tag_name: str) -> None:
         """Handle tag removal from model.
@@ -753,72 +534,11 @@ class DetailMetadataView(QWidget):
         Args:
             tag_name: Name of the tag that was removed.
         """
-        if not self._game_model or not self._game_model.active_game:
+        if not self._metadata_controller:
             return
         
-        # Update the game's PGN with the tag removed
-        try:
-            import chess.pgn
-            from io import StringIO
-            
-            game = self._game_model.active_game
-            
-            # Parse the current PGN
-            pgn_io = StringIO(game.pgn)
-            chess_game = chess.pgn.read_game(pgn_io)
-            
-            if chess_game:
-                # Remove the header if it exists
-                if tag_name in chess_game.headers:
-                    del chess_game.headers[tag_name]
-                
-                # Regenerate the PGN text
-                new_pgn = PgnService.export_game_to_pgn(chess_game)
-                
-                # Update the game's PGN
-                game.pgn = new_pgn
-                
-                # Update corresponding GameData fields if this tag corresponds to a database column
-                tag_to_field_mapping = {
-                    "White": "white",
-                    "Black": "black",
-                    "Result": "result",
-                    "Date": "date",
-                    "ECO": "eco",
-                    "Event": "event",
-                    "Site": "site",
-                    "WhiteElo": "white_elo",
-                    "BlackElo": "black_elo",
-                }
-                
-                # Special handling for CARAAnalysisData and CARAAnnotations tags (boolean fields)
-                if tag_name == "CARAAnalysisData":
-                    game.analyzed = False
-                elif tag_name == "CARAAnnotations":
-                    game.annotated = False
-                elif tag_name in tag_to_field_mapping:
-                    field_name = tag_to_field_mapping[tag_name]
-                    # Clear the field when tag is removed
-                    setattr(game, field_name, "")
-                
-                # Find the database model that contains this game and update it
-                # This ensures the PGN update is persisted when saving
-                database_model = self._find_database_model_for_game(game)
-                if database_model:
-                    database_model.update_game(game)
-                    # Mark database as having unsaved changes
-                    if self._database_panel:
-                        self._database_panel.mark_database_unsaved(database_model)
-                
-                # Emit metadata_updated signal to notify views (e.g., PGN view) that metadata changed
-                self._game_model.metadata_updated.emit()
-                
-                # Refresh active game to update game info display (e.g., player names above chessboard)
-                # This re-emits active_game_changed signal without resetting the move position
-                self._game_model.refresh_active_game()
-        except Exception:
-            # On any error, silently ignore (don't break the UI)
-            pass
+        # Use controller to remove the metadata tag
+        self._metadata_controller.remove_metadata_tag(tag_name)
 
 
 class AddTagDialog(QDialog):

@@ -33,9 +33,9 @@ class MetadataModel(QAbstractTableModel):
         self._config = config or {}
         self._standard_tags: set = set()  # Will be set from STANDARD_TAGS_ORDER
         
-        # Load standard tags list from detail_metadata_view
+        # Load standard tags list from metadata_controller
         try:
-            from app.views.detail_metadata_view import STANDARD_TAGS_ORDER
+            from app.controllers.metadata_controller import STANDARD_TAGS_ORDER
             self._standard_tags = set(STANDARD_TAGS_ORDER)
         except ImportError:
             # Fallback if import fails
@@ -315,7 +315,7 @@ class MetadataModel(QAbstractTableModel):
         # Determine insertion position
         # Standard tags should be inserted in their predefined order
         # Non-standard tags should be inserted alphabetically after standard tags
-        from app.views.detail_metadata_view import STANDARD_TAGS_ORDER
+        from app.controllers.metadata_controller import STANDARD_TAGS_ORDER
         standard_tags_set = set(STANDARD_TAGS_ORDER)
         is_standard = tag_name in standard_tags_set
         
