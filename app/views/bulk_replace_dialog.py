@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QFrame,
 )
 from PyQt6.QtCore import Qt, QSize, QTimer
-from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent, QFontMetrics
+from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent, QFontMetrics, QResizeEvent
 from typing import Optional, Dict, Any, List
 
 from app.controllers.bulk_replace_controller import BulkReplaceController
@@ -783,6 +783,11 @@ class BulkReplaceDialog(QDialog):
         """Override showEvent to ensure checkbox styling is applied when dialog is shown."""
         super().showEvent(event)
         
+        # Re-enforce fixed size after dialog is shown (prevents resizing in PyInstaller bundles)
+        self.setFixedSize(self._fixed_size)
+        self.setMinimumSize(self._fixed_size)
+        self.setMaximumSize(self._fixed_size)
+        
         # Update source tag combo with available tags
         available_tags = self._get_available_tags()
         self.source_tag_combo.clear()
@@ -1122,6 +1127,18 @@ class BulkReplaceDialog(QDialog):
     def sizeHint(self) -> QSize:
         """Return the fixed size as the size hint."""
         return self._fixed_size
+    
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        """Handle resize event to prevent resizing."""
+        super().resizeEvent(event)
+        if event.size() != self._fixed_size:
+            self.blockSignals(True)
+            current_pos = self.pos()
+            self.setGeometry(current_pos.x(), current_pos.y(), self._fixed_size.width(), self._fixed_size.height())
+            self.setFixedSize(self._fixed_size)
+            self.setMinimumSize(self._fixed_size)
+            self.setMaximumSize(self._fixed_size)
+            self.blockSignals(False)
     
     def _show_success_dialog(self, title: str, message: str) -> None:
         """Show a styled success dialog.
