@@ -3,9 +3,12 @@
 import chess.pgn
 import io
 import json
+import os
+import re
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Callable, Tuple
 from datetime import datetime
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 class PgnParseResult:
@@ -24,6 +27,27 @@ class PgnParseResult:
         self.error_message = error_message
 
 
+def _parse_game_chunk(game_chunk: str) -> Optional[Dict[str, Any]]:
+    """Parse a single game chunk and extract game data (must be top-level for pickling).
+    
+    Args:
+        game_chunk: PGN text string for a single game.
+        
+    Returns:
+        Dictionary with game data or None if parsing fails or game is invalid.
+    """
+    try:
+        pgn_io = io.StringIO(game_chunk)
+        game = chess.pgn.read_game(pgn_io)
+        
+        if game is None:
+            return None
+        
+        return PgnService._extract_game_data(game)
+    except Exception:
+        return None
+
+
 class PgnService:
     """Service for parsing PGN text into game data.
     
@@ -35,11 +59,203 @@ class PgnService:
     _export_config_cache: Optional[Tuple[bool, int]] = None
     
     @staticmethod
+    def _normalize_pgn_text(pgn_text: str) -> str:
+        """Normalize PGN text for parsing.
+        
+        This method handles normalization that must run sequentially before parallel parsing.
+        It normalizes blank lines, removes invisible characters, and ensures proper game separators.
+        
+        Args:
+            pgn_text: Raw PGN text string.
+            
+        Returns:
+            Normalized PGN text string.
+        """
+        # Strip trailing whitespace/newlines to avoid parsing empty games
+        pgn_text = pgn_text.rstrip()
+        
+        # Remove zero-width spaces and other invisible unicode characters that might interfere
+        pgn_text = re.sub(r'[\u200B-\u200D\uFEFF]', '', pgn_text)
+        
+        # Normalize blank lines in PGN to prevent python-chess from splitting games incorrectly
+        # Python-chess can misinterpret multiple blank lines as game separators
+        # Strategy: Remove blank lines inside comments, but preserve blank lines between headers
+        # Also: Insert blank lines when headers appear directly after moves (missing game separators)
+        lines = pgn_text.split('\n')
+        normalized_lines = []
+        in_headers = True
+        in_moves = False  # Track if we're currently in move notation
+        last_was_header = False
+        last_was_blank = False
+        comment_depth = 0  # Track nesting depth of comments (count of { minus })
+        
+        for i, line in enumerate(lines):
+            line_stripped = line.strip()
+            is_blank = not line_stripped
+            is_header = line_stripped.startswith('[')
+            is_move_line = line_stripped and (line_stripped[0].isdigit() or line_stripped.startswith('*'))
+            
+            # Check comment depth BEFORE processing this line
+            inside_comment = comment_depth > 0
+            # Count comment braces to track if we're inside a comment
+            comment_depth += line.count('{') - line.count('}')
+            
+            # If we see a header, we're in header section
+            if is_header:
+                # If we were in moves and this header appears without a blank line, insert one
+                # This handles files that don't have blank lines between games
+                if in_moves and not last_was_blank:
+                    # We're transitioning from moves to a new game's headers
+                    # Insert a blank line to help python-chess recognize the game boundary
+                    if normalized_lines and normalized_lines[-1] != '':
+                        normalized_lines.append('')
+                
+                in_headers = True
+                in_moves = False
+                last_was_header = True
+                last_was_blank = False
+                # If we just had a blank line before this header, it's a game separator - keep it
+                # But don't add duplicate blank lines
+                if last_was_blank and normalized_lines and normalized_lines[-1] == '':
+                    # Keep the blank line before the header (game separator)
+                    normalized_lines.append(line)
+                else:
+                    # Normal header line
+                    normalized_lines.append(line)
+            # If we see a move notation (starts with number), we're past headers
+            elif is_move_line:
+                in_headers = False
+                in_moves = True
+                last_was_header = False
+                last_was_blank = False
+                normalized_lines.append(line)
+            # For blank lines
+            elif is_blank:
+                last_was_blank = True
+                if inside_comment:
+                    # Blank line inside comment - skip it (prevents game splitting)
+                    pass
+                elif in_headers:
+                    # Blank line between headers - keep it (helps python-chess parse headers correctly)
+                    # Only add if previous line wasn't blank (avoid consecutive blanks)
+                    if normalized_lines and normalized_lines[-1] != '':
+                        normalized_lines.append('')
+                elif in_moves:
+                    # Blank line after moves - might be game separator
+                    # Only add if previous line wasn't blank (avoid consecutive blanks)
+                    if normalized_lines and normalized_lines[-1] != '':
+                        normalized_lines.append('')
+            else:
+                # Other content (comments, etc.)
+                # If it's not a header and not a move, we're likely in moves section
+                # (comments, annotations, etc. appear within move notation)
+                in_headers = False
+                if not is_blank:
+                    # Non-blank content that's not a header or move is likely part of move notation
+                    in_moves = True
+                last_was_header = False
+                last_was_blank = False
+                normalized_lines.append(line)
+        
+        # Join back with single newlines
+        return '\n'.join(normalized_lines)
+    
+    @staticmethod
+    def _detect_game_boundaries(normalized_pgn: str) -> List[Tuple[int, int]]:
+        """Detect game boundaries in normalized PGN text using python-chess.
+        
+        This method uses python-chess's read_game() to accurately detect game boundaries
+        by parsing sequentially and tracking stream positions. This is more reliable
+        than manual pattern matching.
+        
+        Args:
+            normalized_pgn: Normalized PGN text string.
+            
+        Returns:
+            List of (start_index, end_index) tuples for each game (line indices).
+        """
+        boundaries = []
+        lines = normalized_pgn.split('\n')
+        pgn_io = io.StringIO(normalized_pgn)
+        
+        # Track line positions in the original text
+        # Build a mapping from character position to line number
+        char_to_line = {}
+        char_pos = 0
+        for line_idx, line in enumerate(lines):
+            line_length = len(line) + 1  # +1 for newline
+            for i in range(line_length):
+                char_to_line[char_pos + i] = line_idx
+            char_pos += line_length
+        
+        # Parse games sequentially to detect boundaries
+        while True:
+            # Save position before reading
+            pos_before = pgn_io.tell()
+            
+            # Check if we're at the end
+            peek_content = pgn_io.read(1)
+            if not peek_content:
+                break
+            pgn_io.seek(pos_before)
+            
+            # Check if only whitespace remains
+            peek_ahead = pgn_io.read(100)
+            pgn_io.seek(pos_before)
+            if not peek_ahead.strip():
+                break
+            
+            # Parse one game
+            game = chess.pgn.read_game(pgn_io)
+            if game is None:
+                break
+            
+            # Get position after reading
+            pos_after = pgn_io.tell()
+            
+            # Check if stream advanced (safety check)
+            if pos_after == pos_before:
+                break
+            
+            # Convert character positions to line indices
+            start_line = char_to_line.get(pos_before, 0)
+            end_line = char_to_line.get(pos_after - 1, len(lines) - 1)
+            
+            boundaries.append((start_line, end_line))
+        
+        return boundaries
+    
+    @staticmethod
+    def _split_into_chunks(normalized_pgn: str, boundaries: List[Tuple[int, int]]) -> List[str]:
+        """Split normalized PGN into individual game chunks.
+        
+        Args:
+            normalized_pgn: Normalized PGN text string.
+            boundaries: List of (start_index, end_index) tuples from _detect_game_boundaries.
+            
+        Returns:
+            List of game PGN strings, one per chunk.
+        """
+        lines = normalized_pgn.split('\n')
+        chunks = []
+        
+        for start_idx, end_idx in boundaries:
+            chunk_lines = lines[start_idx:end_idx + 1]
+            chunk = '\n'.join(chunk_lines)
+            chunks.append(chunk)
+        
+        return chunks
+    
+    @staticmethod
     def parse_pgn_text(pgn_text: str, progress_callback: Optional[Callable[[int, str], None]] = None) -> PgnParseResult:
-        """Parse PGN text and extract game data.
+        """Parse PGN text and extract game data using parallel processing.
+        
+        This method normalizes the PGN text sequentially, then splits it into game chunks
+        and parses them in parallel using ProcessPoolExecutor.
         
         Args:
             pgn_text: PGN text string (can contain multiple games).
+            progress_callback: Optional callback function(game_count: int, message: str) for progress updates.
             
         Returns:
             PgnParseResult with parsed game data or error message.
@@ -48,150 +264,76 @@ class PgnService:
             return PgnParseResult(False, error_message="Empty PGN text")
         
         try:
-            # Strip trailing whitespace/newlines to avoid parsing empty games
-            pgn_text = pgn_text.rstrip()
+            # Phase 1: Normalize PGN text (sequential, required)
+            if progress_callback:
+                progress_callback(0, "Normalizing PGN text...")
             
-            # Remove zero-width spaces and other invisible unicode characters that might interfere
-            import re
-            pgn_text = re.sub(r'[\u200B-\u200D\uFEFF]', '', pgn_text)
+            normalized_pgn = PgnService._normalize_pgn_text(pgn_text)
             
-            # Normalize blank lines in PGN to prevent python-chess from splitting games incorrectly
-            # Python-chess can misinterpret multiple blank lines as game separators
-            # Strategy: Remove blank lines inside comments, but preserve blank lines between headers
-            # Also: Insert blank lines when headers appear directly after moves (missing game separators)
-            lines = pgn_text.split('\n')
-            normalized_lines = []
-            in_headers = True
-            in_moves = False  # Track if we're currently in move notation
-            last_was_header = False
-            last_was_blank = False
-            comment_depth = 0  # Track nesting depth of comments (count of { minus })
+            # Phase 2: Detect game boundaries (sequential, fast)
+            if progress_callback:
+                progress_callback(0, "Detecting game boundaries...")
             
-            for i, line in enumerate(lines):
-                line_stripped = line.strip()
-                is_blank = not line_stripped
-                is_header = line_stripped.startswith('[')
-                is_move_line = line_stripped and (line_stripped[0].isdigit() or line_stripped.startswith('*'))
-                
-                # Check comment depth BEFORE processing this line
-                inside_comment = comment_depth > 0
-                # Count comment braces to track if we're inside a comment
-                comment_depth += line.count('{') - line.count('}')
-                
-                # If we see a header, we're in header section
-                if is_header:
-                    # If we were in moves and this header appears without a blank line, insert one
-                    # This handles files that don't have blank lines between games
-                    if in_moves and not last_was_blank:
-                        # We're transitioning from moves to a new game's headers
-                        # Insert a blank line to help python-chess recognize the game boundary
-                        if normalized_lines and normalized_lines[-1] != '':
-                            normalized_lines.append('')
-                    
-                    in_headers = True
-                    in_moves = False
-                    last_was_header = True
-                    last_was_blank = False
-                    # If we just had a blank line before this header, it's a game separator - keep it
-                    # But don't add duplicate blank lines
-                    if last_was_blank and normalized_lines and normalized_lines[-1] == '':
-                        # Keep the blank line before the header (game separator)
-                        normalized_lines.append(line)
-                    else:
-                        # Normal header line
-                        normalized_lines.append(line)
-                # If we see a move notation (starts with number), we're past headers
-                elif is_move_line:
-                    in_headers = False
-                    in_moves = True
-                    last_was_header = False
-                    last_was_blank = False
-                    normalized_lines.append(line)
-                # For blank lines
-                elif is_blank:
-                    last_was_blank = True
-                    if inside_comment:
-                        # Blank line inside comment - skip it (prevents game splitting)
-                        pass
-                    elif in_headers:
-                        # Blank line between headers - keep it (helps python-chess parse headers correctly)
-                        # Only add if previous line wasn't blank (avoid consecutive blanks)
-                        if normalized_lines and normalized_lines[-1] != '':
-                            normalized_lines.append('')
-                    elif in_moves:
-                        # Blank line after moves - might be game separator
-                        # Only add if previous line wasn't blank (avoid consecutive blanks)
-                        if normalized_lines and normalized_lines[-1] != '':
-                            normalized_lines.append('')
-                else:
-                    # Other content (comments, etc.)
-                    # If it's not a header and not a move, we're likely in moves section
-                    # (comments, annotations, etc. appear within move notation)
-                    in_headers = False
-                    if not is_blank:
-                        # Non-blank content that's not a header or move is likely part of move notation
-                        in_moves = True
-                    last_was_header = False
-                    last_was_blank = False
-                    normalized_lines.append(line)
+            boundaries = PgnService._detect_game_boundaries(normalized_pgn)
             
-            # Join back with single newlines
-            normalized_pgn = '\n'.join(normalized_lines)
-            
-            # Create a StringIO object from the normalized PGN text
-            pgn_io = io.StringIO(normalized_pgn)
-            
-            games = []
-            
-            # Parse games one by one (python-chess can parse multiple games)
-            while True:
-                # Save current position before reading
-                pos_before = pgn_io.tell()
-                
-                # Check if we're at the end or only whitespace remains before reading
-                peek_content = pgn_io.read(1)
-                if not peek_content:
-                    # End of file
-                    break
-                # Seek back to read the full game
-                pgn_io.seek(pos_before)
-                
-                # Check if only whitespace remains by reading ahead
-                peek_ahead = pgn_io.read(100)
-                pgn_io.seek(pos_before)
-                if not peek_ahead.strip():
-                    # Only whitespace remains, stop parsing
-                    break
-                
-                game = chess.pgn.read_game(pgn_io)
-                if game is None:
-                    # No more games
-                    break
-                
-                # Check position after reading - if we didn't advance, something is wrong
-                pos_after = pgn_io.tell()
-                if pos_after == pos_before:
-                    # Stream didn't advance, break to avoid infinite loop
-                    break
-                
-                # Extract game data (this will filter out empty/invalid games)
-                game_data = PgnService._extract_game_data(game)
-                if game_data:
-                    games.append(game_data)
-                    # Call progress callback if provided
-                    if progress_callback:
-                        progress_callback(len(games), f"Parsed {len(games)} game(s)...")
-                    # Continue to next game - don't break early
-                    # python-chess will handle the blank line between games
-                else:
-                    # Game was filtered out as invalid
-                    # Continue parsing in case there are more valid games
-                    pass
-            
-            if len(games) == 0:
+            if not boundaries:
                 return PgnParseResult(False, error_message="No valid games found in PGN text")
             
-            return PgnParseResult(True, games=games)
+            # Phase 3: Split into chunks (sequential, fast)
+            if progress_callback:
+                progress_callback(0, f"Splitting into {len(boundaries)} game(s)...")
+            
+            chunks = PgnService._split_into_chunks(normalized_pgn, boundaries)
+            
+            # Phase 4: Parse chunks in parallel
+            total_games = len(chunks)
+            
+            # Calculate number of worker processes (reserve 1-2 cores for UI)
+            cpu_count = os.cpu_count() or 4
+            max_workers = max(1, cpu_count - 2)
+            
+            games: List[Optional[Dict[str, Any]]] = [None] * total_games
+            completed_count = 0
+            
+            executor = None
+            try:
+                executor = ProcessPoolExecutor(max_workers=max_workers)
+                
+                # Submit all chunks for processing
+                future_to_index = {
+                    executor.submit(_parse_game_chunk, chunk): i
+                    for i, chunk in enumerate(chunks)
+                }
+                
+                # Process results as they complete
+                for future in as_completed(future_to_index):
+                    index = future_to_index[future]
+                    
+                    try:
+                        game_data = future.result()
+                        games[index] = game_data
+                    except Exception as e:
+                        # Skip failed games
+                        games[index] = None
+                    
+                    completed_count += 1
+                    if progress_callback:
+                        progress_callback(
+                            completed_count,
+                            f"Parsed {completed_count}/{total_games} game(s)..."
+                        )
+            finally:
+                # Ensure executor is properly shut down
+                if executor:
+                    executor.shutdown(wait=True)
+            
+            # Filter out None values (failed/invalid games) and maintain order
+            valid_games = [g for g in games if g is not None]
+            
+            if len(valid_games) == 0:
+                return PgnParseResult(False, error_message="No valid games found in PGN text")
+            
+            return PgnParseResult(True, games=valid_games)
             
         except Exception as e:
             return PgnParseResult(False, error_message=f"Error parsing PGN: {str(e)}")

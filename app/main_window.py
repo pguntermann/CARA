@@ -1311,39 +1311,8 @@ class MainWindow(QMainWindow):
             self.controller.set_status(message)
             return
         
-        # Handle multiple files
-        opened_count = 0
-        skipped_count = 0
-        failed_count = 0
-        last_successful_database = None
-        last_first_game = None
-        messages = []
-        
-        for file_path in file_paths:
-            # Check if database is already open
-            existing_db = database_controller.get_database_by_file_path(file_path)
-            if existing_db:
-                skipped_count += 1
-                from pathlib import Path
-                file_name = Path(file_path).name
-                messages.append(f"Skipped {file_name} (already open)")
-                continue
-            
-            # Open database
-            success, message, first_game = database_controller.open_pgn_database(file_path)
-            
-            if success:
-                opened_count += 1
-                last_successful_database = database_controller.get_database_by_file_path(file_path)
-                last_first_game = first_game
-                from pathlib import Path
-                file_name = Path(file_path).name
-                messages.append(f"Opened {file_name}")
-            else:
-                failed_count += 1
-                from pathlib import Path
-                file_name = Path(file_path).name
-                messages.append(f"Failed {file_name}: {message}")
+        # Handle multiple files - delegate to controller
+        opened_count, skipped_count, failed_count, messages, last_successful_database, last_first_game = database_controller.open_pgn_databases(file_paths)
         
         # Update save menu state if any databases were opened
         if opened_count > 0:

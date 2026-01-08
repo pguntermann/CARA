@@ -204,6 +204,7 @@ Technical documentation for developers:
 - **Game Highlights**: [`doc/game_highlights_implementation.md`](doc/game_highlights_implementation.md)
 - **Move Classification**: [`doc/move_classification_analysis.md`](doc/move_classification_analysis.md)
 - **Phase Detection**: [`doc/phase_detection_implementation.md`](doc/phase_detection_implementation.md)
+- **Player Statistics**: [`doc/player_stats_implementation.md`](doc/player_stats_implementation.md)
 - **Positional Heatmap**: [`doc/positional_heatmap_implementation.md`](doc/positional_heatmap_implementation.md)
 
 ### UI Features

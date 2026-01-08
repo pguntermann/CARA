@@ -1,14 +1,46 @@
 """Database controller for managing game database operations."""
 
+import os
 from typing import Dict, Any, Optional, List, Tuple
 from collections import Counter
 from datetime import datetime
 import chess.pgn
 from io import StringIO
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from app.models.database_model import DatabaseModel, GameData
 from app.models.database_panel_model import DatabasePanelModel
 from app.services.pgn_service import PgnService
+
+
+def _read_and_parse_pgn_file(file_path: str) -> Tuple[str, bool, str, Optional[List[Dict[str, Any]]]]:
+    """Read and parse a PGN file (must be top-level for pickling).
+    
+    Args:
+        file_path: Path to the PGN file.
+        
+    Returns:
+        Tuple of (file_path, success, message, games).
+        If success is True, games is a list of parsed game dictionaries.
+        If success is False, games is None and message contains error description.
+    """
+    try:
+        # Read file
+        with open(file_path, 'r', encoding='utf-8') as f:
+            pgn_text = f.read()
+        
+        # Parse PGN (no progress callback in parallel context)
+        parse_result = PgnService.parse_pgn_text(pgn_text, progress_callback=None)
+        
+        if not parse_result.success:
+            return (file_path, False, parse_result.error_message, None)
+        
+        if not parse_result.games or len(parse_result.games) == 0:
+            return (file_path, False, "No valid PGN games found in file", None)
+        
+        return (file_path, True, "", parse_result.games)
+    except Exception as e:
+        return (file_path, False, f"Error reading/parsing file: {str(e)}", None)
 
 
 class DatabaseController:
@@ -551,6 +583,205 @@ class DatabaseController:
             # Hide progress on error
             progress_service.hide_progress()
             return (False, f"Error opening PGN database: {str(e)}", None)
+    
+    def open_pgn_databases(self, file_paths: List[str]) -> Tuple[int, int, int, List[str], Optional[DatabaseModel], Optional[GameData]]:
+        """Open multiple PGN databases from files with parallel processing.
+        
+        This method handles reading and parsing multiple files in parallel,
+        then adds them to the database models sequentially (Qt operations must be in main thread).
+        
+        Args:
+            file_paths: List of paths to PGN files to open.
+            
+        Returns:
+            Tuple of (opened_count, skipped_count, failed_count, messages, last_database, last_first_game).
+            - opened_count: Number of databases successfully opened
+            - skipped_count: Number of databases skipped (already open)
+            - failed_count: Number of databases that failed to open
+            - messages: List of status messages for each file
+            - last_database: Last successfully opened database (or None)
+            - last_first_game: First game from last opened database (or None)
+        """
+        from app.services.progress_service import ProgressService
+        from PyQt6.QtWidgets import QApplication
+        from pathlib import Path
+        
+        opened_count = 0
+        skipped_count = 0
+        failed_count = 0
+        last_successful_database = None
+        last_first_game = None
+        messages = []
+        
+        # Filter out already-open databases first
+        files_to_open = []
+        for file_path in file_paths:
+            existing_db = self.get_database_by_file_path(file_path)
+            if existing_db:
+                skipped_count += 1
+                file_name = Path(file_path).name
+                messages.append(f"Skipped {file_name} (already open)")
+            else:
+                files_to_open.append(file_path)
+        
+        if not files_to_open:
+            # All files were skipped
+            return (opened_count, skipped_count, failed_count, messages, None, None)
+        
+        if len(files_to_open) == 1:
+            # Single file - use existing method (has progress reporting)
+            file_path = files_to_open[0]
+            success, message, first_game = self.open_pgn_database(file_path)
+            
+            if success:
+                opened_count += 1
+                last_successful_database = self.get_database_by_file_path(file_path)
+                last_first_game = first_game
+                file_name = Path(file_path).name
+                messages.append(f"Opened {file_name}")
+            else:
+                failed_count += 1
+                file_name = Path(file_path).name
+                messages.append(f"Failed {file_name}: {message}")
+            
+            return (opened_count, skipped_count, failed_count, messages, last_successful_database, last_first_game)
+        
+        # Multiple files - use parallel processing
+        progress_service = ProgressService.get_instance()
+        
+        # Calculate number of worker processes (reserve 1-2 cores for UI)
+        cpu_count = os.cpu_count() or 4
+        max_workers = max(1, cpu_count - 2)
+        
+        # Show progress
+        progress_service.show_progress()
+        progress_service.set_indeterminate(True)
+        progress_service.set_status(f"Opening {len(files_to_open)} database(s)...")
+        QApplication.processEvents()
+        
+        # Process files in parallel
+        parse_results = {}
+        executor = None
+        try:
+            executor = ProcessPoolExecutor(max_workers=max_workers)
+            
+            # Submit all files for processing
+            future_to_path = {
+                executor.submit(_read_and_parse_pgn_file, file_path): file_path
+                for file_path in files_to_open
+            }
+            
+            # Process results as they complete
+            completed = 0
+            total_games_parsed = 0
+            for future in as_completed(future_to_path):
+                file_path = future_to_path[future]
+                completed += 1
+                
+                file_name = Path(file_path).name
+                success = False
+                games = None
+                
+                try:
+                    result_file_path, success, message, games = future.result()
+                    parse_results[result_file_path] = (success, message, games)
+                    
+                    # Track total games parsed
+                    if success and games:
+                        total_games_parsed += len(games)
+                except Exception as e:
+                    parse_results[file_path] = (False, f"Error: {str(e)}", None)
+                
+                # Update progress with file name and game count
+                if success and games:
+                    games_count = len(games)
+                    progress_service.set_status(
+                        f"Parsed {file_name}: {games_count} game(s) ({completed}/{len(files_to_open)} files, {total_games_parsed} total games)"
+                    )
+                else:
+                    progress_service.set_status(
+                        f"Parsing {file_name}... ({completed}/{len(files_to_open)} files)"
+                    )
+                
+                # Update progress bar
+                progress_percent = int((completed / len(files_to_open)) * 50)  # First 50% for parsing
+                progress_service.set_progress(progress_percent)
+                QApplication.processEvents()
+        finally:
+            if executor:
+                executor.shutdown(wait=True)
+            # Don't hide progress - continue to next phase
+        
+        # Add parsed databases to models (sequential - Qt operations must be in main thread)
+        progress_service.set_indeterminate(False)
+        progress_service.set_progress(50)  # Start at 50% (parsing is done)
+        
+        # Calculate total games to add
+        total_games_to_add = sum(
+            len(games) if success and games else 0
+            for success, _, games in parse_results.values()
+        )
+        games_added = 0
+        
+        for idx, file_path in enumerate(files_to_open):
+            success, message, games = parse_results.get(file_path, (False, "Unknown error", None))
+            
+            if success and games:
+                # Update progress with file name and game count
+                file_name = Path(file_path).name
+                games_in_file = len(games)
+                
+                # Convert parsed games to GameData instances
+                game_data_list = []
+                for file_pos, game_dict in enumerate(games, start=1):
+                    game_data = GameData(
+                        game_number=0,  # Will be set by model when adding
+                        white=game_dict.get("white", ""),
+                        black=game_dict.get("black", ""),
+                        result=game_dict.get("result", ""),
+                        date=game_dict.get("date", ""),
+                        moves=game_dict.get("moves", 0),
+                        eco=game_dict.get("eco", ""),
+                        pgn=game_dict.get("pgn", ""),
+                        event=game_dict.get("event", ""),
+                        site=game_dict.get("site", ""),
+                        white_elo=game_dict.get("white_elo", ""),
+                        black_elo=game_dict.get("black_elo", ""),
+                        analyzed=game_dict.get("analyzed", False),
+                        annotated=game_dict.get("annotated", False),
+                        file_position=file_pos,
+                    )
+                    game_data_list.append(game_data)
+                    games_added += 1
+                    
+                    # Update progress every 10 games or on last game of file
+                    if file_pos % 10 == 0 or file_pos == games_in_file:
+                        progress_service.set_status(
+                            f"Adding {file_name}: {games_added}/{total_games_to_add} games ({idx + 1}/{len(files_to_open)} files)"
+                        )
+                        # Progress from 50% to 100% for adding databases
+                        progress_percent = 50 + int((games_added / total_games_to_add) * 50) if total_games_to_add > 0 else 50
+                        progress_service.set_progress(progress_percent)
+                        QApplication.processEvents()
+                
+                # Add database to panel model
+                new_model = self.add_pgn_database(file_path, game_data_list)
+                
+                opened_count += 1
+                last_successful_database = new_model
+                last_first_game = game_data_list[0] if game_data_list else None
+                file_name = Path(file_path).name
+                messages.append(f"Opened {file_name}")
+            else:
+                failed_count += 1
+                file_name = Path(file_path).name
+                error_msg = message if message else "Unknown error"
+                messages.append(f"Failed {file_name}: {error_msg}")
+        
+        progress_service.hide_progress()
+        QApplication.processEvents()
+        
+        return (opened_count, skipped_count, failed_count, messages, last_successful_database, last_first_game)
     
     def reload_database_from_file(self, model: DatabaseModel, file_path: str) -> tuple[bool, str]:
         """Reload a database model from its file path, discarding unsaved changes.

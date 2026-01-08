@@ -102,10 +102,17 @@ app/
 
 ### Threading
 
-- Long-running operations (engine analysis) run in QThread instances
-- Threads communicate with UI via signals/slots
-- UI remains responsive during background operations
-- Each engine operation has its own thread
+- **I/O-bound operations** (engine analysis, file I/O) run in QThread instances
+  - Threads communicate with UI via signals/slots
+  - UI remains responsive during background operations
+  - Each engine operation has its own thread
+  
+- **CPU-bound operations** use ProcessPoolExecutor for parallel processing
+  - Player statistics aggregation: Processes games in parallel
+  - PGN parsing: Parses game chunks in parallel within single files
+  - Multiple file opening: Reads and parses multiple files in parallel
+  - Uses `max(1, os.cpu_count() - 2)` workers to reserve cores for UI
+  - Bypasses Python's GIL for true parallelism
 
 ## Design Principles
 
@@ -164,6 +171,8 @@ The application uses Qt's signal/slot mechanism extensively:
 
 ## Threading Architecture
 
+### QThread for I/O-bound Operations
+
 - **Engine operations run in separate QThread instances**
   - EvaluationEngineThread: Continuous position evaluation
   - GameAnalysisEngineThread: Batch game analysis
@@ -178,6 +187,29 @@ The application uses Qt's signal/slot mechanism extensively:
   - Threads are created when needed
   - Threads are properly cleaned up on completion
   - Engine processes are managed within threads
+
+### ProcessPoolExecutor for CPU-bound Operations
+
+- **Player statistics processing** (`PlayerStatsService`)
+  - Aggregates statistics across multiple games
+  - Processes each game in parallel using `ProcessPoolExecutor`
+  - See `doc/player_stats_implementation.md` for details
+
+- **PGN parsing** (`PgnService`)
+  - Parses game chunks in parallel within single files
+  - Uses chunk-based parsing after normalization
+  - See `doc/pgn_database_management.md` for details
+
+- **Multiple file opening** (`DatabaseController`)
+  - Opens multiple PGN files in parallel
+  - Each file is read and parsed independently
+  - See `doc/pgn_database_management.md` for details
+
+- **Worker process configuration**
+  - Uses `max(1, os.cpu_count() - 2)` workers
+  - Reserves 1-2 CPU cores for UI responsiveness
+  - Processes are isolated (no shared state)
+  - Results are merged maintaining order
 
 ## Error Handling
 
