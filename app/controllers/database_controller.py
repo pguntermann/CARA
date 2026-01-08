@@ -688,7 +688,8 @@ class DatabaseController:
                     analyzed=game.analyzed,
                     annotated=getattr(game, "annotated", False),
                 )
-                new_model.add_game(new_game)
+                # Mark as saved since these games are being saved to the new file
+                new_model.add_game(new_game, mark_unsaved=False)
                 
                 # Update progress every 10 games or on last game
                 should_update = (
