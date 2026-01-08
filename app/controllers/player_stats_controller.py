@@ -152,12 +152,12 @@ class PlayerStatsController(QObject):
                 self._emit_unavailable("no_analyzed_games")
                 return
             
-            # Aggregate statistics (this can be time-consuming)
+            # Aggregate statistics (includes parallel game summary calculation)
             progress_service.set_progress(20)
             progress_service.set_status(f"Aggregating statistics from {len(analyzed_games)} game(s)...")
             QApplication.processEvents()
             
-            aggregated_stats = self.player_stats_service.aggregate_player_statistics(
+            aggregated_stats, game_summaries = self.player_stats_service.aggregate_player_statistics(
                 player_name, analyzed_games, self._game_controller
             )
             
@@ -165,35 +165,7 @@ class PlayerStatsController(QObject):
                 self._emit_unavailable("calculation_error")
                 return
             
-            # Calculate game summaries for error pattern detection
-            # This is the most time-consuming part - process games in batches
-            progress_service.set_progress(50)
-            progress_service.set_status(f"Analyzing {len(analyzed_games)} game(s) for patterns...")
-            QApplication.processEvents()
-            
-            game_summaries: List[GameSummary] = []
-            total_games = len(analyzed_games)
-            
-            for idx, game in enumerate(analyzed_games):
-                if not self._game_controller:
-                    continue
-                
-                # Update progress during game analysis
-                progress_percent = 50 + int((idx / total_games) * 40)  # 50-90%
-                progress_service.set_status(f"Analyzing game {idx + 1}/{total_games}...")
-                progress_service.set_progress(progress_percent)
-                
-                # Process events every 5 games or for first few games
-                if idx < 3 or idx % 5 == 0:
-                    QApplication.processEvents()
-                
-                moves = self._game_controller.extract_moves_from_game(game)
-                if moves:
-                    summary = self.summary_service.calculate_summary(moves, len(moves), game_result=game.result)
-                    if summary:
-                        game_summaries.append(summary)
-            
-            # Detect error patterns
+            # Detect error patterns (using summaries already calculated in parallel)
             progress_service.set_progress(90)
             progress_service.set_status("Detecting error patterns...")
             QApplication.processEvents()

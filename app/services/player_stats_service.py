@@ -1,13 +1,169 @@
 """Service for aggregating player statistics across multiple games."""
 
-from typing import List, Dict, Any, Optional, Tuple
+import os
+from typing import List, Dict, Any, Optional, Tuple, Callable
 from dataclasses import dataclass
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from app.models.database_model import GameData, DatabaseModel
 from app.models.moveslist_model import MoveData
 from app.services.game_summary_service import GameSummary, PlayerStatistics, PhaseStatistics, GameSummaryService
 from app.controllers.game_controller import GameController
+
+
+def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, game_black: str, 
+                            game_eco: str, player_name: str, config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Process a single game for statistics aggregation (must be top-level for pickling).
+    
+    Args:
+        game_pgn: PGN string of the game.
+        game_result: Game result string.
+        game_white: White player name.
+        game_black: Black player name.
+        game_eco: ECO code of the opening.
+        player_name: Name of the player to analyze.
+        config: Configuration dictionary.
+        
+    Returns:
+        Dictionary with game statistics, or None if processing failed.
+    """
+    try:
+        # Extract moves from PGN
+        from app.services.analysis_data_storage_service import AnalysisDataStorageService
+        from app.models.database_model import GameData
+        import io
+        import chess.pgn
+        
+        # Create minimal GameData for analysis data loading
+        game_data = GameData(
+            game_number=0,
+            white=game_white,
+            black=game_black,
+            result=game_result,
+            date="",
+            moves=0,
+            eco=game_eco,
+            pgn=game_pgn,
+            event="",
+            site="",
+            white_elo="",
+            black_elo="",
+            analyzed=True,
+            annotated=False,
+            file_position=0
+        )
+        
+        # Try to load analysis data from PGN tag
+        moves = None
+        try:
+            stored_moves = AnalysisDataStorageService.load_analysis_data(game_data)
+            if stored_moves:
+                moves = stored_moves
+        except (ValueError, Exception):
+            # Continue to parse PGN normally
+            pass
+        
+        # If no stored moves, we can't process this game in parallel
+        # (Games without analysis data in PGN tags need the controller to extract moves)
+        if not moves:
+            return None
+        
+        # Calculate game summary
+        summary_service = GameSummaryService(config)
+        game_summary = summary_service.calculate_summary(moves, len(moves), game_result)
+        if not game_summary:
+            return None
+        
+        # Determine if player is white or black
+        is_white_game = (game_white == player_name)
+        
+        # Get player statistics for this game
+        if is_white_game:
+            game_stats = game_summary.white_stats
+            game_opening = game_summary.white_opening
+            game_middlegame = game_summary.white_middlegame
+            game_endgame = game_summary.white_endgame
+        else:
+            game_stats = game_summary.black_stats
+            game_opening = game_summary.black_opening
+            game_middlegame = game_summary.black_middlegame
+            game_endgame = game_summary.black_endgame
+        
+        # Determine opening phase end
+        opening_end, _ = summary_service._determine_phase_boundaries(moves, len(moves))
+        
+        # Find opening ECO and name
+        repeat_indicator = config.get('resources', {}).get('opening_repeat_indicator', '*')
+        eco = "Unknown"
+        opening_name = None
+        for move in reversed(moves):
+            if move.opening_name and move.opening_name != repeat_indicator:
+                eco = move.eco if move.eco else "Unknown"
+                opening_name = move.opening_name
+                break
+        
+        if eco == "Unknown" and not opening_name:
+            eco = game_eco if game_eco else "Unknown"
+        
+        # Collect opening CPL values
+        game_cpl_field = 'cpl_white' if is_white_game else 'cpl_black'
+        game_opening_cpls = []
+        for move in moves:
+            move_num = move.move_number
+            if move_num <= opening_end:
+                if is_white_game and move.white_move:
+                    cpl_str = getattr(move, game_cpl_field, "")
+                    if cpl_str:
+                        try:
+                            cpl = float(cpl_str)
+                            game_opening_cpls.append(cpl)
+                        except (ValueError, TypeError):
+                            pass
+                elif not is_white_game and move.black_move:
+                    cpl_str = getattr(move, game_cpl_field, "")
+                    if cpl_str:
+                        try:
+                            cpl = float(cpl_str)
+                            game_opening_cpls.append(cpl)
+                        except (ValueError, TypeError):
+                            pass
+        
+        # Calculate average CPL for opening
+        opening_avg_cpl = None
+        if game_opening_cpls:
+            CPL_CAP_FOR_AVERAGE = 500.0
+            capped_cpl_values = [min(cpl, CPL_CAP_FOR_AVERAGE) for cpl in game_opening_cpls]
+            opening_avg_cpl = sum(capped_cpl_values) / len(capped_cpl_values)
+        
+        # Collect moves for overall aggregation
+        all_moves_white = []
+        all_moves_black = []
+        for move in moves:
+            if is_white_game and move.white_move:
+                all_moves_white.append(move)
+            elif not is_white_game and move.black_move:
+                all_moves_black.append(move)
+        
+        return {
+            'is_white': is_white_game,
+            'game_result': game_result,
+            'game_stats': game_stats,
+            'game_opening': game_opening,
+            'game_middlegame': game_middlegame,
+            'game_endgame': game_endgame,
+            'opening_key': (eco, opening_name),
+            'opening_avg_cpl': opening_avg_cpl,
+            'all_moves_white': all_moves_white,
+            'all_moves_black': all_moves_black,
+            'moves': moves,
+            'game_summary': game_summary  # Return full summary for error pattern detection
+        }
+    except Exception as e:
+        # Log error but don't crash - return None to skip this game
+        import sys
+        print(f"Error processing game for stats: {e}", file=sys.stderr)
+        return None
 
 
 @dataclass
@@ -75,99 +231,121 @@ class PlayerStatsService:
         return (player_games, total_count)
     
     def aggregate_player_statistics(self, player_name: str, games: List[GameData],
-                                   game_controller: Optional[GameController] = None) -> Optional[AggregatedPlayerStats]:
+                                   game_controller: Optional[GameController] = None,
+                                   progress_callback: Optional[Callable[[int, str], None]] = None,
+                                   cancellation_check: Optional[Callable[[], bool]] = None) -> Tuple[Optional[AggregatedPlayerStats], List[GameSummary]]:
         """Aggregate statistics for a player across multiple games.
         
         Args:
             player_name: Player name.
             games: List of GameData instances for this player.
-            game_controller: Optional GameController for extracting moves.
+            game_controller: Optional GameController for extracting moves (used for fallback).
+            progress_callback: Optional callback function(completed: int, status: str) for progress updates.
+            cancellation_check: Optional function() -> bool to check if operation should be cancelled.
             
         Returns:
-            AggregatedPlayerStats instance, or None if no analyzed games found.
+            Tuple of (AggregatedPlayerStats instance, List[GameSummary]) or (None, []) if no analyzed games found.
         """
         if not games:
-            return None
-        
-        # Use provided controller or instance controller
-        controller = game_controller or self.game_controller
-        if not controller:
-            return None
+            return (None, [])
         
         # Separate analyzed and unanalyzed games
         analyzed_games = [g for g in games if g.analyzed]
         if not analyzed_games:
-            return None
+            return (None, [])
         
-        # Count results
+        # Calculate number of worker processes (reserve 1-2 cores for UI)
+        cpu_count = os.cpu_count() or 4
+        max_workers = max(1, cpu_count - 2)
+        
+        # Process games in parallel
+        game_results: List[Dict[str, Any]] = []
+        completed_count = 0
+        total_games = len(analyzed_games)
+        
+        executor = None
+        try:
+            executor = ProcessPoolExecutor(max_workers=max_workers)
+            # Submit all games for processing
+            future_to_game = {
+                executor.submit(
+                    _process_game_for_stats,
+                    game.pgn,
+                    game.result,
+                    game.white,
+                    game.black,
+                    game.eco if game.eco else "",
+                    player_name,
+                    self.config
+                ): game
+                for game in analyzed_games
+            }
+            
+            # Process results as they complete
+            for future in as_completed(future_to_game):
+                # Check for cancellation
+                if cancellation_check and cancellation_check():
+                    # Cancel remaining futures
+                    for f in future_to_game:
+                        f.cancel()
+                    break
+                
+                try:
+                    result = future.result()
+                    if result:
+                        game_results.append(result)
+                    
+                    # Update progress
+                    completed_count += 1
+                    if progress_callback:
+                        progress_percent = 50 + int((completed_count / total_games) * 40)
+                        progress_callback(
+                            progress_percent,
+                            f"Analyzing game {completed_count}/{total_games}..."
+                        )
+                except Exception as e:
+                    # Skip cancelled futures silently (they're expected when cancelling)
+                    from concurrent.futures import CancelledError
+                    if isinstance(e, CancelledError):
+                        continue
+                    # Log other errors but continue processing other games
+                    import sys
+                    print(f"Error processing game: {e}", file=sys.stderr)
+                    import traceback
+                    traceback.print_exc()
+        finally:
+            # Ensure executor is properly shut down
+            # This waits for all processes to finish, even if cancelled
+            # This is important to prevent "QThread destroyed while running" errors
+            if executor:
+                executor.shutdown(wait=True)
+        
+        if not game_results:
+            return (None, [])
+        
+        # Extract game summaries for return
+        game_summaries: List[GameSummary] = []
+        for result in game_results:
+            if 'game_summary' in result and result['game_summary']:
+                game_summaries.append(result['game_summary'])
+        
+        # Aggregate results from parallel processing
         wins = 0
         draws = 0
         losses = 0
         
-        # Collect all moves for aggregation (needed for overall aggregated stats)
-        # Note: We need to track which color the player was in each game
-        # For aggregation, we'll use the majority color to determine which fields to use
         all_moves_white: List[MoveData] = []
         all_moves_black: List[MoveData] = []
         
         white_games_count = 0
         black_games_count = 0
         
-        for game in analyzed_games:
-            # Count results
-            if (game.white == player_name and game.result == "1-0") or \
-               (game.black == player_name and game.result == "0-1"):
-                wins += 1
-            elif game.result == "1/2-1/2":
-                draws += 1
-            else:
-                losses += 1
-            
-            # Extract moves
-            moves = controller.extract_moves_from_game(game)
-            if not moves:
-                continue
-            
-            # Determine if player is white or black in this game
-            is_white = (game.white == player_name)
-            if is_white:
-                white_games_count += 1
-            else:
-                black_games_count += 1
-            
-            # Collect moves for this player (filter by color) - needed for aggregated overall stats
-            for move in moves:
-                if is_white and move.white_move:
-                    all_moves_white.append(move)
-                elif not is_white and move.black_move:
-                    all_moves_black.append(move)
-        
-        # Determine which color to use for aggregation (majority)
-        # If player played both colors, we'll aggregate white moves separately
-        # For now, use the color they played most often
-        use_white = white_games_count >= black_games_count
-        
-        if use_white:
-            all_moves = all_moves_white
-            cpl_field = 'cpl_white'
-            assess_field = 'assess_white'
-        else:
-            all_moves = all_moves_black
-            cpl_field = 'cpl_black'
-            assess_field = 'assess_black'
-        
-        if not all_moves:
-            return None
-        
-        # Calculate per-game statistics, then average ELO, accuracy, and phase accuracies
-        # This ensures formulas work correctly with has_won/has_drawn per game
         elo_values = []
         accuracy_values = []
         opening_accuracy_values = []
         middlegame_accuracy_values = []
         endgame_accuracy_values = []
         
-        # Also collect phase statistics for aggregation (moves, CPL, move counts, etc.)
         opening_moves_total = 0
         middlegame_moves_total = 0
         endgame_moves_total = 0
@@ -178,7 +356,6 @@ class PlayerStatsService:
         middlegame_cpl_count = 0
         endgame_cpl_count = 0
         
-        # Aggregate move classification counts for each phase
         opening_book_moves = 0
         opening_brilliant_moves = 0
         opening_best_moves = 0
@@ -206,30 +383,37 @@ class PlayerStatsService:
         endgame_misses = 0
         endgame_blunders = 0
         
-        for game in analyzed_games:
-            moves = controller.extract_moves_from_game(game)
-            if not moves:
-                continue
+        opening_counter = Counter()
+        opening_cpl_data: Dict[Tuple[str, Optional[str]], List[float]] = {}
+        
+        for result in game_results:
+            is_white_game = result['is_white']
+            game_result = result['game_result']
+            game_stats = result['game_stats']
+            game_opening = result['game_opening']
+            game_middlegame = result['game_middlegame']
+            game_endgame = result['game_endgame']
+            opening_key = result['opening_key']
+            opening_avg_cpl = result['opening_avg_cpl']
             
-            is_white_game = (game.white == player_name)
-            game_result = game.result
-            
-            # Calculate complete game summary for this game
-            game_summary = self.summary_service.calculate_summary(moves, len(moves), game_result)
-            if not game_summary:
-                continue
-            
-            # Get player statistics for this game
-            if is_white_game:
-                game_stats = game_summary.white_stats
-                game_opening = game_summary.white_opening
-                game_middlegame = game_summary.white_middlegame
-                game_endgame = game_summary.white_endgame
+            # Count results
+            if (is_white_game and game_result == "1-0") or \
+               (not is_white_game and game_result == "0-1"):
+                wins += 1
+            elif game_result == "1/2-1/2":
+                draws += 1
             else:
-                game_stats = game_summary.black_stats
-                game_opening = game_summary.black_opening
-                game_middlegame = game_summary.black_middlegame
-                game_endgame = game_summary.black_endgame
+                losses += 1
+            
+            # Track color distribution
+            if is_white_game:
+                white_games_count += 1
+            else:
+                black_games_count += 1
+            
+            # Collect moves for overall aggregation
+            all_moves_white.extend(result['all_moves_white'])
+            all_moves_black.extend(result['all_moves_black'])
             
             # Collect per-game values for averaging
             elo_values.append(game_stats.estimated_elo)
@@ -238,12 +422,12 @@ class PlayerStatsService:
             middlegame_accuracy_values.append(game_middlegame.accuracy)
             endgame_accuracy_values.append(game_endgame.accuracy)
             
-            # Collect phase statistics for aggregation (moves, CPL, move counts, etc.)
+            # Collect phase statistics for aggregation
             opening_moves_total += game_opening.moves
             middlegame_moves_total += game_middlegame.moves
             endgame_moves_total += game_endgame.moves
             
-            # Accumulate CPL for weighted average (weighted by number of moves in phase)
+            # Accumulate CPL for weighted average
             if game_opening.moves > 0:
                 opening_cpl_sum += game_opening.average_cpl * game_opening.moves
                 opening_cpl_count += game_opening.moves
@@ -281,6 +465,24 @@ class PlayerStatsService:
             endgame_mistakes += game_endgame.mistakes
             endgame_misses += game_endgame.misses
             endgame_blunders += game_endgame.blunders
+            
+            # Track opening usage and CPL
+            opening_counter[opening_key] += 1
+            if opening_avg_cpl is not None:
+                if opening_key not in opening_cpl_data:
+                    opening_cpl_data[opening_key] = []
+                opening_cpl_data[opening_key].append(opening_avg_cpl)
+        
+        # Determine which color to use for aggregation (majority)
+        use_white = white_games_count >= black_games_count
+        
+        if use_white:
+            all_moves = all_moves_white
+        else:
+            all_moves = all_moves_black
+        
+        if not all_moves:
+            return (None, [])
         
         # Average the results
         if elo_values:
@@ -311,7 +513,7 @@ class PlayerStatsService:
         average_cpl_middlegame = (middlegame_cpl_sum / middlegame_cpl_count) if middlegame_cpl_count > 0 else 0.0
         average_cpl_endgame = (endgame_cpl_sum / endgame_cpl_count) if endgame_cpl_count > 0 else 0.0
         
-        # Still calculate aggregated stats for other metrics (CPL, move counts, etc.)
+        # Calculate aggregated stats for other metrics (CPL, move counts, etc.)
         # But we'll replace ELO and accuracy with averaged values
         aggregated_stats = self.summary_service._calculate_player_statistics(all_moves, use_white, game_result=None)
         
@@ -320,7 +522,6 @@ class PlayerStatsService:
         aggregated_stats.accuracy = averaged_accuracy
         
         # Create phase statistics with averaged accuracy values
-        # Use aggregated move counts and CPL from per-game phase statistics
         opening_stats = PhaseStatistics(
             moves=opening_moves_total,
             average_cpl=average_cpl_opening,
@@ -367,92 +568,19 @@ class PlayerStatsService:
         total_games = len(analyzed_games)
         win_rate = (wins / total_games * 100) if total_games > 0 else 0.0
         
-        # Track opening usage and CPL - get ECO and opening name from last move with non-"*" opening name
-        opening_counter = Counter()
-        opening_cpl_data: Dict[Tuple[str, Optional[str]], List[float]] = {}  # Track CPL values per opening (per-game averages)
-        repeat_indicator = self.config.get('resources', {}).get('opening_repeat_indicator', '*')
-        
-        for game in analyzed_games:
-            moves = controller.extract_moves_from_game(game)
-            if not moves:
-                continue
-            
-            # Determine if player is white or black in this game
-            is_white = (game.white == player_name)
-            game_cpl_field = 'cpl_white' if is_white else 'cpl_black'
-            
-            # Determine opening phase end using the same method as GameSummaryService (per game)
-            total_moves = len(moves)
-            opening_end, _ = self.summary_service._determine_phase_boundaries(moves, total_moves)
-            
-            # Find the last move with a non-"*" opening name to identify the opening (ECO and name)
-            eco = "Unknown"
-            opening_name = None
-            
-            for move in reversed(moves):
-                if move.opening_name and move.opening_name != repeat_indicator:
-                    eco = move.eco if move.eco else "Unknown"
-                    opening_name = move.opening_name
-                    break
-            
-            # If no move with opening name found, fall back to game header ECO
-            if eco == "Unknown" and not opening_name:
-                eco = game.eco if game.eco else "Unknown"
-            
-            # Count this opening
-            opening_key = (eco, opening_name)
-            opening_counter[opening_key] += 1
-            
-            # Collect CPL values for this opening (from all moves up to and including opening_end)
-            if opening_key not in opening_cpl_data:
-                opening_cpl_data[opening_key] = []
-            
-            # Collect CPL from all opening phase moves for this game (up to and including opening_end)
-            game_opening_cpls = []
-            for move in moves:
-                move_num = move.move_number
-                if move_num <= opening_end:
-                    if is_white and move.white_move:
-                        cpl_str = getattr(move, game_cpl_field, "")
-                        if cpl_str:
-                            try:
-                                cpl = float(cpl_str)
-                                game_opening_cpls.append(cpl)
-                            except (ValueError, TypeError):
-                                pass
-                    elif not is_white and move.black_move:
-                        cpl_str = getattr(move, game_cpl_field, "")
-                        if cpl_str:
-                            try:
-                                cpl = float(cpl_str)
-                                game_opening_cpls.append(cpl)
-                            except (ValueError, TypeError):
-                                pass
-            
-            # Calculate average CPL for this game's opening phase and store it
-            if game_opening_cpls:
-                # Cap CPL at 500 for average calculation (same as in game_summary_service)
-                CPL_CAP_FOR_AVERAGE = 500.0
-                capped_cpl_values = [min(cpl, CPL_CAP_FOR_AVERAGE) for cpl in game_opening_cpls]
-                game_avg_cpl = sum(capped_cpl_values) / len(capped_cpl_values)
-                opening_cpl_data[opening_key].append(game_avg_cpl)
-        
         # Get top 3 most played openings
         top_openings = opening_counter.most_common(3)
         top_openings_list = [(eco, opening_name, count) for (eco, opening_name), count in top_openings]
         
         # Calculate average CPL for each opening across all games
-        # opening_cpl_data now contains per-game averages, so we just average those
         opening_avg_cpl: List[Tuple[Tuple[str, Optional[str]], float, int]] = []
         for opening_key, game_avg_cpls in opening_cpl_data.items():
             if game_avg_cpls:
-                # Average the per-game averages to get overall average CPL for this opening
                 overall_avg_cpl = sum(game_avg_cpls) / len(game_avg_cpls)
                 count = opening_counter[opening_key]
                 opening_avg_cpl.append((opening_key, overall_avg_cpl, count))
         
         # Sort by average CPL (worst = highest CPL, best = lowest CPL)
-        # Exclude openings with 0 CPL (perfect play) from worst accuracy list
         opening_avg_cpl.sort(key=lambda x: x[1], reverse=True)  # Highest CPL first (worst)
         worst_openings = [opening for opening in opening_avg_cpl if opening[1] > 0.0][:3]  # Top 3 worst, excluding 0 CPL
         worst_openings_list = [(eco, opening_name, avg_cpl, count) for (eco, opening_name), avg_cpl, count in worst_openings]
@@ -461,7 +589,7 @@ class PlayerStatsService:
         best_openings = opening_avg_cpl[:3]  # Top 3 best
         best_openings_list = [(eco, opening_name, avg_cpl, count) for (eco, opening_name), avg_cpl, count in best_openings]
         
-        return AggregatedPlayerStats(
+        aggregated_stats = AggregatedPlayerStats(
             total_games=total_games,
             analyzed_games=len(analyzed_games),
             wins=wins,
@@ -476,4 +604,6 @@ class PlayerStatsService:
             worst_accuracy_openings=worst_openings_list,
             best_accuracy_openings=best_openings_list
         )
+        
+        return (aggregated_stats, game_summaries)
 

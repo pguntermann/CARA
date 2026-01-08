@@ -183,11 +183,20 @@ class PlayerStatsCalculationWorker(QThread):
                 self.stats_unavailable.emit("no_analyzed_games")
                 return
             
-            # Aggregate statistics
+            # Aggregate statistics (includes parallel game summary calculation)
             self.progress_update.emit(20, f"Aggregating statistics from {len(analyzed_games)} game(s)...")
             
-            aggregated_stats = self.stats_controller.player_stats_service.aggregate_player_statistics(
-                self.player_name, analyzed_games, self.stats_controller._game_controller
+            # Define progress callback for parallel processing
+            def progress_callback(completed: int, status: str) -> None:
+                if not self._is_cancelled():
+                    self.progress_update.emit(completed, status)
+            
+            # Define cancellation check function
+            def cancellation_check() -> bool:
+                return self._is_cancelled()
+            
+            aggregated_stats, game_summaries = self.stats_controller.player_stats_service.aggregate_player_statistics(
+                self.player_name, analyzed_games, self.stats_controller._game_controller, progress_callback, cancellation_check
             )
             
             if self._is_cancelled():
@@ -197,33 +206,7 @@ class PlayerStatsCalculationWorker(QThread):
                 self.stats_unavailable.emit("calculation_error")
                 return
             
-            # Calculate game summaries for error pattern detection
-            self.progress_update.emit(50, f"Analyzing {len(analyzed_games)} game(s) for patterns...")
-            
-            game_summaries: List = []
-            total_games = len(analyzed_games)
-            
-            for idx, game in enumerate(analyzed_games):
-                if self._is_cancelled():
-                    return
-                
-                if not self.stats_controller._game_controller:
-                    continue
-                
-                # Update progress
-                progress_percent = 50 + int((idx / total_games) * 40)
-                self.progress_update.emit(progress_percent, f"Analyzing game {idx + 1}/{total_games}...")
-                
-                moves = self.stats_controller._game_controller.extract_moves_from_game(game)
-                if moves:
-                    summary = self.stats_controller.summary_service.calculate_summary(moves, len(moves), game_result=game.result)
-                    if summary:
-                        game_summaries.append(summary)
-            
-            if self._is_cancelled():
-                return
-            
-            # Detect error patterns
+            # Detect error patterns (using summaries already calculated in parallel)
             self.progress_update.emit(90, "Detecting error patterns...")
             
             error_patterns = self.stats_controller.error_pattern_service.detect_error_patterns(
@@ -496,7 +479,7 @@ class DetailPlayerStatsView(QWidget):
         if self._stats_worker:
             if self._stats_worker.isRunning():
                 self._stats_worker.cancel()
-                self._stats_worker.wait(3000)  # Wait up to 3 seconds
+                self._stats_worker.wait(10000)  # Wait up to 10 seconds for ProcessPoolExecutor shutdown
             # Disconnect signals before deleting
             try:
                 self._stats_worker.stats_ready.disconnect()
@@ -1227,9 +1210,11 @@ class DetailPlayerStatsView(QWidget):
         if self._stats_worker:
             if self._stats_worker.isRunning():
                 self._stats_worker.cancel()
-                # Wait for worker to finish (with timeout)
-                if not self._stats_worker.wait(2000):  # Wait up to 2 seconds
+                # Wait for worker to finish (with longer timeout for ProcessPoolExecutor shutdown)
+                # ProcessPoolExecutor needs time to cancel futures and shutdown processes
+                if not self._stats_worker.wait(10000):  # Wait up to 10 seconds
                     # If it didn't finish, disconnect signals and delete later
+                    # The thread will finish eventually and clean itself up
                     try:
                         self._stats_worker.stats_ready.disconnect()
                         self._stats_worker.stats_unavailable.disconnect()
