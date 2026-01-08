@@ -1,6 +1,7 @@
 """Entry point for CARA: Chess Analysis Review Application."""
 
 import sys
+import multiprocessing
 from pathlib import Path
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
@@ -41,4 +42,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Required for Windows + PyInstaller + multiprocessing
+    # Prevents worker processes from executing main() and launching new GUI instances
+    multiprocessing.freeze_support()
     main()
