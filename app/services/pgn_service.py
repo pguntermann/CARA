@@ -52,7 +52,7 @@ class PgnService:
             
             # Normalize blank lines in PGN to prevent python-chess from splitting games incorrectly
             # Python-chess can misinterpret multiple blank lines as game separators
-            # Strategy: Remove blank lines between headers and moves, but keep one blank line between games
+            # Strategy: Remove blank lines inside comments, but preserve blank lines between headers
             # Also: Insert blank lines when headers appear directly after moves (missing game separators)
             lines = pgn_text.split('\n')
             normalized_lines = []
@@ -60,12 +60,18 @@ class PgnService:
             in_moves = False  # Track if we're currently in move notation
             last_was_header = False
             last_was_blank = False
+            comment_depth = 0  # Track nesting depth of comments (count of { minus })
             
             for i, line in enumerate(lines):
                 line_stripped = line.strip()
                 is_blank = not line_stripped
                 is_header = line_stripped.startswith('[')
                 is_move_line = line_stripped and (line_stripped[0].isdigit() or line_stripped.startswith('*'))
+                
+                # Check comment depth BEFORE processing this line
+                inside_comment = comment_depth > 0
+                # Count comment braces to track if we're inside a comment
+                comment_depth += line.count('{') - line.count('}')
                 
                 # If we see a header, we're in header section
                 if is_header:
@@ -99,9 +105,14 @@ class PgnService:
                 # For blank lines
                 elif is_blank:
                     last_was_blank = True
-                    if last_was_header:
-                        # Blank line after headers - skip it (don't add)
+                    if inside_comment:
+                        # Blank line inside comment - skip it (prevents game splitting)
                         pass
+                    elif in_headers:
+                        # Blank line between headers - keep it (helps python-chess parse headers correctly)
+                        # Only add if previous line wasn't blank (avoid consecutive blanks)
+                        if normalized_lines and normalized_lines[-1] != '':
+                            normalized_lines.append('')
                     elif in_moves:
                         # Blank line after moves - might be game separator
                         # Only add if previous line wasn't blank (avoid consecutive blanks)
