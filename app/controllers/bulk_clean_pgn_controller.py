@@ -108,6 +108,10 @@ class BulkCleanPgnController(QObject):
             self.progress_service.set_progress(percent)
             self.progress_service.set_status(f"Bulk Clean PGN: {message}")
         
+        # Cancel flag
+        def cancel_flag() -> bool:
+            return self._cancelled
+        
         # Perform cleaning
         result = self.service.clean_pgn(
             database,
@@ -117,7 +121,8 @@ class BulkCleanPgnController(QObject):
             remove_annotations,
             remove_results,
             game_indices,
-            progress_callback
+            progress_callback,
+            cancel_flag
         )
         
         # Hide progress

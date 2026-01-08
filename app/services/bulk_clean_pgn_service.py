@@ -1,7 +1,9 @@
 """Bulk PGN cleaning service for database operations."""
 
-from typing import Dict, Any, Optional, List, Callable
+import os
+from typing import Dict, Any, Optional, List, Callable, Tuple
 from dataclasses import dataclass
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from app.models.database_model import DatabaseModel, GameData
 from app.services.pgn_cleaning_service import PgnCleaningService
@@ -16,6 +18,66 @@ class BulkCleanPgnResult:
     games_failed: int
     games_skipped: int
     error_message: Optional[str] = None
+
+
+def _process_game_for_cleaning(
+    game_pgn: str,
+    remove_comments: bool,
+    remove_variations: bool,
+    remove_non_standard_tags: bool,
+    remove_annotations: bool,
+    remove_results: bool
+) -> Tuple[Optional[str], bool]:
+    """Process a single game for PGN cleaning (for parallel execution).
+    
+    Args:
+        game_pgn: PGN string of the game.
+        remove_comments: If True, remove comments from PGN.
+        remove_variations: If True, remove variations from PGN.
+        remove_non_standard_tags: If True, remove non-standard tags from PGN.
+        remove_annotations: If True, remove annotations from PGN.
+        remove_results: If True, remove results from PGN.
+        
+    Returns:
+        Tuple of (new_pgn, updated) or (None, False) if failed.
+    """
+    try:
+        # Create a temporary GameData-like object for processing
+        class TempGame:
+            def __init__(self, pgn: str):
+                self.pgn = pgn
+        
+        temp_game = TempGame(game_pgn)
+        game_modified = False
+        
+        # Apply cleaning operations in order
+        if remove_comments:
+            if PgnCleaningService.remove_comments_from_game(temp_game):
+                game_modified = True
+        
+        if remove_variations:
+            if PgnCleaningService.remove_variations_from_game(temp_game):
+                game_modified = True
+        
+        if remove_non_standard_tags:
+            if PgnCleaningService.remove_non_standard_tags_from_game(temp_game):
+                game_modified = True
+        
+        if remove_annotations:
+            if PgnCleaningService.remove_annotations_from_game(temp_game):
+                game_modified = True
+        
+        if remove_results:
+            if PgnCleaningService.remove_results_from_game(temp_game):
+                game_modified = True
+        
+        if game_modified:
+            return (temp_game.pgn, True)
+        else:
+            return (None, False)
+        
+    except Exception:
+        return (None, False)
 
 
 class BulkCleanPgnService:
@@ -38,7 +100,8 @@ class BulkCleanPgnService:
         remove_annotations: bool = False,
         remove_results: bool = False,
         game_indices: Optional[List[int]] = None,
-        progress_callback: Optional[Callable[[int, int, str], None]] = None
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        cancellation_check: Optional[Callable[[], bool]] = None
     ) -> BulkCleanPgnResult:
         """Clean PGN notation for games in a database.
         
@@ -51,6 +114,7 @@ class BulkCleanPgnService:
             remove_results: If True, remove results from PGN.
             game_indices: Optional list of game indices to process (None = all games).
             progress_callback: Optional callback function(game_index, total, message).
+            cancellation_check: Optional function that returns True if operation should be cancelled.
             
         Returns:
             BulkCleanPgnResult with operation statistics.
@@ -64,8 +128,6 @@ class BulkCleanPgnService:
             games_to_process = games
         
         total_games = len(games_to_process)
-        games_updated = 0
-        games_failed = 0
         
         # If no games to process, return early
         if total_games == 0:
@@ -92,47 +154,67 @@ class BulkCleanPgnService:
                 games_skipped=total_games
             )
         
+        # Determine worker count (reserve 1-2 cores for UI)
+        max_workers = max(1, os.cpu_count() - 2)
+        
         # Collect all updated games for batch update
         updated_games = []
+        games_updated = 0
+        games_failed = 0
         
-        # Process each game
-        for idx, game in enumerate(games_to_process):
-            if progress_callback:
-                progress_callback(idx, total_games, f"Cleaning game {idx + 1}/{total_games}")
+        executor = None
+        try:
+            executor = ProcessPoolExecutor(max_workers=max_workers)
             
-            try:
-                # Track if game was modified
-                game_modified = False
+            # Submit all games for processing
+            future_to_game = {
+                executor.submit(
+                    _process_game_for_cleaning,
+                    game.pgn,
+                    remove_comments,
+                    remove_variations,
+                    remove_non_standard_tags,
+                    remove_annotations,
+                    remove_results
+                ): game
+                for game in games_to_process
+            }
+            
+            # Process results as they complete
+            completed = 0
+            for future in as_completed(future_to_game):
+                if cancellation_check and cancellation_check():
+                    # Cancel remaining futures
+                    for f in future_to_game:
+                        if f != future:
+                            f.cancel()
+                    break
                 
-                # Apply cleaning operations in order
-                if remove_comments:
-                    if PgnCleaningService.remove_comments_from_game(game):
-                        game_modified = True
+                game = future_to_game[future]
+                completed += 1
                 
-                if remove_variations:
-                    if PgnCleaningService.remove_variations_from_game(game):
-                        game_modified = True
+                if progress_callback:
+                    progress_callback(completed, total_games, f"Cleaning game {completed}/{total_games}")
                 
-                if remove_non_standard_tags:
-                    if PgnCleaningService.remove_non_standard_tags_from_game(game):
-                        game_modified = True
-                
-                if remove_annotations:
-                    if PgnCleaningService.remove_annotations_from_game(game):
-                        game_modified = True
-                
-                if remove_results:
-                    if PgnCleaningService.remove_results_from_game(game):
-                        game_modified = True
-                
-                # If game was modified, add to updated list
-                if game_modified:
-                    updated_games.append(game)
-                    games_updated += 1
-                
-            except Exception:
-                games_failed += 1
-                continue
+                try:
+                    new_pgn, updated = future.result()
+                    
+                    if updated and new_pgn:
+                        # Update game data
+                        game.pgn = new_pgn
+                        
+                        # Collect game for batch update
+                        updated_games.append(game)
+                        games_updated += 1
+                    elif new_pgn is None and updated is False:
+                        # Game was not modified or processing failed
+                        pass
+                except Exception:
+                    games_failed += 1
+        
+        finally:
+            if executor:
+                executor.shutdown(wait=True)
         
         # Batch update all modified games with a single dataChanged signal
         if updated_games:

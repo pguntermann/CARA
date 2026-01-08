@@ -116,6 +116,10 @@ class BulkReplaceController(QObject):
             self.progress_service.set_progress(percent)
             self.progress_service.set_status(f"Bulk Replace: {message}")
         
+        # Cancel flag
+        def cancel_flag() -> bool:
+            return self._cancelled
+        
         # Perform replacement
         result = self.service.replace_metadata_tag(
             database,
@@ -126,7 +130,8 @@ class BulkReplaceController(QObject):
             use_regex,
             overwrite_all,
             game_indices,
-            progress_callback
+            progress_callback,
+            cancel_flag
         )
         
         # Hide progress
@@ -178,13 +183,18 @@ class BulkReplaceController(QObject):
             self.progress_service.set_progress(percent)
             self.progress_service.set_status(f"Bulk Replace: {message}")
         
+        # Cancel flag
+        def cancel_flag() -> bool:
+            return self._cancelled
+        
         # Perform copy
         result = self.service.copy_metadata_tag(
             database,
             target_tag,
             source_tag,
             game_indices,
-            progress_callback
+            progress_callback,
+            cancel_flag
         )
         
         # Hide progress

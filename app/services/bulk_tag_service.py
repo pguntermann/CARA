@@ -1,10 +1,12 @@
 """Bulk tag service for adding and removing tags from database games."""
 
+import os
 import chess
 import chess.pgn
 from io import StringIO
-from typing import Dict, Any, Optional, List, Callable
+from typing import Dict, Any, Optional, List, Callable, Tuple
 from dataclasses import dataclass
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from app.models.database_model import DatabaseModel, GameData
 from app.services.pgn_service import PgnService
@@ -19,6 +21,111 @@ class BulkTagResult:
     games_failed: int
     games_skipped: int
     error_message: Optional[str] = None
+
+
+def _process_game_for_add_tag(
+    game_pgn: str,
+    tag_name: str,
+    tag_value: Optional[str],
+    source_tag: Optional[str]
+) -> Tuple[Optional[str], Optional[str], bool]:
+    """Process a single game for tag addition (for parallel execution).
+    
+    Args:
+        game_pgn: PGN string of the game.
+        tag_name: PGN tag name to add.
+        tag_value: Optional fixed value to set. If None and source_tag is None, tag is added empty.
+        source_tag: Optional source tag to copy value from. If provided, tag_value is ignored.
+        
+    Returns:
+        Tuple of (new_pgn, new_field_value, updated) or (None, None, False) if failed/skipped.
+    """
+    try:
+        # Parse PGN
+        pgn_io = StringIO(game_pgn)
+        chess_game = chess.pgn.read_game(pgn_io)
+        
+        if not chess_game:
+            return (None, None, False)
+        
+        # Check if tag already exists - if so, skip this game
+        if tag_name in chess_game.headers:
+            return (None, None, False)
+        
+        # Determine value to set
+        if source_tag is not None:
+            # Copy from source tag
+            new_value = chess_game.headers.get(source_tag, "")
+        elif tag_value is not None and tag_value.strip():
+            # Use fixed value (non-empty)
+            new_value = tag_value
+        else:
+            # Empty value
+            new_value = ""
+        
+        # Add tag
+        chess_game.headers[tag_name] = new_value
+        
+        # Regenerate PGN
+        new_pgn = PgnService.export_game_to_pgn(chess_game)
+        
+        # Get field value if tag maps to a field
+        tag_to_field_mapping = {
+            "White": "white",
+            "Black": "black",
+            "Result": "result",
+            "Date": "date",
+            "ECO": "eco",
+            "Event": "event",
+            "Site": "site",
+            "WhiteElo": "white_elo",
+            "BlackElo": "black_elo",
+        }
+        
+        field_value = new_value if tag_name in tag_to_field_mapping else None
+        
+        return (new_pgn, field_value, True)
+        
+    except Exception:
+        return (None, None, False)
+
+
+def _process_game_for_remove_tag(
+    game_pgn: str,
+    tag_name: str
+) -> Tuple[Optional[str], Optional[str], bool]:
+    """Process a single game for tag removal (for parallel execution).
+    
+    Args:
+        game_pgn: PGN string of the game.
+        tag_name: PGN tag name to remove.
+        
+    Returns:
+        Tuple of (new_pgn, None, updated) or (None, None, False) if failed/skipped.
+    """
+    try:
+        # Parse PGN
+        pgn_io = StringIO(game_pgn)
+        chess_game = chess.pgn.read_game(pgn_io)
+        
+        if not chess_game:
+            return (None, None, False)
+        
+        # Check if tag exists
+        if tag_name not in chess_game.headers:
+            # Tag doesn't exist, skip
+            return (None, None, False)
+        
+        # Remove tag
+        del chess_game.headers[tag_name]
+        
+        # Regenerate PGN
+        new_pgn = PgnService.export_game_to_pgn(chess_game)
+        
+        return (new_pgn, None, True)
+        
+    except Exception:
+        return (None, None, False)
 
 
 class BulkTagService:
@@ -39,7 +146,8 @@ class BulkTagService:
         tag_value: Optional[str] = None,
         source_tag: Optional[str] = None,
         game_indices: Optional[List[int]] = None,
-        progress_callback: Optional[Callable[[int, int, str], None]] = None
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        cancellation_check: Optional[Callable[[], bool]] = None
     ) -> BulkTagResult:
         """Add a tag to games.
         
@@ -50,6 +158,7 @@ class BulkTagService:
             source_tag: Optional source tag to copy value from. If provided, tag_value is ignored.
             game_indices: Optional list of game indices to process (None = all games).
             progress_callback: Optional callback function(game_index, total, message).
+            cancellation_check: Optional function that returns True if operation should be cancelled.
             
         Returns:
             BulkTagResult with operation statistics.
@@ -63,9 +172,6 @@ class BulkTagService:
             games_to_process = games
         
         total_games = len(games_to_process)
-        games_updated = 0
-        games_failed = 0
-        games_skipped = 0
         
         # If no games to process, return early
         if total_games == 0:
@@ -79,84 +185,83 @@ class BulkTagService:
                 games_skipped=0
             )
         
-        # Determine tag value source
-        if source_tag is not None:
-            # Copy from source tag
-            value_mode = "copy"
-        elif tag_value is not None and tag_value.strip():
-            # Use fixed value (non-empty)
-            value_mode = "fixed"
-        else:
-            # Empty value (tag_value is None or empty string)
-            value_mode = "empty"
+        # Determine worker count (reserve 1-2 cores for UI)
+        max_workers = max(1, os.cpu_count() - 2)
         
         # Collect all updated games for batch update
         updated_games = []
+        games_updated = 0
+        games_failed = 0
+        games_skipped = 0
         
-        # Process each game
-        for idx, game in enumerate(games_to_process):
-            if progress_callback:
-                progress_callback(idx, total_games, f"Processing game {idx + 1}/{total_games}")
+        executor = None
+        try:
+            executor = ProcessPoolExecutor(max_workers=max_workers)
             
-            try:
-                # Parse PGN
-                pgn_io = StringIO(game.pgn)
-                chess_game = chess.pgn.read_game(pgn_io)
+            # Submit all games for processing
+            future_to_game = {
+                executor.submit(
+                    _process_game_for_add_tag,
+                    game.pgn,
+                    tag_name,
+                    tag_value,
+                    source_tag
+                ): game
+                for game in games_to_process
+            }
+            
+            # Process results as they complete
+            completed = 0
+            tag_to_field_mapping = {
+                "White": "white",
+                "Black": "black",
+                "Result": "result",
+                "Date": "date",
+                "ECO": "eco",
+                "Event": "event",
+                "Site": "site",
+                "WhiteElo": "white_elo",
+                "BlackElo": "black_elo",
+            }
+            
+            for future in as_completed(future_to_game):
+                if cancellation_check and cancellation_check():
+                    # Cancel remaining futures
+                    for f in future_to_game:
+                        if f != future:
+                            f.cancel()
+                    break
                 
-                if not chess_game:
+                game = future_to_game[future]
+                completed += 1
+                
+                if progress_callback:
+                    progress_callback(completed, total_games, f"Processing game {completed}/{total_games}")
+                
+                try:
+                    new_pgn, new_field_value, updated = future.result()
+                    
+                    if updated and new_pgn:
+                        # Update game data
+                        game.pgn = new_pgn
+                        
+                        # Update corresponding GameData fields if tag maps to a field
+                        if tag_name in tag_to_field_mapping and new_field_value is not None:
+                            field_name = tag_to_field_mapping[tag_name]
+                            setattr(game, field_name, new_field_value)
+                        
+                        # Collect game for batch update
+                        updated_games.append(game)
+                        games_updated += 1
+                    elif new_pgn is None and updated is False:
+                        # Tag already exists or processing failed
+                        games_skipped += 1
+                except Exception:
                     games_failed += 1
-                    continue
-                
-                # Check if tag already exists - if so, skip this game
-                if tag_name in chess_game.headers:
-                    games_skipped += 1
-                    continue
-                
-                # Determine value to set
-                if value_mode == "copy":
-                    # Copy from source tag
-                    source_value = chess_game.headers.get(source_tag, "")
-                    new_value = source_value
-                elif value_mode == "fixed":
-                    # Use fixed value
-                    new_value = tag_value
-                else:
-                    # Empty value
-                    new_value = ""
-                
-                # Add tag (we know it doesn't exist from check above)
-                chess_game.headers[tag_name] = new_value
-                
-                # Regenerate PGN
-                new_pgn = PgnService.export_game_to_pgn(chess_game)
-                
-                # Update game data
-                game.pgn = new_pgn
-                
-                # Update corresponding GameData fields if tag maps to a field
-                tag_to_field_mapping = {
-                    "White": "white",
-                    "Black": "black",
-                    "Result": "result",
-                    "Date": "date",
-                    "ECO": "eco",
-                    "Event": "event",
-                    "Site": "site",
-                    "WhiteElo": "white_elo",
-                    "BlackElo": "black_elo",
-                }
-                
-                if tag_name in tag_to_field_mapping:
-                    field_name = tag_to_field_mapping[tag_name]
-                    setattr(game, field_name, new_value)
-                
-                # Collect game for batch update
-                updated_games.append(game)
-                games_updated += 1
-                
-            except Exception as e:
-                games_failed += 1
-                continue
+        
+        finally:
+            if executor:
+                executor.shutdown(wait=True)
         
         # Batch update all modified games with a single dataChanged signal
         if updated_games:
@@ -175,7 +280,8 @@ class BulkTagService:
         database: DatabaseModel,
         tag_name: str,
         game_indices: Optional[List[int]] = None,
-        progress_callback: Optional[Callable[[int, int, str], None]] = None
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        cancellation_check: Optional[Callable[[], bool]] = None
     ) -> BulkTagResult:
         """Remove a tag from games.
         
@@ -184,6 +290,7 @@ class BulkTagService:
             tag_name: PGN tag name to remove (e.g., "EventDate", "Round").
             game_indices: Optional list of game indices to process (None = all games).
             progress_callback: Optional callback function(game_index, total, message).
+            cancellation_check: Optional function that returns True if operation should be cancelled.
             
         Returns:
             BulkTagResult with operation statistics.
@@ -197,8 +304,6 @@ class BulkTagService:
             games_to_process = games
         
         total_games = len(games_to_process)
-        games_updated = 0
-        games_failed = 0
         
         # If no games to process, return early
         if total_games == 0:
@@ -212,61 +317,80 @@ class BulkTagService:
                 games_skipped=0
             )
         
+        # Determine worker count (reserve 1-2 cores for UI)
+        max_workers = max(1, os.cpu_count() - 2)
+        
         # Collect all updated games for batch update
         updated_games = []
+        games_updated = 0
+        games_failed = 0
         
-        # Process each game
-        for idx, game in enumerate(games_to_process):
-            if progress_callback:
-                progress_callback(idx, total_games, f"Processing game {idx + 1}/{total_games}")
+        executor = None
+        try:
+            executor = ProcessPoolExecutor(max_workers=max_workers)
             
-            try:
-                # Parse PGN
-                pgn_io = StringIO(game.pgn)
-                chess_game = chess.pgn.read_game(pgn_io)
+            # Submit all games for processing
+            future_to_game = {
+                executor.submit(
+                    _process_game_for_remove_tag,
+                    game.pgn,
+                    tag_name
+                ): game
+                for game in games_to_process
+            }
+            
+            # Process results as they complete
+            completed = 0
+            tag_to_field_mapping = {
+                "White": "white",
+                "Black": "black",
+                "Result": "result",
+                "Date": "date",
+                "ECO": "eco",
+                "Event": "event",
+                "Site": "site",
+                "WhiteElo": "white_elo",
+                "BlackElo": "black_elo",
+            }
+            
+            for future in as_completed(future_to_game):
+                if cancellation_check and cancellation_check():
+                    # Cancel remaining futures
+                    for f in future_to_game:
+                        if f != future:
+                            f.cancel()
+                    break
                 
-                if not chess_game:
+                game = future_to_game[future]
+                completed += 1
+                
+                if progress_callback:
+                    progress_callback(completed, total_games, f"Processing game {completed}/{total_games}")
+                
+                try:
+                    new_pgn, _, updated = future.result()
+                    
+                    if updated and new_pgn:
+                        # Update game data
+                        game.pgn = new_pgn
+                        
+                        # Update corresponding GameData fields if tag maps to a field
+                        if tag_name in tag_to_field_mapping:
+                            field_name = tag_to_field_mapping[tag_name]
+                            setattr(game, field_name, "")
+                        
+                        # Collect game for batch update
+                        updated_games.append(game)
+                        games_updated += 1
+                    elif new_pgn is None and updated is False:
+                        # Tag doesn't exist or processing failed
+                        pass
+                except Exception:
                     games_failed += 1
-                    continue
-                
-                # Check if tag exists
-                if tag_name not in chess_game.headers:
-                    # Tag doesn't exist, skip
-                    continue
-                
-                # Remove tag
-                del chess_game.headers[tag_name]
-                
-                # Regenerate PGN
-                new_pgn = PgnService.export_game_to_pgn(chess_game)
-                
-                # Update game data
-                game.pgn = new_pgn
-                
-                # Update corresponding GameData fields if tag maps to a field
-                tag_to_field_mapping = {
-                    "White": "white",
-                    "Black": "black",
-                    "Result": "result",
-                    "Date": "date",
-                    "ECO": "eco",
-                    "Event": "event",
-                    "Site": "site",
-                    "WhiteElo": "white_elo",
-                    "BlackElo": "black_elo",
-                }
-                
-                if tag_name in tag_to_field_mapping:
-                    field_name = tag_to_field_mapping[tag_name]
-                    setattr(game, field_name, "")
-                
-                # Collect game for batch update
-                updated_games.append(game)
-                games_updated += 1
-                
-            except Exception as e:
-                games_failed += 1
-                continue
+        
+        finally:
+            if executor:
+                executor.shutdown(wait=True)
         
         # Batch update all modified games with a single dataChanged signal
         if updated_games:

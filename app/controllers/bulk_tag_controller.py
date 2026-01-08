@@ -135,6 +135,10 @@ class BulkTagController(QObject):
             self.progress_service.set_progress(percent)
             self.progress_service.set_status(f"Bulk Tag: {message}")
         
+        # Cancel flag
+        def cancel_flag() -> bool:
+            return self._cancelled
+        
         # Perform operation
         result = self.service.add_tag(
             database,
@@ -142,7 +146,8 @@ class BulkTagController(QObject):
             tag_value,
             source_tag,
             game_indices,
-            progress_callback
+            progress_callback,
+            cancel_flag
         )
         
         # Hide progress
@@ -208,12 +213,17 @@ class BulkTagController(QObject):
             self.progress_service.set_progress(percent)
             self.progress_service.set_status(f"Bulk Tag: {message}")
         
+        # Cancel flag
+        def cancel_flag() -> bool:
+            return self._cancelled
+        
         # Perform operation
         result = self.service.remove_tag(
             database,
             tag_name,
             game_indices,
-            progress_callback
+            progress_callback,
+            cancel_flag
         )
         
         # Hide progress
