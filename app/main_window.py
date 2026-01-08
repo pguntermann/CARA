@@ -1700,7 +1700,8 @@ class MainWindow(QMainWindow):
                         black_elo=game.black_elo,
                         analyzed=game.analyzed,
                         annotated=getattr(game, "annotated", False),
-                        source_database=db_name
+                        source_database=db_name,
+                        file_position=0  # Search results don't have file position
                     )
                     search_results_model.add_game(game_copy)
                 

@@ -25,7 +25,8 @@ class GameData:
                  black_elo: str = "",
                  analyzed: bool = False,
                  annotated: bool = False,
-                 source_database: str = "") -> None:
+                 source_database: str = "",
+                 file_position: int = 0) -> None:
         """Initialize game data.
         
         Args:
@@ -44,6 +45,7 @@ class GameData:
                 analyzed: Whether the game has been analyzed (has CARAAnalysisData tag).
                 annotated: Whether the game has saved annotations (has CARAAnnotations tag).
             source_database: Name of the database this game came from (for search results).
+            file_position: Original position of game in file (1-based, 0 if not from file).
         """
         self.game_number = game_number
         self.white = white
@@ -60,6 +62,7 @@ class GameData:
         self.analyzed = analyzed
         self.annotated = annotated
         self.source_database = source_database
+        self.file_position = file_position
 
 
 class DatabaseModel(QAbstractTableModel):
@@ -72,21 +75,22 @@ class DatabaseModel(QAbstractTableModel):
     
     # Column indices
     COL_NUM = 0
-    COL_UNSAVED = 1
-    COL_WHITE = 2
-    COL_BLACK = 3
-    COL_WHITE_ELO = 4
-    COL_BLACK_ELO = 5
-    COL_RESULT = 6
-    COL_DATE = 7
-    COL_EVENT = 8
-    COL_SITE = 9
-    COL_MOVES = 10
-    COL_ECO = 11
-    COL_ANALYZED = 12
-    COL_ANNOTATED = 13
-    COL_SOURCE_DB = 14
-    COL_PGN = 15
+    COL_FILE_NUM = 1
+    COL_UNSAVED = 2
+    COL_WHITE = 3
+    COL_BLACK = 4
+    COL_WHITE_ELO = 5
+    COL_BLACK_ELO = 6
+    COL_RESULT = 7
+    COL_DATE = 8
+    COL_EVENT = 9
+    COL_SITE = 10
+    COL_MOVES = 11
+    COL_ECO = 12
+    COL_ANALYZED = 13
+    COL_ANNOTATED = 14
+    COL_SOURCE_DB = 15
+    COL_PGN = 16
     
     def __init__(self) -> None:
         """Initialize the database model."""
@@ -113,9 +117,9 @@ class DatabaseModel(QAbstractTableModel):
             parent: Parent index (unused for table models).
             
         Returns:
-            Number of columns (16: #, ●, White, Black, WhiteElo, BlackElo, Result, Date, Event, Site, Moves, ECO, Analyzed, Annotated, Source DB, PGN).
+            Number of columns (17: #, # in File, ●, White, Black, WhiteElo, BlackElo, Result, Date, Event, Site, Moves, ECO, Analyzed, Annotated, Source DB, PGN).
         """
-        return 16
+        return 17
     
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         """Get item flags for the given index.
@@ -174,6 +178,9 @@ class DatabaseModel(QAbstractTableModel):
         
         if col == self.COL_NUM:
             return game.game_number
+        elif col == self.COL_FILE_NUM:
+            # Return file position if available, empty string otherwise
+            return game.file_position if game.file_position > 0 else ""
         elif col == self.COL_WHITE:
             return game.white
         elif col == self.COL_BLACK:
@@ -221,7 +228,7 @@ class DatabaseModel(QAbstractTableModel):
             return None
         
         if orientation == Qt.Orientation.Horizontal:
-            headers = ["#", "●", "White", "Black", "WhiteElo", "BlackElo", "Result", "Date", "Event", "Site", "Moves", "ECO", "Analyzed", "Annotated", "Source DB", "PGN"]
+            headers = ["#", "# in File", "●", "White", "Black", "WhiteElo", "BlackElo", "Result", "Date", "Event", "Site", "Moves", "ECO", "Analyzed", "Annotated", "Source DB", "PGN"]
             if 0 <= section < len(headers):
                 return headers[section]
         
@@ -576,6 +583,14 @@ class DatabaseModel(QAbstractTableModel):
             """
             if column == self.COL_NUM:
                 return game.game_number
+            elif column == self.COL_FILE_NUM:
+                # Sort by file position (use tuple to ensure None sorts last)
+                # Return (0, position) for file games, (1, 0) for non-file games
+                # This ensures file games sort first, then non-file games
+                if game.file_position > 0:
+                    return (0, game.file_position)
+                else:
+                    return (1, 0)
             elif column == self.COL_WHITE:
                 return game.white or ""
             elif column == self.COL_BLACK:

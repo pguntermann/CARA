@@ -143,6 +143,7 @@ class DatabaseController:
                 black_elo=game_dict.get("black_elo", ""),
                 analyzed=game_dict.get("analyzed", False),
                 annotated=game_dict.get("annotated", False),
+                file_position=0,  # Pasted games don't have file position
             )
             model.add_game(game_data)
             games_added += 1
@@ -485,7 +486,7 @@ class DatabaseController:
             
             # Convert parsed games to GameData instances
             games = []
-            for i, game_dict in enumerate(parse_result.games):
+            for file_pos, game_dict in enumerate(parse_result.games, start=1):
                 game_data = GameData(
                     game_number=0,  # Will be set by model when adding
                     white=game_dict.get("white", ""),
@@ -501,21 +502,22 @@ class DatabaseController:
                     black_elo=game_dict.get("black_elo", ""),
                     analyzed=game_dict.get("analyzed", False),
                     annotated=game_dict.get("annotated", False),
+                    file_position=file_pos,  # Store original file position (1-based)
                 )
                 games.append(game_data)
                 
                 # Update progress more frequently for better feedback
                 # Update every 10 games, or every game for first 10, or on last game
                 should_update = (
-                    (i + 1) <= 10 or  # First 10 games for immediate feedback
-                    (i + 1) % 10 == 0 or  # Every 10 games after that
-                    (i + 1) == total_games  # Always on last game
+                    file_pos <= 10 or  # First 10 games for immediate feedback
+                    file_pos % 10 == 0 or  # Every 10 games after that
+                    file_pos == total_games  # Always on last game
                 )
                 
                 if should_update:
-                    progress_percent = int(((i + 1) / total_games) * 100)
+                    progress_percent = int((file_pos / total_games) * 100)
                     progress_service.report_progress(
-                        f"Processing game {i + 1}/{total_games}...",
+                        f"Processing game {file_pos}/{total_games}...",
                         progress_percent
                     )
                     QApplication.processEvents()  # Process events to update progress bar
@@ -584,7 +586,7 @@ class DatabaseController:
             model.clear()
             
             # Convert parsed games to GameData instances and add to model
-            for game_dict in parse_result.games:
+            for file_pos, game_dict in enumerate(parse_result.games, start=1):
                 game_data = GameData(
                     game_number=0,  # Will be set by model when adding
                     white=game_dict.get("white", ""),
@@ -600,6 +602,7 @@ class DatabaseController:
                     black_elo=game_dict.get("black_elo", ""),
                     analyzed=game_dict.get("analyzed", False),
                     annotated=game_dict.get("annotated", False),
+                    file_position=file_pos,  # Store original file position (1-based)
                 )
                 # Don't mark as unsaved when reloading from file (games are already saved)
                 model.add_game(game_data, mark_unsaved=False)
@@ -670,7 +673,8 @@ class DatabaseController:
             new_model = DatabaseModel()
             
             # Copy all games from the original model to the new model
-            for i, game in enumerate(games):
+            # Set file_position based on their order in the newly saved file (1-based)
+            for file_pos, game in enumerate(games, start=1):
                 # Create a new GameData instance with the same data
                 new_game = GameData(
                     game_number=0,  # Will be set by model when adding
@@ -687,21 +691,22 @@ class DatabaseController:
                     black_elo=game.black_elo,
                     analyzed=game.analyzed,
                     annotated=getattr(game, "annotated", False),
+                    file_position=file_pos,  # Set file position based on order in new file
                 )
                 # Mark as saved since these games are being saved to the new file
                 new_model.add_game(new_game, mark_unsaved=False)
                 
                 # Update progress every 10 games or on last game
                 should_update = (
-                    (i + 1) <= 10 or  # First 10 games for immediate feedback
-                    (i + 1) % 10 == 0 or  # Every 10 games after that
-                    (i + 1) == total_games  # Always on last game
+                    file_pos <= 10 or  # First 10 games for immediate feedback
+                    file_pos % 10 == 0 or  # Every 10 games after that
+                    file_pos == total_games  # Always on last game
                 )
                 
                 if should_update:
-                    progress_percent = int(((i + 1) / total_games) * 50)  # First 50% for copying
+                    progress_percent = int((file_pos / total_games) * 50)  # First 50% for copying
                     progress_service.report_progress(
-                        f"Copying game {i + 1}/{total_games}...",
+                        f"Copying game {file_pos}/{total_games}...",
                         progress_percent
                     )
                     QApplication.processEvents()  # Process events to update progress bar

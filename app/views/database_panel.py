@@ -226,7 +226,8 @@ class DatabasePanel(QWidget):
         widths_config = panel_config.get('table', {}).get('column_widths', {})
         self._column_widths = [
             widths_config.get('col_num', 50),
-            widths_config.get('col_unsaved', 25),  # Narrow column for unsaved indicator icon (second column)
+            widths_config.get('col_file_num', 70),
+            widths_config.get('col_unsaved', 25),  # Narrow column for unsaved indicator icon
             widths_config.get('col_white', 170),
             widths_config.get('col_black', 170),
             widths_config.get('col_white_elo', 80),

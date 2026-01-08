@@ -1955,6 +1955,7 @@
         "table": {
           "columns": {
             "col_num": "#",
+            "col_file_num": "# in File",
             "col_white": "White",
             "col_black": "Black",
             "col_white_elo": "WhiteElo",
@@ -1972,6 +1973,7 @@
           },
           "column_widths": {
             "col_num": 50,
+            "col_file_num": 70,
             "col_white": 170,
             "col_black": 170,
             "col_white_elo": 80,
