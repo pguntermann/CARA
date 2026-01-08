@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from app.models.database_model import DatabaseModel, GameData
 from app.services.uci_communication_service import UCICommunicationService
 from app.services.opening_service import OpeningService
+from app.services.pgn_service import PgnService
 
 
 @dataclass
@@ -167,8 +168,7 @@ class BulkReplaceService:
                         chess_game.headers[tag_name] = new_value
                         
                         # Regenerate PGN
-                        exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
-                        new_pgn = chess_game.accept(exporter).strip()
+                        new_pgn = PgnService.export_game_to_pgn(chess_game)
                         
                         # Update game data
                         game.pgn = new_pgn
@@ -283,8 +283,7 @@ class BulkReplaceService:
                     chess_game.headers[target_tag] = source_value
                     
                     # Regenerate PGN
-                    exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
-                    new_pgn = chess_game.accept(exporter).strip()
+                    new_pgn = PgnService.export_game_to_pgn(chess_game)
                     
                     # Update game data
                     game.pgn = new_pgn
@@ -519,8 +518,7 @@ class BulkReplaceService:
                     chess_game.headers["Result"] = result
                     
                     # Regenerate PGN
-                    exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
-                    new_pgn = chess_game.accept(exporter).strip()
+                    new_pgn = PgnService.export_game_to_pgn(chess_game)
                     
                     # Update game data
                     game.pgn = new_pgn
@@ -762,8 +760,7 @@ class BulkReplaceService:
                 chess_game.headers["ECO"] = eco_code
                 
                 # Regenerate PGN
-                exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
-                new_pgn = chess_game.accept(exporter).strip()
+                new_pgn = PgnService.export_game_to_pgn(chess_game)
                 
                 # Update game data
                 game.pgn = new_pgn

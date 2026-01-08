@@ -2,7 +2,9 @@
 
 import chess.pgn
 import io
-from typing import Optional, List, Dict, Any, Callable
+import json
+from pathlib import Path
+from typing import Optional, List, Dict, Any, Callable, Tuple
 from datetime import datetime
 
 
@@ -28,6 +30,9 @@ class PgnService:
     This service handles parsing PGN text using python-chess and extracting
     game metadata and move data.
     """
+    
+    # Cache for PGN export configuration (loaded lazily on first use)
+    _export_config_cache: Optional[Tuple[bool, int]] = None
     
     @staticmethod
     def parse_pgn_text(pgn_text: str, progress_callback: Optional[Callable[[int, str], None]] = None) -> PgnParseResult:
@@ -192,6 +197,131 @@ class PgnService:
             return PgnParseResult(False, error_message=f"Error parsing PGN: {str(e)}")
     
     @staticmethod
+    def _get_export_config() -> Tuple[bool, int]:
+        """Get PGN export configuration from config.json (cached).
+        
+        Returns:
+            Tuple of (use_fixed_width: bool, fixed_width: int).
+        """
+        if PgnService._export_config_cache is None:
+            try:
+                # Read config file directly without validation to avoid potential issues
+                config_dir = Path(__file__).parent.parent / "config"
+                config_path = config_dir / "config.json"
+                
+                if config_path.exists():
+                    with open(config_path, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+                    pgn_config = config.get('pgn', {}).get('export', {})
+                    use_fixed_width = pgn_config.get('use_fixed_width', True)
+                    fixed_width = pgn_config.get('fixed_width', 80)
+                    PgnService._export_config_cache = (use_fixed_width, fixed_width)
+                else:
+                    # Config file doesn't exist - use defaults
+                    PgnService._export_config_cache = (True, 80)
+            except Exception:
+                # Any error reading config - use defaults
+                PgnService._export_config_cache = (True, 80)
+        return PgnService._export_config_cache
+    
+    @staticmethod
+    def _normalize_pgn_line_breaks(pgn_text: str, use_fixed_width: bool, fixed_width: int) -> str:
+        """Normalize line breaks in PGN move notation.
+        
+        Args:
+            pgn_text: PGN text from StringExporter.
+            use_fixed_width: If True, enforce fixed width; if False, single line.
+            fixed_width: Character width limit when use_fixed_width is True.
+            
+        Returns:
+            Normalized PGN text with line breaks adjusted.
+        """
+        try:
+            # Split into headers and move notation
+            parts = pgn_text.split('\n\n', 1)
+            if len(parts) < 2:
+                return pgn_text  # No move section, return as-is
+            
+            headers = parts[0]
+            moves = parts[1]
+            
+            if not use_fixed_width:
+                # Single line: remove all line breaks in move notation
+                moves_normalized = moves.replace('\n', ' ').replace('  ', ' ').strip()
+            else:
+                # Fixed width: remove premature line breaks (before width limit)
+                # First, remove all line breaks and rebuild with proper width enforcement
+                moves_single_line = moves.replace('\n', ' ').replace('  ', ' ').strip()
+                
+                # Now rebuild with proper line breaks at width limit
+                normalized_lines = []
+                words = moves_single_line.split(' ')
+                current_line = ''
+                
+                for word in words:
+                    if not word:
+                        continue
+                    
+                    # Check if adding this word would exceed width
+                    if current_line:
+                        test_line = current_line + ' ' + word
+                    else:
+                        test_line = word
+                    
+                    if len(test_line) <= fixed_width:
+                        # Can add to current line
+                        if current_line:
+                            current_line += ' ' + word
+                        else:
+                            current_line = word
+                    else:
+                        # Would exceed width - start new line
+                        if current_line:
+                            normalized_lines.append(current_line)
+                        current_line = word
+                
+                # Add the last line if it exists
+                if current_line:
+                    normalized_lines.append(current_line)
+                
+                # Join normalized lines back together
+                moves_normalized = '\n'.join(normalized_lines)
+            
+            # Rejoin headers and moves
+            return headers + '\n\n' + moves_normalized
+        except Exception:
+            # If normalization fails for any reason, return original text
+            return pgn_text
+    
+    @staticmethod
+    def export_game_to_pgn(chess_game: chess.pgn.Game) -> str:
+        """Export chess.pgn.Game to PGN string with consistent formatting.
+        
+        This method centralizes PGN export logic to ensure consistent formatting
+        across the application. All StringExporter usage should go through this method
+        to enable future formatting fixes (e.g., line break handling).
+        
+        Args:
+            chess_game: chess.pgn.Game instance to export.
+            
+        Returns:
+            PGN string representation of the game.
+        """
+        # Get cached export configuration
+        use_fixed_width, fixed_width = PgnService._get_export_config()
+        
+        # Export with appropriate column setting
+        if use_fixed_width:
+            exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=fixed_width)
+        else:
+            exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
+        
+        pgn_text = chess_game.accept(exporter).strip()
+        
+        # Normalize line breaks based on configuration
+        return PgnService._normalize_pgn_line_breaks(pgn_text, use_fixed_width, fixed_width)
+    
+    @staticmethod
     def _extract_game_data(game: chess.pgn.Game) -> Optional[Dict[str, Any]]:
         """Extract game data from a chess.pgn.Game object.
         
@@ -238,8 +368,7 @@ class PgnService:
             
             # Extract PGN text for this game
             # Export the game as PGN string
-            exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
-            game_pgn = game.accept(exporter).strip()
+            game_pgn = PgnService.export_game_to_pgn(game)
             
             # Check if CARAAnalysisData tag exists (check both headers and exported PGN for robustness)
             # Check headers first (most reliable)

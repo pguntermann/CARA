@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional, List, Tuple
 from app.models.metadata_model import MetadataModel
 from app.models.game_model import GameModel
 from app.models.database_model import DatabaseModel
+from app.services.pgn_service import PgnService
 import chess.pgn
 import io
 
@@ -514,8 +515,7 @@ class DetailMetadataView(QWidget):
                 chess_game.headers[tag_name] = new_value
                 
                 # Regenerate the PGN text
-                exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
-                new_pgn = chess_game.accept(exporter).strip()
+                new_pgn = PgnService.export_game_to_pgn(chess_game)
                 
                 # Update the game's PGN
                 game.pgn = new_pgn
@@ -695,8 +695,7 @@ class DetailMetadataView(QWidget):
                 chess_game.headers[tag_name] = tag_value
                 
                 # Regenerate the PGN text
-                exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
-                new_pgn = chess_game.accept(exporter).strip()
+                new_pgn = PgnService.export_game_to_pgn(chess_game)
                 
                 # Update the game's PGN
                 game.pgn = new_pgn
@@ -774,8 +773,7 @@ class DetailMetadataView(QWidget):
                     del chess_game.headers[tag_name]
                 
                 # Regenerate the PGN text
-                exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
-                new_pgn = chess_game.accept(exporter).strip()
+                new_pgn = PgnService.export_game_to_pgn(chess_game)
                 
                 # Update the game's PGN
                 game.pgn = new_pgn

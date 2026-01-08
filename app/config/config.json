@@ -4692,6 +4692,12 @@
       ]
     }
   },
+  "pgn": {
+    "export": {
+      "use_fixed_width": true,
+      "fixed_width": 80
+    }
+  },
   "debug": {
     "show_debug_menu": false,
     "enable_debug_backgrounds": false,

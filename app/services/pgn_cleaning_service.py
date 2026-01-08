@@ -1,7 +1,10 @@
 """Service for cleaning PGN notation by removing comments, variations, annotations, etc."""
 
+import chess.pgn
+from io import StringIO
 from app.models.database_model import GameData
 from app.services.pgn_formatter_service import PgnFormatterService
+from app.services.pgn_service import PgnService
 
 
 class PgnCleaningService:
@@ -29,8 +32,15 @@ class PgnCleaningService:
         
         try:
             # Use PgnFormatterService to remove comments (preserves metadata tags)
-            game.pgn = PgnFormatterService._remove_comments(game.pgn)
-            return True
+            cleaned_pgn = PgnFormatterService._remove_comments(game.pgn)
+            
+            # Re-export through PgnService to apply proper formatting
+            pgn_io = StringIO(cleaned_pgn)
+            chess_game = chess.pgn.read_game(pgn_io)
+            if chess_game:
+                game.pgn = PgnService.export_game_to_pgn(chess_game)
+                return True
+            return False
         except Exception:
             # On any error, return False
             return False
@@ -50,8 +60,15 @@ class PgnCleaningService:
         
         try:
             # Use PgnFormatterService to remove variations (preserves metadata tags)
-            game.pgn = PgnFormatterService._remove_variations(game.pgn)
-            return True
+            cleaned_pgn = PgnFormatterService._remove_variations(game.pgn)
+            
+            # Re-export through PgnService to apply proper formatting
+            pgn_io = StringIO(cleaned_pgn)
+            chess_game = chess.pgn.read_game(pgn_io)
+            if chess_game:
+                game.pgn = PgnService.export_game_to_pgn(chess_game)
+                return True
+            return False
         except Exception:
             # On any error, return False
             return False
@@ -71,8 +88,15 @@ class PgnCleaningService:
         
         try:
             # Use PgnFormatterService to remove non-standard tags (preserves metadata tags)
-            game.pgn = PgnFormatterService._remove_non_standard_tags(game.pgn)
-            return True
+            cleaned_pgn = PgnFormatterService._remove_non_standard_tags(game.pgn)
+            
+            # Re-export through PgnService to apply proper formatting
+            pgn_io = StringIO(cleaned_pgn)
+            chess_game = chess.pgn.read_game(pgn_io)
+            if chess_game:
+                game.pgn = PgnService.export_game_to_pgn(chess_game)
+                return True
+            return False
         except Exception:
             # On any error, return False
             return False
@@ -96,8 +120,15 @@ class PgnCleaningService:
         try:
             # Use PgnFormatterService to remove annotations (preserves metadata tags)
             # This fixes the bug where annotations in metadata tags were being removed
-            game.pgn = PgnFormatterService._remove_annotations(game.pgn)
-            return True
+            cleaned_pgn = PgnFormatterService._remove_annotations(game.pgn)
+            
+            # Re-export through PgnService to apply proper formatting
+            pgn_io = StringIO(cleaned_pgn)
+            chess_game = chess.pgn.read_game(pgn_io)
+            if chess_game:
+                game.pgn = PgnService.export_game_to_pgn(chess_game)
+                return True
+            return False
         except Exception:
             # On any error, return False
             return False
@@ -119,8 +150,15 @@ class PgnCleaningService:
         
         try:
             # Use PgnFormatterService to remove results (preserves metadata tags)
-            game.pgn = PgnFormatterService._remove_results(game.pgn)
-            return True
+            cleaned_pgn = PgnFormatterService._remove_results(game.pgn)
+            
+            # Re-export through PgnService to apply proper formatting
+            pgn_io = StringIO(cleaned_pgn)
+            chess_game = chess.pgn.read_game(pgn_io)
+            if chess_game:
+                game.pgn = PgnService.export_game_to_pgn(chess_game)
+                return True
+            return False
         except Exception:
             # On any error, return False
             return False

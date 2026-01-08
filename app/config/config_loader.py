@@ -1281,6 +1281,8 @@ class ConfigLoader:
             'ai.api_endpoints.anthropic.models',
             'resources.ecolists_path',
             'resources.opening_repeat_indicator',
+            'pgn.export.use_fixed_width',
+            'pgn.export.fixed_width',
             'debug.enable_debug_backgrounds',
             'debug.background_color_debug_mainpanel',
             'debug.background_color_debug_detailpanel',

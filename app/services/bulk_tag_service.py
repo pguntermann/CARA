@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional, List, Callable
 from dataclasses import dataclass
 
 from app.models.database_model import DatabaseModel, GameData
+from app.services.pgn_service import PgnService
 
 
 @dataclass
@@ -127,8 +128,7 @@ class BulkTagService:
                 chess_game.headers[tag_name] = new_value
                 
                 # Regenerate PGN
-                exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
-                new_pgn = chess_game.accept(exporter).strip()
+                new_pgn = PgnService.export_game_to_pgn(chess_game)
                 
                 # Update game data
                 game.pgn = new_pgn
@@ -238,8 +238,7 @@ class BulkTagService:
                 del chess_game.headers[tag_name]
                 
                 # Regenerate PGN
-                exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
-                new_pgn = chess_game.accept(exporter).strip()
+                new_pgn = PgnService.export_game_to_pgn(chess_game)
                 
                 # Update game data
                 game.pgn = new_pgn

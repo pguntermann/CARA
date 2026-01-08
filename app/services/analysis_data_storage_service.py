@@ -12,6 +12,7 @@ from datetime import datetime
 import chess.pgn
 
 from app.models.moveslist_model import MoveData
+from app.services.pgn_service import PgnService
 from app.models.database_model import GameData
 
 
@@ -196,8 +197,7 @@ class AnalysisDataStorageService:
             chess_game.headers[AnalysisDataStorageService.TAG_CHECKSUM] = checksum
             
             # Regenerate PGN text
-            exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
-            new_pgn = chess_game.accept(exporter).strip()
+            new_pgn = PgnService.export_game_to_pgn(chess_game)
             
             # Update game's PGN
             game.pgn = new_pgn
@@ -377,8 +377,7 @@ class AnalysisDataStorageService:
                 del chess_game.headers[AnalysisDataStorageService.TAG_CHECKSUM]
             
             # Regenerate PGN text
-            exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
-            new_pgn = chess_game.accept(exporter).strip()
+            new_pgn = PgnService.export_game_to_pgn(chess_game)
             
             # Update game's PGN
             game.pgn = new_pgn
