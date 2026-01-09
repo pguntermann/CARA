@@ -660,6 +660,10 @@
                 </ul>
                 <p>The content is displayed in a formatted, color-coded view with syntax highlighting to distinguish between different elements.</p>
                 
+                <div class="tip-box">
+                    <strong>Quick Tip:</strong> You can customize the colors, fonts, and display format (e.g., whether annotations appear as symbols or text, whether NAGs show as text descriptions) by editing <code>config.json</code>. See <a href="#customizing-pgn-display-formatting">section 7.1.6 "Customizing PGN Display Formatting"</a> for advanced customization options.
+                </div>
+                
                 <p>As you navigate through the game using the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys, the active move is highlighted in the PGN notation. Alternatively, you can click on any main-line move in the PGN notation to jump directly to that position in the game. Note that clicking on variation moves, comments, or metadata tags does not trigger navigation—only main-line moves are clickable.</p>
                 
                 <img src="screenshots/detail_panel.png" alt="CARA Detail Panel - Right-side panel showing PGN notation pane at the top and seven tabs below (Moves List, Metadata, Manual Analysis, Game Summary, Player Stats, Annotations, AI Summary) for detailed game analysis" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
@@ -2067,6 +2071,129 @@
             </div>
             
             <div class="outline-item">
+                <h5 id="configuring-pgn-import-settings">7.1.5 Configuring PGN Import Settings</h5>
+                <p>CARA allows you to configure how PGN files are processed when importing games. The PGN import settings control character handling during file loading.</p>
+                
+                <p>To configure PGN import settings:</p>
+                <ol>
+                    <li><strong>Locate the PGN import configuration:</strong><br>
+                    Open <code>config.json</code> in a text editor and navigate to: <code>pgn → import</code></li>
+                    
+                    <li><strong>Modify the import settings:</strong><br>
+                    You'll find the following property:
+                    <ul>
+                        <li><code>"strip_pua_characters": true</code> - When <code>true</code>, removes Unicode Private Use Area (PUA) characters (U+E000-U+F8FF) from PGN text during import. These characters are used by ChessBase and other chess software for special font symbols. When fonts don't support these characters, they appear as blue boxes or other visual artifacts. Setting this to <code>true</code> removes them automatically during import to ensure clean PGN text.</li>
+                    </ul>
+                    Example configuration:
+                    <pre><code>"pgn": {
+    "import": {
+        "strip_pua_characters": true
+    }
+}</code></pre>
+                    </li>
+                    
+                    <li><strong>Save and restart:</strong><br>
+                    Save the file and restart CARA for the changes to take effect. The new settings will apply to all future import operations (opening PGN files, pasting PGN text, importing from online platforms).</li>
+                </ol>
+            </div>
+            
+            <div class="outline-item">
+                <h5 id="customizing-pgn-display-formatting">7.1.6 Customizing PGN Display Formatting</h5>
+                <p>CARA allows you to customize the visual appearance of PGN notation in the Detail Panel, including colors, fonts, and how annotations and NAGs are displayed.</p>
+                
+                <p>To customize PGN display formatting:</p>
+                <ol>
+                    <li><strong>Locate the PGN formatting configuration:</strong><br>
+                    Open <code>config.json</code> in a text editor and navigate to: <code>ui → panels → detail → pgn_notation → formatting</code></li>
+                    
+                    <li><strong>Modify formatting settings:</strong><br>
+                    You'll find several categories of formatting options:<br><br>
+                    
+                    <p><strong>Element Colors and Styling:</strong></p>
+                    <ul>
+                        <li><code>"headers"</code> - Color and bold styling for PGN header tags (Event, Site, Date, etc.)</li>
+                        <li><code>"move_numbers"</code> - Color and bold styling for move numbers (1., 2., etc.)</li>
+                        <li><code>"moves"</code> - Color and bold styling for chess moves (e4, Nf3, etc.)</li>
+                        <li><code>"comments"</code> - Color and italic styling for move comments</li>
+                        <li><code>"variations"</code> - Color and italic styling for move variations (alternative lines)</li>
+                        <li><code>"results"</code> - Color and bold styling for game results (1-0, 0-1, 1/2-1/2)</li>
+                    </ul>
+                    
+                    <p><strong>Active Move Highlighting:</strong></p>
+                    <ul>
+                        <li><code>"active_move"</code> - Background color, text color, and bold styling for the currently active move in the main line</li>
+                        <li><code>"active_move_variation"</code> - Background color, text color, bold, and italic styling for the active move when it's in a variation</li>
+                    </ul>
+                    
+                    <p><strong>Annotation Display Settings:</strong></p>
+                    <ul>
+                        <li><code>"annotations.use_symbols"</code> - When <code>true</code>, symbol-based annotations (!, !!, ?, ??, !?, ?!) are displayed as symbols. When <code>false</code>, they are displayed as text descriptions.</li>
+                        <li><code>"annotations.good"</code> - Color and bold styling for good move annotations (!)</li>
+                        <li><code>"annotations.bad"</code> - Color and bold styling for poor move annotations (?)</li>
+                        <li><code>"annotations.interesting"</code> - Color and bold styling for interesting move annotations (!?)</li>
+                        <li><code>"annotations.dubious"</code> - Color and bold styling for dubious move annotations (?!)</li>
+                    </ul>
+                    
+                    <p><strong>NAG (Numeric Annotation Glyph) Settings:</strong></p>
+                    <ul>
+                        <li><code>"nags.show_text"</code> - When <code>true</code>, NAGs are displayed as readable text descriptions in parentheses (e.g., "good move", "poor move", "White has a slight advantage"). When <code>false</code>, NAGs are displayed as symbols or numbers.</li>
+                        <li><code>"nags.color"</code> - Text color for NAG text</li>
+                        <li><code>"nags.bold"</code> - Whether NAG text is displayed in bold</li>
+                        <li><code>"nags.italic"</code> - Whether NAG text is displayed in italic</li>
+                    </ul>
+                    </li>
+                </ol>
+                
+                <ol start="3">
+                    <li><strong>Example configuration:</strong><br>
+                    <pre><code>"formatting": {
+    "headers": {
+        "color": [100, 150, 255],
+        "bold": true
+    },
+    "moves": {
+        "color": [220, 220, 220],
+        "bold": false
+    },
+    "annotations": {
+        "use_symbols": true,
+        "good": {
+            "color": [100, 255, 100],
+            "bold": true
+        }
+    },
+    "nags": {
+        "color": [200, 150, 255],
+        "bold": false,
+        "italic": true,
+        "show_text": true
+    },
+    "comments": {
+        "color": [180, 200, 255],
+        "italic": true
+    },
+    "variations": {
+        "color": [180, 180, 180],
+        "italic": true
+    },
+    "results": {
+        "color": [255, 255, 100],
+        "bold": true
+    },
+    "active_move": {
+        "background_color": [100, 120, 180],
+        "text_color": [255, 255, 255],
+        "bold": true
+    }
+}</code></pre>
+                    </li>
+                    
+                    <li><strong>Save and restart:</strong><br>
+                    Save the file and restart CARA for the changes to take effect. The new formatting will apply to all PGN notation displayed in the Detail Panel.</li>
+                </ol>
+            </div>
+            
+            <div class="outline-item">
                 <h4 id="understanding-user-settings">7.2 Understanding user_settings.json</h4>
                 <p>The <code>user_settings.json</code> file stores your personal preferences and settings. While most settings are managed through the application interface, understanding the file structure can be helpful for advanced users who want to manually edit settings or transfer configurations between installations.</p>
                 
@@ -2411,7 +2538,7 @@
                     <li><strong><code>blunders</code>:</strong> Number of blunders made by the player (integer)</li>
                     <li><strong><code>mistakes</code>:</strong> Number of mistakes made by the player (integer)</li>
                     <li><strong><code>inaccuracies</code>:</strong> Number of inaccuracies made by the player (integer)</li>
-                    <li><strong><code>misses</code>:</strong> Number of missed opportunities (brilliant moves not played) (integer)</li>
+                    <li><strong><code>misses</code>:</strong> Number of missed opportunities (e.g., missing a checkmate, missing a winning move, or missing a critical tactical opportunity) (integer)</li>
                     <li><strong><code>best_moves</code>:</strong> Number of best moves played (integer)</li>
                     <li><strong><code>good_moves</code>:</strong> Number of good moves played (integer)</li>
                     <li><strong><code>brilliant_moves</code>:</strong> Number of brilliant moves played (integer)</li>
