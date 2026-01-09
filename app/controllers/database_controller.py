@@ -13,6 +13,54 @@ from app.models.database_panel_model import DatabasePanelModel
 from app.services.pgn_service import PgnService
 
 
+def _read_pgn_file_with_encoding_detection(file_path: str) -> str:
+    """Read a PGN file with automatic encoding detection.
+    
+    Uses charset-normalizer to detect the file encoding automatically,
+    with fallback to UTF-8 if detection fails or confidence is low.
+    
+    Args:
+        file_path: Path to the PGN file.
+        
+    Returns:
+        File contents as a string.
+        
+    Raises:
+        UnicodeDecodeError: If file cannot be decoded with detected or fallback encoding.
+    """
+    from charset_normalizer import from_bytes
+    
+    # Read file in binary mode
+    with open(file_path, 'rb') as f:
+        raw_data = f.read()
+    
+    # Detect encoding using charset-normalizer
+    detected = from_bytes(raw_data)
+    
+    if detected and len(detected) > 0:
+        # Get the best match (first result is the most confident)
+        best_match = detected[0]
+        encoding = best_match.encoding
+        coherence = best_match.coherence
+        
+        # Use detected encoding if coherence is reasonable (>= 0.5)
+        # Coherence ranges from 0.0 to 1.0, where higher values indicate better confidence
+        # Otherwise fall back to UTF-8
+        if coherence >= 0.5:
+            try:
+                return raw_data.decode(encoding)
+            except (UnicodeDecodeError, LookupError):
+                # If detected encoding fails, fall back to UTF-8
+                pass
+    
+    # Fallback to UTF-8 with error handling
+    try:
+        return raw_data.decode('utf-8')
+    except UnicodeDecodeError:
+        # Last resort: try with error replacement to avoid complete failure
+        return raw_data.decode('utf-8', errors='replace')
+
+
 def _read_and_parse_pgn_file(file_path: str) -> Tuple[str, bool, str, Optional[List[Dict[str, Any]]]]:
     """Read and parse a PGN file (must be top-level for pickling).
     
@@ -25,9 +73,8 @@ def _read_and_parse_pgn_file(file_path: str) -> Tuple[str, bool, str, Optional[L
         If success is False, games is None and message contains error description.
     """
     try:
-        # Read file
-        with open(file_path, 'r', encoding='utf-8') as f:
-            pgn_text = f.read()
+        # Read file with encoding detection
+        pgn_text = _read_pgn_file_with_encoding_detection(file_path)
         
         # Parse PGN (no progress callback in parallel context)
         parse_result = PgnService.parse_pgn_text(pgn_text, progress_callback=None)
@@ -535,9 +582,8 @@ class DatabaseController:
             progress_service.set_status(f"Reading PGN file: {file_path}")
             QApplication.processEvents()  # Process events to show the progress bar
             
-            # Read file
-            with open(file_path, 'r', encoding='utf-8') as f:
-                pgn_text = f.read()
+            # Read file with encoding detection
+            pgn_text = _read_pgn_file_with_encoding_detection(file_path)
             
             # Update status for parsing
             progress_service.set_status("Parsing PGN games...")
@@ -874,9 +920,8 @@ class DatabaseController:
             progress_service.set_status(f"Reading PGN file: {file_path}")
             QApplication.processEvents()  # Process events to show the progress bar
             
-            # Read file
-            with open(file_path, 'r', encoding='utf-8') as f:
-                pgn_text = f.read()
+            # Read file with encoding detection
+            pgn_text = _read_pgn_file_with_encoding_detection(file_path)
             
             # Update status for parsing
             progress_service.set_status("Reloading PGN games...")

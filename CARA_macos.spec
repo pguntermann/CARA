@@ -18,7 +18,7 @@ a = Analysis(
         ('user_settings.json', '.'),
         ('user_settings.json.template', '.'),
     ],
-    hiddenimports=[],
+    hiddenimports=['_charset_normalizer'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

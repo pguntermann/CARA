@@ -23,6 +23,12 @@ CARA relies on the third-party components listed below. End users normally insta
 - License: MIT License
 - Notes: The MIT License text is provided below in the "ECO Database" section.
 
+### charset-normalizer (>= 3.0.0)
+- Source: https://github.com/Ousret/charset_normalizer
+- License: MIT License
+- Copyright: Copyright © Ahmed TAHRI @Ousret. Characters frequencies used in this project © 2012 Denny Vrandečić
+- Notes: The MIT License text is provided below in the "ECO Database" section.
+
 #### Apache License 2.0
 ```
 Apache License

@@ -108,6 +108,7 @@ This installs:
 - python-chess (>= 1.999)
 - requests (>= 2.31.0)
 - asteval (>= 0.9.31)
+- charset-normalizer (>= 3.0.0)
 
 **Note**: pip (Python package installer) is included with Python 3.4 and later. If you installed Python using the methods described above, pip should already be available. Verify pip is installed by running `pip --version` in your terminal.
 
@@ -126,6 +127,7 @@ If you prefer to install dependencies individually instead of using the requirem
 - `pip install python-chess>=1.999`
 - `pip install requests>=2.31.0`
 - `pip install asteval>=0.9.31`
+- `pip install charset-normalizer>=3.0.0`
 
 After installing all dependencies, verify they are installed correctly using `pip list`.
 
@@ -287,6 +289,7 @@ CARA relies on several open-source projects and resources:
   - [python-chess](https://github.com/niklasf/python-chess) (>= 1.999)
   - [requests](https://requests.readthedocs.io/) (>= 2.31.0)
   - [asteval](https://github.com/newville/asteval) (>= 0.9.31)
+  - [charset-normalizer](https://github.com/Ousret/charset_normalizer) (>= 3.0.0)
 
 - **Chess Pieces**: Classic SVG set by [User:Cburnett](https://commons.wikimedia.org/wiki/User:Cburnett) hosted on [Wikimedia Commons](https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces), licensed under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) and the [GNU Free Documentation License 1.2](https://www.gnu.org/licenses/old-licenses/fdl-1.2.html)
 

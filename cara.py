@@ -1,19 +1,49 @@
 """Entry point for CARA: Chess Analysis Review Application."""
 
 import sys
+import os
 import multiprocessing
 from pathlib import Path
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import QtMsgType, qInstallMessageHandler, QLoggingCategory
 
 from app.config.config_loader import ConfigLoader
 from app.main_window import MainWindow
 from app.services.error_handler import ErrorHandler
 from app.utils.path_resolver import get_app_resource_path
 
+# Suppress Qt font warnings before importing Qt modules
+# Set environment variable to reduce Qt font logging
+os.environ.setdefault("QT_LOGGING_RULES", "qt.qpa.fonts.warning=false")
+
+
+def _qt_message_handler(msg_type: QtMsgType, context, message: str) -> None:
+    """Filter out harmless Qt font warnings on Windows.
+    
+    Suppresses DirectWrite font warnings about missing fonts like "8514oem"
+    which are harmless but noisy. All other messages are printed normally.
+    """
+    # Filter out DirectWrite font warnings (these are harmless on Windows)
+    # The message format is: "DirectWrite: CreateFontFaceFromHDC() failed..."
+    # We check for "DirectWrite" keyword which appears in all these warnings
+    if "DirectWrite" in message:
+        return  # Suppress these warnings
+    
+    # For all other messages, print to stderr (Qt's default behavior)
+    # This preserves important warnings and errors while filtering font noise
+    print(message, file=sys.stderr)
+
 
 def main() -> None:
     """Run CARA: Chess Analysis Review Application."""
+    # Suppress harmless Qt font warnings before creating QApplication
+    qInstallMessageHandler(_qt_message_handler)
+    
+    # Disable Qt font category warnings (suppresses DirectWrite font errors)
+    font_category = QLoggingCategory("qt.qpa.fonts")
+    font_category.setEnabled(QtMsgType.QtWarningMsg, False)
+    
     # Setup global exception handler for uncaught exceptions
     ErrorHandler.setup_exception_handler()
     

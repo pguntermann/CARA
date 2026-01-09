@@ -211,6 +211,7 @@
                     <li><strong><a href="https://github.com/niklasf/python-chess" target="_blank">python-chess</a></strong> (>= 1.999) — licensed under <a href="https://github.com/niklasf/python-chess/blob/master/LICENSE" target="_blank">GNU GPL v3.0</a>.</li>
                     <li><strong><a href="https://requests.readthedocs.io/" target="_blank">requests</a></strong> (>= 2.31.0) — licensed under the <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank">Apache License 2.0</a>.</li>
                     <li><strong><a href="https://github.com/newville/asteval" target="_blank">asteval</a></strong> (>= 0.9.31) — licensed under the <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a>.</li>
+                    <li><strong><a href="https://github.com/Ousret/charset_normalizer" target="_blank">charset-normalizer</a></strong> (>= 3.0.0) — licensed under the <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a>.</li>
                 </ul>
                 <p>The author would like to express sincere appreciation to the developers and maintainers of these open-source projects. Their dedication and excellent work have made this application possible, and their contributions to the open-source community are invaluable.</p>
             </div>
@@ -369,7 +370,7 @@
                     <li><strong>Verify installation:</strong><br>
                     After installation completes, verify that the libraries were installed correctly:<br>
                     <code class="command">pip list</code><br>
-                    You should see <strong>PyQt6</strong>, <strong>python-chess</strong>, <strong>requests</strong>, and <strong>asteval</strong> in the list of installed packages.</li>
+                    You should see <strong>PyQt6</strong>, <strong>python-chess</strong>, <strong>requests</strong>, <strong>asteval</strong>, and <strong>charset-normalizer</strong> in the list of installed packages.</li>
                 </ol>
             </div>
             <div class="outline-item">
@@ -409,6 +410,10 @@
                     
                     <li><strong>Install asteval:</strong><br>
                     <code class="command">pip install asteval>=0.9.31</code><br>
+                    </li>
+                    
+                    <li><strong>Install charset-normalizer:</strong><br>
+                    <code class="command">pip install charset-normalizer>=3.0.0</code><br>
                     </li>
                 </ol>
                 <p>After installing all dependencies, verify they are installed correctly using <code class="command">pip list</code>.</p>
@@ -2149,7 +2154,7 @@
                 <p>If CARA fails to start, check the following:</p>
                 <ul>
                     <li><strong>Invalid config.json:</strong> If you've edited <code>config.json</code>, verify the JSON syntax is valid. Use a JSON validator or text editor with JSON syntax checking. Restore from backup if needed.</li>
-                    <li><strong>Missing dependencies:</strong> Ensure all required Python libraries are installed. Run <code>pip list</code> to verify PyQt6, python-chess, and requests are present.</li>
+                    <li><strong>Missing dependencies:</strong> Ensure all required Python libraries are installed. Run <code>pip list</code> to verify PyQt6, python-chess, requests, asteval, and charset-normalizer are present.</li>
                     <li><strong>Python version:</strong> Verify you're using Python 3.8 or higher with <code>python --version</code>.</li>
                 </ul>
                 
