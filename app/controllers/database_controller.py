@@ -230,6 +230,10 @@ class DatabaseController:
             if not games:
                 return (False, "Cannot save: Database is empty")
             
+            # Sort games by game_number in ascending order before saving
+            # This ensures games are saved in the correct order (by their game numbers)
+            games.sort(key=lambda game: game.game_number)
+            
             total_games = len(games)
             
             # Show progress
@@ -962,7 +966,9 @@ class DatabaseController:
         
         if success:
             # Show progress for post-save operations
+            # Get games and sort by game_number (same order as saved to file)
             games = model.get_all_games()
+            games.sort(key=lambda game: game.game_number)
             total_games = len(games)
             
             progress_service.show_progress()

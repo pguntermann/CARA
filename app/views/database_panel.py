@@ -408,6 +408,11 @@ class DatabasePanel(QWidget):
         if column_count > 0:
             header.setSectionResizeMode(column_count - 1, header.ResizeMode.Stretch)
         
+        # Hide "# in File" column (always hidden - users can restore file order by sorting "#" column)
+        file_num_col = model.COL_FILE_NUM
+        if file_num_col < column_count:
+            tab_table.setColumnHidden(file_num_col, True)
+        
         # Hide Source DB column for non-search-results tabs
         if identifier != 'search_results':
             source_db_col = model.COL_SOURCE_DB

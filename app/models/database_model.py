@@ -243,8 +243,12 @@ class DatabaseModel(QAbstractTableModel):
                          Set to False when loading games from a file (they're already saved).
                          Default is True for newly added games (import, paste, etc.).
         """
-        # Set game number based on current row count
-        game.game_number = len(self._games) + 1
+        # Set game number: use file_position if available (loaded from file),
+        # otherwise use incremental number (pasted/imported)
+        if game.file_position > 0:
+            game.game_number = game.file_position
+        else:
+            game.game_number = len(self._games) + 1
         
         # Insert the new row
         row = len(self._games)
@@ -342,9 +346,7 @@ class DatabaseModel(QAbstractTableModel):
         # Reorder: highlighted games first, then others
         self._games = highlighted + others
         
-        # Update game numbers
-        for i, game in enumerate(self._games):
-            game.game_number = i + 1
+        # Note: game_number is NOT updated - it always reflects the original assignment
         
         # Map old persistent indexes to new positions
         new_persistent_indexes = []
@@ -570,8 +572,8 @@ class DatabaseModel(QAbstractTableModel):
             column: Column index to sort by.
             order: Sort order (AscendingOrder or DescendingOrder).
         """
-        # Don't sort by unsaved column (icon column)
-        if column == self.COL_UNSAVED:
+        # Don't sort by unsaved column (icon column) or "# in File" column (hidden)
+        if column == self.COL_UNSAVED or column == self.COL_FILE_NUM:
             return
         
         # Define key extraction function for each column type
@@ -582,6 +584,8 @@ class DatabaseModel(QAbstractTableModel):
                 Sort key value appropriate for the column type.
             """
             if column == self.COL_NUM:
+                # Sort by game_number (the value displayed in "#" column)
+                # This sorts by the actual game number, whether from file_position or incremental
                 return game.game_number
             elif column == self.COL_FILE_NUM:
                 # Sort by file position (use tuple to ensure None sorts last)
@@ -651,9 +655,8 @@ class DatabaseModel(QAbstractTableModel):
         reverse = (order == Qt.SortOrder.DescendingOrder)
         self._games.sort(key=get_sort_key, reverse=reverse)
         
-        # Update game numbers to reflect new positions after sorting
-        for i, game in enumerate(self._games):
-            game.game_number = i + 1
+        # Note: game_number is NOT updated during sorting - it always reflects
+        # the original assignment (file_position when loaded, or incremental when pasted/imported)
         
         # Map old persistent indexes to new positions based on game objects
         new_persistent_indexes = []
