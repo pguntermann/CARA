@@ -1,3 +1,39 @@
+# CARA v2.5.3 - PGN Handling Improvements and Performance Enhancements
+
+**Release Date:** 09.01.2026
+
+This release focuses on significant improvements to PGN file handling, including better encoding support, fixed-width formatting fixes, and character cleanup. It also includes performance enhancements through parallel processing for various database operations and several bug fixes.
+
+## New Features
+
+- **Close All Databases**: New menu option to close all open PGN databases at once
+- **Parallel Game Parsing**: Parallel processing for game parsing when opening PGN database files, significantly reducing load times for large databases and when opening multiple files simultaneously
+- **Parallel Bulk Operations**: Parallel processing for bulk tag replacement, bulk add/remove tags, and bulk cleaning operations
+- **Parallel Player Statistics Processing**: Parallel processing for player statistics calculations, improving calculation speed
+
+## Enhancements
+
+### PGN Handling
+- **Consistent PGN Export Formatting**: PGN files are now properly formatted on export according to config.json settings, with correct fixed-width line wrapping that works consistently across Windows and macOS
+- **Improved Encoding Detection**: Enhanced loading of non-UTF-8 encoded PGN files with better character encoding detection and handling
+- **PGN Display-Formatting Improvements**: Improved PGN formatting in the PGN pane, including better display of NAG (Numeric Annotation Glyph) move assessment symbols
+- **Pattern-Based Game Boundary Detection**: Implemented faster pattern-based game boundary detection during loading of PGN files, significantly improving load times for large files
+- **PGN Import Character Cleanup**: Automatically remove Unicode Private Use Area (PUA) characters from PGN files during import to prevent display issues with ChessBase font characters
+
+## Bug Fixes
+- **PGN Database Loading**: Fixed issue where some games were not correctly loaded from PGN databases
+- **PGN Formatting and Removal**: Fixed several issues with PGN formatting and removal options
+- **Game Sorting on Save**: Fixed reverse-order issue when saving games to a PGN file
+- **Window Resizing**: Fixed window resizing issue with bulk replace dialog on Windows app bundle installs
+
+## Documentation
+
+- **Manual Updates**: Updated the Advanced section in the manual with comprehensive documentation for:
+  - PGN import settings (strip PUA characters)
+  - PGN display formatting customization (colors, NAGs as symbols/text, annotations)
+
+---
+
 # CARA v2.5.2 - Bulk Analysis Improvements and Enhanced Formula Support
 
 **Release Date:** 07.01.2026

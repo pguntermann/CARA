@@ -646,7 +646,7 @@
                     </div>
                     <div class="header-right">
                         <p class="header-manual-label">User Manual</p>
-                        <p class="header-version">Version 2.5.2</p>
+                        <p class="header-version">Version 2.5.3</p>
                     </div>
                 </div>
             </div>
@@ -839,6 +839,7 @@
                     <li><strong><a href="https://github.com/niklasf/python-chess" target="_blank">python-chess</a></strong> (>= 1.999) — licensed under <a href="https://github.com/niklasf/python-chess/blob/master/LICENSE" target="_blank">GNU GPL v3.0</a>.</li>
                     <li><strong><a href="https://requests.readthedocs.io/" target="_blank">requests</a></strong> (>= 2.31.0) — licensed under the <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank">Apache License 2.0</a>.</li>
                     <li><strong><a href="https://github.com/newville/asteval" target="_blank">asteval</a></strong> (>= 0.9.31) — licensed under the <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a>.</li>
+                    <li><strong><a href="https://github.com/Ousret/charset_normalizer" target="_blank">charset-normalizer</a></strong> (>= 3.0.0) — licensed under the <a href="https://opensource.org/licenses/MIT" target="_blank">MIT License</a>.</li>
                 </ul>
                 <p>The author would like to express sincere appreciation to the developers and maintainers of these open-source projects. Their dedication and excellent work have made this application possible, and their contributions to the open-source community are invaluable.</p>
             </div>
@@ -997,7 +998,7 @@
                     <li><strong>Verify installation:</strong><br>
                     After installation completes, verify that the libraries were installed correctly:<br>
                     <code class="command">pip list</code><br>
-                    You should see <strong>PyQt6</strong>, <strong>python-chess</strong>, <strong>requests</strong>, and <strong>asteval</strong> in the list of installed packages.</li>
+                    You should see <strong>PyQt6</strong>, <strong>python-chess</strong>, <strong>requests</strong>, <strong>asteval</strong>, and <strong>charset-normalizer</strong> in the list of installed packages.</li>
                 </ol>
             </div>
             <div class="outline-item">
@@ -1037,6 +1038,10 @@
                     
                     <li><strong>Install asteval:</strong><br>
                     <code class="command">pip install asteval>=0.9.31</code><br>
+                    </li>
+                    
+                    <li><strong>Install charset-normalizer:</strong><br>
+                    <code class="command">pip install charset-normalizer>=3.0.0</code><br>
                     </li>
                 </ol>
                 <p>After installing all dependencies, verify they are installed correctly using <code class="command">pip list</code>.</p>
@@ -1260,6 +1265,7 @@
                     <li><strong>Save PGN Database:</strong> Use <span class="menu-item">File → Save PGN Database</span> (<code>Ctrl+S</code> / <code>⌘+S</code>) to save the active database. This overwrites the existing database file with the current contents.</li>
                     <li><strong>Save PGN Database as...</strong>: Use <span class="menu-item">File → Save PGN Database as...</span> (<code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>) to save the active database as a new copy.</li>
                     <li><strong>Close PGN Database:</strong> Use <span class="menu-item">File → Close PGN Database</span> (<code>Ctrl+W</code> / <code>⌘+W</code>) to close the active database tab.</li>
+                    <li><strong>Close All Databases:</strong> Use <span class="menu-item">File → Close All Databases</span> (<code>Ctrl+Alt+W</code> / <code>⌘+⌥+W</code>) to close all file-based database tabs. The Clipboard and Search Results tabs are preserved.</li>
                 </ul>
                 
                 <div class="tip-box">
@@ -1281,6 +1287,10 @@
                     <li><strong>Game result:</strong> The final outcome of the game (1-0 for White wins, 0-1 for Black wins, 1/2-1/2 for a draw).</li>
                 </ul>
                 <p>The content is displayed in a formatted, color-coded view with syntax highlighting to distinguish between different elements.</p>
+                
+                <div class="tip-box">
+                    <strong>Quick Tip:</strong> You can customize the colors, fonts, and display format (e.g., whether annotations appear as symbols or text, whether NAGs show as text descriptions) by editing <code>config.json</code>. See <a href="#customizing-pgn-display-formatting">section 7.1.6 "Customizing PGN Display Formatting"</a> for advanced customization options.
+                </div>
                 
                 <p>As you navigate through the game using the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys, the active move is highlighted in the PGN notation. Alternatively, you can click on any main-line move in the PGN notation to jump directly to that position in the game. Note that clicking on variation moves, comments, or metadata tags does not trigger navigation—only main-line moves are clickable.</p>
                 
@@ -1512,6 +1522,7 @@
                     <li><code>Ctrl+S</code> / <code>⌘+S</code>: Save active PGN database</li>
                     <li><code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>: Save active PGN database as...</li>
                     <li><code>Ctrl+W</code> / <code>⌘+W</code>: Close active PGN database</li>
+                    <li><code>Ctrl+Alt+W</code> / <code>⌘+⌥+W</code>: Close all PGN databases</li>
                     <li><code>Ctrl+Q</code> / <code>⌘+Q</code>: Close application</li>
                 </ul>
                 
@@ -2095,43 +2106,47 @@
                 <p><strong>Shortcut:</strong> <code>Ctrl+W</code> / <code>⌘+W</code></p>
                 <p>Closes the currently active database tab. Any unsaved changes will be lost if you haven't saved the database first.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
                 
-                <h5>6.1.4 Save PGN Database</h5>
+                <h5>6.1.4 Close All Databases</h5>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Alt+W</code> / <code>⌘+⌥+W</code></p>
+                <p>Closes all file-based database tabs. The Clipboard and Search Results tabs are preserved. Any unsaved changes will be lost if you haven't saved the databases first.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
+                
+                <h5>6.1.5 Save PGN Database</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+S</code> / <code>⌘+S</code></p>
                 <p>Saves the active database to disk, overwriting the existing file.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
                 
-                <h5>6.1.5 Save PGN Database as...</h5>
+                <h5>6.1.6 Save PGN Database as...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code></p>
                 <p>Saves the active database to a new file location. This allows you to create a copy of the database without overwriting the original.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
                 
-                <h5>6.1.6 Import Games from Online...</h5>
+                <h5>6.1.7 Import Games from Online...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+I</code> / <code>⌘+Shift+I</code></p>
                 <p>Opens a dialog to import games from Lichess or Chess.com.<br>See <a href="#import-from-online">section 5.2.3</a> for detailed instructions.</p>
                 
-                <h5>6.1.7 Bulk Replace Tags...</h5>
+                <h5>6.1.8 Bulk Replace Tags...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+R</code> / <code>⌘+Shift+R</code></p>
                 <p>Opens a dialog to find and replace text in metadata tags across multiple games.<br>See <a href="#bulk-replace-tags">section 5.3.2</a> for detailed instructions.</p>
                 
-                <h5>6.1.8 Bulk Add/Remove Tags...</h5>
+                <h5>6.1.9 Bulk Add/Remove Tags...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Alt+T</code> / <code>⌘+⌥+T</code></p>
                 <p>Opens a dialog to add or remove metadata tags across multiple games.<br>See <a href="#bulk-add-remove-tags">section 5.3.3</a> for detailed instructions.</p>
                 
-                <h5>6.1.9 Bulk Clean PGN...</h5>
+                <h5>6.1.10 Bulk Clean PGN...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+L</code> / <code>⌘+Shift+L</code></p>
                 <p>Opens a dialog to remove unwanted elements (comments, variations, annotations, etc.) from PGN notation across multiple games.<br>See <a href="#bulk-clean-pgn">section 5.3.4</a> for detailed instructions.</p>
                 
-                <h5>6.1.10 Deduplicate Games in Active Database...</h5>
+                <h5>6.1.11 Deduplicate Games in Active Database...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+U</code> / <code>⌘+Shift+U</code></p>
                 <p>Opens a dialog to identify and remove duplicate games from the active database.<br>See <a href="#deduplicate-games">section 5.3.5</a> for detailed instructions.</p>
                 
-                <h5>6.1.11 Search Games...</h5>
+                <h5>6.1.12 Search Games...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+F</code> / <code>⌘+Shift+F</code></p>
                 <p>Opens a dialog to search for games across databases using multiple criteria and logical operators.<br>See <a href="#searching-games">section 5.4</a> for detailed instructions.</p>
                 
-                <h5>6.1.12 Close Search Results</h5>
+                <h5>6.1.13 Close Search Results</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+W</code> / <code>⌘+Shift+W</code></p>
                 <p>Closes the Search Results tab in the Database Panel. This menu item is only enabled when a search results tab is open.</p>
                 
-                <h5>6.1.13 Close Application</h5>
+                <h5>6.1.14 Close Application</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Q</code> / <code>⌘+Q</code></p>
                 <p>Closes the CARA application. Any unsaved changes in open databases will be lost if you haven't saved them first.</p>
             </div>
@@ -2507,6 +2522,7 @@
                     <li><code>Ctrl+S</code> / <code>⌘+S</code>: Save active PGN database</li>
                     <li><code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>: Save active PGN database as...</li>
                     <li><code>Ctrl+W</code> / <code>⌘+W</code>: Close active PGN database</li>
+                    <li><code>Ctrl+Alt+W</code> / <code>⌘+⌥+W</code>: Close all PGN databases</li>
                     <li><code>Ctrl+Q</code> / <code>⌘+Q</code>: Close application</li>
                 </ul>
                 
@@ -2617,8 +2633,7 @@
                 <p>To change the colors of the chessboard squares:</p>
                 <ol>
                     <li><strong>Locate the squares configuration:</strong><br>
-                    Open <code>config.json</code> in a text editor and navigate to:<br>
-                    <code>ui → panels → main → board → squares</code></li>
+                    Open <code>config.json</code> in a text editor and navigate to: <code>ui → panels → main → board → squares</code></li>
                     
                     <li><strong>Modify the color values:</strong><br>
                     You'll find two color properties:
@@ -2650,6 +2665,160 @@
                     <li><strong>Panel colors:</strong> Modify background colors, borders, and text colors in <code>ui → panels</code></li>
                     <li><strong>Move classification colors:</strong> Customize colors for move classifications (Brilliant, Best Move, Inaccuracy, etc.) in <code>ui → panels → detail → moveslist → colors</code></li>
                 </ul>
+                
+                <h5>7.1.4 Configuring PGN Export Format</h5>
+                <p>CARA allows you to customize how PGN files are formatted when saving databases. The PGN export settings control whether move notation is wrapped at a fixed width or saved as a single line.</p>
+                
+                <p>To configure PGN export formatting:</p>
+                <ol>
+                    <li><strong>Locate the PGN export configuration:</strong><br>
+                    Open <code>config.json</code> in a text editor and navigate to: <code>pgn → export</code></li>
+                    
+                    <li><strong>Modify the export settings:</strong><br>
+                    You'll find two properties:
+                    <ul>
+                        <li><code>"use_fixed_width": true</code> - When <code>true</code>, move notation is wrapped at the specified width. When <code>false</code>, move notation is saved as a single continuous line.</li>
+                        <li><code>"fixed_width": 80</code> - The character width limit when <code>use_fixed_width</code> is <code>true</code>. Default is 80 characters, which is a common standard for PGN files.</li>
+                    </ul>
+                    Example configuration:
+                    <pre><code>"pgn": {
+    "export": {
+        "use_fixed_width": true,
+        "fixed_width": 80
+    }
+}</code></pre>
+                    </li>
+                    
+                    <li><strong>Save and restart:</strong><br>
+                    Save the file and restart CARA for the changes to take effect. The new formatting will apply to all future save operations (both "Save" and "Save As").</li>
+                </ol>
+                
+                <div class="tip-box">
+                    <strong>Note:</strong> These settings only affect how games are saved to disk. The formatting does not affect how games are displayed in CARA's interface or how they are parsed when loading PGN files.
+                </div>
+            </div>
+            
+            <div class="outline-item">
+                <h5 id="configuring-pgn-import-settings">7.1.5 Configuring PGN Import Settings</h5>
+                <p>CARA allows you to configure how PGN files are processed when importing games. The PGN import settings control character handling during file loading.</p>
+                
+                <p>To configure PGN import settings:</p>
+                <ol>
+                    <li><strong>Locate the PGN import configuration:</strong><br>
+                    Open <code>config.json</code> in a text editor and navigate to: <code>pgn → import</code></li>
+                    
+                    <li><strong>Modify the import settings:</strong><br>
+                    You'll find the following property:
+                    <ul>
+                        <li><code>"strip_pua_characters": true</code> - When <code>true</code>, removes Unicode Private Use Area (PUA) characters (U+E000-U+F8FF) from PGN text during import. These characters are used by ChessBase and other chess software for special font symbols. When fonts don't support these characters, they appear as blue boxes or other visual artifacts. Setting this to <code>true</code> removes them automatically during import to ensure clean PGN text.</li>
+                    </ul>
+                    Example configuration:
+                    <pre><code>"pgn": {
+    "import": {
+        "strip_pua_characters": true
+    }
+}</code></pre>
+                    </li>
+                    
+                    <li><strong>Save and restart:</strong><br>
+                    Save the file and restart CARA for the changes to take effect. The new settings will apply to all future import operations (opening PGN files, pasting PGN text, importing from online platforms).</li>
+                </ol>
+            </div>
+            
+            <div class="outline-item">
+                <h5 id="customizing-pgn-display-formatting">7.1.6 Customizing PGN Display Formatting</h5>
+                <p>CARA allows you to customize the visual appearance of PGN notation in the Detail Panel, including colors, fonts, and how annotations and NAGs are displayed.</p>
+                
+                <p>To customize PGN display formatting:</p>
+                <ol>
+                    <li><strong>Locate the PGN formatting configuration:</strong><br>
+                    Open <code>config.json</code> in a text editor and navigate to: <code>ui → panels → detail → pgn_notation → formatting</code></li>
+                    
+                    <li><strong>Modify formatting settings:</strong><br>
+                    You'll find several categories of formatting options:<br><br>
+                    
+                    <p><strong>Element Colors and Styling:</strong></p>
+                    <ul>
+                        <li><code>"headers"</code> - Color and bold styling for PGN header tags (Event, Site, Date, etc.)</li>
+                        <li><code>"move_numbers"</code> - Color and bold styling for move numbers (1., 2., etc.)</li>
+                        <li><code>"moves"</code> - Color and bold styling for chess moves (e4, Nf3, etc.)</li>
+                        <li><code>"comments"</code> - Color and italic styling for move comments</li>
+                        <li><code>"variations"</code> - Color and italic styling for move variations (alternative lines)</li>
+                        <li><code>"results"</code> - Color and bold styling for game results (1-0, 0-1, 1/2-1/2)</li>
+                    </ul>
+                    
+                    <p><strong>Active Move Highlighting:</strong></p>
+                    <ul>
+                        <li><code>"active_move"</code> - Background color, text color, and bold styling for the currently active move in the main line</li>
+                        <li><code>"active_move_variation"</code> - Background color, text color, bold, and italic styling for the active move when it's in a variation</li>
+                    </ul>
+                    
+                    <p><strong>Annotation Display Settings:</strong></p>
+                    <ul>
+                        <li><code>"annotations.use_symbols"</code> - When <code>true</code>, symbol-based annotations (!, !!, ?, ??, !?, ?!) are displayed as symbols. When <code>false</code>, they are displayed as text descriptions.</li>
+                        <li><code>"annotations.good"</code> - Color and bold styling for good move annotations (!)</li>
+                        <li><code>"annotations.bad"</code> - Color and bold styling for poor move annotations (?)</li>
+                        <li><code>"annotations.interesting"</code> - Color and bold styling for interesting move annotations (!?)</li>
+                        <li><code>"annotations.dubious"</code> - Color and bold styling for dubious move annotations (?!)</li>
+                    </ul>
+                    
+                    <p><strong>NAG (Numeric Annotation Glyph) Settings:</strong></p>
+                    <ul>
+                        <li><code>"nags.show_text"</code> - When <code>true</code>, NAGs are displayed as readable text descriptions in parentheses (e.g., "good move", "poor move", "White has a slight advantage"). When <code>false</code>, NAGs are displayed as symbols or numbers.</li>
+                        <li><code>"nags.color"</code> - Text color for NAG text</li>
+                        <li><code>"nags.bold"</code> - Whether NAG text is displayed in bold</li>
+                        <li><code>"nags.italic"</code> - Whether NAG text is displayed in italic</li>
+                    </ul>
+                    </li>
+                </ol>
+                
+                <ol start="3">
+                    <li><strong>Example configuration:</strong><br>
+                    <pre><code>"formatting": {
+    "headers": {
+        "color": [100, 150, 255],
+        "bold": true
+    },
+    "moves": {
+        "color": [220, 220, 220],
+        "bold": false
+    },
+    "annotations": {
+        "use_symbols": true,
+        "good": {
+            "color": [100, 255, 100],
+            "bold": true
+        }
+    },
+    "nags": {
+        "color": [200, 150, 255],
+        "bold": false,
+        "italic": true,
+        "show_text": true
+    },
+    "comments": {
+        "color": [180, 200, 255],
+        "italic": true
+    },
+    "variations": {
+        "color": [180, 180, 180],
+        "italic": true
+    },
+    "results": {
+        "color": [255, 255, 100],
+        "bold": true
+    },
+    "active_move": {
+        "background_color": [100, 120, 180],
+        "text_color": [255, 255, 255],
+        "bold": true
+    }
+}</code></pre>
+                    </li>
+                    
+                    <li><strong>Save and restart:</strong><br>
+                    Save the file and restart CARA for the changes to take effect. The new formatting will apply to all PGN notation displayed in the Detail Panel.</li>
+                </ol>
             </div>
             
             <div class="outline-item">
@@ -2740,7 +2909,7 @@
                 <p>If CARA fails to start, check the following:</p>
                 <ul>
                     <li><strong>Invalid config.json:</strong> If you've edited <code>config.json</code>, verify the JSON syntax is valid. Use a JSON validator or text editor with JSON syntax checking. Restore from backup if needed.</li>
-                    <li><strong>Missing dependencies:</strong> Ensure all required Python libraries are installed. Run <code>pip list</code> to verify PyQt6, python-chess, and requests are present.</li>
+                    <li><strong>Missing dependencies:</strong> Ensure all required Python libraries are installed. Run <code>pip list</code> to verify PyQt6, python-chess, requests, asteval, and charset-normalizer are present.</li>
                     <li><strong>Python version:</strong> Verify you're using Python 3.8 or higher with <code>python --version</code>.</li>
                 </ul>
                 
@@ -2997,7 +3166,7 @@
                     <li><strong><code>blunders</code>:</strong> Number of blunders made by the player (integer)</li>
                     <li><strong><code>mistakes</code>:</strong> Number of mistakes made by the player (integer)</li>
                     <li><strong><code>inaccuracies</code>:</strong> Number of inaccuracies made by the player (integer)</li>
-                    <li><strong><code>misses</code>:</strong> Number of missed opportunities (brilliant moves not played) (integer)</li>
+                    <li><strong><code>misses</code>:</strong> Number of missed opportunities (e.g., missing a checkmate, missing a winning move, or missing a critical tactical opportunity) (integer)</li>
                     <li><strong><code>best_moves</code>:</strong> Number of best moves played (integer)</li>
                     <li><strong><code>good_moves</code>:</strong> Number of good moves played (integer)</li>
                     <li><strong><code>brilliant_moves</code>:</strong> Number of brilliant moves played (integer)</li>
@@ -3159,7 +3328,7 @@
         </section>
 
         <footer style="margin-top: 50px; padding-top: 20px; border-top: 2px solid rgb(60, 60, 65); color: rgb(180, 180, 180); text-align: center;">
-            <p>CARA - Chess Analysis and Review Application v2.5.2</p>
+            <p>CARA - Chess Analysis and Review Application v2.5.3</p>
             <p>Copyright (C) 2025 Philipp Guntermann</p>
             <p>This program is free software: you can redistribute it and/or modify it under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" style="color: rgb(100, 150, 255);">GNU General Public License version 3</a> (GPL-3.0) or any later version.</p>
             <p>This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.</p>
