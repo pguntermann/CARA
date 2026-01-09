@@ -1996,8 +1996,7 @@
                 <p>To change the colors of the chessboard squares:</p>
                 <ol>
                     <li><strong>Locate the squares configuration:</strong><br>
-                    Open <code>config.json</code> in a text editor and navigate to:<br>
-                    <code>ui → panels → main → board → squares</code></li>
+                    Open <code>config.json</code> in a text editor and navigate to: <code>ui → panels → main → board → squares</code></li>
                     
                     <li><strong>Modify the color values:</strong><br>
                     You'll find two color properties:
@@ -2029,6 +2028,37 @@
                     <li><strong>Panel colors:</strong> Modify background colors, borders, and text colors in <code>ui → panels</code></li>
                     <li><strong>Move classification colors:</strong> Customize colors for move classifications (Brilliant, Best Move, Inaccuracy, etc.) in <code>ui → panels → detail → moveslist → colors</code></li>
                 </ul>
+                
+                <h5>7.1.4 Configuring PGN Export Format</h5>
+                <p>CARA allows you to customize how PGN files are formatted when saving databases. The PGN export settings control whether move notation is wrapped at a fixed width or saved as a single line.</p>
+                
+                <p>To configure PGN export formatting:</p>
+                <ol>
+                    <li><strong>Locate the PGN export configuration:</strong><br>
+                    Open <code>config.json</code> in a text editor and navigate to: <code>pgn → export</code></li>
+                    
+                    <li><strong>Modify the export settings:</strong><br>
+                    You'll find two properties:
+                    <ul>
+                        <li><code>"use_fixed_width": true</code> - When <code>true</code>, move notation is wrapped at the specified width. When <code>false</code>, move notation is saved as a single continuous line.</li>
+                        <li><code>"fixed_width": 80</code> - The character width limit when <code>use_fixed_width</code> is <code>true</code>. Default is 80 characters, which is a common standard for PGN files.</li>
+                    </ul>
+                    Example configuration:
+                    <pre><code>"pgn": {
+    "export": {
+        "use_fixed_width": true,
+        "fixed_width": 80
+    }
+}</code></pre>
+                    </li>
+                    
+                    <li><strong>Save and restart:</strong><br>
+                    Save the file and restart CARA for the changes to take effect. The new formatting will apply to all future save operations (both "Save" and "Save As").</li>
+                </ol>
+                
+                <div class="tip-box">
+                    <strong>Note:</strong> These settings only affect how games are saved to disk. The formatting does not affect how games are displayed in CARA's interface or how they are parsed when loading PGN files.
+                </div>
             </div>
             
             <div class="outline-item">
