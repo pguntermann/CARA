@@ -700,20 +700,39 @@ class PgnFormatterService:
             PGN text without variations.
         Note: Preserves metadata tags - does not process metadata-only lines.
         """
-        lines = pgn_text.split('\n')
-        result_lines = []
+        result_chars: List[str] = []
         variation_depth = 0
+        comment_depth = 0
+        in_comment = False
         
-        for line in lines:
-            # Preserve metadata lines exactly
-            if PgnFormatterService._is_metadata_only_line(line):
-                result_lines.append(line)
+        i = 0
+        while i < len(pgn_text):
+            char = pgn_text[i]
+            
+            # Track comments first - parentheses inside comments should be ignored
+            if char == '{':
+                comment_depth += 1
+                in_comment = True
+                # Add opening brace if not in a variation (preserve comments outside variations)
+                if variation_depth == 0:
+                    result_chars.append(char)
+                i += 1
                 continue
             
-            line_result = []
-            i = 0
-            while i < len(line):
-                char = line[i]
+            if char == '}' and in_comment:
+                comment_depth -= 1
+                if comment_depth <= 0:
+                    in_comment = False
+                    comment_depth = 0
+                # Add closing brace if not in a variation (preserve comments outside variations)
+                if variation_depth == 0:
+                    result_chars.append(char)
+                i += 1
+                continue
+            
+            # Only process variation markers when NOT inside a comment
+            # (parentheses inside comments are not variation markers)
+            if not in_comment:
                 if char == '(':
                     variation_depth += 1
                     i += 1
@@ -722,14 +741,29 @@ class PgnFormatterService:
                     variation_depth -= 1
                     i += 1
                     continue
+                
+                # Only add characters when not in a variation
                 if variation_depth == 0:
-                    line_result.append(char)
-                i += 1
+                    result_chars.append(char)
+            else:
+                # Inside a comment - only add if not in a variation
+                # (comments inside variations should be removed with the variation)
+                if variation_depth == 0:
+                    result_chars.append(char)
             
-            result_lines.append(''.join(line_result))
+            i += 1
         
-        result_str = '\n'.join(result_lines)
+        # Validate that variation_depth is 0 at the end (all variations should be closed)
+        if variation_depth != 0:
+            # This indicates mismatched parentheses - log warning but continue
+            # In this case, we may have removed too much or too little
+            import sys
+            print(f"Warning: _remove_variations ended with variation_depth={variation_depth} (mismatched parentheses)", file=sys.stderr)
+        
+        result_str = ''.join(result_chars)
+        # Clean up spaces (preserve newlines)
         result_str = re.sub(r'[ \t]+', ' ', result_str)
+        # Clean up multiple consecutive newlines
         result_str = re.sub(r'\n\s*\n\s*\n+', '\n\n', result_str)
         return result_str.strip()
     
@@ -1810,8 +1844,15 @@ class PgnFormatterService:
                             
                             # Check if this is actually NAG text (like " (poor move)" or " (unknown NAG 146)")
                             # NAG text has a space before the opening paren and contains NAG meaning text
+                            # IMPORTANT: NAG text should be short and simple, not a full variation with moves
                             is_nag_text = False
-                            if start > 0 and formatted[start - 1] == ' ':
+                            
+                            # Strip HTML tags to get plain text for comparison
+                            content_without_html = re.sub(r'<[^>]+>', '', variation_content).strip()
+                            
+                            # Only check for NAG text if content is short (NAG text is typically < 50 chars)
+                            # Variations with moves are much longer
+                            if len(content_without_html) < 50 and start > 0 and formatted[start - 1] == ' ':
                                 # Check if content matches NAG text patterns
                                 # Build NAG patterns (same logic as in NAG text styling)
                                 # Note: variation_content is the text INSIDE parentheses (without the parens)
@@ -1823,19 +1864,23 @@ class PgnFormatterService:
                                 
                                 if all_patterns:
                                     nag_meanings_pattern = '|'.join(all_patterns)
-                                    # Match the content (without parentheses) against NAG patterns
+                                    # Match the content (without HTML, without parentheses) against NAG patterns
                                     nag_text_pattern = re.compile('^' + nag_meanings_pattern + '$')
-                                    content_stripped = variation_content.strip()
-                                    if nag_text_pattern.match(content_stripped):
+                                    if nag_text_pattern.match(content_without_html):
                                         is_nag_text = True
                             
                             # Also check if content is already styled as NAG (has NAG color span)
                             # This handles the case where NAG text styling already happened before variations
-                            if not is_nag_text and nags_config:
+                            # But only if content is short (to avoid false positives with variations)
+                            if not is_nag_text and len(content_without_html) < 50 and nags_config:
                                 nag_color = nags_config.get('color', [200, 200, 255])
                                 nag_color_css = f'color: rgb({nag_color[0]}, {nag_color[1]}, {nag_color[2]})'
+                                # Only treat as NAG if the content is mostly/entirely NAG text
+                                # Check if content has moves (numbers followed by dots), it's not NAG text
                                 if nag_color_css in variation_content:
-                                    is_nag_text = True
+                                    has_moves = re.search(r'\d+\.', content_without_html)
+                                    if not has_moves:
+                                        is_nag_text = True
                             
                             if is_nag_text:
                                 # This is NAG text, not a variation - skip it (will be styled later)

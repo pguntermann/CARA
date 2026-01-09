@@ -66,11 +66,24 @@ class PgnCleaningService:
             pgn_io = StringIO(cleaned_pgn)
             chess_game = chess.pgn.read_game(pgn_io)
             if chess_game:
+                # Validate that the parsed game has moves (not just headers)
+                # Count moves in the mainline to ensure we didn't lose the game
+                mainline_moves = list(chess_game.mainline())
+                if len(mainline_moves) == 0:
+                    # No moves parsed - this suggests the cleaned PGN is malformed
+                    # Return False to indicate failure
+                    return False
+                
                 game.pgn = PgnService.export_game_to_pgn(chess_game)
                 return True
             return False
-        except Exception:
+        except Exception as e:
             # On any error, return False
+            # Log the error for debugging
+            import sys
+            print(f"Error removing variations: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
             return False
     
     @staticmethod
