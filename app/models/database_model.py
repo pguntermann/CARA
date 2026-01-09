@@ -651,6 +651,10 @@ class DatabaseModel(QAbstractTableModel):
         reverse = (order == Qt.SortOrder.DescendingOrder)
         self._games.sort(key=get_sort_key, reverse=reverse)
         
+        # Update game numbers to reflect new positions after sorting
+        for i, game in enumerate(self._games):
+            game.game_number = i + 1
+        
         # Map old persistent indexes to new positions based on game objects
         new_persistent_indexes = []
         for old_index, game in persistent_games:
@@ -671,6 +675,13 @@ class DatabaseModel(QAbstractTableModel):
         
         # Notify views that layout has changed
         self.layoutChanged.emit()
+        
+        # Explicitly emit dataChanged for all rows and columns to ensure view refreshes
+        # This is necessary for large datasets where layoutChanged might not fully refresh all cells
+        if len(self._games) > 0:
+            top_left = self.index(0, 0)
+            bottom_right = self.index(len(self._games) - 1, self.columnCount() - 1)
+            self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
     
     def _parse_date_for_sort(self, date_str: str) -> tuple:
         """Parse a date string for sorting purposes.
