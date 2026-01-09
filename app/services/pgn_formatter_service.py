@@ -170,12 +170,11 @@ def get_nag_text(nag_number: int) -> str:
         nag_number: The NAG number (e.g., 1, 2, 146)
         
     Returns:
-        The NAG meaning if found in NAG_MEANINGS, otherwise "unknown NAG {number}"
+        The NAG meaning if found in NAG_MEANINGS, otherwise "NAG {number}"
     """
     nag_text = NAG_MEANINGS.get(nag_number)
     if not nag_text or not nag_text.strip():
         return f"NAG {nag_number}"
-    return nag_text
     return nag_text
 
 
