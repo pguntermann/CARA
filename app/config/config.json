@@ -575,6 +575,7 @@
               "bold": false
             },
             "annotations": {
+              "use_symbols": true,
               "good": {
                 "color": [
                   100,
@@ -597,7 +598,7 @@
                   255,
                   100
                 ],
-                "bold": false
+                "bold": true
               },
               "dubious": {
                 "color": [
@@ -605,13 +606,13 @@
                   200,
                   100
                 ],
-                "bold": false
+                "bold": true
               }
             },
             "nags": {
               "color": [
                 200,
-                200,
+                150,
                 255
               ],
               "bold": false,
