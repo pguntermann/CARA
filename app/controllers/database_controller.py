@@ -807,21 +807,63 @@ class DatabaseController:
             If success is True, message indicates success.
             If success is False, message contains error description.
         """
+        from app.services.progress_service import ProgressService
+        from PyQt6.QtWidgets import QApplication
+        progress_service = ProgressService.get_instance()
+        
         try:
+            # Show progress and status for reading file
+            progress_service.show_progress()
+            progress_service.set_indeterminate(True)
+            progress_service.set_status(f"Reading PGN file: {file_path}")
+            QApplication.processEvents()  # Process events to show the progress bar
+            
             # Read file
             with open(file_path, 'r', encoding='utf-8') as f:
                 pgn_text = f.read()
             
-            # Parse PGN
-            parse_result = PgnService.parse_pgn_text(pgn_text)
+            # Update status for parsing
+            progress_service.set_status("Reloading PGN games...")
+            QApplication.processEvents()  # Process events to update status
+            
+            # Define progress callback for parsing
+            def parsing_progress(progress_value: int, message: str) -> None:
+                """Update progress during parsing.
+                
+                Args:
+                    progress_value: Progress percentage (0-100) for all phases.
+                    message: Status message to display.
+                """
+                progress_service.set_status(message)
+                # All phases now report percentage-based progress
+                progress_service.set_progress(progress_value)
+                progress_service.set_indeterminate(False)
+                # Update UI periodically to avoid excessive processing
+                # Update more frequently for early phases (normalization/boundary detection)
+                # which report progress more often
+                if progress_value <= 42 or progress_value % 5 == 0:
+                    QApplication.processEvents()  # Process events to update status
+            
+            # Parse PGN with progress callback
+            parse_result = PgnService.parse_pgn_text(pgn_text, progress_callback=parsing_progress)
             
             if not parse_result.success:
+                progress_service.hide_progress()
                 error_message = self.format_pgn_error_message(parse_result.error_message)
                 return (False, error_message)
             
             # Verify at least one valid game was parsed
             if not parse_result.games or len(parse_result.games) == 0:
+                progress_service.hide_progress()
                 return (False, "Error: No valid PGN games found in file")
+            
+            total_games = len(parse_result.games)
+            
+            # Switch to determinate progress for converting games
+            progress_service.set_indeterminate(False)
+            progress_service.set_progress(50)
+            progress_service.set_status(f"Processing {total_games} game(s)...")
+            QApplication.processEvents()  # Process events to update status
             
             # Clear the model
             model.clear()
@@ -847,6 +889,27 @@ class DatabaseController:
                 )
                 # Don't mark as unsaved when reloading from file (games are already saved)
                 model.add_game(game_data, mark_unsaved=False)
+                
+                # Update progress more frequently for better feedback
+                # Update every 10 games, or every game for first 10, or on last game
+                should_update = (
+                    file_pos <= 10 or  # First 10 games for immediate feedback
+                    file_pos % 10 == 0 or  # Every 10 games after that
+                    file_pos == total_games  # Always on last game
+                )
+                
+                if should_update:
+                    # Progress from 50% to 100% for adding games
+                    progress_percent = 50 + int((file_pos / total_games) * 50) if total_games > 0 else 50
+                    progress_service.report_progress(
+                        f"Processing game {file_pos}/{total_games}...",
+                        progress_percent
+                    )
+                    QApplication.processEvents()  # Process events to update progress bar
+            
+            # Hide progress
+            progress_service.hide_progress()
+            QApplication.processEvents()  # Process events to hide progress bar
             
             # Create success message
             if len(parse_result.games) == 1:
@@ -857,6 +920,8 @@ class DatabaseController:
             return (True, status_message)
             
         except Exception as e:
+            # Hide progress on error
+            progress_service.hide_progress()
             return (False, f"Error reloading PGN database: {str(e)}")
     
     def save_pgn_database_as(self, model: DatabaseModel, file_path: str) -> tuple[bool, str]:
