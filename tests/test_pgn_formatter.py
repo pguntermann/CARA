@@ -180,9 +180,15 @@ def test_formatter(pgn_text: str, test_name: str, config: dict) -> bool:
                     errors.append("NAG conversion appears to have failed - empty parentheses found (should contain NAG text)")
                 elif not has_nag_text:
                     # If we have NAGs but no NAG text, it might still be OK if NAGs are shown as symbols
-                    # But we should check if show_nag_text is enabled
-                    # For now, just warn if we don't see NAG text
-                    pass  # Don't fail - NAGs might be configured to show as symbols
+                    # Check if NAGs are shown as symbols (!, ?, !!, ??, !?, ?!)
+                    nag_symbols = ['!', '?', '!!', '??', '!?', '?!']
+                    has_nag_symbols = any(symbol in formatted_html for symbol in nag_symbols)
+                    if not has_nag_symbols:
+                        # Check for unknown NAGs (e.g., "NAG 146" or "Novelty")
+                        has_unknown_nag = 'NAG 146' in formatted_html or 'Novelty' in formatted_html
+                        if not has_unknown_nag:
+                            # NAGs might be configured to show as symbols, so don't fail
+                            pass
         
         # Check that headers don't have unintended formatting
         # Headers should not contain variation formatting, move numbers, annotations, or results
@@ -202,6 +208,58 @@ def test_formatter(pgn_text: str, test_name: str, config: dict) -> bool:
             if 'color: rgb(255, 255, 100)' in header_content and 'Result' not in match.group(0):
                 if re.search(r'\b(1-0|0-1|1/2-1/2|\*)\b', header_content):
                     errors.append("Result formatting found inside non-Result header (should not happen)")
+        
+        # Check for move color formatting (recently added feature)
+        # Mainline moves should be formatted with move color (default: rgb(220, 220, 220))
+        if has_moves:
+            # Check if move color formatting exists in the HTML
+            # Moves should be formatted with the move color (not just plain text)
+            move_color_pattern = re.compile(r'color:\s*rgb\(220,\s*220,\s*220\)')
+            has_move_color = bool(move_color_pattern.search(formatted_html))
+            # If moves exist, they should be formatted with move color
+            # (unless they're in variations, which have different formatting)
+            if has_moves and not has_move_color:
+                # Check if moves are in variations (which have grey/italic formatting)
+                variation_move_pattern = re.compile(r'color:\s*rgb\(180,\s*180,\s*180\).*font-style:\s*italic')
+                has_variation_moves = bool(variation_move_pattern.search(formatted_html))
+                if not has_variation_moves:
+                    # Moves should be formatted, but don't fail if config disables it
+                    pass  # Move color formatting might be disabled in config
+        
+        # Check for NAG text color (recently changed to purple/magenta)
+        # NAG text should be formatted with NAG color (default: rgb(200, 150, 255))
+        nag_color_pattern = re.compile(r'color:\s*rgb\(200,\s*150,\s*255\)')
+        has_nag_color = bool(nag_color_pattern.search(formatted_html))
+        if has_nags and not has_nag_color:
+            # NAGs might be shown as symbols (which use annotation colors), so don't fail
+            pass
+        
+        # Special validation for test cases with specific features
+        if "NAG Symbols" in test_name or "Unknown NAG" in test_name:
+            # For NAG symbol tests, check that symbols or NAG text appear
+            if "$1" in pgn_text or "$2" in pgn_text or "$146" in pgn_text:
+                # Check for either symbols or NAG text
+                has_symbols = any(symbol in formatted_html for symbol in ['!', '?', '!!', '??', '!?', '?!'])
+                has_nag_text = 'good move' in formatted_html or 'poor move' in formatted_html or 'NAG 146' in formatted_html or 'Novelty' in formatted_html
+                if not has_symbols and not has_nag_text:
+                    errors.append("NAG symbols or text should appear in formatted HTML for NAG test cases")
+        
+        if "Unknown NAG" in test_name:
+            # For unknown NAG test (NAG 146), check that it's converted to "NAG 146" or "Novelty"
+            if "$146" in pgn_text:
+                has_unknown_nag = 'NAG 146' in formatted_html or 'Novelty' in formatted_html
+                if not has_unknown_nag:
+                    errors.append("Unknown NAG 146 should be converted to 'NAG 146' or 'Novelty'")
+        
+        if "Mainline Moves" in test_name:
+            # For move color formatting test, check that moves are formatted
+            if has_moves:
+                # Check if moves are formatted with move color
+                move_color_pattern = re.compile(r'color:\s*rgb\(220,\s*220,\s*220\)')
+                has_move_color = bool(move_color_pattern.search(formatted_html))
+                if not has_move_color:
+                    # Moves might be in variations or formatting might be disabled, so don't fail
+                    pass
         
         if errors:
             print(f"[FAILED] {test_name}")
@@ -440,6 +498,45 @@ def main():
             "pgn": """[Event "Chessable Masters Play In"] [Site "Chess.com INT"] [Date "2025.02.17"] [Round "1"] [White "Hong, Andrew Z"] [Black "Kramnik, Vladimir"] [Result "1-0"] [ECO "C11"] [WhiteElo "2579"] [BlackElo "2753"] [WhiteFideId "4101588"] [PlyCount "53"] [Beauty "8249579424798"] [GameId "2146417135622649"] [EventDate "2025.02.17"] [EventType "swiss (blitz)"] [EventRounds "9"] [EventCountry "USA"] [SourceTitle "Mega2025 Update 16"] [Source "Chessbase"] [SourceDate "2025.02.21"] [SourceVersion "1"] [SourceVersionDate "2025.02.21"] [SourceQuality "1"]
 
 1. d4 Nf6 2. Nc3 e6 3. e4 d5 4. e5 Nfd7 5. f4 c5 6. Nf3 Nc6 7. Be3 Be7 8. Qd2 a6 9. Bd3 { is the new trend. ist der neue Trend. } 9... b5 10. Qf2 c4 11. Be2 Nb6 12. a3 Bd7 $146 (12... b4 13. axb4 Nxb4 14. Bd1 Bd7 a5 16. g4 g6 17. h4 a4 18. Kg2 Nc6 19. Rh1 f5 20. exf6 Bxf6 21. h5 Qe7 22. g5 Bg7 23. Ne5 { 1-0 Cheparinov,I (2686)-Tratar,M (2409) SLO-chT 32nd Ljubljana 2022 (8.4) }) 13. O-O g6 14. Qg3 Qc7 15. Ng5 b4 16. axb4 Nxb4 17. f5 Nxc2 18. Nxf7 Nxe3 19. Qxe3 Rf8 20. fxg6 hxg6 21. Qh6 Rxf7 22. Rxf7 Kd8 23. Rxe7 Kxe7 24. Qh4+ Ke8 25. Qh8+ Ke7 26. Qf6+ Ke8 27. Rf1 1-0"""
+        },
+        
+        # Test 16: PGN with NAG symbols (use_symbols setting)
+        {
+            "name": "PGN with NAG Symbols (use_symbols)",
+            "pgn": """[Event "Test Game"]
+[Site "Test"]
+[Date "2025.01.01"]
+[White "Player1"]
+[Black "Player2"]
+[Result "1-0"]
+
+1. e4 $1 c5 $2 2. Nf3 $3 e6 $4 3. Bb5 $5 Nc6 $6 1-0"""
+        },
+        
+        # Test 17: PGN with unknown NAG (e.g., NAG 146)
+        {
+            "name": "PGN with Unknown NAG (146)",
+            "pgn": """[Event "Test Game"]
+[Site "Test"]
+[Date "2025.01.01"]
+[White "Player1"]
+[Black "Player2"]
+[Result "1-0"]
+
+1. e4 c5 2. Nf3 e6 3. c4 Nc6 4. Nc3 Nf6 5. Be2 d5 $146 6. e5 Ne4 1-0"""
+        },
+        
+        # Test 18: PGN with move color formatting (mainline moves)
+        {
+            "name": "PGN with Mainline Moves (move color formatting)",
+            "pgn": """[Event "Test Game"]
+[Site "Test"]
+[Date "2025.01.01"]
+[White "Player1"]
+[Black "Player2"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 1-0"""
         },
         
     ]

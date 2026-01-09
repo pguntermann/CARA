@@ -13,7 +13,12 @@ from app.models.database_panel_model import DatabasePanelModel
 from app.services.pgn_service import PgnService
 
 
-def _read_pgn_file_with_encoding_detection(file_path: str) -> str:
+# Module-level translation table for PUA characters (Private Use Area: U+E000-U+F8FF)
+# Created once for efficiency - these are ChessBase font characters that appear as blue boxes
+_PUA_TRANSLATE_TABLE = str.maketrans('', '', ''.join(chr(i) for i in range(0xE000, 0xF900)))
+
+
+def _read_pgn_file_with_encoding_detection(file_path: str, strip_pua_characters: bool = False) -> str:
     """Read a PGN file with automatic encoding detection.
     
     Uses charset-normalizer to detect the file encoding automatically,
@@ -21,6 +26,9 @@ def _read_pgn_file_with_encoding_detection(file_path: str) -> str:
     
     Args:
         file_path: Path to the PGN file.
+        strip_pua_characters: If True, removes Unicode Private Use Area characters
+                             (U+E000-U+F8FF) which are ChessBase font symbols that
+                             appear as blue boxes when fonts don't support them.
         
     Returns:
         File contents as a string.
@@ -37,6 +45,8 @@ def _read_pgn_file_with_encoding_detection(file_path: str) -> str:
     # Detect encoding using charset-normalizer
     detected = from_bytes(raw_data)
     
+    decoded_text = None
+    
     if detected and len(detected) > 0:
         # Get the best match (first result is the most confident)
         best_match = detected[0]
@@ -48,24 +58,33 @@ def _read_pgn_file_with_encoding_detection(file_path: str) -> str:
         # Otherwise fall back to UTF-8
         if coherence >= 0.5:
             try:
-                return raw_data.decode(encoding)
+                decoded_text = raw_data.decode(encoding)
             except (UnicodeDecodeError, LookupError):
                 # If detected encoding fails, fall back to UTF-8
                 pass
     
     # Fallback to UTF-8 with error handling
-    try:
-        return raw_data.decode('utf-8')
-    except UnicodeDecodeError:
-        # Last resort: try with error replacement to avoid complete failure
-        return raw_data.decode('utf-8', errors='replace')
+    if decoded_text is None:
+        try:
+            decoded_text = raw_data.decode('utf-8')
+        except UnicodeDecodeError:
+            # Last resort: try with error replacement to avoid complete failure
+            decoded_text = raw_data.decode('utf-8', errors='replace')
+    
+    # Strip PUA characters if enabled
+    if strip_pua_characters:
+        decoded_text = decoded_text.translate(_PUA_TRANSLATE_TABLE)
+    
+    return decoded_text
 
 
-def _read_and_parse_pgn_file(file_path: str) -> Tuple[str, bool, str, Optional[List[Dict[str, Any]]]]:
+def _read_and_parse_pgn_file(file_path: str, strip_pua_characters: bool = False) -> Tuple[str, bool, str, Optional[List[Dict[str, Any]]]]:
     """Read and parse a PGN file (must be top-level for pickling).
     
     Args:
         file_path: Path to the PGN file.
+        strip_pua_characters: If True, removes Unicode Private Use Area characters
+                             (U+E000-U+F8FF) which are ChessBase font symbols.
         
     Returns:
         Tuple of (file_path, success, message, games).
@@ -74,7 +93,7 @@ def _read_and_parse_pgn_file(file_path: str) -> Tuple[str, bool, str, Optional[L
     """
     try:
         # Read file with encoding detection
-        pgn_text = _read_pgn_file_with_encoding_detection(file_path)
+        pgn_text = _read_pgn_file_with_encoding_detection(file_path, strip_pua_characters=strip_pua_characters)
         
         # Parse PGN (no progress callback in parallel context)
         parse_result = PgnService.parse_pgn_text(pgn_text, progress_callback=None)
@@ -582,8 +601,11 @@ class DatabaseController:
             progress_service.set_status(f"Reading PGN file: {file_path}")
             QApplication.processEvents()  # Process events to show the progress bar
             
+            # Read config setting for PUA character stripping
+            strip_pua = self.config.get('pgn', {}).get('import', {}).get('strip_pua_characters', True)
+            
             # Read file with encoding detection
-            pgn_text = _read_pgn_file_with_encoding_detection(file_path)
+            pgn_text = _read_pgn_file_with_encoding_detection(file_path, strip_pua_characters=strip_pua)
             
             # Update status for parsing
             progress_service.set_status("Parsing PGN games...")
@@ -771,6 +793,9 @@ class DatabaseController:
         progress_service.set_status(f"Opening {len(files_to_open)} database(s)...")
         QApplication.processEvents()
         
+        # Read config setting for PUA character stripping
+        strip_pua = self.config.get('pgn', {}).get('import', {}).get('strip_pua_characters', True)
+        
         # Process files in parallel
         parse_results = {}
         executor = None
@@ -779,7 +804,7 @@ class DatabaseController:
             
             # Submit all files for processing
             future_to_path = {
-                executor.submit(_read_and_parse_pgn_file, file_path): file_path
+                executor.submit(_read_and_parse_pgn_file, file_path, strip_pua): file_path
                 for file_path in files_to_open
             }
             
@@ -920,8 +945,11 @@ class DatabaseController:
             progress_service.set_status(f"Reading PGN file: {file_path}")
             QApplication.processEvents()  # Process events to show the progress bar
             
+            # Read config setting for PUA character stripping
+            strip_pua = self.config.get('pgn', {}).get('import', {}).get('strip_pua_characters', True)
+            
             # Read file with encoding detection
-            pgn_text = _read_pgn_file_with_encoding_detection(file_path)
+            pgn_text = _read_pgn_file_with_encoding_detection(file_path, strip_pua_characters=strip_pua)
             
             # Update status for parsing
             progress_service.set_status("Reloading PGN games...")

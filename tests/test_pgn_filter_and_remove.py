@@ -384,6 +384,67 @@ class TestPgnFilterAndRemove(unittest.TestCase):
         move_lines = [line for line in lines if not line.strip().startswith('[')]
         move_text = ' '.join(move_lines)
         self.assertIsNone(re.search(r'\b(1-0|0-1|1/2-1/2)\s*$', move_text), "Standalone results should be removed")
+    
+    def test_remove_variations_with_comments_containing_parentheses(self):
+        """Test: Remove variations when comments contain parentheses (recent fix)."""
+        # This tests the fix where comments containing parentheses were incorrectly
+        # affecting variation depth tracking
+        pgn = """[Event "Test Game"]
+[Site "Test"]
+[Date "2025.01.01"]
+[White "White"]
+[Black "Black"]
+[Result "1-0"]
+
+1. e4 { Ribli: 'Test (with parentheses) in comment' } c5 2. Nf3 e6 3. c4 { Ribli: 'Another (test) comment' } Nc6 4. Nc3 Nf6 5. Be2 d5 { Ribli: 'Comment with (nested) parentheses' } ( 5... Be7 { Ribli } 6. d4 ) 6. e5 Ne4 7. O-O Be7 8. Qc2 f5 9. Na4 1-0"""
+        
+        original_moves = self._count_moves(pgn)
+        self.assertGreater(original_moves, 0, "Original PGN should be parseable")
+        
+        # Remove variations
+        cleaned_pgn = PgnFormatterService._remove_variations(pgn)
+        final_moves = self._count_moves(cleaned_pgn)
+        
+        self.assertEqual(
+            original_moves, final_moves,
+            f"Move count should be preserved after removing variations with comments containing parentheses "
+            f"(original: {original_moves}, final: {final_moves})"
+        )
+        
+        # Verify variation is removed but mainline continues
+        self.assertNotIn('( 5... Be7', cleaned_pgn, "Variation should be removed")
+        self.assertIn('6. e5 Ne4', cleaned_pgn, "Mainline continuation should be preserved")
+        self.assertIn("Ribli: 'Test (with parentheses) in comment'", cleaned_pgn, "Comments with parentheses should be preserved")
+    
+    def test_remove_variations_multi_line(self):
+        """Test: Remove multi-line variations correctly."""
+        pgn = """[Event "Test Game"]
+[Site "Test"]
+[Date "2025.01.01"]
+[White "White"]
+[Black "Black"]
+[Result "1-0"]
+
+1. e4 c5 2. Nf3 e6 3. c4 Nc6 4. Nc3 Nf6 5. Be2 d5 ( 5... Be7
+6. d4
+cxd4 ) 6. e5 Ne4 1-0"""
+        
+        original_moves = self._count_moves(pgn)
+        self.assertGreater(original_moves, 0, "Original PGN should be parseable")
+        
+        # Remove variations
+        cleaned_pgn = PgnFormatterService._remove_variations(pgn)
+        final_moves = self._count_moves(cleaned_pgn)
+        
+        self.assertEqual(
+            original_moves, final_moves,
+            f"Move count should be preserved after removing multi-line variations "
+            f"(original: {original_moves}, final: {final_moves})"
+        )
+        
+        # Verify variation is removed but mainline continues
+        self.assertNotIn('( 5... Be7', cleaned_pgn, "Multi-line variation should be removed")
+        self.assertIn('6. e5 Ne4', cleaned_pgn, "Mainline continuation should be preserved")
 
 
 if __name__ == '__main__':

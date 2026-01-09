@@ -337,6 +337,69 @@ that spans multiple lines
             re.search(r'\$\d+', pgn),
             "NAGs ($1, $2, etc.) should be removed"
         )
+    
+    def test_variation_removal_with_comments_containing_parentheses(self):
+        """Test: Variation removal with comments containing parentheses (recent fix)."""
+        # This tests the fix where comments containing parentheses were incorrectly
+        # affecting variation depth tracking
+        pgn = """[Event "Test Game"]
+[Site "Test"]
+[Date "2025.01.01"]
+[White "White"]
+[Black "Black"]
+[Result "1-0"]
+
+1. e4 { Ribli: 'Test (with parentheses) in comment' } c5 2. Nf3 e6 3. c4 { Ribli: 'Another (test) comment' } Nc6 4. Nc3 Nf6 5. Be2 d5 { Ribli: 'Comment with (nested) parentheses' } ( 5... Be7 { Ribli } 6. d4 ) 6. e5 Ne4 1-0"""
+        
+        original_moves = self._count_moves(pgn)
+        self.assertGreater(original_moves, 0, "Original PGN should be parseable")
+        
+        # Remove variations
+        pgn = PgnFormatterService._remove_variations(pgn)
+        final_moves = self._count_moves(pgn)
+        
+        self.assertEqual(
+            original_moves, final_moves,
+            f"Move count should be preserved after removing variations with comments containing parentheses "
+            f"(original: {original_moves}, final: {final_moves})"
+        )
+        
+        # Verify variation is removed but mainline continues
+        self.assertNotIn('( 5... Be7', pgn, "Variation should be removed")
+        self.assertIn('6. e5 Ne4', pgn, "Mainline continuation should be preserved")
+        self.assertIn("Ribli: 'Test (with parentheses) in comment'", pgn, "Comments with parentheses should be preserved")
+    
+    def test_variation_removal_preserves_mainline_after_variation(self):
+        """Test: Variation removal preserves mainline continuation after variation."""
+        # This tests that the mainline continues correctly after a variation is removed
+        pgn = """[Event "Test Game"]
+[Site "Test"]
+[Date "2025.01.01"]
+[White "White"]
+[Black "Black"]
+[Result "1-0"]
+
+1. e4 c5 2. Nf3 e6 3. c4 Nc6 4. Nc3 Nf6 5. Be2 d5 { Comment } ( 5... Be7 { Variation comment } 6. d4 ) 6. e5 Ne4 !? 7. O-O Be7 8. Qc2 f5 !? 9. Na4 !? 1-0"""
+        
+        original_moves = self._count_moves(pgn)
+        self.assertGreater(original_moves, 0, "Original PGN should be parseable")
+        
+        # Remove variations
+        pgn = PgnFormatterService._remove_variations(pgn)
+        final_moves = self._count_moves(pgn)
+        
+        self.assertEqual(
+            original_moves, final_moves,
+            f"Move count should be preserved after removing variations "
+            f"(original: {original_moves}, final: {final_moves})"
+        )
+        
+        # Verify variation is removed but mainline continues correctly
+        self.assertNotIn('( 5... Be7', pgn, "Variation should be removed")
+        self.assertIn('6. e5 Ne4', pgn, "Mainline continuation should be preserved")
+        self.assertIn('7. O-O Be7', pgn, "Mainline moves after variation should be preserved")
+        self.assertIn('8. Qc2 f5', pgn, "Mainline moves after variation should be preserved")
+        self.assertIn('9. Na4', pgn, "Mainline moves after variation should be preserved")
 
 
 if __name__ == '__main__':

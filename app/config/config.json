@@ -4699,6 +4699,9 @@
     "export": {
       "use_fixed_width": true,
       "fixed_width": 80
+    },
+    "import": {
+      "strip_pua_characters": true
     }
   },
   "debug": {
