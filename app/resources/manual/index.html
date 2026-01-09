@@ -632,6 +632,7 @@
                     <li><strong>Save PGN Database:</strong> Use <span class="menu-item">File → Save PGN Database</span> (<code>Ctrl+S</code> / <code>⌘+S</code>) to save the active database. This overwrites the existing database file with the current contents.</li>
                     <li><strong>Save PGN Database as...</strong>: Use <span class="menu-item">File → Save PGN Database as...</span> (<code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>) to save the active database as a new copy.</li>
                     <li><strong>Close PGN Database:</strong> Use <span class="menu-item">File → Close PGN Database</span> (<code>Ctrl+W</code> / <code>⌘+W</code>) to close the active database tab.</li>
+                    <li><strong>Close All Databases:</strong> Use <span class="menu-item">File → Close All Databases</span> (<code>Ctrl+Alt+W</code> / <code>⌘+⌥+W</code>) to close all file-based database tabs. The Clipboard and Search Results tabs are preserved.</li>
                 </ul>
                 
                 <div class="tip-box">
@@ -884,6 +885,7 @@
                     <li><code>Ctrl+S</code> / <code>⌘+S</code>: Save active PGN database</li>
                     <li><code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>: Save active PGN database as...</li>
                     <li><code>Ctrl+W</code> / <code>⌘+W</code>: Close active PGN database</li>
+                    <li><code>Ctrl+Alt+W</code> / <code>⌘+⌥+W</code>: Close all PGN databases</li>
                     <li><code>Ctrl+Q</code> / <code>⌘+Q</code>: Close application</li>
                 </ul>
                 
@@ -1467,43 +1469,47 @@
                 <p><strong>Shortcut:</strong> <code>Ctrl+W</code> / <code>⌘+W</code></p>
                 <p>Closes the currently active database tab. Any unsaved changes will be lost if you haven't saved the database first.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
                 
-                <h5>6.1.4 Save PGN Database</h5>
+                <h5>6.1.4 Close All Databases</h5>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Alt+W</code> / <code>⌘+⌥+W</code></p>
+                <p>Closes all file-based database tabs. The Clipboard and Search Results tabs are preserved. Any unsaved changes will be lost if you haven't saved the databases first.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
+                
+                <h5>6.1.5 Save PGN Database</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+S</code> / <code>⌘+S</code></p>
                 <p>Saves the active database to disk, overwriting the existing file.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
                 
-                <h5>6.1.5 Save PGN Database as...</h5>
+                <h5>6.1.6 Save PGN Database as...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code></p>
                 <p>Saves the active database to a new file location. This allows you to create a copy of the database without overwriting the original.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
                 
-                <h5>6.1.6 Import Games from Online...</h5>
+                <h5>6.1.7 Import Games from Online...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+I</code> / <code>⌘+Shift+I</code></p>
                 <p>Opens a dialog to import games from Lichess or Chess.com.<br>See <a href="#import-from-online">section 5.2.3</a> for detailed instructions.</p>
                 
-                <h5>6.1.7 Bulk Replace Tags...</h5>
+                <h5>6.1.8 Bulk Replace Tags...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+R</code> / <code>⌘+Shift+R</code></p>
                 <p>Opens a dialog to find and replace text in metadata tags across multiple games.<br>See <a href="#bulk-replace-tags">section 5.3.2</a> for detailed instructions.</p>
                 
-                <h5>6.1.8 Bulk Add/Remove Tags...</h5>
+                <h5>6.1.9 Bulk Add/Remove Tags...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Alt+T</code> / <code>⌘+⌥+T</code></p>
                 <p>Opens a dialog to add or remove metadata tags across multiple games.<br>See <a href="#bulk-add-remove-tags">section 5.3.3</a> for detailed instructions.</p>
                 
-                <h5>6.1.9 Bulk Clean PGN...</h5>
+                <h5>6.1.10 Bulk Clean PGN...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+L</code> / <code>⌘+Shift+L</code></p>
                 <p>Opens a dialog to remove unwanted elements (comments, variations, annotations, etc.) from PGN notation across multiple games.<br>See <a href="#bulk-clean-pgn">section 5.3.4</a> for detailed instructions.</p>
                 
-                <h5>6.1.10 Deduplicate Games in Active Database...</h5>
+                <h5>6.1.11 Deduplicate Games in Active Database...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+U</code> / <code>⌘+Shift+U</code></p>
                 <p>Opens a dialog to identify and remove duplicate games from the active database.<br>See <a href="#deduplicate-games">section 5.3.5</a> for detailed instructions.</p>
                 
-                <h5>6.1.11 Search Games...</h5>
+                <h5>6.1.12 Search Games...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+F</code> / <code>⌘+Shift+F</code></p>
                 <p>Opens a dialog to search for games across databases using multiple criteria and logical operators.<br>See <a href="#searching-games">section 5.4</a> for detailed instructions.</p>
                 
-                <h5>6.1.12 Close Search Results</h5>
+                <h5>6.1.13 Close Search Results</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+W</code> / <code>⌘+Shift+W</code></p>
                 <p>Closes the Search Results tab in the Database Panel. This menu item is only enabled when a search results tab is open.</p>
                 
-                <h5>6.1.13 Close Application</h5>
+                <h5>6.1.14 Close Application</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Q</code> / <code>⌘+Q</code></p>
                 <p>Closes the CARA application. Any unsaved changes in open databases will be lost if you haven't saved them first.</p>
             </div>
@@ -1879,6 +1885,7 @@
                     <li><code>Ctrl+S</code> / <code>⌘+S</code>: Save active PGN database</li>
                     <li><code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>: Save active PGN database as...</li>
                     <li><code>Ctrl+W</code> / <code>⌘+W</code>: Close active PGN database</li>
+                    <li><code>Ctrl+Alt+W</code> / <code>⌘+⌥+W</code>: Close all PGN databases</li>
                     <li><code>Ctrl+Q</code> / <code>⌘+Q</code>: Close application</li>
                 </ul>
                 

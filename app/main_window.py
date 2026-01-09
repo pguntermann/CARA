@@ -170,6 +170,12 @@ class MainWindow(QMainWindow):
         self.close_pgn_database_action.triggered.connect(self._close_pgn_database)
         file_menu.addAction(self.close_pgn_database_action)
         
+        # Close All Databases action
+        self.close_all_databases_action = QAction("Close All Databases", self)
+        self.close_all_databases_action.setShortcut(QKeySequence("Ctrl+Alt+W"))
+        self.close_all_databases_action.triggered.connect(self._close_all_pgn_databases)
+        file_menu.addAction(self.close_all_databases_action)
+        
         file_menu.addSeparator()
         
         # Save PGN Database action
@@ -1302,6 +1308,8 @@ class MainWindow(QMainWindow):
             if success:
                 # Update save menu state
                 self._update_save_menu_state()
+                # Update close menu state
+                self._update_close_menu_state()
                 
                 # Set first game as active if available
                 if first_game:
@@ -1317,6 +1325,8 @@ class MainWindow(QMainWindow):
         # Update save menu state if any databases were opened
         if opened_count > 0:
             self._update_save_menu_state()
+            # Update close menu state
+            self._update_close_menu_state()
             
             # Set last successfully opened database as active
             if last_successful_database:
@@ -1355,8 +1365,29 @@ class MainWindow(QMainWindow):
             self.controller.set_status("PGN database closed")
             # Update save menu state
             self._update_save_menu_state()
+            # Update close menu state
+            self._update_close_menu_state()
         else:
             self.controller.set_status("No PGN database tab selected to close")
+    
+    def _close_all_pgn_databases(self) -> None:
+        """Close all PGN databases except clipboard and search results."""
+        database_controller = self.controller.get_database_controller()
+        closed_count = database_controller.close_all_pgn_databases()
+        
+        if closed_count > 0:
+            # Clear active game if it was from a closed tab
+            self.controller.get_game_controller().set_active_game(None)
+            if closed_count == 1:
+                self.controller.set_status("1 database closed")
+            else:
+                self.controller.set_status(f"{closed_count} databases closed")
+            # Update save menu state
+            self._update_save_menu_state()
+            # Update close menu state
+            self._update_close_menu_state()
+        else:
+            self.controller.set_status("No databases to close")
     
     def _on_database_tab_changed(self, index_or_database) -> None:
         """Handle database tab change to update save menu state and close search results menu state.
@@ -1421,12 +1452,27 @@ class MainWindow(QMainWindow):
         self.save_pgn_database_action.setEnabled(can_save)
     
     def _update_close_menu_state(self) -> None:
-        """Update the enabled state of the Close PGN Database menu item."""
+        """Update the enabled state of the Close PGN Database and Close All Databases menu items."""
         if not hasattr(self, 'close_pgn_database_action'):
             return
         
         can_close = self._can_save_or_close_database()
         self.close_pgn_database_action.setEnabled(can_close)
+        
+        # Update Close All Databases action
+        if hasattr(self, 'close_all_databases_action'):
+            # Check if there are any file-based databases to close
+            database_controller = self.controller.get_database_controller()
+            panel_model = database_controller.get_panel_model()
+            all_databases = panel_model.get_all_databases()
+            
+            # Count file-based databases (exclude clipboard and search_results)
+            file_based_count = sum(
+                1 for identifier in all_databases.keys()
+                if identifier != "clipboard" and identifier != "search_results"
+            )
+            
+            self.close_all_databases_action.setEnabled(file_based_count > 0)
     
     def _save_pgn_database(self) -> None:
         """Save the current PGN database to its existing file."""

@@ -345,6 +345,43 @@ class DatabaseController:
         """
         return self.panel_model.remove_database(file_path)
     
+    def _close_database_by_identifier(self, identifier: str) -> bool:
+        """Close a database by identifier and handle active database switching.
+        
+        This is a helper method that can be used to close any database,
+        not just the active one. It handles the business logic of determining
+        which database should become active after removal.
+        
+        Args:
+            identifier: Database identifier to close.
+            
+        Returns:
+            True if database was closed, False if not found or cannot be closed.
+        """
+        if not identifier or identifier == "clipboard" or identifier == "search_results":
+            return False
+        
+        # Determine which database should become active before removing
+        new_active_model = self._determine_new_active_database(identifier)
+        
+        # Remove the database (this will set active_database to None in the model if it was active)
+        removed = self.panel_model.remove_database(identifier)
+        
+        if removed:
+            # Set the new active database (if one exists)
+            if new_active_model is not None:
+                self.panel_model.set_active_database(new_active_model)
+            else:
+                # No other database tabs exist - set Clipboard as active
+                clipboard_model = self.panel_model.get_database_by_identifier("clipboard")
+                if clipboard_model:
+                    self.panel_model.set_active_database(clipboard_model)
+                else:
+                    # Fallback: set to None if clipboard doesn't exist (shouldn't happen)
+                    self.panel_model.set_active_database(None)
+        
+        return removed
+    
     def close_active_pgn_database(self) -> bool:
         """Close the currently active PGN database and switch to the previous one.
         
@@ -363,30 +400,45 @@ class DatabaseController:
         
         # Find identifier for the active database
         identifier = self.panel_model.find_database_by_model(active_database)
-        if not identifier or identifier == "clipboard":
-            # Cannot close clipboard database
+        if not identifier:
             return False
         
-        # Determine which database should become active before removing
-        new_active_model = self._determine_new_active_database(identifier)
+        return self._close_database_by_identifier(identifier)
+    
+    def close_all_pgn_databases(self) -> int:
+        """Close all PGN databases except clipboard and search results.
         
-        # Remove the database (this will set active_database to None in the model)
-        removed = self.panel_model.remove_database(identifier)
+        This method closes all file-based databases while preserving the clipboard
+        and search results tabs. After closing all databases, the clipboard will
+        be set as the active database.
         
-        if removed:
-            # Set the new active database (if one exists)
-            if new_active_model is not None:
-                self.panel_model.set_active_database(new_active_model)
-            else:
-                # No other database tabs exist - set Clipboard as active
-                clipboard_model = self.panel_model.get_database_by_identifier("clipboard")
-                if clipboard_model:
-                    self.panel_model.set_active_database(clipboard_model)
-                else:
-                    # Fallback: set to None if clipboard doesn't exist (shouldn't happen)
-                    self.panel_model.set_active_database(None)
+        Returns:
+            Number of databases closed.
+        """
+        # Get all databases
+        all_databases = self.panel_model.get_all_databases()
         
-        return removed
+        # Filter to only file-based databases (exclude clipboard and search_results)
+        databases_to_close = [
+            identifier for identifier, info in all_databases.items()
+            if identifier != "clipboard" and identifier != "search_results"
+        ]
+        
+        if not databases_to_close:
+            return 0
+        
+        # Close each database (helper handles active database switching)
+        closed_count = 0
+        for identifier in databases_to_close:
+            if self._close_database_by_identifier(identifier):
+                closed_count += 1
+        
+        # Final state: ensure clipboard is active (in case all were closed)
+        clipboard_model = self.panel_model.get_database_by_identifier("clipboard")
+        if clipboard_model:
+            self.panel_model.set_active_database(clipboard_model)
+        
+        return closed_count
     
     def _determine_new_active_database(self, removed_identifier: str) -> Optional[DatabaseModel]:
         """Determine which database should become active when a database is removed.
