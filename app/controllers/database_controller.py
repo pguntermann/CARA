@@ -312,11 +312,20 @@ class DatabaseController:
             # Write games incrementally to avoid memory issues with large databases
             # This avoids building the entire PGN string in memory
             try:
+                from app.services.pgn_service import PgnService
+                
+                # Get export configuration for fixed_width formatting
+                use_fixed_width, fixed_width = PgnService._get_export_config()
+                
                 with open(file_path, 'w', encoding='utf-8') as f:
                     for i, game in enumerate(games):
                         if game.pgn:
-                            # Write game PGN directly to file
-                            f.write(game.pgn.strip())
+                            # Apply safer normalization that preserves PGN structure
+                            # This respects fixed_width while preserving comments and variations
+                            formatted_pgn = PgnService._normalize_pgn_line_breaks(
+                                game.pgn, use_fixed_width, fixed_width
+                            )
+                            f.write(formatted_pgn.strip())
                             f.write("\n\n")  # Blank lines between games
                         
                         # Update progress every 10 games or on last game
@@ -997,7 +1006,9 @@ class DatabaseController:
             # Clear the model
             model.clear()
             
-            # Convert parsed games to GameData instances and add to model
+            # Convert parsed games to GameData instances first (before adding to model)
+            # This allows us to batch add them for better performance
+            games_data = []
             for file_pos, game_dict in enumerate(parse_result.games, start=1):
                 game_data = GameData(
                     game_number=0,  # Will be set by model when adding
@@ -1016,8 +1027,7 @@ class DatabaseController:
                     annotated=game_dict.get("annotated", False),
                     file_position=file_pos,  # Store original file position (1-based)
                 )
-                # Don't mark as unsaved when reloading from file (games are already saved)
-                model.add_game(game_data, mark_unsaved=False)
+                games_data.append(game_data)
                 
                 # Update progress more frequently for better feedback
                 # Update every 10 games, or every game for first 10, or on last game
@@ -1028,13 +1038,26 @@ class DatabaseController:
                 )
                 
                 if should_update:
-                    # Progress from 50% to 100% for adding games
-                    progress_percent = 50 + int((file_pos / total_games) * 50) if total_games > 0 else 50
+                    # Progress from 50% to 90% for creating GameData objects
+                    progress_percent = 50 + int((file_pos / total_games) * 40) if total_games > 0 else 50
                     progress_service.report_progress(
                         f"Processing game {file_pos}/{total_games}...",
                         progress_percent
                     )
                     QApplication.processEvents()  # Process events to update progress bar
+            
+            # Batch add all games to the model at once (much faster than adding one by one)
+            # This triggers only one view update cycle instead of one per game
+            progress_service.set_status(f"Adding {total_games} game(s) to database...")
+            progress_service.set_progress(90)
+            QApplication.processEvents()  # Process events to update status
+            
+            # Don't mark as unsaved when reloading from file (games are already saved)
+            model.add_games_batch(games_data, mark_unsaved=False)
+            
+            # Final progress update
+            progress_service.set_progress(95)
+            QApplication.processEvents()  # Process events to update progress bar
             
             # Hide progress
             progress_service.hide_progress()

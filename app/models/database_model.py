@@ -268,6 +268,53 @@ class DatabaseModel(QAbstractTableModel):
             self.dataChanged.emit(unsaved_index, unsaved_index,
                                  [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole])
     
+    def add_games_batch(self, games: List[GameData], mark_unsaved: bool = True) -> None:
+        """Add multiple games to the model in a single batch operation.
+        
+        This is much more efficient than calling add_game() multiple times,
+        especially when the model is already connected to views, as it only
+        triggers one view update cycle instead of one per game.
+        
+        Args:
+            games: List of GameData instances to add.
+            mark_unsaved: If True, mark all games as having unsaved changes.
+                         Set to False when loading games from a file (they're already saved).
+                         Default is True for newly added games (import, paste, etc.).
+        """
+        if not games:
+            return
+        
+        # Set game numbers for all games
+        start_count = len(self._games)
+        for i, game in enumerate(games):
+            if game.file_position > 0:
+                game.game_number = game.file_position
+            else:
+                game.game_number = start_count + i + 1
+        
+        # Batch insert: notify view once for all rows
+        first_row = start_count
+        last_row = start_count + len(games) - 1
+        self.beginInsertRows(self.index(first_row, 0).parent(), first_row, last_row)
+        
+        # Add all games to the list
+        self._games.extend(games)
+        
+        # Mark games as unsaved if requested
+        if mark_unsaved:
+            self._unsaved_games.update(games)
+        
+        self.endInsertRows()
+        
+        # Emit dataChanged for unsaved column if needed (only if marking as unsaved)
+        # We emit for all rows at once for efficiency
+        if mark_unsaved:
+            parent = QModelIndex()
+            top_left = self.index(first_row, self.COL_UNSAVED, parent)
+            bottom_right = self.index(last_row, self.COL_UNSAVED, parent)
+            self.dataChanged.emit(top_left, bottom_right,
+                                 [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole])
+    
     def clear(self) -> None:
         """Clear all games from the model."""
         if len(self._games) > 0:

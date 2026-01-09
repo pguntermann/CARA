@@ -43,7 +43,8 @@ def _parse_game_chunk(game_chunk: str) -> Optional[Dict[str, Any]]:
         if game is None:
             return None
         
-        return PgnService._extract_game_data(game)
+        # Pass the original game_chunk text to preserve it instead of regenerating with StringExporter
+        return PgnService._extract_game_data(game, original_pgn_text=game_chunk)
     except Exception:
         return None
 
@@ -254,6 +255,10 @@ class PgnService:
             inside_comment_before = comment_depth > 0
             inside_variation_before = variation_depth > 0
             
+            # Store depth BEFORE updating (needed for termination detection)
+            comment_depth_before_line = comment_depth
+            variation_depth_before_line = variation_depth
+            
             # Update depth
             comment_depth += line.count('{') - line.count('}')
             variation_depth += line.count('(') - line.count(')')
@@ -279,21 +284,25 @@ class PgnService:
             # Detect termination marker (only if not inside comment/variation and in moves section)
             # IMPORTANT: We need to check that we're not inside a comment/variation
             # AND that the termination marker is not inside a comment/variation on this line
-            # To do this properly, we need to check if the termination is actually outside comments/variations
+            # We must use the comment/variation depth BEFORE processing this line to catch
+            # cases where a comment closes on the same line as the termination
             has_termination = False
-            if in_moves and not inside_comment and not inside_variation:
+            if in_moves and not inside_comment_before and not inside_variation_before:
                 # Check if termination marker exists in the line
                 termination_match = termination_pattern.search(line_stripped)
                 if termination_match:
                     # Verify the termination marker is not inside a comment or variation
-                    # by checking the position relative to braces/parentheses
+                    # by checking the position relative to braces/parentheses on THIS line
+                    # AND ensuring we're not in a multi-line comment/variation (using depth BEFORE this line)
                     term_pos = termination_match.start()
-                    # Count braces and parentheses before the termination marker
+                    # Count braces and parentheses before the termination marker on this line
                     before_term = line_stripped[:term_pos]
                     comment_count_before = before_term.count('{') - before_term.count('}')
                     variation_count_before = before_term.count('(') - before_term.count(')')
-                    # If we're not inside a comment/variation and counts are balanced, it's valid
-                    if comment_count_before == 0 and variation_count_before == 0:
+                    # The termination is valid only if:
+                    # 1. We're not in a multi-line comment/variation (depth BEFORE this line is 0)
+                    # 2. The termination is not inside a comment/variation on this line (local counts are 0)
+                    if comment_depth_before_line == 0 and variation_depth_before_line == 0 and comment_count_before == 0 and variation_count_before == 0:
                         has_termination = True
             
             # Game start detection
@@ -625,15 +634,21 @@ class PgnService:
     
     @staticmethod
     def _normalize_pgn_line_breaks(pgn_text: str, use_fixed_width: bool, fixed_width: int) -> str:
-        """Normalize line breaks in PGN move notation.
+        """Normalize line breaks in PGN move notation while preserving structure.
+        
+        This function safely reformats PGN text by:
+        - Preserving comments { ... } structure
+        - Preserving variations ( ... ) structure
+        - Only reformatting move notation text
+        - Applying fixed width only to move notation, not inside comments/variations
         
         Args:
-            pgn_text: PGN text from StringExporter.
+            pgn_text: PGN text (can be from StringExporter or original file).
             use_fixed_width: If True, enforce fixed width; if False, single line.
             fixed_width: Character width limit when use_fixed_width is True.
             
         Returns:
-            Normalized PGN text with line breaks adjusted.
+            Normalized PGN text with line breaks adjusted while preserving structure.
         """
         try:
             # Split into headers and move notation
@@ -645,52 +660,168 @@ class PgnService:
             moves = parts[1]
             
             if not use_fixed_width:
-                # Single line: remove all line breaks in move notation
+                # Single line: remove line breaks but preserve structure
+                # Replace newlines with spaces, but be careful not to break comments/variations
+                # Simple approach: replace newlines with spaces, then clean up multiple spaces
                 moves_normalized = moves.replace('\n', ' ').replace('  ', ' ').strip()
             else:
-                # Fixed width: remove premature line breaks (before width limit)
-                # First, remove all line breaks and rebuild with proper width enforcement
-                moves_single_line = moves.replace('\n', ' ').replace('  ', ' ').strip()
-                
-                # Now rebuild with proper line breaks at width limit
-                normalized_lines = []
-                words = moves_single_line.split(' ')
-                current_line = ''
-                
-                for word in words:
-                    if not word:
-                        continue
-                    
-                    # Check if adding this word would exceed width
-                    if current_line:
-                        test_line = current_line + ' ' + word
-                    else:
-                        test_line = word
-                    
-                    if len(test_line) <= fixed_width:
-                        # Can add to current line
-                        if current_line:
-                            current_line += ' ' + word
-                        else:
-                            current_line = word
-                    else:
-                        # Would exceed width - start new line
-                        if current_line:
-                            normalized_lines.append(current_line)
-                        current_line = word
-                
-                # Add the last line if it exists
-                if current_line:
-                    normalized_lines.append(current_line)
-                
-                # Join normalized lines back together
-                moves_normalized = '\n'.join(normalized_lines)
+                # Fixed width: reformat move notation while preserving comments/variations
+                moves_normalized = PgnService._normalize_moves_with_fixed_width(
+                    moves, fixed_width
+                )
             
             # Rejoin headers and moves
             return headers + '\n\n' + moves_normalized
         except Exception:
             # If normalization fails for any reason, return original text
             return pgn_text
+    
+    @staticmethod
+    def _normalize_moves_with_fixed_width(moves_text: str, fixed_width: int) -> str:
+        """Normalize move notation with fixed width while preserving comments and variations.
+        
+        Simple approach: track line length and break when needed, ensuring we don't
+        break in the middle of moves, comments, or variations.
+        
+        Args:
+            moves_text: The moves section of PGN text.
+            fixed_width: Character width limit for lines.
+            
+        Returns:
+            Normalized moves text with fixed width applied.
+        """
+        result_lines = []
+        current_line = ''
+        
+        i = 0
+        comment_depth = 0
+        variation_depth = 0
+        
+        def break_line():
+            """Break the current line at the last space, or at current position if no space."""
+            nonlocal current_line
+            if not current_line.strip():
+                return
+            
+            last_space = current_line.rfind(' ')
+            if last_space > 0:
+                # Break at word boundary
+                line_to_add = current_line[:last_space].rstrip()
+                if line_to_add:
+                    result_lines.append(line_to_add)
+                current_line = current_line[last_space + 1:]
+            else:
+                # No space found, break here anyway
+                result_lines.append(current_line.rstrip())
+                current_line = ''
+        
+        while i < len(moves_text):
+            char = moves_text[i]
+            current_line_len = len(current_line)
+            
+            # Check if adding this character would exceed width
+            if (current_line_len + 1) > fixed_width and current_line_len > 0:
+                # Need to break - but only if we're not in the middle of a comment/variation delimiter
+                # (we can break inside comments/variations, just not in the middle of { } or ( ))
+                if char in '{})' and (comment_depth > 0 or variation_depth > 0):
+                    # We're closing a comment/variation, add it first then break
+                    current_line += char
+                    if char == '}':
+                        comment_depth = max(0, comment_depth - 1)
+                    elif char == ')':
+                        variation_depth = max(0, variation_depth - 1)
+                    i += 1
+                    # Now break after the closing delimiter
+                    if len(current_line) > fixed_width:
+                        break_line()
+                    continue
+                elif char == ' ':
+                    # We're at a space - check if it's safe to break
+                    # Don't break if the next token is a move number (digit followed by dot)
+                    lookahead = i + 1
+                    while lookahead < len(moves_text) and moves_text[lookahead] == ' ':
+                        lookahead += 1
+                    if lookahead < len(moves_text):
+                        next_char = moves_text[lookahead]
+                        # If next is a digit, check if it's followed by a dot (move number like "17.")
+                        if next_char.isdigit() and lookahead + 1 < len(moves_text) and moves_text[lookahead + 1] == '.':
+                            # This is a move number - find an earlier safe break point in current_line
+                            # Look backwards for the last space that's NOT before a move number
+                            last_safe_space = -1
+                            for j in range(len(current_line) - 1, -1, -1):
+                                if current_line[j] == ' ':
+                                    # Check if the token after this space is a move number
+                                    after_space_idx = j + 1
+                                    if after_space_idx < len(current_line):
+                                        # Extract the token after this space (until next space or end)
+                                        token_end = after_space_idx
+                                        while token_end < len(current_line) and current_line[token_end] != ' ':
+                                            token_end += 1
+                                        token = current_line[after_space_idx:token_end]
+                                        
+                                        # Check if token is a move number pattern (digits followed by dot)
+                                        is_move_number = False
+                                        if token and token[0].isdigit():
+                                            # Check if it ends with a dot (like "17.")
+                                            dot_idx = 0
+                                            while dot_idx < len(token) and token[dot_idx].isdigit():
+                                                dot_idx += 1
+                                            if dot_idx < len(token) and token[dot_idx] == '.':
+                                                is_move_number = True
+                                        
+                                        if not is_move_number:
+                                            # This is a safe break point
+                                            last_safe_space = j
+                                            break
+                            
+                            if last_safe_space > 0:
+                                # Break at the earlier safe point
+                                line_to_add = current_line[:last_safe_space].rstrip()
+                                if line_to_add:
+                                    result_lines.append(line_to_add)
+                                current_line = current_line[last_safe_space + 1:]
+                                # Don't add the current space, continue processing
+                                i += 1
+                                continue
+                            # If no safe space found, we have to break here anyway (better than exceeding)
+                            # But this might cause parsing issues - at least we tried
+                    # Safe to break at this space
+                    break_line()
+                else:
+                    # Break before adding this character (at word boundary)
+                    break_line()
+            
+            # Track comment/variation depth
+            if char == '{':
+                comment_depth += 1
+            elif char == '}':
+                comment_depth = max(0, comment_depth - 1)
+            elif char == '(' and comment_depth == 0:
+                variation_depth += 1
+            elif char == ')' and comment_depth == 0:
+                variation_depth = max(0, variation_depth - 1)
+            
+            # Handle newlines: in move notation, treat as space; in comments/variations, preserve
+            if char == '\n':
+                if comment_depth == 0 and variation_depth == 0:
+                    # In move notation: treat as space
+                    if not current_line.endswith(' '):
+                        current_line += ' '
+                else:
+                    # In comment/variation: preserve newline
+                    current_line += char
+                i += 1
+                continue
+            
+            # Add character to current line
+            current_line += char
+            i += 1
+        
+        # Add remaining line
+        if current_line.strip():
+            result_lines.append(current_line.rstrip())
+        
+        return '\n'.join(result_lines)
     
     @staticmethod
     def export_game_to_pgn(chess_game: chess.pgn.Game) -> str:
@@ -721,11 +852,14 @@ class PgnService:
         return PgnService._normalize_pgn_line_breaks(pgn_text, use_fixed_width, fixed_width)
     
     @staticmethod
-    def _extract_game_data(game: chess.pgn.Game) -> Optional[Dict[str, Any]]:
+    def _extract_game_data(game: chess.pgn.Game, original_pgn_text: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Extract game data from a chess.pgn.Game object.
         
         Args:
             game: chess.pgn.Game instance.
+            original_pgn_text: Optional original PGN text to preserve instead of regenerating with StringExporter.
+                            If provided, this will be used as the game's PGN text. If None, falls back to
+                            StringExporter (for backward compatibility or cases where original text isn't available).
             
         Returns:
             Dictionary with game data or None if extraction fails or game is empty.
@@ -766,8 +900,19 @@ class PgnService:
             # The PlyCount header is informational and may not always be accurate
             
             # Extract PGN text for this game
-            # Export the game as PGN string
-            game_pgn = PgnService.export_game_to_pgn(game)
+            # Use original PGN text if provided to preserve it, otherwise fall back to StringExporter
+            if original_pgn_text is not None:
+                # Use the original PGN text, but normalize line breaks to avoid mixed CRLF/LF issues
+                # Strip trailing whitespace and normalize all line endings to LF (\n)
+                game_pgn = original_pgn_text.rstrip()
+                # Normalize line breaks: replace CRLF (\r\n) and CR (\r) with LF (\n)
+                game_pgn = game_pgn.replace('\r\n', '\n').replace('\r', '\n')
+                # Note: We do NOT apply fixed_width formatting here during loading.
+                # The fixed_width setting should only be applied when saving (in save_pgn_to_file),
+                # not when loading, to preserve the original PGN structure and avoid parsing errors.
+            else:
+                # Fallback to StringExporter for backward compatibility (e.g., when games are created/modified in memory)
+                game_pgn = PgnService.export_game_to_pgn(game)
             
             # Check if CARAAnalysisData tag exists (check both headers and exported PGN for robustness)
             # Check headers first (most reliable)
