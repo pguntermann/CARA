@@ -59,7 +59,8 @@ class PgnService:
     _export_config_cache: Optional[Tuple[bool, int]] = None
     
     @staticmethod
-    def _normalize_pgn_text(pgn_text: str) -> str:
+    def _normalize_pgn_text(pgn_text: str, progress_callback: Optional[Callable[[int, str], None]] = None, 
+                            progress_start: int = 0, progress_end: int = 20) -> str:
         """Normalize PGN text for parsing.
         
         This method handles normalization that must run sequentially before parallel parsing.
@@ -67,6 +68,10 @@ class PgnService:
         
         Args:
             pgn_text: Raw PGN text string.
+            progress_callback: Optional callback function(progress: int, message: str) for progress updates.
+                             Progress is reported as percentage (0-100) within the progress_start to progress_end range.
+            progress_start: Starting progress percentage for this phase (default: 0).
+            progress_end: Ending progress percentage for this phase (default: 20).
             
         Returns:
             Normalized PGN text string.
@@ -82,12 +87,17 @@ class PgnService:
         # Strategy: Remove blank lines inside comments, but preserve blank lines between headers
         # Also: Insert blank lines when headers appear directly after moves (missing game separators)
         lines = pgn_text.split('\n')
+        total_lines = len(lines)
         normalized_lines = []
         in_headers = True
         in_moves = False  # Track if we're currently in move notation
         last_was_header = False
         last_was_blank = False
         comment_depth = 0  # Track nesting depth of comments (count of { minus })
+        
+        # Progress update frequency: update every N lines or at key milestones
+        # For large files, update every 1% of lines or every 1000 lines, whichever is more frequent
+        update_interval = max(1, min(1000, total_lines // 100)) if total_lines > 0 else 1000
         
         for i, line in enumerate(lines):
             line_stripped = line.strip()
@@ -156,72 +166,297 @@ class PgnService:
                 last_was_header = False
                 last_was_blank = False
                 normalized_lines.append(line)
+            
+            # Report progress periodically
+            if progress_callback and (i == 0 or i == total_lines - 1 or i % update_interval == 0):
+                # Calculate progress percentage within this phase's range
+                if total_lines > 0:
+                    line_progress = (i + 1) / total_lines
+                    progress_percent = progress_start + int(line_progress * (progress_end - progress_start))
+                    progress_percent = min(progress_end, max(progress_start, progress_percent))
+                else:
+                    progress_percent = progress_start
+                
+                progress_callback(
+                    progress_percent,
+                    f"Normalizing PGN text... ({i + 1}/{total_lines} lines)"
+                )
         
         # Join back with single newlines
         return '\n'.join(normalized_lines)
     
     @staticmethod
-    def _detect_game_boundaries(normalized_pgn: str) -> List[Tuple[int, int]]:
-        """Detect game boundaries in normalized PGN text using python-chess.
+    def _detect_game_boundaries(normalized_pgn: str, progress_callback: Optional[Callable[[int, str], None]] = None,
+                                progress_start: int = 20, progress_end: int = 40) -> List[Tuple[int, int]]:
+        """Detect game boundaries in normalized PGN text using pattern-based detection.
         
-        This method uses python-chess's read_game() to accurately detect game boundaries
-        by parsing sequentially and tracking stream positions. This is more reliable
-        than manual pattern matching.
+        This method uses pattern matching to detect game boundaries by scanning for:
+        - Header tags: [Tag "value"] format
+        - Move notation: Numbered moves (1., 2., etc.) or game termination markers
+        - Game termination: 1-0, 0-1, 1/2-1/2, or *
+        
+        Handles games with headers, games without headers, comments, variations, and edge cases.
+        Much faster than full parsing while maintaining accuracy.
         
         Args:
             normalized_pgn: Normalized PGN text string.
+            progress_callback: Optional callback function(progress: int, message: str) for progress updates.
+                             Progress is reported as percentage (0-100) within the progress_start to progress_end range.
+            progress_start: Starting progress percentage for this phase (default: 20).
+            progress_end: Ending progress percentage for this phase (default: 40).
             
         Returns:
             List of (start_index, end_index) tuples for each game (line indices).
         """
         boundaries = []
         lines = normalized_pgn.split('\n')
-        pgn_io = io.StringIO(normalized_pgn)
+        total_lines = len(lines)
         
-        # Track line positions in the original text
-        # Build a mapping from character position to line number
-        char_to_line = {}
-        char_pos = 0
+        if total_lines == 0:
+            return boundaries
+        
+        # Patterns for detection
+        # Header pattern: [Tag "value"] or [Tag 'value'] - must be at start of line (after whitespace)
+        header_pattern = re.compile(r'^\s*\[([A-Za-z][A-Za-z0-9_]*)\s+"[^"]*"\]\s*$')
+        # Alternative header format with single quotes (less common but valid)
+        header_pattern_alt = re.compile(r"^\s*\[([A-Za-z][A-Za-z0-9_]*)\s+'[^']*'\]\s*$")
+        
+        # Move notation pattern: starts with number followed by dot (1., 2., etc.)
+        # Must not be inside a comment or variation
+        move_pattern = re.compile(r'\b([1-9]\d{0,2}|0)\.(?:\.\.| |\w)')
+        
+        # Game termination markers: 1-0, 0-1, 1/2-1/2, or *
+        # These must appear at the end of move notation (not in comments/variations)
+        termination_pattern = re.compile(r'\b(1-0|0-1|1/2-1/2|\*)\b')
+        
+        # State tracking
+        game_start_line = None
+        in_headers = False
+        in_moves = False
+        comment_depth = 0  # Track nested comments { }
+        variation_depth = 0  # Track nested variations ( )
+        game_count = 0
+        
+        # Optimized line position tracking: build cumulative line lengths
+        # This avoids the expensive character-to-line mapping
+        line_lengths = [len(line) + 1 for line in lines]  # +1 for newline
+        cumulative_lengths = [0]
+        for length in line_lengths:
+            cumulative_lengths.append(cumulative_lengths[-1] + length)
+        
         for line_idx, line in enumerate(lines):
-            line_length = len(line) + 1  # +1 for newline
-            for i in range(line_length):
-                char_to_line[char_pos + i] = line_idx
-            char_pos += line_length
+            line_stripped = line.strip()
+            is_blank = not line_stripped
+            
+            # Track comment and variation depth
+            # Count braces and parentheses to know if we're inside comments/variations
+            # We need to check depth BEFORE updating to know if we're entering/exiting comments/variations
+            inside_comment_before = comment_depth > 0
+            inside_variation_before = variation_depth > 0
+            
+            # Update depth
+            comment_depth += line.count('{') - line.count('}')
+            variation_depth += line.count('(') - line.count(')')
+            
+            # Ensure depth never goes negative (handles malformed PGN)
+            comment_depth = max(0, comment_depth)
+            variation_depth = max(0, variation_depth)
+            
+            # Check if we're inside a comment or variation AFTER updating depth
+            # This handles cases where comments/variations open and close on the same line
+            inside_comment = comment_depth > 0
+            inside_variation = variation_depth > 0
+            
+            # Detect header line
+            is_header = bool(header_pattern.match(line) or header_pattern_alt.match(line))
+            
+            # Detect move notation (only if not inside comment/variation)
+            # Check both before and after to handle comments that span lines
+            has_move_notation = False
+            if not inside_comment and not inside_variation:
+                has_move_notation = bool(move_pattern.search(line_stripped))
+            
+            # Detect termination marker (only if not inside comment/variation and in moves section)
+            # IMPORTANT: We need to check that we're not inside a comment/variation
+            # AND that the termination marker is not inside a comment/variation on this line
+            # To do this properly, we need to check if the termination is actually outside comments/variations
+            has_termination = False
+            if in_moves and not inside_comment and not inside_variation:
+                # Check if termination marker exists in the line
+                termination_match = termination_pattern.search(line_stripped)
+                if termination_match:
+                    # Verify the termination marker is not inside a comment or variation
+                    # by checking the position relative to braces/parentheses
+                    term_pos = termination_match.start()
+                    # Count braces and parentheses before the termination marker
+                    before_term = line_stripped[:term_pos]
+                    comment_count_before = before_term.count('{') - before_term.count('}')
+                    variation_count_before = before_term.count('(') - before_term.count(')')
+                    # If we're not inside a comment/variation and counts are balanced, it's valid
+                    if comment_count_before == 0 and variation_count_before == 0:
+                        has_termination = True
+            
+            # Game start detection
+            if game_start_line is None:
+                # Start a new game if we see:
+                # 1. A header line (game with headers)
+                # 2. Move notation (game without headers)
+                if is_header:
+                    game_start_line = line_idx
+                    in_headers = True
+                    in_moves = False
+                elif has_move_notation:
+                    # Game without headers - starts directly with moves
+                    game_start_line = line_idx
+                    in_headers = False
+                    in_moves = True
+            elif in_headers and is_header:
+                # We're already in headers and see another header
+                # This could be:
+                # 1. Continuation of current game's headers (normal case)
+                # 2. Start of next game if previous game had only headers
+                # Check if there was a blank line separator or if we're transitioning
+                # For now, treat as continuation (will be handled by blank line detection)
+                pass
+            
+            # State transitions
+            elif in_headers:
+                # We're in headers section
+                if is_header:
+                    # Continue in headers
+                    pass
+                elif has_move_notation:
+                    # Transition from headers to moves
+                    in_headers = False
+                    in_moves = True
+                elif is_blank:
+                    # Blank line in headers - might be separator, but continue current game
+                    # (normalization should have handled this, but be safe)
+                    # If next line is a header, we'll detect it as a new game start
+                    pass
+            
+            elif in_moves:
+                # We're in moves section
+                if has_termination:
+                    # Found game termination marker - end this game AT THIS LINE (include termination)
+                    boundaries.append((game_start_line, line_idx))
+                    game_count += 1
+                    
+                    # Report progress
+                    if progress_callback:
+                        if total_lines > 0:
+                            line_progress = (line_idx + 1) / total_lines
+                            progress_percent = progress_start + int(line_progress * (progress_end - progress_start))
+                            progress_percent = min(progress_end, max(progress_start, progress_percent))
+                        else:
+                            progress_percent = progress_start
+                        
+                        if game_count <= 5 or game_count % 10 == 0:
+                            progress_callback(
+                                progress_percent,
+                                f"Detecting game boundaries... (found {game_count} game(s))"
+                            )
+                    
+                    # Reset for next game - IMPORTANT: Skip blank line check for this iteration
+                    game_start_line = None
+                    in_headers = False
+                    in_moves = False
+                    # Continue to next iteration - don't process blank lines or headers this iteration
+                    continue
+                elif is_header:
+                    # Header appears directly while in moves (no blank line separator)
+                    # This means previous game ended without termination marker
+                    # End current game at previous line (before this header)
+                    if game_start_line is not None:
+                        # Find last non-blank line before this header
+                        end_line = line_idx - 1
+                        while end_line >= game_start_line and not lines[end_line].strip():
+                            end_line -= 1
+                        
+                        if end_line >= game_start_line:
+                            boundaries.append((game_start_line, end_line))
+                            game_count += 1
+                            
+                            # Report progress
+                            if progress_callback:
+                                if total_lines > 0:
+                                    line_progress = line_idx / total_lines
+                                    progress_percent = progress_start + int(line_progress * (progress_end - progress_start))
+                                    progress_percent = min(progress_end, max(progress_start, progress_percent))
+                                else:
+                                    progress_percent = progress_start
+                                
+                                if game_count <= 5 or game_count % 10 == 0:
+                                    progress_callback(
+                                        progress_percent,
+                                        f"Detecting game boundaries... (found {game_count} game(s))"
+                                    )
+                    
+                    # Start new game with this header
+                    game_start_line = line_idx
+                    in_headers = True
+                    in_moves = False
+                    # Continue to next iteration - don't process blank lines this iteration
+                    continue
+            
+            # Handle edge case: blank line between games (header appears on next line)
+            # This handles games ending without termination marker, followed by blank line + header
+            # Only check if we haven't already processed termination or header in this iteration
+            if is_blank and game_start_line is not None and not has_termination:
+                # Check if next non-blank line is a header (indicates next game)
+                if line_idx + 1 < total_lines:
+                    # Find next non-blank line
+                    next_non_blank_idx = line_idx + 1
+                    while next_non_blank_idx < total_lines and not lines[next_non_blank_idx].strip():
+                        next_non_blank_idx += 1
+                    
+                    if next_non_blank_idx < total_lines:
+                        next_line = lines[next_non_blank_idx].strip()
+                        is_next_header = bool(header_pattern.match(next_line) or header_pattern_alt.match(next_line))
+                        
+                        if is_next_header:
+                            # Next game starts - end current game at last non-blank line
+                            # Find last non-blank line before this blank line
+                            end_line = line_idx - 1
+                            while end_line >= game_start_line and not lines[end_line].strip():
+                                end_line -= 1
+                            
+                            if end_line >= game_start_line:
+                                boundaries.append((game_start_line, end_line))
+                                game_count += 1
+                                
+                                # Report progress
+                                if progress_callback:
+                                    if total_lines > 0:
+                                        line_progress = (line_idx + 1) / total_lines
+                                        progress_percent = progress_start + int(line_progress * (progress_end - progress_start))
+                                        progress_percent = min(progress_end, max(progress_start, progress_percent))
+                                    else:
+                                        progress_percent = progress_start
+                                    
+                                    if game_count <= 5 or game_count % 10 == 0:
+                                        progress_callback(
+                                            progress_percent,
+                                            f"Detecting game boundaries... (found {game_count} game(s))"
+                                        )
+                            
+                            # Will start new game when we reach next_non_blank_idx
+                            game_start_line = None
+                            in_headers = False
+                            in_moves = False
         
-        # Parse games sequentially to detect boundaries
-        while True:
-            # Save position before reading
-            pos_before = pgn_io.tell()
+        # Handle last game if file doesn't end with termination marker
+        if game_start_line is not None:
+            # Last game ends at last line
+            boundaries.append((game_start_line, total_lines - 1))
+            game_count += 1
             
-            # Check if we're at the end
-            peek_content = pgn_io.read(1)
-            if not peek_content:
-                break
-            pgn_io.seek(pos_before)
-            
-            # Check if only whitespace remains
-            peek_ahead = pgn_io.read(100)
-            pgn_io.seek(pos_before)
-            if not peek_ahead.strip():
-                break
-            
-            # Parse one game
-            game = chess.pgn.read_game(pgn_io)
-            if game is None:
-                break
-            
-            # Get position after reading
-            pos_after = pgn_io.tell()
-            
-            # Check if stream advanced (safety check)
-            if pos_after == pos_before:
-                break
-            
-            # Convert character positions to line indices
-            start_line = char_to_line.get(pos_before, 0)
-            end_line = char_to_line.get(pos_after - 1, len(lines) - 1)
-            
-            boundaries.append((start_line, end_line))
+            # Final progress update
+            if progress_callback:
+                progress_callback(
+                    progress_end,
+                    f"Detecting game boundaries... (found {game_count} game(s))"
+                )
         
         return boundaries
     
@@ -255,7 +490,12 @@ class PgnService:
         
         Args:
             pgn_text: PGN text string (can contain multiple games).
-            progress_callback: Optional callback function(game_count: int, message: str) for progress updates.
+            progress_callback: Optional callback function(progress: int, message: str) for progress updates.
+                             Progress is reported as percentage (0-100) across all phases:
+                             - Normalization: 0-20%
+                             - Boundary Detection: 20-40%
+                             - Splitting: 40-42%
+                             - Parsing: 42-100%
             
         Returns:
             PgnParseResult with parsed game data or error message.
@@ -264,26 +504,39 @@ class PgnService:
             return PgnParseResult(False, error_message="Empty PGN text")
         
         try:
-            # Phase 1: Normalize PGN text (sequential, required)
-            if progress_callback:
-                progress_callback(0, "Normalizing PGN text...")
+            # Allocate progress percentages across phases:
+            # Phase 1 (Normalization): 0-20%
+            # Phase 2 (Boundary Detection): 20-40%
+            # Phase 3 (Splitting): 40-42% (quick phase)
+            # Phase 4 (Parsing): 42-100%
             
-            normalized_pgn = PgnService._normalize_pgn_text(pgn_text)
+            # Phase 1: Normalize PGN text (sequential, required)
+            normalized_pgn = PgnService._normalize_pgn_text(
+                pgn_text, 
+                progress_callback=progress_callback,
+                progress_start=0,
+                progress_end=20
+            )
             
             # Phase 2: Detect game boundaries (sequential, fast)
-            if progress_callback:
-                progress_callback(0, "Detecting game boundaries...")
-            
-            boundaries = PgnService._detect_game_boundaries(normalized_pgn)
+            boundaries = PgnService._detect_game_boundaries(
+                normalized_pgn,
+                progress_callback=progress_callback,
+                progress_start=20,
+                progress_end=40
+            )
             
             if not boundaries:
                 return PgnParseResult(False, error_message="No valid games found in PGN text")
             
             # Phase 3: Split into chunks (sequential, fast)
             if progress_callback:
-                progress_callback(0, f"Splitting into {len(boundaries)} game(s)...")
+                progress_callback(41, f"Splitting into {len(boundaries)} game(s)...")
             
             chunks = PgnService._split_into_chunks(normalized_pgn, boundaries)
+            
+            if progress_callback:
+                progress_callback(42, f"Prepared {len(chunks)} game(s) for parsing...")
             
             # Phase 4: Parse chunks in parallel
             total_games = len(chunks)
@@ -318,8 +571,12 @@ class PgnService:
                     
                     completed_count += 1
                     if progress_callback:
+                        # Progress from 42% to 100% for parsing phase
+                        # Reserve 42% for normalization/boundary detection/splitting
+                        parsing_progress = 42 + int((completed_count / total_games) * 58) if total_games > 0 else 42
+                        parsing_progress = min(100, max(42, parsing_progress))
                         progress_callback(
-                            completed_count,
+                            parsing_progress,
                             f"Parsed {completed_count}/{total_games} game(s)..."
                         )
             finally:

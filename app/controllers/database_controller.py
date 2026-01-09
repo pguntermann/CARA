@@ -488,11 +488,21 @@ class DatabaseController:
             QApplication.processEvents()  # Process events to update status
             
             # Define progress callback for parsing
-            def parsing_progress(game_count: int, message: str) -> None:
-                """Update progress during parsing."""
+            def parsing_progress(progress_value: int, message: str) -> None:
+                """Update progress during parsing.
+                
+                Args:
+                    progress_value: Progress percentage (0-100) for all phases.
+                    message: Status message to display.
+                """
                 progress_service.set_status(message)
-                # Update every 10 games or first few games for immediate feedback
-                if game_count <= 10 or game_count % 10 == 0:
+                # All phases now report percentage-based progress
+                progress_service.set_progress(progress_value)
+                progress_service.set_indeterminate(False)
+                # Update UI periodically to avoid excessive processing
+                # Update more frequently for early phases (normalization/boundary detection)
+                # which report progress more often
+                if progress_value <= 42 or progress_value % 5 == 0:
                     QApplication.processEvents()  # Process events to update status
             
             # Parse PGN with progress callback
