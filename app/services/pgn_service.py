@@ -690,6 +690,23 @@ class PgnService:
         Returns:
             Normalized moves text with fixed width applied.
         """
+        # First, normalize line endings and remove existing line breaks in move notation
+        # This ensures we start with clean, continuous text before applying fixed-width formatting
+        # Convert all line endings to LF first
+        moves_text_normalized = moves_text.replace('\r\n', '\n').replace('\r', '\n')
+        
+        # Now remove all existing line breaks by converting them to spaces
+        # This is critical because the input text may already have line breaks from
+        # previous saves or StringExporter, and we need to start fresh
+        # We'll preserve structure by converting newlines to spaces, then the function
+        # will re-apply proper fixed-width formatting
+        moves_text_normalized = moves_text_normalized.replace('\n', ' ')
+        # Clean up multiple consecutive spaces
+        import re
+        moves_text_normalized = re.sub(r' +', ' ', moves_text_normalized).strip()
+        
+        moves_text = moves_text_normalized
+        
         result_lines = []
         current_line = ''
         
@@ -840,11 +857,11 @@ class PgnService:
         # Get cached export configuration
         use_fixed_width, fixed_width = PgnService._get_export_config()
         
-        # Export with appropriate column setting
-        if use_fixed_width:
-            exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=fixed_width)
-        else:
-            exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
+        # Always export with columns=None to get continuous text
+        # Our normalization function will handle all fixed-width formatting
+        # This ensures consistent behavior across platforms (StringExporter's column
+        # handling may differ between platforms)
+        exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
         
         pgn_text = chess_game.accept(exporter).strip()
         
