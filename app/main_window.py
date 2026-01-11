@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
 )
 from PyQt6.QtGui import QAction, QKeySequence, QCloseEvent, QColor, QDesktopServices, QCursor
-from PyQt6.QtCore import Qt, QEvent, QTimer, QUrl
+from PyQt6.QtCore import Qt, QEvent, QTimer, QUrl, QThread, pyqtSignal
 
 from app.views.main_panel import MainPanel
 from app.views.detail_panel import DetailPanel
@@ -30,6 +30,7 @@ from app.views.engine_configuration_dialog import EngineConfigurationDialog
 from app.views.classification_settings_dialog import ClassificationSettingsDialog
 from app.views.about_dialog import AboutDialog
 from app.views.message_dialog import MessageDialog
+from app.views.confirmation_dialog import ConfirmationDialog
 from app.controllers.app_controller import AppController
 from app.input.shortcut_manager import ShortcutManager
 from app.models.column_profile_model import DEFAULT_PROFILE_NAME
@@ -1000,6 +1001,13 @@ class MainWindow(QMainWindow):
         
         help_menu.addSeparator()
         
+        # Check for Updates action
+        check_updates_action = QAction("Check for Updates...", self)
+        check_updates_action.triggered.connect(self._check_for_updates)
+        help_menu.addAction(check_updates_action)
+        
+        help_menu.addSeparator()
+        
         # About action
         about_action = QAction("About...", self)
         # Set menu role to NoRole to prevent macOS from moving it to the application menu
@@ -1893,6 +1901,75 @@ class MainWindow(QMainWindow):
         """Show the about dialog."""
         dialog = AboutDialog(self.config, self)
         dialog.exec()
+    
+    def _check_for_updates(self) -> None:
+        """Check for application updates."""
+        # Run version check in a separate thread to avoid blocking UI
+        class VersionCheckThread(QThread):
+            finished = pyqtSignal(bool, bool, str, str)  # success, is_newer, remote_version, error_message
+            
+            def __init__(self, controller, url):
+                super().__init__()
+                self.controller = controller
+                self.url = url
+            
+            def run(self):
+                success, is_newer, remote_version, error_message = self.controller.check_for_updates(self.url)
+                self.finished.emit(success, is_newer or False, remote_version or "", error_message or "")
+        
+        # Get URL from config or use default
+        update_url = self.config.get('update_check_url', 'https://pguntermann.github.io/CARA/')
+        
+        # Create and start thread
+        self._version_check_thread = VersionCheckThread(self.controller, update_url)
+        self._version_check_thread.finished.connect(self._on_version_check_complete)
+        self._version_check_thread.start()
+    
+    def _on_version_check_complete(self, success: bool, is_newer: bool, remote_version: str, error_message: str) -> None:
+        """Handle version check completion.
+        
+        Args:
+            success: True if check completed successfully.
+            is_newer: True if remote version is newer.
+            remote_version: Remote version string.
+            error_message: Error message if check failed.
+        """
+        current_version = self.config.get('version', '1.0')
+        
+        if not success:
+            # Show error message
+            MessageDialog.show_error(
+                self.config,
+                "Update Check Failed",
+                f"Could not check for updates:\n\n{error_message}",
+                self
+            )
+        elif is_newer:
+            # Show new version available confirmation dialog
+            message = (f"A newer version is available!\n\n"
+                      f"Current version: {current_version}\n"
+                      f"Available version: {remote_version}\n\n"
+                      f"Would you like to go to the download page?")
+            
+            confirmed = ConfirmationDialog.show_confirmation(
+                self.config,
+                "Update Available",
+                message,
+                self
+            )
+            
+            if confirmed:
+                # Open download page in browser
+                download_url = self.config.get('download_url', 'https://pguntermann.github.io/CARA/')
+                QDesktopServices.openUrl(QUrl(download_url))
+        else:
+            # Show up-to-date message
+            MessageDialog.show_information(
+                self.config,
+                "Up to Date",
+                f"You are using the latest version.\n\nCurrent version: {current_version}",
+                self
+            )
     
     def _close_application(self) -> None:
         """Close the application."""

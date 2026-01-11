@@ -24,6 +24,7 @@ from app.controllers.ai_chat_controller import AIChatController
 from app.controllers.game_summary_controller import GameSummaryController
 from app.controllers.player_stats_controller import PlayerStatsController
 from app.controllers.metadata_controller import MetadataController
+from app.services.version_check_service import VersionCheckService
 
 
 class AppController:
@@ -1115,4 +1116,20 @@ class AppController:
         
         # Tell UserSettingsService to persist all settings to file
         self.user_settings_service.save()
+    
+    def check_for_updates(self, url: str = "https://pguntermann.github.io/CARA/") -> Tuple[bool, Optional[bool], Optional[str], Optional[str]]:
+        """Check if a newer version of the application is available.
+        
+        Args:
+            url: URL to fetch the remote version information from (default: GitHub Pages URL).
+            
+        Returns:
+            Tuple of (success, is_newer, remote_version, error_message):
+            - success: True if the check completed (regardless of result), False if an error occurred
+            - is_newer: True if remote version is newer, False if same or older, None if check failed
+            - remote_version: Remote version string if found, None otherwise
+            - error_message: Error message if check failed, None otherwise
+        """
+        current_version = self.config.get('version', '1.0')
+        return VersionCheckService.check_for_updates(current_version, url)
 
