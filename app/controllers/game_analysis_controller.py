@@ -1049,15 +1049,13 @@ class GameAnalysisController(QObject):
             self._cumulative_seldepth_count += 1
         
         # Cache best move info for next iteration (position after move N = position before move N+1)
-        # Only cache if this is not a book move (book moves don't have meaningful best moves)
-        if not is_book_move:
-            self._cached_best_move_info = (
-                eval_after, is_mate, mate_moves, best_move_san, pv2_move_san, pv3_move_san,
-                pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth
-            )
-        else:
-            # Clear cache for book moves
-            self._cached_best_move_info = None
+        # Always cache regardless of book move status - the position after move N is still the position
+        # before move N+1, and the analysis result is valid for the next move even if move N was a book move.
+        # The book move check only affects what gets stored in the move data, not what gets cached.
+        self._cached_best_move_info = (
+            eval_after, is_mate, mate_moves, best_move_san, pv2_move_san, pv3_move_san,
+            pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth
+        )
         
         # Update previous evaluation for next move
         self._previous_evaluation = eval_after

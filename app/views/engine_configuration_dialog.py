@@ -418,6 +418,24 @@ class EngineConfigurationDialog(QDialog):
         common_layout.addRow("Move Time:", movetime_edit)
         self.task_widgets[task]["movetime"] = movetime_edit
         
+        # Disable depth and movetime inputs based on task requirements
+        # Evaluation: both depth and movetime are ignored (infinite analysis)
+        # Manual Analysis: both depth and movetime are ignored (continuous analysis)
+        # Game Analysis: depth is ignored, movetime is used
+        if task == self.TASK_EVALUATION or task == self.TASK_MANUAL_ANALYSIS:
+            # Disable both depth and movetime for Evaluation and Manual Analysis
+            depth_edit.setEnabled(False)
+            depth_edit.setToolTip("Depth is not used for this task type (infinite/continuous analysis)")
+            movetime_edit.setEnabled(False)
+            movetime_edit.setToolTip("Move time is not used for this task type (infinite/continuous analysis)")
+        elif task == self.TASK_GAME_ANALYSIS:
+            # Disable depth only for Game Analysis (movetime is used)
+            depth_edit.setEnabled(False)
+            depth_edit.setToolTip("Depth is not used for game analysis (only move time is used)")
+            # Ensure movetime_edit is enabled for Game Analysis
+            movetime_edit.setEnabled(True)
+            movetime_edit.setToolTip("Maximum time per move in milliseconds (0 = unlimited, max 3600000)")
+        
         common_group.setLayout(common_layout)
         tab_layout.addWidget(common_group)
         
@@ -1132,25 +1150,36 @@ class EngineConfigurationDialog(QDialog):
             else:
                 params["threads"] = 1
         if "depth" in self.task_widgets[task]:
-            text = self.task_widgets[task]["depth"].text().strip()
-            if text:
-                try:
-                    # Handle decimal values by rounding to nearest integer
-                    params["depth"] = int(round(float(text)))
-                except (ValueError, OverflowError):
-                    params["depth"] = 0  # Default fallback (0 = unlimited)
-            else:
+            depth_edit = self.task_widgets[task]["depth"]
+            # If depth field is disabled, force it to 0 (not used for this task)
+            # For Evaluation task, depth is enabled and can be 0 (infinite) or >0 (max depth)
+            if not depth_edit.isEnabled():
                 params["depth"] = 0
-        if "movetime" in self.task_widgets[task]:
-            text = self.task_widgets[task]["movetime"].text().strip()
-            if text:
-                try:
-                    # Handle decimal values by rounding to nearest millisecond
-                    params["movetime"] = int(round(float(text)))
-                except (ValueError, OverflowError):
-                    params["movetime"] = 0  # Default fallback
             else:
+                text = depth_edit.text().strip()
+                if text:
+                    try:
+                        # Handle decimal values by rounding to nearest integer
+                        params["depth"] = int(round(float(text)))
+                    except (ValueError, OverflowError):
+                        params["depth"] = 0  # Default fallback (0 = unlimited)
+                else:
+                    params["depth"] = 0
+        if "movetime" in self.task_widgets[task]:
+            movetime_edit = self.task_widgets[task]["movetime"]
+            # If movetime field is disabled, force it to 0 (not used for this task)
+            if not movetime_edit.isEnabled():
                 params["movetime"] = 0
+            else:
+                text = movetime_edit.text().strip()
+                if text:
+                    try:
+                        # Handle decimal values by rounding to nearest millisecond
+                        params["movetime"] = int(round(float(text)))
+                    except (ValueError, OverflowError):
+                        params["movetime"] = 0  # Default fallback
+                else:
+                    params["movetime"] = 0
         
         # Get engine-specific parameters
         for key, widget in self.task_widgets[task].items():

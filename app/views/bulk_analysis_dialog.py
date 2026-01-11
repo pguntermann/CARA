@@ -872,7 +872,7 @@ class BulkAnalysisDialog(QDialog):
         # Store original max for "all games" mode
         self._parallel_games_max_all = parallel_games_max
         
-        # Parallel games label (set fixed width to align with time per move)
+        # Parallel games label (set fixed width to align with move time)
         labels_config = dialog_config.get('labels', {})
         parallel_games_label = QLabel("Parallel games:")
         parallel_games_label.setStyleSheet(
@@ -881,7 +881,7 @@ class BulkAnalysisDialog(QDialog):
             f"{labels_config.get('text_color', [200, 200, 200])[1]}, "
             f"{labels_config.get('text_color', [200, 200, 200])[2]});"
         )
-        # Set fixed width to match "Time per move:" label for vertical alignment
+        # Set fixed width to match "Move Time (ply):" label for vertical alignment
         label_fixed_width = labels_config.get('fixed_width', 110)
         parallel_games_label.setFixedWidth(label_fixed_width)
         parallel_games_row_layout.addWidget(parallel_games_label)
@@ -950,7 +950,7 @@ class BulkAnalysisDialog(QDialog):
         movetime_row_layout = QHBoxLayout()
         movetime_row_layout.setSpacing(spacing_config.get('label_spinbox', 8))
         
-        movetime_label = QLabel("Time per move:")
+        movetime_label = QLabel("Move Time (ply):")
         movetime_label.setStyleSheet(
             f"font-size: {scale_font_size(labels_config.get('font_size', 11))}pt; "
             f"color: rgb({labels_config.get('text_color', [200, 200, 200])[0]}, "
