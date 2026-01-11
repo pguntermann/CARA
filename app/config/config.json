@@ -655,20 +655,6 @@
                 255
               ],
               "bold": true
-            },
-            "active_move_variation": {
-              "background_color": [
-                60,
-                60,
-                65
-              ],
-              "text_color": [
-                180,
-                180,
-                180
-              ],
-              "bold": false,
-              "italic": true
             }
           }
         },

@@ -455,7 +455,6 @@ class DetailPgnView(QWidget):
             pgn_config = panel_config.get('pgn_notation', {})
             formatting = pgn_config.get('formatting', {})
             active_move_config = formatting.get('active_move', {})
-            active_move_variation_config = formatting.get('active_move_variation', {})
             
             # Find the move text in the document by searching sequentially through moves
             # This ensures we find moves in the main line, not in variations/comments
@@ -744,27 +743,14 @@ class DetailPgnView(QWidget):
                 
                 # Validate positions are within document bounds
                 if move_start >= 0 and move_end >= move_start and move_end <= document_length:
-                    # Determine if move is in variation and get appropriate config
-                    format_at_cursor = cursor.charFormat()
-                    is_in_variation = format_at_cursor.fontItalic()
-                    
-                    if is_in_variation:
-                        # Use variation move highlight styling from config
-                        # Note: The move is already formatted with variation styling (italic, color)
-                        # by the formatter service. We just add the highlight on top.
-                        bg_color = active_move_variation_config.get('background_color', [60, 60, 65])
-                        text_color = active_move_variation_config.get('text_color', [180, 180, 180])
-                        bold = active_move_variation_config.get('bold', False)
-                        # Keep italic since variation moves should remain italic
-                        italic = True
-                    else:
-                        # Use main line move highlight styling from config
-                        # Note: The move is already formatted with main line styling by the formatter service.
-                        # We just add the highlight on top.
-                        bg_color = active_move_config.get('background_color', [100, 120, 180])
-                        text_color = active_move_config.get('text_color', [255, 255, 255])
-                        bold = active_move_config.get('bold', True)
-                        italic = False
+                    # Use main line move highlight styling from config
+                    # Note: The active move is always a main-line move (users can only navigate to main-line moves).
+                    # The move is already formatted with main line styling by the formatter service.
+                    # We just add the highlight on top.
+                    bg_color = active_move_config.get('background_color', [100, 120, 180])
+                    text_color = active_move_config.get('text_color', [255, 255, 255])
+                    bold = active_move_config.get('bold', True)
+                    italic = False
                     
                     # Create highlight format
                     highlight_format = QTextCharFormat()
