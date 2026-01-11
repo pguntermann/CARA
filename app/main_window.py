@@ -151,19 +151,13 @@ class MainWindow(QMainWindow):
         """Setup the File menu."""
         file_menu = menu_bar.addMenu("File")
         
-        # Clear Clipboard Database action
-        clear_clipboard_action = QAction("Clear Clipboard Database", self)
-        clear_clipboard_action.setShortcut(QKeySequence("Ctrl+Shift+C"))
-        clear_clipboard_action.triggered.connect(self._clear_clipboard_database)
-        file_menu.addAction(clear_clipboard_action)
-        
-        file_menu.addSeparator()
-        
         # Open PGN Database action
         open_pgn_database_action = QAction("Open PGN Database", self)
         open_pgn_database_action.setShortcut(QKeySequence("Ctrl+O"))
         open_pgn_database_action.triggered.connect(self._open_pgn_database)
         file_menu.addAction(open_pgn_database_action)
+        
+        file_menu.addSeparator()
         
         # Close PGN Database action
         self.close_pgn_database_action = QAction("Close PGN Database", self)
@@ -171,11 +165,17 @@ class MainWindow(QMainWindow):
         self.close_pgn_database_action.triggered.connect(self._close_pgn_database)
         file_menu.addAction(self.close_pgn_database_action)
         
-        # Close All Databases action
-        self.close_all_databases_action = QAction("Close All Databases", self)
+        # Close All PGN Databases action
+        self.close_all_databases_action = QAction("Close All PGN Databases", self)
         self.close_all_databases_action.setShortcut(QKeySequence("Ctrl+Alt+W"))
         self.close_all_databases_action.triggered.connect(self._close_all_pgn_databases)
         file_menu.addAction(self.close_all_databases_action)
+        
+        # Clear Clipboard Database action
+        clear_clipboard_action = QAction("Clear Clipboard Database", self)
+        clear_clipboard_action.setShortcut(QKeySequence("Ctrl+Shift+C"))
+        clear_clipboard_action.triggered.connect(self._clear_clipboard_database)
+        file_menu.addAction(clear_clipboard_action)
         
         file_menu.addSeparator()
         
@@ -1460,14 +1460,14 @@ class MainWindow(QMainWindow):
         self.save_pgn_database_action.setEnabled(can_save)
     
     def _update_close_menu_state(self) -> None:
-        """Update the enabled state of the Close PGN Database and Close All Databases menu items."""
+        """Update the enabled state of the Close PGN Database and Close All PGN Databases menu items."""
         if not hasattr(self, 'close_pgn_database_action'):
             return
         
         can_close = self._can_save_or_close_database()
         self.close_pgn_database_action.setEnabled(can_close)
         
-        # Update Close All Databases action
+        # Update Close All PGN Databases action
         if hasattr(self, 'close_all_databases_action'):
             # Check if there are any file-based databases to close
             database_controller = self.controller.get_database_controller()
