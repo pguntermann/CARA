@@ -4695,7 +4695,8 @@ Visibility Settings:
         game_analysis_controller.move_analyzed.disconnect(self._on_move_analyzed)
     
     def _on_game_analysis_progress(self, current_move: int, total_moves: int, depth: int,
-                                   centipawns: float, engine_name: str, threads: int, elapsed_ms: int) -> None:
+                                   centipawns: float, engine_name: str, threads: int, elapsed_ms: int,
+                                   avg_depth: float = 0.0, avg_seldepth: float = 0.0, movetime_ms: int = 0) -> None:
         """Handle game analysis progress update.
         
         Args:
@@ -4706,6 +4707,9 @@ Visibility Settings:
             engine_name: Engine name.
             threads: Number of threads.
             elapsed_ms: Elapsed time in milliseconds.
+            avg_depth: Average depth from completed moves (0.0 if not available).
+            avg_seldepth: Average seldepth from completed moves (0.0 if not available).
+            movetime_ms: Movetime limit in milliseconds.
         """
         # Update status bar with progress
         from app.services.progress_service import ProgressService
@@ -4733,6 +4737,19 @@ Visibility Settings:
                     # Format time
                     estimated_remaining_time = self._format_estimated_time(estimated_remaining_seconds)
         
+        # Format movetime for display
+        movetime_str = ""
+        if movetime_ms > 0:
+            if movetime_ms < 1000:
+                movetime_str = f"{movetime_ms}ms"
+            else:
+                movetime_seconds = movetime_ms / 1000.0
+                if movetime_seconds < 60:
+                    movetime_str = f"{movetime_seconds:.1f}s"
+                else:
+                    movetime_minutes = movetime_seconds / 60.0
+                    movetime_str = f"{movetime_minutes:.1f}m"
+        
         # Format status message
         status_parts = [
             f"Game Analysis: Move {current_move}/{total_moves}",
@@ -4741,6 +4758,18 @@ Visibility Settings:
             f"Engine: {engine_name}",
             f"Threads: {threads}"
         ]
+        
+        # Add movetime if available
+        if movetime_str:
+            status_parts.append(f"Movetime: {movetime_str}")
+        
+        # Add average depth if available (only if we have completed moves with depth data)
+        if avg_depth > 0:
+            status_parts.append(f"Avg Depth: {int(avg_depth)}")
+        
+        # Add average seldepth if available (only if we have completed moves with seldepth data)
+        if avg_seldepth > 0:
+            status_parts.append(f"Avg SelDepth: {int(avg_seldepth)}")
         
         if estimated_remaining_time:
             status_parts.append(f"Est. remaining: {estimated_remaining_time}")

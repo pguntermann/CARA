@@ -33,7 +33,7 @@ class GameAnalysisController(QObject):
     analysis_started = pyqtSignal()
     analysis_completed = pyqtSignal()
     analysis_cancelled = pyqtSignal()
-    analysis_progress = pyqtSignal(int, int, int, float, str, int, int)  # move_number, total_moves, depth, centipawns, engine_name, threads, elapsed_ms
+    analysis_progress = pyqtSignal(int, int, int, float, str, int, int, float, float, int)  # move_number, total_moves, depth, centipawns, engine_name, threads, elapsed_ms, avg_depth, avg_seldepth, movetime_ms
     move_analyzed = pyqtSignal(int)  # row_index - emitted when a move is analyzed and should be scrolled to
     
     def __init__(self, config: Dict[str, Any], game_model: GameModel, moves_list_model: MovesListModel,
@@ -108,12 +108,19 @@ class GameAnalysisController(QObject):
         
         # Progress tracking
         self._last_progress_depth = 0
+        self._last_progress_seldepth = 0  # Track seldepth from progress updates
         self._last_progress_centipawns = 0.0
         self._last_progress_time = 0.0
         self._current_engine_name = ""
         self._current_threads = 0
         self._analysis_start_time: Optional[float] = None  # Track when analysis started (timestamp in ms)
         self._move_times: List[float] = []  # Track time taken for each completed move (in ms)
+        
+        # Cumulative depth/seldepth tracking for average calculation
+        self._cumulative_depth_sum = 0
+        self._cumulative_depth_count = 0
+        self._cumulative_seldepth_sum = 0
+        self._cumulative_seldepth_count = 0
     
     def _load_settings(self) -> None:
         """Load settings from config and user settings."""
@@ -306,6 +313,12 @@ class GameAnalysisController(QObject):
         self._analysis_start_time = time.time() * 1000.0  # milliseconds
         self._move_times = []  # Track time taken for each completed move
         self._current_move_start_time: Optional[float] = None  # Track when current move started
+        
+        # Reset cumulative depth/seldepth tracking
+        self._cumulative_depth_sum = 0
+        self._cumulative_depth_count = 0
+        self._cumulative_seldepth_sum = 0
+        self._cumulative_seldepth_count = 0
         
         # Get task-specific parameters for this engine (with fallback to config.json)
         from pathlib import Path
@@ -1023,6 +1036,18 @@ class GameAnalysisController(QObject):
             self._move_times.append(move_time)
             self._current_move_start_time = None
         
+        # Accumulate depth/seldepth for average calculation
+        # Use depth from the completed analysis
+        if depth > 0:
+            self._cumulative_depth_sum += depth
+            self._cumulative_depth_count += 1
+        
+        # Use seldepth from last progress update (if available)
+        # Some engines may not provide seldepth, so only count if we have valid data
+        if self._last_progress_seldepth > 0:
+            self._cumulative_seldepth_sum += self._last_progress_seldepth
+            self._cumulative_seldepth_count += 1
+        
         # Cache best move info for next iteration (position after move N = position before move N+1)
         # Only cache if this is not a book move (book moves don't have meaningful best moves)
         if not is_book_move:
@@ -1050,12 +1075,13 @@ class GameAnalysisController(QObject):
         else:
             self._analyze_next_move()
     
-    def _on_progress_update(self, depth: int, centipawns: int, elapsed_ms: float,
+    def _on_progress_update(self, depth: int, seldepth: int, centipawns: int, elapsed_ms: float,
                            engine_name: str, threads: int, move_number: int) -> None:
         """Handle progress update from engine.
         
         Args:
             depth: Current search depth.
+            seldepth: Current selective search depth (may be 0 if engine doesn't provide it).
             centipawns: Current evaluation in centipawns.
             elapsed_ms: Elapsed time in milliseconds.
             engine_name: Engine name.
@@ -1063,6 +1089,8 @@ class GameAnalysisController(QObject):
             move_number: Current move number.
         """
         self._last_progress_depth = depth
+        # Track seldepth safely - some engines may not provide it (will be 0)
+        self._last_progress_seldepth = seldepth if seldepth and seldepth > 0 else 0
         self._last_progress_centipawns = float(centipawns)
         self._last_progress_time = elapsed_ms
     
@@ -1144,22 +1172,27 @@ class GameAnalysisController(QObject):
             if estimated_remaining_seconds is not None and estimated_remaining_seconds > 0:
                 estimated_remaining_time = self._format_time(estimated_remaining_seconds)
         
-        # Update progress bar and status
+        # Update progress bar
         from app.services.progress_service import ProgressService
         progress_service = ProgressService.get_instance()
         progress_service.set_progress(progress_percent)
         
-        # Build status message with progress info
-        status_parts = [f"Game Analysis: Move {current_full_move}/{total_full_moves}"]
-        if estimated_remaining_time:
-            status_parts.append(f"Est. remaining: {estimated_remaining_time}")
-        status_message = " - ".join(status_parts)
-        progress_service.set_status(status_message)
+        # Calculate average depth/seldepth from completed moves
+        avg_depth = 0.0
+        if self._cumulative_depth_count > 0:
+            avg_depth = self._cumulative_depth_sum / self._cumulative_depth_count
+        
+        avg_seldepth = 0.0
+        if self._cumulative_seldepth_count > 0:
+            avg_seldepth = self._cumulative_seldepth_sum / self._cumulative_seldepth_count
         
         # Calculate total elapsed time since analysis started
         total_elapsed_ms = 0
         if self._analysis_start_time is not None:
             total_elapsed_ms = time.time() * 1000.0 - self._analysis_start_time
+        
+        # Get movetime from engine service (actual movetime being used)
+        movetime_ms = self._engine_service.time_limit_ms if self._engine_service else self.time_limit_ms
         
         self.analysis_progress.emit(
             current_full_move,
@@ -1168,7 +1201,10 @@ class GameAnalysisController(QObject):
             self._last_progress_centipawns,
             self._current_engine_name,
             self._current_threads,
-            int(total_elapsed_ms)
+            int(total_elapsed_ms),
+            avg_depth,
+            avg_seldepth,
+            movetime_ms
         )
     
     def _on_analysis_error(self, error_message: str) -> None:
