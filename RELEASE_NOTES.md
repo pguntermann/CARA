@@ -1,3 +1,39 @@
+# CARA v2.5.4 - Game Analysis Improvements and UI Enhancements
+
+**Release Date:** 11.01.2026
+
+This release focuses on additional improvements and bug fixes of the bulk analysis function and the game analysis performance in general, along with some smaller UI enhancements and a new function to check for new versions.
+
+## New Features
+
+- **Version Check**: Added "Check for Updates..." menu item in the Help menu to check if a newer version of CARA is available
+
+## Enhancements
+
+### Game Analysis
+- **Improved Analysis Performance**: Improved move processing logic to reduce additional analysis queries for determining before-the-move/best move values, by caching  analysis results from previous ply analysis, significantly improving performance when analyzing games
+- **Enhanced Single Game Analysis Status Display**: Game analysis status now includes additional information: Average depth, Average selective depth and Move time parameter
+- **UI Improvements**: Small improvements to engine settings dialog, disabling settings which are not applicable for a specific engine task, changed the movetime label in the Bulk Analysis dialog from "Time per Move" to "Move Time (ply)" to better reflect the meaning of the setting.
+
+### User Interface
+- **File Menu Reordering**: Minor reeorganization of menu items in the File menu for improved UX.
+- **Menu Item Naming**: Renamed "Close All Databases" to "Close All PGN Databases" for consistency with other menu items
+
+## Bug Fixes
+
+- **Bulk Analysis Timeout Handling**: Fixed timeout handling during bulk analysis operations
+- **Game Analysis Caching**: Fixed caching issue that could occur during game analysis
+
+## Configuration
+
+- **Config Cleanup**: Removed obsolete settings from config.json
+
+## Documentation
+
+- **Manual Updates**: Updated the HTML manual to reflect the new File menu structure and include the "Check for Updates" menu item.
+
+---
+
 # CARA v2.5.3 - PGN Handling Improvements and Performance Enhancements
 
 **Release Date:** 09.01.2026
