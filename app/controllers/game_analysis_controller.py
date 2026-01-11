@@ -95,7 +95,6 @@ class GameAnalysisController(QObject):
         self._previous_evaluation = 0.0  # Track previous position's evaluation
         self._previous_is_mate = False
         self._previous_mate_moves = 0
-        self._analyzing_best_move = False  # Track if we're analyzing position before (best move) or after (evaluation)
         self._best_alternative_move = ""  # Store best alternative move (PV1) from position before
         self._best_move_evaluation = None  # Store evaluation after playing the best move (from position before analysis)
         self._best_move_is_mate = False  # Store whether best move leads to mate
@@ -291,7 +290,6 @@ class GameAnalysisController(QObject):
         self._previous_evaluation = 0.0  # Starting position evaluation
         self._previous_is_mate = False
         self._previous_mate_moves = 0
-        self._analyzing_best_move = False
         self._best_alternative_move = ""
         self._best_move_pv2 = ""
         self._best_move_pv3 = ""
@@ -301,7 +299,8 @@ class GameAnalysisController(QObject):
         self._move_depth = 0
         self._best_move_mate_moves = 0
         self._consecutive_errors = 0
-        self._pending_best_move_analysis: Optional[Dict[str, Any]] = None
+        # Cache best move info from previous position analysis (position after move N = position before move N+1)
+        self._cached_best_move_info: Optional[tuple] = None  # (best_move_eval, best_move_is_mate, best_mate_moves, best_move_san, pv2_move_san, pv3_move_san, pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth)
         
         # Track analysis timing for progress reporting
         self._analysis_start_time = time.time() * 1000.0  # milliseconds
@@ -596,35 +595,79 @@ class GameAnalysisController(QObject):
             # Fallback: only update active move (board won't update)
             self.game_model.set_active_move_ply(ply_index)
         
-        # We need to analyze TWO positions:
-        # 1. Position BEFORE the move -> to get the best alternative move
-        # 2. Position AFTER the move -> to get the evaluation (for CPL calculation)
+        # Get best move info: reuse from previous analysis if available, otherwise analyze position before move
+        if self._cached_best_move_info is not None:
+            # Reuse best move info from previous position analysis (position after move N-1 = position before move N)
+            best_move_eval, best_move_is_mate, best_mate_moves, best_move_san, pv2_move_san, pv3_move_san, \
+                pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth = self._cached_best_move_info
+            
+            # Store best move info for current move
+            self._best_alternative_move = best_move_san
+            self._best_move_pv2 = pv2_move_san
+            self._best_move_pv3 = pv3_move_san
+            self._best_move_evaluation = best_move_eval
+            self._best_move_is_mate = best_move_is_mate
+            self._best_move_mate_moves = best_mate_moves
+            self._best_move_depth = depth
+            
+            # Check if this is a book move - if so, don't store best moves
+            if self._is_book_move(move_info):
+                self._best_alternative_move = ""
+                self._best_move_pv2 = ""
+                self._best_move_pv3 = ""
+                self._best_move_evaluation = None
+                self._best_move_depth = 0
+            
+            # Proceed directly to analyzing position after move
+            self._analyze_position_after_move(move_info)
+        else:
+            # First move: analyze position before move to get best move
+            fen_before = move_info["fen_before"]
+            board_before = move_info["board_before"]
+            
+            # Verify that fen_before matches the expected position
+            expected_turn = move_info["is_white_move"]
+            if board_before.turn != expected_turn:
+                import logging
+                logging.error(f"Position mismatch: move_info is_white_move={expected_turn}, but board_before.turn={board_before.turn}")
+            
+            # Queue analysis for position before
+            thread = self._engine_service.analyze_position(
+                fen_before,
+                move_info["move_number"],
+                self.progress_update_interval_ms
+            )
+            
+            if not thread:
+                self._on_analysis_error("Failed to queue position for analysis")
+                return
+            
+            # Connect analysis_complete signal for this specific analysis
+            try:
+                thread.analysis_complete.disconnect()
+            except TypeError:
+                pass
+            
+            # Connect with lambda that captures move_info
+            thread.analysis_complete.connect(
+                lambda eval_cp, is_mate, mate_moves, best_move, pv1, pv2, pv3, pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth, nps, engine_name: 
+                self._on_best_move_analysis_complete(move_info, best_move, pv2, pv3, eval_cp, is_mate, mate_moves, depth)
+            )
         
-        # First, analyze position BEFORE the move to get best alternative move
-        # IMPORTANT: fen_before is the position where the move is ABOUT TO BE PLAYED
-        # So if is_white_move is True, fen_before is the position where White is to move
-        # If is_white_move is False, fen_before is the position where Black is to move
-        fen_before = move_info["fen_before"]
-        board_before = move_info["board_before"]
+        # Setup progress timer for periodic updates
+        if self._progress_timer:
+            self._progress_timer.stop()
+        self._progress_timer = QTimer()
+        self._progress_timer.timeout.connect(self._emit_progress_update)
+        self._progress_timer.start(self.progress_update_interval_ms)
+    
+    def _analyze_position_after_move(self, move_info: Dict[str, Any]) -> None:
+        """Analyze position after the move to get evaluation and best move for next iteration."""
+        fen_after = move_info["fen_after"]
         
-        # Verify that fen_before matches the expected position
-        # The board_before should have the correct side to move
-        expected_turn = move_info["is_white_move"]  # True if White is to move, False if Black
-        if board_before.turn != expected_turn:
-            # This is a critical error - the position doesn't match what we expect
-            import logging
-            logging.error(f"Position mismatch: move_info is_white_move={expected_turn}, but board_before.turn={board_before.turn}")
-        
-        self._analyzing_best_move = True
-        self._best_alternative_move = ""
-        
-        # Queue position before for analysis
-        # Store move_info for routing the completion signal
-        self._pending_best_move_analysis = move_info
-        
-        # Queue analysis for position before
+        # Queue position after for analysis
         thread = self._engine_service.analyze_position(
-            fen_before,
+            fen_after,
             move_info["move_number"],
             self.progress_update_interval_ms
         )
@@ -634,24 +677,16 @@ class GameAnalysisController(QObject):
             return
         
         # Connect analysis_complete signal for this specific analysis
-        # We need to disconnect any existing connection first
         try:
             thread.analysis_complete.disconnect()
         except TypeError:
-            pass  # No connections to disconnect
+            pass
         
         # Connect with lambda that captures move_info
         thread.analysis_complete.connect(
             lambda eval_cp, is_mate, mate_moves, best_move, pv1, pv2, pv3, pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth, nps, engine_name: 
-            self._on_best_move_analysis_complete(move_info, best_move, pv2, pv3, eval_cp, is_mate, mate_moves, depth)
+            self._on_move_analysis_complete(move_info, eval_cp, is_mate, mate_moves, depth, pv2_score, pv3_score, pv2_score_black, pv3_score_black, best_move, pv2, pv3)
         )
-        
-        # Setup progress timer for periodic updates
-        if self._progress_timer:
-            self._progress_timer.stop()
-        self._progress_timer = QTimer()
-        self._progress_timer.timeout.connect(self._emit_progress_update)
-        self._progress_timer.start(self.progress_update_interval_ms)
     
     def _on_best_move_analysis_complete(self, move_info: Dict[str, Any], best_move_san: str, 
                                        pv2_move_san: str, pv3_move_san: str,
@@ -692,37 +727,13 @@ class GameAnalysisController(QObject):
             self._best_move_depth = 0
         
         # Now analyze position AFTER the move to get evaluation
-        self._analyzing_best_move = False
-        fen_after = move_info["fen_after"]
-        
-        # Queue position after for analysis
-        thread = self._engine_service.analyze_position(
-            fen_after,
-            move_info["move_number"],
-            self.progress_update_interval_ms
-        )
-        
-        if not thread:
-            self._on_analysis_error("Failed to queue position for analysis")
-            return
-        
-        # Connect analysis_complete signal for this specific analysis
-        # We need to disconnect any existing connection first
-        try:
-            thread.analysis_complete.disconnect()
-        except TypeError:
-            pass  # No connections to disconnect
-        
-        # Connect with lambda that captures move_info
-        thread.analysis_complete.connect(
-            lambda eval_cp, is_mate, mate_moves, best_move, pv1, pv2, pv3, pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth, nps, engine_name: 
-            self._on_move_analysis_complete(move_info, eval_cp, is_mate, mate_moves, depth, pv2_score, pv3_score, pv2_score_black, pv3_score_black)
-        )
+        self._analyze_position_after_move(move_info)
     
     def _on_move_analysis_complete(self, move_info: Dict[str, Any], eval_after: float, 
                                    is_mate: bool, mate_moves: int, depth: int,
                                    pv2_score: float = 0.0, pv3_score: float = 0.0,
-                                   pv2_score_black: float = 0.0, pv3_score_black: float = 0.0) -> None:
+                                   pv2_score_black: float = 0.0, pv3_score_black: float = 0.0,
+                                   best_move_san: str = "", pv2_move_san: str = "", pv3_move_san: str = "") -> None:
         """Handle completion of move evaluation analysis (position after the move).
         
         Args:
@@ -1011,6 +1022,17 @@ class GameAnalysisController(QObject):
             move_time = time.time() * 1000.0 - self._current_move_start_time
             self._move_times.append(move_time)
             self._current_move_start_time = None
+        
+        # Cache best move info for next iteration (position after move N = position before move N+1)
+        # Only cache if this is not a book move (book moves don't have meaningful best moves)
+        if not is_book_move:
+            self._cached_best_move_info = (
+                eval_after, is_mate, mate_moves, best_move_san, pv2_move_san, pv3_move_san,
+                pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth
+            )
+        else:
+            # Clear cache for book moves
+            self._cached_best_move_info = None
         
         # Update previous evaluation for next move
         self._previous_evaluation = eval_after

@@ -196,6 +196,9 @@ class BulkAnalysisService(QObject):
             previous_is_mate = False
             previous_mate_moves = 0
             
+            # Store best move info from previous position analysis (position after move N = position before move N+1)
+            cached_best_move_info = None  # (best_move_eval, best_move_is_mate, best_mate_moves, best_move_san, pv2_move_san, pv3_move_san, pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth)
+            
             # Track opening information (for repeat indicator)
             last_known_eco = None
             last_known_opening_name = None
@@ -215,23 +218,29 @@ class BulkAnalysisService(QObject):
                     status = f"Analyzing move {move_index + 1}/{total_moves} (Move {move_number}{'W' if is_white_move else 'B'})"
                     progress_callback(move_index, total_moves, move_number, is_white_move, status, None)
                 
-                # Analyze position before move (to get best move)
-                best_move_result = self._analyze_position(
-                    move_info["fen_before"],
-                    move_number,
-                    is_white_move,
-                    progress_callback,
-                    move_index,
-                    total_moves
-                )
+                # Get best move info: reuse from previous analysis if available, otherwise analyze position before move
+                if cached_best_move_info is not None:
+                    # Reuse best move info from previous position analysis (position after move N-1 = position before move N)
+                    best_move_eval, best_move_is_mate, best_mate_moves, best_move_san, pv2_move_san, pv3_move_san, \
+                        pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth = cached_best_move_info
+                else:
+                    # First move: analyze position before move to get best move
+                    best_move_result = self._analyze_position(
+                        move_info["fen_before"],
+                        move_number,
+                        is_white_move,
+                        progress_callback,
+                        move_index,
+                        total_moves
+                    )
+                    
+                    if not best_move_result:
+                        continue
+                    
+                    best_move_eval, best_move_is_mate, best_mate_moves, best_move_san, pv2_move_san, pv3_move_san, \
+                        pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth = best_move_result
                 
-                if not best_move_result:
-                    continue
-                
-                best_move_eval, best_move_is_mate, best_mate_moves, best_move_san, pv2_move_san, pv3_move_san, \
-                    pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth = best_move_result
-                
-                # Analyze position after move (to get evaluation)
+                # Analyze position after move (to get evaluation AND best move for next iteration)
                 eval_result = self._analyze_position(
                     move_info["fen_after"],
                     move_number,
@@ -244,7 +253,15 @@ class BulkAnalysisService(QObject):
                 if not eval_result:
                     continue
                 
-                eval_after, is_mate, mate_moves, _, _, _, _, _, _, _, _ = eval_result
+                # Extract both evaluation (for current move) and best move info (for next move)
+                eval_after, is_mate, mate_moves, best_move_san_next, pv2_move_san_next, pv3_move_san_next, \
+                    pv2_score_next, pv3_score_next, pv2_score_black_next, pv3_score_black_next, depth_after = eval_result
+                
+                # Cache best move info for next iteration (position after move N = position before move N+1)
+                cached_best_move_info = (
+                    eval_after, is_mate, mate_moves, best_move_san_next, pv2_move_san_next, pv3_move_san_next,
+                    pv2_score_next, pv3_score_next, pv2_score_black_next, pv3_score_black_next, depth_after
+                )
                 
                 # Calculate CPL
                 played_move_san = move_info["move_san"]
@@ -646,6 +663,8 @@ class BulkAnalysisService(QObject):
         # Wait for analysis to complete using signals
         result_container = {"result": None, "completed": False}
         last_progress_info = {"depth": 0, "seldepth": 0, "centipawns": 0.0, "engine_name": "", "threads": 0, "elapsed_ms": 0.0}
+        last_progress_time = {"value": None}  # Use dict to allow modification in nested function
+        first_progress_received = {"value": False}  # Track if we've received at least one progress update
         
         def on_progress_update(depth, seldepth, centipawns, elapsed_ms, engine_name, threads, move_num):
             """Handle progress update from engine."""
@@ -655,6 +674,8 @@ class BulkAnalysisService(QObject):
             last_progress_info["engine_name"] = engine_name
             last_progress_info["threads"] = threads
             last_progress_info["elapsed_ms"] = elapsed_ms
+            last_progress_time["value"] = time.time()  # Update progress timestamp
+            first_progress_received["value"] = True  # Mark that we've received progress
             
             # Forward to progress callback if provided
             if progress_callback:
@@ -685,17 +706,83 @@ class BulkAnalysisService(QObject):
         analysis_thread.analysis_complete.connect(on_complete)
         analysis_thread.error_occurred.connect(on_error)
         
-        # Wait for completion with timeout
+        # Wait for completion with progress-based timeout
         start_time = time.time()
-        timeout_seconds = (self.time_limit_ms / 1000.0) + 5.0  # Add 5 second buffer
+        
+        # Get actual movetime from engine service (which has the override applied)
+        actual_time_limit_ms = self._engine_service.time_limit_ms if self._engine_service else self.time_limit_ms
+        
+        # Calculate timeouts: progress timeout (no progress for 2x movetime) and absolute max (safety net)
+        movetime_seconds = actual_time_limit_ms / 1000.0
+        # Progress timeout: no progress for 2x movetime, but minimum 10 seconds to allow engine startup
+        # This prevents false timeouts when engines take time to send first progress update
+        progress_timeout_seconds = max(movetime_seconds * 2.0, 10.0)
+        timeout_buffer_seconds = max(movetime_seconds * 0.2, 5.0)
+        absolute_max_timeout_seconds = movetime_seconds + timeout_buffer_seconds
+        
+        # Log timeout configuration for debugging
+        if hasattr(self._engine_service, 'analysis_thread') and self._engine_service.analysis_thread:
+            if hasattr(self._engine_service.analysis_thread, 'uci') and self._engine_service.analysis_thread.uci:
+                self._engine_service.analysis_thread.uci._debug_lifecycle(
+                    "TIMEOUT_CONFIG",
+                    f" (movetime: {actual_time_limit_ms}ms, progress_timeout: {progress_timeout_seconds:.1f}s, absolute_max: {absolute_max_timeout_seconds:.1f}s)"
+                )
+        
+        timeout_occurred = False
         
         # Process events until complete
         while not result_container["completed"] and not self._cancelled:
             elapsed = time.time() - start_time
-            if elapsed > timeout_seconds:
+            
+            # Only check progress timeout if we've received at least one progress update
+            # Engines may take time to send the first progress update, which is normal
+            # Also wait a minimum time after first progress before checking (engines may have gaps between updates)
+            if first_progress_received["value"] and last_progress_time["value"]:
+                time_since_progress = time.time() - last_progress_time["value"]
+                time_since_first_progress = elapsed  # Time since we started waiting
+                
+                # Only check progress timeout if:
+                # 1. We've waited at least 5 seconds since start (allow engine to settle)
+                # 2. No progress for extended period (2x movetime, min 10s)
+                if time_since_first_progress >= 5.0 and time_since_progress > progress_timeout_seconds:
+                    timeout_occurred = True
+                    # Log timeout to debug lifecycle if available
+                    if hasattr(self._engine_service, 'analysis_thread') and self._engine_service.analysis_thread:
+                        if hasattr(self._engine_service.analysis_thread, 'uci') and self._engine_service.analysis_thread.uci:
+                            self._engine_service.analysis_thread.uci._debug_lifecycle(
+                                "TIMEOUT",
+                                f" (progress timeout: no progress for {time_since_progress:.1f}s, elapsed: {elapsed:.1f}s)"
+                            )
+                    self._engine_service.stop_current_analysis()
+                    break
+            
+            # Check for absolute maximum timeout (safety net)
+            if elapsed > absolute_max_timeout_seconds:
+                timeout_occurred = True
+                # Log timeout to debug lifecycle if available
+                if hasattr(self._engine_service, 'analysis_thread') and self._engine_service.analysis_thread:
+                    if hasattr(self._engine_service.analysis_thread, 'uci') and self._engine_service.analysis_thread.uci:
+                        self._engine_service.analysis_thread.uci._debug_lifecycle(
+                            "TIMEOUT",
+                            f" (absolute max timeout: {elapsed:.1f}s > {absolute_max_timeout_seconds:.1f}s)"
+                        )
+                self._engine_service.stop_current_analysis()
                 break
+            
             QApplication.processEvents()
             time.sleep(0.01)
+        
+        # Grace period: give signal a chance to be delivered (Qt event processing delay)
+        if timeout_occurred and not result_container["completed"]:
+            grace_period = 0.5  # 500ms grace period
+            grace_start = time.time()
+            while (time.time() - grace_start) < grace_period:
+                QApplication.processEvents()
+                if result_container["completed"]:
+                    # Signal arrived during grace period - not a real timeout
+                    timeout_occurred = False
+                    break
+                time.sleep(0.01)
         
         # Disconnect signals
         try:
@@ -707,5 +794,29 @@ class BulkAnalysisService(QObject):
         
         if self._cancelled:
             return None
+        
+        # If timeout occurred, try to use partial results
+        if timeout_occurred:
+            # Check if we have partial results from progress updates
+            if last_progress_info["depth"] > 0:
+                # Use partial results instead of failing
+                # Note: We don't have best move info from progress updates, so use empty strings
+                partial_result = (
+                    last_progress_info["centipawns"],
+                    False,  # is_mate (unknown from partial data)
+                    0,      # mate_moves
+                    "",     # best_move_san (unknown)
+                    "",     # pv2_move_san
+                    "",     # pv3_move_san
+                    0.0,    # pv2_score
+                    0.0,    # pv3_score
+                    0.0,    # pv2_score_black
+                    0.0,    # pv3_score_black
+                    last_progress_info["depth"]
+                )
+                return partial_result
+            else:
+                # No progress data available - return None
+                return None
         
         return result_container["result"]

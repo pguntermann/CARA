@@ -49,6 +49,7 @@ class GameAnalysisEngineThread(QThread):
         self.uci: Optional[UCICommunicationService] = None
         self.running = False
         self._stop_requested = False
+        self._stop_current_analysis = False
         self._analysis_queue: queue.Queue = queue.Queue()
         self._current_request: Optional[AnalysisRequest] = None
         self._current_depth = 0
@@ -78,6 +79,14 @@ class GameAnalysisEngineThread(QThread):
             request: AnalysisRequest with position details.
         """
         self._analysis_queue.put(request)
+    
+    def stop_current_analysis(self) -> None:
+        """Stop only the current analysis without clearing queue or stopping thread."""
+        # Set flag to break out of current _analyze_position loop
+        self._stop_current_analysis = True
+        # Stop current search
+        if self.uci and self.uci.is_process_alive():
+            self.uci.stop_search()
     
     def stop(self) -> None:
         """Stop current analysis and clear queue."""
@@ -161,6 +170,8 @@ class GameAnalysisEngineThread(QThread):
                         break
                     
                     self._current_request = request
+                    # Reset stop flag before starting new analysis
+                    self._stop_current_analysis = False
                     self._analyze_position(request)
                     self._current_request = None
                     
@@ -221,7 +232,7 @@ class GameAnalysisEngineThread(QThread):
                 return
             
             # Read analysis output
-            while not self._stop_requested:
+            while not self._stop_requested and not self._stop_current_analysis:
                 if not self.uci.is_process_alive():
                     self.error_occurred.emit("Engine process terminated unexpectedly")
                     break
@@ -255,6 +266,10 @@ class GameAnalysisEngineThread(QThread):
                 
                 # Check for bestmove (analysis complete)
                 elif line.startswith("bestmove"):
+                    # If we've been asked to stop current analysis, ignore this result
+                    if self._stop_current_analysis:
+                        break
+                    
                     parts = line.split()
                     if len(parts) >= 2:
                         self._best_move_uci = parts[1]
@@ -340,12 +355,17 @@ class GameAnalysisEngineThread(QThread):
                         pv3_score_black,
                         self._current_depth,
                         self._current_nps,
-                        self.engine_name
-                    )
+                    self.engine_name
+                )
                     break
+            
+            # Reset stop current analysis flag for next analysis
+            self._stop_current_analysis = False
         
         except Exception as e:
             self.error_occurred.emit(f"Error analyzing position: {str(e)}")
+            # Reset stop current analysis flag even on error
+            self._stop_current_analysis = False
     
     def _parse_info_line(self, line: str) -> None:
         """Parse UCI info line.
@@ -585,6 +605,11 @@ class GameAnalysisEngineService(QObject):
         self.analysis_thread.queue_analysis(request)
         
         return self.analysis_thread
+    
+    def stop_current_analysis(self) -> None:
+        """Stop only the current analysis without clearing queue or stopping thread."""
+        if self.analysis_thread and self.analysis_thread.isRunning():
+            self.analysis_thread.stop_current_analysis()
     
     def stop_analysis(self) -> None:
         """Stop current analysis and clear queue."""

@@ -60,6 +60,7 @@ class ContinuousGameAnalysisWorker(QThread):
         self._queue_mutex = queue_mutex
         self._queue_condition = queue_condition
         self._cancelled = False
+        self._is_actively_analyzing = False
     
     def cancel(self) -> None:
         """Cancel the worker."""
@@ -100,15 +101,16 @@ class ContinuousGameAnalysisWorker(QThread):
                     engine_info or {}
                 )
             
+            self._is_actively_analyzing = True
             try:
                 success = self.bulk_analysis_service.analyze_game(game, progress_callback)
                 self._game_finished_callback(game, success)
             except Exception as e:
                 self._game_finished_callback(game, False)
             finally:
+                self._is_actively_analyzing = False
                 # Cleanup is handled by BulkAnalysisThread's finally block
                 # This ensures cleanup happens even if worker finishes normally
-                pass
 
 
 class GameAnalysisWorker(QThread):
@@ -383,21 +385,31 @@ class BulkAnalysisThread(QThread):
         completed_count = analyzed_count + skipped_count
         
         # Calculate active workers and thread information dynamically
+        # Only count workers that are actively analyzing games, not just running
         active_workers_count = 0
         active_parallel_games = 0
         active_total_threads = 0
         
         if hasattr(self, '_workers') and self._workers:
-            active_workers_count = sum(1 for w in self._workers if w.isRunning())
+            # Count workers that are both running AND actively analyzing
+            active_workers_count = sum(
+                1 for w in self._workers 
+                if w.isRunning() and getattr(w, '_is_actively_analyzing', False)
+            )
             if active_workers_count > 0 and hasattr(self, '_threads_per_engine_list'):
                 active_parallel_games = active_workers_count
                 # Sum actual thread counts for active workers (dynamic distribution)
+                # Map active workers to their thread counts
+                active_worker_indices = [
+                    i for i, w in enumerate(self._workers)
+                    if w.isRunning() and getattr(w, '_is_actively_analyzing', False)
+                ]
                 active_total_threads = sum(
                     self._threads_per_engine_list[i] 
-                    for i in range(min(active_workers_count, len(self._threads_per_engine_list)))
+                    for i in active_worker_indices
+                    if i < len(self._threads_per_engine_list)
                 )
             elif active_workers_count > 0 and hasattr(self, '_threads_per_engine') and self._threads_per_engine > 0:
-                # Fallback for backward compatibility
                 active_parallel_games = active_workers_count
                 active_total_threads = active_workers_count * self._threads_per_engine
             else:
