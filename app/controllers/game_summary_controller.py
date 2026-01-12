@@ -11,6 +11,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from app.models.game_model import GameModel
 from app.models.moveslist_model import MovesListModel, MoveData
 from app.services.game_summary_service import GameSummaryService, GameSummary, GameHighlight
+from app.services.logging_service import LoggingService
 
 
 class GameSummaryController(QObject):
@@ -70,10 +71,8 @@ class GameSummaryController(QObject):
         except Exception as e:
             # Avoid crashing the UI; surface a generic error state
             # Log the exception to console for debugging
-            import sys
-            import traceback
-            print(f"Error calculating game summary: {e}", file=sys.stderr)
-            print(f"Traceback: {traceback.format_exc()}", file=sys.stderr)
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Error calculating game summary: {e}", exc_info=e)
             self._emit_unavailable("error")
             return
 

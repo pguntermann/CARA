@@ -14,6 +14,7 @@ from app.models.database_model import DatabaseModel
 from app.models.game_model import GameModel
 from app.controllers.game_controller import GameController
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.services.logging_service import LoggingService
 
 if TYPE_CHECKING:
     from app.controllers.player_stats_controller import PlayerStatsController
@@ -108,8 +109,8 @@ class PlayerDropdownWorker(QThread):
         
         except Exception as e:
             # Emit empty list on error
-            import sys
-            print(f"Error in PlayerDropdownWorker: {e}", file=sys.stderr)
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Error in PlayerDropdownWorker: {e}", exc_info=e)
             self.players_ready.emit([])
 
 
@@ -232,10 +233,8 @@ class PlayerStatsCalculationWorker(QThread):
         
         except Exception as e:
             # Emit error signal
-            import sys
-            print(f"Error in PlayerStatsCalculationWorker: {e}", file=sys.stderr)
-            import traceback
-            traceback.print_exc()
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Error in PlayerStatsCalculationWorker: {e}", exc_info=e)
             self.stats_unavailable.emit("error")
 
 
@@ -1480,8 +1479,8 @@ class DetailPlayerStatsView(QWidget):
             self._dropdown_worker.finished.connect(self._on_dropdown_worker_finished)
             self._dropdown_worker.start()
         except Exception as e:
-            import sys
-            print(f"Error starting dropdown worker: {e}", file=sys.stderr)
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Error starting dropdown worker: {e}", exc_info=e)
             if self._dropdown_worker:
                 self._dropdown_worker.deleteLater()
                 self._dropdown_worker = None

@@ -90,6 +90,11 @@ class EngineDialogController(QObject):
         Args:
             engine_path: Path to engine executable.
         """
+        # Log engine validation started
+        from app.services.logging_service import LoggingService
+        logging_service = LoggingService.get_instance()
+        logging_service.info(f"Engine validation started: path={engine_path}")
+        
         # Show progress and set status
         self.show_progress()
         self.set_indeterminate(True)
@@ -112,6 +117,14 @@ class EngineDialogController(QObject):
             name: Engine name if validation succeeded.
             author: Engine author if validation succeeded.
         """
+        # Log engine validation completed
+        from app.services.logging_service import LoggingService
+        logging_service = LoggingService.get_instance()
+        if success:
+            logging_service.info(f"Engine validation completed: success=True, name={name}, author={author}")
+        else:
+            logging_service.warning(f"Engine validation completed: success=False, error={error}")
+        
         # Hide progress bar
         self.hide_progress()
         self.set_indeterminate(False)

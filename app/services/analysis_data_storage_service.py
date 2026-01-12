@@ -14,6 +14,7 @@ import chess.pgn
 from app.models.moveslist_model import MoveData
 from app.services.pgn_service import PgnService
 from app.models.database_model import GameData
+from app.services.logging_service import LoggingService
 
 
 class AnalysisDataStorageService:
@@ -209,10 +210,8 @@ class AnalysisDataStorageService:
         except Exception as e:
             # On any error, return False
             # Log error for debugging
-            import sys
-            print(f"Error storing analysis data: {e}", file=sys.stderr)
-            import traceback
-            traceback.print_exc()
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Error storing analysis data: {e}", exc_info=e)
             return False
     
     @staticmethod
@@ -267,8 +266,8 @@ class AnalysisDataStorageService:
                     # Checksum mismatch - data may be corrupted
                     # Remove corrupted tags from game
                     AnalysisDataStorageService._remove_corrupted_analysis_tags(game)
-                    import sys
-                    print(f"Warning: Analysis data checksum mismatch. Stored: {stored_checksum[:16]}..., Calculated: {calculated_checksum[:16]}...", file=sys.stderr)
+                    logging_service = LoggingService.get_instance()
+                    logging_service.warning(f"Analysis data checksum mismatch. Stored: {stored_checksum[:16]}..., Calculated: {calculated_checksum[:16]}...")
                     return None
             
             # Deserialize JSON
@@ -329,10 +328,8 @@ class AnalysisDataStorageService:
             raise
         except Exception as e:
             # On any other error, return None silently
-            import sys
-            print(f"Error loading analysis data: {e}", file=sys.stderr)
-            import traceback
-            traceback.print_exc()
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Error loading analysis data: {e}", exc_info=e)
             return None
     
     @staticmethod

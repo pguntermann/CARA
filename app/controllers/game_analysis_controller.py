@@ -18,6 +18,7 @@ from app.services.book_move_service import BookMoveService
 from app.services.opening_service import OpeningService
 from app.services.progress_service import ProgressService
 from app.services.move_analysis_service import MoveAnalysisService
+from app.services.logging_service import LoggingService
 from app.utils.material_tracker import (calculate_material_loss, calculate_material_balance,
                                          get_captured_piece_letter, calculate_material_count, count_pieces)
 
@@ -389,6 +390,11 @@ class GameAnalysisController(QObject):
         # Emit started signal
         self.analysis_started.emit()
         
+        # Log analysis started
+        logging_service = LoggingService.get_instance()
+        game_info = f"{active_game.white} vs {active_game.black}" if active_game else "unknown"
+        logging_service.info(f"Game analysis started: engine={engine.name}, moves={len(moves_data)}, game={game_info}")
+        
         # Start analyzing first move
         self._analyze_next_move()
         
@@ -516,11 +522,18 @@ class GameAnalysisController(QObject):
             # Analysis complete
             self._is_analyzing = False
             
+            # Log analysis completed
+            logging_service = LoggingService.get_instance()
+            duration_ms = (time.time() * 1000.0) - self._analysis_start_time if hasattr(self, '_analysis_start_time') else 0
+            duration_sec = duration_ms / 1000.0
+            total_half_moves = moves_count
+            total_full_moves = (total_half_moves + 1) // 2
+            engine_name = getattr(self, '_current_engine_name', 'unknown')
+            logging_service.info(f"Game analysis completed: engine={engine_name}, moves={total_full_moves}, duration={duration_sec:.1f}s")
+            
             # Update status bar with completion message
             from app.services.progress_service import ProgressService
             progress_service = ProgressService.get_instance()
-            total_half_moves = moves_count
-            total_full_moves = (total_half_moves + 1) // 2
             
             if self._cancelled:
                 current_half_move = self._current_move_index + 1

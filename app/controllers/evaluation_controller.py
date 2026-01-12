@@ -7,6 +7,7 @@ from PyQt6.QtCore import QTimer
 from app.models.evaluation_model import EvaluationModel
 from app.services.evaluation_engine_service import EvaluationEngineService
 from app.services.progress_service import ProgressService
+from app.services.logging_service import LoggingService
 from app.controllers.engine_controller import TASK_EVALUATION
 
 
@@ -110,6 +111,10 @@ class EvaluationController:
         except TypeError:
             pass  # Already connected
         
+        # Log evaluation started
+        logging_service = LoggingService.get_instance()
+        logging_service.info(f"Evaluation started: engine={engine.name}, FEN={fen[:50]}...")
+        
         # Start evaluation
         engine_path = Path(engine.path)
         
@@ -190,6 +195,10 @@ class EvaluationController:
             self.evaluation_service.evaluation_update.disconnect(self._on_evaluation_update)
         except TypeError:
             pass  # Not connected, ignore
+        
+        # Log evaluation stopped
+        logging_service = LoggingService.get_instance()
+        logging_service.info("Evaluation stopped")
         
         # Stop evaluation service (this ensures no more updates are emitted)
         self.evaluation_service.stop_evaluation()

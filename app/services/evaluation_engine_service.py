@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
 from app.services.uci_communication_service import UCICommunicationService
+from app.services.logging_service import LoggingService
 
 
 class EvaluationEngineThread(QThread):
@@ -637,6 +638,11 @@ class EvaluationEngineService(QObject):
         self.evaluation_thread.error_occurred.connect(self.error_occurred.emit)
         self.evaluation_thread.start_evaluation(fen)
         
+        # Log evaluation engine started
+        logging_service = LoggingService.get_instance()
+        options_str = f", options={engine_options}" if engine_options else ""
+        logging_service.info(f"Evaluation engine started: path={engine_path}, depth={max_depth}, threads={max_threads}, movetime={movetime}ms{options_str}")
+        
         return True
     
     def update_position(self, fen: str) -> None:
@@ -669,6 +675,10 @@ class EvaluationEngineService(QObject):
     def stop_evaluation(self) -> None:
         """Stop current evaluation."""
         if self.evaluation_thread:
+            # Log evaluation engine stopped
+            logging_service = LoggingService.get_instance()
+            logging_service.info(f"Evaluation engine stopped: path={self.current_engine_path}")
+            
             # Set flags to stop the thread, it will exit naturally and cleanup in finally block
             self.evaluation_thread.stop_evaluation()
             self.evaluation_thread.shutdown()

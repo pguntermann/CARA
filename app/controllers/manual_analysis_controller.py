@@ -9,6 +9,7 @@ from app.models.manual_analysis_model import ManualAnalysisModel, AnalysisLine
 from app.services.manual_analysis_engine_service import ManualAnalysisEngineService
 from app.services.progress_service import ProgressService
 from app.services.pv_plan_parser_service import PvPlanParserService
+from app.services.logging_service import LoggingService
 from app.controllers.engine_controller import TASK_MANUAL_ANALYSIS, TASK_EVALUATION
 
 
@@ -256,6 +257,10 @@ class ManualAnalysisController:
                 # Switch to manual analysis in background (non-blocking)
                 QTimer.singleShot(0, lambda: self._evaluation_controller._switch_to_manual_analysis())
         
+        # Log manual analysis started
+        logging_service = LoggingService.get_instance()
+        logging_service.info(f"Manual analysis started: engine={engine.name}, FEN={fen[:50]}..., multipv={multipv}")
+        
         # Start service in background (non-blocking) using QTimer
         # This allows the UI to update immediately before the service starts
         QTimer.singleShot(0, lambda: self.analysis_service.start_analysis(engine_path, fen, multipv))
@@ -287,6 +292,10 @@ class ManualAnalysisController:
             evaluation_engine_id = self._evaluation_controller.engine_controller.get_engine_assignment(TASK_EVALUATION)
             if self._current_engine_id and evaluation_engine_id and self._current_engine_id == evaluation_engine_id:
                 same_engine = True
+        
+        # Log manual analysis stopped
+        logging_service = LoggingService.get_instance()
+        logging_service.info("Manual analysis stopped")
         
         # Stop service in background (non-blocking) using QTimer
         # Pass same_engine flag to coordinate shutdown

@@ -10,6 +10,7 @@ from app.models.database_model import GameData, DatabaseModel
 from app.models.moveslist_model import MoveData
 from app.services.game_summary_service import GameSummary, PlayerStatistics, PhaseStatistics, GameSummaryService
 from app.controllers.game_controller import GameController
+from app.services.logging_service import LoggingService
 
 
 def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, game_black: str, 
@@ -161,8 +162,8 @@ def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, ga
         }
     except Exception as e:
         # Log error but don't crash - return None to skip this game
-        import sys
-        print(f"Error processing game for stats: {e}", file=sys.stderr)
+        logging_service = LoggingService.get_instance()
+        logging_service.error(f"Error processing game for stats: {e}", exc_info=e)
         return None
 
 
@@ -309,10 +310,8 @@ class PlayerStatsService:
                     if isinstance(e, CancelledError):
                         continue
                     # Log other errors but continue processing other games
-                    import sys
-                    print(f"Error processing game: {e}", file=sys.stderr)
-                    import traceback
-                    traceback.print_exc()
+                    logging_service = LoggingService.get_instance()
+                    logging_service.error(f"Error processing game: {e}", exc_info=e)
         finally:
             # Ensure executor is properly shut down
             # This waits for all processes to finish, even if cancelled

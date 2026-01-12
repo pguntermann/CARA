@@ -5,6 +5,7 @@ from typing import Optional, List, Dict, Any, Tuple, Callable
 from datetime import datetime, timedelta
 from io import StringIO
 import json
+from app.services.logging_service import LoggingService
 
 
 class OnlineImportService:
@@ -94,6 +95,14 @@ class OnlineImportService:
             if progress_callback:
                 progress_callback(f"Fetching games from Lichess for user '{username}'...", 10)
             
+            # Log Lichess API call
+            logging_service = LoggingService.get_instance()
+            filter_str = f", max={max_games}" if max_games else ""
+            filter_str += f", since={since_date}" if since_date else ""
+            filter_str += f", until={until_date}" if until_date else ""
+            filter_str += f", perf_type={perf_type}" if perf_type else ""
+            logging_service.info(f"Lichess API call: username={username}{filter_str}")
+            
             response = requests.get(
                 url,
                 params=params,
@@ -130,8 +139,8 @@ class OnlineImportService:
                     continue
                 except Exception as e:
                     # Log but continue
-                    import sys
-                    print(f"Warning: Error parsing game line: {e}", file=sys.stderr)
+                    logging_service = LoggingService.get_instance()
+                    logging_service.warning(f"Error parsing game line: {e}", exc_info=e)
                     continue
             
             if progress_callback:
@@ -139,6 +148,10 @@ class OnlineImportService:
             
             if not pgn_list:
                 return (False, f"No games found for user '{username}'", [])
+            
+            # Log Lichess import result
+            logging_service = LoggingService.get_instance()
+            logging_service.info(f"Lichess import completed: username={username}, {len(pgn_list)} game(s) fetched")
             
             return (True, f"Successfully imported {len(pgn_list)} game(s) from Lichess", pgn_list)
             
@@ -194,6 +207,13 @@ class OnlineImportService:
             
             if progress_callback:
                 progress_callback(f"Fetching archive list for user '{username}'...", 5)
+            
+            # Log Chess.com API call
+            logging_service = LoggingService.get_instance()
+            filter_str = f", max={max_games}" if max_games else ""
+            filter_str += f", since={since_date}" if since_date else ""
+            filter_str += f", until={until_date}" if until_date else ""
+            logging_service.info(f"Chess.com API call: username={username}{filter_str}")
             
             archives_response = requests.get(
                 archives_url,
@@ -347,15 +367,15 @@ class OnlineImportService:
                 
                 except requests.exceptions.RequestException as e:
                     # Log but continue with other archives
-                    import sys
-                    print(f"Warning: Error fetching archive {archive_url}: {e}", file=sys.stderr)
+                    logging_service = LoggingService.get_instance()
+                    logging_service.warning(f"Error fetching archive {archive_url}: {e}", exc_info=e)
                     if progress_callback:
                         progress_callback(f"Warning: Error fetching archive {idx + 1}/{total_archives}, continuing...", 
                                         min(90, 10 + int((idx / total_archives) * 70)))
                     continue
                 except Exception as e:
-                    import sys
-                    print(f"Warning: Error processing archive {archive_url}: {e}", file=sys.stderr)
+                    logging_service = LoggingService.get_instance()
+                    logging_service.warning(f"Error processing archive {archive_url}: {e}", exc_info=e)
                     if progress_callback:
                         progress_callback(f"Warning: Error processing archive {idx + 1}/{total_archives}, continuing...", 
                                         min(90, 10 + int((idx / total_archives) * 70)))
@@ -366,6 +386,10 @@ class OnlineImportService:
             
             if not pgn_list:
                 return (False, f"No games found for user '{username}' in the specified criteria", [])
+            
+            # Log Chess.com import result
+            logging_service = LoggingService.get_instance()
+            logging_service.info(f"Chess.com import completed: username={username}, {len(pgn_list)} game(s) fetched")
             
             return (True, f"Successfully imported {len(pgn_list)} game(s) from Chess.com", pgn_list)
             

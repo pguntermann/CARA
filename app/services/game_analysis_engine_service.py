@@ -8,6 +8,7 @@ from typing import Optional, Dict, Any, Tuple, List
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
 from app.services.uci_communication_service import UCICommunicationService
+from app.services.logging_service import LoggingService
 
 
 class AnalysisRequest:
@@ -580,6 +581,12 @@ class GameAnalysisEngineService(QObject):
             QApplication.processEvents()
             time.sleep(0.05)  # Reduced sleep time, events are processed above
         
+        # Log engine thread started
+        if self.analysis_thread.running:
+            logging_service = LoggingService.get_instance()
+            options_str = f", options={self.engine_options}" if self.engine_options else ""
+            logging_service.info(f"Game analysis engine thread started: engine={self.engine_name}, path={self.engine_path}, threads={self.max_threads}, depth={self.max_depth}, movetime={self.time_limit_ms}ms{options_str}")
+        
         return self.analysis_thread.running
     
     def analyze_position(self, fen: str, move_number: int, progress_interval_ms: int = 500) -> GameAnalysisEngineThread:
@@ -619,6 +626,10 @@ class GameAnalysisEngineService(QObject):
     def shutdown(self) -> None:
         """Shutdown engine process and thread."""
         if self.analysis_thread:
+            # Log engine thread shutdown
+            logging_service = LoggingService.get_instance()
+            logging_service.info(f"Game analysis engine thread shutdown: engine={self.engine_name}")
+            
             # Set flags to stop the thread, it will exit naturally and cleanup in finally block
             if self.analysis_thread.isRunning():
                 self.analysis_thread.shutdown()

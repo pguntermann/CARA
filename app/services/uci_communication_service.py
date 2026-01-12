@@ -13,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Callable, Dict, Any
 from enum import Enum
+from app.services.logging_service import LoggingService
 
 # Module-level debug callbacks (set from MainWindow)
 _debug_outbound_callback: Optional[Callable[[], bool]] = None
@@ -119,17 +120,14 @@ class UCICommunicationService:
         """
         try:
             if _debug_lifecycle_enabled:
-                # Use datetime for timestamp with milliseconds
-                now = datetime.now()
-                timestamp = now.strftime("%H:%M:%S.") + str(now.microsecond // 1000).zfill(3)
-                # Use string concatenation to avoid format string issues
-                identifier_str = ("[" + str(self.identifier) + "] ") if self.identifier else ""
-                thread_id = threading.get_ident()
-                thread_str = (" [Thread-" + str(thread_id) + "]") if thread_id else ""
-                pid_str = (" [PID:" + str(self.process.pid) + "]") if self.process else ""
-                details_str = (" " + details) if details else ""
-                formatted = "[UCI LIFECYCLE] " + identifier_str + timestamp + thread_str + pid_str + ": " + event + details_str
-                print(formatted, flush=True)
+                # Build message with identifier and PID (logging service handles timestamp/thread)
+                identifier_str = f"[{self.identifier}] " if self.identifier else ""
+                pid_str = f" [PID:{self.process.pid}]" if self.process else ""
+                details_str = f" {details}" if details else ""
+                message = f"[UCI LIFECYCLE] {identifier_str}{pid_str}: {event}{details_str}"
+                
+                logging_service = LoggingService.get_instance()
+                logging_service.debug(message)
         except Exception:
             # Silently ignore any errors in debug output to prevent breaking communication
             pass
@@ -177,23 +175,20 @@ class UCICommunicationService:
                             pass
             
             if should_log:
-                # Use datetime for timestamp with milliseconds
-                now = datetime.now()
-                timestamp = now.strftime("%H:%M:%S.") + str(now.microsecond // 1000).zfill(3)
-                # Use string concatenation to avoid format string issues
-                identifier_str = ("[" + str(self.identifier) + "] ") if self.identifier else ""
-                thread_id = threading.get_ident()
-                thread_str = (" [Thread-" + str(thread_id) + "]") if thread_id else ""
-                # Use string concatenation instead of f-string to avoid format string issues
-                formatted = "[UCI " + str(direction) + "] " + identifier_str + str(timestamp) + thread_str + ": " + str(message)
-                print(formatted, flush=True)
+                # Build message with identifier (logging service handles timestamp/thread)
+                identifier_str = f"[{self.identifier}] " if self.identifier else ""
+                formatted_message = f"[UCI {direction}] {identifier_str}{message}"
+                
+                logging_service = LoggingService.get_instance()
+                logging_service.debug(formatted_message)
         except Exception as e:
             # Silently ignore any errors in debug output to prevent breaking communication
-            # But log to stderr for debugging
-            import sys
-            import traceback
-            print("DEBUG: Error in _debug_console: " + str(e), file=sys.stderr, flush=True)
-            print("DEBUG: Traceback: " + str(traceback.format_exc()), file=sys.stderr, flush=True)
+            # But log error using logging service
+            try:
+                logging_service = LoggingService.get_instance()
+                logging_service.error(f"Error in _debug_console: {e}", exc_info=e)
+            except Exception:
+                pass  # Fallback: silently ignore if logging also fails
     
     def spawn_process(self) -> bool:
         """Spawn the engine process.
@@ -222,6 +217,12 @@ class UCICommunicationService:
             self._read_buffer = b''
             self._crash_logged = False  # Reset crash flag when engine starts
             self._debug_lifecycle("STARTED", "PID:" + str(self.process.pid))
+            
+            # Log engine process spawned
+            logging_service = LoggingService.get_instance()
+            identifier_str = f" [{self.identifier}]" if self.identifier else ""
+            logging_service.info(f"Engine process spawned{identifier_str}: path={self.engine_path}, PID={self.process.pid}")
+            
             return True
         except Exception as e:
             self._debug_lifecycle("ERROR", f"Failed to spawn engine process: {str(e)}")
@@ -268,6 +269,12 @@ class UCICommunicationService:
                     uciok_received = True
                     self._uciok_received = True
                     self._initialized = True
+                    
+                    # Log UCI initialized
+                    logging_service = LoggingService.get_instance()
+                    identifier_str = f" [{self.identifier}]" if self.identifier else ""
+                    pid_str = f", PID={self.process.pid}" if self.process else ""
+                    logging_service.info(f"UCI initialized{identifier_str}: path={self.engine_path}{pid_str}")
                     break
             
             if not uciok_received:
@@ -625,6 +632,11 @@ class UCICommunicationService:
                 pass
             
             self.process = None
+        
+        # Log engine cleanup
+        logging_service = LoggingService.get_instance()
+        identifier_str = f" [{self.identifier}]" if self.identifier else ""
+        logging_service.info(f"Engine process cleaned up{identifier_str}: path={self.engine_path}")
         
         self._initialized = False
         self._uciok_received = False

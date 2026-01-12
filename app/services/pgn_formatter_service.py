@@ -3,6 +3,7 @@
 import re
 import io
 from typing import Dict, Any, Tuple, List, Optional
+from app.services.logging_service import LoggingService
 
 
 # NAG (Numeric Annotation Glyph) mapping
@@ -757,8 +758,8 @@ class PgnFormatterService:
         if variation_depth != 0:
             # This indicates mismatched parentheses - log warning but continue
             # In this case, we may have removed too much or too little
-            import sys
-            print(f"Warning: _remove_variations ended with variation_depth={variation_depth} (mismatched parentheses)", file=sys.stderr)
+            logging_service = LoggingService.get_instance()
+            logging_service.warning(f"_remove_variations ended with variation_depth={variation_depth} (mismatched parentheses)")
         
         result_str = ''.join(result_chars)
         # Clean up spaces (preserve newlines)
@@ -2078,8 +2079,7 @@ class PgnFormatterService:
             # On any error, return empty list
             # Note: This is intentionally silent to avoid breaking formatting
             # if PGN parsing fails
-            import traceback
-            print(f"Warning: Failed to extract move positions from PGN: {e}")
-            traceback.print_exc()
+            logging_service = LoggingService.get_instance()
+            logging_service.warning(f"Failed to extract move positions from PGN: {e}", exc_info=e)
         
         return moves

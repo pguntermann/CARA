@@ -7,6 +7,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from app.models.database_model import DatabaseModel, GameData
 from app.services.pgn_cleaning_service import PgnCleaningService
+from app.services.logging_service import LoggingService
 
 
 @dataclass
@@ -219,6 +220,22 @@ class BulkCleanPgnService:
         # Batch update all modified games with a single dataChanged signal
         if updated_games:
             database.batch_update_games(updated_games)
+        
+        # Log bulk clean operation
+        logging_service = LoggingService.get_instance()
+        options = []
+        if remove_comments:
+            options.append("comments")
+        if remove_variations:
+            options.append("variations")
+        if remove_non_standard_tags:
+            options.append("non_standard_tags")
+        if remove_annotations:
+            options.append("annotations")
+        if remove_results:
+            options.append("results")
+        options_str = ", ".join(options) if options else "none"
+        logging_service.info(f"Bulk clean PGN operation completed: options=[{options_str}], games_processed={total_games}, games_updated={games_updated}, games_failed={games_failed}")
         
         return BulkCleanPgnResult(
             success=True,

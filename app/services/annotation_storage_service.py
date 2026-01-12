@@ -14,6 +14,7 @@ import chess.pgn
 from app.models.database_model import GameData
 from app.services.pgn_service import PgnService
 from app.models.annotation_model import Annotation, AnnotationType
+from app.services.logging_service import LoggingService
 
 
 class AnnotationStorageService:
@@ -175,10 +176,8 @@ class AnnotationStorageService:
             
             return True
         except Exception as e:
-            import sys
-            print(f"Error storing annotations: {e}", file=sys.stderr)
-            import traceback
-            traceback.print_exc()
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Error storing annotations: {e}", exc_info=e)
             return False
     
     @staticmethod
@@ -220,8 +219,8 @@ class AnnotationStorageService:
                 
                 if stored_checksum != calculated_checksum:
                     AnnotationStorageService._remove_corrupted_annotation_tags(game)
-                    import sys
-                    print(f"Warning: Annotations checksum mismatch.", file=sys.stderr)
+                    logging_service = LoggingService.get_instance()
+                    logging_service.warning("Annotations checksum mismatch.")
                     return None
             
             # Deserialize JSON

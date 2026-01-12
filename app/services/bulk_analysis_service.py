@@ -20,6 +20,7 @@ from app.services.book_move_service import BookMoveService
 from app.services.opening_service import OpeningService
 from app.services.analysis_data_storage_service import AnalysisDataStorageService
 from app.services.engine_parameters_service import EngineParametersService
+from app.services.logging_service import LoggingService
 from app.utils.material_tracker import (
     get_captured_piece_letter,
     calculate_material_count,
@@ -359,8 +360,8 @@ class BulkAnalysisService(QObject):
                         # If not loaded, skip lookup to avoid blocking (opening info will be None)
                     except Exception as e:
                         # If opening lookup fails, continue without opening info
-                        import sys
-                        print(f"Warning: Opening lookup failed: {e}", file=sys.stderr)
+                        logging_service = LoggingService.get_instance()
+                        logging_service.warning(f"Opening lookup failed: {e}", exc_info=e)
                         eco, opening_name = None, None
                 
                 # If we found an opening, update our tracking variables

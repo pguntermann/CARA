@@ -15,6 +15,7 @@ from app.services.engine_parameters_service import EngineParametersService
 from app.services.book_move_service import BookMoveService
 from app.services.bulk_analysis_service import BulkAnalysisService
 from app.services.progress_service import ProgressService
+from app.services.logging_service import LoggingService
 
 
 class ContinuousGameAnalysisWorker(QThread):
@@ -748,8 +749,8 @@ class BulkAnalysisController(QObject):
                 opening_service.load()
             except Exception as e:
                 # If loading fails, continue anyway (opening info will just be missing)
-                import sys
-                print(f"Warning: Failed to load opening service: {e}", file=sys.stderr)
+                logging_service = LoggingService.get_instance()
+                logging_service.warning(f"Failed to load opening service: {e}", exc_info=e)
             
             if status_callback:
                 status_callback("Ready")
@@ -771,8 +772,8 @@ class BulkAnalysisController(QObject):
                         self.config
                     )
         except Exception as e:
-            import sys
-            print(f"Warning: Failed to pre-load engine parameters: {e}", file=sys.stderr)
+            logging_service = LoggingService.get_instance()
+            logging_service.warning(f"Failed to pre-load engine parameters: {e}", exc_info=e)
         
         if status_callback:
             status_callback("Ready")
@@ -851,10 +852,41 @@ class BulkAnalysisController(QObject):
         self._analysis_thread.progress_updated.connect(self.progress_updated.emit)
         self._analysis_thread.status_update_requested.connect(self.status_update_requested.emit)
         self._analysis_thread.game_analyzed.connect(self.game_analyzed.emit)
-        self._analysis_thread.finished.connect(self.finished.emit)
+        self._analysis_thread.finished.connect(self._on_bulk_analysis_finished)
+        
+        # Log bulk analysis started
+        logging_service = LoggingService.get_instance()
+        engine_assignment = engine_model.get_assignment(EngineModel.TASK_GAME_ANALYSIS)
+        engine_name = "unknown"
+        if engine_assignment:
+            engine = engine_model.get_engine(engine_assignment)
+            if engine:
+                engine_name = engine.name
+        parallel_workers = parallel_games_override if parallel_games_override else "default"
+        movetime = movetime_override if movetime_override else "default"
+        max_threads = max_threads_override if max_threads_override else "unlimited"
+        logging_service.info(f"Bulk analysis started: games={len(games)}, engine={engine_name}, parallel_workers={parallel_workers}, movetime={movetime}ms, max_threads={max_threads}, re_analyze={re_analyze}")
         
         # Start the thread
         self._analysis_thread.start()
+    
+    def _on_bulk_analysis_finished(self, success: bool, message: str) -> None:
+        """Handle bulk analysis completion.
+        
+        Args:
+            success: Whether analysis completed successfully.
+            message: Completion message.
+        """
+        # Log bulk analysis completed
+        logging_service = LoggingService.get_instance()
+        if success:
+            # Extract stats from message if available
+            logging_service.info(f"Bulk analysis completed: {message}")
+        else:
+            logging_service.warning(f"Bulk analysis failed: {message}")
+        
+        # Emit finished signal for other observers
+        self.finished.emit(success, message)
     
     def cancel_analysis(self) -> None:
         """Cancel the current analysis if running."""

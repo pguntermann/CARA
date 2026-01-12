@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 
 from app.utils.path_resolver import resolve_data_file_path
+from app.services.logging_service import LoggingService
 
 
 class EngineParametersService:
@@ -75,10 +76,16 @@ class EngineParametersService:
                 if not isinstance(self._parameters, dict):
                     self._parameters = self._deep_copy(self.DEFAULT_PARAMETERS)
                 
+                # Log engine parameters loaded
+                logging_service = LoggingService.get_instance()
+                engine_count = len(self._parameters) if isinstance(self._parameters, dict) else 0
+                logging_service.info(f"Engine parameters loaded: path={self.parameters_path}, {engine_count} engine(s)")
+                
                 return self._parameters
             except (json.JSONDecodeError, IOError) as e:
                 # If file is corrupted or can't be read, use defaults
-                print(f"Warning: Failed to load engine parameters: {e}. Using defaults.", file=sys.stderr)
+                logging_service = LoggingService.get_instance()
+                logging_service.warning(f"Failed to load engine parameters: {e}. Using defaults.", exc_info=e)
                 self._parameters = self._deep_copy(self.DEFAULT_PARAMETERS)
                 return self._parameters
     
@@ -115,9 +122,15 @@ class EngineParametersService:
                 with open(self.parameters_path, "w", encoding="utf-8") as f:
                     json.dump(self._parameters, f, indent=2, ensure_ascii=False)
                 
+                # Log engine parameters saved
+                logging_service = LoggingService.get_instance()
+                engine_count = len(self._parameters) if isinstance(self._parameters, dict) else 0
+                logging_service.info(f"Engine parameters saved: path={self.parameters_path}, {engine_count} engine(s)")
+                
                 return True
             except IOError as e:
-                print(f"Error: Failed to save engine parameters: {e}", file=sys.stderr)
+                logging_service = LoggingService.get_instance()
+                logging_service.error(f"Failed to save engine parameters: {e}", exc_info=e)
                 return False
     
     def get_parameters(self) -> Dict[str, Any]:

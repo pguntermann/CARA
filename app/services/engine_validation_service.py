@@ -11,6 +11,7 @@ import uuid
 
 from app.services.uci_communication_service import UCICommunicationService
 from app.services.engine_parameters_service import EngineParametersService
+from app.services.logging_service import LoggingService
 
 
 @dataclass
@@ -371,7 +372,8 @@ class EngineValidationService:
             return (True, options)
             
         except Exception as e:
-            print(f"Warning: Failed to refresh engine options: {e}", file=sys.stderr)
+            logging_service = LoggingService.get_instance()
+            logging_service.warning(f"Failed to refresh engine options: {e}", exc_info=e)
             return (False, [])
     
     @staticmethod
@@ -393,5 +395,6 @@ class EngineValidationService:
             service.set_engine_options(engine_path_str, options)
         except Exception as e:
             # Don't fail validation if storing options fails
-            print(f"Warning: Failed to store engine options: {e}", file=sys.stderr)
+            logging_service = LoggingService.get_instance()
+            logging_service.warning(f"Failed to store engine options: {e}", exc_info=e)
 

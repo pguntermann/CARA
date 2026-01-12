@@ -9,6 +9,7 @@ import io
 from app.services.ai_service import AIService, AIProvider
 from app.services.user_settings_service import UserSettingsService
 from app.services.pgn_formatter_service import PgnFormatterService
+from app.services.logging_service import LoggingService
 
 
 class AIRequestThread(QThread):
@@ -412,7 +413,8 @@ Please provide a brief analysis of this position, including:
                 self._played_move_sequence.append(notation)
                 board.push(move)
         except Exception as exc:
-            print(f"Warning: failed to build move label cache: {exc}")
+            logging_service = LoggingService.get_instance()
+            logging_service.warning(f"Failed to build move label cache: {exc}", exc_info=exc)
 
     def handle_move_link_click(self, move_notation: str) -> bool:
         """Handle move link clicks from the AI chat view."""
@@ -506,6 +508,12 @@ Please provide a brief analysis of this position, including:
 
 {current_prompt}"""
         
+        # Log AI request sent
+        logging_service = LoggingService.get_instance()
+        message_length = len(user_message)
+        conversation_length = len(self._conversation)
+        logging_service.info(f"AI request sent: provider={provider}, model={model}, message_length={message_length}, conversation_length={conversation_length}, token_limit={self._token_limit}")
+        
         # Emit request started signal
         self.request_started.emit()
         
@@ -532,10 +540,15 @@ Please provide a brief analysis of this position, including:
             success: True if request succeeded.
             response: Response text or error message.
         """
+        # Log AI response received
+        logging_service = LoggingService.get_instance()
         if success:
+            response_length = len(response) if response else 0
+            logging_service.info(f"AI response received: success=True, response_length={response_length}")
             self._conversation.append({"role": "ai", "content": response})
             self.message_added.emit("ai", response)
         else:
+            logging_service.warning(f"AI response received: success=False, error={response}")
             self.error_occurred.emit(response)
     
     def _on_request_finished(self) -> None:

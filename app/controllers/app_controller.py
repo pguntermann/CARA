@@ -1131,7 +1131,15 @@ class AppController:
                 })
         
         # Tell UserSettingsService to persist all settings to file
-        self.user_settings_service.save()
+        success = self.user_settings_service.save()
+        
+        # Log all settings saved
+        from app.services.logging_service import LoggingService
+        logging_service = LoggingService.get_instance()
+        if success:
+            logging_service.info("All user settings saved successfully")
+        else:
+            logging_service.warning("Failed to save all user settings")
     
     def check_for_updates(self, url: str = "https://pguntermann.github.io/CARA/") -> Tuple[bool, Optional[bool], Optional[str], Optional[str]]:
         """Check if a newer version of the application is available.

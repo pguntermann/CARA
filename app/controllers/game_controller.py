@@ -13,6 +13,7 @@ from app.models.moveslist_model import MoveData
 from app.utils.material_tracker import get_captured_piece_letter, calculate_material_count, count_pieces
 from app.controllers.board_controller import BoardController
 from app.services.opening_service import OpeningService
+from app.services.logging_service import LoggingService
 
 
 @dataclass
@@ -916,10 +917,9 @@ class GameController:
         
         except Exception as e:
             # On any error, return empty list
-            # Log error for debugging (in production, use proper logging)
-            import traceback
-            print(f"Error extracting moves from game: {e}")
-            print(traceback.format_exc())
+            # Log error for debugging
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Error extracting moves from game: {e}", exc_info=e)
             return []
         
         return moves

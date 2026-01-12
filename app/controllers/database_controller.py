@@ -11,6 +11,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from app.models.database_model import DatabaseModel, GameData
 from app.models.database_panel_model import DatabasePanelModel
 from app.services.pgn_service import PgnService
+from app.services.logging_service import LoggingService
 
 
 # Module-level translation table for PUA characters (Private Use Area: U+E000-U+F8FF)
@@ -359,8 +360,8 @@ class DatabaseController:
                     QApplication.processEvents()  # Process events after clearing unsaved
                 except Exception as e:
                     # Log error but don't fail the save - file is already written
-                    import sys
-                    print(f"Warning: Error clearing unsaved indicators: {e}", file=sys.stderr)
+                    logging_service = LoggingService.get_instance()
+                    logging_service.warning(f"Error clearing unsaved indicators: {e}", exc_info=e)
                 
                 # Mark database as saved (clear unsaved changes flag)
                 try:
@@ -368,8 +369,8 @@ class DatabaseController:
                     QApplication.processEvents()  # Process events after marking saved
                 except Exception as e:
                     # Log error but don't fail the save - file is already written
-                    import sys
-                    print(f"Warning: Error marking database as saved: {e}", file=sys.stderr)
+                    logging_service = LoggingService.get_instance()
+                    logging_service.warning(f"Error marking database as saved: {e}", exc_info=e)
                 
             except MemoryError:
                 progress_service.hide_progress()
@@ -384,6 +385,10 @@ class DatabaseController:
             # Hide progress
             progress_service.hide_progress()
             QApplication.processEvents()  # Process events to hide progress bar
+            
+            # Log database saved
+            logging_service = LoggingService.get_instance()
+            logging_service.info(f"Saved PGN database: {file_path}, {total_games} game(s)")
             
             return (True, f"PGN database saved to {file_path}")
             
@@ -484,7 +489,18 @@ class DatabaseController:
         if not identifier:
             return False
         
-        return self._close_database_by_identifier(identifier)
+        # Get file path for logging
+        file_path = identifier if identifier != "clipboard" else "clipboard"
+        game_count = len(active_database.get_all_games()) if active_database else 0
+        
+        result = self._close_database_by_identifier(identifier)
+        
+        # Log database closed
+        if result:
+            logging_service = LoggingService.get_instance()
+            logging_service.info(f"Closed PGN database: {file_path}, {game_count} game(s)")
+        
+        return result
     
     def close_all_pgn_databases(self) -> int:
         """Close all PGN databases except clipboard and search results.
@@ -730,6 +746,10 @@ class DatabaseController:
             else:
                 status_message = f"Opened PGN database: {len(games)} game(s)"
             
+            # Log database opened
+            logging_service = LoggingService.get_instance()
+            logging_service.info(f"Opened PGN database: {file_path}, {len(games)} game(s)")
+            
             return (True, status_message, first_game)
             
         except Exception as e:
@@ -779,6 +799,9 @@ class DatabaseController:
         
         if not files_to_open:
             # All files were skipped
+            # Log multiple databases opened (all skipped)
+            logging_service = LoggingService.get_instance()
+            logging_service.info(f"Opened {opened_count} database(s), skipped {skipped_count}, failed {failed_count} from {len(file_paths)} file(s)")
             return (opened_count, skipped_count, failed_count, messages, None, None)
         
         if len(files_to_open) == 1:
@@ -796,6 +819,10 @@ class DatabaseController:
                 failed_count += 1
                 file_name = Path(file_path).name
                 messages.append(f"Failed {file_name}: {message}")
+            
+            # Log multiple databases opened
+            logging_service = LoggingService.get_instance()
+            logging_service.info(f"Opened {opened_count} database(s), skipped {skipped_count}, failed {failed_count} from {len(file_paths)} file(s)")
             
             return (opened_count, skipped_count, failed_count, messages, last_successful_database, last_first_game)
         
@@ -940,6 +967,10 @@ class DatabaseController:
         
         progress_service.hide_progress()
         QApplication.processEvents()
+        
+        # Log multiple databases opened
+        logging_service = LoggingService.get_instance()
+        logging_service.info(f"Opened {opened_count} database(s), skipped {skipped_count}, failed {failed_count} from {len(file_paths)} file(s)")
         
         return (opened_count, skipped_count, failed_count, messages, last_successful_database, last_first_game)
     
@@ -1286,6 +1317,14 @@ class DatabaseController:
             # Get application version from config
             app_version = self.config.get("version", "2.4.0")
             
+            # Log online import started
+            logging_service = LoggingService.get_instance()
+            filter_str = f", max={max_games}" if max_games else ""
+            filter_str += f", since={since_date}" if since_date else ""
+            filter_str += f", until={until_date}" if until_date else ""
+            filter_str += f", perf_type={perf_type}" if perf_type else ""
+            logging_service.info(f"Starting online import: platform={platform}, username={username}{filter_str}")
+            
             # Import games from platform
             if platform.lower() == "lichess":
                 success, message, pgn_list = OnlineImportService.import_lichess_games(
@@ -1333,6 +1372,9 @@ class DatabaseController:
             QApplication.processEvents()
             
             if parse_success:
+                # Log online import completed
+                logging_service = LoggingService.get_instance()
+                logging_service.info(f"Completed online import: platform={platform}, username={username}, {len(pgn_list)} game(s) imported")
                 return (True, message, first_game_index)
             else:
                 return (False, f"Import succeeded but parsing failed: {parse_message}", None)

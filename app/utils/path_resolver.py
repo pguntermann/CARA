@@ -140,12 +140,30 @@ def resolve_data_file_path(filename: str) -> Tuple[Path, bool]:
                     # The file will be created with defaults when first saved
                     pass
             
+            # Log path resolution
+            try:
+                from app.services.logging_service import LoggingService
+                logging_service = LoggingService.get_instance()
+                if logging_service._initialized:
+                    logging_service.debug(f"Path resolved: filename={filename}, path={user_data_file}, mode=user_data_directory (macOS bundle)")
+            except Exception:
+                pass  # Silently ignore if logging not available
+            
             return user_data_file, False
     
     # For all other cases (development mode, Windows bundles, etc.):
     # Check if app root has write access
     if has_write_access(app_root):
         # Portable mode: use app root directory
+        # Log path resolution
+        try:
+            from app.services.logging_service import LoggingService
+            logging_service = LoggingService.get_instance()
+            if logging_service._initialized:
+                logging_service.debug(f"Path resolved: filename={filename}, path={app_root_file}, mode=portable (app_root)")
+        except Exception:
+            pass  # Silently ignore if logging not available
+        
         return app_root_file, True
     
     # No write access: use user data directory
@@ -161,6 +179,15 @@ def resolve_data_file_path(filename: str) -> Tuple[Path, bool]:
             # If copy fails, we'll just use the user data directory
             # The file will be created with defaults when first saved
             pass
+    
+    # Log path resolution
+    try:
+        from app.services.logging_service import LoggingService
+        logging_service = LoggingService.get_instance()
+        if logging_service._initialized:
+            logging_service.debug(f"Path resolved: filename={filename}, path={user_data_file}, mode=user_data_directory (no_write_access)")
+    except Exception:
+        pass  # Silently ignore if logging not available
     
     return user_data_file, False
 

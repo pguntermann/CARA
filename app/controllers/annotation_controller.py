@@ -8,6 +8,7 @@ from app.models.annotation_model import AnnotationModel, Annotation, AnnotationT
 from app.models.game_model import GameModel
 from app.models.database_model import GameData
 from app.services.annotation_storage_service import AnnotationStorageService
+from app.services.logging_service import LoggingService
 from app.views.chessboard_widget import ChessBoardWidget
 
 
@@ -425,6 +426,11 @@ class AnnotationController:
         total_count = sum(len(anns) for anns in annotations.values())
         
         success = AnnotationStorageService.store_annotations(game, annotations, self.config)
+        
+        # Log annotations saved
+        if success:
+            logging_service = LoggingService.get_instance()
+            logging_service.info(f"Annotations saved: game_count=1, annotation_count={total_count}")
         
         if success:
             # Emit metadata_updated signal to notify views (e.g., PGN view, metadata view)

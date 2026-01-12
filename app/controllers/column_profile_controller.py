@@ -4,6 +4,7 @@ from typing import Dict, Any, Optional, List
 
 from app.models.column_profile_model import ColumnProfileModel, DEFAULT_PROFILE_NAME
 from app.services.user_settings_service import UserSettingsService
+from app.services.logging_service import LoggingService
 
 
 class ColumnProfileController:
@@ -63,7 +64,17 @@ class ColumnProfileController:
         Returns:
             True if save was successful, False otherwise.
         """
-        return self._save_settings()
+        result = self._save_settings()
+        
+        # Log column profile saved
+        if result:
+            logging_service = LoggingService.get_instance()
+            active_profile = self.profile_model.active_profile_name
+            profile_count = len(self.profile_model.get_all_profiles())
+            column_count = len(self.profile_model.get_profile_columns(active_profile)) if active_profile else 0
+            logging_service.info(f"Column profile saved: profile={active_profile}, profile_count={profile_count}, column_count={column_count}")
+        
+        return result
     
     def get_profile_model(self) -> ColumnProfileModel:
         """Get the column profile model.

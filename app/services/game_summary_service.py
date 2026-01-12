@@ -8,6 +8,7 @@ from asteval import Interpreter
 from app.models.moveslist_model import MoveData
 from app.models.move_classification_model import MoveClassificationModel
 from app.services.game_highlights.base_rule import GameHighlight
+from app.services.logging_service import LoggingService
 
 
 @dataclass
@@ -168,8 +169,8 @@ class GameSummaryService:
             return result
         except Exception as e:
             # Log error for debugging
-            import sys
-            print(f"Error evaluating formula: {e}", file=sys.stderr)
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Error evaluating formula: {e}", exc_info=e)
             return value_on_error
     
     def _evaluate_accuracy_formula(self, **kwargs) -> float:

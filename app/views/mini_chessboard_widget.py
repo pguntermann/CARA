@@ -6,7 +6,9 @@ from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtCore import Qt, QRect, QRectF, QPointF
 from pathlib import Path
 import chess
+import sys
 from typing import Dict, Any, Optional, List
+from app.services.logging_service import LoggingService
 
 
 class MiniChessBoardWidget(QWidget):
@@ -94,7 +96,8 @@ class MiniChessBoardWidget(QWidget):
         pieces_dir = project_root / self.svg_path
         
         if not pieces_dir.exists():
-            print(f"Warning: Chess pieces directory not found: {pieces_dir}", file=sys.stderr)
+            logging_service = LoggingService.get_instance()
+            logging_service.warning(f"Chess pieces directory not found: {pieces_dir}")
             self.piece_renderers = {}
             return
         
@@ -114,7 +117,8 @@ class MiniChessBoardWidget(QWidget):
                     if renderer.isValid():
                         self.piece_renderers[(color, piece_type)] = renderer
                     else:
-                        print(f"Warning: Invalid SVG file: {file_path}", file=sys.stderr)
+                        logging_service = LoggingService.get_instance()
+                        logging_service.warning(f"Invalid SVG file: {file_path}")
     
     def _load_position_from_fen(self, fen: str) -> None:
         """Load board position from FEN string.

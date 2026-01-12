@@ -4693,6 +4693,19 @@
       "strip_pua_characters": true
     }
   },
+  "logging": {
+    "console": {
+      "enabled": false,
+      "level": "DEBUG"
+    },
+    "file": {
+      "enabled": false,
+      "level": "ERROR",
+      "max_size_mb": 10,
+      "backup_count": 5,
+      "filename": "cara.log"
+    }
+  },
   "debug": {
     "show_debug_menu": false,
     "enable_debug_backgrounds": false,

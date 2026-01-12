@@ -5,6 +5,13 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+# Import logging service - may not be initialized during config loading
+try:
+    from app.services.logging_service import LoggingService
+    _logging_available = True
+except ImportError:
+    _logging_available = False
+
 
 class ConfigLoader:
     """Strict configuration loader that fails fast on validation errors."""
@@ -48,6 +55,16 @@ class ConfigLoader:
         
         # Validate required keys
         self._validate()
+        
+        # Log configuration loaded
+        # NOTE: Pass config to get_instance to ensure logging service uses correct config
+        try:
+            from app.services.logging_service import LoggingService
+            logging_service = LoggingService.get_instance(self._config)
+            key_count = len(self._config) if isinstance(self._config, dict) else 0
+            logging_service.info(f"Configuration loaded: path={self.config_path}, {key_count} key(s), validation=passed")
+        except Exception:
+            pass  # Silently ignore if logging not available during config loading
         
         return self._config
     
@@ -581,6 +598,13 @@ class ConfigLoader:
             'ui.panels.status.message.color',
             'ui.panels.status.resize_grip.width',
             'ui.panels.status.resize_grip.height',
+            'logging.console.enabled',
+            'logging.console.level',
+            'logging.file.enabled',
+            'logging.file.level',
+            'logging.file.max_size_mb',
+            'logging.file.backup_count',
+            'logging.file.filename',
             'ui.splitter.top.main_size',
             'ui.splitter.top.detail_size',
             'ui.splitter.top.main_stretch_factor',
@@ -1340,6 +1364,13 @@ class ConfigLoader:
         Args:
             message: Error message to display.
         """
+        # Try logging first, but always print to stderr as fallback
+        if _logging_available:
+            try:
+                logging_service = LoggingService.get_instance()
+                logging_service.error(f"Configuration Error: {message}")
+            except Exception:
+                pass  # Fall through to print
         print(f"Configuration Error: {message}", file=sys.stderr)
         sys.exit(1)
 

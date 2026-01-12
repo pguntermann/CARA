@@ -81,6 +81,11 @@ class MainWindow(QMainWindow):
         
         # Set up AI debug callbacks
         self._setup_ai_debug_callbacks()
+        
+        # Log application initialized
+        from app.services.logging_service import LoggingService
+        logging_service = LoggingService.get_instance()
+        logging_service.info("Application initialized: config loaded, services ready")
     
     def _setup_window(self) -> None:
         """Setup window properties."""
@@ -1918,6 +1923,11 @@ class MainWindow(QMainWindow):
         Args:
             event: Close event.
         """
+        # Log application closing
+        from app.services.logging_service import LoggingService
+        logging_service = LoggingService.get_instance()
+        logging_service.info("Application closing: saving settings, cleaning up")
+        
         self._save_user_settings()
         event.accept()
     

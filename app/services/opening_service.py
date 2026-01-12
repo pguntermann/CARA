@@ -63,6 +63,13 @@ class OpeningService:
             self._eco_interpolated = {}
         
         self._loaded = True
+        
+        # Log opening book loaded
+        from app.services.logging_service import LoggingService
+        logging_service = LoggingService.get_instance()
+        base_count = len(self._eco_base) if self._eco_base else 0
+        interpolated_count = len(self._eco_interpolated) if self._eco_interpolated else 0
+        logging_service.info(f"Opening book loaded: path={ecolists_path}, base_positions={base_count}, interpolated_positions={interpolated_count}")
     
     def lookup_opening(self, fen: str) -> Optional[Dict[str, Any]]:
         """Look up opening information for a FEN position.

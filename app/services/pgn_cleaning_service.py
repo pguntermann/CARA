@@ -5,6 +5,7 @@ from io import StringIO
 from app.models.database_model import GameData
 from app.services.pgn_formatter_service import PgnFormatterService
 from app.services.pgn_service import PgnService
+from app.services.logging_service import LoggingService
 
 
 class PgnCleaningService:
@@ -80,10 +81,8 @@ class PgnCleaningService:
         except Exception as e:
             # On any error, return False
             # Log the error for debugging
-            import sys
-            print(f"Error removing variations: {e}", file=sys.stderr)
-            import traceback
-            traceback.print_exc()
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Error removing variations: {e}", exc_info=e)
             return False
     
     @staticmethod

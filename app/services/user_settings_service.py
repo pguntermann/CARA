@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional
 from app.models.column_profile_model import DEFAULT_PROFILE_NAME
 from app.models.user_settings_model import UserSettingsModel
 from app.utils.path_resolver import resolve_data_file_path, get_app_root, get_app_resource_path
+from app.services.logging_service import LoggingService
 
 
 class UserSettingsService:
@@ -260,12 +261,20 @@ class UserSettingsService:
                     settings = json.load(f)
             except (json.JSONDecodeError, IOError) as e:
                 # File is corrupted or unreadable, start with empty settings
-                print(f"Warning: Failed to load user settings: {e}. Starting with empty settings.", file=sys.stderr)
+                logging_service = LoggingService.get_instance()
+                logging_service.warning(f"Failed to load user settings: {e}. Starting with empty settings.", exc_info=e)
                 settings = {}
         
         # Initialize model with loaded settings
         self._model = UserSettingsModel(settings)
-        return self._model.get_settings()
+        settings_dict = self._model.get_settings()
+        
+        # Log user settings loaded
+        logging_service = LoggingService.get_instance()
+        settings_count = len(settings_dict) if isinstance(settings_dict, dict) else 0
+        logging_service.info(f"User settings loaded: path={self.settings_path}, {settings_count} setting(s)")
+        
+        return settings_dict
     
     def migrate(self) -> None:
         """Migrate settings by adding missing keys from template.
@@ -279,7 +288,8 @@ class UserSettingsService:
         # Load template - it's the source of truth
         template_settings = self._load_template()
         if not template_settings:
-            print(f"Error: Template file not found at {self._get_template_path()}. Cannot migrate settings.", file=sys.stderr)
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Template file not found at {self._get_template_path()}. Cannot migrate settings.")
             self._migration_done = True
             return
         
@@ -379,7 +389,8 @@ class UserSettingsService:
             try:
                 self.save()
             except Exception as e:
-                print(f"Warning: Failed to save migrated settings: {e}.", file=sys.stderr)
+                logging_service = LoggingService.get_instance()
+                logging_service.warning(f"Failed to save migrated settings: {e}.", exc_info=e)
     
     def save(self) -> bool:
         """Save current settings state to file.
@@ -404,9 +415,15 @@ class UserSettingsService:
             # Atomic rename
             temp_path.replace(self.settings_path)
             
+            # Log user settings saved
+            logging_service = LoggingService.get_instance()
+            settings_count = len(settings) if isinstance(settings, dict) else 0
+            logging_service.info(f"User settings saved: path={self.settings_path}, {settings_count} setting(s)")
+            
             return True
         except IOError as e:
-            print(f"Error: Failed to save user settings: {e}", file=sys.stderr)
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Failed to save user settings: {e}", exc_info=e)
             return False
     
     def get_settings(self) -> Dict[str, Any]:

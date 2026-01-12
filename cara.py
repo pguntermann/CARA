@@ -61,11 +61,31 @@ def main() -> None:
         loader = ConfigLoader()
         config = loader.load()
         
+        # Initialize logging service
+        from app.services.logging_service import LoggingService
+        logging_service = LoggingService.get_instance(config)
+        logging_service.initialize()
+        
+        # Log application version
+        app_version = config.get('version', 'unknown')
+        logging_service.info(f"CARA version {app_version}")
+        
+        # Test logging service with debug message
+        logging_service.debug("CARA application starting")
+        
         # Initialize MainWindow with injected configuration
         window = MainWindow(config)
         window.show()
         
-        sys.exit(app.exec())
+        exit_code = app.exec()
+        
+        # Log application shutdown
+        logging_service.debug("CARA application shutting down")
+        
+        # Shutdown logging service gracefully before exit
+        logging_service.shutdown()
+        
+        sys.exit(exit_code)
     except Exception as e:
         # Catch any uncaught exceptions during startup or execution
         ErrorHandler.handle_fatal_error(e, "Application execution")

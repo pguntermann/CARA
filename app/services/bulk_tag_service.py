@@ -10,6 +10,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from app.models.database_model import DatabaseModel, GameData
 from app.services.pgn_service import PgnService
+from app.services.logging_service import LoggingService
 
 
 @dataclass
@@ -398,6 +399,10 @@ class BulkTagService:
         # Batch update all modified games with a single dataChanged signal
         if updated_games:
             database.batch_update_games(updated_games)
+        
+        # Log bulk tag operation
+        logging_service = LoggingService.get_instance()
+        logging_service.info(f"Bulk tag operation completed: tag={tag_name}, games_processed={total_games}, games_updated={games_updated}, games_failed={games_failed}")
         
         return BulkTagResult(
             success=True,

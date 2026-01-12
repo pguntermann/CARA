@@ -6,6 +6,7 @@ import threading
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Tuple, Callable
 from enum import Enum
+from app.services.logging_service import LoggingService
 
 # Module-level debug callbacks (set from MainWindow)
 _debug_outbound_callback: Optional[Callable[[], bool]] = None
@@ -105,14 +106,11 @@ class AIService:
                         pass
             
             if should_log:
-                # Use datetime for timestamp with milliseconds
-                now = datetime.now()
-                timestamp = now.strftime("%H:%M:%S.") + str(now.microsecond // 1000).zfill(3)
-                thread_id = threading.get_ident()
-                thread_str = (" [Thread-" + str(thread_id) + "]") if thread_id else ""
-                # Use string concatenation instead of f-string to avoid format string issues
-                formatted = "[AI " + str(direction) + "] " + str(timestamp) + thread_str + ": " + str(message)
-                print(formatted, flush=True)
+                # Build message (logging service handles timestamp/thread)
+                formatted_message = f"[AI {direction}] {message}"
+                
+                logging_service = LoggingService.get_instance()
+                logging_service.debug(formatted_message)
         except Exception:
             # Silently ignore debug logging errors
             pass

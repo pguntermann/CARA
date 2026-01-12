@@ -14,6 +14,7 @@ from app.models.database_model import DatabaseModel, GameData
 from app.services.uci_communication_service import UCICommunicationService
 from app.services.opening_service import OpeningService
 from app.services.pgn_service import PgnService
+from app.services.logging_service import LoggingService
 
 
 @dataclass
@@ -522,6 +523,11 @@ class BulkReplaceService:
         if updated_games:
             database.batch_update_games(updated_games)
         
+        # Log bulk replace operation (replace_metadata_tags)
+        logging_service = LoggingService.get_instance()
+        tags_str = ", ".join(tag_names) if tag_names else "none"
+        logging_service.info(f"Bulk replace operation completed: tags=[{tags_str}], pattern={find_text[:50] if find_text else 'overwrite_all'}, games_processed={total_games}, games_updated={games_updated}, games_failed={games_failed}")
+        
         return BulkReplaceResult(
             success=True,
             games_processed=total_games,
@@ -694,6 +700,11 @@ class BulkReplaceService:
         if updated_games:
             database.batch_update_games(updated_games)
         
+        # Log bulk replace operation (replace_metadata_tags)
+        logging_service = LoggingService.get_instance()
+        tags_str = ", ".join(tag_names) if tag_names else "none"
+        logging_service.info(f"Bulk replace operation completed: tags=[{tags_str}], pattern={find_text[:50] if find_text else 'overwrite_all'}, games_processed={total_games}, games_updated={games_updated}, games_failed={games_failed}")
+        
         return BulkReplaceResult(
             success=True,
             games_processed=total_games,
@@ -821,6 +832,10 @@ class BulkReplaceService:
         # Batch update all modified games with a single dataChanged signal
         if updated_games:
             database.batch_update_games(updated_games)
+        
+        # Log bulk replace operation (copy_metadata_tag)
+        logging_service = LoggingService.get_instance()
+        logging_service.info(f"Bulk replace operation completed: operation=copy_tag, target_tag={target_tag}, source_tag={source_tag}, games_processed={total_games}, games_updated={games_updated}, games_failed={games_failed}")
         
         return BulkReplaceResult(
             success=True,
@@ -967,6 +982,11 @@ class BulkReplaceService:
         # Batch update all modified games with a single dataChanged signal
         if updated_games:
             database.batch_update_games(updated_games)
+        
+        # Log bulk replace operation (copy_metadata_tags)
+        logging_service = LoggingService.get_instance()
+        targets_str = ", ".join(target_tags) if target_tags else "none"
+        logging_service.info(f"Bulk replace operation completed: operation=copy_tags, target_tags=[{targets_str}], source_tag={source_tag}, games_processed={total_games}, games_updated={games_updated}, games_failed={games_failed}")
         
         return BulkReplaceResult(
             success=True,
@@ -1195,6 +1215,10 @@ class BulkReplaceService:
             # Cleanup engine
             if uci:
                 uci.cleanup()
+        
+        # Log bulk replace operation (update_result_tags)
+        logging_service = LoggingService.get_instance()
+        logging_service.info(f"Bulk replace operation completed: operation=update_result_tags, engine={engine_path.name if engine_path else 'unknown'}, games_processed={total_games}, games_updated={games_updated}, games_failed={games_failed}, games_skipped={games_skipped}")
         
         return BulkReplaceResult(
             success=True,

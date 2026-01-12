@@ -15,6 +15,7 @@ from app.models.evaluation_model import EvaluationModel
 from app.models.annotation_model import AnnotationModel, Annotation, AnnotationType
 from app.views.material_widget import MaterialWidget
 from app.views.evaluation_bar_widget import EvaluationBarWidget
+from app.services.logging_service import LoggingService
 
 
 class ChessBoardWidget(QWidget):
@@ -1151,7 +1152,8 @@ class ChessBoardWidget(QWidget):
         pieces_dir = project_root / self.svg_path
         
         if not pieces_dir.exists():
-            print(f"Warning: Chess pieces directory not found: {pieces_dir}", file=sys.stderr)
+            logging_service = LoggingService.get_instance()
+            logging_service.warning(f"Chess pieces directory not found: {pieces_dir}")
             self.piece_renderers = {}
             return
         
@@ -1173,9 +1175,11 @@ class ChessBoardWidget(QWidget):
                     if renderer.isValid():
                         self.piece_renderers[(color, piece_type)] = renderer
                     else:
-                        print(f"Warning: Invalid SVG file: {file_path}", file=sys.stderr)
+                        logging_service = LoggingService.get_instance()
+                        logging_service.warning(f"Invalid SVG file: {file_path}")
                 else:
-                    print(f"Warning: Piece file not found: {file_path}", file=sys.stderr)
+                    logging_service = LoggingService.get_instance()
+                    logging_service.warning(f"Piece file not found: {file_path}")
     
     def _initialize_starting_position(self) -> None:
         """Initialize the board state with standard starting position.
@@ -2601,8 +2605,8 @@ class ChessBoardWidget(QWidget):
                 QToolTip.hideText()
         except Exception as e:
             # Log error for debugging
-            import traceback
-            print(f"Error showing tooltip: {e}")
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Error showing tooltip: {e}", exc_info=e)
     
     def mousePressEvent(self, event: QMouseEvent) -> None:
         """Handle mouse press events for text annotation editing.

@@ -11,6 +11,7 @@ from app.services.error_pattern_service import ErrorPatternService, ErrorPattern
 from app.services.game_summary_service import GameSummaryService, GameSummary
 from app.services.progress_service import ProgressService
 from app.controllers.game_controller import GameController
+from app.services.logging_service import LoggingService
 
 
 class PlayerStatsController(QObject):
@@ -191,10 +192,8 @@ class PlayerStatsController(QObject):
             
         except Exception as e:
             # Avoid crashing the UI
-            import sys
-            print(f"Error calculating player statistics: {e}", file=sys.stderr)
-            import traceback
-            traceback.print_exc()
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Error calculating player statistics: {e}", exc_info=e)
             self._emit_unavailable("error")
         finally:
             # Always hide progress, even if there's an error
