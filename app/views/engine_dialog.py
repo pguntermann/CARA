@@ -15,37 +15,12 @@ from PyQt6.QtWidgets import (
     QWidget,
     QGroupBox,
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QResizeEvent, QShowEvent, QPalette, QColor
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 
-
-class EngineValidationThread(QThread):
-    """Thread for validating engine in background."""
-    
-    validation_complete = pyqtSignal(bool, str, str, str)  # success, error, name, author
-    
-    def __init__(self, engine_path: Path, validation_service) -> None:
-        """Initialize validation thread.
-        
-        Args:
-            engine_path: Path to engine executable.
-            validation_service: EngineValidationService instance.
-        """
-        super().__init__()
-        self.engine_path = engine_path
-        self.validation_service = validation_service
-    
-    def run(self) -> None:
-        """Run engine validation."""
-        # Don't save to file during validation - only when user clicks "Add Engine"
-        result = self.validation_service.validate_engine(self.engine_path, save_to_file=False)
-        
-        if result.is_valid:
-            self.validation_complete.emit(True, "", result.name, result.author)
-        else:
-            self.validation_complete.emit(False, result.error_message, "", "")
+from app.controllers.engine_dialog_controller import EngineDialogController
 
 
 class EngineDialog(QDialog):
@@ -62,11 +37,17 @@ class EngineDialog(QDialog):
         super().__init__(parent)
         self.config = config
         self.engine_controller = engine_controller
+        
+        # Initialize controller
+        self.controller = EngineDialogController(config, engine_controller)
+        
+        # Connect to controller signals
+        self.controller.validation_complete.connect(self._on_validation_complete)
+        
         self.engine_path: Optional[Path] = None
         self.engine_name: str = ""
         self.engine_author: str = ""
         self.engine_version: str = ""
-        self.validation_thread: Optional[EngineValidationThread] = None
         
         # Store fixed size - set it BEFORE layout is set up
         # Read size from config, accounting for Windows frame margins
@@ -536,10 +517,8 @@ class EngineDialog(QDialog):
             self._reset_engine_info()
             self.validate_button.setEnabled(True)
             self.add_button.setEnabled(False)
-            # Report status to main window status bar
-            from app.services.progress_service import ProgressService
-            progress_service = ProgressService.get_instance()
-            progress_service.set_status("Click 'Validate Engine' to verify this is a UCI engine.")
+            # Report status through controller
+            self.controller.set_status("Click 'Validate Engine' to verify this is a UCI engine.")
     
     def _on_path_changed(self, text: str) -> None:
         """Handle path input changes."""
@@ -568,20 +547,8 @@ class EngineDialog(QDialog):
         self.validate_button.setEnabled(False)
         self.add_button.setEnabled(False)
         
-        # Report status to main window status bar
-        from app.services.progress_service import ProgressService
-        progress_service = ProgressService.get_instance()
-        progress_service.show_progress()
-        progress_service.set_indeterminate(True)
-        progress_service.set_status("Validating engine... Please wait.")
-        
-        # Start validation in background thread
-        self.validation_thread = EngineValidationThread(
-            self.engine_path,
-            self.engine_controller.validation_service
-        )
-        self.validation_thread.validation_complete.connect(self._on_validation_complete)
-        self.validation_thread.start()
+        # Start validation through controller
+        self.controller.start_validation(self.engine_path)
     
     def _on_validation_complete(self, success: bool, error: str, name: str, author: str) -> None:
         """Handle validation completion.
@@ -592,21 +559,14 @@ class EngineDialog(QDialog):
             name: Engine name if validation succeeded.
             author: Engine author if validation succeeded.
         """
-        # Hide progress bar in main window status bar
-        from app.services.progress_service import ProgressService
-        progress_service = ProgressService.get_instance()
-        progress_service.hide_progress()
-        progress_service.set_indeterminate(False)
-        
         self.validate_button.setEnabled(True)
         
         if success:
             # Populate engine info
             self.engine_name = name
             self.engine_author = author
-            # Extract version using the validation service's static method
-            from app.services.engine_validation_service import EngineValidationService
-            self.engine_version = EngineValidationService._extract_version(author, name)
+            # Extract version through controller
+            self.engine_version = self.controller.extract_version(author, name)
             
             self.name_input.setText(name)
             self.author_input.setText(author)
@@ -614,13 +574,13 @@ class EngineDialog(QDialog):
             
             # Enable add button
             self.add_button.setEnabled(True)
-            # Report success status to main window status bar
-            progress_service.set_status("Engine validated successfully! Click 'Add Engine' to add it.")
+            # Report success status through controller
+            self.controller.set_status("Engine validated successfully! Click 'Add Engine' to add it.")
         else:
             # Show error
             self._reset_engine_info()
-            # Report error status to main window status bar
-            progress_service.set_status(f"Validation failed: {error}")
+            # Report error status through controller
+            self.controller.set_status(f"Validation failed: {error}")
             
             # Show error dialog
             from app.views.message_dialog import MessageDialog
@@ -636,45 +596,32 @@ class EngineDialog(QDialog):
         if not self.engine_path or not self.engine_name:
             return
         
-        # Check if engine with same path already exists
-        existing_engine = self.engine_controller.get_engine_model().get_engine_by_path(str(self.engine_path))
-        if existing_engine:
+        # Check if engine already exists through controller
+        exists, error_message = self.controller.check_engine_exists(self.engine_path)
+        if exists:
             from app.views.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Engine Already Exists",
-                f"An engine with path '{self.engine_path}' is already configured.",
+                error_message,
                 self
             )
             return
         
-        # Save engine options to file now that user is adding the engine
-        validation_service = self.engine_controller.validation_service
-        options_saved, options = validation_service.refresh_engine_options(
-            self.engine_path,
-            save_to_file=True  # Save to file when user adds the engine
-        )
-        
-        # Save recommended defaults for all tasks
-        from app.services.engine_parameters_service import EngineParametersService
-        from app.services.engine_configuration_service import EngineConfigurationService, TaskType
-        
-        parameters_service = EngineParametersService.get_instance()
-        parameters_service.load()
-        config_service = EngineConfigurationService(self.config)
-        
-        # Get recommended defaults for each task
-        tasks_parameters = {
-            "evaluation": config_service.get_recommended_defaults(TaskType.EVALUATION),
-            "game_analysis": config_service.get_recommended_defaults(TaskType.GAME_ANALYSIS),
-            "manual_analysis": config_service.get_recommended_defaults(TaskType.MANUAL_ANALYSIS)
-        }
-        
-        # Save task parameters
-        parameters_service.set_all_task_parameters(str(self.engine_path), tasks_parameters)
+        # Prepare engine for addition (saves options and defaults) through controller
+        success, error_message = self.controller.prepare_engine_for_addition(self.engine_path)
+        if not success:
+            from app.views.message_dialog import MessageDialog
+            MessageDialog.show_warning(
+                self.config,
+                "Prepare Engine Failed",
+                error_message,
+                self
+            )
+            return
         
         # Add engine through controller
-        success, message, engine = self.engine_controller.add_engine(
+        success, message = self.controller.add_engine(
             self.engine_path,
             self.engine_name,
             self.engine_author,
@@ -694,9 +641,7 @@ class EngineDialog(QDialog):
     
     def closeEvent(self, event) -> None:
         """Handle dialog close event."""
-        # Cancel validation thread if running
-        if self.validation_thread and self.validation_thread.isRunning():
-            self.validation_thread.terminate()
-            self.validation_thread.wait()
+        # Cancel validation through controller
+        self.controller.cancel_validation()
         event.accept()
 
