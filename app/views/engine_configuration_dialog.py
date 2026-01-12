@@ -22,6 +22,7 @@ from PyQt6.QtGui import QIntValidator, QResizeEvent, QShowEvent, QMoveEvent, QWh
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.controllers.engine_configuration_controller import EngineConfigurationController
 
 
 class NoWheelComboBox(QComboBox):
@@ -49,7 +50,6 @@ class EngineConfigurationDialog(QDialog):
         self.engine_id = engine_id
         self.engine_controller = engine_controller
         
-        
         # Get engine data
         engine_model = engine_controller.get_engine_model()
         engine = engine_model.get_engine(engine_id)
@@ -67,21 +67,15 @@ class EngineConfigurationDialog(QDialog):
         self.engine = engine
         self.engine_path = Path(engine.path)
         
-        # Load engine options from engine_parameters.json
-        from app.services.engine_parameters_service import EngineParametersService
-        self.parameters_service = EngineParametersService.get_instance()
-        self.parameters_service.load()
-        self.engine_options = self.parameters_service.get_engine_options(str(self.engine_path))
+        # Initialize controller
+        self.controller = EngineConfigurationController(config, self.engine_path, engine_controller)
+        self.engine_options = self.controller.get_engine_options()
+        self.TaskType = self.controller.get_task_type_enum()
         
-        # Initialize engine configuration service for validation and defaults
-        from app.services.engine_configuration_service import EngineConfigurationService, TaskType
-        self.config_service = EngineConfigurationService(config)
-        self.TaskType = TaskType  # Store reference for use in methods
-        
-        # Task constants
-        self.TASK_EVALUATION = "evaluation"
-        self.TASK_GAME_ANALYSIS = "game_analysis"
-        self.TASK_MANUAL_ANALYSIS = "manual_analysis"
+        # Task constants (from controller)
+        self.TASK_EVALUATION = EngineConfigurationController.TASK_EVALUATION
+        self.TASK_GAME_ANALYSIS = EngineConfigurationController.TASK_GAME_ANALYSIS
+        self.TASK_MANUAL_ANALYSIS = EngineConfigurationController.TASK_MANUAL_ANALYSIS
         
         # Store widgets for each task: {task: {param_name: widget}}
         self.task_widgets: Dict[str, Dict[str, Any]] = {
@@ -375,16 +369,10 @@ class EngineConfigurationDialog(QDialog):
         common_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         
         # Get saved parameters for this task (with fallback to recommended defaults)
-        task_type_map = {
-            self.TASK_EVALUATION: self.TaskType.EVALUATION,
-            self.TASK_GAME_ANALYSIS: self.TaskType.GAME_ANALYSIS,
-            self.TASK_MANUAL_ANALYSIS: self.TaskType.MANUAL_ANALYSIS
-        }
-        task_type = task_type_map.get(task, self.TaskType.EVALUATION)
-        recommended_defaults = self.config_service.get_recommended_defaults(task_type)
+        recommended_defaults = self.controller.get_recommended_defaults(task)
         
         # Load saved parameters from engine_parameters.json
-        saved_params = self.parameters_service.get_task_parameters(str(self.engine_path), task)
+        saved_params = self.controller.get_task_parameters(task)
         
         # Use saved values if available, otherwise use recommended defaults
         threads_value = saved_params.get("threads", recommended_defaults.get("threads", 1))
@@ -627,20 +615,14 @@ class EngineConfigurationDialog(QDialog):
             source_task: Task identifier to copy from.
             target_task: Task identifier to copy to.
         """
-        # Get progress service for status updates
-        from app.services.progress_service import ProgressService
-        progress_service = ProgressService.get_instance()
+        # Extract source parameters from widgets
+        source_params = self._get_task_parameters(source_task)
         
-        # Format task names for display
-        source_task_name = source_task.replace("_", " ").title()
-        target_task_name = target_task.replace("_", " ").title()
-        
-        # Show progress bar and set initial status
-        progress_service.show_progress()
-        progress_service.set_status(f"Copying parameters from {source_task_name} to {target_task_name}...")
+        # Notify controller (manages ProgressService)
+        self.controller.copy_parameters(source_task, target_task, source_params)
         QApplication.processEvents()  # Process events to show the status
         
-        # Copy common parameters
+        # Copy common parameters in UI
         if "threads" in self.task_widgets[source_task] and "threads" in self.task_widgets[target_task]:
             source_text = self.task_widgets[source_task]["threads"].text().strip()
             self.task_widgets[target_task]["threads"].setText(source_text)
@@ -653,7 +635,7 @@ class EngineConfigurationDialog(QDialog):
             source_text = self.task_widgets[source_task]["movetime"].text().strip()
             self.task_widgets[target_task]["movetime"].setText(source_text)
         
-        # Copy engine-specific parameters
+        # Copy engine-specific parameters in UI
         for key, source_widget in self.task_widgets[source_task].items():
             if key.startswith("engine_option_") and key in self.task_widgets[target_task]:
                 target_widget = self.task_widgets[target_task][key]
@@ -665,9 +647,6 @@ class EngineConfigurationDialog(QDialog):
                 elif isinstance(source_widget, QComboBox) and isinstance(target_widget, QComboBox):
                     target_widget.setCurrentText(source_widget.currentText())
         
-        # Hide progress bar and set final status
-        progress_service.hide_progress()
-        progress_service.set_status(f"Parameters copied from {source_task_name} to {target_task_name}")
         QApplication.processEvents()  # Process events to update status
     
     def _reset_to_defaults(self, task: str) -> None:
@@ -679,63 +658,37 @@ class EngineConfigurationDialog(QDialog):
         Args:
             task: Task identifier to reset.
         """
-        # Get progress service for status updates
-        from app.services.progress_service import ProgressService
-        progress_service = ProgressService.get_instance()
-        
-        # Show progress bar and set initial status
-        progress_service.show_progress()
-        progress_service.set_status("Refreshing engine options from engine...")
+        # Call controller to refresh options and get defaults
+        success, refreshed_options, status_message = self.controller.reset_to_defaults(task)
         QApplication.processEvents()  # Process events to show the status
         
-        try:
-            # Refresh engine options from the engine (without saving to file)
-            # This only updates the in-memory options for UI display
-            validation_service = self.engine_controller.validation_service
-            success, refreshed_options = validation_service.refresh_engine_options(
-                self.engine_path,
-                save_to_file=False  # Don't save to file - only update UI
-            )
-            
-            if success and refreshed_options:
-                # Update in-memory options with fresh defaults from engine
-                self.engine_options = refreshed_options
-                progress_service.set_status("Resetting parameters to engine defaults...")
-                QApplication.processEvents()  # Process events to update status
-            else:
-                # If refresh failed, show error and use existing options
-                progress_service.hide_progress()
-                progress_service.set_status("Failed to refresh engine options. Using cached options.")
-                from app.views.message_dialog import MessageDialog
+        if not success:
+            # Show error dialog if refresh failed
+            from app.views.message_dialog import MessageDialog
+            if "Failed to refresh" in status_message:
                 MessageDialog.show_warning(
                     self.config,
                     "Refresh Failed",
                     "Failed to refresh engine options. Using cached options.",
                     self
                 )
-                # Continue with existing options
+            else:
+                MessageDialog.show_warning(
+                    self.config,
+                    "Refresh Error",
+                    status_message,
+                    self
+                )
+            # Continue with existing options if refresh failed
+            if not refreshed_options:
                 return
-        except Exception as e:
-            progress_service.hide_progress()
-            progress_service.set_status(f"Error refreshing engine options: {str(e)}")
-            from app.views.message_dialog import MessageDialog
-            MessageDialog.show_warning(
-                self.config,
-                "Refresh Error",
-                f"Error refreshing engine options: {str(e)}",
-                self
-            )
-            # Continue with existing options
-            return
+        
+        # Update engine options if refresh succeeded
+        if refreshed_options:
+            self.engine_options = refreshed_options
         
         # Get recommended defaults for this task
-        task_type_map = {
-            self.TASK_EVALUATION: self.TaskType.EVALUATION,
-            self.TASK_GAME_ANALYSIS: self.TaskType.GAME_ANALYSIS,
-            self.TASK_MANUAL_ANALYSIS: self.TaskType.MANUAL_ANALYSIS
-        }
-        task_type = task_type_map.get(task, self.TaskType.EVALUATION)
-        recommended_defaults = self.config_service.get_recommended_defaults(task_type)
+        recommended_defaults = self.controller.get_recommended_defaults(task)
         
         # Reset common parameters to recommended defaults
         if "threads" in self.task_widgets[task]:
@@ -780,84 +733,46 @@ class EngineConfigurationDialog(QDialog):
                     elif widget.count() > 0:
                         widget.setCurrentIndex(0)
         
-        # Hide progress bar and set final status
-        progress_service.hide_progress()
-        progress_service.set_status("Parameters reset to engine defaults")
         QApplication.processEvents()  # Process events to update status
     
     def _on_ok_clicked(self) -> None:
         """Handle OK button click."""
-        # Get progress service for status updates
-        from app.services.progress_service import ProgressService
-        progress_service = ProgressService.get_instance()
-        
-        # Show progress bar and set initial status
-        progress_service.show_progress()
-        progress_service.set_status("Validating parameters...")
-        QApplication.processEvents()  # Process events to show the status
-        
-        # Validate all task parameters
-        all_validation_results = {}
-        task_type_map = {
-            self.TASK_EVALUATION: self.TaskType.EVALUATION,
-            self.TASK_GAME_ANALYSIS: self.TaskType.GAME_ANALYSIS,
-            self.TASK_MANUAL_ANALYSIS: self.TaskType.MANUAL_ANALYSIS
-        }
-        
+        # Extract parameters from all tasks
+        task_params = {}
         for task in [self.TASK_EVALUATION, self.TASK_GAME_ANALYSIS, self.TASK_MANUAL_ANALYSIS]:
-            task_type = task_type_map[task]
-            parameters = self._get_task_parameters(task)
-            validation_result = self.config_service.validate_parameters(task_type, parameters)
-            all_validation_results[task] = validation_result
+            task_params[task] = self._get_task_parameters(task)
+        
+        # Validate parameters through controller
+        all_validation_results = self.controller.validate_parameters(task_params)
         
         # Check if there are any validation issues
         has_errors = any(result.has_errors for result in all_validation_results.values())
         has_warnings = any(result.has_warnings for result in all_validation_results.values())
-        has_info = any(any(issue.severity.value == "info" for issue in result.issues) for result in all_validation_results.values())
+        ValidationSeverity = self.controller.get_validation_severity_enum()
+        has_info = any(any(issue.severity == ValidationSeverity.INFO for issue in result.issues) for result in all_validation_results.values())
         
         if has_errors or has_warnings or has_info:
-            # Hide progress bar temporarily while showing validation dialog
-            progress_service.hide_progress()
             # Show validation dialog
             if not self._show_validation_dialog(all_validation_results):
                 # User cancelled, don't save
                 return
-            # Show progress bar again for saving
-            progress_service.show_progress()
-            progress_service.set_status("Saving parameters...")
-            QApplication.processEvents()  # Process events to show the status
         
-        # Save parameters to engine_parameters.json
-        progress_service.set_status("Saving parameters...")
+        # Save parameters through controller
+        success, status_message = self.controller.save_parameters(task_params, self.engine.name)
         QApplication.processEvents()  # Process events to update status
         
-        tasks_parameters = {}
-        for task in [self.TASK_EVALUATION, self.TASK_GAME_ANALYSIS, self.TASK_MANUAL_ANALYSIS]:
-            parameters = self._get_task_parameters(task)
-            # Only save common parameters (threads, depth, movetime) and engine-specific options
-            # Separate common parameters from engine-specific options
-            task_params = {
-                "threads": parameters.get("threads", 1),
-                "depth": parameters.get("depth", 0),
-                "movetime": parameters.get("movetime", 0)
-            }
-            # Add engine-specific options (all keys that are not common parameters)
-            for key, value in parameters.items():
-                if key not in ["threads", "depth", "movetime"]:
-                    task_params[key] = value
-            
-            tasks_parameters[task] = task_params
-        
-        # Save to file
-        self.parameters_service.set_all_task_parameters(str(self.engine_path), tasks_parameters)
-        
-        # Hide progress bar and set final status
-        progress_service.hide_progress()
-        progress_service.set_status(f"Engine configuration saved for {self.engine.name}")
-        QApplication.processEvents()  # Process events to update status
-        
-        # Accept the dialog
-        self.accept()
+        if success:
+            # Accept the dialog
+            self.accept()
+        else:
+            # Show error dialog if save failed
+            from app.views.message_dialog import MessageDialog
+            MessageDialog.show_warning(
+                self.config,
+                "Save Error",
+                status_message,
+                self
+            )
     
     def _show_validation_dialog(self, validation_results: Dict[str, Any]) -> bool:
         """Show validation dialog with issues and get user confirmation.
@@ -868,7 +783,7 @@ class EngineConfigurationDialog(QDialog):
         Returns:
             True if user confirmed to save despite issues, False if user cancelled.
         """
-        from app.services.engine_configuration_service import ValidationSeverity
+        ValidationSeverity = self.controller.get_validation_severity_enum()
         
         # Get validation dialog config
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('engine_configuration', {})
