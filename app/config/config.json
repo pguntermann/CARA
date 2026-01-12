@@ -1048,6 +1048,9 @@
         "player_stats": {
           "placeholder_text_no_player": "Select a player to view statistics",
           "placeholder_text_no_analyzed": "No analyzed games found for this player",
+          "placeholder_text_no_source": "Select a data source above to view player statistics.",
+          "placeholder_text_no_analyzed_players": "No players with at least 2 analyzed games found in selected database(s).",
+          "placeholder_text_loading": "Loading players...",
           "colors": {
             "text_color": [
               220,

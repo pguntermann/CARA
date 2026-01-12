@@ -414,6 +414,10 @@ class DetailPlayerStatsView(QWidget):
             'placeholder_text_no_analyzed',
             'No analyzed games found for this player'
         )
+        self.placeholder_text_no_source = self.player_stats_config.get(
+            'placeholder_text_no_source',
+            'Select a data source above to view player statistics.'
+        )
         
         self._setup_ui()
         
@@ -421,7 +425,8 @@ class DetailPlayerStatsView(QWidget):
         self._create_player_selection_section()
         
         # Initially show placeholder message (but keep player selection visible)
-        self._set_disabled_placeholder_visible(True, self.placeholder_text_no_player)
+        # Default to "None" source, so show "no source" placeholder
+        self._set_disabled_placeholder_visible(True, self.placeholder_text_no_source)
         
         # Connect to models/controllers if provided
         if game_model:
@@ -962,9 +967,10 @@ class DetailPlayerStatsView(QWidget):
         
         # Create combobox for data source selection
         self.source_combo = QComboBox()
+        self.source_combo.addItem("None")
         self.source_combo.addItem("Active Database")
         self.source_combo.addItem("All Open Databases")
-        self.source_combo.setCurrentIndex(0)  # Default to "Active Database"
+        self.source_combo.setCurrentIndex(0)  # Default to "None"
         self._use_all_databases = False
         
         self.source_combo.currentIndexChanged.connect(self._on_source_changed)
@@ -1056,6 +1062,13 @@ class DetailPlayerStatsView(QWidget):
         """Populate the player dropdown with available players asynchronously."""
         if not self._stats_controller:
             return
+        
+        # Don't populate if "None" is selected as data source
+        if hasattr(self, 'source_combo'):
+            source_index = self.source_combo.currentIndex()
+            if source_index == 0:
+                # "None" selected - don't populate
+                return
         
         # Update database controller reference if available
         if not self._database_controller and hasattr(self._stats_controller, '_database_controller'):
@@ -1196,19 +1209,42 @@ class DetailPlayerStatsView(QWidget):
         if index < 0:
             index = self.source_combo.currentIndex()
         
-        # Update flag: index 0 = Active Database, index 1 = All Open Databases
-        self._use_all_databases = (index == 1)
-        
-        # Reconnect to database changes (different set of databases)
-        self._connect_to_database_changes()
-        
-        # Repopulate dropdown asynchronously
-        # Use QTimer to debounce rapid changes
-        QTimer.singleShot(100, self._populate_player_dropdown)
-        
-        # If a player is selected, recalculate stats with new source
-        if self._current_player:
-            QTimer.singleShot(200, self._schedule_stats_recalculation)
+        # Update flag: index 0 = None, index 1 = Active Database, index 2 = All Open Databases
+        if index == 0:
+            # "None" selected - disable updates
+            self._use_all_databases = False
+            # Clear player dropdown and stats
+            if hasattr(self, 'player_combo') and self.player_combo:
+                try:
+                    self.player_combo.currentIndexChanged.disconnect()
+                except (RuntimeError, TypeError):
+                    pass
+                self.player_combo.clear()
+                self.player_combo.currentIndexChanged.connect(self._on_player_selected)
+            self._current_player = None
+            self._clear_stats_sections()
+            self._set_disabled_placeholder_visible(True, self.placeholder_text_no_source)
+        else:
+            # "Active Database" (index 1) or "All Open Databases" (index 2) selected
+            self._use_all_databases = (index == 2)
+            
+            # Reconnect to database changes (different set of databases)
+            self._connect_to_database_changes()
+            
+            # Show loading placeholder to prevent layout shift while dropdown is being populated
+            loading_text = self.player_stats_config.get(
+                'placeholder_text_loading',
+                'Loading players...'
+            )
+            self._set_disabled_placeholder_visible(True, loading_text)
+            
+            # Repopulate dropdown asynchronously
+            # Use QTimer to debounce rapid changes
+            QTimer.singleShot(100, self._populate_player_dropdown)
+            
+            # If a player is selected, recalculate stats with new source
+            if self._current_player:
+                QTimer.singleShot(200, self._schedule_stats_recalculation)
     
     def _schedule_stats_recalculation(self) -> None:
         """Schedule an asynchronous statistics recalculation."""
@@ -1494,6 +1530,21 @@ class DetailPlayerStatsView(QWidget):
         except RuntimeError:
             return
         
+        # If no players found, show placeholder and return
+        if not players_with_analyzed:
+            # Reconnect signal
+            self.player_combo.currentIndexChanged.connect(self._on_player_selected)
+            self.player_combo.setCurrentIndex(-1)
+            self._current_player = None
+            self._clear_stats_sections()
+            # Show placeholder indicating no players with at least 2 analyzed games
+            placeholder_text = self.player_stats_config.get(
+                'placeholder_text_no_analyzed_players',
+                'No players with at least 2 analyzed games found in selected database(s).'
+            )
+            self._set_disabled_placeholder_visible(True, placeholder_text)
+            return
+        
         # Track if current player still exists and what their new counts are
         current_player_found = False
         current_player_analyzed = 0
@@ -1511,6 +1562,9 @@ class DetailPlayerStatsView(QWidget):
             
             # Reconnect signal
             self.player_combo.currentIndexChanged.connect(self._on_player_selected)
+            
+            # Hide placeholder since we have players
+            self._set_disabled_placeholder_visible(False)
             
             # Restore selection or update if player still exists
             if current_player_found:
@@ -1537,8 +1591,9 @@ class DetailPlayerStatsView(QWidget):
                 self._set_disabled_placeholder_visible(True, self.placeholder_text_no_player)
                 self._clear_stats_sections()
             else:
-                # No previous selection, ensure combo is empty
+                # No previous selection, ensure combo is empty and show placeholder
                 self.player_combo.setCurrentIndex(-1)
+                self._set_disabled_placeholder_visible(True, self.placeholder_text_no_player)
         except RuntimeError:
             # View might be destroyed during update
             return
@@ -1592,6 +1647,12 @@ class DetailPlayerStatsView(QWidget):
         """Handle active database change - repopulate dropdown if 'Active Database' is selected."""
         # Reconnect to database changes
         self._connect_to_database_changes()
+        
+        # Only update if a source is selected (not "None") and "Active Database" is selected (not "All Open Databases")
+        source_index = self.source_combo.currentIndex() if hasattr(self, 'source_combo') else -1
+        if source_index == 0:
+            # "None" selected - don't update
+            return
         
         # Only repopulate if "Active Database" is selected (not "All Open Databases")
         if not self._use_all_databases:
