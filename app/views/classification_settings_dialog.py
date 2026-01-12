@@ -21,6 +21,7 @@ from PyQt6.QtGui import QShowEvent, QColor, QPalette, QPainter, QPen, QFont, QFo
 from typing import Optional, Dict, Any, Tuple
 
 from app.controllers.move_classification_controller import MoveClassificationController
+from app.controllers.classification_settings_controller import ClassificationSettingsController
 from app.utils.font_utils import resolve_font_family, scale_font_size
 
 
@@ -279,6 +280,9 @@ class ClassificationSettingsDialog(QDialog):
         """
         super().__init__(parent)
         self.config = config
+        
+        # Initialize controller
+        self.controller = ClassificationSettingsController(config, classification_controller)
         self.classification_controller = classification_controller
         
         # Get current values from model
@@ -858,19 +862,15 @@ class ClassificationSettingsDialog(QDialog):
     
     def _reset_to_defaults(self) -> None:
         """Reset all settings to defaults from config."""
-        # Get progress service for status updates
-        from app.services.progress_service import ProgressService
-        progress_service = ProgressService.get_instance()
-        
-        # Show progress and set status
-        progress_service.show_progress()
-        progress_service.set_status("Resetting classification settings to defaults...")
+        # Show progress and set status through controller
+        self.controller.show_progress()
+        self.controller.set_status("Resetting classification settings to defaults...")
         QApplication.processEvents()  # Process events to show the status
         
-        # Reset via controller
+        # Reset via classification controller
         if not self.classification_controller.reset_to_defaults():
-            progress_service.hide_progress()
-            progress_service.set_status("Failed to reset settings")
+            self.controller.hide_progress()
+            self.controller.set_status("Failed to reset settings")
             from app.views.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
@@ -918,9 +918,9 @@ class ClassificationSettingsDialog(QDialog):
         # Update enabled state and styling based on checkbox
         self._on_exclude_winning_toggled(self.exclude_winning_check.isChecked())
         
-        # Hide progress bar and set final status
-        progress_service.hide_progress()
-        progress_service.set_status("Classification settings reset to defaults")
+        # Hide progress bar and set final status through controller
+        self.controller.hide_progress()
+        self.controller.set_status("Classification settings reset to defaults")
         QApplication.processEvents()  # Process events to update status
     
     def _on_exclude_winning_toggled(self, checked: bool) -> None:
@@ -983,13 +983,9 @@ class ClassificationSettingsDialog(QDialog):
             )
             return
         
-        # Get progress service for status updates
-        from app.services.progress_service import ProgressService
-        progress_service = ProgressService.get_instance()
-        
-        # Show progress and set status
-        progress_service.show_progress()
-        progress_service.set_status("Saving classification settings...")
+        # Show progress and set status through controller
+        self.controller.show_progress()
+        self.controller.set_status("Saving classification settings...")
         QApplication.processEvents()  # Process events to show the status
         
         # Collect values from UI
@@ -1003,10 +999,10 @@ class ClassificationSettingsDialog(QDialog):
                 "material_sacrifice_lookahead_plies": self.lookahead_plies_spinbox.value()
         }
         
-        # Save via controller
+        # Save via classification controller
         if not self.classification_controller.update_all_settings(thresholds, brilliant):
-            progress_service.hide_progress()
-            progress_service.set_status("Failed to save settings")
+            self.controller.hide_progress()
+            self.controller.set_status("Failed to save settings")
             from app.views.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
@@ -1016,9 +1012,9 @@ class ClassificationSettingsDialog(QDialog):
             )
             return
         
-        # Hide progress bar and set final status
-        progress_service.hide_progress()
-        progress_service.set_status("Classification settings saved")
+        # Hide progress bar and set final status through controller
+        self.controller.hide_progress()
+        self.controller.set_status("Classification settings saved")
         QApplication.processEvents()  # Process events to update status
         
         self.accept()
