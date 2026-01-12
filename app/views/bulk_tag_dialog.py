@@ -36,19 +36,21 @@ class BulkTagDialog(QDialog):
     ]
     
     def __init__(self, config: Dict[str, Any], bulk_tag_controller: BulkTagController,
-                 database: Optional[DatabaseModel], parent=None) -> None:
+                 database: Optional[DatabaseModel], selected_game_indices: Optional[List[int]] = None, parent=None) -> None:
         """Initialize the bulk tag dialog.
         
         Args:
             config: Configuration dictionary.
             bulk_tag_controller: BulkTagController instance.
             database: Optional DatabaseModel instance (active database).
+            selected_game_indices: Optional list of pre-selected game indices from the database panel.
             parent: Parent widget.
         """
         super().__init__(parent)
         self.config = config
         self.controller = bulk_tag_controller
         self.database = database
+        self.selected_game_indices = selected_game_indices if selected_game_indices else []
         
         # Store fixed size
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_tag', {})
@@ -254,7 +256,11 @@ class BulkTagDialog(QDialog):
         self.selected_games_radio = QRadioButton("Selected games")
         self.games_button_group.addButton(self.all_games_radio, 0)
         self.games_button_group.addButton(self.selected_games_radio, 1)
-        self.all_games_radio.setChecked(True)
+        # Pre-select "selected games" if there are selected games, otherwise "all games"
+        if self.selected_game_indices:
+            self.selected_games_radio.setChecked(True)
+        else:
+            self.all_games_radio.setChecked(True)
         # Ensure consistent sizing for proper alignment
         self.all_games_radio.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.selected_games_radio.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
@@ -752,7 +758,7 @@ class BulkTagDialog(QDialog):
         # Get game indices
         game_indices = None
         if self.selected_games_radio.isChecked():
-            game_indices = self.controller.get_selected_game_indices()
+            game_indices = self.selected_game_indices if self.selected_game_indices else []
             if not game_indices:
                 from app.views.message_dialog import MessageDialog
                 MessageDialog.show_warning(self.config, "Error", "No games selected", self)

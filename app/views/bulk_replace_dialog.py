@@ -31,19 +31,21 @@ class BulkReplaceDialog(QDialog):
     """Dialog for bulk replacement operations on databases."""
     
     def __init__(self, config: Dict[str, Any], bulk_replace_controller: BulkReplaceController,
-                 database: Optional[DatabaseModel], parent=None) -> None:
+                 database: Optional[DatabaseModel], selected_game_indices: Optional[List[int]] = None, parent=None) -> None:
         """Initialize the bulk replace dialog.
         
         Args:
             config: Configuration dictionary.
             bulk_replace_controller: BulkReplaceController instance.
             database: Optional DatabaseModel instance (active database).
+            selected_game_indices: Optional list of pre-selected game indices from the database panel.
             parent: Parent widget.
         """
         super().__init__(parent)
         self.config = config
         self.controller = bulk_replace_controller
         self.database = database
+        self.selected_game_indices = selected_game_indices if selected_game_indices else []
         
         # Store fixed size
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_replace', {})
@@ -279,7 +281,11 @@ class BulkReplaceDialog(QDialog):
         self.selected_games_radio = QRadioButton("Selected games")
         self.games_button_group.addButton(self.all_games_radio, 0)
         self.games_button_group.addButton(self.selected_games_radio, 1)
-        self.all_games_radio.setChecked(True)
+        # Pre-select "selected games" if there are selected games, otherwise "all games"
+        if self.selected_game_indices:
+            self.selected_games_radio.setChecked(True)
+        else:
+            self.all_games_radio.setChecked(True)
         games_layout.addWidget(self.all_games_radio)
         games_layout.addWidget(self.selected_games_radio)
         games_layout.addStretch()
@@ -896,7 +902,7 @@ class BulkReplaceDialog(QDialog):
             # Get game indices
             game_indices = None
             if self.selected_games_radio.isChecked():
-                game_indices = self.controller.get_selected_game_indices()
+                game_indices = self.selected_game_indices if self.selected_game_indices else None
             
             # Execute operations through controller (all validation and aggregation in controller)
             result = self.controller.execute_bulk_replace_operations(

@@ -18,20 +18,18 @@ class BulkCleanPgnController(QObject):
     # Signal emitted when operation completes
     operation_complete = pyqtSignal(BulkCleanPgnResult)  # result
     
-    def __init__(self, config: Dict[str, Any], database_controller, game_controller=None, database_panel=None) -> None:
+    def __init__(self, config: Dict[str, Any], database_controller, game_controller=None) -> None:
         """Initialize the bulk clean PGN controller.
         
         Args:
             config: Configuration dictionary.
             database_controller: DatabaseController instance.
             game_controller: Optional GameController instance for refreshing active game.
-            database_panel: Optional DatabasePanel view instance for getting selected games.
         """
         super().__init__()
         self.config = config
         self.database_controller = database_controller
         self.game_controller = game_controller
-        self.database_panel = database_panel
         
         # Initialize service
         self.service = BulkCleanPgnService(config)
@@ -42,14 +40,6 @@ class BulkCleanPgnController(QObject):
         # Track cancellation
         self._cancelled = False
     
-    def set_database_panel(self, database_panel) -> None:
-        """Set the database panel view reference.
-        
-        Args:
-            database_panel: DatabasePanel view instance.
-        """
-        self.database_panel = database_panel
-    
     def get_active_database(self) -> Optional[DatabaseModel]:
         """Get the currently active database.
         
@@ -57,17 +47,6 @@ class BulkCleanPgnController(QObject):
             The active DatabaseModel instance, or None.
         """
         return self.database_controller.get_active_database()
-    
-    def get_selected_game_indices(self) -> List[int]:
-        """Get selected game indices from the database panel.
-        
-        Returns:
-            List of selected game row indices.
-        """
-        if not self.database_panel:
-            return []
-        
-        return self.database_panel.get_selected_game_indices()
     
     def clean_pgn(
         self,

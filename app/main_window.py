@@ -1562,11 +1562,14 @@ class MainWindow(QMainWindow):
         if not active_database:
             return
         
+        # Get selected game indices from database panel (if any)
+        selected_game_indices = []
+        active_info = self.database_panel.get_active_database_info()
+        if active_info and active_info.get('model') == active_database:
+            selected_game_indices = self.database_panel.get_selected_game_indices()
+        
         # Get bulk replace controller
         bulk_replace_controller = self.controller.get_bulk_replace_controller()
-        
-        # Set database panel reference in controller
-        bulk_replace_controller.set_database_panel(self.database_panel)
         
         # Import and show dialog
         from app.views.bulk_replace_dialog import BulkReplaceDialog
@@ -1574,7 +1577,8 @@ class MainWindow(QMainWindow):
             self.config,
             bulk_replace_controller,
             active_database,
-            self
+            selected_game_indices=selected_game_indices if selected_game_indices else None,
+            parent=self
         )
         dialog.exec()
     
@@ -1587,11 +1591,14 @@ class MainWindow(QMainWindow):
         if not active_database:
             return
         
+        # Get selected game indices from database panel (if any)
+        selected_game_indices = []
+        active_info = self.database_panel.get_active_database_info()
+        if active_info and active_info.get('model') == active_database:
+            selected_game_indices = self.database_panel.get_selected_game_indices()
+        
         # Get bulk tag controller
         bulk_tag_controller = self.controller.get_bulk_tag_controller()
-        
-        # Set database panel reference in controller
-        bulk_tag_controller.set_database_panel(self.database_panel)
         
         # Import and show dialog
         from app.views.bulk_tag_dialog import BulkTagDialog
@@ -1599,7 +1606,8 @@ class MainWindow(QMainWindow):
             self.config,
             bulk_tag_controller,
             active_database,
-            self
+            selected_game_indices=selected_game_indices if selected_game_indices else None,
+            parent=self
         )
         dialog.exec()
     
@@ -1765,9 +1773,6 @@ class MainWindow(QMainWindow):
         
         # Get bulk clean PGN controller
         bulk_clean_pgn_controller = self.controller.get_bulk_clean_pgn_controller()
-        
-        # Set database panel reference in controller
-        bulk_clean_pgn_controller.set_database_panel(self.database_panel)
         
         # Import and show dialog
         from app.views.bulk_clean_pgn_dialog import BulkCleanPgnDialog
