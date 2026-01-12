@@ -122,11 +122,12 @@ class AppController:
             self.game_controller
         )
         
-        # Initialize bulk analysis controller (depends on engine controller and game analysis controller)
+        # Initialize bulk analysis controller (depends on engine controller, game analysis controller, and database controller)
         self.bulk_analysis_controller = BulkAnalysisController(
             config,
             self.engine_controller.get_engine_model(),
-            self.game_analysis_controller
+            self.game_analysis_controller,
+            self.database_controller
         )
         
         # Initialize deduplication controller (depends on database controller and game controller)

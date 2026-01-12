@@ -635,29 +635,22 @@ class BulkAnalysisController(QObject):
     finished = pyqtSignal(bool, str)  # success, error_message
     
     def __init__(self, config: Dict[str, Any], engine_model: EngineModel,
-                 game_analysis_controller, database_panel=None) -> None:
+                 game_analysis_controller, database_controller=None) -> None:
         """Initialize the bulk analysis controller.
         
         Args:
             config: Configuration dictionary.
             engine_model: EngineModel instance.
             game_analysis_controller: GameAnalysisController instance.
-            database_panel: Optional DatabasePanel view instance for getting selected games.
+            database_controller: Optional DatabaseController instance for marking databases as unsaved.
         """
         super().__init__()
         self.config = config
         self.engine_model = engine_model
         self.game_analysis_controller = game_analysis_controller
-        self.database_panel = database_panel
+        self.database_controller = database_controller
         self._analysis_thread = None
-    
-    def set_database_panel(self, database_panel) -> None:
-        """Set the database panel view reference.
-        
-        Args:
-            database_panel: DatabasePanel view instance.
-        """
-        self.database_panel = database_panel
+        self._current_database_model: Optional[DatabaseModel] = None  # Track database model for current analysis
     
     def validate_engine_for_analysis(self) -> Tuple[bool, Optional[str], Optional[str]]:
         """Validate that an engine is configured and assigned for game analysis.
@@ -704,54 +697,12 @@ class BulkAnalysisController(QObject):
         
         return (True, None, None)
     
-    def get_selected_games(self, database_model: DatabaseModel) -> List[GameData]:
-        """Get selected games from the database panel.
-        
-        Args:
-            database_model: DatabaseModel instance to get games from.
-            
-        Returns:
-            List of selected GameData instances.
-        """
-        selected_games = []
-        if database_model and self.database_panel:
-            # Get selected rows from the database panel (only works if this is the active database)
-            # Check if the active database matches our database model
-            active_info = self.database_panel.get_active_database_info()
-            if active_info and active_info.get('model') == database_model:
-                selected_indices = self.database_panel.get_selected_game_indices()
-                for idx in selected_indices:
-                    game = database_model.get_game(idx)
-                    if game:
-                        selected_games.append(game)
-        return selected_games
     
-    def has_selected_games(self, database_model: Optional[DatabaseModel]) -> bool:
-        """Check if there are selected games in the database panel.
-        
-        Args:
-            database_model: DatabaseModel instance to check.
-            
-        Returns:
-            True if there are selected games, False otherwise.
-        """
-        if not database_model or not self.database_panel:
-            return False
-        
-        # Check if the active database matches our database model
-        active_info = self.database_panel.get_active_database_info()
-        if active_info and active_info.get('model') == database_model:
-            selected_indices = self.database_panel.get_selected_game_indices()
-            return len(selected_indices) > 0
-        return False
-    
-    def get_games_to_analyze(self, selection_mode: str, database_model: Optional[DatabaseModel],
-                             selected_games: List[GameData]) -> Tuple[Optional[List[GameData]], Optional[str], Optional[str]]:
+    def get_games_to_analyze(self, selection_mode: str, selected_games: List[GameData]) -> Tuple[Optional[List[GameData]], Optional[str], Optional[str]]:
         """Get games to analyze based on selection mode.
         
         Args:
             selection_mode: "selected" or "all"
-            database_model: DatabaseModel instance (required for "all" mode)
             selected_games: List of selected games (required for "selected" mode)
             
         Returns:
@@ -766,8 +717,11 @@ class BulkAnalysisController(QObject):
                        "Please select games in the database view to analyze, or choose 'All games'.")
             games_to_analyze = selected_games
         else:  # "all"
+            if not self.database_controller:
+                return (None, "No Database Controller", "Database controller is not available.")
+            database_model = self.database_controller.get_active_database()
             if not database_model:
-                return (None, "No Database", "No database is available.")
+                return (None, "No Database", "No database is currently active.")
             games_to_analyze = database_model.get_all_games()
         
         if not games_to_analyze:
@@ -858,7 +812,8 @@ class BulkAnalysisController(QObject):
                 return task_params.get("movetime", fallback_default)
         return fallback_default
     
-    def start_analysis(self, games: List[GameData], re_analyze: bool = False,
+    def start_analysis(self, games: List[GameData], database_model: Optional[DatabaseModel] = None,
+                       re_analyze: bool = False,
                        movetime_override: Optional[int] = None,
                        max_threads_override: Optional[int] = None,
                        parallel_games_override: Optional[int] = None) -> None:
@@ -866,11 +821,14 @@ class BulkAnalysisController(QObject):
         
         Args:
             games: List of games to analyze.
+            database_model: Optional DatabaseModel instance that contains these games.
             re_analyze: Whether to re-analyze already analyzed games.
             movetime_override: Optional override for movetime in milliseconds.
             max_threads_override: Optional override for maximum total threads (None = unlimited).
             parallel_games_override: Optional override for number of parallel games (None = use config default).
         """
+        # Track database model for updating games after analysis
+        self._current_database_model = database_model
         # Get required services
         engine_model, opening_service, book_move_service, classification_model = self.get_required_services()
         
@@ -948,19 +906,22 @@ class BulkAnalysisController(QObject):
         """
         return self._analysis_thread is not None and self._analysis_thread.isRunning()
     
-    def update_game_in_database(self, game: GameData, database_model: Optional[DatabaseModel]) -> None:
+    def update_game_in_database(self, game: GameData, database_model: Optional[DatabaseModel] = None) -> None:
         """Update game in database model and mark database as unsaved.
         
         Args:
             game: GameData instance that was analyzed.
-            database_model: DatabaseModel instance to update.
+            database_model: Optional DatabaseModel instance to update. If None, uses the tracked database model.
         """
-        if database_model:
+        # Use provided database model or fall back to tracked one
+        target_model = database_model if database_model is not None else self._current_database_model
+        
+        if target_model:
             # Update game in database model (this will refresh the view)
-            database_model.update_game(game)
+            target_model.update_game(game)
             # Mark database as having unsaved changes to show flashing indicator
-            if self.database_panel:
-                self.database_panel.mark_database_unsaved(database_model)
+            if self.database_controller:
+                self.database_controller.mark_database_unsaved(target_model)
     
     def set_progress_status(self, message: str) -> None:
         """Set progress service status message.

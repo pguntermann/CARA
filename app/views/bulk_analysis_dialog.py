@@ -27,27 +27,20 @@ from app.models.database_model import DatabaseModel, GameData
 class BulkAnalysisDialog(QDialog):
     """Dialog for bulk game analysis."""
     
-    def __init__(self, config: Dict[str, Any], database_model: Optional[DatabaseModel],
-                 bulk_analysis_controller, database_panel=None, parent=None) -> None:
+    def __init__(self, config: Dict[str, Any], bulk_analysis_controller,
+                 selected_games: Optional[List[GameData]] = None, parent=None) -> None:
         """Initialize the bulk analysis dialog.
         
         Args:
             config: Configuration dictionary.
-            database_model: DatabaseModel instance for the active database.
             bulk_analysis_controller: BulkAnalysisController instance.
-            database_panel: Optional DatabasePanel instance for getting selected games.
+            selected_games: Optional list of pre-selected games from the database panel.
             parent: Parent widget.
         """
         super().__init__(parent)
         self.config = config
-        self.database_model = database_model
         self.controller = bulk_analysis_controller
-        self.database_panel = database_panel
-        
-        # Set database panel in controller
-        if database_panel:
-            self.controller.set_database_panel(database_panel)
-        self.selected_games: List[GameData] = []
+        self.selected_games: List[GameData] = selected_games if selected_games else []
         
         # Connect to controller signals
         self.controller.progress_updated.connect(self._on_progress_updated)
@@ -137,7 +130,7 @@ class BulkAnalysisDialog(QDialog):
         self.selection_button_group.addButton(self.all_games_radio, 1)
         
         # Default to selected games if any are selected, otherwise all games
-        if self.controller.has_selected_games(self.database_model):
+        if self._has_selected_games():
             self.selected_games_radio.setChecked(True)
             self._update_selected_games()
         else:
@@ -396,13 +389,25 @@ class BulkAnalysisDialog(QDialog):
             # Reset parallel games max to config value
             self._update_parallel_games_limit()
     
+    def _has_selected_games(self) -> bool:
+        """Check if there are selected games.
+        
+        Returns:
+            True if there are selected games, False otherwise.
+        """
+        return len(self.selected_games) > 0
+    
     def _update_selected_games(self) -> None:
-        """Update the list of selected games."""
-        if self.database_model:
-            self.selected_games = self.controller.get_selected_games(self.database_model)
-            # Update parallel games limit if in selected games mode
-            if self.selected_games_radio.isChecked():
-                self._update_parallel_games_limit()
+        """Update the list of selected games.
+        
+        Note: Selected games are passed from MainWindow and don't change during dialog lifetime.
+        This method exists for consistency but doesn't need to do anything since selection
+        is static once the dialog is opened.
+        """
+        # Selection is static - passed from MainWindow when dialog is created
+        # Update parallel games limit if in selected games mode
+        if self.selected_games_radio.isChecked():
+            self._update_parallel_games_limit()
     
     def _update_parallel_games_limit(self) -> None:
         """Update the maximum value of the parallel games spinbox based on selection mode."""
@@ -443,7 +448,6 @@ class BulkAnalysisDialog(QDialog):
         selection_mode = "selected" if self.selected_games_radio.isChecked() else "all"
         games_to_analyze, error_title, error_message = self.controller.get_games_to_analyze(
             selection_mode,
-            self.database_model,
             self.selected_games
         )
         
@@ -501,8 +505,13 @@ class BulkAnalysisDialog(QDialog):
         self.controller.set_progress_value(0)
         
         # Start analysis via controller
+        # Get active database model from controller for tracking
+        database_controller = self.controller.database_controller if hasattr(self.controller, 'database_controller') else None
+        database_model = database_controller.get_active_database() if database_controller else None
+        
         self.controller.start_analysis(
             games_to_analyze,
+            database_model=database_model,
             re_analyze=re_analyze,
             movetime_override=movetime_override,
             max_threads_override=max_threads_override,
@@ -535,7 +544,7 @@ class BulkAnalysisDialog(QDialog):
     def _on_game_analyzed(self, game: GameData) -> None:
         """Handle game analyzed signal."""
         # Update database model through controller
-        self.controller.update_game_in_database(game, self.database_model)
+        self.controller.update_game_in_database(game, None)  # Database model determined by controller
         QApplication.processEvents()
     
     def _on_analysis_finished(self, success: bool, message: str) -> None:

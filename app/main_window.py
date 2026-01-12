@@ -4628,15 +4628,23 @@ Visibility Settings:
         if not database_model:
             return
         
+        # Get selected games from database panel (if any)
+        selected_games = []
+        if active_info.get('model') == database_model:
+            selected_indices = database_panel.get_selected_game_indices()
+            for idx in selected_indices:
+                game = database_model.get_game(idx)
+                if game:
+                    selected_games.append(game)
+        
         # Get bulk analysis controller
         bulk_analysis_controller = self.controller.get_bulk_analysis_controller()
         
         # Create and show dialog
         dialog = BulkAnalysisDialog(
             self.config,
-            database_model,
             bulk_analysis_controller,
-            database_panel=database_panel,
+            selected_games=selected_games if selected_games else None,
             parent=self
         )
         dialog.exec()
