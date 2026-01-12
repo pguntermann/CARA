@@ -1628,12 +1628,12 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'database_panel'):
             return
         
-        # Get active database and all databases
+        # Get active database
         active_database = self._require_active_database()
         if not active_database:
             return
         
-        # Get all open databases from panel model
+        # Get all open databases from panel model for dialog
         database_controller = self.controller.get_database_controller()
         panel_model = database_controller.get_panel_model()
         all_databases = []
@@ -1642,7 +1642,6 @@ class MainWindow(QMainWindow):
         
         # Import and show dialog
         from app.views.search_dialog import SearchDialog
-        from app.services.database_search_service import DatabaseSearchService
         
         dialog = SearchDialog(
             self.config,
@@ -1654,81 +1653,25 @@ class MainWindow(QMainWindow):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             search_query = dialog.get_search_query()
             if search_query and search_query.criteria:
-                # Determine which databases to search
-                databases_to_search = []
-                database_names = []
-                if search_query.scope == "active":
-                    if active_database:
-                        databases_to_search = [active_database]
-                        # Get database name from panel model
-                        identifier = panel_model.find_database_by_model(active_database)
-                        if identifier:
-                            database_names = [self._get_database_name_from_identifier(identifier)]
-                        else:
-                            database_names = ["Active Database"]
-                else:
-                    databases_to_search = all_databases
-                    # Get database names from panel model
-                    for db in all_databases:
-                        identifier = panel_model.find_database_by_model(db)
-                        if identifier:
-                            database_names.append(self._get_database_name_from_identifier(identifier))
-                        else:
-                            database_names.append("Unknown Database")
+                # Delegate search to controller
+                search_controller = self.controller.get_search_controller()
+                search_results_model, status_message = search_controller.perform_search(
+                    search_query,
+                    active_database
+                )
                 
-                if not databases_to_search:
+                if search_results_model is None:
+                    # Show error dialog if search failed
                     MessageDialog.show_warning(
                         self.config,
-                        "No Database",
-                        "No database available for search.",
+                        "Search Failed",
+                        status_message,
                         self
                     )
                     return
                 
-                # Perform search
-                matching_results = DatabaseSearchService.search_databases(
-                    databases_to_search,
-                    search_query.criteria,
-                    database_names
-                )
-                
                 # Report search status
-                from app.services.progress_service import ProgressService
-                progress_service = ProgressService.get_instance()
-                num_games = len(matching_results)
-                num_databases = len(databases_to_search)
-                if num_games == 1:
-                    status_message = f"1 game found across {num_databases} database{'s' if num_databases > 1 else ''} matching the search criteria"
-                else:
-                    status_message = f"{num_games} games found across {num_databases} database{'s' if num_databases > 1 else ''} matching the search criteria"
-                progress_service.set_status(status_message)
-                
-                # Create a new database model for search results
-                from app.models.database_model import DatabaseModel, GameData
-                search_results_model = DatabaseModel()
-                for game, db_name in matching_results:
-                    # Create a copy of the game with source database info
-                    game_copy = GameData(
-                        game_number=0,  # Will be set by model
-                        white=game.white,
-                        black=game.black,
-                        result=game.result,
-                        date=game.date,
-                        moves=game.moves,
-                        eco=game.eco,
-                        pgn=game.pgn,
-                        event=game.event,
-                        site=game.site,
-                        white_elo=game.white_elo,
-                        black_elo=game.black_elo,
-                        analyzed=game.analyzed,
-                        annotated=getattr(game, "annotated", False),
-                        source_database=db_name,
-                        file_position=0  # Search results don't have file position
-                    )
-                    # Extract tags from existing game's PGN (game is being copied for search results)
-                    tags = search_results_model._extract_tags_from_game(game_copy)
-                    search_results_model.add_game(game_copy, tags=tags)
+                self.controller.set_status(status_message)
                 
                 # Add search results tab to database panel and switch to it
                 tab_index = self.database_panel.add_search_results_tab(search_results_model)
@@ -1751,20 +1694,6 @@ class MainWindow(QMainWindow):
                 return tab_idx
         return None
     
-    def _get_database_name_from_identifier(self, identifier: str) -> str:
-        """Get a display name for a database identifier.
-        
-        Args:
-            identifier: Database identifier (file path or "clipboard").
-            
-        Returns:
-            Display name for the database.
-        """
-        if identifier == "clipboard":
-            return "Clipboard"
-        else:
-            from pathlib import Path
-            return Path(identifier).stem
     
     def _close_search_results_tab(self) -> None:
         """Close the Search Results tab and set the previous database as active.

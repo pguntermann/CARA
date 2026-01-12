@@ -24,6 +24,7 @@ from app.controllers.ai_chat_controller import AIChatController
 from app.controllers.game_summary_controller import GameSummaryController
 from app.controllers.player_stats_controller import PlayerStatsController
 from app.controllers.metadata_controller import MetadataController
+from app.controllers.search_controller import SearchController
 from app.services.version_check_service import VersionCheckService
 
 
@@ -167,6 +168,12 @@ class AppController:
         # Initialize metadata controller (depends on game controller and database controller)
         self.metadata_controller = MetadataController(
             self.game_controller.get_game_model(),
+            self.database_controller
+        )
+        
+        # Initialize search controller (depends on database controller)
+        self.search_controller = SearchController(
+            config,
             self.database_controller
         )
         
@@ -769,6 +776,14 @@ class AppController:
             The PlayerStatsController instance for managing player statistics.
         """
         return self.player_stats_controller
+    
+    def get_search_controller(self) -> SearchController:
+        """Get the search controller.
+        
+        Returns:
+            The SearchController instance.
+        """
+        return self.search_controller
     
     def set_moves_list_model(self, moves_list_model) -> None:
         """Set the moves list model for game analysis controller.
