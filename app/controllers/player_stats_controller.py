@@ -230,6 +230,20 @@ class PlayerStatsController(QObject):
             active_db = self._database_controller.get_active_database()
             databases = [active_db] if active_db else []
         
+        return self.get_analyzed_game_count_with_databases(player_name, databases)
+    
+    def get_analyzed_game_count_with_databases(self, player_name: str, databases: List[DatabaseModel]) -> tuple:
+        """Get analyzed and total game counts for a player using provided databases.
+        
+        This method avoids repeated get_active_database() calls when checking multiple players.
+        
+        Args:
+            player_name: Player name.
+            databases: List of DatabaseModel instances to search.
+            
+        Returns:
+            Tuple of (analyzed_count, total_count).
+        """
         if not databases:
             return (0, 0)
         

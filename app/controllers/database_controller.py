@@ -404,8 +404,8 @@ class DatabaseController:
         Returns:
             The new DatabaseModel instance.
         """
-        # Create new model
-        model = DatabaseModel()
+        # Create new model with file path
+        model = DatabaseModel(file_path=file_path)
         # Use batch addition for better performance
         # Don't mark as unsaved when loading from file (games are already saved)
         model.add_games_batch(games, mark_unsaved=False, tags_list=tags_list)
@@ -1146,7 +1146,7 @@ class DatabaseController:
             self.panel_model.mark_database_saved(model)
             
             # Create a new database model with copied data
-            new_model = DatabaseModel()
+            new_model = DatabaseModel(file_path=file_path)
             
             # Copy all games from the original model to the new model
             # Set file_position based on their order in the newly saved file (1-based)

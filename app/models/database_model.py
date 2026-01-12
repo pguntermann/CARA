@@ -92,13 +92,18 @@ class DatabaseModel(QAbstractTableModel):
     COL_SOURCE_DB = 15
     COL_PGN = 16
     
-    def __init__(self) -> None:
-        """Initialize the database model."""
+    def __init__(self, file_path: Optional[str] = None) -> None:
+        """Initialize the database model.
+        
+        Args:
+            file_path: Optional file path for file-based databases. None for clipboard database.
+        """
         super().__init__()
         self._games: List[GameData] = []
         self._unsaved_games: Set[GameData] = set()  # Track games with unsaved changes
         self._unsaved_icon: Optional[QIcon] = None  # Cached icon for unsaved indicator
         self._unique_tags: Set[str] = set()  # Cache of unique tag names found in games
+        self.file_path: Optional[str] = file_path  # File path for file-based databases, None for clipboard
     
     def rowCount(self, parent=None) -> int:
         """Get number of rows in the model.

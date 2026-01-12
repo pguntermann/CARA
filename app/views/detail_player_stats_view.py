@@ -72,6 +72,14 @@ class PlayerDropdownWorker(QThread):
             players_with_analyzed = []
             total_players = len(players)
             
+            # Cache databases once at the start to avoid repeated get_active_database() calls
+            if self.use_all_databases:
+                panel_model = self.stats_controller._database_controller.get_panel_model()
+                cached_databases = panel_model.get_all_database_models()
+            else:
+                active_db = self.stats_controller._database_controller.get_active_database()
+                cached_databases = [active_db] if active_db else []
+            
             for idx, (player_name, game_count) in enumerate(players):
                 if self._is_cancelled():
                     return
@@ -81,9 +89,10 @@ class PlayerDropdownWorker(QThread):
                 self.progress_update.emit(progress_percent, f"Checking players: {idx + 1}/{total_players}...")
                 
                 # Check if this player has at least 2 analyzed games
-                analyzed_count, _ = self.stats_controller.get_analyzed_game_count(
+                # Use cached databases to avoid repeated get_active_database() calls
+                analyzed_count, _ = self.stats_controller.get_analyzed_game_count_with_databases(
                     player_name,
-                    self.use_all_databases
+                    cached_databases
                 )
                 
                 if analyzed_count >= 2:
@@ -1586,8 +1595,18 @@ class DetailPlayerStatsView(QWidget):
         
         # Only repopulate if "Active Database" is selected (not "All Open Databases")
         if not self._use_all_databases:
-            # Only populate if we have a controller and combo box exists
-            if self._stats_controller and hasattr(self, 'player_combo') and self.player_combo:
+            # Check if player_combo is a valid widget
+            player_combo_valid = False
+            if hasattr(self, 'player_combo') and self.player_combo is not None:
+                try:
+                    # Try to access a method to verify it's a valid widget
+                    self.player_combo.count()  # This will work for QComboBox
+                    player_combo_valid = True
+                except (RuntimeError, AttributeError):
+                    player_combo_valid = False
+            
+            # Only populate if we have a controller and combo box exists and is valid
+            if self._stats_controller and player_combo_valid:
                 self._populate_player_dropdown()
             # If a player was selected, recalculate (might be in different database now)
             if self._current_player:
