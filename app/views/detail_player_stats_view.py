@@ -601,6 +601,10 @@ class DetailPlayerStatsView(QWidget):
             self._stats_controller.stats_updated.connect(self._handle_stats_updated)
             self._stats_controller.stats_unavailable.connect(self._handle_stats_unavailable)
             
+            # Set database panel in controller for highlighting games
+            if self._database_panel:
+                self._stats_controller.set_database_panel(self._database_panel)
+            
             # Update database controller reference if available
             if not self._database_controller and hasattr(self._stats_controller, '_database_controller'):
                 self._database_controller = self._stats_controller._database_controller
@@ -1261,20 +1265,18 @@ class DetailPlayerStatsView(QWidget):
     
     def _on_stats_progress(self, progress: int, status: str) -> None:
         """Handle progress update from stats worker."""
-        # Show progress in status bar
-        from app.services.progress_service import ProgressService
-        progress_service = ProgressService.get_instance()
-        progress_service.show_progress()
-        progress_service.set_indeterminate(False)
-        progress_service.set_progress(progress)
-        progress_service.set_status(status)
+        # Show progress in status bar through controller
+        if self._stats_controller:
+            self._stats_controller.show_progress()
+            self._stats_controller.set_indeterminate(False)
+            self._stats_controller.set_progress(progress)
+            self._stats_controller.set_status(status)
     
     def _on_stats_ready(self, stats: "AggregatedPlayerStats", patterns: List["ErrorPattern"], game_summaries: List) -> None:
         """Handle stats ready from worker."""
-        # Hide progress
-        from app.services.progress_service import ProgressService
-        progress_service = ProgressService.get_instance()
-        progress_service.hide_progress()
+        # Hide progress through controller
+        if self._stats_controller:
+            self._stats_controller.hide_progress()
         
         # Update controller's current stats
         if self._stats_controller:
@@ -2409,8 +2411,9 @@ class DetailPlayerStatsView(QWidget):
         target_database = max(games_by_database.items(), key=lambda x: len(x[1]))[0]
         target_row_indices = games_by_database[target_database]
         
-        # Highlight all games in the target database and sort them to the top
-        self._database_panel.highlight_rows(target_database, target_row_indices)
+        # Highlight all games in the target database and sort them to the top through controller
+        if self._stats_controller:
+            self._stats_controller.highlight_rows(target_database, target_row_indices)
     
     def _add_section_header(self, text: str, font: QFont, color: QColor) -> None:
         """Add a section header label."""
@@ -2961,10 +2964,9 @@ class DetailPlayerStatsView(QWidget):
             clipboard = QApplication.clipboard()
             clipboard.setText(text)
             
-            # Update status bar
-            from app.services.progress_service import ProgressService
-            progress_service = ProgressService.get_instance()
-            progress_service.set_status(f"Copied '{section_name}' section to clipboard")
+            # Update status bar through controller
+            if self._stats_controller:
+                self._stats_controller.set_status(f"Copied '{section_name}' section to clipboard")
     
     def _copy_full_stats_to_clipboard(self) -> None:
         """Copy the full stats to clipboard."""
@@ -2980,8 +2982,7 @@ class DetailPlayerStatsView(QWidget):
             clipboard = QApplication.clipboard()
             clipboard.setText(text)
             
-            # Update status bar
-            from app.services.progress_service import ProgressService
-            progress_service = ProgressService.get_instance()
-            progress_service.set_status("Copied player statistics to clipboard")
+            # Update status bar through controller
+            if self._stats_controller:
+                self._stats_controller.set_status("Copied player statistics to clipboard")
 

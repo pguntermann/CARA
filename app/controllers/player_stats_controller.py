@@ -9,6 +9,7 @@ from app.models.game_model import GameModel
 from app.services.player_stats_service import PlayerStatsService, AggregatedPlayerStats
 from app.services.error_pattern_service import ErrorPatternService, ErrorPattern
 from app.services.game_summary_service import GameSummaryService, GameSummary
+from app.services.progress_service import ProgressService
 from app.controllers.game_controller import GameController
 
 
@@ -49,6 +50,10 @@ class PlayerStatsController(QObject):
         self._last_unavailable_reason: str = "no_player"
         self._current_player: Optional[str] = None
         self._use_all_databases: bool = False
+        self._database_panel = None  # DatabasePanel instance for highlighting games
+        
+        # Initialize ProgressService
+        self._progress_service = ProgressService.get_instance()
         
         # Connect to game model for auto-selection
         if self._game_model:
@@ -259,6 +264,56 @@ class PlayerStatsController(QObject):
                 return (database, row_index)
         
         return None
+    
+    def set_database_panel(self, database_panel) -> None:
+        """Set the database panel instance for highlighting games.
+        
+        Args:
+            database_panel: DatabasePanel instance.
+        """
+        self._database_panel = database_panel
+    
+    def highlight_rows(self, database: DatabaseModel, row_indices: List[int]) -> None:
+        """Highlight rows in the database panel.
+        
+        Args:
+            database: DatabaseModel instance.
+            row_indices: List of row indices to highlight.
+        """
+        if self._database_panel:
+            self._database_panel.highlight_rows(database, row_indices)
+    
+    def show_progress(self) -> None:
+        """Show the progress bar."""
+        self._progress_service.show_progress()
+    
+    def hide_progress(self) -> None:
+        """Hide the progress bar."""
+        self._progress_service.hide_progress()
+    
+    def set_progress(self, progress: int) -> None:
+        """Set progress value (0-100).
+        
+        Args:
+            progress: Progress value (0-100).
+        """
+        self._progress_service.set_progress(progress)
+    
+    def set_status(self, status: str) -> None:
+        """Set status message.
+        
+        Args:
+            status: Status message to display.
+        """
+        self._progress_service.set_status(status)
+    
+    def set_indeterminate(self, indeterminate: bool) -> None:
+        """Set whether progress bar is indeterminate.
+        
+        Args:
+            indeterminate: True for indeterminate progress, False for determinate.
+        """
+        self._progress_service.set_indeterminate(indeterminate)
     
     def _emit_unavailable(self, reason: str) -> None:
         """Emit unavailable signal with reason."""
