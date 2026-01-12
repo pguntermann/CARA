@@ -253,6 +253,37 @@ class MetadataModel(QAbstractTableModel):
         
         return None
     
+    def update_tag_value(self, tag_name: str, new_value: str) -> bool:
+        """Update a single tag's value without re-extracting all metadata.
+        
+        This is a performance optimization that avoids re-parsing the entire PGN
+        when only a single tag value changes.
+        
+        Args:
+            tag_name: Name of the tag to update.
+            new_value: New value for the tag.
+            
+        Returns:
+            True if tag was found and updated, False otherwise.
+        """
+        # Find the tag in current metadata
+        for i, (name, _) in enumerate(self._metadata):
+            if name == tag_name:
+                # Update the value
+                self._metadata[i] = (name, new_value)
+                
+                # Emit dataChanged for this row only
+                index = self.index(i, self.COL_VALUE)
+                self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole])
+                
+                # Note: We don't emit value_changed signal here because
+                # this method is called AFTER the controller has already
+                # updated the game PGN. The signal was already emitted by setData().
+                
+                return True
+        
+        return False
+    
     def set_metadata(self, metadata: List[Tuple[str, str]]) -> None:
         """Set metadata from a list of (name, value) tuples.
         

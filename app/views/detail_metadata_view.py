@@ -274,6 +274,10 @@ class DetailMetadataView(QWidget):
         
         self._metadata_model = model
         
+        # Set metadata model in controller if available
+        if self._metadata_controller:
+            self._metadata_controller.set_metadata_model(model)
+        
         # Connect to model signals
         if hasattr(model, 'value_changed'):
             model.value_changed.connect(self._on_metadata_value_changed)
@@ -325,6 +329,9 @@ class DetailMetadataView(QWidget):
             controller: The MetadataController instance.
         """
         self._metadata_controller = controller
+        # Set metadata model in controller for model updates
+        if self._metadata_model and self._metadata_controller:
+            self._metadata_controller.set_metadata_model(self._metadata_model)
     
     def _on_active_game_changed(self, game) -> None:
         """Handle active game change from model.
@@ -336,33 +343,32 @@ class DetailMetadataView(QWidget):
             return
         
         if game is None:
-            # Clear metadata
-            self._metadata_model.clear()
+            # Clear metadata through controller
+            if self._metadata_controller:
+                self._metadata_controller.clear_metadata_model()
             return
         
         # Extract headers from game's PGN using controller
         if self._metadata_controller:
             metadata = self._metadata_controller.extract_metadata_from_game(game)
-        else:
-            metadata = []
-        
-        # Update model with metadata
-        self._metadata_model.set_metadata(metadata)
+            # Update model through controller
+            self._metadata_controller.update_metadata_model(metadata)
     
     def _on_metadata_updated(self) -> None:
         """Handle metadata update from model - refresh metadata display.
         
         This is called when metadata tags are added, edited, or removed.
+        
+
         """
         if self._game_model and self._game_model.active_game:
-            # Re-extract metadata from the updated game using controller
+            # Always re-extract metadata from the updated game using controller
+            # This ensures we show the latest tag values, including when existing tags
+            # are updated 
             if self._metadata_controller:
                 metadata = self._metadata_controller.extract_metadata_from_game(self._game_model.active_game)
-            else:
-                metadata = []
-            # Update model with refreshed metadata
-            if self._metadata_model:
-                self._metadata_model.set_metadata(metadata)
+                # Update model through controller
+                self._metadata_controller.update_metadata_model(metadata)
     
     
     def _on_metadata_value_changed(self, tag_name: str, new_value: str) -> None:
