@@ -1341,4 +1341,16 @@ class DatabaseController:
             progress_service.hide_progress()
             QApplication.processEvents()
             return (False, f"Error importing games: {str(e)}", None)
+    
+    def highlight_rows(self, database: DatabaseModel, row_indices: List[int]) -> None:
+        """Request highlighting of rows in the database panel.
+        
+        This follows the architecture pattern: Controller → Model → (Model emits signal) → View observes.
+        The DatabasePanelModel emits a signal that DatabasePanel observes.
+        
+        Args:
+            database: DatabaseModel instance.
+            row_indices: List of row indices to highlight.
+        """
+        self.panel_model.request_highlight_rows(database, row_indices)
 

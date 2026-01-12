@@ -2381,6 +2381,7 @@ class MainWindow(QMainWindow):
             on_add_tab_clicked=self._open_pgn_database
         )
         
+        
         # Pass database_panel to detail_panel so metadata view can refresh table views
         if hasattr(self, 'detail_panel'):
             self.detail_panel._database_panel = self.database_panel
@@ -2388,7 +2389,6 @@ class MainWindow(QMainWindow):
                 self.detail_panel.metadata_view._database_panel = self.database_panel
             # Pass database_controller and database_panel to player_stats_view
             if hasattr(self.detail_panel, 'player_stats_view'):
-                database_controller = self.controller.get_database_controller()
                 self.detail_panel.player_stats_view._database_controller = database_controller
                 self.detail_panel.player_stats_view._database_panel = self.database_panel
                 # Connect to database panel model for active database changes

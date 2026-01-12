@@ -50,7 +50,6 @@ class PlayerStatsController(QObject):
         self._last_unavailable_reason: str = "no_player"
         self._current_player: Optional[str] = None
         self._use_all_databases: bool = False
-        self._database_panel = None  # DatabasePanel instance for highlighting games
         
         # Initialize ProgressService
         self._progress_service = ProgressService.get_instance()
@@ -265,23 +264,15 @@ class PlayerStatsController(QObject):
         
         return None
     
-    def set_database_panel(self, database_panel) -> None:
-        """Set the database panel instance for highlighting games.
-        
-        Args:
-            database_panel: DatabasePanel instance.
-        """
-        self._database_panel = database_panel
-    
     def highlight_rows(self, database: DatabaseModel, row_indices: List[int]) -> None:
-        """Highlight rows in the database panel.
+        """Highlight rows in the database panel through the database controller.
         
         Args:
             database: DatabaseModel instance.
             row_indices: List of row indices to highlight.
         """
-        if self._database_panel:
-            self._database_panel.highlight_rows(database, row_indices)
+        if self._database_controller:
+            self._database_controller.highlight_rows(database, row_indices)
     
     def show_progress(self) -> None:
         """Show the progress bar."""

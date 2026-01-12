@@ -601,10 +601,6 @@ class DetailPlayerStatsView(QWidget):
             self._stats_controller.stats_updated.connect(self._handle_stats_updated)
             self._stats_controller.stats_unavailable.connect(self._handle_stats_unavailable)
             
-            # Set database panel in controller for highlighting games
-            if self._database_panel:
-                self._stats_controller.set_database_panel(self._database_panel)
-            
             # Update database controller reference if available
             if not self._database_controller and hasattr(self._stats_controller, '_database_controller'):
                 self._database_controller = self._stats_controller._database_controller

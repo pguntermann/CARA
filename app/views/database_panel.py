@@ -266,6 +266,7 @@ class DatabasePanel(QWidget):
             self._panel_model.database_added.disconnect(self._on_database_added)
             self._panel_model.database_removed.disconnect(self._on_database_removed)
             self._panel_model.database_unsaved_changed.disconnect(self._on_database_unsaved_changed)
+            self._panel_model.rows_to_highlight.disconnect(self._on_rows_to_highlight)
         
         self._panel_model = panel_model
         
@@ -274,6 +275,7 @@ class DatabasePanel(QWidget):
         panel_model.database_added.connect(self._on_database_added)
         panel_model.database_removed.connect(self._on_database_removed)
         panel_model.database_unsaved_changed.connect(self._on_database_unsaved_changed)
+        panel_model.rows_to_highlight.connect(self._on_rows_to_highlight)
         
         # Initialize UI with existing databases
         all_databases = panel_model.get_all_databases()
@@ -336,6 +338,18 @@ class DatabasePanel(QWidget):
         
         if tab_index is not None:
             self._update_tab_unsaved_indicator(tab_index, has_unsaved)
+    
+    def _on_rows_to_highlight(self, database: DatabaseModel, row_indices: List[int]) -> None:
+        """Handle rows to highlight signal from panel model.
+        
+        This method is called when the panel model emits rows_to_highlight signal.
+        This follows the architecture pattern: Controller → Model → (Model emits signal) → View observes.
+        
+        Args:
+            database: DatabaseModel instance.
+            row_indices: List of row indices to highlight.
+        """
+        self.highlight_rows(database, row_indices)
     
     def _set_active_tab_for_database(self, database: DatabaseModel) -> None:
         """Set the active tab for a given database model.

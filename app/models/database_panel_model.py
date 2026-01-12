@@ -32,6 +32,7 @@ class DatabasePanelModel(QObject):
     database_added = pyqtSignal(str, object)  # identifier, DatabaseInfo
     database_removed = pyqtSignal(str)  # identifier
     database_unsaved_changed = pyqtSignal(str, bool)  # identifier, has_unsaved
+    rows_to_highlight = pyqtSignal(object, list)  # Emitted when rows should be highlighted (DatabaseModel, List[int] row_indices)
     
     def __init__(self) -> None:
         """Initialize the database panel model."""
@@ -235,4 +236,20 @@ class DatabasePanelModel(QObject):
         if info and info.has_unsaved_changes:
             info.has_unsaved_changes = False
             self.database_unsaved_changed.emit(identifier, False)
+    
+    def request_highlight_rows(self, database: DatabaseModel, row_indices: List[int]) -> None:
+        """Request highlighting of rows in a database.
+        
+        This method emits a signal that the DatabasePanel view observes to update the UI.
+        This follows the architecture pattern: Controller → Model → (Model emits signal) → View observes.
+        
+        Args:
+            database: DatabaseModel instance.
+            row_indices: List of row indices to highlight.
+        """
+        # Verify database is in the panel
+        if self.find_database_by_model(database) is None:
+            return
+        
+        self.rows_to_highlight.emit(database, row_indices)
 
