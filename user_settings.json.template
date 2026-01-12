@@ -814,7 +814,8 @@
   "manual_analysis": {
     "max_pieces_to_explore": 3,
     "max_exploration_depth": 3,
-    "enable_miniature_preview": true
+    "enable_miniature_preview": true,
+    "miniature_preview_scale_factor": 1.0
   },
   "annotations": {
     "preset_colors": [
