@@ -2,7 +2,7 @@
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QToolButton,
-    QButtonGroup, QColorDialog, QScrollArea, QLabel, QSizePolicy, QFrame, QSplitter, QSlider
+    QButtonGroup, QColorDialog, QScrollArea, QLabel, QSizePolicy, QFrame, QSplitter, QSlider, QSplitterHandle
 )
 from PyQt6.QtCore import Qt, QSize, QEvent, QPropertyAnimation, QEasingCurve, QTimer, QAbstractAnimation
 import chess
@@ -14,6 +14,45 @@ from app.views.chessboard_widget import ChessBoardWidget
 from app.controllers.annotation_controller import AnnotationController
 from app.models.annotation_model import AnnotationType
 from app.utils.font_utils import scale_font_size
+
+
+class NonResizableSplitterHandle(QSplitterHandle):
+    """QSplitterHandle that blocks all mouse events to prevent resizing."""
+    
+    def __init__(self, orientation, parent=None):
+        super().__init__(orientation, parent)
+        # Set cursor to arrow to prevent resize cursor from appearing
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+    
+    def mousePressEvent(self, event):
+        """Block mouse press events."""
+        event.ignore()
+    
+    def mouseMoveEvent(self, event):
+        """Block mouse move events."""
+        event.ignore()
+    
+    def mouseReleaseEvent(self, event):
+        """Block mouse release events."""
+        event.ignore()
+    
+    def enterEvent(self, event):
+        """Override to prevent cursor change on hover."""
+        # Don't call super() - this prevents the default resize cursor
+        pass
+    
+    def leaveEvent(self, event):
+        """Override to prevent cursor change on leave."""
+        # Don't call super() - this prevents cursor restoration issues
+        pass
+
+
+class NonResizableSplitter(QSplitter):
+    """QSplitter that uses non-resizable handles."""
+    
+    def createHandle(self):
+        """Create a non-resizable handle."""
+        return NonResizableSplitterHandle(self.orientation(), self)
 
 
 class DetailAnnotationView(QWidget):
@@ -170,7 +209,9 @@ class DetailAnnotationView(QWidget):
         # Set spacing to match top padding for consistent spacing
         controls_layout.setSpacing(padding)
         # Ensure container respects its layout margins
-        controls_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        # Use Minimum vertical policy to ensure controls maintain minimum height and don't shrink below it
+        # This prioritizes controls over annotations when space is constrained
+        controls_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         
         # Calculate minimum height to prevent truncation:
         # - Action buttons: tool_button_height
@@ -413,26 +454,33 @@ class DetailAnnotationView(QWidget):
         
         controls_layout.addWidget(size_slider_container)
         
-        # Create vertical splitter to allow resizing between controls and annotations list
-        self.splitter = QSplitter(Qt.Orientation.Vertical)
+        # Create vertical splitter (non-resizable by user)
+        self.splitter = NonResizableSplitter(Qt.Orientation.Vertical)
+        # Set handle width to 0 to hide it
+        self.splitter.setHandleWidth(0)
         
         # Add controls container to splitter (top section)
         self.splitter.addWidget(controls_container)
         
         # Annotations section (simplified design - always visible compact list)
         annotations_section = QFrame()
+        # Set size policy to allow shrinking when space is constrained
+        annotations_section.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         annotations_layout = QVBoxLayout(annotations_section)
+        # Set minimal margins to allow complete collapse
         annotations_layout.setContentsMargins(padding, padding, padding, padding)
-        annotations_layout.setSpacing(self.annotations_section_spacing)
+        annotations_layout.setSpacing(0)  # Remove spacing to minimize height
         
         # Header with count
         annotations_header = QHBoxLayout()
         annotations_header.setSpacing(self.annotations_header_spacing)
         
         self.annotation_count_label = QLabel("Annotations:")
+        self.annotation_count_label.setMinimumHeight(0)  # Allow header to shrink
         annotations_header.addWidget(self.annotation_count_label)
         
         self.annotation_count_value = QLabel("0")
+        self.annotation_count_value.setMinimumHeight(0)  # Allow header to shrink
         annotations_header.addWidget(self.annotation_count_value)
         
         annotations_header.addStretch()
@@ -443,7 +491,8 @@ class DetailAnnotationView(QWidget):
         self.annotation_scroll = QScrollArea()
         self.annotation_scroll.setWidgetResizable(True)
         self.annotation_scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.annotation_scroll.setMinimumHeight(self.annotations_list_min_height)
+        # Set minimum height to 0 to allow complete collapse when space is constrained
+        self.annotation_scroll.setMinimumHeight(0)
         self.annotation_scroll.setFrameShape(QFrame.Shape.NoFrame)
         
         # Get background color for scroll area - use pane_background from tabs config
@@ -478,7 +527,12 @@ class DetailAnnotationView(QWidget):
         self.splitter.setStretchFactor(0, self.splitter_controls_stretch)
         self.splitter.setStretchFactor(1, self.splitter_annotations_stretch)
         self.splitter.setCollapsible(0, False)  # Don't allow controls to collapse
-        self.splitter.setCollapsible(1, False)  # Don't allow annotations to collapse
+        self.splitter.setCollapsible(1, True)  # Allow annotations to collapse when space is constrained
+        # Set minimum size to 0 for annotations section so it can shrink completely
+        annotations_section.setMinimumHeight(0)
+        annotations_section.setMinimumWidth(0)
+        # Store reference to annotations section for potential future use
+        self.annotations_section = annotations_section
         
         # Fix cursor on splitter handle for macOS compatibility
         # Vertical splitter needs horizontal resize cursor
@@ -1577,15 +1631,44 @@ class DetailAnnotationView(QWidget):
             self._populate_annotation_list()
             self._update_annotation_count_display()
     
+    def resizeEvent(self, event) -> None:
+        """Handle widget resize to force annotations collapse when space is constrained.
+        
+        Args:
+            event: Resize event.
+        """
+        super().resizeEvent(event)
+        
+        # Only adjust if splitter is visible
+        if not hasattr(self, 'splitter') or not self.splitter.isVisible():
+            return
+        
+        # When space is constrained, force annotations section to 0 if needed
+        available_height = self.splitter.height()
+        controls_min = self.splitter.widget(0).minimumHeight() if self.splitter.count() > 0 else 200
+        splitter_handle_height = 5
+        threshold = controls_min + splitter_handle_height + 50
+        
+        # If there's not enough space for both, collapse annotations completely
+        if available_height < threshold:
+            # Force annotations to 0 height to prevent controls from moving under it
+            self.splitter.setSizes([available_height, 0])
+        else:
+            # Space is available - restore annotations section if it was collapsed
+            current_sizes = self.splitter.sizes()
+            if len(current_sizes) >= 2 and current_sizes[1] == 0:
+                # Annotations was collapsed, restore to configured sizes
+                self.splitter.setSizes([self.splitter_controls_height, self.splitter_annotations_height])
+    
     def _on_splitter_moved(self, pos: int, index: int) -> None:
-        """Handle splitter movement - restore configured sizes to prevent resizing.
+        """Handle splitter movement - allow collapse when space is constrained.
         
         Args:
             pos: New position of the splitter handle.
             index: Index of the splitter handle that moved.
         """
-        # Immediately restore the configured sizes to prevent any resizing
-        self.splitter.setSizes([self.splitter_controls_height, self.splitter_annotations_height])
+        # Don't interfere with natural collapse behavior
+        pass
     
     def _on_size_slider_released(self) -> None:
         """Handle size slider released - snap to nearest tick interval."""
