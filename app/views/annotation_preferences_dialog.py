@@ -18,6 +18,8 @@ from PyQt6.QtGui import QColor, QPalette, QPainter, QPen, QPixmap, QIcon, QFontD
 from typing import Dict, Any, List, Optional
 from copy import deepcopy
 
+from app.controllers.annotation_preferences_controller import AnnotationPreferencesController
+
 
 class ColorSwatchButton(QPushButton):
     """Button that displays a color swatch and opens color picker on click."""
@@ -81,6 +83,10 @@ class AnnotationPreferencesDialog(QDialog):
         """
         super().__init__(parent)
         self.config = config
+        
+        # Initialize controller
+        self.controller = AnnotationPreferencesController(config)
+        
         self._original_colors: List[QColor] = []
         self._original_font_family: str = ""
         self._original_font_size: int = 0
@@ -94,7 +100,7 @@ class AnnotationPreferencesDialog(QDialog):
         # Apply styling
         self._apply_styling()
         
-        # Load current user settings
+        # Load current user settings through controller
         self._load_user_settings()
         
         # Store original values for cancel
@@ -178,14 +184,11 @@ class AnnotationPreferencesDialog(QDialog):
         self.font_size_max = font_size_config.get('maximum', 72)
         self.font_size_default = font_size_config.get('default', 12)
         
-        # Get default colors from annotations config
-        annotations_config = self.config.get('ui', {}).get('panels', {}).get('detail', {}).get('annotations', {})
-        default_preset_colors = annotations_config.get('preset_colors', [[255, 100, 100], [100, 220, 100], [150, 200, 255], [255, 200, 100], [200, 100, 255], [100, 220, 255], [255, 150, 200], [150, 150, 255], [200, 200, 100], [240, 240, 240]])
-        self.default_colors = [QColor(color[0], color[1], color[2]) for color in default_preset_colors]
-        
-        # Get default font from config (if available, otherwise use Arial)
-        self.default_font_family = annotations_config.get('text_font_family', 'Arial')
-        self.default_font_size = annotations_config.get('text_font_size', 12)
+        # Get default colors from controller
+        default_colors, default_font_family, default_font_size = self.controller.get_defaults()
+        self.default_colors = default_colors
+        self.default_font_family = default_font_family
+        self.default_font_size = default_font_size
     
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
@@ -402,31 +405,13 @@ class AnnotationPreferencesDialog(QDialog):
     
     def _load_user_settings(self) -> None:
         """Load current user settings and apply to UI."""
-        from app.services.user_settings_service import UserSettingsService
-        settings_service = UserSettingsService.get_instance()
-        settings = settings_service.get_settings()
+        # Load settings through controller
+        colors, font_family, font_size = self.controller.load_settings()
         
-        annotations_prefs = settings.get('annotations', {})
-        
-        # Load colors
-        preset_colors = annotations_prefs.get('preset_colors', None)
-        if preset_colors:
-            for i, color_list in enumerate(preset_colors):
-                if i < len(self.color_swatches):
-                    self.color_swatches[i].set_color(QColor(color_list[0], color_list[1], color_list[2]))
-        else:
-            # Use defaults
-            for i, default_color in enumerate(self.default_colors):
-                if i < len(self.color_swatches):
-                    self.color_swatches[i].set_color(default_color)
-        
-        # Load font
-        font_family = annotations_prefs.get('text_font_family', self.default_font_family)
-        if font_family is None:
-            font_family = self.default_font_family
-        font_size = annotations_prefs.get('text_font_size', self.default_font_size)
-        if font_size is None:
-            font_size = self.default_font_size
+        # Apply colors to swatches
+        for i, color in enumerate(colors):
+            if i < len(self.color_swatches):
+                self.color_swatches[i].set_color(color)
         
         # Set font family (find index in combo box)
         index = self.font_family_combo.findText(font_family)
@@ -460,54 +445,43 @@ class AnnotationPreferencesDialog(QDialog):
     
     def _on_reset_clicked(self) -> None:
         """Handle reset to defaults button click."""
-        from app.services.progress_service import ProgressService
-        progress_service = ProgressService.get_instance()
+        # Get defaults from controller
+        default_colors, default_font_family, default_font_size = self.controller.get_defaults()
         
         # Reset colors to defaults
-        for i, default_color in enumerate(self.default_colors):
+        for i, default_color in enumerate(default_colors):
             if i < len(self.color_swatches):
                 self.color_swatches[i].set_color(default_color)
         
         # Reset font to defaults
-        index = self.font_family_combo.findText(self.default_font_family)
+        index = self.font_family_combo.findText(default_font_family)
         if index >= 0:
             self.font_family_combo.setCurrentIndex(index)
         else:
             # If not found, try to set it by text
-            self.font_family_combo.setCurrentText(self.default_font_family)
-        self.font_size_spinbox.setValue(self.default_font_size)
+            self.font_family_combo.setCurrentText(default_font_family)
+        self.font_size_spinbox.setValue(default_font_size)
         
-        progress_service.set_status("Reset annotation preferences to defaults")
+        # Set status through controller
+        self.controller.set_status("Reset annotation preferences to defaults")
     
     def _on_save_clicked(self) -> None:
         """Handle save button click."""
-        from app.services.user_settings_service import UserSettingsService
-        from app.services.progress_service import ProgressService
-        settings_service = UserSettingsService.get_instance()
-        progress_service = ProgressService.get_instance()
-        
         # Collect current values
         colors = []
         for swatch in self.color_swatches:
             color = swatch.get_color()
-            colors.append([color.red(), color.green(), color.blue()])
+            colors.append(color)
         
         font_family = self.font_family_combo.currentText()
         font_size = self.font_size_spinbox.value()
         
-        # Update user settings
-        settings = settings_service.get_settings()
-        if 'annotations' not in settings:
-            settings['annotations'] = {}
+        # Save through controller
+        success, message = self.controller.save_settings(colors, font_family, font_size)
         
-        settings['annotations']['preset_colors'] = colors
-        settings['annotations']['text_font_family'] = font_family
-        settings['annotations']['text_font_size'] = font_size
+        # Set status through controller
+        self.controller.set_status(message)
         
-        # Save to file
-        if settings_service.save():
-            progress_service.set_status("Annotation preferences saved")
+        if success:
             self.accept()
-        else:
-            progress_service.set_status("Failed to save annotation preferences")
 
