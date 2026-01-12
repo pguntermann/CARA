@@ -27,6 +27,113 @@ class BulkReplaceResult:
     error_message: Optional[str] = None
 
 
+def _process_game_for_replace_multiple_tags(
+    game_pgn: str,
+    tag_names: List[str],
+    find_text: str,
+    replace_text: str,
+    case_sensitive: bool,
+    use_regex: bool,
+    overwrite_all: bool
+) -> Tuple[Optional[str], Dict[str, str], bool]:
+    """Process a single game for multiple tag replacements (for parallel execution).
+    
+    Args:
+        game_pgn: PGN string of the game.
+        tag_names: List of PGN tag names to replace.
+        find_text: Text to find.
+        replace_text: Text to replace with.
+        case_sensitive: If True, match case exactly.
+        use_regex: If True, treat find_text as regex pattern.
+        overwrite_all: If True, replace any value with replace_text.
+        
+    Returns:
+        Tuple of (new_pgn, field_values_dict, updated) or (None, {}, False) if failed/skipped.
+        field_values_dict maps tag names to their new field values (for tags that map to GameData fields).
+    """
+    try:
+        # Parse PGN once
+        pgn_io = StringIO(game_pgn)
+        chess_game = chess.pgn.read_game(pgn_io)
+        
+        if not chess_game:
+            return (None, {}, False)
+        
+        updated = False
+        field_values: Dict[str, str] = {}
+        
+        tag_to_field_mapping = {
+            "White": "white",
+            "Black": "black",
+            "Result": "result",
+            "Date": "date",
+            "ECO": "eco",
+            "Event": "event",
+            "Site": "site",
+            "WhiteElo": "white_elo",
+            "BlackElo": "black_elo",
+        }
+        
+        # Process each tag
+        for tag_name in tag_names:
+            # Get current tag value
+            current_value = chess_game.headers.get(tag_name, "")
+            
+            # Prepare replacement function and match check
+            if overwrite_all:
+                new_value = replace_text
+                should_update = True
+            elif use_regex:
+                try:
+                    pattern = re.compile(find_text, 0 if case_sensitive else re.IGNORECASE)
+                    if pattern.search(current_value):
+                        new_value = pattern.sub(replace_text, current_value)
+                        should_update = True
+                    else:
+                        should_update = False
+                        new_value = current_value
+                except re.error:
+                    continue  # Skip this tag if regex is invalid
+            else:
+                if case_sensitive:
+                    if find_text in current_value:
+                        new_value = current_value.replace(find_text, replace_text)
+                        should_update = True
+                    else:
+                        should_update = False
+                        new_value = current_value
+                else:
+                    pattern = re.compile(re.escape(find_text), re.IGNORECASE)
+                    if pattern.search(current_value):
+                        new_value = pattern.sub(replace_text, current_value)
+                        should_update = True
+                    else:
+                        should_update = False
+                        new_value = current_value
+            
+            if should_update:
+                # For overwrite_all, always update (even if value is same, to ensure tag exists)
+                # For normal replacement, only update if value changed
+                if overwrite_all or new_value != current_value:
+                    # Update tag
+                    chess_game.headers[tag_name] = new_value
+                    updated = True
+                    
+                    # Store field value if tag maps to a field
+                    if tag_name in tag_to_field_mapping:
+                        field_values[tag_name] = new_value
+        
+        if updated:
+            # Regenerate PGN once for all changes
+            new_pgn = PgnService.export_game_to_pgn(chess_game)
+            return (new_pgn, field_values, True)
+        
+        return (None, {}, False)
+        
+    except Exception:
+        return (None, {}, False)
+
+
 def _process_game_for_replace_tag(
     game_pgn: str,
     tag_name: str,
@@ -124,6 +231,78 @@ def _process_game_for_replace_tag(
         
     except Exception:
         return (None, None, False)
+
+
+def _process_game_for_copy_multiple_tags(
+    game_pgn: str,
+    target_tags: List[str],
+    source_tag: str
+) -> Tuple[Optional[str], Dict[str, str], bool]:
+    """Process a single game for multiple tag copying (for parallel execution).
+    
+    Args:
+        game_pgn: PGN string of the game.
+        target_tags: List of PGN tag names to update.
+        source_tag: PGN tag name to copy from.
+        
+    Returns:
+        Tuple of (new_pgn, field_values_dict, updated) or (None, {}, False) if failed/skipped.
+        field_values_dict maps tag names to their new field values (for tags that map to GameData fields).
+    """
+    try:
+        # Parse PGN once
+        pgn_io = StringIO(game_pgn)
+        chess_game = chess.pgn.read_game(pgn_io)
+        
+        if not chess_game:
+            return (None, {}, False)
+        
+        # Get source tag value
+        source_value = chess_game.headers.get(source_tag, "")
+        
+        if not source_value:
+            # No source value to copy
+            return (None, {}, False)
+        
+        updated = False
+        field_values: Dict[str, str] = {}
+        
+        tag_to_field_mapping = {
+            "White": "white",
+            "Black": "black",
+            "Result": "result",
+            "Date": "date",
+            "ECO": "eco",
+            "Event": "event",
+            "Site": "site",
+            "WhiteElo": "white_elo",
+            "BlackElo": "black_elo",
+        }
+        
+        # Process each target tag
+        for target_tag in target_tags:
+            # Get current target tag value
+            current_value = chess_game.headers.get(target_tag, "")
+            
+            # Only update if source has a value and it's different from current
+            if source_value != current_value:
+                # Update target tag
+                chess_game.headers[target_tag] = source_value
+                updated = True
+                
+                # Store field value if tag maps to a field
+                if target_tag in tag_to_field_mapping:
+                    field_values[target_tag] = source_value
+        
+        if updated:
+            # Regenerate PGN once for all changes
+            new_pgn = PgnService.export_game_to_pgn(chess_game)
+            return (new_pgn, field_values, True)
+        
+        return (None, {}, False)
+        
+    except Exception:
+        return (None, {}, False)
 
 
 def _process_game_for_copy_tag(
@@ -351,6 +530,178 @@ class BulkReplaceService:
             games_skipped=0
         )
     
+    def replace_metadata_tags(
+        self,
+        database: DatabaseModel,
+        tag_names: List[str],
+        find_text: str,
+        replace_text: str,
+        case_sensitive: bool = False,
+        use_regex: bool = False,
+        overwrite_all: bool = False,
+        game_indices: Optional[List[int]] = None,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        cancellation_check: Optional[Callable[[], bool]] = None
+    ) -> BulkReplaceResult:
+        """Replace text in multiple metadata tags in a single pass.
+        
+        This method processes each game once and updates all selected tags,
+        which is more efficient than calling replace_metadata_tag multiple times.
+        
+        Args:
+            database: DatabaseModel instance to process.
+            tag_names: List of PGN tag names to replace.
+            find_text: Text to find.
+            replace_text: Text to replace with.
+            case_sensitive: If True, match case exactly.
+            use_regex: If True, treat find_text as regex pattern.
+            overwrite_all: If True, replace any value with replace_text, ignoring find_text.
+            game_indices: Optional list of game indices to process (None = all games).
+            progress_callback: Optional callback function(game_index, total, message).
+            cancellation_check: Optional function that returns True if operation should be cancelled.
+            
+        Returns:
+            BulkReplaceResult with operation statistics.
+        """
+        if not tag_names:
+            return BulkReplaceResult(
+                success=False,
+                games_processed=0,
+                games_updated=0,
+                games_failed=0,
+                games_skipped=0,
+                error_message="No tags specified"
+            )
+        
+        games = database.get_all_games()
+        
+        # Filter games if indices provided
+        if game_indices is not None:
+            games_to_process = [games[i] for i in game_indices if 0 <= i < len(games)]
+        else:
+            games_to_process = games
+        
+        total_games = len(games_to_process)
+        
+        # If no games to process, return early
+        if total_games == 0:
+            if progress_callback:
+                progress_callback(0, 0, "No games to process")
+            return BulkReplaceResult(
+                success=True,
+                games_processed=0,
+                games_updated=0,
+                games_failed=0,
+                games_skipped=0
+            )
+        
+        # Validate regex pattern early if using regex
+        if use_regex:
+            try:
+                re.compile(find_text, 0 if case_sensitive else re.IGNORECASE)
+            except re.error as e:
+                return BulkReplaceResult(
+                    success=False,
+                    games_processed=0,
+                    games_updated=0,
+                    games_failed=0,
+                    games_skipped=0,
+                    error_message=f"Invalid regex pattern: {str(e)}"
+                )
+        
+        # Determine worker count (reserve 1-2 cores for UI)
+        max_workers = max(1, os.cpu_count() - 2)
+        
+        # Collect all updated games for batch update
+        updated_games = []
+        games_updated = 0
+        games_failed = 0
+        
+        executor = None
+        try:
+            executor = ProcessPoolExecutor(max_workers=max_workers)
+            
+            # Submit all games for processing (one pass per game, all tags at once)
+            future_to_game = {
+                executor.submit(
+                    _process_game_for_replace_multiple_tags,
+                    game.pgn,
+                    tag_names,
+                    find_text,
+                    replace_text,
+                    case_sensitive,
+                    use_regex,
+                    overwrite_all
+                ): game
+                for game in games_to_process
+            }
+            
+            # Process results as they complete
+            completed = 0
+            tag_to_field_mapping = {
+                "White": "white",
+                "Black": "black",
+                "Result": "result",
+                "Date": "date",
+                "ECO": "eco",
+                "Event": "event",
+                "Site": "site",
+                "WhiteElo": "white_elo",
+                "BlackElo": "black_elo",
+            }
+            
+            for future in as_completed(future_to_game):
+                if cancellation_check and cancellation_check():
+                    # Cancel remaining futures
+                    for f in future_to_game:
+                        if f != future:
+                            f.cancel()
+                    break
+                
+                game = future_to_game[future]
+                completed += 1
+                
+                if progress_callback:
+                    progress_callback(completed, total_games, f"Processing game {completed}/{total_games}")
+                
+                try:
+                    new_pgn, field_values_dict, updated = future.result()
+                    
+                    if updated and new_pgn:
+                        # Update game data
+                        game.pgn = new_pgn
+                        
+                        # Update corresponding GameData fields if tags map to fields
+                        for tag_name, field_value in field_values_dict.items():
+                            if tag_name in tag_to_field_mapping:
+                                field_name = tag_to_field_mapping[tag_name]
+                                setattr(game, field_name, field_value)
+                        
+                        # Collect game for batch update
+                        updated_games.append(game)
+                        games_updated += 1
+                    elif new_pgn is None and updated is False:
+                        # Processing failed
+                        games_failed += 1
+                except Exception:
+                    games_failed += 1
+        
+        finally:
+            if executor:
+                executor.shutdown(wait=True)
+        
+        # Batch update all modified games with a single dataChanged signal
+        if updated_games:
+            database.batch_update_games(updated_games)
+        
+        return BulkReplaceResult(
+            success=True,
+            games_processed=total_games,
+            games_updated=games_updated,
+            games_failed=games_failed,
+            games_skipped=0
+        )
+    
     def copy_metadata_tag(
         self,
         database: DatabaseModel,
@@ -453,6 +804,152 @@ class BulkReplaceService:
                         if target_tag in tag_to_field_mapping and new_field_value is not None:
                             field_name = tag_to_field_mapping[target_tag]
                             setattr(game, field_name, new_field_value)
+                        
+                        # Collect game for batch update
+                        updated_games.append(game)
+                        games_updated += 1
+                    elif new_pgn is None and updated is False:
+                        # Processing failed
+                        games_failed += 1
+                except Exception:
+                    games_failed += 1
+        
+        finally:
+            if executor:
+                executor.shutdown(wait=True)
+        
+        # Batch update all modified games with a single dataChanged signal
+        if updated_games:
+            database.batch_update_games(updated_games)
+        
+        return BulkReplaceResult(
+            success=True,
+            games_processed=total_games,
+            games_updated=games_updated,
+            games_failed=games_failed,
+            games_skipped=0
+        )
+    
+    def copy_metadata_tags(
+        self,
+        database: DatabaseModel,
+        target_tags: List[str],
+        source_tag: str,
+        game_indices: Optional[List[int]] = None,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        cancellation_check: Optional[Callable[[], bool]] = None
+    ) -> BulkReplaceResult:
+        """Copy value from one metadata tag to multiple target tags in a single pass.
+        
+        This method processes each game once and updates all selected tags,
+        which is more efficient than calling copy_metadata_tag multiple times.
+        
+        Args:
+            database: DatabaseModel instance to process.
+            target_tags: List of PGN tag names to update.
+            source_tag: PGN tag name to copy from.
+            game_indices: Optional list of game indices to process (None = all games).
+            progress_callback: Optional callback function(game_index, total, message).
+            cancellation_check: Optional function that returns True if operation should be cancelled.
+            
+        Returns:
+            BulkReplaceResult with operation statistics.
+        """
+        if not target_tags:
+            return BulkReplaceResult(
+                success=False,
+                games_processed=0,
+                games_updated=0,
+                games_failed=0,
+                games_skipped=0,
+                error_message="No target tags specified"
+            )
+        
+        games = database.get_all_games()
+        
+        # Filter games if indices provided
+        if game_indices is not None:
+            games_to_process = [games[i] for i in game_indices if 0 <= i < len(games)]
+        else:
+            games_to_process = games
+        
+        total_games = len(games_to_process)
+        
+        # If no games to process, return early
+        if total_games == 0:
+            if progress_callback:
+                progress_callback(0, 0, "No games to process")
+            return BulkReplaceResult(
+                success=True,
+                games_processed=0,
+                games_updated=0,
+                games_failed=0,
+                games_skipped=0
+            )
+        
+        # Determine worker count (reserve 1-2 cores for UI)
+        max_workers = max(1, os.cpu_count() - 2)
+        
+        # Collect all updated games for batch update
+        updated_games = []
+        games_updated = 0
+        games_failed = 0
+        
+        executor = None
+        try:
+            executor = ProcessPoolExecutor(max_workers=max_workers)
+            
+            # Submit all games for processing (one pass per game, all tags at once)
+            future_to_game = {
+                executor.submit(
+                    _process_game_for_copy_multiple_tags,
+                    game.pgn,
+                    target_tags,
+                    source_tag
+                ): game
+                for game in games_to_process
+            }
+            
+            # Process results as they complete
+            completed = 0
+            tag_to_field_mapping = {
+                "White": "white",
+                "Black": "black",
+                "Result": "result",
+                "Date": "date",
+                "ECO": "eco",
+                "Event": "event",
+                "Site": "site",
+                "WhiteElo": "white_elo",
+                "BlackElo": "black_elo",
+            }
+            
+            for future in as_completed(future_to_game):
+                if cancellation_check and cancellation_check():
+                    # Cancel remaining futures
+                    for f in future_to_game:
+                        if f != future:
+                            f.cancel()
+                    break
+                
+                game = future_to_game[future]
+                completed += 1
+                
+                if progress_callback:
+                    progress_callback(completed, total_games, f"Processing game {completed}/{total_games}")
+                
+                try:
+                    new_pgn, field_values_dict, updated = future.result()
+                    
+                    if updated and new_pgn:
+                        # Update game data
+                        game.pgn = new_pgn
+                        
+                        # Update corresponding GameData fields if tags map to fields
+                        for tag_name, field_value in field_values_dict.items():
+                            if tag_name in tag_to_field_mapping:
+                                field_name = tag_to_field_mapping[tag_name]
+                                setattr(game, field_name, field_value)
                         
                         # Collect game for batch update
                         updated_games.append(game)

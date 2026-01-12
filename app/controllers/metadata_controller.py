@@ -370,6 +370,9 @@ class MetadataController:
                 # Mark database as having unsaved changes
                 if self._database_controller:
                     self._database_controller.mark_database_unsaved(database_model)
+                
+                # Update tag cache with new tag
+                database_model._add_tags_to_cache({tag_name})
             
             # Emit metadata_updated signal to notify views (e.g., PGN view) that metadata changed
             self._game_model.metadata_updated.emit()

@@ -30,17 +30,6 @@ from app.models.database_model import DatabaseModel
 class BulkReplaceDialog(QDialog):
     """Dialog for bulk replacement operations on databases."""
     
-    # Standard PGN tags - ordered by importance/commonality
-    STANDARD_TAGS = [
-        "White", "Black", "Result", "Date", "Event", "Site", "Round",
-        "ECO", "WhiteElo", "BlackElo", "TimeControl", "WhiteTitle",
-        "BlackTitle", "WhiteFideId", "BlackFideId", "WhiteTeam", "BlackTeam",
-        "PlyCount", "EventDate", "Termination", "Annotator", "UTCTime"
-    ]
-    
-    # Important/common tags that should appear first (even if less frequent)
-    IMPORTANT_TAGS = ["White", "Black", "Result", "Date", "Event", "Site", "Round", "ECO"]
-    
     def __init__(self, config: Dict[str, Any], bulk_replace_controller: BulkReplaceController,
                  database: Optional[DatabaseModel], parent=None) -> None:
         """Initialize the bulk replace dialog.
@@ -885,200 +874,54 @@ class BulkReplaceDialog(QDialog):
         if self._operation_in_progress:
             return
         
-        # Check if at least one operation is selected
-        is_copy_mode = self.copy_from_tag_check.isChecked()
-        overwrite_all = self.overwrite_all_check.isChecked()
-        has_find_text = bool(self.find_input.text().strip())
-        has_replace_text = bool(self.replace_input.text().strip())
-        # Replace operation is valid if:
-        # - Copy mode is enabled, OR
-        # - Overwrite all is checked (replace text is optional but recommended), OR
-        # - Both find and replace text are provided
-        has_replace = is_copy_mode or overwrite_all or (has_find_text and has_replace_text)
-        has_result_update = self.update_result_check.isChecked()
-        has_eco_update = self.update_eco_check.isChecked()
-        
-        if not has_replace and not has_result_update and not has_eco_update:
-            from app.views.message_dialog import MessageDialog
-            MessageDialog.show_warning(self.config, "Error", "Please select at least one operation", self)
-            return
-        
         # Disable controls during operation
         self._set_controls_enabled(False)
         self._operation_in_progress = True
         
-        # Get game indices
-        game_indices = None
-        if self.selected_games_radio.isChecked():
-            game_indices = self.controller.get_selected_game_indices()
-            if not game_indices:
+        try:
+            # Collect UI state (view only handles UI, no business logic)
+            is_copy_mode = self.copy_from_tag_check.isChecked()
+            overwrite_all = self.overwrite_all_check.isChecked()
+            has_find_text = bool(self.find_input.text().strip())
+            has_replace_text = bool(self.replace_input.text().strip())
+            selected_tags = self._get_selected_tags()
+            source_tag = self.source_tag_combo.currentText().strip() if is_copy_mode else None
+            find_text = self.find_input.text()
+            replace_text = self.replace_input.text()
+            case_sensitive = self.case_sensitive_check.isChecked()
+            use_regex = self.regex_check.isChecked()
+            has_result_update = self.update_result_check.isChecked()
+            has_eco_update = self.update_eco_check.isChecked()
+            
+            # Get game indices
+            game_indices = None
+            if self.selected_games_radio.isChecked():
+                game_indices = self.controller.get_selected_game_indices()
+            
+            # Execute operations through controller (all validation and aggregation in controller)
+            result = self.controller.execute_bulk_replace_operations(
+                self.database,
+                is_copy_mode,
+                overwrite_all,
+                has_find_text,
+                has_replace_text,
+                selected_tags,
+                source_tag,
+                find_text,
+                replace_text,
+                case_sensitive,
+                use_regex,
+                has_result_update,
+                has_eco_update,
+                game_indices
+            )
+            
+            if not result.success:
                 from app.views.message_dialog import MessageDialog
-                MessageDialog.show_warning(self.config, "Error", "No games selected", self)
+                MessageDialog.show_warning(self.config, "Error", result.error_message or "Operation failed", self)
                 self._set_controls_enabled(True)
                 self._operation_in_progress = False
                 return
-        
-        # Perform operations
-        try:
-            # Initialize result variable (will be set by first operation)
-            result = None
-            
-            # Metadata replacement or copy
-            if has_replace:
-                # Get selected tags
-                selected_tags = self._get_selected_tags()
-                if not selected_tags:
-                    from app.views.message_dialog import MessageDialog
-                    MessageDialog.show_warning(self.config, "Error", "Please select at least one tag", self)
-                    self._set_controls_enabled(True)
-                    self._operation_in_progress = False
-                    return
-                
-                if is_copy_mode:
-                    # Copy from another tag
-                    source_tag = self.source_tag_combo.currentText().strip()
-                    if not source_tag:
-                        from app.views.message_dialog import MessageDialog
-                        MessageDialog.show_warning(self.config, "Error", "Please enter a source tag name", self)
-                        self._set_controls_enabled(True)
-                        self._operation_in_progress = False
-                        return
-                    
-                    # Check if source tag is in selected tags
-                    if source_tag in selected_tags:
-                        from app.views.message_dialog import MessageDialog
-                        MessageDialog.show_warning(self.config, "Error", "Source tag cannot be in the target tags list", self)
-                        self._set_controls_enabled(True)
-                        self._operation_in_progress = False
-                        return
-                    
-                    # Process each selected tag
-                    total_games_processed = 0
-                    total_games_updated = 0
-                    total_games_failed = 0
-                    total_games_skipped = 0
-                    
-                    for target_tag in selected_tags:
-                        result = self.controller.copy_metadata_tag(
-                            self.database,
-                            target_tag,
-                            source_tag,
-                            game_indices
-                        )
-                        
-                        if not result.success:
-                            from app.views.message_dialog import MessageDialog
-                            MessageDialog.show_warning(self.config, "Error", f"Failed to copy to {target_tag}: {result.error_message or 'Operation failed'}", self)
-                            self._set_controls_enabled(True)
-                            self._operation_in_progress = False
-                            return
-                        
-                        # Aggregate results
-                        total_games_processed = max(total_games_processed, result.games_processed)
-                        total_games_updated += result.games_updated
-                        total_games_failed += result.games_failed
-                        total_games_skipped += result.games_skipped
-                    
-                    # Create aggregated result
-                    from app.services.bulk_replace_service import BulkReplaceResult
-                    result = BulkReplaceResult(
-                        success=True,
-                        games_processed=total_games_processed,
-                        games_updated=total_games_updated,
-                        games_failed=total_games_failed,
-                        games_skipped=total_games_skipped
-                    )
-                else:
-                    # Text replacement
-                    find_text = self.find_input.text()
-                    replace_text = self.replace_input.text()
-                    case_sensitive = self.case_sensitive_check.isChecked()
-                    use_regex = self.regex_check.isChecked()
-                    overwrite_all = self.overwrite_all_check.isChecked()
-                    
-                    # Process each selected tag
-                    total_games_processed = 0
-                    total_games_updated = 0
-                    total_games_failed = 0
-                    total_games_skipped = 0
-                    
-                    for target_tag in selected_tags:
-                        tag_result = self.controller.replace_metadata_tag(
-                            self.database,
-                            target_tag,
-                            find_text,
-                            replace_text,
-                            case_sensitive,
-                            use_regex,
-                            overwrite_all,
-                            game_indices
-                        )
-                        
-                        if not tag_result.success:
-                            from app.views.message_dialog import MessageDialog
-                            MessageDialog.show_warning(self.config, "Error", f"Failed to replace in {target_tag}: {tag_result.error_message or 'Operation failed'}", self)
-                            self._set_controls_enabled(True)
-                            self._operation_in_progress = False
-                            return
-                        
-                        # Aggregate results
-                        total_games_processed = max(total_games_processed, tag_result.games_processed)
-                        total_games_updated += tag_result.games_updated
-                        total_games_failed += tag_result.games_failed
-                        total_games_skipped += tag_result.games_skipped
-                    
-                    # Create aggregated result
-                    from app.services.bulk_replace_service import BulkReplaceResult
-                    result = BulkReplaceResult(
-                        success=True,
-                        games_processed=total_games_processed,
-                        games_updated=total_games_updated,
-                        games_failed=total_games_failed,
-                        games_skipped=total_games_skipped
-                    )
-            
-            # Result update
-            if has_result_update:
-                result = self.controller.update_result_tags(
-                    self.database,
-                    game_indices
-                )
-                
-                if not result.success:
-                    from app.views.message_dialog import MessageDialog
-                    MessageDialog.show_warning(self.config, "Error", result.error_message or "Operation failed", self)
-                    self._set_controls_enabled(True)
-                    self._operation_in_progress = False
-                    return
-            
-            # ECO update
-            if has_eco_update:
-                eco_result = self.controller.update_eco_tags(
-                    self.database,
-                    game_indices
-                )
-                
-                if not eco_result.success:
-                    from app.views.message_dialog import MessageDialog
-                    MessageDialog.show_warning(self.config, "Error", eco_result.error_message or "Operation failed", self)
-                    self._set_controls_enabled(True)
-                    self._operation_in_progress = False
-                    return
-                
-                # If we had a previous result (from replace or result update), aggregate
-                # Otherwise use ECO result
-                if has_replace or has_result_update:
-                    # Aggregate results
-                    from app.services.bulk_replace_service import BulkReplaceResult
-                    result = BulkReplaceResult(
-                        success=True,
-                        games_processed=max(result.games_processed, eco_result.games_processed),
-                        games_updated=result.games_updated + eco_result.games_updated,
-                        games_failed=result.games_failed + eco_result.games_failed,
-                        games_skipped=result.games_skipped + eco_result.games_skipped
-                    )
-                else:
-                    result = eco_result
             
             # Show success message using styled dialog
             self._show_success_dialog(

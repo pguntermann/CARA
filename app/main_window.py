@@ -1726,7 +1726,9 @@ class MainWindow(QMainWindow):
                         source_database=db_name,
                         file_position=0  # Search results don't have file position
                     )
-                    search_results_model.add_game(game_copy)
+                    # Extract tags from existing game's PGN (game is being copied for search results)
+                    tags = search_results_model._extract_tags_from_game(game_copy)
+                    search_results_model.add_game(game_copy, tags=tags)
                 
                 # Add search results tab to database panel and switch to it
                 tab_index = self.database_panel.add_search_results_tab(search_results_model)

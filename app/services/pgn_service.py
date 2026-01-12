@@ -969,6 +969,9 @@ class PgnService:
                     # This indicates an invalid game where move counting failed
                     return None
             
+            # Extract tag names from headers (already parsed, no extra cost)
+            tag_names = list(headers.keys()) if headers else []
+            
             return {
                 "white": white,
                 "black": black,
@@ -982,7 +985,8 @@ class PgnService:
                 "white_elo": white_elo,
                 "black_elo": black_elo,
                 "analyzed": analyzed,
-                "annotated": annotated
+                "annotated": annotated,
+                "tags": tag_names  # Tag names extracted during parsing
             }
             
         except Exception:

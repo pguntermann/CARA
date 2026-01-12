@@ -98,6 +98,7 @@ class DatabaseModel(QAbstractTableModel):
         self._games: List[GameData] = []
         self._unsaved_games: Set[GameData] = set()  # Track games with unsaved changes
         self._unsaved_icon: Optional[QIcon] = None  # Cached icon for unsaved indicator
+        self._unique_tags: Set[str] = set()  # Cache of unique tag names found in games
     
     def rowCount(self, parent=None) -> int:
         """Get number of rows in the model.
@@ -234,7 +235,7 @@ class DatabaseModel(QAbstractTableModel):
         
         return None
     
-    def add_game(self, game: GameData, mark_unsaved: bool = True) -> None:
+    def add_game(self, game: GameData, mark_unsaved: bool = True, tags: List[str] = None) -> None:
         """Add a game to the model.
         
         Args:
@@ -242,7 +243,12 @@ class DatabaseModel(QAbstractTableModel):
             mark_unsaved: If True, mark the game as having unsaved changes.
                          Set to False when loading games from a file (they're already saved).
                          Default is True for newly added games (import, paste, etc.).
+            tags: List of tag names already extracted from the game (required).
+                 Tags must be provided from the parsed game data to avoid redundant parsing.
         """
+        if tags is None:
+            raise ValueError("tags parameter is required. Tags must be extracted during PGN parsing.")
+        
         # Set game number: use file_position if available (loaded from file),
         # otherwise use incremental number (pasted/imported)
         if game.file_position > 0:
@@ -259,6 +265,9 @@ class DatabaseModel(QAbstractTableModel):
             self._unsaved_games.add(game)
         self.endInsertRows()
         
+        # Cache tags from this game
+        self._add_tags_to_cache(set(tags))
+        
         # Emit dataChanged for the unsaved column to ensure the indicator is displayed
         # This is needed because endInsertRows() may not trigger a refresh of the DecorationRole
         # Only emit if we marked it as unsaved (otherwise no indicator needed)
@@ -268,7 +277,7 @@ class DatabaseModel(QAbstractTableModel):
             self.dataChanged.emit(unsaved_index, unsaved_index,
                                  [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole])
     
-    def add_games_batch(self, games: List[GameData], mark_unsaved: bool = True) -> None:
+    def add_games_batch(self, games: List[GameData], mark_unsaved: bool = True, tags_list: List[List[str]] = None) -> None:
         """Add multiple games to the model in a single batch operation.
         
         This is much more efficient than calling add_game() multiple times,
@@ -280,9 +289,17 @@ class DatabaseModel(QAbstractTableModel):
             mark_unsaved: If True, mark all games as having unsaved changes.
                          Set to False when loading games from a file (they're already saved).
                          Default is True for newly added games (import, paste, etc.).
+            tags_list: List of tag lists, one per game (must match games length, required).
+                      Tags must be provided from the parsed game data to avoid redundant parsing.
         """
         if not games:
             return
+        
+        if tags_list is None:
+            raise ValueError("tags_list parameter is required. Tags must be extracted during PGN parsing.")
+        
+        if len(tags_list) != len(games):
+            raise ValueError(f"tags_list length ({len(tags_list)}) must match games length ({len(games)})")
         
         # Set game numbers for all games
         start_count = len(self._games)
@@ -306,6 +323,13 @@ class DatabaseModel(QAbstractTableModel):
         
         self.endInsertRows()
         
+        # Cache tags from all games in this batch (use provided tags)
+        all_tags: Set[str] = set()
+        for tags in tags_list:
+            if tags:
+                all_tags.update(tags)
+        self._add_tags_to_cache(all_tags)
+        
         # Emit dataChanged for unsaved column if needed (only if marking as unsaved)
         # We emit for all rows at once for efficiency
         if mark_unsaved:
@@ -321,6 +345,7 @@ class DatabaseModel(QAbstractTableModel):
             self.beginRemoveRows(self.index(0, 0).parent(), 0, len(self._games) - 1)
             self._games.clear()
             self._unsaved_games.clear()
+            self._unique_tags.clear()
             self.endRemoveRows()
     
     def remove_games(self, games_to_remove: List['GameData']) -> None:
@@ -434,6 +459,94 @@ class DatabaseModel(QAbstractTableModel):
             List of GameData instances.
         """
         return self._games.copy()
+    
+    def _extract_tags_from_game(self, game: GameData) -> Set[str]:
+        """Extract tag names from a game's PGN.
+        
+        Args:
+            game: GameData instance to extract tags from.
+            
+        Returns:
+            Set of tag names found in the game.
+        """
+        if not game or not game.pgn:
+            return set()
+        
+        try:
+            import chess.pgn
+            from io import StringIO
+            pgn_io = StringIO(game.pgn)
+            chess_game = chess.pgn.read_game(pgn_io)
+            if chess_game and chess_game.headers:
+                return set(chess_game.headers.keys())
+        except Exception:
+            pass
+        
+        return set()
+    
+    def _add_tags_to_cache(self, tags: Set[str]) -> None:
+        """Add tags to the unique tags cache.
+        
+        Args:
+            tags: Set of tag names to add.
+        """
+        if tags:
+            self._unique_tags.update(tags)
+    
+    def get_unique_tags(self) -> List[str]:
+        """Get ordered list of unique tags.
+        
+        Returns:
+            List of tag names ordered by importance (same ordering as bulk_replace_controller).
+        """
+        if not self._unique_tags:
+            return []
+        
+        # Standard PGN tags
+        STANDARD_TAGS = [
+            "White", "Black", "Result", "Date", "Event", "Site", "Round",
+            "ECO", "WhiteElo", "BlackElo", "TimeControl", "WhiteTitle",
+            "BlackTitle", "WhiteFideId", "BlackFideId", "WhiteTeam", "BlackTeam",
+            "PlyCount", "EventDate", "Termination", "Annotator", "UTCTime"
+        ]
+        
+        # Important/common tags that should appear first
+        IMPORTANT_TAGS = ["White", "Black", "Result", "Date", "Event", "Site", "Round", "ECO"]
+        
+        # Separate tags into categories
+        important_tags: List[str] = []
+        standard_tags: List[str] = []
+        custom_tags: List[str] = []
+        
+        standard_tags_set = set(STANDARD_TAGS)
+        important_tags_set = set(IMPORTANT_TAGS)
+        
+        for tag_name in self._unique_tags:
+            if tag_name in important_tags_set:
+                important_tags.append(tag_name)
+            elif tag_name in standard_tags_set:
+                standard_tags.append(tag_name)
+            else:
+                custom_tags.append(tag_name)
+        
+        # Sort each category alphabetically
+        important_tags.sort()
+        standard_tags.sort()
+        custom_tags.sort()
+        
+        # Within important tags, maintain importance order first, then alphabetical
+        important_ordered: List[str] = []
+        for important_tag in IMPORTANT_TAGS:
+            if important_tag in important_tags:
+                important_ordered.append(important_tag)
+        
+        # Combine: important tags (in importance order), then other standard tags (alphabetically), then custom tags (alphabetically)
+        result: List[str] = []
+        result.extend(important_ordered)
+        result.extend([tag for tag in standard_tags if tag not in important_tags_set])
+        result.extend(custom_tags)
+        
+        return result
     
     def get_unique_players(self) -> List[Tuple[str, int]]:
         """Get unique player names with game counts.

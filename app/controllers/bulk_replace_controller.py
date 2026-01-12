@@ -150,6 +150,150 @@ class BulkReplaceController(QObject):
         
         return result
     
+    def replace_metadata_tags(
+        self,
+        database: DatabaseModel,
+        tag_names: List[str],
+        find_text: str,
+        replace_text: str,
+        case_sensitive: bool = False,
+        use_regex: bool = False,
+        overwrite_all: bool = False,
+        game_indices: Optional[List[int]] = None
+    ) -> BulkReplaceResult:
+        """Replace text in multiple metadata tags in a single pass.
+        
+        This method processes each game once and updates all selected tags,
+        which is more efficient than calling replace_metadata_tag multiple times.
+        
+        Args:
+            database: DatabaseModel instance to process.
+            tag_names: List of PGN tag names to replace.
+            find_text: Text to find.
+            replace_text: Text to replace with.
+            case_sensitive: If True, match case exactly.
+            use_regex: If True, treat find_text as regex pattern.
+            overwrite_all: If True, replace any value with replace_text, ignoring find_text.
+            game_indices: Optional list of game indices to process (None = all games).
+            
+        Returns:
+            BulkReplaceResult with operation statistics.
+        """
+        self._cancelled = False
+        
+        # Show progress
+        self.progress_service.show_progress()
+        self.progress_service.set_progress(0)
+        self.progress_service.set_status("Bulk Replace: Starting...")
+        
+        # Progress callback
+        def progress_callback(game_index: int, total: int, message: str) -> None:
+            if self._cancelled:
+                return
+            percent = int((game_index / total) * 100) if total > 0 else 0
+            self.progress_service.set_progress(percent)
+            self.progress_service.set_status(f"Bulk Replace: {message}")
+        
+        # Cancel flag
+        def cancel_flag() -> bool:
+            return self._cancelled
+        
+        # Perform replacement
+        result = self.service.replace_metadata_tags(
+            database,
+            tag_names,
+            find_text,
+            replace_text,
+            case_sensitive,
+            use_regex,
+            overwrite_all,
+            game_indices,
+            progress_callback,
+            cancel_flag
+        )
+        
+        # Hide progress
+        self.progress_service.hide_progress()
+        
+        # If active game was updated, refresh it to update metadata view
+        if self.game_controller and result.success:
+            self._refresh_active_game_if_updated(database, game_indices)
+        
+        # Mark database as having unsaved changes if operation was successful
+        if result.success and result.games_updated > 0:
+            self.database_controller.mark_database_unsaved(database)
+        
+        # Emit signal
+        self.operation_complete.emit(result)
+        
+        return result
+    
+    def copy_metadata_tags(
+        self,
+        database: DatabaseModel,
+        target_tags: List[str],
+        source_tag: str,
+        game_indices: Optional[List[int]] = None
+    ) -> BulkReplaceResult:
+        """Copy value from one metadata tag to multiple target tags in a single pass.
+        
+        This method processes each game once and updates all selected tags,
+        which is more efficient than calling copy_metadata_tag multiple times.
+        
+        Args:
+            database: DatabaseModel instance to process.
+            target_tags: List of PGN tag names to update.
+            source_tag: PGN tag name to copy from.
+            game_indices: Optional list of game indices to process (None = all games).
+            
+        Returns:
+            BulkReplaceResult with operation statistics.
+        """
+        self._cancelled = False
+        
+        # Show progress
+        self.progress_service.show_progress()
+        self.progress_service.set_progress(0)
+        self.progress_service.set_status("Bulk Replace: Starting...")
+        
+        # Progress callback
+        def progress_callback(game_index: int, total: int, message: str) -> None:
+            if self._cancelled:
+                return
+            percent = int((game_index / total) * 100) if total > 0 else 0
+            self.progress_service.set_progress(percent)
+            self.progress_service.set_status(f"Bulk Replace: {message}")
+        
+        # Cancel flag
+        def cancel_flag() -> bool:
+            return self._cancelled
+        
+        # Perform copy
+        result = self.service.copy_metadata_tags(
+            database,
+            target_tags,
+            source_tag,
+            game_indices,
+            progress_callback,
+            cancel_flag
+        )
+        
+        # Hide progress
+        self.progress_service.hide_progress()
+        
+        # If active game was updated, refresh it to update metadata view
+        if self.game_controller and result.success:
+            self._refresh_active_game_if_updated(database, game_indices)
+        
+        # Mark database as having unsaved changes if operation was successful
+        if result.success and result.games_updated > 0:
+            self.database_controller.mark_database_unsaved(database)
+        
+        # Emit signal
+        self.operation_complete.emit(result)
+        
+        return result
+    
     def copy_metadata_tag(
         self,
         database: DatabaseModel,
@@ -424,4 +568,176 @@ class BulkReplaceController(QObject):
     def cancel_operation(self) -> None:
         """Cancel the current operation."""
         self._cancelled = True
+    
+    def execute_bulk_replace_operations(
+        self,
+        database: DatabaseModel,
+        is_copy_mode: bool,
+        overwrite_all: bool,
+        has_find_text: bool,
+        has_replace_text: bool,
+        selected_tags: List[str],
+        source_tag: Optional[str],
+        find_text: str,
+        replace_text: str,
+        case_sensitive: bool,
+        use_regex: bool,
+        has_result_update: bool,
+        has_eco_update: bool,
+        game_indices: Optional[List[int]]
+    ) -> BulkReplaceResult:
+        """Execute bulk replace operations with validation and result aggregation.
+        
+        This method validates inputs, executes operations, and aggregates results.
+        All business logic is centralized here, keeping the view simple.
+        
+        Args:
+            database: DatabaseModel instance to process.
+            is_copy_mode: True if copying from source tag.
+            overwrite_all: True if overwriting all values.
+            has_find_text: True if find text is provided.
+            has_replace_text: True if replace text is provided.
+            selected_tags: List of selected tag names.
+            source_tag: Source tag name for copy mode.
+            find_text: Text to find.
+            replace_text: Text to replace with.
+            case_sensitive: True if case-sensitive matching.
+            use_regex: True if using regex.
+            has_result_update: True if updating result tags.
+            has_eco_update: True if updating ECO tags.
+            game_indices: Optional list of game indices to process.
+            
+        Returns:
+            BulkReplaceResult with aggregated operation statistics.
+        """
+        # Validate at least one operation is selected
+        has_replace = is_copy_mode or overwrite_all or (has_find_text and has_replace_text)
+        if not has_replace and not has_result_update and not has_eco_update:
+            return BulkReplaceResult(
+                success=False,
+                games_processed=0,
+                games_updated=0,
+                games_failed=0,
+                games_skipped=0,
+                error_message="Please select at least one operation"
+            )
+        
+        # Validate game selection
+        if game_indices is not None and len(game_indices) == 0:
+            return BulkReplaceResult(
+                success=False,
+                games_processed=0,
+                games_updated=0,
+                games_failed=0,
+                games_skipped=0,
+                error_message="No games selected"
+            )
+        
+        # Validate replace/copy operation
+        if has_replace:
+            if not selected_tags:
+                return BulkReplaceResult(
+                    success=False,
+                    games_processed=0,
+                    games_updated=0,
+                    games_failed=0,
+                    games_skipped=0,
+                    error_message="Please select at least one tag"
+                )
+            
+            if is_copy_mode:
+                if not source_tag or not source_tag.strip():
+                    return BulkReplaceResult(
+                        success=False,
+                        games_processed=0,
+                        games_updated=0,
+                        games_failed=0,
+                        games_skipped=0,
+                        error_message="Please enter a source tag name"
+                    )
+                
+                if source_tag in selected_tags:
+                    return BulkReplaceResult(
+                        success=False,
+                        games_processed=0,
+                        games_updated=0,
+                        games_failed=0,
+                        games_skipped=0,
+                        error_message="Source tag cannot be in the target tags list"
+                    )
+        
+        # Execute operations and aggregate results
+        result = None
+        
+        # Metadata replacement or copy
+        if has_replace:
+            if is_copy_mode:
+                # Copy from source tag to all target tags in a single pass
+                result = self.copy_metadata_tags(
+                    database,
+                    selected_tags,
+                    source_tag,
+                    game_indices
+                )
+            else:
+                # Text replacement in all selected tags in a single pass
+                result = self.replace_metadata_tags(
+                    database,
+                    selected_tags,
+                    find_text,
+                    replace_text,
+                    case_sensitive,
+                    use_regex,
+                    overwrite_all,
+                    game_indices
+                )
+            
+            if not result.success:
+                return result
+        
+        # Result update
+        if has_result_update:
+            result_update = self.update_result_tags(
+                database,
+                game_indices
+            )
+            
+            if not result_update.success:
+                return result_update
+            
+            # Aggregate with previous result
+            if result:
+                result = BulkReplaceResult(
+                    success=True,
+                    games_processed=max(result.games_processed, result_update.games_processed),
+                    games_updated=result.games_updated + result_update.games_updated,
+                    games_failed=result.games_failed + result_update.games_failed,
+                    games_skipped=result.games_skipped + result_update.games_skipped
+                )
+            else:
+                result = result_update
+        
+        # ECO update
+        if has_eco_update:
+            eco_result = self.update_eco_tags(
+                database,
+                game_indices
+            )
+            
+            if not eco_result.success:
+                return eco_result
+            
+            # Aggregate with previous result
+            if result:
+                result = BulkReplaceResult(
+                    success=True,
+                    games_processed=max(result.games_processed, eco_result.games_processed),
+                    games_updated=result.games_updated + eco_result.games_updated,
+                    games_failed=result.games_failed + eco_result.games_failed,
+                    games_skipped=result.games_skipped + eco_result.games_skipped
+                )
+            else:
+                result = eco_result
+        
+        return result
 

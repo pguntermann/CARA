@@ -243,7 +243,11 @@ class DatabaseController:
                 annotated=game_dict.get("annotated", False),
                 file_position=0,  # Pasted games don't have file position
             )
-            model.add_game(game_data)
+            # Extract tags from parsed game dict (already available, no parsing needed)
+            tags = game_dict.get("tags", [])
+            if not tags:
+                raise ValueError(f"Tags missing from parsed game dict. This indicates a bug in PgnService._extract_game_data().")
+            model.add_game(game_data, tags=tags)
             games_added += 1
         
         # The first game added is at start_count index
@@ -388,21 +392,23 @@ class DatabaseController:
             progress_service.hide_progress()
             return (False, f"Error saving PGN database: {str(e)}")
     
-    def add_pgn_database(self, file_path: str, games: List[GameData]) -> DatabaseModel:
+    def add_pgn_database(self, file_path: str, games: List[GameData], tags_list: Optional[List[List[str]]] = None) -> DatabaseModel:
         """Add a new PGN database from file.
         
         Args:
             file_path: Path to the PGN file.
             games: List of games to populate the database.
+            tags_list: Optional list of tag lists, one per game (must match games length).
+                      If None, tags will be extracted from each game's PGN.
             
         Returns:
             The new DatabaseModel instance.
         """
         # Create new model
         model = DatabaseModel()
-        for game in games:
-            # Don't mark as unsaved when loading from file (games are already saved)
-            model.add_game(game, mark_unsaved=False)
+        # Use batch addition for better performance
+        # Don't mark as unsaved when loading from file (games are already saved)
+        model.add_games_batch(games, mark_unsaved=False, tags_list=tags_list)
         
         # Add to panel model
         self.panel_model.add_database(model, file_path=file_path)
@@ -661,6 +667,7 @@ class DatabaseController:
             
             # Convert parsed games to GameData instances
             games = []
+            tags_list = []  # Collect tags for batch addition
             for file_pos, game_dict in enumerate(parse_result.games, start=1):
                 game_data = GameData(
                     game_number=0,  # Will be set by model when adding
@@ -680,6 +687,9 @@ class DatabaseController:
                     file_position=file_pos,  # Store original file position (1-based)
                 )
                 games.append(game_data)
+                # Extract tags from parsed game dict (already available, no parsing needed)
+                tags = game_dict.get("tags", [])
+                tags_list.append(tags)
                 
                 # Update progress more frequently for better feedback
                 # Update every 10 games, or every game for first 10, or on last game
@@ -701,8 +711,8 @@ class DatabaseController:
             progress_service.set_status("Adding games to database...")
             QApplication.processEvents()  # Process events to update status
             
-            # Add database to panel model
-            new_model = self.add_pgn_database(file_path, games)
+            # Add database to panel model (pass tags to avoid re-parsing)
+            new_model = self.add_pgn_database(file_path, games, tags_list=tags_list)
             
             # Set the new database as active
             self.set_active_database(new_model)
@@ -879,6 +889,7 @@ class DatabaseController:
                 
                 # Convert parsed games to GameData instances
                 game_data_list = []
+                tags_list = []  # Collect tags for batch addition
                 for file_pos, game_dict in enumerate(games, start=1):
                     game_data = GameData(
                         game_number=0,  # Will be set by model when adding
@@ -898,6 +909,9 @@ class DatabaseController:
                         file_position=file_pos,
                     )
                     game_data_list.append(game_data)
+                    # Extract tags from parsed game dict (already available, no parsing needed)
+                    tags = game_dict.get("tags", [])
+                    tags_list.append(tags)
                     games_added += 1
                     
                     # Update progress every 10 games or on last game of file
@@ -910,8 +924,8 @@ class DatabaseController:
                         progress_service.set_progress(progress_percent)
                         QApplication.processEvents()
                 
-                # Add database to panel model
-                new_model = self.add_pgn_database(file_path, game_data_list)
+                # Add database to panel model (pass tags to avoid re-parsing)
+                new_model = self.add_pgn_database(file_path, game_data_list, tags_list=tags_list)
                 
                 opened_count += 1
                 last_successful_database = new_model
@@ -1053,7 +1067,9 @@ class DatabaseController:
             QApplication.processEvents()  # Process events to update status
             
             # Don't mark as unsaved when reloading from file (games are already saved)
-            model.add_games_batch(games_data, mark_unsaved=False)
+            # Extract tags from parsed game dicts (already available, no parsing needed)
+            tags_list = [game_dict.get("tags", []) for game_dict in parse_result.games]
+            model.add_games_batch(games_data, mark_unsaved=False, tags_list=tags_list)
             
             # Final progress update
             progress_service.set_progress(95)
@@ -1153,8 +1169,10 @@ class DatabaseController:
                     annotated=getattr(game, "annotated", False),
                     file_position=file_pos,  # Set file position based on order in new file
                 )
+                # Extract tags from existing game's PGN (game is being copied, not parsed)
+                tags = new_model._extract_tags_from_game(new_game)
                 # Mark as saved since these games are being saved to the new file
-                new_model.add_game(new_game, mark_unsaved=False)
+                new_model.add_game(new_game, mark_unsaved=False, tags=tags)
                 
                 # Update progress every 10 games or on last game
                 should_update = (
@@ -1203,168 +1221,19 @@ class DatabaseController:
         return (success, message)
     
     def get_available_tags(self, model: DatabaseModel) -> List[str]:
-        """Extract and order tags from database games by commonality.
+        """Get available tags from database model cache.
         
-        This method extracts all unique tags from games in the database,
-        counts their occurrences, and orders them by importance and frequency.
+        This method returns cached unique tags from the database model,
+        which are extracted and maintained during database loading and game operations.
         
         Args:
-            model: DatabaseModel instance to extract tags from.
+            model: DatabaseModel instance to get tags from.
             
         Returns:
-            List of tag names ordered by:
-            1. Important/common tags first (White, Black, Event, etc.) in importance order
-            2. Other standard tags by frequency (most common first)
-            3. Custom tags by frequency (most common first)
+            List of tag names ordered by importance (same ordering as DatabaseModel.get_unique_tags()).
         """
-        # Standard PGN tags
-        STANDARD_TAGS = [
-            "White", "Black", "Result", "Date", "Event", "Site", "Round",
-            "ECO", "WhiteElo", "BlackElo", "TimeControl", "WhiteTitle",
-            "BlackTitle", "WhiteFideId", "BlackFideId", "WhiteTeam", "BlackTeam",
-            "PlyCount", "EventDate", "Termination", "Annotator", "UTCTime"
-        ]
-        
-        # Important/common tags that should appear first (even if less frequent)
-        IMPORTANT_TAGS = ["White", "Black", "Result", "Date", "Event", "Site", "Round", "ECO"]
-        
-        # Count tag occurrences across games
-        # For large databases, sample games to improve performance
-        from app.services.progress_service import ProgressService
-        from PyQt6.QtWidgets import QApplication
-        
-        progress_service = ProgressService.get_instance()
-        tag_counts: Counter[str] = Counter()
-        
-        # Get all games from database
-        games = model.get_all_games()
-        total_games = len(games)
-        
-        # Sample games for large databases to improve performance
-        # Sample up to MAX_SAMPLE_SIZE games, or all games if fewer
-        MAX_SAMPLE_SIZE = 2000  # Sample up to 2000 games for tag extraction
-        
-        # Show progress if we have a significant number of games
-        show_progress = total_games > 100
-        if show_progress:
-            progress_service.show_progress()
-            progress_service.set_indeterminate(False)
-            progress_service.set_progress(0)
-            if total_games > MAX_SAMPLE_SIZE:
-                progress_service.set_status(f"Scanning database for tags (sampling {MAX_SAMPLE_SIZE} of {total_games} games)...")
-            else:
-                progress_service.set_status(f"Scanning database for tags ({total_games} games)...")
-            QApplication.processEvents()  # Process events to show progress bar
-        
-        if total_games > MAX_SAMPLE_SIZE:
-            # Sample games: take first 1000, middle 500, and last 500
-            # This gives a good representation across the database
-            sample_size = MAX_SAMPLE_SIZE
-            first_batch = 1000
-            middle_batch = 500
-            last_batch = 500
-            
-            sample_indices = set()
-            # First batch
-            for i in range(min(first_batch, total_games)):
-                sample_indices.add(i)
-            # Middle batch
-            if total_games > first_batch:
-                middle_start = (total_games - first_batch) // 2
-                for i in range(middle_start, min(middle_start + middle_batch, total_games)):
-                    sample_indices.add(i)
-            # Last batch
-            if total_games > first_batch + middle_batch:
-                last_start = max(0, total_games - last_batch)
-                for i in range(last_start, total_games):
-                    sample_indices.add(i)
-            
-            games_to_process = [games[i] for i in sorted(sample_indices)]
-        else:
-            games_to_process = games
-        
-        total_to_process = len(games_to_process)
-        
-        # Process games with periodic event processing for UI responsiveness
-        for i, game in enumerate(games_to_process):
-            if not game.pgn:
-                continue
-            
-            try:
-                # Parse PGN to extract headers
-                pgn_io = StringIO(game.pgn)
-                chess_game = chess.pgn.read_game(pgn_io)
-                
-                if chess_game and chess_game.headers:
-                    # Count each tag that appears in this game
-                    for tag_name in chess_game.headers.keys():
-                        tag_counts[tag_name] += 1
-            except Exception:
-                # Skip games that can't be parsed
-                continue
-            
-            # Update progress every 10 games or on last game
-            if show_progress:
-                should_update = (
-                    (i + 1) <= 10 or  # First 10 games for immediate feedback
-                    (i + 1) % 10 == 0 or  # Every 10 games after that
-                    (i + 1) == total_to_process  # Always on last game
-                )
-                
-                if should_update:
-                    progress_percent = int(((i + 1) / total_to_process) * 100)
-                    progress_service.report_progress(
-                        f"Scanning game {i + 1}/{total_to_process}...",
-                        progress_percent
-                    )
-                    QApplication.processEvents()  # Process events to update progress bar
-        
-        # Hide progress when done
-        if show_progress:
-            progress_service.hide_progress()
-            QApplication.processEvents()  # Process events to hide progress bar
-        
-        if not tag_counts:
-            # If no tags found, return empty list
-            return []
-        
-        # Separate tags into categories
-        important_tags: List[Tuple[str, int]] = []
-        standard_tags: List[Tuple[str, int]] = []
-        custom_tags: List[Tuple[str, int]] = []
-        
-        standard_tags_set = set(STANDARD_TAGS)
-        important_tags_set = set(IMPORTANT_TAGS)
-        
-        for tag_name, count in tag_counts.items():
-            if tag_name in important_tags_set:
-                important_tags.append((tag_name, count))
-            elif tag_name in standard_tags_set:
-                standard_tags.append((tag_name, count))
-            else:
-                custom_tags.append((tag_name, count))
-        
-        # Sort each category by frequency (descending), then by name for ties
-        important_tags.sort(key=lambda x: (-x[1], x[0]))
-        standard_tags.sort(key=lambda x: (-x[1], x[0]))
-        custom_tags.sort(key=lambda x: (-x[1], x[0]))
-        
-        # Within important tags, maintain importance order first, then by frequency
-        # Reorder important tags to maintain importance order, but keep frequency as secondary
-        important_ordered: List[Tuple[str, int]] = []
-        for important_tag in IMPORTANT_TAGS:
-            for tag_name, count in important_tags:
-                if tag_name == important_tag:
-                    important_ordered.append((tag_name, count))
-                    break
-        
-        # Combine: important tags (in importance order), then other standard tags (by frequency), then custom tags (by frequency)
-        result: List[str] = []
-        result.extend([tag for tag, _ in important_ordered])
-        result.extend([tag for tag, _ in standard_tags if tag not in important_tags_set])
-        result.extend([tag for tag, _ in custom_tags])
-        
-        return result
+        # Use cached tags from model (no scanning needed)
+        return model.get_unique_tags()
     
     def import_online_games(
         self,

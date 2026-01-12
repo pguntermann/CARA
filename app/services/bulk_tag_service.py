@@ -267,6 +267,9 @@ class BulkTagService:
         if updated_games:
             database.batch_update_games(updated_games)
         
+        # Update tag cache with new tag
+        database._add_tags_to_cache({tag_name})
+        
         return BulkTagResult(
             success=True,
             games_processed=total_games,
