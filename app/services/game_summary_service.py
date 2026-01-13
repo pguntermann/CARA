@@ -278,6 +278,9 @@ class GameSummaryService:
         Returns:
             GameSummary instance with all calculated statistics.
         """
+        logging_service = LoggingService.get_instance()
+        logging_service.debug(f"Starting game summary calculation: total_moves={total_moves}, game_result={game_result or 'None'}")
+        
         # Determine phase boundaries first (needed for phase statistics and overall formulas)
         opening_end, middlegame_end = self._determine_phase_boundaries(moves, total_moves)
         
@@ -438,6 +441,9 @@ class GameSummaryService:
             endgame_type=endgame_type,
             highlights=highlights
         )
+        
+        logging_service.debug(f"Completed game summary calculation: opening_end={opening_end}, middlegame_end={middlegame_end}, white_accuracy={white_stats.accuracy:.1f}%, black_accuracy={black_stats.accuracy:.1f}%, endgame_type={endgame_type or 'None'}")
+        
         return summary
     
     def _calculate_player_statistics(self, moves: List[MoveData], is_white: bool, game_result: Optional[str] = None,

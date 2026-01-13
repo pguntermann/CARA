@@ -1,7 +1,7 @@
 """Logging service for centralized application logging."""
 
 import sys
-import queue
+import multiprocessing
 import threading
 import logging
 import logging.handlers
@@ -12,6 +12,36 @@ from datetime import datetime
 from app.utils.path_resolver import resolve_data_file_path
 
 
+# Module-level queue for multiprocessing support
+# Set by initializer in worker processes, created in main process
+_log_queue: Optional[multiprocessing.Queue] = None
+_queue_listener: Optional[logging.handlers.QueueListener] = None
+
+
+def init_worker_logging(queue: multiprocessing.Queue) -> None:
+    """Initialize logging queue in worker process.
+    
+    Called by ProcessPoolExecutor initializer to set the shared queue
+    in each worker process's module scope.
+    
+    Args:
+        queue: The shared multiprocessing.Queue instance from main process.
+    """
+    global _log_queue
+    _log_queue = queue
+
+
+class ResilientQueueHandler(logging.handlers.QueueHandler):
+    """QueueHandler that gracefully handles connection errors during shutdown."""
+    
+    def enqueue(self, record: logging.LogRecord) -> None:
+        """Enqueue a log record, handling connection errors gracefully."""
+        try:
+            super().enqueue(record)
+        except (BrokenPipeError, OSError, ConnectionError):
+            pass
+
+
 class LoggingService:
     """Service for centralized application logging.
     
@@ -19,10 +49,12 @@ class LoggingService:
     - Console and/or file output (configurable)
     - Multiple log levels (DEBUG, INFO, WARNING, ERROR)
     - Rolling log files (size-based rotation)
-    - Non-blocking async logging via background thread
-    - Thread-safe operation
+    - Non-blocking async logging via QueueHandler/QueueListener
+    - Thread-safe and process-safe operation
     
     This is a singleton service - use get_instance() to get the shared instance.
+    All processes (main and workers) use QueueHandler to send logs to a shared queue.
+    The main process runs QueueListener to consume from the queue and write to handlers.
     """
     
     _instance: Optional['LoggingService'] = None
@@ -32,18 +64,14 @@ class LoggingService:
         """Initialize the logging service.
         
         Args:
-            config: Configuration dictionary. If None, will be loaded from config.json.
+            config: Configuration dictionary.
         """
         self.config = config or {}
         self._logger: Optional[logging.Logger] = None
-        self._log_queue: Optional[queue.Queue] = None
-        self._worker_thread: Optional[threading.Thread] = None
-        self._shutdown_event = threading.Event()
         self._initialized = False
         self._log_path: Optional[Path] = None
         self._instance_lock = threading.Lock()
         
-        # Load configuration
         self._load_config()
     
     @classmethod
@@ -61,29 +89,40 @@ class LoggingService:
                 if cls._instance is None:
                     cls._instance = cls(config)
         elif config is not None:
-            # Update config if instance already exists
             with cls._instance._instance_lock:
                 cls._instance.config = config
                 cls._instance._load_config()
+                if cls._instance._initialized:
+                    cls._instance.initialize()
         return cls._instance
+    
+    @classmethod
+    def get_queue(cls) -> multiprocessing.Queue:
+        """Get the shared log queue for this process.
+        
+        Creates the queue if it doesn't exist (for main process).
+        Worker processes should have the queue set via initializer.
+        
+        Returns:
+            The shared multiprocessing.Queue instance.
+        """
+        global _log_queue
+        if _log_queue is None:
+            _log_queue = multiprocessing.Queue()
+        return _log_queue
     
     def _load_config(self) -> None:
         """Load logging configuration from config dictionary."""
         logging_config = self.config.get('logging', {})
         
-        # Console settings
         console_config = logging_config.get('console', {})
         self._console_enabled = console_config.get('enabled', True)
         self._console_level = console_config.get('level', 'INFO')
         
-        # File settings
         file_config = logging_config.get('file', {})
-        # Explicitly handle False - ensure boolean conversion
         if 'enabled' in file_config:
-            # Key exists, use its value (False in JSON becomes False in Python)
             self._file_enabled = bool(file_config['enabled'])
         else:
-            # Key not present, use default True
             self._file_enabled = True
         self._file_level = file_config.get('level', 'DEBUG')
         self._log_filename = file_config.get('filename', 'cara.log')
@@ -93,94 +132,61 @@ class LoggingService:
     def initialize(self) -> None:
         """Initialize the logging service.
         
-        Must be called before using the service. Sets up logger, handlers, and worker thread.
+        Must be called before using the service. Sets up logger, handlers, and queue listener.
         Must be called with _instance_lock held.
         """
-        # Reload config in case it was updated
-        old_file_enabled = getattr(self, '_file_enabled', None)
+        global _log_queue, _queue_listener
+        
         self._load_config()
         
-        # If file logging was just disabled, remove any existing file handler immediately
-        # This prevents file creation when config changes from True to False
-        if old_file_enabled is True and self._file_enabled is False and self._logger:
-            for handler in self._logger.handlers[:]:
-                if isinstance(handler, logging.handlers.RotatingFileHandler):
-                    self._logger.removeHandler(handler)
-                    handler.close()
-                    handler.flush()
-                    self._log_path = None
+        is_main_process = multiprocessing.parent_process() is None
         
         if self._initialized:
-            # If already initialized, update handlers based on new config
+            if is_main_process and _queue_listener:
+                _queue_listener.stop()
+                _queue_listener = None
+            
+            if _log_queue is None:
+                _log_queue = multiprocessing.Queue()
+            
             if self._logger:
                 for handler in self._logger.handlers[:]:
-                    if isinstance(handler, logging.StreamHandler) and handler.stream == sys.stderr:
-                        # Console handler
-                        if self._console_enabled:
-                            # Update console handler level
-                            handler.setLevel(self._get_log_level(self._console_level))
-                        else:
-                            # Remove console handler if disabled
-                            self._logger.removeHandler(handler)
-                            handler.close()
-                    elif isinstance(handler, logging.handlers.RotatingFileHandler):
-                        # File handler
-                        if self._file_enabled is True:
-                            # Update file handler level
-                            handler.setLevel(self._get_log_level(self._file_level))
-                        else:
-                            # Remove file handler if disabled
-                            # CRITICAL: Remove handler before closing to prevent file creation
-                            self._logger.removeHandler(handler)
-                            handler.close()
-                            handler.flush()  # Ensure any pending writes are flushed
-                            # Clear log path reference
-                            self._log_path = None
-                
-                # Add handlers if they're enabled but don't exist
-                has_console_handler = any(
-                    isinstance(h, logging.StreamHandler) and h.stream == sys.stderr
-                    for h in self._logger.handlers
-                )
-                has_file_handler = any(
-                    isinstance(h, logging.handlers.RotatingFileHandler)
-                    for h in self._logger.handlers
-                )
-                
-                # Add console handler if enabled but missing
-                if self._console_enabled and not has_console_handler:
+                    if isinstance(handler, (logging.handlers.QueueHandler, ResilientQueueHandler)):
+                        self._logger.removeHandler(handler)
+                queue_handler = ResilientQueueHandler(_log_queue)
+                self._logger.addHandler(queue_handler)
+            
+            if is_main_process:
+                handlers = []
+                if self._console_enabled:
                     console_handler = logging.StreamHandler(sys.stderr)
-                    console_level = self._get_log_level(self._console_level)
-                    console_handler.setLevel(console_level)
+                    console_handler.setLevel(self._get_log_level(self._console_level))
                     console_formatter = logging.Formatter(
                         '%(asctime)s [%(levelname)s] [Thread-%(thread)d] %(message)s',
                         datefmt='%H:%M:%S'
                     )
                     console_handler.setFormatter(console_formatter)
-                    self._logger.addHandler(console_handler)
+                    handlers.append(console_handler)
                 
-                # Add file handler if enabled but missing
-                if self._file_enabled is True and not has_file_handler:
+                if self._file_enabled is True:
                     try:
-                        # Generate timestamp for log filename
-                        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-                        
-                        # Insert timestamp into filename
-                        base_filename = self._log_filename
-                        if '.' in base_filename:
-                            name, ext = base_filename.rsplit('.', 1)
-                            timestamped_filename = f"{name}_{timestamp}.{ext}"
+                        # Reuse existing log path if already set (to avoid creating new files on reinitialization)
+                        if self._log_path is None:
+                            date = datetime.now().strftime('%Y-%m-%d')
+                            base_filename = self._log_filename
+                            if '.' in base_filename:
+                                name, ext = base_filename.rsplit('.', 1)
+                                timestamped_filename = f"{name}_{date}.{ext}"
+                            else:
+                                timestamped_filename = f"{base_filename}_{date}"
+                            
+                            log_path, _ = resolve_data_file_path(timestamped_filename)
+                            self._log_path = log_path
                         else:
-                            timestamped_filename = f"{base_filename}_{timestamp}"
+                            log_path = self._log_path
                         
-                        # Resolve log file path - rely entirely on path_resolver's result
-                        log_path, _ = resolve_data_file_path(timestamped_filename)
-                        self._log_path = log_path
-                        
-                        # Ensure directory exists
                         log_path.parent.mkdir(parents=True, exist_ok=True)
                         
-                        # Create rotating file handler
                         max_bytes = self._max_size_mb * 1024 * 1024
                         file_handler = logging.handlers.RotatingFileHandler(
                             str(log_path),
@@ -194,105 +200,91 @@ class LoggingService:
                             datefmt='%Y-%m-%d %H:%M:%S'
                         )
                         file_handler.setFormatter(file_formatter)
-                        self._logger.addHandler(file_handler)
+                        handlers.append(file_handler)
                     except Exception as e:
                         print(f"Warning: Failed to initialize file logging: {e}", file=sys.stderr)
+                
+                if handlers:
+                    _queue_listener = logging.handlers.QueueListener(_log_queue, *handlers, respect_handler_level=True)
+                    _queue_listener.start()
+            self._initialized = True
             return
         
-        # Only initialize if at least one handler is enabled
         if not self._console_enabled and not self._file_enabled:
-            self._initialized = True  # Mark as initialized but disabled
+            self._initialized = True
             return
         
-        # Create logger
         self._logger = logging.getLogger('CARA')
-        # Set logger to DEBUG (lowest level) - handlers will filter based on their own levels
         self._logger.setLevel(logging.DEBUG)
-        self._logger.propagate = False  # Don't propagate to root logger
+        self._logger.propagate = False
         
-        # Create log queue for async processing
-        self._log_queue = queue.Queue()
+        if _log_queue is None:
+            _log_queue = multiprocessing.Queue()
         
-        # Set up handlers based on configuration
+        queue_handler = ResilientQueueHandler(_log_queue)
+        self._logger.addHandler(queue_handler)
+        
+        is_main_process = multiprocessing.parent_process() is None
+        
         handlers = []
         
-        # Console handler
-        if self._console_enabled:
-            console_handler = logging.StreamHandler(sys.stderr)
-            console_level = self._get_log_level(self._console_level)
-            console_handler.setLevel(console_level)
-            console_formatter = logging.Formatter(
-                '%(asctime)s [%(levelname)s] [Thread-%(thread)d] %(message)s',
-                datefmt='%H:%M:%S'
-            )
-            console_handler.setFormatter(console_formatter)
-            handlers.append(console_handler)
-        
-        # File handler (rolling)
-        # Only create file handler if explicitly enabled (RotatingFileHandler creates file on instantiation)
-        # Use explicit True check to prevent any accidental file creation
-        if self._file_enabled is True:
-            try:
-                # Generate timestamp for log filename
-                timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-                
-                # Insert timestamp into filename (e.g., "cara.log" -> "cara_2024-01-15_14-30-00.log")
-                base_filename = self._log_filename
-                if '.' in base_filename:
-                    name, ext = base_filename.rsplit('.', 1)
-                    timestamped_filename = f"{name}_{timestamp}.{ext}"
-                else:
-                    timestamped_filename = f"{base_filename}_{timestamp}"
-                
-                # Resolve log file path using same pattern as user settings
-                # Rely entirely on path_resolver's result
-                log_path, _ = resolve_data_file_path(timestamped_filename)
-                self._log_path = log_path
-                
-                # Ensure directory exists
-                log_path.parent.mkdir(parents=True, exist_ok=True)
-                
-                # Create rotating file handler (this will create the file immediately)
-                max_bytes = self._max_size_mb * 1024 * 1024  # Convert MB to bytes
-                file_handler = logging.handlers.RotatingFileHandler(
-                    str(log_path),
-                    maxBytes=max_bytes,
-                    backupCount=self._backup_count,
-                    encoding='utf-8'
-                )
-                file_handler.setLevel(self._get_log_level(self._file_level))
-                file_formatter = logging.Formatter(
+        # Only create console/file handlers in main process
+        # Worker processes only use QueueHandler to send logs to the queue
+        if is_main_process:
+            if self._console_enabled:
+                console_handler = logging.StreamHandler(sys.stderr)
+                console_handler.setLevel(self._get_log_level(self._console_level))
+                console_formatter = logging.Formatter(
                     '%(asctime)s [%(levelname)s] [Thread-%(thread)d] %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S'
+                    datefmt='%H:%M:%S'
                 )
-                file_handler.setFormatter(file_formatter)
-                handlers.append(file_handler)
-            except Exception as e:
-                # If file logging fails, fall back to console only
-                # Use print to avoid circular dependency
-                print(f"Warning: Failed to initialize file logging: {e}", file=sys.stderr)
+                console_handler.setFormatter(console_formatter)
+                handlers.append(console_handler)
+            
+            if self._file_enabled is True:
+                try:
+                    # Reuse existing log path if already set (to avoid creating new files on reinitialization)
+                    if self._log_path is None:
+                        date = datetime.now().strftime('%Y-%m-%d')
+                        base_filename = self._log_filename
+                        if '.' in base_filename:
+                            name, ext = base_filename.rsplit('.', 1)
+                            timestamped_filename = f"{name}_{date}.{ext}"
+                        else:
+                            timestamped_filename = f"{base_filename}_{date}"
+                        
+                        log_path, _ = resolve_data_file_path(timestamped_filename)
+                        self._log_path = log_path
+                    else:
+                        log_path = self._log_path
+                    
+                    log_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    max_bytes = self._max_size_mb * 1024 * 1024
+                    file_handler = logging.handlers.RotatingFileHandler(
+                        str(log_path),
+                        maxBytes=max_bytes,
+                        backupCount=self._backup_count,
+                        encoding='utf-8'
+                    )
+                    file_handler.setLevel(self._get_log_level(self._file_level))
+                    file_formatter = logging.Formatter(
+                        '%(asctime)s [%(levelname)s] [Thread-%(thread)d] %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S'
+                    )
+                    file_handler.setFormatter(file_formatter)
+                    handlers.append(file_handler)
+                except Exception as e:
+                    print(f"Warning: Failed to initialize file logging: {e}", file=sys.stderr)
         
-        # Add handlers to logger
-        for handler in handlers:
-            self._logger.addHandler(handler)
-        
-        # Start background worker thread for async logging
-        self._worker_thread = threading.Thread(
-            target=self._log_worker,
-            name='LoggingWorker',
-            daemon=True
-        )
-        self._worker_thread.start()
-        
-        # Give worker thread a moment to start processing
-        # This ensures it's ready when we start logging
-        import time
-        time.sleep(0.01)  # 10ms should be enough for thread to start
+        if is_main_process and _queue_listener is None and handlers:
+            _queue_listener = logging.handlers.QueueListener(_log_queue, *handlers, respect_handler_level=True)
+            _queue_listener.start()
         
         self._initialized = True
         
-        # Log the resolved log file path (now that logging is initialized)
-        if self._file_enabled and self._log_path:
+        # Only log file path in main process
+        if is_main_process and self._file_enabled and self._log_path:
             self.debug(f"Log file path resolved: filename={self._log_filename}, path={self._log_path}")
     
     def _get_log_level(self, level_str: str) -> int:
@@ -312,134 +304,54 @@ class LoggingService:
         }
         return level_map.get(level_str.upper(), logging.INFO)
     
-    def _log_worker(self) -> None:
-        """Background worker thread that processes log messages from queue."""
-        _error_logged = False  # Track if we've logged an error to prevent infinite loops
-        while not self._shutdown_event.is_set():
-            try:
-                # Get message from queue with timeout to allow checking shutdown event
-                try:
-                    log_record = self._log_queue.get(timeout=0.1)
-                except queue.Empty:
-                    continue
-                
-                # Process the log record
-                if self._logger:
-                    try:
-                        self._logger.handle(log_record)
-                    except Exception as e:
-                        # Log error only once to prevent infinite loops
-                        if not _error_logged:
-                            _error_logged = True
-                            try:
-                                import sys
-                                print(f"[LoggingService] Error processing log record: {e}", file=sys.stderr)
-                                import traceback
-                                traceback.print_exc(file=sys.stderr)
-                            except Exception:
-                                pass  # Absolute fallback - can't even print
-                
-                # Mark task as done
-                self._log_queue.task_done()
-            except Exception as e:
-                # Log error only once to prevent infinite loops
-                if not _error_logged:
-                    _error_logged = True
-                    try:
-                        import sys
-                        print(f"[LoggingService] Error in log worker: {e}", file=sys.stderr)
-                        import traceback
-                        traceback.print_exc(file=sys.stderr)
-                    except Exception:
-                        pass  # Absolute fallback - can't even print
-    
     def _log(self, level: int, message: str, exc_info: Optional[Exception] = None) -> None:
-        """Internal logging method that enqueues log messages.
+        """Internal logging method.
         
         Args:
             level: Logging level constant.
             message: Log message.
             exc_info: Optional exception info for error logging.
         """
-        # Auto-initialize on first use if not already initialized (thread-safe)
         if not self._initialized:
             with self._instance_lock:
                 if not self._initialized:
                     self.initialize()
         
-        # Early exit if both handlers are disabled to reduce overhead
         if not self._console_enabled and not self._file_enabled:
             return
         
-        if not self._initialized or not self._logger or not self._log_queue:
-            # Fallback to direct print if logging service isn't working
-            if level >= logging.WARNING:
-                print(f"[FALLBACK] {message}", file=sys.stderr)
+        if not self._initialized or not self._logger:
             return
         
-        # Create log record with thread information
-        # Use makeRecord to automatically capture thread info (threadName, thread)
-        import threading
-        import sys
+        exc_info_param = exc_info
+        if exc_info is not None and isinstance(exc_info, Exception):
+            traceback = getattr(exc_info, '__traceback__', None)
+            if traceback is not None:
+                exc_info_param = (type(exc_info), exc_info, traceback)
+            else:
+                message = f"{message}\nException: {type(exc_info).__name__}: {exc_info}"
+                exc_info_param = None
+        
         try:
-            # Convert exc_info to proper format for makeRecord
-            # makeRecord expects: None, True, or (type, value, traceback) tuple
-            exc_info_param = exc_info
-            if exc_info is not None and isinstance(exc_info, Exception):
-                # Check if exception has traceback info
-                traceback = getattr(exc_info, '__traceback__', None)
-                if traceback is not None:
-                    # Has traceback - convert to tuple format
-                    exc_info_param = (type(exc_info), exc_info, traceback)
-                else:
-                    # No traceback (manually created exception) - include exception info in message instead
-                    # makeRecord may not handle tuple with None traceback well
-                    message = f"{message}\nException: {type(exc_info).__name__}: {exc_info}"
-                    exc_info_param = None
-            
             record = self._logger.makeRecord(
                 self._logger.name,
                 level,
                 __file__,
-                0,  # lineno - not meaningful for programmatic calls
+                0,
                 message,
                 (),
                 exc_info_param
             )
-        except Exception as e:
-            # If record creation fails, try without exc_info
-            try:
-                record = self._logger.makeRecord(
-                    self._logger.name,
-                    level,
-                    __file__,
-                    0,
-                    f"{message} [Failed to include exception info: {e}]",
-                    (),
-                    None
-                )
-            except Exception:
-                # If that also fails, fall back to direct print
-                if level >= logging.WARNING:
-                    print(f"[FALLBACK] {message}", file=sys.stderr)
-                    if exc_info:
-                        import traceback
-                        traceback.print_exc(file=sys.stderr)
-                return
-        # Ensure thread name is preserved (makeRecord captures it, but we verify)
-        # The threadName should already be set by makeRecord, but we ensure it's correct
+        except Exception:
+            return
+        
+        import threading
         if not hasattr(record, 'threadName') or not record.threadName:
             record.threadName = threading.current_thread().name
         if not hasattr(record, 'thread') or not record.thread:
             record.thread = threading.get_ident()
         
-        # Enqueue for async processing (non-blocking)
-        try:
-            self._log_queue.put_nowait(record)
-        except queue.Full:
-            # If queue is full, fall back to direct logging (shouldn't happen in practice)
-            if self._logger:
-                self._logger.handle(record)
+        self._logger.handle(record)
     
     def debug(self, message: str) -> None:
         """Log a DEBUG level message.
@@ -477,43 +389,41 @@ class LoggingService:
     def shutdown(self) -> None:
         """Shutdown the logging service gracefully.
         
-        Flushes all pending log messages and stops the worker thread.
+        Flushes all pending log messages and stops the queue listener.
         """
+        global _queue_listener, _log_queue
+        
         with self._instance_lock:
             if not self._initialized:
                 return
             
-            # Wait for queue to empty BEFORE signaling shutdown
-            # This ensures all queued messages are processed
-            if self._log_queue and self._worker_thread:
-                import time
-                # Give worker thread a moment to start processing if it just started
-                if self._worker_thread.is_alive():
-                    # Wait a bit for worker to start processing
-                    time.sleep(0.05)
-                    
-                    # Now wait for queue to actually empty
-                    try:
-                        self._log_queue.join(timeout=2.0)
-                    except Exception:
-                        pass
-                
-                # Flush all handlers to ensure output is written
-                if self._logger:
-                    for handler in self._logger.handlers[:]:
-                        handler.flush()
+            if _queue_listener:
+                try:
+                    _queue_listener.stop()
+                    if hasattr(_queue_listener, '_thread') and _queue_listener._thread:
+                        _queue_listener._thread.join(timeout=1.0)
+                    else:
+                        import time
+                        time.sleep(0.2)
+                except Exception:
+                    pass
+                _queue_listener = None
             
-            # Signal shutdown AFTER queue is empty
-            self._shutdown_event.set()
+            if _log_queue:
+                try:
+                    _log_queue.put_nowait(None)
+                    _log_queue.close()
+                    _log_queue.join_thread()
+                except Exception:
+                    pass
+                _log_queue = None
             
-            # Wait for worker thread to finish
-            if self._worker_thread and self._worker_thread.is_alive():
-                self._worker_thread.join(timeout=1.0)
-            
-            # Close all handlers
             if self._logger:
                 for handler in self._logger.handlers[:]:
-                    handler.close()
-                    self._logger.removeHandler(handler)
+                    try:
+                        handler.close()
+                        self._logger.removeHandler(handler)
+                    except Exception:
+                        pass
             
             self._initialized = False

@@ -846,7 +846,14 @@ class DatabaseController:
         parse_results = {}
         executor = None
         try:
-            executor = ProcessPoolExecutor(max_workers=max_workers)
+            from app.services.logging_service import LoggingService, init_worker_logging
+            
+            log_queue = LoggingService.get_queue()
+            executor = ProcessPoolExecutor(
+                max_workers=max_workers,
+                initializer=init_worker_logging,
+                initargs=(log_queue,)
+            )
             
             # Submit all files for processing
             future_to_path = {

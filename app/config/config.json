@@ -4696,10 +4696,10 @@
   "logging": {
     "console": {
       "enabled": true,
-      "level": "DEBUG"
+      "level": "ERROR"
     },
     "file": {
-      "enabled": false,
+      "enabled": true,
       "level": "ERROR",
       "max_size_mb": 10,
       "backup_count": 5,

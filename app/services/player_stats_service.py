@@ -10,7 +10,7 @@ from app.models.database_model import GameData, DatabaseModel
 from app.models.moveslist_model import MoveData
 from app.services.game_summary_service import GameSummary, PlayerStatistics, PhaseStatistics, GameSummaryService
 from app.controllers.game_controller import GameController
-from app.services.logging_service import LoggingService
+from app.services.logging_service import LoggingService, init_worker_logging
 
 
 def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, game_black: str, 
@@ -247,6 +247,8 @@ class PlayerStatsService:
         Returns:
             Tuple of (AggregatedPlayerStats instance, List[GameSummary]) or (None, []) if no analyzed games found.
         """
+        logging_service = LoggingService.get_instance()
+        
         if not games:
             return (None, [])
         
@@ -255,6 +257,9 @@ class PlayerStatsService:
         if not analyzed_games:
             return (None, [])
         
+        total_games = len(analyzed_games)
+        logging_service.debug(f"Starting player stats aggregation: player={player_name}, games={total_games}")
+        
         # Calculate number of worker processes (reserve 1-2 cores for UI)
         cpu_count = os.cpu_count() or 4
         max_workers = max(1, cpu_count - 2)
@@ -262,11 +267,15 @@ class PlayerStatsService:
         # Process games in parallel
         game_results: List[Dict[str, Any]] = []
         completed_count = 0
-        total_games = len(analyzed_games)
         
         executor = None
         try:
-            executor = ProcessPoolExecutor(max_workers=max_workers)
+            log_queue = LoggingService.get_queue()
+            executor = ProcessPoolExecutor(
+                max_workers=max_workers,
+                initializer=init_worker_logging,
+                initargs=(log_queue,)
+            )
             # Submit all games for processing
             future_to_game = {
                 executor.submit(
@@ -320,6 +329,7 @@ class PlayerStatsService:
                 executor.shutdown(wait=True)
         
         if not game_results:
+            logging_service.debug(f"Player stats aggregation completed: player={player_name}, games_processed=0, no_results")
             return (None, [])
         
         # Extract game summaries for return
@@ -603,6 +613,8 @@ class PlayerStatsService:
             worst_accuracy_openings=worst_openings_list,
             best_accuracy_openings=best_openings_list
         )
+        
+        logging_service.debug(f"Completed player stats aggregation: player={player_name}, games={total_games}, wins={wins}, draws={draws}, losses={losses}, win_rate={win_rate:.1f}%")
         
         return (aggregated_stats, game_summaries)
 

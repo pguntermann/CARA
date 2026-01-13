@@ -793,34 +793,44 @@ class ManualAnalysisEngineService(QObject):
             keep_engine_alive: If True, stop analysis but don't shutdown the engine process.
                               This is used when the same engine is needed by another service.
         """
-        if self.analysis_thread:
-            # Disconnect signals to prevent pending updates from being emitted
-            try:
-                self.analysis_thread.line_update.disconnect()
-            except Exception:
-                pass
-            try:
-                self.analysis_thread.error_occurred.disconnect()
-            except Exception:
-                pass
-            
-            if keep_engine_alive:
-                # Stop thread but keep engine process alive
-                self.analysis_thread._keep_engine_alive = True
-                self.analysis_thread.running = False
-                self.analysis_thread._stop_requested = True
-                if self.analysis_thread.uci and self.analysis_thread.uci.is_process_alive():
-                    self.analysis_thread.uci.stop_search()
-                # Don't wait - let thread exit naturally, cleanup will be skipped due to flag
-                self.analysis_thread = None
-            else:
-                # Normal shutdown - terminate engine process
-                # Set flags to stop the thread, it will exit naturally and cleanup in finally block
-                self.analysis_thread._keep_engine_alive = False
-                self.analysis_thread.running = False
-                self.analysis_thread._stop_requested = True
-                if self.analysis_thread.uci and self.analysis_thread.uci.is_process_alive():
-                    self.analysis_thread.uci.stop_search()
-                # Don't wait - let thread exit naturally, cleanup will happen in finally block
-                self.analysis_thread = None
+        logging_service = LoggingService.get_instance()
+        logging_service.debug(f"Manual analysis stop_analysis called, keep_engine_alive={keep_engine_alive}, analysis_thread={'exists' if self.analysis_thread else 'None'}")
+        
+        if not self.analysis_thread:
+            return
+        
+        # Log shutdown message (always log, regardless of keep_engine_alive)
+        multipv = self.analysis_thread.multipv if self.analysis_thread else 1
+        engine_path = self.current_engine_path or (self.analysis_thread.engine_path if self.analysis_thread else None)
+        logging_service.info(f"Manual analysis engine thread shutdown: path={engine_path}, multipv={multipv}")
+        
+        # Disconnect signals to prevent pending updates from being emitted
+        try:
+            self.analysis_thread.line_update.disconnect()
+        except Exception:
+            pass
+        try:
+            self.analysis_thread.error_occurred.disconnect()
+        except Exception:
+            pass
+        
+        if keep_engine_alive:
+            # Stop thread but keep engine process alive
+            self.analysis_thread._keep_engine_alive = True
+            self.analysis_thread.running = False
+            self.analysis_thread._stop_requested = True
+            if self.analysis_thread.uci and self.analysis_thread.uci.is_process_alive():
+                self.analysis_thread.uci.stop_search()
+            # Don't wait - let thread exit naturally, cleanup will be skipped due to flag
+            self.analysis_thread = None
+        else:
+            # Normal shutdown - terminate engine process
+            # Set flags to stop the thread, it will exit naturally and cleanup in finally block
+            self.analysis_thread._keep_engine_alive = False
+            self.analysis_thread.running = False
+            self.analysis_thread._stop_requested = True
+            if self.analysis_thread.uci and self.analysis_thread.uci.is_process_alive():
+                self.analysis_thread.uci.stop_search()
+            # Don't wait - let thread exit naturally, cleanup will happen in finally block
+            self.analysis_thread = None
 

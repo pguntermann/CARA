@@ -103,7 +103,10 @@ class GameAnalysisEngineThread(QThread):
             self.uci.stop_search()
     
     def shutdown(self) -> None:
-        """Shutdown engine process."""
+        """Shutdown engine process.
+        
+        Sets flags to stop the thread. Cleanup will be handled by the thread's finally block.
+        """
         self.running = False
         self._stop_requested = True
         # Clear queue
@@ -112,8 +115,7 @@ class GameAnalysisEngineThread(QThread):
                 self._analysis_queue.get_nowait()
             except queue.Empty:
                 break
-        if self.uci:
-            self.uci.cleanup()
+        # Note: cleanup() is called in run()'s finally block, not here
     
     def run(self) -> None:
         """Run engine analysis thread - processes queue of positions."""
@@ -180,9 +182,7 @@ class GameAnalysisEngineThread(QThread):
                     self.error_occurred.emit(f"Error processing analysis queue: {str(e)}")
                     break
             
-            # Cleanup
-            if self.uci:
-                self.uci.cleanup()
+            # Note: cleanup is handled in finally block below
         
         except Exception as e:
             self.error_occurred.emit(f"Error in analysis thread: {str(e)}")
@@ -634,6 +634,7 @@ class GameAnalysisEngineService(QObject):
             if self.analysis_thread.isRunning():
                 self.analysis_thread.shutdown()
             # Don't wait - let thread exit naturally, cleanup will happen in finally block
+            # Qt will handle thread cleanup when the object is garbage collected
             self.analysis_thread = None
     
     def cleanup(self) -> None:

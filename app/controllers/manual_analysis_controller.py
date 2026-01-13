@@ -286,20 +286,13 @@ class ManualAnalysisController:
                 self.game_controller.board_controller.get_board_model().show_evaluation_bar):
             self.progress_service.hide_progress()
         
-        # Check if evaluation uses the same engine - if so, coordinate shutdown
-        same_engine = False
-        if self._evaluation_controller:
-            evaluation_engine_id = self._evaluation_controller.engine_controller.get_engine_assignment(TASK_EVALUATION)
-            if self._current_engine_id and evaluation_engine_id and self._current_engine_id == evaluation_engine_id:
-                same_engine = True
-        
         # Log manual analysis stopped
         logging_service = LoggingService.get_instance()
         logging_service.info("Manual analysis stopped")
         
         # Stop service in background (non-blocking) using QTimer
-        # Pass same_engine flag to coordinate shutdown
-        QTimer.singleShot(0, lambda: self._stop_service_in_background(same_engine))
+        # Always shut down the engine when user stops manual analysis
+        QTimer.singleShot(0, lambda: self._stop_service_in_background(keep_engine_alive=False))
         
         # If evaluation bar is visible and using manual analysis, switch it back to evaluation engine
         if self._evaluation_controller:
@@ -408,13 +401,14 @@ class ManualAnalysisController:
         # Clear expected FEN - no longer expecting updates
         self._expected_fen = None
     
-    def _stop_service_in_background(self, same_engine: bool = False) -> None:
+    def _stop_service_in_background(self, keep_engine_alive: bool = False) -> None:
         """Stop analysis service in background (non-blocking).
         
         Args:
-            same_engine: If True, stop analysis but keep engine process alive for evaluation to reuse.
+            keep_engine_alive: If True, stop analysis but keep engine process alive (not used currently).
         """
-        self.analysis_service.stop_analysis(keep_engine_alive=same_engine)
+        if self.analysis_service:
+            self.analysis_service.stop_analysis(keep_engine_alive=keep_engine_alive)
     
     def update_position(self, fen: str) -> None:
         """Update analysis position.

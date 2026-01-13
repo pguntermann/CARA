@@ -3,12 +3,15 @@
 import chess.pgn
 import io
 import json
+import multiprocessing
 import os
 import re
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Callable, Tuple
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
+
+from app.services.logging_service import LoggingService, init_worker_logging
 
 
 class PgnParseResult:
@@ -77,6 +80,10 @@ class PgnService:
         Returns:
             Normalized PGN text string.
         """
+        logging_service = LoggingService.get_instance()
+        input_size = len(pgn_text)
+        logging_service.debug(f"Starting PGN normalization: input_size={input_size} characters")
+        
         # Strip trailing whitespace/newlines to avoid parsing empty games
         pgn_text = pgn_text.rstrip()
         
@@ -184,7 +191,10 @@ class PgnService:
                 )
         
         # Join back with single newlines
-        return '\n'.join(normalized_lines)
+        normalized_text = '\n'.join(normalized_lines)
+        output_size = len(normalized_text)
+        logging_service.debug(f"Completed PGN normalization: output_size={output_size} characters")
+        return normalized_text
     
     @staticmethod
     def _detect_game_boundaries(normalized_pgn: str, progress_callback: Optional[Callable[[int, str], None]] = None,
@@ -209,6 +219,10 @@ class PgnService:
         Returns:
             List of (start_index, end_index) tuples for each game (line indices).
         """
+        logging_service = LoggingService.get_instance()
+        input_size = len(normalized_pgn)
+        logging_service.debug(f"Starting game boundary detection: input_size={input_size} characters")
+        
         boundaries = []
         lines = normalized_pgn.split('\n')
         total_lines = len(lines)
@@ -467,6 +481,8 @@ class PgnService:
                     f"Detecting game boundaries... (found {game_count} game(s))"
                 )
         
+        games_detected = len(boundaries)
+        logging_service.debug(f"Completed game boundary detection: games_detected={games_detected}")
         return boundaries
     
     @staticmethod
@@ -559,7 +575,12 @@ class PgnService:
             
             executor = None
             try:
-                executor = ProcessPoolExecutor(max_workers=max_workers)
+                log_queue = LoggingService.get_queue()
+                executor = ProcessPoolExecutor(
+                    max_workers=max_workers,
+                    initializer=init_worker_logging,
+                    initargs=(log_queue,)
+                )
                 
                 # Submit all chunks for processing
                 future_to_index = {
