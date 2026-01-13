@@ -61,8 +61,7 @@ class ConfigLoader:
         try:
             from app.services.logging_service import LoggingService
             logging_service = LoggingService.get_instance(self._config)
-            key_count = len(self._config) if isinstance(self._config, dict) else 0
-            logging_service.info(f"Configuration loaded: path={self.config_path}, {key_count} key(s), validation=passed")
+            logging_service.info(f"Configuration loaded: path={self.config_path}, validation=passed")
         except Exception:
             pass  # Silently ignore if logging not available during config loading
         

@@ -41,7 +41,7 @@ class LoggingService:
         self._shutdown_event = threading.Event()
         self._initialized = False
         self._log_path: Optional[Path] = None
-        self._is_portable_mode: bool = False
+        self._instance_lock = threading.Lock()
         
         # Load configuration
         self._load_config()
@@ -62,8 +62,9 @@ class LoggingService:
                     cls._instance = cls(config)
         elif config is not None:
             # Update config if instance already exists
-            cls._instance.config = config
-            cls._instance._load_config()
+            with cls._instance._instance_lock:
+                cls._instance.config = config
+                cls._instance._load_config()
         return cls._instance
     
     def _load_config(self) -> None:
@@ -93,6 +94,7 @@ class LoggingService:
         """Initialize the logging service.
         
         Must be called before using the service. Sets up logger, handlers, and worker thread.
+        Must be called with _instance_lock held.
         """
         # Reload config in case it was updated
         old_file_enabled = getattr(self, '_file_enabled', None)
@@ -107,7 +109,6 @@ class LoggingService:
                     handler.close()
                     handler.flush()
                     self._log_path = None
-                    self._is_portable_mode = False
         
         if self._initialized:
             # If already initialized, update handlers based on new config
@@ -135,7 +136,6 @@ class LoggingService:
                             handler.flush()  # Ensure any pending writes are flushed
                             # Clear log path reference
                             self._log_path = None
-                            self._is_portable_mode = False
                 
                 # Add handlers if they're enabled but don't exist
                 has_console_handler = any(
@@ -173,10 +173,9 @@ class LoggingService:
                         else:
                             timestamped_filename = f"{base_filename}_{timestamp}"
                         
-                        # Resolve log file path
-                        log_path, is_portable = resolve_data_file_path(timestamped_filename)
+                        # Resolve log file path - rely entirely on path_resolver's result
+                        log_path, _ = resolve_data_file_path(timestamped_filename)
                         self._log_path = log_path
-                        self._is_portable_mode = is_portable
                         
                         # Ensure directory exists
                         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -246,9 +245,9 @@ class LoggingService:
                     timestamped_filename = f"{base_filename}_{timestamp}"
                 
                 # Resolve log file path using same pattern as user settings
-                log_path, is_portable = resolve_data_file_path(timestamped_filename)
+                # Rely entirely on path_resolver's result
+                log_path, _ = resolve_data_file_path(timestamped_filename)
                 self._log_path = log_path
-                self._is_portable_mode = is_portable
                 
                 # Ensure directory exists
                 log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -285,12 +284,16 @@ class LoggingService:
         )
         self._worker_thread.start()
         
+        # Give worker thread a moment to start processing
+        # This ensures it's ready when we start logging
+        import time
+        time.sleep(0.01)  # 10ms should be enough for thread to start
+        
         self._initialized = True
         
         # Log the resolved log file path (now that logging is initialized)
         if self._file_enabled and self._log_path:
-            mode_str = "portable (app_root)" if self._is_portable_mode else "user_data_directory"
-            self.debug(f"Log file path resolved: filename={self._log_filename}, path={self._log_path}, mode={mode_str}")
+            self.debug(f"Log file path resolved: filename={self._log_filename}, path={self._log_path}")
     
     def _get_log_level(self, level_str: str) -> int:
         """Convert log level string to logging constant.
@@ -311,6 +314,7 @@ class LoggingService:
     
     def _log_worker(self) -> None:
         """Background worker thread that processes log messages from queue."""
+        _error_logged = False  # Track if we've logged an error to prevent infinite loops
         while not self._shutdown_event.is_set():
             try:
                 # Get message from queue with timeout to allow checking shutdown event
@@ -321,13 +325,33 @@ class LoggingService:
                 
                 # Process the log record
                 if self._logger:
-                    self._logger.handle(log_record)
+                    try:
+                        self._logger.handle(log_record)
+                    except Exception as e:
+                        # Log error only once to prevent infinite loops
+                        if not _error_logged:
+                            _error_logged = True
+                            try:
+                                import sys
+                                print(f"[LoggingService] Error processing log record: {e}", file=sys.stderr)
+                                import traceback
+                                traceback.print_exc(file=sys.stderr)
+                            except Exception:
+                                pass  # Absolute fallback - can't even print
                 
                 # Mark task as done
                 self._log_queue.task_done()
-            except Exception:
-                # Silently ignore errors in logging worker to prevent infinite loops
-                pass
+            except Exception as e:
+                # Log error only once to prevent infinite loops
+                if not _error_logged:
+                    _error_logged = True
+                    try:
+                        import sys
+                        print(f"[LoggingService] Error in log worker: {e}", file=sys.stderr)
+                        import traceback
+                        traceback.print_exc(file=sys.stderr)
+                    except Exception:
+                        pass  # Absolute fallback - can't even print
     
     def _log(self, level: int, message: str, exc_info: Optional[Exception] = None) -> None:
         """Internal logging method that enqueues log messages.
@@ -337,9 +361,11 @@ class LoggingService:
             message: Log message.
             exc_info: Optional exception info for error logging.
         """
-        # Auto-initialize on first use if not already initialized
+        # Auto-initialize on first use if not already initialized (thread-safe)
         if not self._initialized:
-            self.initialize()
+            with self._instance_lock:
+                if not self._initialized:
+                    self.initialize()
         
         # Early exit if both handlers are disabled to reduce overhead
         if not self._console_enabled and not self._file_enabled:
@@ -354,15 +380,52 @@ class LoggingService:
         # Create log record with thread information
         # Use makeRecord to automatically capture thread info (threadName, thread)
         import threading
-        record = self._logger.makeRecord(
-            self._logger.name,
-            level,
-            __file__,
-            0,  # lineno - not meaningful for programmatic calls
-            message,
-            (),
-            exc_info
-        )
+        import sys
+        try:
+            # Convert exc_info to proper format for makeRecord
+            # makeRecord expects: None, True, or (type, value, traceback) tuple
+            exc_info_param = exc_info
+            if exc_info is not None and isinstance(exc_info, Exception):
+                # Check if exception has traceback info
+                traceback = getattr(exc_info, '__traceback__', None)
+                if traceback is not None:
+                    # Has traceback - convert to tuple format
+                    exc_info_param = (type(exc_info), exc_info, traceback)
+                else:
+                    # No traceback (manually created exception) - include exception info in message instead
+                    # makeRecord may not handle tuple with None traceback well
+                    message = f"{message}\nException: {type(exc_info).__name__}: {exc_info}"
+                    exc_info_param = None
+            
+            record = self._logger.makeRecord(
+                self._logger.name,
+                level,
+                __file__,
+                0,  # lineno - not meaningful for programmatic calls
+                message,
+                (),
+                exc_info_param
+            )
+        except Exception as e:
+            # If record creation fails, try without exc_info
+            try:
+                record = self._logger.makeRecord(
+                    self._logger.name,
+                    level,
+                    __file__,
+                    0,
+                    f"{message} [Failed to include exception info: {e}]",
+                    (),
+                    None
+                )
+            except Exception:
+                # If that also fails, fall back to direct print
+                if level >= logging.WARNING:
+                    print(f"[FALLBACK] {message}", file=sys.stderr)
+                    if exc_info:
+                        import traceback
+                        traceback.print_exc(file=sys.stderr)
+                return
         # Ensure thread name is preserved (makeRecord captures it, but we verify)
         # The threadName should already be set by makeRecord, but we ensure it's correct
         if not hasattr(record, 'threadName') or not record.threadName:
@@ -416,27 +479,41 @@ class LoggingService:
         
         Flushes all pending log messages and stops the worker thread.
         """
-        if not self._initialized:
-            return
-        
-        # Signal shutdown
-        self._shutdown_event.set()
-        
-        # Wait for queue to empty (with timeout)
-        if self._log_queue:
-            try:
-                self._log_queue.join(timeout=2.0)
-            except Exception:
-                pass
-        
-        # Wait for worker thread to finish
-        if self._worker_thread and self._worker_thread.is_alive():
-            self._worker_thread.join(timeout=1.0)
-        
-        # Close all handlers
-        if self._logger:
-            for handler in self._logger.handlers[:]:
-                handler.close()
-                self._logger.removeHandler(handler)
-        
-        self._initialized = False
+        with self._instance_lock:
+            if not self._initialized:
+                return
+            
+            # Wait for queue to empty BEFORE signaling shutdown
+            # This ensures all queued messages are processed
+            if self._log_queue and self._worker_thread:
+                import time
+                # Give worker thread a moment to start processing if it just started
+                if self._worker_thread.is_alive():
+                    # Wait a bit for worker to start processing
+                    time.sleep(0.05)
+                    
+                    # Now wait for queue to actually empty
+                    try:
+                        self._log_queue.join(timeout=2.0)
+                    except Exception:
+                        pass
+                
+                # Flush all handlers to ensure output is written
+                if self._logger:
+                    for handler in self._logger.handlers[:]:
+                        handler.flush()
+            
+            # Signal shutdown AFTER queue is empty
+            self._shutdown_event.set()
+            
+            # Wait for worker thread to finish
+            if self._worker_thread and self._worker_thread.is_alive():
+                self._worker_thread.join(timeout=1.0)
+            
+            # Close all handlers
+            if self._logger:
+                for handler in self._logger.handlers[:]:
+                    handler.close()
+                    self._logger.removeHandler(handler)
+            
+            self._initialized = False

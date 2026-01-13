@@ -594,7 +594,17 @@ class UCICommunicationService:
                 self._debug_lifecycle("ERROR", f"Error killing process: {str(e)}")
     
     def cleanup(self) -> None:
-        """Clean up resources."""
+        """Clean up resources.
+        
+        Safe to call multiple times - will only clean up once.
+        """
+        # Idempotent: if already cleaned up, return early
+        if self.process is None:
+            return
+        
+        # Capture PID before cleanup for logging
+        process_pid = self.process.pid if self.process else None
+        
         if self.process:
             was_alive = self.process.poll() is None
             if was_alive:
@@ -636,7 +646,8 @@ class UCICommunicationService:
         # Log engine cleanup
         logging_service = LoggingService.get_instance()
         identifier_str = f" [{self.identifier}]" if self.identifier else ""
-        logging_service.info(f"Engine process cleaned up{identifier_str}: path={self.engine_path}")
+        pid_str = f", PID={process_pid}" if process_pid is not None else ""
+        logging_service.info(f"Engine process cleaned up{identifier_str}: path={self.engine_path}{pid_str}")
         
         self._initialized = False
         self._uciok_received = False

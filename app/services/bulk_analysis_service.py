@@ -147,7 +147,7 @@ class BulkAnalysisService(QObject):
         self._cancelled = True
         if self._engine_service:
             self._engine_service.stop_analysis()
-            self._engine_service.cleanup()
+            # Note: cleanup() is called in finally block, not here
     
     def cleanup(self) -> None:
         """Cleanup engine service after analysis completes normally."""

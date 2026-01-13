@@ -56,6 +56,13 @@ class DatabasePanelModel(QObject):
             database: DatabaseModel instance to set as active, or None to clear.
         """
         if self._active_database != database:
+            # Debug log: active database change
+            from app.services.logging_service import LoggingService
+            logging_service = LoggingService.get_instance()
+            old_identifier = self.find_database_by_model(self._active_database) if self._active_database else "None"
+            new_identifier = self.find_database_by_model(database) if database else "None"
+            logging_service.debug(f"Active database changed: {old_identifier} -> {new_identifier}")
+            
             self._active_database = database
             self.active_database_changed.emit(database)
     

@@ -53,6 +53,11 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.config = config
         
+        # Debug log: MainWindow initialization started
+        from app.services.logging_service import LoggingService
+        logging_service = LoggingService.get_instance()
+        logging_service.debug("MainWindow initialization started")
+        
         # Initialize controller
         # Note: user_settings_service will be set after column profile controller is created
         # We'll update it in _load_user_settings
@@ -132,6 +137,12 @@ class MainWindow(QMainWindow):
     
     def _setup_menu_bar(self) -> None:
         """Setup the menu bar with menu items."""
+        
+        # Debug log
+        from app.services.logging_service import LoggingService
+        logging_service = LoggingService.get_instance()
+        logging_service.debug("Setting up menus")
+        
         menu_bar = self.menuBar()
         
         # Apply menu bar styling from config
@@ -2314,6 +2325,12 @@ class MainWindow(QMainWindow):
     
     def _setup_ui(self) -> None:
         """Setup the UI layout with four panels."""
+        
+        # Debug log
+        from app.services.logging_service import LoggingService
+        logging_service = LoggingService.get_instance()
+        logging_service.debug("Setting up UI")
+        
         # Central widget container
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -2604,6 +2621,12 @@ class MainWindow(QMainWindow):
     
     def _setup_shortcuts(self) -> None:
         """Setup global keyboard shortcuts."""
+
+        # Debug log
+        from app.services.logging_service import LoggingService
+        logging_service = LoggingService.get_instance()
+        logging_service.debug("Setting up shortcuts")
+
         # Initialize shortcut manager with MainWindow as parent
         shortcut_manager = ShortcutManager(self)
         

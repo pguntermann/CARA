@@ -43,6 +43,13 @@ class GameModel(QObject):
             game: GameData instance to set as active, or None to clear active game.
         """
         if self._active_game != game:
+            # Debug log: active game change
+            from app.services.logging_service import LoggingService
+            logging_service = LoggingService.get_instance()
+            old_identifier = self._get_game_identifier(self._active_game) if self._active_game else "None"
+            new_identifier = self._get_game_identifier(game) if game else "None"
+            logging_service.debug(f"Active game changed: {old_identifier} -> {new_identifier}")
+            
             self._active_game = game
             # Reset analysis flag when active game changes
             self._set_is_game_analyzed(False)
@@ -108,4 +115,22 @@ class GameModel(QObject):
         if self._active_game is not None:
             # Re-emit the signal to trigger view updates
             self.active_game_changed.emit(self._active_game)
+    
+    def _get_game_identifier(self, game: GameData) -> str:
+        """Get a string identifier for a game.
+        
+        Args:
+            game: GameData instance.
+            
+        Returns:
+            String identifier (e.g., "#1 White vs Black" or "#1" if players unknown).
+        """
+        if game is None:
+            return "None"
+        identifier = f"#{game.game_number}"
+        if game.white or game.black:
+            white = game.white or "?"
+            black = game.black or "?"
+            identifier += f" {white} vs {black}"
+        return identifier
 

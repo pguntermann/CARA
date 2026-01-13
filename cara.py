@@ -37,6 +37,8 @@ def _qt_message_handler(msg_type: QtMsgType, context, message: str) -> None:
 
 def main() -> None:
     """Run CARA: Chess Analysis Review Application."""
+
+    
     # Suppress harmless Qt font warnings before creating QApplication
     qInstallMessageHandler(_qt_message_handler)
     
