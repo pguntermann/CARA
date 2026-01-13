@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QGridLayout, QSizePolicy, QComboBox, QPushButton, QApplication,
     QGraphicsOpacityEffect, QMenu
 )
-from PyQt6.QtCore import Qt, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QThread, pyqtSignal, QMutex, QMutexLocker, QPoint
+from PyQt6.QtCore import Qt, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QPoint
 from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QFontMetrics, QContextMenuEvent
 from app.views.detail_summary_view import PieChartWidget
 from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING
@@ -23,219 +23,6 @@ if TYPE_CHECKING:
     from app.services.error_pattern_service import ErrorPattern
 
 
-
-
-class PlayerDropdownWorker(QThread):
-    """Worker thread for populating player dropdown asynchronously."""
-    
-    players_ready = pyqtSignal(list)  # List of (player_name, game_count, analyzed_count) tuples
-    progress_update = pyqtSignal(int, str)  # progress_percent, status_message
-    
-    def __init__(self, stats_controller: "PlayerStatsController", use_all_databases: bool) -> None:
-        """Initialize the dropdown worker.
-        
-        Args:
-            stats_controller: PlayerStatsController instance.
-            use_all_databases: Whether to use all databases or just active.
-        """
-        super().__init__()
-        self.stats_controller = stats_controller
-        self.use_all_databases = use_all_databases
-        self._cancelled = False
-        self._mutex = QMutex()
-    
-    def cancel(self) -> None:
-        """Cancel the worker."""
-        with QMutexLocker(self._mutex):
-            self._cancelled = True
-    
-    def _is_cancelled(self) -> bool:
-        """Check if worker is cancelled."""
-        with QMutexLocker(self._mutex):
-            return self._cancelled
-    
-    def run(self) -> None:
-        """Run the worker to populate dropdown."""
-        try:
-            if self._is_cancelled():
-                return
-            
-            self.progress_update.emit(10, "Collecting player names...")
-            
-            # Get unique players
-            players = self.stats_controller.get_unique_players(self.use_all_databases)
-            
-            if self._is_cancelled() or not players:
-                self.players_ready.emit([])
-                return
-            
-            # Filter to only include players with at least 2 analyzed games
-            players_with_analyzed = []
-            total_players = len(players)
-            
-            # Cache databases once at the start to avoid repeated get_active_database() calls
-            if self.use_all_databases:
-                panel_model = self.stats_controller._database_controller.get_panel_model()
-                cached_databases = panel_model.get_all_database_models()
-            else:
-                active_db = self.stats_controller._database_controller.get_active_database()
-                cached_databases = [active_db] if active_db else []
-            
-            for idx, (player_name, game_count) in enumerate(players):
-                if self._is_cancelled():
-                    return
-                
-                # Update progress
-                progress_percent = 10 + int((idx / total_players) * 80)
-                self.progress_update.emit(progress_percent, f"Checking players: {idx + 1}/{total_players}...")
-                
-                # Check if this player has at least 2 analyzed games
-                # Use cached databases to avoid repeated get_active_database() calls
-                analyzed_count, _ = self.stats_controller.get_analyzed_game_count_with_databases(
-                    player_name,
-                    cached_databases
-                )
-                
-                if analyzed_count >= 2:
-                    players_with_analyzed.append((player_name, game_count, analyzed_count))
-            
-            if not self._is_cancelled():
-                try:
-                    self.progress_update.emit(100, f"Found {len(players_with_analyzed)} player(s)")
-                    self.players_ready.emit(players_with_analyzed)
-                except RuntimeError:
-                    # Receiver might be deleted, ignore
-                    pass
-        
-        except Exception as e:
-            # Emit empty list on error
-            logging_service = LoggingService.get_instance()
-            logging_service.error(f"Error in PlayerDropdownWorker: {e}", exc_info=e)
-            self.players_ready.emit([])
-
-
-class PlayerStatsCalculationWorker(QThread):
-    """Worker thread for calculating player statistics asynchronously."""
-    
-    stats_ready = pyqtSignal(object, list, list)  # AggregatedPlayerStats, List[ErrorPattern], List[GameSummary]
-    stats_unavailable = pyqtSignal(str)  # Reason key
-    progress_update = pyqtSignal(int, str)  # progress_percent, status_message
-    
-    def __init__(self, stats_controller: "PlayerStatsController", player_name: str, use_all_databases: bool) -> None:
-        """Initialize the stats calculation worker.
-        
-        Args:
-            stats_controller: PlayerStatsController instance.
-            player_name: Player name to analyze.
-            use_all_databases: Whether to use all databases or just active.
-        """
-        super().__init__()
-        self.stats_controller = stats_controller
-        self.player_name = player_name
-        self.use_all_databases = use_all_databases
-        self._cancelled = False
-        self._mutex = QMutex()
-    
-    def cancel(self) -> None:
-        """Cancel the worker."""
-        with QMutexLocker(self._mutex):
-            self._cancelled = True
-    
-    def _is_cancelled(self) -> bool:
-        """Check if worker is cancelled."""
-        with QMutexLocker(self._mutex):
-            return self._cancelled
-    
-    def run(self) -> None:
-        """Run the worker to calculate statistics."""
-        try:
-            if self._is_cancelled():
-                return
-            
-            if not self.player_name or not self.player_name.strip():
-                self.stats_unavailable.emit("no_player")
-                return
-            
-            # Get databases
-            self.progress_update.emit(5, "Loading databases...")
-            
-            if self.use_all_databases:
-                panel_model = self.stats_controller._database_controller.get_panel_model()
-                databases = panel_model.get_all_database_models()
-            else:
-                active_db = self.stats_controller._database_controller.get_active_database()
-                databases = [active_db] if active_db else []
-            
-            if self._is_cancelled():
-                return
-            
-            if not databases:
-                self.stats_unavailable.emit("no_database")
-                return
-            
-            # Get player games
-            self.progress_update.emit(10, "Finding player games...")
-            
-            player_games, total_count = self.stats_controller.player_stats_service.get_player_games(
-                self.player_name, databases, only_analyzed=False
-            )
-            
-            if self._is_cancelled():
-                return
-            
-            if not player_games:
-                self.stats_unavailable.emit("player_not_found")
-                return
-            
-            # Separate analyzed and unanalyzed
-            analyzed_games = [g for g in player_games if g.analyzed]
-            if not analyzed_games:
-                self.stats_unavailable.emit("no_analyzed_games")
-                return
-            
-            # Aggregate statistics (includes parallel game summary calculation)
-            self.progress_update.emit(20, f"Aggregating statistics from {len(analyzed_games)} game(s)...")
-            
-            # Define progress callback for parallel processing
-            def progress_callback(completed: int, status: str) -> None:
-                if not self._is_cancelled():
-                    self.progress_update.emit(completed, status)
-            
-            # Define cancellation check function
-            def cancellation_check() -> bool:
-                return self._is_cancelled()
-            
-            aggregated_stats, game_summaries = self.stats_controller.player_stats_service.aggregate_player_statistics(
-                self.player_name, analyzed_games, self.stats_controller._game_controller, progress_callback, cancellation_check
-            )
-            
-            if self._is_cancelled():
-                return
-            
-            if not aggregated_stats:
-                self.stats_unavailable.emit("calculation_error")
-                return
-            
-            # Detect error patterns (using summaries already calculated in parallel)
-            self.progress_update.emit(90, "Detecting error patterns...")
-            
-            error_patterns = self.stats_controller.error_pattern_service.detect_error_patterns(
-                self.player_name, analyzed_games, aggregated_stats, game_summaries
-            )
-            
-            if not self._is_cancelled():
-                try:
-                    self.progress_update.emit(100, f"Statistics calculated for {self.player_name}")
-                    self.stats_ready.emit(aggregated_stats, error_patterns, game_summaries)
-                except RuntimeError:
-                    # Receiver might be deleted, ignore
-                    pass
-        
-        except Exception as e:
-            # Emit error signal
-            logging_service = LoggingService.get_instance()
-            logging_service.error(f"Error in PlayerStatsCalculationWorker: {e}", exc_info=e)
-            self.stats_unavailable.emit("error")
 
 
 class PhaseBarChartWidget(QWidget):
@@ -386,20 +173,6 @@ class DetailPlayerStatsView(QWidget):
         
         self.current_stats: Optional["AggregatedPlayerStats"] = None
         self.current_patterns: List["ErrorPattern"] = []
-        self._current_player: Optional[str] = None
-        self._use_all_databases: bool = False
-        self._last_unavailable_reason: str = "no_player"
-        
-        # Async workers
-        self._dropdown_worker: Optional[PlayerDropdownWorker] = None
-        self._stats_worker: Optional[PlayerStatsCalculationWorker] = None
-        
-        # Database change tracking
-        self._connected_databases: List[DatabaseModel] = []
-        self._database_update_timer = QTimer()
-        self._database_update_timer.setSingleShot(True)
-        self._database_update_timer.timeout.connect(self._on_database_update_debounced)
-        self._database_update_debounce_ms = 500  # Debounce database updates by 500ms
         
         # Get player stats config
         ui_config = self.config.get('ui', {})
@@ -434,13 +207,6 @@ class DetailPlayerStatsView(QWidget):
         if stats_controller:
             self.set_stats_controller(stats_controller)
         
-        # Connect to database panel model for active database changes
-        # Note: This might be None initially, connection will be set up when controller is available
-        self._connect_to_database_panel_model()
-        
-        # Connect to database change signals for automatic updates
-        self._connect_to_database_changes()
-        
         # Responsive width handling
         self._move_accuracy_widget: Optional[QWidget] = None
         self._pie_chart_widget: Optional[QWidget] = None
@@ -471,46 +237,8 @@ class DetailPlayerStatsView(QWidget):
     
     def cleanup(self) -> None:
         """Clean up resources when view is being destroyed."""
-        # Stop timer first
-        self._database_update_timer.stop()
-        
-        # Cancel and wait for workers
-        if self._dropdown_worker:
-            if self._dropdown_worker.isRunning():
-                self._dropdown_worker.cancel()
-                self._dropdown_worker.wait(3000)  # Wait up to 3 seconds
-            # Disconnect signals before deleting
-            try:
-                self._dropdown_worker.players_ready.disconnect()
-                self._dropdown_worker.progress_update.disconnect()
-                self._dropdown_worker.finished.disconnect()
-            except (RuntimeError, TypeError):
-                pass
-            self._dropdown_worker.deleteLater()
-            self._dropdown_worker = None
-        
-        if self._stats_worker:
-            if self._stats_worker.isRunning():
-                self._stats_worker.cancel()
-                self._stats_worker.wait(10000)  # Wait up to 10 seconds for ProcessPoolExecutor shutdown
-            # Disconnect signals before deleting
-            try:
-                self._stats_worker.stats_ready.disconnect()
-                self._stats_worker.stats_unavailable.disconnect()
-                self._stats_worker.progress_update.disconnect()
-                self._stats_worker.finished.disconnect()
-            except (RuntimeError, TypeError):
-                pass
-            self._stats_worker.deleteLater()
-            self._stats_worker = None
-        
-        # Disconnect from databases
-        for database in self._connected_databases:
-            try:
-                database.dataChanged.disconnect(self._on_database_data_changed)
-            except (RuntimeError, TypeError):
-                pass
-        self._connected_databases.clear()
+        # Controller handles worker cleanup
+        pass
     
     def _setup_ui(self) -> None:
         """Setup the player stats UI."""
@@ -605,29 +333,39 @@ class DetailPlayerStatsView(QWidget):
             try:
                 self._stats_controller.stats_updated.disconnect(self._handle_stats_updated)
                 self._stats_controller.stats_unavailable.disconnect(self._handle_stats_unavailable)
+                self._stats_controller.players_ready.disconnect(self._on_players_ready)
+                self._stats_controller.player_selection_cleared.disconnect(self._on_player_selection_cleared)
+                self._stats_controller.source_selection_changed.disconnect(self._on_source_selection_changed)
             except (RuntimeError, TypeError):
                 pass
         
         self._stats_controller = stats_controller
         
         if self._stats_controller:
+            # Connect to controller signals
             self._stats_controller.stats_updated.connect(self._handle_stats_updated)
             self._stats_controller.stats_unavailable.connect(self._handle_stats_unavailable)
+            self._stats_controller.players_ready.connect(self._on_players_ready)
+            self._stats_controller.player_selection_cleared.connect(self._on_player_selection_cleared)
+            self._stats_controller.source_selection_changed.connect(self._on_source_selection_changed)
             
             # Update database controller reference if available
             if not self._database_controller and hasattr(self._stats_controller, '_database_controller'):
                 self._database_controller = self._stats_controller._database_controller
-                # Reconnect to database changes now that we have the controller
-                self._connect_to_database_changes()
-                self._connect_to_database_panel_model()
             
-            # Populate player dropdown if selection section already exists
-            # Use QTimer.singleShot to ensure this happens after the UI is fully set up
-            has_combo_attr = hasattr(self, 'player_combo')
-            if has_combo_attr:
-                combo_value = getattr(self, 'player_combo', None)
-                if combo_value is not None:
-                    QTimer.singleShot(100, self._populate_player_dropdown)
+            # Initialize source selection from controller
+            source_index = stats_controller.get_source_selection()
+            if hasattr(self, 'source_combo'):
+                if source_index != self.source_combo.currentIndex():
+                    self.source_combo.setCurrentIndex(source_index)
+            
+            # Populate player dropdown if selection section already exists and source is not None
+            if source_index != 0:
+                has_combo_attr = hasattr(self, 'player_combo')
+                if has_combo_attr:
+                    combo_value = getattr(self, 'player_combo', None)
+                    if combo_value is not None:
+                        QTimer.singleShot(100, lambda: stats_controller._schedule_dropdown_update())
     
     def _on_active_game_changed(self, game) -> None:
         """Handle active game change - auto-select player if available."""
@@ -970,7 +708,6 @@ class DetailPlayerStatsView(QWidget):
         self.source_combo.addItem("Active Database")
         self.source_combo.addItem("All Open Databases")
         self.source_combo.setCurrentIndex(0)  # Default to "None"
-        self._use_all_databases = False
         
         self.source_combo.currentIndexChanged.connect(self._on_source_changed)
         
@@ -1052,29 +789,12 @@ class DetailPlayerStatsView(QWidget):
         # Add placeholder after player selection (will be shown/hidden as needed)
         self.content_layout.addWidget(self.disabled_placeholder, 1)  # Give it stretch factor
         
-        # Populate player dropdown if controller is available
+        # Populate player dropdown if controller is available and source is not None
         # Use QTimer.singleShot to ensure this happens after the UI is fully set up
         if self._stats_controller:
-            QTimer.singleShot(100, self._populate_player_dropdown)
-    
-    def _populate_player_dropdown(self) -> None:
-        """Populate the player dropdown with available players asynchronously."""
-        if not self._stats_controller:
-            return
-        
-        # Don't populate if "None" is selected as data source
-        if hasattr(self, 'source_combo'):
-            source_index = self.source_combo.currentIndex()
-            if source_index == 0:
-                # "None" selected - don't populate
-                return
-        
-        # Update database controller reference if available
-        if not self._database_controller and hasattr(self._stats_controller, '_database_controller'):
-            self._database_controller = self._stats_controller._database_controller
-        
-        # Schedule async update
-        self._schedule_dropdown_update()
+            source_index = self._stats_controller.get_source_selection()
+            if source_index != 0:
+                QTimer.singleShot(100, lambda: self._stats_controller._schedule_dropdown_update())
     
     def _on_player_activated(self, index: int) -> None:
         """Handle player selection from dropdown (user clicked on item)."""
@@ -1084,7 +804,7 @@ class DetailPlayerStatsView(QWidget):
     
     def _on_player_selected(self, index: int = -1) -> None:
         """Handle player selection from combo box."""
-        if not hasattr(self, 'player_combo') or not self.player_combo:
+        if not self._stats_controller or not hasattr(self, 'player_combo') or not self.player_combo:
             return
         
         # Get selected index if not provided
@@ -1111,9 +831,8 @@ class DetailPlayerStatsView(QWidget):
                         self.player_combo.currentIndexChanged.connect(self._on_player_selected)
             
             if index == -1 or index < 0:
-                self._current_player = None
-                self._set_disabled_placeholder_visible(True, self.placeholder_text_no_player)
-                self._clear_stats_sections()
+                # Clear selection - call controller method
+                self._stats_controller.set_player_selection(None)
                 return
         
         # Get player name from combo box data
@@ -1126,9 +845,9 @@ class DetailPlayerStatsView(QWidget):
             else:
                 player_name = display_text.strip()
         
-        if player_name and player_name != self._current_player:
-            self._current_player = player_name
-            self._schedule_stats_recalculation()
+        # Call controller method to handle player selection
+        if player_name:
+            self._stats_controller.set_player_selection(player_name)
     
     def _apply_button_styling(self, button: QPushButton, error_pattern_button: bool = False) -> None:
         """Apply standard button styling from config using StyleManager.
@@ -1200,299 +919,24 @@ class DetailPlayerStatsView(QWidget):
     
     def _on_refresh_clicked(self) -> None:
         """Handle refresh button click."""
-        self._populate_player_dropdown()
+        if self._stats_controller:
+            self._stats_controller._schedule_dropdown_update()
     
     def _on_source_changed(self, index: int = -1) -> None:
         """Handle data source combobox change."""
+        if not self._stats_controller:
+            return
+        
         # Get selected index if not provided
         if index < 0:
             index = self.source_combo.currentIndex()
         
-        # Update flag: index 0 = None, index 1 = Active Database, index 2 = All Open Databases
-        if index == 0:
-            # "None" selected - disable updates
-            self._use_all_databases = False
-            # Clear player dropdown and stats
-            if hasattr(self, 'player_combo') and self.player_combo:
-                try:
-                    self.player_combo.currentIndexChanged.disconnect()
-                except (RuntimeError, TypeError):
-                    pass
-                self.player_combo.clear()
-                self.player_combo.currentIndexChanged.connect(self._on_player_selected)
-            self._current_player = None
-            self._clear_stats_sections()
-            self._set_disabled_placeholder_visible(True, self.placeholder_text_no_source)
-        else:
-            # "Active Database" (index 1) or "All Open Databases" (index 2) selected
-            self._use_all_databases = (index == 2)
-            
-            # Reconnect to database changes (different set of databases)
-            self._connect_to_database_changes()
-            
-            # Show loading placeholder to prevent layout shift while dropdown is being populated
-            loading_text = self.player_stats_config.get(
-                'placeholder_text_loading',
-                'Loading players...'
-            )
-            self._set_disabled_placeholder_visible(True, loading_text)
-            
-            # Repopulate dropdown asynchronously
-            # Use QTimer to debounce rapid changes
-            QTimer.singleShot(100, self._populate_player_dropdown)
-            
-            # If a player is selected, recalculate stats with new source
-            if self._current_player:
-                QTimer.singleShot(200, self._schedule_stats_recalculation)
+        # Call controller method to handle source selection
+        self._stats_controller.set_source_selection(index)
     
-    def _schedule_stats_recalculation(self) -> None:
-        """Schedule an asynchronous statistics recalculation."""
-        if not self._current_player or not self._stats_controller:
-            return
-        
-        # If a worker is already running, cancel it and wait for it to finish
-        if self._stats_worker:
-            if self._stats_worker.isRunning():
-                self._stats_worker.cancel()
-                # Wait for worker to finish (with longer timeout for ProcessPoolExecutor shutdown)
-                # ProcessPoolExecutor needs time to cancel futures and shutdown processes
-                if not self._stats_worker.wait(10000):  # Wait up to 10 seconds
-                    # If it didn't finish, disconnect signals and delete later
-                    # The thread will finish eventually and clean itself up
-                    try:
-                        self._stats_worker.stats_ready.disconnect()
-                        self._stats_worker.stats_unavailable.disconnect()
-                        self._stats_worker.progress_update.disconnect()
-                        self._stats_worker.finished.disconnect()
-                    except (RuntimeError, TypeError):
-                        pass
-                    self._stats_worker.deleteLater()
-                    self._stats_worker = None
-                else:
-                    # Worker finished, disconnect and clean up
-                    try:
-                        self._stats_worker.stats_ready.disconnect()
-                        self._stats_worker.stats_unavailable.disconnect()
-                        self._stats_worker.progress_update.disconnect()
-                        self._stats_worker.finished.disconnect()
-                    except (RuntimeError, TypeError):
-                        pass
-                    self._stats_worker.deleteLater()
-                    self._stats_worker = None
-            else:
-                # Worker not running, just clean up
-                try:
-                    self._stats_worker.stats_ready.disconnect()
-                    self._stats_worker.stats_unavailable.disconnect()
-                    self._stats_worker.progress_update.disconnect()
-                    self._stats_worker.finished.disconnect()
-                except (RuntimeError, TypeError):
-                    pass
-                self._stats_worker.deleteLater()
-                self._stats_worker = None
-        
-        # Create and start new worker
-        self._stats_worker = PlayerStatsCalculationWorker(
-            self._stats_controller,
-            self._current_player,
-            self._use_all_databases
-        )
-        self._stats_worker.stats_ready.connect(self._on_stats_ready)
-        self._stats_worker.stats_unavailable.connect(self._handle_stats_unavailable)
-        self._stats_worker.progress_update.connect(self._on_stats_progress)
-        self._stats_worker.finished.connect(self._on_stats_worker_finished)
-        self._stats_worker.start()
     
-    def _on_stats_progress(self, progress: int, status: str) -> None:
-        """Handle progress update from stats worker."""
-        # Show progress in status bar through controller
-        if self._stats_controller:
-            self._stats_controller.show_progress()
-            self._stats_controller.set_indeterminate(False)
-            self._stats_controller.set_progress(progress)
-            self._stats_controller.set_status(status)
-    
-    def _on_stats_ready(self, stats: "AggregatedPlayerStats", patterns: List["ErrorPattern"], game_summaries: List) -> None:
-        """Handle stats ready from worker."""
-        # Hide progress through controller
-        if self._stats_controller:
-            self._stats_controller.hide_progress()
-        
-        # Update controller's current stats
-        if self._stats_controller:
-            self._stats_controller.current_stats = stats
-            self._stats_controller.current_patterns = patterns
-            self._stats_controller.current_game_summaries = game_summaries
-        
-        # Handle the stats update
-        self._handle_stats_updated(stats, patterns, game_summaries)
-    
-    def _on_stats_worker_finished(self) -> None:
-        """Handle stats worker finished."""
-        # Clean up worker reference - use deleteLater to ensure safe deletion
-        # Only clean up if this is still the current worker (might have been replaced)
-        if self._stats_worker and self.sender() == self._stats_worker:
-            worker = self._stats_worker
-            self._stats_worker = None
-            # Disconnect signals before deleting
-            try:
-                worker.stats_ready.disconnect()
-                worker.stats_unavailable.disconnect()
-                worker.progress_update.disconnect()
-                worker.finished.disconnect()
-            except (RuntimeError, TypeError):
-                pass
-            worker.deleteLater()
-    
-    def _connect_to_database_panel_model(self) -> None:
-        """Connect to database panel model signals for active database changes."""
-        if not self._database_controller:
-            return
-        
-        panel_model = self._database_controller.get_panel_model()
-        if not panel_model:
-            return
-        
-        # Disconnect first to avoid duplicate connections
-        try:
-            panel_model.active_database_changed.disconnect(self._on_active_database_changed)
-            panel_model.database_added.disconnect(self._on_database_added)
-            panel_model.database_removed.disconnect(self._on_database_removed)
-        except (RuntimeError, TypeError):
-            pass  # Not connected yet, that's fine
-        
-        # Connect to active database changes
-        panel_model.active_database_changed.connect(self._on_active_database_changed)
-        panel_model.database_added.connect(self._on_database_added)
-        panel_model.database_removed.connect(self._on_database_removed)
-    
-    def _connect_to_database_changes(self) -> None:
-        """Connect to DatabaseModel dataChanged signals to detect game updates."""
-        if not self._database_controller:
-            return
-        
-        # Disconnect from all previously connected databases
-        for database in self._connected_databases:
-            try:
-                database.dataChanged.disconnect(self._on_database_data_changed)
-            except (RuntimeError, TypeError):
-                pass
-        
-        self._connected_databases.clear()
-        
-        # Connect to all current databases
-        panel_model = self._database_controller.get_panel_model()
-        if panel_model:
-            databases = panel_model.get_all_database_models()
-            for database in databases:
-                database.dataChanged.connect(self._on_database_data_changed)
-                self._connected_databases.append(database)
-    
-    def _on_database_added(self, identifier: str, info) -> None:
-        """Handle database added - connect to its signals."""
-        if info and info.model:
-            info.model.dataChanged.connect(self._on_database_data_changed)
-            if info.model not in self._connected_databases:
-                self._connected_databases.append(info.model)
-            # Always trigger dropdown update when database is added
-            # (will update if using all databases, or if this becomes the active database)
-            # Use QTimer to ensure this happens after the database is fully initialized
-            QTimer.singleShot(200, self._schedule_dropdown_update)
-    
-    def _on_database_removed(self, identifier: str) -> None:
-        """Handle database removed - disconnect from its signals."""
-        # Remove from connected list (will be cleaned up on next connection refresh)
-        # The database model may already be destroyed, so we just refresh connections
-        self._connect_to_database_changes()
-    
-    def _on_database_data_changed(self, top_left, bottom_right, roles=None) -> None:
-        """Handle database data changed signal - debounce and update."""
-        # Debounce the update to avoid excessive recalculations
-        self._database_update_timer.stop()
-        self._database_update_timer.start(self._database_update_debounce_ms)
-    
-    def _on_database_update_debounced(self) -> None:
-        """Handle debounced database update - refresh dropdown and recalculate stats."""
-        # Update dropdown asynchronously
-        self._schedule_dropdown_update()
-        
-        # If a player is selected, update their counts and recalculate stats
-        if self._current_player:
-            self._update_selected_player_counts()
-            self._schedule_stats_recalculation()
-    
-    def _schedule_dropdown_update(self) -> None:
-        """Schedule an asynchronous dropdown update."""
-        if not self._stats_controller:
-            return
-        
-        # Check if combo box exists - use getattr with default to avoid AttributeError
-        try:
-            combo_value = getattr(self, 'player_combo', None)
-        except Exception:
-            combo_value = None
-        
-        if combo_value is None:
-            return
-        
-        # If a worker is already running, cancel it and wait for it to finish
-        if self._dropdown_worker:
-            if self._dropdown_worker.isRunning():
-                self._dropdown_worker.cancel()
-                # Wait for worker to finish (with timeout)
-                if not self._dropdown_worker.wait(2000):  # Wait up to 2 seconds
-                    # If it didn't finish, disconnect signals and delete later
-                    try:
-                        self._dropdown_worker.players_ready.disconnect()
-                        self._dropdown_worker.progress_update.disconnect()
-                        self._dropdown_worker.finished.disconnect()
-                    except (RuntimeError, TypeError):
-                        pass
-                    self._dropdown_worker.deleteLater()
-                    self._dropdown_worker = None
-                else:
-                    # Worker finished, disconnect and clean up
-                    try:
-                        self._dropdown_worker.players_ready.disconnect()
-                        self._dropdown_worker.progress_update.disconnect()
-                        self._dropdown_worker.finished.disconnect()
-                    except (RuntimeError, TypeError):
-                        pass
-                    self._dropdown_worker.deleteLater()
-                    self._dropdown_worker = None
-            else:
-                # Worker not running, just clean up
-                try:
-                    self._dropdown_worker.players_ready.disconnect()
-                    self._dropdown_worker.progress_update.disconnect()
-                    self._dropdown_worker.finished.disconnect()
-                except (RuntimeError, TypeError):
-                    pass
-                self._dropdown_worker.deleteLater()
-                self._dropdown_worker = None
-        
-        # Create and start new worker
-        try:
-            self._dropdown_worker = PlayerDropdownWorker(self._stats_controller, self._use_all_databases)
-            self._dropdown_worker.players_ready.connect(self._on_dropdown_players_ready)
-            self._dropdown_worker.progress_update.connect(self._on_dropdown_progress)
-            self._dropdown_worker.finished.connect(self._on_dropdown_worker_finished)
-            self._dropdown_worker.start()
-        except Exception as e:
-            logging_service = LoggingService.get_instance()
-            logging_service.error(f"Error starting dropdown worker: {e}", exc_info=e)
-            if self._dropdown_worker:
-                self._dropdown_worker.deleteLater()
-                self._dropdown_worker = None
-    
-    def _on_dropdown_progress(self, progress: int, status: str) -> None:
-        """Handle progress update from dropdown worker."""
-        # Optionally show progress in status bar for long operations
-        # For now, we'll keep it silent to avoid UI noise
-        pass
-    
-    def _on_dropdown_players_ready(self, players_with_analyzed: List[Tuple[str, int, int]]) -> None:
-        """Handle players ready from dropdown worker."""
+    def _on_players_ready(self, players_with_analyzed: List[Tuple[str, int, int]]) -> None:
+        """Handle players ready from controller signal."""
         # Check if view still exists and combo box is available
         try:
             has_combo_attr = hasattr(self, 'player_combo')
@@ -1519,8 +963,8 @@ class DetailPlayerStatsView(QWidget):
         except (RuntimeError, TypeError):
             pass
         
-        # Store current selection
-        current_player = self._current_player
+        # Store current selection from controller
+        current_player = self._stats_controller.get_current_player() if self._stats_controller else None
         current_index = self.player_combo.currentIndex()
         
         # Clear and repopulate dropdown
@@ -1531,10 +975,12 @@ class DetailPlayerStatsView(QWidget):
         
         # If no players found, show placeholder and return
         if not players_with_analyzed:
+            # Clear player selection in controller if one was set
+            if self._stats_controller and self._stats_controller.get_current_player():
+                self._stats_controller.set_player_selection(None)
             # Reconnect signal
             self.player_combo.currentIndexChanged.connect(self._on_player_selected)
             self.player_combo.setCurrentIndex(-1)
-            self._current_player = None
             self._clear_stats_sections()
             # Show placeholder indicating no players with at least 2 analyzed games
             placeholder_text = self.player_stats_config.get(
@@ -1586,7 +1032,7 @@ class DetailPlayerStatsView(QWidget):
             elif current_player:
                 # Player no longer in list, clear selection
                 self.player_combo.setCurrentIndex(-1)
-                self._current_player = None
+                self._stats_controller.set_player_selection(None) if self._stats_controller else None
                 self._set_disabled_placeholder_visible(True, self.placeholder_text_no_player)
                 self._clear_stats_sections()
             else:
@@ -1597,82 +1043,39 @@ class DetailPlayerStatsView(QWidget):
             # View might be destroyed during update
             return
     
-    def _on_dropdown_worker_finished(self) -> None:
-        """Handle dropdown worker finished."""
-        # Clean up worker reference - use deleteLater to ensure safe deletion
-        # Only clean up if this is still the current worker (might have been replaced)
-        if self._dropdown_worker and self.sender() == self._dropdown_worker:
-            worker = self._dropdown_worker
-            self._dropdown_worker = None
-            # Disconnect signals before deleting
+    def _on_player_selection_cleared(self) -> None:
+        """Handle player selection cleared from controller."""
+        if hasattr(self, 'player_combo') and self.player_combo:
             try:
-                worker.players_ready.disconnect()
-                worker.progress_update.disconnect()
-                worker.finished.disconnect()
+                self.player_combo.currentIndexChanged.disconnect()
             except (RuntimeError, TypeError):
                 pass
-            worker.deleteLater()
+            self.player_combo.setCurrentIndex(-1)
+            self.player_combo.currentIndexChanged.connect(self._on_player_selected)
+        self._clear_stats_sections()
+        self._set_disabled_placeholder_visible(True, self.placeholder_text_no_player)
     
-    def _update_selected_player_counts(self) -> None:
-        """Update the counts for the currently selected player in the dropdown."""
-        if not self._current_player or not hasattr(self, 'player_combo') or not self.player_combo:
-            return
-        
-        if not self._stats_controller:
-            return
-        
-        # Get updated counts
-        analyzed_count, total_count = self._stats_controller.get_analyzed_game_count(
-            self._current_player,
-            self._use_all_databases
-        )
-        
-        # Find the player in the dropdown
-        index = self.player_combo.findData(self._current_player)
-        if index != -1:
-            # Update the item text silently
-            new_text = f"{self._current_player} ({analyzed_count} analyzed, {total_count} total)"
-            current_text = self.player_combo.itemText(index)
-            if current_text != new_text:
-                # Temporarily disconnect to avoid triggering selection
+    def _on_source_selection_changed(self, index: int) -> None:
+        """Handle source selection changed from controller."""
+        if index == 0:
+            # "None" selected - clear player dropdown and stats
+            if hasattr(self, 'player_combo') and self.player_combo:
                 try:
                     self.player_combo.currentIndexChanged.disconnect()
                 except (RuntimeError, TypeError):
                     pass
-                self.player_combo.setItemText(index, new_text)
+                self.player_combo.clear()
                 self.player_combo.currentIndexChanged.connect(self._on_player_selected)
+            self._clear_stats_sections()
+            self._set_disabled_placeholder_visible(True, self.placeholder_text_no_source)
+        else:
+            # Show loading placeholder to prevent layout shift while dropdown is being populated
+            loading_text = self.player_stats_config.get(
+                'placeholder_text_loading',
+                'Loading players...'
+            )
+            self._set_disabled_placeholder_visible(True, loading_text)
     
-    def _on_active_database_changed(self, database) -> None:
-        """Handle active database change - repopulate dropdown if 'Active Database' is selected."""
-        # Reconnect to database changes
-        self._connect_to_database_changes()
-        
-        # Only update if a source is selected (not "None") and "Active Database" is selected (not "All Open Databases")
-        source_index = self.source_combo.currentIndex() if hasattr(self, 'source_combo') else -1
-        if source_index == 0:
-            # "None" selected - don't update
-            return
-        
-        # Only repopulate if "Active Database" is selected (not "All Open Databases")
-        if not self._use_all_databases:
-            # Check if player_combo is a valid widget
-            player_combo_valid = False
-            if hasattr(self, 'player_combo') and self.player_combo is not None:
-                try:
-                    # Try to access a method to verify it's a valid widget
-                    self.player_combo.count()  # This will work for QComboBox
-                    player_combo_valid = True
-                except (RuntimeError, AttributeError):
-                    player_combo_valid = False
-            
-            # Only populate if we have a controller and combo box exists and is valid
-            if self._stats_controller and player_combo_valid:
-                self._populate_player_dropdown()
-            # If a player was selected, recalculate (might be in different database now)
-            if self._current_player:
-                self._schedule_stats_recalculation()
-        # If using all databases, the dropdown should already be up to date
-        # but we can refresh it to ensure it includes the new active database
     
     def _create_analysis_coverage_banner(self, analyzed_count: int, total_count: int,
                                         text_color: QColor, label_font: QFont,
@@ -3031,8 +2434,9 @@ class DetailPlayerStatsView(QWidget):
             return
         
         from app.utils.player_stats_text_formatter import PlayerStatsTextFormatter
+        current_player = self._stats_controller.get_current_player() if self._stats_controller else None
         text = PlayerStatsTextFormatter.format_section(
-            self.current_stats, self.current_patterns, section_name, self._current_player or "Player"
+            self.current_stats, self.current_patterns, section_name, current_player or "Player"
         )
         
         if text:
@@ -3049,8 +2453,9 @@ class DetailPlayerStatsView(QWidget):
             return
         
         from app.utils.player_stats_text_formatter import PlayerStatsTextFormatter
+        current_player = self._stats_controller.get_current_player() if self._stats_controller else None
         text = PlayerStatsTextFormatter.format_full_stats(
-            self.current_stats, self.current_patterns, self._current_player or "Player"
+            self.current_stats, self.current_patterns, current_player or "Player"
         )
         
         if text:

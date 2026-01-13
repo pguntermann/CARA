@@ -2423,8 +2423,7 @@ class MainWindow(QMainWindow):
             if hasattr(self.detail_panel, 'player_stats_view'):
                 self.detail_panel.player_stats_view._database_controller = database_controller
                 self.detail_panel.player_stats_view._database_panel = self.database_panel
-                # Connect to database panel model for active database changes
-                self.detail_panel.player_stats_view._connect_to_database_panel_model()
+                # Database connections are now handled by the controller
         
         # Set moves list model in game analysis controller
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
