@@ -734,6 +734,8 @@ class ManualAnalysisEngineService(QObject):
         # Create and start new analysis thread
         self.current_engine_path = engine_path
         self.analysis_thread = ManualAnalysisEngineThread(engine_path, final_multipv, self.update_interval_ms, max_threads, engine_options, max_depth, movetime)
+        # Set service as parent so Qt maintains reference for deleteLater()
+        self.analysis_thread.setParent(self)
         self.analysis_thread.line_update.connect(self.line_update.emit)
         self.analysis_thread.error_occurred.connect(self.error_occurred.emit)
         self.analysis_thread.start_analysis(fen)
@@ -814,23 +816,39 @@ class ManualAnalysisEngineService(QObject):
         except Exception:
             pass
         
+        # Store reference to thread for cleanup
+        thread = self.analysis_thread
+        
         if keep_engine_alive:
             # Stop thread but keep engine process alive
-            self.analysis_thread._keep_engine_alive = True
-            self.analysis_thread.running = False
-            self.analysis_thread._stop_requested = True
-            if self.analysis_thread.uci and self.analysis_thread.uci.is_process_alive():
-                self.analysis_thread.uci.stop_search()
-            # Don't wait - let thread exit naturally, cleanup will be skipped due to flag
-            self.analysis_thread = None
+            thread._keep_engine_alive = True
+            thread.running = False
+            thread._stop_requested = True
+            if thread.uci and thread.uci.is_process_alive():
+                thread.uci.stop_search()
         else:
             # Normal shutdown - terminate engine process
             # Set flags to stop the thread, it will exit naturally and cleanup in finally block
-            self.analysis_thread._keep_engine_alive = False
-            self.analysis_thread.running = False
-            self.analysis_thread._stop_requested = True
-            if self.analysis_thread.uci and self.analysis_thread.uci.is_process_alive():
-                self.analysis_thread.uci.stop_search()
-            # Don't wait - let thread exit naturally, cleanup will happen in finally block
+            thread._keep_engine_alive = False
+            thread.running = False
+            thread._stop_requested = True
+            if thread.uci and thread.uci.is_process_alive():
+                thread.uci.stop_search()
+        
+        # Wait for thread to finish before deleting (prevents Qt crash)
+        # The thread should exit quickly once flags are set and it checks them in the loop
+        # UCI cleanup can take up to ~2 seconds, so wait a bit longer
+        if thread.isRunning():
+            # Wait for thread to finish (with timeout to prevent indefinite blocking)
+            if thread.wait(3000):  # Wait up to 3 seconds (allows time for UCI cleanup)
+                # Thread finished, safe to delete
+                self.analysis_thread = None
+            else:
+                # Thread still running after timeout - schedule deletion
+                # Since thread has parent (this service), Qt will maintain reference and delete when safe
+                thread.deleteLater()
+                self.analysis_thread = None  # Clear our reference, Qt will handle deletion
+        else:
+            # Thread not running, safe to delete immediately
             self.analysis_thread = None
 
