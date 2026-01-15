@@ -164,6 +164,8 @@ class BulkAnalysisThread(QThread):
         self._cumulative_depth_count = 0
         self._cumulative_seldepth_sum = 0
         self._cumulative_seldepth_count = 0
+        self._cumulative_nps_sum = 0
+        self._cumulative_nps_count = 0
         # Thread information for status bar display
         self._total_threads_used = 0
         self._parallel_games = 0
@@ -203,7 +205,7 @@ class BulkAnalysisThread(QThread):
                 'engine_info': engine_info
             }
             
-            # Accumulate depth/seldepth from all moves (cumulative across all games)
+            # Accumulate depth/seldepth/NPS from all moves (cumulative across all games)
             if engine_info:
                 depth = engine_info.get('depth', 0)
                 if depth > 0:
@@ -213,6 +215,10 @@ class BulkAnalysisThread(QThread):
                 if seldepth > 0:
                     self._cumulative_seldepth_sum += seldepth
                     self._cumulative_seldepth_count += 1
+                nps = engine_info.get('nps', 0)
+                if nps > 0:
+                    self._cumulative_nps_sum += nps
+                    self._cumulative_nps_count += 1
         
         # Request status update from main thread (throttled)
         current_time = time.time()
@@ -301,6 +307,23 @@ class BulkAnalysisThread(QThread):
             avg_seldepth_str = f"Avg SelDepth: {int(avg_seldepth)}"
         else:
             avg_seldepth_str = ""
+        
+        # Calculate average NPS
+        with self._progress_lock:
+            cumulative_nps_sum = self._cumulative_nps_sum
+            cumulative_nps_count = self._cumulative_nps_count
+        
+        avg_nps_str = ""
+        if cumulative_nps_count > 0:
+            avg_nps = cumulative_nps_sum / cumulative_nps_count
+            # Format nps nicely (e.g., 1.5M, 500K, etc.)
+            if avg_nps >= 1_000_000:
+                nps_str = f"{avg_nps / 1_000_000:.1f}M"
+            elif avg_nps >= 1_000:
+                nps_str = f"{avg_nps / 1_000:.1f}K"
+            else:
+                nps_str = str(int(avg_nps))
+            avg_nps_str = f"Avg NPS: {nps_str}"
         
         # Count completed games
         completed_count = analyzed_count + skipped_count
@@ -421,8 +444,11 @@ class BulkAnalysisThread(QThread):
                     threads_info,
                     avg_depth_str,
                     avg_seldepth_str,
+                    avg_nps_str,
                     f"Estimated time remaining: {time_str}"
                 ]
+                # Remove empty strings
+                status_parts = [p for p in status_parts if p]
                 status_bar_message = " | ".join([p for p in status_parts if p])
             else:
                 # Format thread info - show distribution if threads vary, otherwise show simple format
@@ -443,8 +469,11 @@ class BulkAnalysisThread(QThread):
                     f"Bulk Analysis: Analyzing {active_count} game{'s' if active_count != 1 else ''} ({avg_active_progress_str}%) from total {total_games} games, {completed_count} completed",
                     threads_info,
                     avg_depth_str,
-                    avg_seldepth_str
+                    avg_seldepth_str,
+                    avg_nps_str
                 ]
+                # Remove empty strings
+                status_parts = [p for p in status_parts if p]
                 status_bar_message = " | ".join([p for p in status_parts if p])
         else:
             # Format thread info - show distribution if threads vary, otherwise show simple format
@@ -463,9 +492,12 @@ class BulkAnalysisThread(QThread):
                 threads_info = ""
             status_parts = [
                 f"Bulk Analysis: Preparing analysis of {games_being_analyzed} game{'s' if games_being_analyzed != 1 else ''} from total {total_games} games, {completed_count} completed",
-                threads_info
+                threads_info,
+                avg_nps_str
             ]
-            status_bar_message = " | ".join([p for p in status_parts if p]) + "."
+            # Remove empty strings
+            status_parts = [p for p in status_parts if p]
+            status_bar_message = " | ".join(status_parts) + "."
         
         progress_service.set_status(status_bar_message)
         

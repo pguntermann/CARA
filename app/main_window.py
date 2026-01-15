@@ -4749,7 +4749,7 @@ Visibility Settings:
     
     def _on_game_analysis_progress(self, current_move: int, total_moves: int, depth: int,
                                    centipawns: float, engine_name: str, threads: int, elapsed_ms: int,
-                                   avg_depth: float = 0.0, avg_seldepth: float = 0.0, movetime_ms: int = 0) -> None:
+                                   avg_depth: float = 0.0, avg_seldepth: float = 0.0, movetime_ms: int = 0, avg_nps: float = 0.0) -> None:
         """Handle game analysis progress update.
         
         Args:
@@ -4823,6 +4823,17 @@ Visibility Settings:
         # Add average seldepth if available (only if we have completed moves with seldepth data)
         if avg_seldepth > 0:
             status_parts.append(f"Avg SelDepth: {int(avg_seldepth)}")
+        
+        # Add average NPS if available (only if we have completed moves with NPS data)
+        if avg_nps > 0:
+            # Format nps nicely (e.g., 1.5M, 500K, etc.)
+            if avg_nps >= 1_000_000:
+                nps_str = f"{avg_nps / 1_000_000:.1f}M"
+            elif avg_nps >= 1_000:
+                nps_str = f"{avg_nps / 1_000:.1f}K"
+            else:
+                nps_str = str(int(avg_nps))
+            status_parts.append(f"Avg NPS: {nps_str}")
         
         if estimated_remaining_time:
             status_parts.append(f"Est. remaining: {estimated_remaining_time}")

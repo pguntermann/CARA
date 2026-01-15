@@ -667,7 +667,7 @@ class BulkAnalysisService(QObject):
         last_progress_time = {"value": None}  # Use dict to allow modification in nested function
         first_progress_received = {"value": False}  # Track if we've received at least one progress update
         
-        def on_progress_update(depth, seldepth, centipawns, elapsed_ms, engine_name, threads, move_num):
+        def on_progress_update(depth, seldepth, centipawns, elapsed_ms, engine_name, threads, move_num, nps):
             """Handle progress update from engine."""
             last_progress_info["depth"] = depth
             last_progress_info["seldepth"] = seldepth
@@ -675,6 +675,7 @@ class BulkAnalysisService(QObject):
             last_progress_info["engine_name"] = engine_name
             last_progress_info["threads"] = threads
             last_progress_info["elapsed_ms"] = elapsed_ms
+            last_progress_info["nps"] = nps if nps > 0 else 0
             last_progress_time["value"] = time.time()  # Update progress timestamp
             first_progress_received["value"] = True  # Mark that we've received progress
             
@@ -686,7 +687,8 @@ class BulkAnalysisService(QObject):
                     "centipawns": float(centipawns),
                     "engine_name": engine_name,
                     "threads": threads,
-                    "elapsed_ms": elapsed_ms
+                    "elapsed_ms": elapsed_ms,
+                    "nps": nps if nps > 0 else 0
                 }
                 status = f"Analyzing move {game_move_index + 1}/{total_moves} (Move {move_number}{'W' if is_white_move else 'B'})"
                 progress_callback(game_move_index, total_moves, move_number, is_white_move, status, engine_info)

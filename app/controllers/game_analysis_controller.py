@@ -34,7 +34,7 @@ class GameAnalysisController(QObject):
     analysis_started = pyqtSignal()
     analysis_completed = pyqtSignal()
     analysis_cancelled = pyqtSignal()
-    analysis_progress = pyqtSignal(int, int, int, float, str, int, int, float, float, int)  # move_number, total_moves, depth, centipawns, engine_name, threads, elapsed_ms, avg_depth, avg_seldepth, movetime_ms
+    analysis_progress = pyqtSignal(int, int, int, float, str, int, int, float, float, int, float)  # move_number, total_moves, depth, centipawns, engine_name, threads, elapsed_ms, avg_depth, avg_seldepth, movetime_ms, avg_nps
     move_analyzed = pyqtSignal(int)  # row_index - emitted when a move is analyzed and should be scrolled to
     
     def __init__(self, config: Dict[str, Any], game_model: GameModel, moves_list_model: MovesListModel,
@@ -112,16 +112,19 @@ class GameAnalysisController(QObject):
         self._last_progress_seldepth = 0  # Track seldepth from progress updates
         self._last_progress_centipawns = 0.0
         self._last_progress_time = 0.0
+        self._last_progress_nps = 0  # Track NPS from progress updates
         self._current_engine_name = ""
         self._current_threads = 0
         self._analysis_start_time: Optional[float] = None  # Track when analysis started (timestamp in ms)
         self._move_times: List[float] = []  # Track time taken for each completed move (in ms)
         
-        # Cumulative depth/seldepth tracking for average calculation
+        # Cumulative depth/seldepth/NPS tracking for average calculation
         self._cumulative_depth_sum = 0
         self._cumulative_depth_count = 0
         self._cumulative_seldepth_sum = 0
         self._cumulative_seldepth_count = 0
+        self._cumulative_nps_sum = 0
+        self._cumulative_nps_count = 0
     
     def _load_settings(self) -> None:
         """Load settings from config and user settings."""
@@ -315,11 +318,13 @@ class GameAnalysisController(QObject):
         self._move_times = []  # Track time taken for each completed move
         self._current_move_start_time: Optional[float] = None  # Track when current move started
         
-        # Reset cumulative depth/seldepth tracking
+        # Reset cumulative depth/seldepth/NPS tracking
         self._cumulative_depth_sum = 0
         self._cumulative_depth_count = 0
         self._cumulative_seldepth_sum = 0
         self._cumulative_seldepth_count = 0
+        self._cumulative_nps_sum = 0
+        self._cumulative_nps_count = 0
         
         # Get task-specific parameters for this engine (with fallback to config.json)
         from pathlib import Path
@@ -1061,6 +1066,12 @@ class GameAnalysisController(QObject):
             self._cumulative_seldepth_sum += self._last_progress_seldepth
             self._cumulative_seldepth_count += 1
         
+        # Use NPS from last progress update (if available)
+        # Only count if we have valid NPS data (> 0)
+        if self._last_progress_nps > 0:
+            self._cumulative_nps_sum += self._last_progress_nps
+            self._cumulative_nps_count += 1
+        
         # Cache best move info for next iteration (position after move N = position before move N+1)
         # Always cache regardless of book move status - the position after move N is still the position
         # before move N+1, and the analysis result is valid for the next move even if move N was a book move.
@@ -1087,7 +1098,7 @@ class GameAnalysisController(QObject):
             self._analyze_next_move()
     
     def _on_progress_update(self, depth: int, seldepth: int, centipawns: int, elapsed_ms: float,
-                           engine_name: str, threads: int, move_number: int) -> None:
+                           engine_name: str, threads: int, move_number: int, nps: int) -> None:
         """Handle progress update from engine.
         
         Args:
@@ -1098,12 +1109,14 @@ class GameAnalysisController(QObject):
             engine_name: Engine name.
             threads: Number of threads.
             move_number: Current move number.
+            nps: Nodes per second (0 if not available).
         """
         self._last_progress_depth = depth
         # Track seldepth safely - some engines may not provide it (will be 0)
         self._last_progress_seldepth = seldepth if seldepth and seldepth > 0 else 0
         self._last_progress_centipawns = float(centipawns)
         self._last_progress_time = elapsed_ms
+        self._last_progress_nps = nps if nps > 0 else 0
     
     def _format_time(self, seconds: float) -> str:
         """Format time duration nicely (seconds, minutes, hours).
@@ -1197,6 +1210,11 @@ class GameAnalysisController(QObject):
         if self._cumulative_seldepth_count > 0:
             avg_seldepth = self._cumulative_seldepth_sum / self._cumulative_seldepth_count
         
+        # Calculate average NPS from completed moves
+        avg_nps = 0.0
+        if self._cumulative_nps_count > 0:
+            avg_nps = self._cumulative_nps_sum / self._cumulative_nps_count
+        
         # Calculate total elapsed time since analysis started
         total_elapsed_ms = 0
         if self._analysis_start_time is not None:
@@ -1215,7 +1233,8 @@ class GameAnalysisController(QObject):
             int(total_elapsed_ms),
             avg_depth,
             avg_seldepth,
-            movetime_ms
+            movetime_ms,
+            avg_nps
         )
     
     def _on_analysis_error(self, error_message: str) -> None:

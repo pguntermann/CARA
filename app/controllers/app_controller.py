@@ -372,6 +372,8 @@ class AppController:
             If success is False, status_message indicates no active game.
         """
         from PyQt6.QtWidgets import QApplication
+        from pathlib import Path
+        from app.services.logging_service import LoggingService
         
         game_model = self.game_controller.get_game_model()
         active_game = game_model.active_game
@@ -382,6 +384,21 @@ class AppController:
         pgn = active_game.pgn
         clipboard = QApplication.clipboard()
         clipboard.setText(pgn)
+        
+        # Debug log: copy operation (only on success)
+        panel_model = self.database_controller.get_panel_model()
+        # Find which database contains this game
+        source_db_name = "unknown"
+        for identifier, db_info in panel_model.get_all_databases().items():
+            if active_game in db_info.model._games:
+                if identifier == "clipboard":
+                    source_db_name = "Clipboard"
+                else:
+                    source_db_name = Path(identifier).stem
+                break
+        
+        logging_service = LoggingService.get_instance()
+        logging_service.debug(f"PGN copied: source_db={source_db_name}, games_count=1")
         
         status_message = f"PGN copied to clipboard ({active_game.white} vs {active_game.black})"
         return (True, status_message)
@@ -398,6 +415,8 @@ class AppController:
             If success is False, status_message indicates error (no database, no selection, etc.).
         """
         from PyQt6.QtWidgets import QApplication
+        from pathlib import Path
+        from app.services.logging_service import LoggingService
         
         # Get active database info
         active_info = database_panel.get_active_database_info()
@@ -407,6 +426,13 @@ class AppController:
         database_model = active_info.get('model')
         if not database_model:
             return (False, "No active database")
+        
+        # Get database name for debug logging
+        identifier = active_info.get('identifier', 'unknown')
+        if identifier == "clipboard":
+            source_db_name = "Clipboard"
+        else:
+            source_db_name = Path(identifier).stem if identifier != 'unknown' else "unknown"
         
         # Get selected game indices
         selected_indices = database_panel.get_selected_game_indices()
@@ -442,6 +468,11 @@ class AppController:
         clipboard.setText(combined_pgn)
         
         game_count = len(games)
+        
+        # Debug log: copy operation (only on success)
+        logging_service = LoggingService.get_instance()
+        logging_service.debug(f"PGN copied: source_db={source_db_name}, games_count={game_count}")
+        
         status_message = f"Copied {game_count} game(s) to clipboard"
         return (True, status_message)
     
@@ -457,6 +488,8 @@ class AppController:
             If success is False, status_message indicates error (no database, no selection, etc.).
         """
         from PyQt6.QtWidgets import QApplication
+        from pathlib import Path
+        from app.services.logging_service import LoggingService
         
         # Get active database info
         active_info = database_panel.get_active_database_info()
@@ -466,6 +499,13 @@ class AppController:
         database_model = active_info.get('model')
         if not database_model:
             return (False, "No active database")
+        
+        # Get database name for debug logging
+        identifier = active_info.get('identifier', 'unknown')
+        if identifier == "clipboard":
+            source_db_name = "Clipboard"
+        else:
+            source_db_name = Path(identifier).stem if identifier != 'unknown' else "unknown"
         
         # Get selected game indices
         selected_indices = database_panel.get_selected_game_indices()
@@ -515,6 +555,11 @@ class AppController:
             game_model.set_active_game(None)
         
         game_count = len(games)
+        
+        # Debug log: cut operation (only on success)
+        logging_service = LoggingService.get_instance()
+        logging_service.debug(f"PGN copied: source_db={source_db_name}, games_count={game_count}")
+        
         status_message = f"Cut {game_count} game(s) to clipboard"
         return (True, status_message)
     
@@ -954,6 +999,7 @@ class AppController:
             first_game_index is None, and games_added is 0.
         """
         from PyQt6.QtWidgets import QApplication
+        from app.services.logging_service import LoggingService
         
         clipboard = QApplication.clipboard()
         pgn_text = clipboard.text().strip()
@@ -966,6 +1012,9 @@ class AppController:
         success, message, first_game_index, games_added = self.database_controller.parse_pgn_to_model(pgn_text, database_model)
         
         if success:
+            # Debug log: paste operation (only on success)
+            logging_service = LoggingService.get_instance()
+            logging_service.debug(f"PGN pasted: target_db=Clipboard, games_count={games_added}")
             # If successful, set the first game as active
             if first_game_index is not None:
                 first_game = database_model.get_game(first_game_index)
@@ -994,11 +1043,23 @@ class AppController:
             first_game_index is None, and games_added is 0.
         """
         from PyQt6.QtWidgets import QApplication
+        from pathlib import Path
+        from app.services.logging_service import LoggingService
         
         # Get the currently active database
         active_database = self.database_controller.get_active_database()
         if active_database is None:
             return (False, "No active database selected", None)
+        
+        # Get database name for debug logging
+        panel_model = self.database_controller.get_panel_model()
+        identifier = panel_model.find_database_by_model(active_database)
+        if identifier == "clipboard":
+            target_db_name = "Clipboard"
+        elif identifier:
+            target_db_name = Path(identifier).stem
+        else:
+            target_db_name = "unknown"
         
         # Get PGN text from clipboard
         clipboard = QApplication.clipboard()
@@ -1011,6 +1072,9 @@ class AppController:
         success, message, first_game_index, games_added = self.database_controller.parse_pgn_to_model(pgn_text, active_database)
         
         if success:
+            # Debug log: paste operation (only on success)
+            logging_service = LoggingService.get_instance()
+            logging_service.debug(f"PGN pasted: target_db={target_db_name}, games_count={games_added}")
             # If successful, set the first game as active
             if first_game_index is not None:
                 first_game = active_database.get_game(first_game_index)

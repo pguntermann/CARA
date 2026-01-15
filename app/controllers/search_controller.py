@@ -7,6 +7,7 @@ from app.models.database_model import DatabaseModel, GameData
 from app.models.search_criteria import SearchQuery
 from app.services.database_search_service import DatabaseSearchService
 from app.services.progress_service import ProgressService
+from app.services.logging_service import LoggingService
 
 
 class SearchController:
@@ -38,7 +39,11 @@ class SearchController:
             Tuple of (search_results_model, status_message).
             If search fails or no results, model is None and status_message explains why.
         """
+        logging_service = LoggingService.get_instance()
+        search_scope = search_query.scope if search_query else "unknown"
+        
         if not search_query or not search_query.criteria:
+            logging_service.debug(f"Search failed: scope={search_scope}, reason=no_criteria")
             return None, "No search criteria provided"
         
         # Determine which databases to search
@@ -48,6 +53,7 @@ class SearchController:
         )
         
         if not databases_to_search:
+            logging_service.debug(f"Search failed: scope={search_scope}, reason=no_databases")
             return None, "No database available for search"
         
         # Perform search using service
@@ -64,6 +70,9 @@ class SearchController:
         
         # Create search results model
         search_results_model = self._create_search_results_model(matching_results)
+        
+        # Debug log: search success
+        logging_service.debug(f"Search completed: scope={search_scope}, games_found={num_games}, success=true")
         
         return search_results_model, status_message
     

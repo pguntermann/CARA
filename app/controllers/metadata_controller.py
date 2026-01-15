@@ -193,6 +193,9 @@ class MetadataController:
         try:
             game = self._game_model.active_game
             
+            # Get game identifier for debug logging
+            game_id = f"#{game.game_number}" if hasattr(game, 'game_number') else "unknown"
+            
             # Ensure database model cache is valid (O(1) after first call)
             self._update_database_model_cache()
             database_model = self._cached_database_model
@@ -204,8 +207,16 @@ class MetadataController:
             if not chess_game:
                 return False
             
+            # Get old value for debug logging
+            old_value = chess_game.headers.get(tag_name, "")
+            
             # STEP 2: Update the header
             chess_game.headers[tag_name] = new_value
+            
+            # Debug log: metadata tag updated
+            from app.services.logging_service import LoggingService
+            logging_service = LoggingService.get_instance()
+            logging_service.debug(f"Metadata tag updated: game={game_id}, tag={tag_name}, old_value=\"{old_value}\", new_value=\"{new_value}\"")
             
             # STEP 3: Regenerate PGN (required for saving/copying)
             new_pgn = PgnService.export_game_to_pgn(chess_game)
@@ -327,6 +338,9 @@ class MetadataController:
         try:
             game = self._game_model.active_game
             
+            # Get game identifier for debug logging
+            game_id = f"#{game.game_number}" if hasattr(game, 'game_number') else "unknown"
+            
             # Ensure database model cache is valid
             self._update_database_model_cache()
             database_model = self._cached_database_model
@@ -340,6 +354,11 @@ class MetadataController:
             
             # Add the new header
             chess_game.headers[tag_name] = tag_value
+            
+            # Debug log: metadata tag added
+            from app.services.logging_service import LoggingService
+            logging_service = LoggingService.get_instance()
+            logging_service.debug(f"Metadata tag added: game={game_id}, tag={tag_name}, value=\"{tag_value}\"")
             
             # Regenerate the PGN text
             new_pgn = PgnService.export_game_to_pgn(chess_game)
@@ -402,6 +421,9 @@ class MetadataController:
         try:
             game = self._game_model.active_game
             
+            # Get game identifier for debug logging
+            game_id = f"#{game.game_number}" if hasattr(game, 'game_number') else "unknown"
+            
             # Ensure database model cache is valid
             self._update_database_model_cache()
             database_model = self._cached_database_model
@@ -413,9 +435,17 @@ class MetadataController:
             if not chess_game:
                 return False
             
+            # Get old value for debug logging (before removal)
+            old_value = chess_game.headers.get(tag_name, "")
+            
             # Remove the header if it exists
             if tag_name in chess_game.headers:
                 del chess_game.headers[tag_name]
+                
+                # Debug log: metadata tag removed
+                from app.services.logging_service import LoggingService
+                logging_service = LoggingService.get_instance()
+                logging_service.debug(f"Metadata tag removed: game={game_id}, tag={tag_name}, old_value=\"{old_value}\"")
             
             # Regenerate the PGN text
             new_pgn = PgnService.export_game_to_pgn(chess_game)

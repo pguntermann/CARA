@@ -31,6 +31,13 @@ class PgnCleaningService:
         if not game or not game.pgn:
             return False
         
+        # Get game identifier for debug logging
+        game_id = f"#{game.game_number}" if hasattr(game, 'game_number') else "unknown"
+        if hasattr(game, 'white') and hasattr(game, 'black') and (game.white or game.black):
+            white = game.white or "?"
+            black = game.black or "?"
+            game_id = f"{game_id} {white} vs {black}"
+        
         try:
             # Use PgnFormatterService to remove comments (preserves metadata tags)
             cleaned_pgn = PgnFormatterService._remove_comments(game.pgn)
@@ -40,10 +47,22 @@ class PgnCleaningService:
             chess_game = chess.pgn.read_game(pgn_io)
             if chess_game:
                 game.pgn = PgnService.export_game_to_pgn(chess_game)
+                
+                # Debug log: comments removed
+                logging_service = LoggingService.get_instance()
+                logging_service.debug(f"PGN element removed: game={game_id}, element_type=comments")
+                
                 return True
+            
+            # Debug log: removal failed
+            logging_service = LoggingService.get_instance()
+            logging_service.debug(f"PGN element removal failed: game={game_id}, element_type=comments, reason=parse_failed")
             return False
-        except Exception:
+        except Exception as e:
             # On any error, return False
+            # Debug log: removal error
+            logging_service = LoggingService.get_instance()
+            logging_service.debug(f"PGN element removal error: game={game_id}, element_type=comments, error={str(e)}")
             return False
     
     @staticmethod
@@ -59,6 +78,13 @@ class PgnCleaningService:
         if not game or not game.pgn:
             return False
         
+        # Get game identifier for debug logging
+        game_id = f"#{game.game_number}" if hasattr(game, 'game_number') else "unknown"
+        if hasattr(game, 'white') and hasattr(game, 'black') and (game.white or game.black):
+            white = game.white or "?"
+            black = game.black or "?"
+            game_id = f"{game_id} {white} vs {black}"
+        
         try:
             # Use PgnFormatterService to remove variations (preserves metadata tags)
             cleaned_pgn = PgnFormatterService._remove_variations(game.pgn)
@@ -73,16 +99,28 @@ class PgnCleaningService:
                 if len(mainline_moves) == 0:
                     # No moves parsed - this suggests the cleaned PGN is malformed
                     # Return False to indicate failure
+                    logging_service = LoggingService.get_instance()
+                    logging_service.debug(f"PGN element removal failed: game={game_id}, element_type=variations, reason=no_moves_parsed")
                     return False
                 
                 game.pgn = PgnService.export_game_to_pgn(chess_game)
+                
+                # Debug log: variations removed
+                logging_service = LoggingService.get_instance()
+                logging_service.debug(f"PGN element removed: game={game_id}, element_type=variations")
+                
                 return True
+            
+            # Debug log: removal failed
+            logging_service = LoggingService.get_instance()
+            logging_service.debug(f"PGN element removal failed: game={game_id}, element_type=variations, reason=parse_failed")
             return False
         except Exception as e:
             # On any error, return False
             # Log the error for debugging
             logging_service = LoggingService.get_instance()
             logging_service.error(f"Error removing variations: {e}", exc_info=e)
+            logging_service.debug(f"PGN element removal error: game={game_id}, element_type=variations, error={str(e)}")
             return False
     
     @staticmethod
@@ -98,6 +136,13 @@ class PgnCleaningService:
         if not game or not game.pgn:
             return False
         
+        # Get game identifier for debug logging
+        game_id = f"#{game.game_number}" if hasattr(game, 'game_number') else "unknown"
+        if hasattr(game, 'white') and hasattr(game, 'black') and (game.white or game.black):
+            white = game.white or "?"
+            black = game.black or "?"
+            game_id = f"{game_id} {white} vs {black}"
+        
         try:
             # Use PgnFormatterService to remove non-standard tags (preserves metadata tags)
             cleaned_pgn = PgnFormatterService._remove_non_standard_tags(game.pgn)
@@ -107,10 +152,22 @@ class PgnCleaningService:
             chess_game = chess.pgn.read_game(pgn_io)
             if chess_game:
                 game.pgn = PgnService.export_game_to_pgn(chess_game)
+                
+                # Debug log: non-standard tags removed
+                logging_service = LoggingService.get_instance()
+                logging_service.debug(f"PGN element removed: game={game_id}, element_type=non_standard_tags")
+                
                 return True
+            
+            # Debug log: removal failed
+            logging_service = LoggingService.get_instance()
+            logging_service.debug(f"PGN element removal failed: game={game_id}, element_type=non_standard_tags, reason=parse_failed")
             return False
-        except Exception:
+        except Exception as e:
             # On any error, return False
+            # Debug log: removal error
+            logging_service = LoggingService.get_instance()
+            logging_service.debug(f"PGN element removal error: game={game_id}, element_type=non_standard_tags, error={str(e)}")
             return False
     
     @staticmethod
@@ -129,6 +186,13 @@ class PgnCleaningService:
         if not game or not game.pgn:
             return False
         
+        # Get game identifier for debug logging
+        game_id = f"#{game.game_number}" if hasattr(game, 'game_number') else "unknown"
+        if hasattr(game, 'white') and hasattr(game, 'black') and (game.white or game.black):
+            white = game.white or "?"
+            black = game.black or "?"
+            game_id = f"{game_id} {white} vs {black}"
+        
         try:
             # Use PgnFormatterService to remove annotations (preserves metadata tags)
             # This fixes the bug where annotations in metadata tags were being removed
@@ -139,10 +203,22 @@ class PgnCleaningService:
             chess_game = chess.pgn.read_game(pgn_io)
             if chess_game:
                 game.pgn = PgnService.export_game_to_pgn(chess_game)
+                
+                # Debug log: annotations removed
+                logging_service = LoggingService.get_instance()
+                logging_service.debug(f"PGN element removed: game={game_id}, element_type=annotations")
+                
                 return True
+            
+            # Debug log: removal failed
+            logging_service = LoggingService.get_instance()
+            logging_service.debug(f"PGN element removal failed: game={game_id}, element_type=annotations, reason=parse_failed")
             return False
-        except Exception:
+        except Exception as e:
             # On any error, return False
+            # Debug log: removal error
+            logging_service = LoggingService.get_instance()
+            logging_service.debug(f"PGN element removal error: game={game_id}, element_type=annotations, error={str(e)}")
             return False
     
     @staticmethod
@@ -160,6 +236,13 @@ class PgnCleaningService:
         if not game or not game.pgn:
             return False
         
+        # Get game identifier for debug logging
+        game_id = f"#{game.game_number}" if hasattr(game, 'game_number') else "unknown"
+        if hasattr(game, 'white') and hasattr(game, 'black') and (game.white or game.black):
+            white = game.white or "?"
+            black = game.black or "?"
+            game_id = f"{game_id} {white} vs {black}"
+        
         try:
             # Use PgnFormatterService to remove results (preserves metadata tags)
             cleaned_pgn = PgnFormatterService._remove_results(game.pgn)
@@ -169,9 +252,21 @@ class PgnCleaningService:
             chess_game = chess.pgn.read_game(pgn_io)
             if chess_game:
                 game.pgn = PgnService.export_game_to_pgn(chess_game)
+                
+                # Debug log: results removed
+                logging_service = LoggingService.get_instance()
+                logging_service.debug(f"PGN element removed: game={game_id}, element_type=results")
+                
                 return True
+            
+            # Debug log: removal failed
+            logging_service = LoggingService.get_instance()
+            logging_service.debug(f"PGN element removal failed: game={game_id}, element_type=results, reason=parse_failed")
             return False
-        except Exception:
+        except Exception as e:
             # On any error, return False
+            # Debug log: removal error
+            logging_service = LoggingService.get_instance()
+            logging_service.debug(f"PGN element removal error: game={game_id}, element_type=results, error={str(e)}")
             return False
 
