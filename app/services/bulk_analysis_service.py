@@ -724,12 +724,12 @@ class BulkAnalysisService(QObject):
         absolute_max_timeout_seconds = movetime_seconds + timeout_buffer_seconds
         
         # Log timeout configuration for debugging
-        if hasattr(self._engine_service, 'analysis_thread') and self._engine_service.analysis_thread:
-            if hasattr(self._engine_service.analysis_thread, 'uci') and self._engine_service.analysis_thread.uci:
-                self._engine_service.analysis_thread.uci._debug_lifecycle(
-                    "TIMEOUT_CONFIG",
-                    f" (movetime: {actual_time_limit_ms}ms, progress_timeout: {progress_timeout_seconds:.1f}s, absolute_max: {absolute_max_timeout_seconds:.1f}s)"
-                )
+        # if hasattr(self._engine_service, 'analysis_thread') and self._engine_service.analysis_thread:
+        #     if hasattr(self._engine_service.analysis_thread, 'uci') and self._engine_service.analysis_thread.uci:
+        #         self._engine_service.analysis_thread.uci._debug_lifecycle(
+        #             "TIMEOUT_CONFIG",
+        #             f" (movetime: {actual_time_limit_ms}ms, progress_timeout: {progress_timeout_seconds:.1f}s, absolute_max: {absolute_max_timeout_seconds:.1f}s)"
+        #         )
         
         timeout_occurred = False
         

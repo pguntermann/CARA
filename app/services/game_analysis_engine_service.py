@@ -631,12 +631,29 @@ class GameAnalysisEngineService(QObject):
             logging_service = LoggingService.get_instance()
             logging_service.info(f"Game analysis engine thread shutdown: engine={self.engine_name}")
             
+            # Store reference to thread for cleanup
+            thread = self.analysis_thread
+            
             # Set flags to stop the thread, it will exit naturally and cleanup in finally block
-            if self.analysis_thread.isRunning():
-                self.analysis_thread.shutdown()
-            # Don't wait - let thread exit naturally, cleanup will happen in finally block
-            # Qt will handle thread cleanup when the object is garbage collected
-            self.analysis_thread = None
+            if thread.isRunning():
+                thread.shutdown()
+            
+            # Wait for thread to finish before deleting (prevents Qt crash)
+            # The thread should exit quickly once flags are set and it checks them in the loop
+            # UCI cleanup can take up to ~2 seconds, so wait a bit longer
+            if thread.isRunning():
+                # Wait for thread to finish (with timeout to prevent indefinite blocking)
+                if thread.wait(3000):  # Wait up to 3 seconds (allows time for UCI cleanup)
+                    # Thread finished, safe to delete
+                    self.analysis_thread = None
+                else:
+                    # Thread still running after timeout - schedule deletion
+                    # Since thread has parent (this service), Qt will maintain reference and delete when safe
+                    thread.deleteLater()
+                    self.analysis_thread = None  # Clear our reference, Qt will handle deletion
+            else:
+                # Thread not running, safe to delete immediately
+                self.analysis_thread = None
     
     def cleanup(self) -> None:
         """Cleanup resources."""

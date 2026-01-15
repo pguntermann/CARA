@@ -390,6 +390,7 @@ class LoggingService:
         """Shutdown the logging service gracefully.
         
         Flushes all pending log messages and stops the queue listener.
+        Also cleans up empty log files if no messages were logged.
         """
         global _queue_listener, _log_queue
         
@@ -425,5 +426,17 @@ class LoggingService:
                         self._logger.removeHandler(handler)
                     except Exception:
                         pass
+            
+            # Cleanup empty log file if no messages were logged
+            if self._file_enabled and self._log_path:
+                try:
+                    if self._log_path.exists():
+                        # Check if file is empty (0 bytes)
+                        if self._log_path.stat().st_size == 0:
+                            # Delete empty log file
+                            self._log_path.unlink()
+                except (OSError, PermissionError, FileNotFoundError):
+                    # Silently ignore errors (file locked, permissions, already deleted, etc.)
+                    pass
             
             self._initialized = False
