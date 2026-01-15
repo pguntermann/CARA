@@ -1,3 +1,6 @@
 # Mark HTML files as documentation for GitHub language statistics
 *.html linguist-documentation
 
+# Ensure consistent line endings for Python files
+*.py text eol=lf
+

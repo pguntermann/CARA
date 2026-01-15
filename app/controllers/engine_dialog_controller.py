@@ -1,7 +1,7 @@
 """Controller for managing engine dialog operations."""
 
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
 
 from app.services.progress_service import ProgressService
@@ -25,6 +25,7 @@ class EngineValidationThread(QThread):
         super().__init__()
         self.engine_path = engine_path
         self.validation_service = validation_service
+        self._validation_result: Optional[Any] = None  # Store validation result for options retrieval
     
     def run(self) -> None:
         """Run engine validation."""
@@ -59,6 +60,8 @@ class EngineDialogController(QObject):
         self.engine_controller = engine_controller
         self.progress_service = ProgressService.get_instance()
         self.validation_thread: Optional[EngineValidationThread] = None
+        # Cache validated engine options by engine path (cleared when dialog closes)
+        self._cached_options: Dict[Path, List[Dict[str, Any]]] = {}
     
     def set_status(self, message: str) -> None:
         """Set status message.
@@ -106,6 +109,8 @@ class EngineDialogController(QObject):
             self.engine_controller.validation_service
         )
         self.validation_thread.validation_complete.connect(self._on_validation_complete)
+        # Store engine_path for caching options later
+        self._current_validation_path = engine_path
         self.validation_thread.start()
     
     def _on_validation_complete(self, success: bool, error: str, name: str, author: str) -> None:
@@ -117,6 +122,12 @@ class EngineDialogController(QObject):
             name: Engine name if validation succeeded.
             author: Engine author if validation succeeded.
         """
+        # Cache options from validation result if validation succeeded
+        if success and self.validation_thread and hasattr(self.validation_thread, '_validation_result'):
+            result = self.validation_thread._validation_result
+            if result and result.is_valid and hasattr(self, '_current_validation_path'):
+                self._cached_options[self._current_validation_path] = result.options
+        
         # Log engine validation completed
         from app.services.logging_service import LoggingService
         logging_service = LoggingService.get_instance()
@@ -163,8 +174,8 @@ class EngineDialogController(QObject):
         """Prepare engine for addition by saving options and recommended defaults.
         
         This method:
-        1. Saves engine options to file
-        2. Saves recommended defaults for all tasks
+        1. Uses cached engine options from validation (or refreshes if not cached)
+        2. Saves engine options and recommended defaults for all tasks in one operation
         
         Args:
             engine_path: Path to engine executable.
@@ -174,27 +185,41 @@ class EngineDialogController(QObject):
             If success is True, error_message is empty.
         """
         try:
-            # Save engine options to file now that user is adding the engine
-            validation_service = self.engine_controller.validation_service
-            options_saved, options = validation_service.refresh_engine_options(
-                engine_path,
-                save_to_file=True  # Save to file when user adds the engine
-            )
-            
-            # Save recommended defaults for all tasks
+            # Get parameters service and ensure data is loaded
             parameters_service = EngineParametersService.get_instance()
             parameters_service.load()
-            config_service = EngineConfigurationService(self.config)
+            
+            # Get cached options from validation, or refresh if not available
+            options = self._cached_options.get(engine_path)
+            if not options:
+                # Fallback: refresh options if not cached (shouldn't happen in normal flow)
+                validation_service = self.engine_controller.validation_service
+                options_saved, options = validation_service.refresh_engine_options(
+                    engine_path,
+                    save_to_file=False  # Don't save yet, we'll save everything together
+                )
+                if not options_saved or not options:
+                    return (False, "Failed to retrieve engine options")
+            
+            # Set engine options in memory (without saving)
+            engine_path_str = str(engine_path)
+            if engine_path_str not in parameters_service.get_parameters():
+                parameters_service.get_parameters()[engine_path_str] = {}
+            parameters_service.get_parameters()[engine_path_str]["options"] = options
             
             # Get recommended defaults for each task
+            config_service = EngineConfigurationService(self.config)
             tasks_parameters = {
                 "evaluation": config_service.get_recommended_defaults(TaskType.EVALUATION),
                 "game_analysis": config_service.get_recommended_defaults(TaskType.GAME_ANALYSIS),
                 "manual_analysis": config_service.get_recommended_defaults(TaskType.MANUAL_ANALYSIS)
             }
             
-            # Save task parameters
-            parameters_service.set_all_task_parameters(str(engine_path), tasks_parameters)
+            # Set task parameters in memory (without saving)
+            parameters_service.get_parameters()[engine_path_str]["tasks"] = tasks_parameters
+            
+            # Save everything in one operation (both options and task parameters)
+            parameters_service.save()
             
             return (True, "")
         except Exception as e:

@@ -23,6 +23,7 @@ class EngineValidationResult:
     author: str
     version: str
     error_message: str
+    options: List[Dict[str, Any]]  # Parsed engine options from UCI
 
 
 class EngineValidationService:
@@ -63,7 +64,8 @@ class EngineValidationService:
                 name="",
                 author="",
                 version="",
-                error_message=f"Engine file not found: {engine_path}"
+                error_message=f"Engine file not found: {engine_path}",
+                options=[]
             )
         
         # Check if file is executable (basic check)
@@ -73,7 +75,8 @@ class EngineValidationService:
                 name="",
                 author="",
                 version="",
-                error_message=f"Path is not a file: {engine_path}"
+                error_message=f"Path is not a file: {engine_path}",
+                options=[]
             )
         
         try:
@@ -91,7 +94,8 @@ class EngineValidationService:
                     name="",
                     author="",
                     version="",
-                    error_message="Failed to spawn engine process"
+                    error_message="Failed to spawn engine process",
+                    options=[]
                 )
             
             # Initialize UCI and collect lines
@@ -103,7 +107,8 @@ class EngineValidationService:
                     name="",
                     author="",
                     version="",
-                    error_message="Engine did not respond with 'uciok' (timeout or invalid UCI engine)"
+                    error_message="Engine did not respond with 'uciok' (timeout or invalid UCI engine)",
+                    options=[]
                 )
             
             # Parse collected lines for name, author, and options
@@ -141,7 +146,8 @@ class EngineValidationService:
                     name="",
                     author="",
                     version="",
-                    error_message="Engine did not respond with 'uciok' (timeout or invalid UCI engine)"
+                    error_message="Engine did not respond with 'uciok' (timeout or invalid UCI engine)",
+                    options=[]
                 )
             
             if not name:
@@ -150,7 +156,8 @@ class EngineValidationService:
                     name="",
                     author="",
                     version="",
-                    error_message="Engine did not provide 'id name' response"
+                    error_message="Engine did not provide 'id name' response",
+                    options=[]
                 )
             
             # Extract version from author string (common pattern: "Engine Name version")
@@ -165,7 +172,8 @@ class EngineValidationService:
                 name=name,
                 author=author,
                 version=version,
-                error_message=""
+                error_message="",
+                options=options
             )
             
         except subprocess.TimeoutExpired:
@@ -174,7 +182,8 @@ class EngineValidationService:
                 name="",
                 author="",
                 version="",
-                error_message="Engine validation timed out"
+                error_message="Engine validation timed out",
+                options=[]
             )
         except Exception as e:
             return EngineValidationResult(
@@ -182,7 +191,8 @@ class EngineValidationService:
                 name="",
                 author="",
                 version="",
-                error_message=f"Error validating engine: {str(e)}"
+                error_message=f"Error validating engine: {str(e)}",
+                options=[]
             )
     
     @staticmethod

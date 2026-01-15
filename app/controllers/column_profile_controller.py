@@ -119,10 +119,9 @@ class ColumnProfileController:
         # Now switch to the requested profile (this will use the reloaded profile data)
         success = self.profile_model.set_active_profile(profile_name)
         
-        # Save the active profile name change
+        # Update the active profile name in memory (will be saved on explicit save or exit)
         if success:
             self.settings_service.update_active_profile(profile_name)
-            self.settings_service.save()
         return success
     
     def add_profile(self, profile_name: str) -> tuple[bool, str]:
