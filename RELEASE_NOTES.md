@@ -1,3 +1,47 @@
+# CARA v2.5.5 - Logging System, UI Improvements & Bug Fixes
+
+**Release Date:** 15.01.2026
+
+This release introduces a logging system with enhanced debug capabilities, UI improvements including a new NAG display format toggle, and minor bug fixes and code quality improvements.
+
+## New Features
+
+- **NAG Display Format Toggle**: Added menu option "PGN → Display NAG move assessments as..." to toggle between displaying NAGs as symbols (??, ?, ?! ..) or as text descriptions. The setting is persisted in user_settings.json and can now be changed at runtime without editing config.json.
+
+## Enhancements
+
+### Game Analysis
+- **NPS Display**: Added Nodes Per Second (NPS) metric to game analysis progress updates for both single and bulk game analysis, displayed in status messages when available
+- **Engine Validation**: Improved engine validation and persistence business logic to reduce redundant file I/O operations when adding engines
+
+### Logging
+- **Logging System**: Introduced a configurable logging system with support for both console and file output. Console logging is available for manual installations when running from the console, while file logging is available for both manual installations and app bundles. Both logging methods support independent log level configuration (DEBUG, INFO, WARNING, ERROR)
+- **File Logging Features**: File logging includes automatic log rotation based on file size, configurable backup retention, and timestamped log files. Log files are stored alongside user settings and engine parameters, with platform-specific location handling for app bundles
+
+### User Interface
+- **Player Statistics**: Improved Player Statistics UX with None-option to prevent unwanted statistics calculation
+- **Bulk Operations**: Significant performance improvement to bulk tag replacement with larger PGN databases by implementing a metadata cache during loading
+- **Metadata Editing**: Improved performance when editing metadata tag values through refactored MetaDataController
+
+## Bug Fixes
+
+- **Thread Management**: Fixed potential crashes related to thread cleanup and deletion in game analysis, evaluation, and manual analysis engines by ensuring proper thread termination before cleanup
+- **Player Stats View**: Fixed update issue of the player stats view and multiple unnecessary calls to get_active_database
+- **Player Stats Signals**: Fixed missing signal update when clicking on the View-buttons in the player stats error-pattern lines
+- **Annotation View**: Fixed Annotation Detail view resizing issues
+
+## Code Quality
+
+### Refactoring
+- Refactored multiple dialogs and views by moving business logic to dedicated controller classes, improving code organization and maintainability
+
+## Documentation
+
+- Added logging settings documentation to user manual
+- Updated manual to document new NAG display format toggle menu option
+
+---
+
 # CARA v2.5.4 - Game Analysis Improvements and UI Enhancements
 
 **Release Date:** 11.01.2026

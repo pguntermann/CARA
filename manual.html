@@ -646,7 +646,7 @@
                     </div>
                     <div class="header-right">
                         <p class="header-manual-label">User Manual</p>
-                        <p class="header-version">Version 2.5.4</p>
+                        <p class="header-version">Version 2.5.5</p>
                     </div>
                 </div>
             </div>
@@ -748,7 +748,11 @@
                 </li>
                 <li><a href="#advanced-topics">7. Advanced Topics</a>
                     <ul>
-                        <li><a href="#customizing-config">7.1 Customizing config.json</a></li>
+                        <li><a href="#customizing-config">7.1 Customizing config.json</a>
+                            <ul>
+                                <li><a href="#configuring-logging-settings">7.1.7 Configuring Logging Settings</a></li>
+                            </ul>
+                        </li>
                         <li><a href="#understanding-user-settings">7.2 Understanding user_settings.json</a></li>
                         <li><a href="#understanding-engine-parameters">7.3 Understanding engine_parameters.json</a></li>
                         <li><a href="#pgn-metadata-tags">7.4 PGN Metadata Tags Used by CARA</a></li>
@@ -1069,7 +1073,7 @@
                 <p>However, when running CARA as an app bundle, the files are stored in different locations:</p>
                 
                 <ul>
-                    <li><strong>Windows:</strong> Files are stored in your user data directory: <code>%APPDATA%\CARA\</code> (usually <code>C:\Users\YourUsername\AppData\Roaming\CARA\</code>).</li>
+                    <li><strong>Windows:</strong> Files are stored in the app directory (where CARA.exe is located) if the directory has write access (portable mode). If the app directory cannot be written to, files are stored in your user data directory: <code>%APPDATA%\CARA\</code> (usually <code>C:\Users\YourUsername\AppData\Roaming\CARA\</code>).</li>
                     
                     <li><strong>macOS:</strong> Files are stored in <code>~/Library/Application Support/CARA/</code>.</li>
                 </ul>
@@ -1077,7 +1081,7 @@
                 <div class="tip-box">
                     <strong>Finding Your Configuration Files:</strong> If you're using an app bundle and need to locate your configuration files:
                     <ul style="margin-top: 10px;">
-                        <li><strong>Windows:</strong> Press <code>Win+R</code>, type <code>%APPDATA%\CARA</code>, and press Enter to open the folder in File Explorer.</li>
+                        <li><strong>Windows:</strong> First check the directory where CARA.exe is located. If the files are not there, press <code>Win+R</code>, type <code>%APPDATA%\CARA</code>, and press Enter to open the folder in File Explorer.</li>
                         <li><strong>macOS:</strong> Open Finder, press <code>⌘+Shift+G</code> (Go to Folder), type <code>~/Library/Application Support/CARA</code>, and press Enter.</li>
                     </ul>
                 </div>
@@ -1289,7 +1293,7 @@
                 <p>The content is displayed in a formatted, color-coded view with syntax highlighting to distinguish between different elements.</p>
                 
                 <div class="tip-box">
-                    <strong>Quick Tip:</strong> You can customize the colors, fonts, and display format (e.g., whether annotations appear as symbols or text, whether NAGs show as text descriptions) by editing <code>config.json</code>. See <a href="#customizing-pgn-display-formatting">section 7.1.6 "Customizing PGN Display Formatting"</a> for advanced customization options.
+                    <strong>Quick Tip:</strong> You can customize the display format for NAG move assessments (symbols vs. text) using the PGN menu (Display NAG move assessments as...). Colors and fonts can be customized by editing <code>config.json</code>. See <a href="#customizing-pgn-display-formatting">section 7.1.6 "Customizing PGN Display Formatting"</a> for advanced customization options.
                 </div>
                 
                 <p>As you navigate through the game using the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys, the active move is highlighted in the PGN notation. Alternatively, you can click on any main-line move in the PGN notation to jump directly to that position in the game. Note that clicking on variation moves, comments, or metadata tags does not trigger navigation—only main-line moves are clickable.</p>
@@ -1304,6 +1308,7 @@
                     <li><span class="menu-item">PGN → Show Non-Standard Tags</span> (<code>Ctrl+Shift+T</code> / <code>⌘+Shift+T</code>): Toggle display of non-standard tags like [%evp] and [%mdl] within comments</li>
                     <li><span class="menu-item">PGN → Show Annotations</span> (<code>Ctrl+Shift+A</code> / <code>⌘+Shift+A</code>): Toggle display of move annotations, including symbol-based annotations (!, !!, ?, ??, !?, ?!) and NAGs (Numeric Annotation Glyphs).</li>
                     <li><span class="menu-item">PGN → Show Results</span> (<code>Ctrl+R</code> / <code>⌘+R</code>): Toggle display of game results (1-0, 0-1, 1/2-1/2)</li>
+                    <li><span class="menu-item">PGN → Display NAG move assessments as...</span>: Choose between displaying NAGs as symbols (??, ?, ?! ..) or as text descriptions</li>
                 </ul>
                 
                 <p>The PGN menu also provides options to permanently remove elements from the game's PGN. The following options are available:</p>
@@ -2276,16 +2281,24 @@
                 <p><strong>Shortcut:</strong> <code>Ctrl+R</code> / <code>⌘+R</code></p>
                 <p>Toggles the display of game results (1-0, 0-1, 1/2-1/2) in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.7 Remove Comments</h5>
+                <h5>6.4.7 Display NAG move assessments as...</h5>
+                <p>This submenu allows you to choose how NAG (Numeric Annotation Glyph) move assessments are displayed in the PGN Notation Pane:</p>
+                <ul>
+                    <li><span class="menu-item">Symbols (??, ?, ?! ..)</span>: Displays common NAGs as symbols (!, !!, ?, ??, !?, ?!) and other NAGs as numbers</li>
+                    <li><span class="menu-item">Text</span>: Displays all NAGs as readable text descriptions in parentheses (e.g., "good move", "poor move", "White has a slight advantage")</li>
+                </ul>
+                <p>The selected option is saved in your user settings and persists between application sessions.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
+                
+                <h5>6.4.8 Remove Comments</h5>
                 <p>Permanently removes all comments from the active game's PGN notation. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.8 Remove Variations</h5>
+                <h5>6.4.9 Remove Variations</h5>
                 <p>Permanently removes all move variations from the active game's PGN notation. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.9 Remove Non-Standard Tags</h5>
+                <h5>6.4.10 Remove Non-Standard Tags</h5>
                 <p>Permanently removes non-standard tags (like [%evp] and [%mdl]) from comments in the active game's PGN. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.10 Remove Annotations</h5>
+                <h5>6.4.11 Remove Annotations</h5>
                 <p>Permanently removes all move annotations (symbols and NAGs) from the active game's PGN notation. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
             </div>
 
@@ -2735,6 +2748,8 @@
                 <h5 id="customizing-pgn-display-formatting">7.1.6 Customizing PGN Display Formatting</h5>
                 <p>CARA allows you to customize the visual appearance of PGN notation in the Detail Panel, including colors, fonts, and how annotations and NAGs are displayed.</p>
                 
+                <p><strong>Note:</strong> The display format for NAG move assessments (symbols vs. text) can be changed via the PGN menu (Display NAG move assessments as...) and is not configured through config.json.</p>
+                
                 <p>To customize PGN display formatting:</p>
                 <ol>
                     <li><strong>Locate the PGN formatting configuration:</strong><br>
@@ -2760,7 +2775,6 @@
                     
                     <p><strong>Annotation Display Settings:</strong></p>
                     <ul>
-                        <li><code>"annotations.use_symbols"</code> - When <code>true</code>, symbol-based annotations (!, !!, ?, ??, !?, ?!) are displayed as symbols. When <code>false</code>, they are displayed as text descriptions.</li>
                         <li><code>"annotations.good"</code> - Color and bold styling for good move annotations (!)</li>
                         <li><code>"annotations.bad"</code> - Color and bold styling for poor move annotations (?)</li>
                         <li><code>"annotations.interesting"</code> - Color and bold styling for interesting move annotations (!?)</li>
@@ -2769,7 +2783,6 @@
                     
                     <p><strong>NAG (Numeric Annotation Glyph) Settings:</strong></p>
                     <ul>
-                        <li><code>"nags.show_text"</code> - When <code>true</code>, NAGs are displayed as readable text descriptions in parentheses (e.g., "good move", "poor move", "White has a slight advantage"). When <code>false</code>, NAGs are displayed as symbols or numbers.</li>
                         <li><code>"nags.color"</code> - Text color for NAG text</li>
                         <li><code>"nags.bold"</code> - Whether NAG text is displayed in bold</li>
                         <li><code>"nags.italic"</code> - Whether NAG text is displayed in italic</li>
@@ -2824,6 +2837,109 @@
                     <li><strong>Save and restart:</strong><br>
                     Save the file and restart CARA for the changes to take effect. The new formatting will apply to all PGN notation displayed in the Detail Panel.</li>
                 </ol>
+            </div>
+            
+            <div class="outline-item">
+                <h5 id="configuring-logging-settings">7.1.7 Configuring Logging Settings</h5>
+                <p>CARA provides configurable logging to help with debugging and troubleshooting. Logging can be configured for both console output and file output, with separate log levels for each.</p>
+                
+                <p><strong>Important:</strong> Console logging is only available when running CARA from the console on manual installation. When using app bundles (pre-built Windows or macOS applications), console logging is not available and only file-based logging can be used.</p>
+                
+                <p>To configure logging settings:</p>
+                <ol>
+                    <li><strong>Locate the logging configuration:</strong><br>
+                    Open <code>config.json</code> in a text editor and navigate to: <code>logging</code></li>
+                    
+                    <li><strong>Configure console logging (manual installations only):</strong><br>
+                    The console logging section contains:
+                    <ul>
+                        <li><code>"enabled": true</code> - Enable or disable console logging. Set to <code>false</code> to disable console output.</li>
+                        <li><code>"level": "ERROR"</code> - Log level for console output. Valid values are: <code>"DEBUG"</code>, <code>"INFO"</code>, <code>"WARNING"</code>, <code>"ERROR"</code>. Only messages at or above this level will be displayed.</li>
+                    </ul>
+                    <div class="tip-box">
+                        <strong>Note:</strong> Console logging has no effect when running app bundles, as there is no console available. For app bundles, use file logging instead.
+                    </div>
+                    </li>
+                    
+                    <li><strong>Configure file logging:</strong><br>
+                    The file logging section contains:
+                    <ul>
+                        <li><code>"enabled": true</code> - Enable or disable file logging. Set to <code>false</code> to disable log file creation.</li>
+                        <li><code>"level": "ERROR"</code> - Log level for file output. Valid values are: <code>"DEBUG"</code>, <code>"INFO"</code>, <code>"WARNING"</code>, <code>"ERROR"</code>. Only messages at or above this level will be written to the log file.</li>
+                        <li><code>"max_size_mb": 10</code> - Maximum size of the log file in megabytes before rotation. When the file reaches this size, it is rotated to a backup file.</li>
+                        <li><code>"backup_count": 5</code> - Number of backup log files to keep. Older files are automatically deleted when this limit is exceeded.</li>
+                        <li><code>"filename": "cara.log"</code> - Base filename for log files. Log files are automatically timestamped with the date (e.g., <code>cara_2026-01-15.log</code>).</li>
+                    </ul>
+                    Example configuration:
+                    <pre><code>"logging": {
+    "console": {
+        "enabled": true,
+        "level": "ERROR"
+    },
+    "file": {
+        "enabled": true,
+        "level": "DEBUG",
+        "max_size_mb": 10,
+        "backup_count": 5,
+        "filename": "cara.log"
+    }
+}</code></pre>
+                    </li>
+                    
+                    <li><strong>Log file location:</strong><br>
+                    Log files are created in the same location as <code>user_settings.json</code> and <code>engine_parameters.json</code>:
+                    <ul>
+                        <li><strong>Manual installations:</strong> Log files are created in the CARA root directory (where <code>cara.py</code> is located).</li>
+                        <li><strong>Windows app bundles:</strong> Log files are stored in the app directory (where CARA.exe is located) if the directory has write access (portable mode). If the app directory cannot be written to, log files are stored in <code>%APPDATA%\CARA\</code> (usually <code>C:\Users\YourUsername\AppData\Roaming\CARA\</code>).</li>
+                        <li><strong>macOS app bundles:</strong> Log files are stored in <code>~/Library/Application Support/CARA/</code>.</li>
+                    </ul>
+                    <div class="tip-box">
+                        <strong>Finding Your Log Files:</strong> If you're using an app bundle and need to locate your log files:
+                        <ul style="margin-top: 10px;">
+                            <li><strong>Windows:</strong> First check the directory where CARA.exe is located. If the files are not there, press <code>Win+R</code>, type <code>%APPDATA%\CARA</code>, and press Enter to open the folder in File Explorer.</li>
+                            <li><strong>macOS:</strong> Open Finder, press <code>⌘+Shift+G</code> (Go to Folder), type <code>~/Library/Application Support/CARA</code>, and press Enter.</li>
+                        </ul>
+                    </div>
+                    </li>
+                    
+                    <li><strong>Save and restart:</strong><br>
+                    Save the file and restart CARA for the changes to take effect.</li>
+                </ol>
+                
+                <h5>7.1.7.1 Advanced Debug Logging</h5>
+                <p>In addition to the standard logging levels, CARA provides detailed debug logging for UCI engine communication and AI service interactions. These debug logs provide detailed information about:</p>
+                <ul>
+                    <li><strong>UCI Lifecycle:</strong> Engine process lifecycle events (started, stopped, quit, crashed)</li>
+                    <li><strong>UCI Outbound:</strong> Commands sent to chess engines (e.g., "uci", "isready", "position", "go")</li>
+                    <li><strong>UCI Inbound:</strong> Responses received from chess engines (e.g., "uciok", "readyok", "bestmove")</li>
+                    <li><strong>AI Outbound:</strong> Requests sent to AI services (OpenAI, Anthropic)</li>
+                    <li><strong>AI Inbound:</strong> Responses received from AI services</li>
+                </ul>
+                
+                <p>To enable these advanced debug logs:</p>
+                <ol>
+                    <li><strong>Enable the Debug menu:</strong><br>
+                    Open <code>config.json</code> in a text editor and navigate to: <code>debug → show_debug_menu</code><br>
+                    Set <code>"show_debug_menu": true</code> to enable the Debug menu in the application.</li>
+                    
+                    <li><strong>Restart CARA:</strong><br>
+                    After enabling the debug menu, restart CARA. The Debug menu will now appear in the menu bar.</li>
+                    
+                    <li><strong>Enable debug options:</strong><br>
+                    Use the Debug menu to enable the desired debug logging options:
+                    <ul>
+                        <li><span class="menu-item">Debug → Debug UCI Lifecycle</span> - Enable UCI lifecycle event logging</li>
+                        <li><span class="menu-item">Debug → Debug UCI Outbound</span> - Enable UCI command logging</li>
+                        <li><span class="menu-item">Debug → Debug UCI Inbound</span> - Enable UCI response logging</li>
+                        <li><span class="menu-item">Debug → Debug AI Outbound</span> - Enable AI request logging</li>
+                        <li><span class="menu-item">Debug → Debug AI Inbound</span> - Enable AI response logging</li>
+                    </ul>
+                    These options are checkable menu items that can be toggled on or off at runtime. When enabled, the corresponding debug messages will be written to the log file (if file logging is enabled) or displayed in the console.</li>
+                </ol>
+                
+                <div class="tip-box">
+                    <strong>Note:</strong> Advanced debug logging can generate a large volume of log messages, especially UCI Inbound logs during engine analysis. Use these options only when troubleshooting specific issues. The debug options are runtime settings and do not persist between application sessions—you'll need to re-enable them each time you start CARA.
+                </div>
             </div>
             
             <div class="outline-item">
@@ -3333,7 +3449,7 @@
         </section>
 
         <footer style="margin-top: 50px; padding-top: 20px; border-top: 2px solid rgb(60, 60, 65); color: rgb(180, 180, 180); text-align: center;">
-            <p>CARA - Chess Analysis and Review Application v2.5.4</p>
+            <p>CARA - Chess Analysis and Review Application v2.5.5</p>
             <p>Copyright (C) 2025 Philipp Guntermann</p>
             <p>This program is free software: you can redistribute it and/or modify it under the terms of the <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" style="color: rgb(100, 150, 255);">GNU General Public License version 3</a> (GPL-3.0) or any later version.</p>
             <p>This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.</p>
