@@ -181,7 +181,7 @@ CARA uses three configuration files:
 
 ### Video Tutorials
 
-[YouTube Playlist](https://www.youtube.com/playlist?list=PLvHVh9RRAd6berWo4__KW43LVX0KbndOx)
+[YouTube Channel](https://www.youtube.com/@CARA-Chess)
 
 Technical documentation for developers:
 

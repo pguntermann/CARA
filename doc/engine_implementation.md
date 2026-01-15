@@ -92,8 +92,15 @@ The UCI layer automatically filters out zero-value parameters:
 
 ### Configuration Storage
 
-Engine parameters are stored in `engine_parameters.json` in the app root directory:
+Engine parameters are stored in `engine_parameters.json`. The file location is determined by `resolve_data_file_path()` (same logic as `user_settings.json`):
 
+- **Portable mode**: If app root has write access, file is stored in app root directory
+- **User data directory**: If app root is not writable (or macOS app bundle), file is stored in platform-specific user data directory:
+  - Windows: `%APPDATA%\CARA\`
+  - macOS: `~/Library/Application Support/CARA/`
+  - Linux: `~/.local/share/CARA/`
+
+File structure:
 ```json
 {
   "engine_path": {
@@ -165,20 +172,36 @@ EngineValidationService handles engine discovery and option parsing:
 - **validate_engine(engine_path, debug_callback=None, save_to_file=True)**:
   - Spawns engine and sends "uci" command
   - Parses "id name", "id author", and "option" lines
+  - Returns `EngineValidationResult` containing:
+    - Validation status (is_valid, error_message)
+    - Engine information (name, author, version)
+    - Parsed options list (stored in `options` field)
   - Stores parsed options to engine_parameters.json if save_to_file=True
-  - Returns EngineValidationResult with validation status
   - Optional debug_callback for custom debug message handling
+  - **Note**: During engine addition, called with `save_to_file=False` to avoid premature persistence
 
 - **refresh_engine_options(engine_path, debug_callback=None, save_to_file=True)**:
   - Re-connects to engine and re-parses options
   - Useful for refreshing defaults or when options may have changed
   - Can update UI without saving to file (save_to_file=False)
+  - Returns tuple of (success: bool, options: List[Dict[str, Any]])
   - Optional debug_callback for custom debug message handling
 
 - **Option Parsing**:
   - Parses UCI option strings: "option name Threads type spin default 1 min 1 max 1024"
   - Extracts: name, type (spin/check/combo/string/button), default, min, max, var
   - Stores as structured JSON for UI generation
+
+### Engine Dialog Controller Caching
+
+`EngineDialogController` implements option caching to optimize the engine addition flow:
+
+- **`_cached_options`**: Dictionary mapping engine paths to parsed options lists
+- **Caching Flow**:
+  1. `EngineValidationThread` stores `EngineValidationResult` in `_validation_result`
+  2. `_on_validation_complete()` extracts `result.options` and caches in `_cached_options[engine_path]`
+  3. `prepare_engine_for_addition()` retrieves from cache (or falls back to `refresh_engine_options()` if not cached)
+- **Benefits**: Avoids redundant engine connections and option parsing when adding validated engines
 
 ## Engine Services Implementation
 
@@ -283,13 +306,22 @@ When a user adds an engine:
 2. `EngineValidationService.validate_engine()` is called with `save_to_file=False`
    - Validates engine is UCI-compliant
    - Parses engine options
+   - Returns `EngineValidationResult` containing options (stored in memory)
    - Does NOT save to engine_parameters.json yet
-3. User clicks "Add Engine" button
-4. `EngineValidationService.refresh_engine_options()` is called with `save_to_file=True`
-   - Re-parses options and saves to engine_parameters.json
-5. `EngineConfigurationService.get_recommended_defaults()` is called for each task
-6. `EngineParametersService.set_all_task_parameters()` saves recommended defaults
+3. `EngineValidationThread` stores the full `EngineValidationResult` (including options) in `_validation_result`
+4. `EngineDialogController._on_validation_complete()` caches options in `_cached_options` dict (keyed by engine path)
+5. User clicks "Add Engine" button
+6. `EngineDialogController.prepare_engine_for_addition()` is called:
+   - Retrieves cached options from `_cached_options` (or falls back to `refresh_engine_options()` with `save_to_file=False` if not cached)
+   - Loads `EngineParametersService` once
+   - Updates `EngineParametersService.get_parameters()` in memory for both options and task parameters (recommended defaults from `EngineConfigurationService`)
+   - Calls `EngineParametersService.save()` once at the end to persist all changes
 7. Engine is added to EngineModel
+
+**Key Points:**
+- Options are cached after validation to avoid re-parsing when adding the engine
+- All persistence operations (options + task parameters) are combined into a single `save()` call
+- This reduces redundant file I/O and ensures atomic updates
 
 ### Engine Configuration
 
@@ -457,7 +489,12 @@ Debug menu items (if `show_debug_menu` is enabled in config.json):
 
 ## File Locations
 
-- **engine_parameters.json**: App root directory
+- **engine_parameters.json**: Location determined by `resolve_data_file_path()` (same logic as `user_settings.json`)
+  - **Portable mode**: App root directory (if writable)
+  - **User data directory**: Platform-specific location if app root is not writable or macOS app bundle:
+    - Windows: `%APPDATA%\CARA\`
+    - macOS: `~/Library/Application Support/CARA/`
+    - Linux: `~/.local/share/CARA/`
   - Stores engine-specific parameters per task
   - Created automatically when first engine is added
   - Updated when user configures engine parameters
