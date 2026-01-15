@@ -110,11 +110,13 @@ class EvaluationEngineThread(QThread):
         self._update_position(fen)
     
     def shutdown(self) -> None:
-        """Shutdown engine process."""
+        """Shutdown engine process.
+        
+        Sets flags to stop the thread. Cleanup will be handled by the thread's finally block.
+        """
         self.running = False
         self._stop_requested = True
-        if self.uci:
-            self.uci.cleanup()
+        # Note: cleanup() is called in run()'s finally block, not here
     
     def _update_position(self, fen: str) -> None:
         """Update engine position.
@@ -634,6 +636,8 @@ class EvaluationEngineService(QObject):
         # Create and start new evaluation thread
         self.current_engine_path = engine_path
         self.evaluation_thread = EvaluationEngineThread(engine_path, max_depth, self.update_interval_ms, max_threads, engine_options, movetime)
+        # Set service as parent so Qt maintains reference for deleteLater()
+        self.evaluation_thread.setParent(self)
         self.evaluation_thread.score_update.connect(self.evaluation_update.emit)
         self.evaluation_thread.error_occurred.connect(self.error_occurred.emit)
         self.evaluation_thread.start_evaluation(fen)
@@ -674,15 +678,35 @@ class EvaluationEngineService(QObject):
     
     def stop_evaluation(self) -> None:
         """Stop current evaluation."""
-        if self.evaluation_thread:
-            # Log evaluation engine stopped
-            logging_service = LoggingService.get_instance()
-            logging_service.info(f"Evaluation engine stopped: path={self.current_engine_path}")
-            
-            # Set flags to stop the thread, it will exit naturally and cleanup in finally block
-            self.evaluation_thread.stop_evaluation()
-            self.evaluation_thread.shutdown()
-            # Don't wait - let thread exit naturally, cleanup will happen in finally block
+        if not self.evaluation_thread:
+            return
+        
+        # Log evaluation engine stopped
+        logging_service = LoggingService.get_instance()
+        logging_service.info(f"Evaluation engine stopped: path={self.current_engine_path}")
+        
+        # Store reference to thread for cleanup
+        thread = self.evaluation_thread
+        
+        # Set flags to stop the thread, it will exit naturally and cleanup in finally block
+        thread.stop_evaluation()
+        thread.shutdown()
+        
+        # Wait for thread to finish before deleting (prevents Qt crash)
+        # The thread should exit quickly once flags are set and it checks them in the loop
+        # UCI cleanup can take up to ~2 seconds, so wait a bit longer
+        if thread.isRunning():
+            # Wait for thread to finish (with timeout to prevent indefinite blocking)
+            if thread.wait(3000):  # Wait up to 3 seconds (allows time for UCI cleanup)
+                # Thread finished, safe to delete
+                self.evaluation_thread = None
+            else:
+                # Thread still running after timeout - schedule deletion
+                # Since thread has parent (this service), Qt will maintain reference and delete when safe
+                thread.deleteLater()
+                self.evaluation_thread = None  # Clear our reference, Qt will handle deletion
+        else:
+            # Thread not running, safe to delete immediately
             self.evaluation_thread = None
     
     def suspend_evaluation(self) -> None:
