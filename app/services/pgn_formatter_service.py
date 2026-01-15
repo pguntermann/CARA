@@ -885,13 +885,15 @@ class PgnFormatterService:
         return result.strip()
     
     @staticmethod
-    def format_pgn_to_html(pgn_text: str, config: Dict[str, Any], active_move_ply: int = 0) -> Tuple[str, List[Tuple[str, int, bool]]]:
+    def format_pgn_to_html(pgn_text: str, config: Dict[str, Any], active_move_ply: int = 0, pgn_notation_settings: Optional[Dict[str, Any]] = None) -> Tuple[str, List[Tuple[str, int, bool]]]:
         """Format plain PGN text to HTML with colors and styles.
         
         Args:
             pgn_text: Plain PGN text string.
             config: Configuration dictionary containing formatting settings.
             active_move_ply: Ply index of the active move to highlight (0 = starting position).
+            pgn_notation_settings: Optional user settings for PGN notation (overrides config.json).
+                If provided, should contain 'use_symbols_for_nags' and 'show_nag_text' keys.
             
         Returns:
             Tuple of (formatted_html, move_info) where:
@@ -941,9 +943,15 @@ class PgnFormatterService:
         # or to readable text, depending on user preference
         # Other NAGs are converted to readable text
         nags_config = formatting.get('nags', {})
-        show_nag_text = nags_config.get('show_text', True)  # Whether to show text or just symbol for non-symbol NAGs
         annotations_config = formatting.get('annotations', {})
-        use_symbols_for_common_nags = annotations_config.get('use_symbols', True)  # Whether to convert common NAGs to symbols
+        
+        # Use user settings if provided, otherwise fall back to config.json
+        if pgn_notation_settings:
+            show_nag_text = pgn_notation_settings.get('show_nag_text', True)
+            use_symbols_for_common_nags = pgn_notation_settings.get('use_symbols_for_nags', True)
+        else:
+            show_nag_text = nags_config.get('show_text', True)  # Whether to show text or just symbol for non-symbol NAGs
+            use_symbols_for_common_nags = annotations_config.get('use_symbols', True)  # Whether to convert common NAGs to symbols
         
         # Pattern to match NAGs: $ followed by one or more digits
         # But NOT in metadata tags - we need to skip headers

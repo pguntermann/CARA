@@ -348,6 +348,8 @@ class UserSettingsService:
                         model.set_board_visibility(section_dict)
                     elif key == "pgn_visibility":
                         model.set_pgn_visibility(section_dict)
+                    elif key == "pgn_notation":
+                        model.set_pgn_notation(section_dict)
                     elif key == "game_analysis":
                         model.set_game_analysis(section_dict)
                     elif key == "game_analysis_settings":
@@ -455,6 +457,17 @@ class UserSettingsService:
         current = model.get_pgn_visibility()
         current.update(visibility)
         model.set_pgn_visibility(current)
+    
+    def update_pgn_notation(self, notation: Dict[str, Any]) -> None:
+        """Update PGN notation settings.
+        
+        Args:
+            notation: Dictionary with PGN notation settings.
+        """
+        model = self.get_model()
+        current = model.get_pgn_notation()
+        current.update(notation)
+        model.set_pgn_notation(current)
     
     def update_game_analysis(self, settings: Dict[str, Any]) -> None:
         """Update game analysis settings (menu toggles).

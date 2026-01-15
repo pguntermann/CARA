@@ -890,5 +890,9 @@
     "use_anthropic_models": false,
     "include_analysis_data_in_preprompt": true,
     "include_metadata_in_preprompt": true
+  },
+  "pgn_notation": {
+    "use_symbols_for_nags": true,
+    "show_nag_text": false
   }
 }

@@ -665,7 +665,7 @@
                 <p>The content is displayed in a formatted, color-coded view with syntax highlighting to distinguish between different elements.</p>
                 
                 <div class="tip-box">
-                    <strong>Quick Tip:</strong> You can customize the colors, fonts, and display format (e.g., whether annotations appear as symbols or text, whether NAGs show as text descriptions) by editing <code>config.json</code>. See <a href="#customizing-pgn-display-formatting">section 7.1.6 "Customizing PGN Display Formatting"</a> for advanced customization options.
+                    <strong>Quick Tip:</strong> You can customize the display format for NAG move assessments (symbols vs. text) using the PGN menu (Display NAG move assessments as...). Colors and fonts can be customized by editing <code>config.json</code>. See <a href="#customizing-pgn-display-formatting">section 7.1.6 "Customizing PGN Display Formatting"</a> for advanced customization options.
                 </div>
                 
                 <p>As you navigate through the game using the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys, the active move is highlighted in the PGN notation. Alternatively, you can click on any main-line move in the PGN notation to jump directly to that position in the game. Note that clicking on variation moves, comments, or metadata tags does not trigger navigation—only main-line moves are clickable.</p>
@@ -680,6 +680,7 @@
                     <li><span class="menu-item">PGN → Show Non-Standard Tags</span> (<code>Ctrl+Shift+T</code> / <code>⌘+Shift+T</code>): Toggle display of non-standard tags like [%evp] and [%mdl] within comments</li>
                     <li><span class="menu-item">PGN → Show Annotations</span> (<code>Ctrl+Shift+A</code> / <code>⌘+Shift+A</code>): Toggle display of move annotations, including symbol-based annotations (!, !!, ?, ??, !?, ?!) and NAGs (Numeric Annotation Glyphs).</li>
                     <li><span class="menu-item">PGN → Show Results</span> (<code>Ctrl+R</code> / <code>⌘+R</code>): Toggle display of game results (1-0, 0-1, 1/2-1/2)</li>
+                    <li><span class="menu-item">PGN → Display NAG move assessments as...</span>: Choose between displaying NAGs as symbols (??, ?, ?! ..) or as text descriptions</li>
                 </ul>
                 
                 <p>The PGN menu also provides options to permanently remove elements from the game's PGN. The following options are available:</p>
@@ -1652,16 +1653,24 @@
                 <p><strong>Shortcut:</strong> <code>Ctrl+R</code> / <code>⌘+R</code></p>
                 <p>Toggles the display of game results (1-0, 0-1, 1/2-1/2) in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.7 Remove Comments</h5>
+                <h5>6.4.7 Display NAG move assessments as...</h5>
+                <p>This submenu allows you to choose how NAG (Numeric Annotation Glyph) move assessments are displayed in the PGN Notation Pane:</p>
+                <ul>
+                    <li><span class="menu-item">Symbols (??, ?, ?! ..)</span>: Displays common NAGs as symbols (!, !!, ?, ??, !?, ?!) and other NAGs as numbers</li>
+                    <li><span class="menu-item">Text</span>: Displays all NAGs as readable text descriptions in parentheses (e.g., "good move", "poor move", "White has a slight advantage")</li>
+                </ul>
+                <p>The selected option is saved in your user settings and persists between application sessions.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
+                
+                <h5>6.4.8 Remove Comments</h5>
                 <p>Permanently removes all comments from the active game's PGN notation. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.8 Remove Variations</h5>
+                <h5>6.4.9 Remove Variations</h5>
                 <p>Permanently removes all move variations from the active game's PGN notation. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.9 Remove Non-Standard Tags</h5>
+                <h5>6.4.10 Remove Non-Standard Tags</h5>
                 <p>Permanently removes non-standard tags (like [%evp] and [%mdl]) from comments in the active game's PGN. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.10 Remove Annotations</h5>
+                <h5>6.4.11 Remove Annotations</h5>
                 <p>Permanently removes all move annotations (symbols and NAGs) from the active game's PGN notation. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
             </div>
 
@@ -2111,6 +2120,8 @@
                 <h5 id="customizing-pgn-display-formatting">7.1.6 Customizing PGN Display Formatting</h5>
                 <p>CARA allows you to customize the visual appearance of PGN notation in the Detail Panel, including colors, fonts, and how annotations and NAGs are displayed.</p>
                 
+                <p><strong>Note:</strong> The display format for NAG move assessments (symbols vs. text) can be changed via the PGN menu (Display NAG move assessments as...) and is not configured through config.json.</p>
+                
                 <p>To customize PGN display formatting:</p>
                 <ol>
                     <li><strong>Locate the PGN formatting configuration:</strong><br>
@@ -2136,7 +2147,6 @@
                     
                     <p><strong>Annotation Display Settings:</strong></p>
                     <ul>
-                        <li><code>"annotations.use_symbols"</code> - When <code>true</code>, symbol-based annotations (!, !!, ?, ??, !?, ?!) are displayed as symbols. When <code>false</code>, they are displayed as text descriptions.</li>
                         <li><code>"annotations.good"</code> - Color and bold styling for good move annotations (!)</li>
                         <li><code>"annotations.bad"</code> - Color and bold styling for poor move annotations (?)</li>
                         <li><code>"annotations.interesting"</code> - Color and bold styling for interesting move annotations (!?)</li>
@@ -2145,7 +2155,6 @@
                     
                     <p><strong>NAG (Numeric Annotation Glyph) Settings:</strong></p>
                     <ul>
-                        <li><code>"nags.show_text"</code> - When <code>true</code>, NAGs are displayed as readable text descriptions in parentheses (e.g., "good move", "poor move", "White has a slight advantage"). When <code>false</code>, NAGs are displayed as symbols or numbers.</li>
                         <li><code>"nags.color"</code> - Text color for NAG text</li>
                         <li><code>"nags.bold"</code> - Whether NAG text is displayed in bold</li>
                         <li><code>"nags.italic"</code> - Whether NAG text is displayed in italic</li>

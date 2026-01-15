@@ -541,6 +541,28 @@ class MainWindow(QMainWindow):
         self.show_results_action.triggered.connect(self._on_show_results_toggled)
         pgn_menu.addAction(self.show_results_action)
         
+        # Separator before NAG display options
+        pgn_menu.addSeparator()
+        
+        # Display NAG move assessments as... submenu
+        self.nag_display_menu = pgn_menu.addMenu("Display NAG move assessments as...")
+        # Apply menu styling to submenu (same as other submenus)
+        self._apply_menu_styling(self.nag_display_menu)
+        
+        # Symbols action (checkable)
+        self.nag_display_symbols_action = QAction("Symbols (??, ?, ?! ..)", self)
+        self.nag_display_symbols_action.setCheckable(True)
+        self.nag_display_symbols_action.setChecked(True)  # Default (will be loaded from settings)
+        self.nag_display_symbols_action.triggered.connect(lambda: self._on_nag_display_mode_selected(True))
+        self.nag_display_menu.addAction(self.nag_display_symbols_action)
+        
+        # Text action (checkable)
+        self.nag_display_text_action = QAction("Text", self)
+        self.nag_display_text_action.setCheckable(True)
+        self.nag_display_text_action.setChecked(False)  # Default (will be loaded from settings)
+        self.nag_display_text_action.triggered.connect(lambda: self._on_nag_display_mode_selected(False))
+        self.nag_display_menu.addAction(self.nag_display_text_action)
+        
         # Separator for cleaning actions
         pgn_menu.addSeparator()
         
@@ -3454,6 +3476,33 @@ Visibility Settings:
         status = "shown" if checked else "hidden"
         self.controller.set_status(f"Results {status} in PGN view")
     
+    def _on_nag_display_mode_selected(self, use_symbols: bool) -> None:
+        """Handle NAG display mode selection (Symbols or Text).
+        
+        Args:
+            use_symbols: True for symbols mode, False for text mode.
+        """
+        # Update check states (exclusive group)
+        self.nag_display_symbols_action.setChecked(use_symbols)
+        self.nag_display_text_action.setChecked(not use_symbols)
+        
+        # Update user settings
+        from app.services.user_settings_service import UserSettingsService
+        settings_service = UserSettingsService.get_instance()
+        settings_service.update_pgn_notation({
+            "use_symbols_for_nags": use_symbols,
+            "show_nag_text": not use_symbols
+        })
+        
+        # Refresh PGN display
+        if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
+            pgn_view = self.detail_panel.pgn_view
+            if hasattr(pgn_view, '_current_pgn_text'):
+                pgn_view.set_pgn_text(pgn_view._current_pgn_text)
+        
+        mode = "symbols" if use_symbols else "text"
+        self.controller.set_status(f"NAG move assessments displayed as {mode}")
+    
     def _on_show_non_standard_tags_toggled(self, checked: bool) -> None:
         """Handle Show Non-Standard Tags toggle.
         
@@ -4376,6 +4425,16 @@ Visibility Settings:
         show_results = pgn_visibility.get("show_results", True)
         show_non_standard_tags = pgn_visibility.get("show_non_standard_tags", False)
         
+        # Load PGN notation settings
+        pgn_notation = settings.get("pgn_notation", {})
+        use_symbols_for_nags = pgn_notation.get("use_symbols_for_nags", True)
+        show_nag_text = pgn_notation.get("show_nag_text", False)
+        
+        # Update NAG display menu actions
+        if hasattr(self, 'nag_display_symbols_action') and hasattr(self, 'nag_display_text_action'):
+            self.nag_display_symbols_action.setChecked(use_symbols_for_nags)
+            self.nag_display_text_action.setChecked(not use_symbols_for_nags)
+        
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
             pgn_view = self.detail_panel.pgn_view
             if hasattr(pgn_view, 'set_show_metadata'):
@@ -4541,6 +4600,14 @@ Visibility Settings:
                     "show_non_standard_tags": pgn_view._show_non_standard_tags if hasattr(pgn_view, '_show_non_standard_tags') else False
                 }
         
+        # Collect PGN notation settings from menu actions
+        pgn_notation_settings = None
+        if hasattr(self, 'nag_display_symbols_action') and hasattr(self, 'nag_display_text_action'):
+            pgn_notation_settings = {
+                "use_symbols_for_nags": self.nag_display_symbols_action.isChecked(),
+                "show_nag_text": self.nag_display_text_action.isChecked()
+            }
+        
         # Collect game analysis settings from view
         game_analysis_settings = None
         if hasattr(self, 'return_to_first_move_action'):
@@ -4564,6 +4631,14 @@ Visibility Settings:
                 from app.services.user_settings_service import UserSettingsService
                 settings_service = UserSettingsService.get_instance()
             settings_service.update_ai_summary_settings(ai_summary_settings)
+        
+        # Save PGN notation settings if collected
+        if pgn_notation_settings:
+            settings_service = getattr(self, '_settings_service', None)
+            if settings_service is None:
+                from app.services.user_settings_service import UserSettingsService
+                settings_service = UserSettingsService.get_instance()
+            settings_service.update_pgn_notation(pgn_notation_settings)
         
         # Delegate to controller for business logic
         self.controller.save_user_settings(pgn_visibility_settings, game_analysis_settings)

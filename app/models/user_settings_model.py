@@ -17,6 +17,7 @@ class UserSettingsModel(QObject):
     active_profile_changed = pyqtSignal(str)  # Emitted when active profile changes (profile_name)
     board_visibility_changed = pyqtSignal()  # Emitted when board visibility settings change
     pgn_visibility_changed = pyqtSignal()  # Emitted when PGN visibility settings change
+    pgn_notation_changed = pyqtSignal()  # Emitted when PGN notation settings change
     game_analysis_changed = pyqtSignal()  # Emitted when game analysis settings change
     manual_analysis_changed = pyqtSignal()  # Emitted when manual analysis settings change
     annotations_changed = pyqtSignal()  # Emitted when annotation settings change
@@ -128,6 +129,24 @@ class UserSettingsModel(QObject):
         """
         self._settings["pgn_visibility"] = settings.copy()
         self.pgn_visibility_changed.emit()
+        self.settings_changed.emit()
+    
+    def get_pgn_notation(self) -> Dict[str, Any]:
+        """Get PGN notation settings.
+        
+        Returns:
+            Dictionary of PGN notation settings.
+        """
+        return self._settings.get("pgn_notation", {}).copy()
+    
+    def set_pgn_notation(self, settings: Dict[str, Any]) -> None:
+        """Set PGN notation settings.
+        
+        Args:
+            settings: Dictionary of PGN notation settings.
+        """
+        self._settings["pgn_notation"] = settings.copy()
+        self.pgn_notation_changed.emit()
         self.settings_changed.emit()
     
     def get_game_analysis(self) -> Dict[str, Any]:

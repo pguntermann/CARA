@@ -119,7 +119,17 @@ class DetailPgnView(QWidget):
         self._show_annotations: bool = True  # Whether to show annotations in PGN view
         self._show_results: bool = True  # Whether to show results in PGN view
         self._show_non_standard_tags: bool = False  # Whether to show non-standard tags like [%evp], [%mdl] in comments
+        self._pgn_notation_settings: Dict[str, Any] = {}  # PGN notation settings (use_symbols_for_nags, show_nag_text)
         self._setup_ui()
+        
+        # Load initial PGN notation settings from user settings
+        self._load_pgn_notation_settings()
+        
+        # Connect to user settings model for PGN notation changes
+        from app.services.user_settings_service import UserSettingsService
+        settings_service = UserSettingsService.get_instance()
+        settings_model = settings_service.get_model()
+        settings_model.pgn_notation_changed.connect(self._on_pgn_notation_changed)
         
         # Connect to game model if provided
         if game_model:
@@ -228,7 +238,8 @@ class DetailPgnView(QWidget):
             formatted_html, _ = PgnFormatterService.format_pgn_to_html(
                 pgn_text_to_format, 
                 self.config, 
-                0  # Don't highlight in HTML formatting
+                0,  # Don't highlight in HTML formatting
+                pgn_notation_settings=self._pgn_notation_settings  # Pass user settings
             )
             self.pgn_text.setHtml(formatted_html)
             # Store formatted HTML and move info for highlighting
@@ -297,6 +308,23 @@ class DetailPgnView(QWidget):
             show: True to show non-standard tags, False to hide them.
         """
         self._show_non_standard_tags = show
+    
+    def _load_pgn_notation_settings(self) -> None:
+        """Load PGN notation settings from user settings service."""
+        from app.services.user_settings_service import UserSettingsService
+        settings_service = UserSettingsService.get_instance()
+        settings_model = settings_service.get_model()
+        self._pgn_notation_settings = settings_model.get_pgn_notation()
+    
+    def _on_pgn_notation_changed(self) -> None:
+        """Handle PGN notation settings change.
+        
+        Reloads settings and refreshes PGN display.
+        """
+        self._load_pgn_notation_settings()
+        # Refresh PGN display with new settings
+        if self._current_pgn_text:
+            self.set_pgn_text(self._current_pgn_text)
         # Refresh PGN display to apply filtering
         if self._current_pgn_text:
             self.set_pgn_text(self._current_pgn_text)
