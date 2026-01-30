@@ -4650,16 +4650,22 @@
       }
     },
     "elo_estimation": {
-      "formula": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40)))",
+      "formula": "(max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) - max(0, (average_cpl_opening - average_cpl) * 5)))) / 1.995 + 233 if max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) - max(0, (average_cpl_opening - average_cpl) * 5))) < 2172 else (max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) - max(0, (average_cpl_opening - average_cpl) * 5)))) / 0.33 - 5261",
       "value_on_error": 0,
       "_examples": {
         "default": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40)))",
+        "normalized_default": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40))) / 1.918 + 166 if max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40))) < 2207 else (max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40)))) / 0.311 - 5780",
         "simple": "max(0, int(2800 - (average_cpl * 10)))",
+        "normalized_simple": "max(0, int(2800 - (average_cpl * 10))) / 1.681 - 39 if max(0, int(2800 - (average_cpl * 10))) < 2271 else max(0, int(2800 - (average_cpl * 10))) / 0.268 - 7162",
         "with_result_bonus": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) + (has_won * 50) - ((1 - has_won) * (1 - has_drawn) * 30)))",
         "accuracy_based": "max(0, int(accuracy * 28))",
+        "normalized_accuracy_based": "max(0, int(accuracy * 28)) / 1.349 - 450 if max(0, int(accuracy * 28)) < 2376 else max(0, int(accuracy * 28)) / 0.214 - 9790",
         "penalize_weak_opening": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) - max(0, (average_cpl_opening - average_cpl) * 5)))",
+	      "normalized_penalize_weak_opening": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) - max(0, (average_cpl_opening - average_cpl) * 5))) / 1.995 + 233 if max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) - max(0, (average_cpl_opening - average_cpl) * 5))) < 2172 else max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) - max(0, (average_cpl_opening - average_cpl) * 5))) / 0.33 - 5261",
         "consider_phase_balance": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) - (abs(average_cpl_opening - average_cpl_middlegame) + abs(average_cpl_middlegame - average_cpl_endgame)) * 2))",
-        "weight_by_phase_importance": "max(0, int(2800 - ((average_cpl_opening * opening_moves + average_cpl_middlegame * middlegame_moves + average_cpl_endgame * endgame_moves) / max(total_moves, 1) * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40)))"
+        "normalized_consider_phase_balance": "max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) - (abs(average_cpl_opening - average_cpl_middlegame) + abs(average_cpl_middlegame - average_cpl_endgame)) * 2)) / 2.3 + 429 if max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) - (abs(average_cpl_opening - average_cpl_middlegame) + abs(average_cpl_middlegame - average_cpl_endgame)) * 2)) < 2039 else max(0, int(2800 - (average_cpl * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40) - (abs(average_cpl_opening - average_cpl_middlegame) + abs(average_cpl_middlegame - average_cpl_endgame)) * 2)) / 0.388 - 3940",
+        "weight_by_phase_importance": "max(0, int(2800 - ((average_cpl_opening * opening_moves + average_cpl_middlegame * middlegame_moves + average_cpl_endgame * endgame_moves) / max(total_moves, 1) * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40)))",
+        "normalized_weight_by_phase_importance": "max(0, int(2800 - ((average_cpl_opening * opening_moves + average_cpl_middlegame * middlegame_moves + average_cpl_endgame * endgame_moves) / max(total_moves, 1) * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40))) / 1.931 + 166 if max(0, int(2800 - ((average_cpl_opening * opening_moves + average_cpl_middlegame * middlegame_moves + average_cpl_endgame * endgame_moves) / max(total_moves, 1) * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40))) < 2229 else max(0, int(2800 - ((average_cpl_opening * opening_moves + average_cpl_middlegame * middlegame_moves + average_cpl_endgame * endgame_moves) / max(total_moves, 1) * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40))) / 0.305 - 5988"
       }
     },
     "brilliant_criteria": {
