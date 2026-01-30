@@ -1037,6 +1037,16 @@ class MainWindow(QMainWindow):
         open_manual_action.triggered.connect(self._open_manual)
         help_menu.addAction(open_manual_action)
         
+        # Watch Video Tutorials action
+        watch_video_tutorials_action = QAction("Watch Video Tutorials", self)
+        watch_video_tutorials_action.triggered.connect(self._open_video_tutorials)
+        help_menu.addAction(watch_video_tutorials_action)
+        
+        # Visit GitHub Repository action
+        visit_github_action = QAction("Visit GitHub Repository", self)
+        visit_github_action.triggered.connect(self._open_github_repository)
+        help_menu.addAction(visit_github_action)
+        
         help_menu.addSeparator()
         
         # Check for Updates action
@@ -1870,6 +1880,14 @@ class MainWindow(QMainWindow):
         # Convert to QUrl and open in default browser
         url = QUrl.fromLocalFile(str(manual_path))
         QDesktopServices.openUrl(url)
+    
+    def _open_video_tutorials(self) -> None:
+        """Open the CARA Chess YouTube channel in the default browser."""
+        QDesktopServices.openUrl(QUrl("https://www.youtube.com/@CARA-Chess"))
+    
+    def _open_github_repository(self) -> None:
+        """Open the CARA GitHub repository in the default browser."""
+        QDesktopServices.openUrl(QUrl("https://github.com/pguntermann/CARA"))
     
     def _show_about_dialog(self) -> None:
         """Show the about dialog."""
