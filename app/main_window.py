@@ -2450,6 +2450,12 @@ class MainWindow(QMainWindow):
         # Set moves list model in game analysis controller
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
             self.controller.set_moves_list_model(self.detail_panel.moveslist_model)
+            # Connect bulk analysis finished so active game's Game Summary becomes available after bulk run
+            if not getattr(self, '_bulk_analysis_finished_connected', False):
+                self.controller.get_bulk_analysis_controller().finished.connect(
+                    self._on_bulk_analysis_finished_refresh_active_game
+                )
+                self._bulk_analysis_finished_connected = True
         
         # Connect to game model to update best alternative move when position changes
         game_model = self.controller.get_game_controller().get_game_model()
@@ -4821,6 +4827,14 @@ Visibility Settings:
         game_analysis_controller.analysis_cancelled.disconnect(self._on_game_analysis_cancelled)
         game_analysis_controller.analysis_progress.disconnect(self._on_game_analysis_progress)
         game_analysis_controller.move_analyzed.disconnect(self._on_move_analyzed)
+    
+    def _on_bulk_analysis_finished_refresh_active_game(self, success: bool, message: str) -> None:
+        """When bulk analysis finishes (success or cancel), refresh active game state so Game Summary
+        becomes available if the active game was among those already analyzed."""
+        if not hasattr(self, 'detail_panel') or not hasattr(self.detail_panel, 'moveslist_model'):
+            return
+        game_controller = self.controller.get_game_controller()
+        game_controller.refresh_active_game_analysis_state(self.detail_panel.moveslist_model)
     
     def _on_game_analysis_progress(self, current_move: int, total_moves: int, depth: int,
                                    centipawns: float, engine_name: str, threads: int, elapsed_ms: int,
