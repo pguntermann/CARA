@@ -13,6 +13,7 @@ from app.models.column_profile_model import (ColumnProfileModel, COL_NUM, COL_WH
                                              COL_ASSESS_WHITE, COL_ASSESS_BLACK, COL_BEST_WHITE, 
                                              COL_BEST_BLACK, COL_BEST_WHITE_2, COL_BEST_WHITE_3, COL_BEST_BLACK_2, COL_BEST_BLACK_3,
                                              COL_WHITE_IS_TOP3, COL_BLACK_IS_TOP3, COL_WHITE_DEPTH, COL_BLACK_DEPTH,
+                                             COL_WHITE_SELDEPTH, COL_BLACK_SELDEPTH,
                                              COL_ECO, COL_OPENING, COL_COMMENT, COL_WHITE_CAPTURE, COL_BLACK_CAPTURE,
                                              COL_WHITE_MATERIAL, COL_BLACK_MATERIAL, COL_FEN_WHITE, COL_FEN_BLACK)
 
@@ -439,6 +440,8 @@ class DetailMovesListView(QWidget):
             MovesListModel.COL_BLACK_IS_TOP3: COL_BLACK_IS_TOP3,
             MovesListModel.COL_WHITE_DEPTH: COL_WHITE_DEPTH,
             MovesListModel.COL_BLACK_DEPTH: COL_BLACK_DEPTH,
+            MovesListModel.COL_WHITE_SELDEPTH: COL_WHITE_SELDEPTH,
+            MovesListModel.COL_BLACK_SELDEPTH: COL_BLACK_SELDEPTH,
             MovesListModel.COL_ECO: COL_ECO,
             MovesListModel.COL_OPENING: COL_OPENING,
             MovesListModel.COL_COMMENT: COL_COMMENT,
@@ -451,7 +454,7 @@ class DetailMovesListView(QWidget):
         }
         
         # Apply visibility for all columns
-        for logical_idx in range(32):
+        for logical_idx in range(self._moveslist_model.columnCount()):
             col_name = logical_to_name.get(logical_idx)
             if col_name:
                 visible = column_visibility.get(col_name, True)
@@ -515,6 +518,8 @@ class DetailMovesListView(QWidget):
             MovesListModel.COL_BLACK_IS_TOP3: COL_BLACK_IS_TOP3,
             MovesListModel.COL_WHITE_DEPTH: COL_WHITE_DEPTH,
             MovesListModel.COL_BLACK_DEPTH: COL_BLACK_DEPTH,
+            MovesListModel.COL_WHITE_SELDEPTH: COL_WHITE_SELDEPTH,
+            MovesListModel.COL_BLACK_SELDEPTH: COL_BLACK_SELDEPTH,
             MovesListModel.COL_ECO: COL_ECO,
             MovesListModel.COL_OPENING: COL_OPENING,
             MovesListModel.COL_COMMENT: COL_COMMENT,
@@ -527,7 +532,7 @@ class DetailMovesListView(QWidget):
         }
         
         # Set widths for all columns (including hidden ones)
-        for logical_idx in range(32):
+        for logical_idx in range(self._moveslist_model.columnCount()):
             col_name = logical_to_name.get(logical_idx)
             if not col_name:
                 continue
@@ -598,6 +603,8 @@ class DetailMovesListView(QWidget):
             COL_BLACK_IS_TOP3: MovesListModel.COL_BLACK_IS_TOP3,
             COL_WHITE_DEPTH: MovesListModel.COL_WHITE_DEPTH,
             COL_BLACK_DEPTH: MovesListModel.COL_BLACK_DEPTH,
+            COL_WHITE_SELDEPTH: MovesListModel.COL_WHITE_SELDEPTH,
+            COL_BLACK_SELDEPTH: MovesListModel.COL_BLACK_SELDEPTH,
             COL_ECO: MovesListModel.COL_ECO,
             COL_OPENING: MovesListModel.COL_OPENING,
             COL_COMMENT: MovesListModel.COL_COMMENT,
@@ -672,6 +679,8 @@ class DetailMovesListView(QWidget):
             COL_BLACK_IS_TOP3: MovesListModel.COL_BLACK_IS_TOP3,
             COL_WHITE_DEPTH: MovesListModel.COL_WHITE_DEPTH,
             COL_BLACK_DEPTH: MovesListModel.COL_BLACK_DEPTH,
+            COL_WHITE_SELDEPTH: MovesListModel.COL_WHITE_SELDEPTH,
+            COL_BLACK_SELDEPTH: MovesListModel.COL_BLACK_SELDEPTH,
             COL_ECO: MovesListModel.COL_ECO,
             COL_OPENING: MovesListModel.COL_OPENING,
             COL_COMMENT: MovesListModel.COL_COMMENT,
@@ -761,6 +770,8 @@ class DetailMovesListView(QWidget):
             MovesListModel.COL_BLACK_IS_TOP3: COL_BLACK_IS_TOP3,
             MovesListModel.COL_WHITE_DEPTH: COL_WHITE_DEPTH,
             MovesListModel.COL_BLACK_DEPTH: COL_BLACK_DEPTH,
+            MovesListModel.COL_WHITE_SELDEPTH: COL_WHITE_SELDEPTH,
+            MovesListModel.COL_BLACK_SELDEPTH: COL_BLACK_SELDEPTH,
             MovesListModel.COL_ECO: COL_ECO,
             MovesListModel.COL_OPENING: COL_OPENING,
             MovesListModel.COL_COMMENT: COL_COMMENT,
@@ -826,6 +837,8 @@ class DetailMovesListView(QWidget):
             MovesListModel.COL_BLACK_IS_TOP3: COL_BLACK_IS_TOP3,
             MovesListModel.COL_WHITE_DEPTH: COL_WHITE_DEPTH,
             MovesListModel.COL_BLACK_DEPTH: COL_BLACK_DEPTH,
+            MovesListModel.COL_WHITE_SELDEPTH: COL_WHITE_SELDEPTH,
+            MovesListModel.COL_BLACK_SELDEPTH: COL_BLACK_SELDEPTH,
             MovesListModel.COL_ECO: COL_ECO,
             MovesListModel.COL_OPENING: COL_OPENING,
             MovesListModel.COL_COMMENT: COL_COMMENT,
@@ -851,7 +864,7 @@ class DetailMovesListView(QWidget):
                 break
         
         # Save widths for all columns (including hidden ones), excluding the last visible one which stretches
-        for logical_idx in range(32):
+        for logical_idx in range(self._moveslist_model.columnCount()):
             col_name = logical_to_name.get(logical_idx)
             if col_name:
                 # Skip the last visible column (it stretches)

@@ -223,7 +223,7 @@ class BulkAnalysisService(QObject):
                 if cached_best_move_info is not None:
                     # Reuse best move info from previous position analysis (position after move N-1 = position before move N)
                     best_move_eval, best_move_is_mate, best_mate_moves, best_move_san, pv2_move_san, pv3_move_san, \
-                        pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth = cached_best_move_info
+                        pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth, seldepth = cached_best_move_info
                 else:
                     # First move: analyze position before move to get best move
                     best_move_result = self._analyze_position(
@@ -239,7 +239,7 @@ class BulkAnalysisService(QObject):
                         continue
                     
                     best_move_eval, best_move_is_mate, best_mate_moves, best_move_san, pv2_move_san, pv3_move_san, \
-                        pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth = best_move_result
+                        pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth, seldepth = best_move_result
                 
                 # Analyze position after move (to get evaluation AND best move for next iteration)
                 eval_result = self._analyze_position(
@@ -256,12 +256,12 @@ class BulkAnalysisService(QObject):
                 
                 # Extract both evaluation (for current move) and best move info (for next move)
                 eval_after, is_mate, mate_moves, best_move_san_next, pv2_move_san_next, pv3_move_san_next, \
-                    pv2_score_next, pv3_score_next, pv2_score_black_next, pv3_score_black_next, depth_after = eval_result
+                    pv2_score_next, pv3_score_next, pv2_score_black_next, pv3_score_black_next, depth_after, seldepth_after = eval_result
                 
                 # Cache best move info for next iteration (position after move N = position before move N+1)
                 cached_best_move_info = (
                     eval_after, is_mate, mate_moves, best_move_san_next, pv2_move_san_next, pv3_move_san_next,
-                    pv2_score_next, pv3_score_next, pv2_score_black_next, pv3_score_black_next, depth_after
+                    pv2_score_next, pv3_score_next, pv2_score_black_next, pv3_score_black_next, depth_after, seldepth_after
                 )
                 
                 # Calculate CPL
@@ -413,12 +413,14 @@ class BulkAnalysisService(QObject):
                         move_data.best_white_2 = pv2_move_san
                         move_data.best_white_3 = pv3_move_san
                         move_data.white_depth = depth
+                        move_data.white_seldepth = seldepth
                         move_data.white_is_top3 = is_top3
                     else:
                         move_data.best_white = ""
                         move_data.best_white_2 = ""
                         move_data.best_white_3 = ""
                         move_data.white_depth = 0
+                        move_data.white_seldepth = 0
                         move_data.white_is_top3 = False
                     move_data.white_capture = get_captured_piece_letter(board_before, move)
                     move_data.white_material = white_material_after
@@ -446,12 +448,14 @@ class BulkAnalysisService(QObject):
                         move_data.best_black_2 = pv2_move_san
                         move_data.best_black_3 = pv3_move_san
                         move_data.black_depth = depth
+                        move_data.black_seldepth = seldepth
                         move_data.black_is_top3 = is_top3
                     else:
                         move_data.best_black = ""
                         move_data.best_black_2 = ""
                         move_data.best_black_3 = ""
                         move_data.black_depth = 0
+                        move_data.black_seldepth = 0
                         move_data.black_is_top3 = False
                     move_data.black_capture = get_captured_piece_letter(board_before, move)
                     move_data.white_material = white_material_after
@@ -694,10 +698,10 @@ class BulkAnalysisService(QObject):
                 progress_callback(game_move_index, total_moves, move_number, is_white_move, status, engine_info)
         
         def on_complete(centipawns, is_mate, mate_moves, best_move_san, pv1_string, pv2_move_san, pv3_move_san,
-                       pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth, nps, engine_name):
+                       pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth, seldepth, nps, engine_name):
             result_container["result"] = (
                 centipawns, is_mate, mate_moves, best_move_san, pv2_move_san, pv3_move_san,
-                pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth
+                pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth, seldepth
             )
             result_container["completed"] = True
         
@@ -815,7 +819,8 @@ class BulkAnalysisService(QObject):
                     0.0,    # pv3_score
                     0.0,    # pv2_score_black
                     0.0,    # pv3_score_black
-                    last_progress_info["depth"]
+                    last_progress_info["depth"],
+                    last_progress_info["seldepth"]
                 )
                 return partial_result
             else:

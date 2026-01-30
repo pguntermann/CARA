@@ -90,6 +90,14 @@
           "visible": false,
           "width": 0
         },
+        "col_white_seldepth": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_seldepth": {
+          "visible": false,
+          "width": 0
+        },
         "col_white_capture": {
           "visible": false,
           "width": 80
@@ -219,6 +227,14 @@
           "width": 0
         },
         "col_black_depth": {
+          "visible": false,
+          "width": 0
+        },
+        "col_white_seldepth": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_seldepth": {
           "visible": false,
           "width": 0
         },
@@ -354,6 +370,14 @@
           "visible": true,
           "width": 0
         },
+        "col_white_seldepth": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_seldepth": {
+          "visible": false,
+          "width": 0
+        },
         "col_white_capture": {
           "visible": false,
           "width": 80
@@ -411,6 +435,8 @@
         "col_black_is_top3",
         "col_white_depth",
         "col_black_depth",
+        "col_white_seldepth",
+        "col_black_seldepth",
         "col_best_white_2",
         "col_best_white_3",
         "col_best_black_2",
@@ -510,6 +536,14 @@
           "visible": false,
           "width": 0
         },
+        "col_white_seldepth": {
+          "visible": true,
+          "width": 70
+        },
+        "col_black_seldepth": {
+          "visible": false,
+          "width": 0
+        },
         "col_white_capture": {
           "visible": false,
           "width": 0
@@ -564,6 +598,7 @@
         "col_best_white_2",
         "col_best_white_3",
         "col_white_depth",
+        "col_white_seldepth",
         "col_eval_black",
         "col_cpl_black",
         "col_cpl_black_2",
@@ -676,6 +711,14 @@
           "visible": true,
           "width": 100
         },
+        "col_white_seldepth": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_seldepth": {
+          "visible": true,
+          "width": 70
+        },
         "col_white_capture": {
           "visible": false,
           "width": 0
@@ -730,6 +773,7 @@
         "col_best_black_2",
         "col_best_black_3",
         "col_black_depth",
+        "col_black_seldepth",
         "col_eval_white",
         "col_cpl_white",
         "col_cpl_white_2",

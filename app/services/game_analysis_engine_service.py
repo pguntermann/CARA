@@ -24,7 +24,7 @@ class AnalysisRequest:
 class GameAnalysisEngineThread(QThread):
     """Persistent thread for analyzing multiple positions with a single engine instance."""
     
-    analysis_complete = pyqtSignal(float, bool, int, str, str, str, str, float, float, float, float, int, int, str)  # centipawns, is_mate, mate_moves, best_move_san, pv1_string, pv2_move_san, pv3_move_san, pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth, nps, engine_name
+    analysis_complete = pyqtSignal(float, bool, int, str, str, str, str, float, float, float, float, int, int, int, str)  # centipawns, is_mate, mate_moves, best_move_san, pv1_string, pv2_move_san, pv3_move_san, pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth, seldepth, nps, engine_name
     progress_update = pyqtSignal(int, int, int, float, str, int, int, int)  # depth, seldepth, centipawns, time_elapsed_ms, engine_name, threads, move_number, nps
     error_occurred = pyqtSignal(str)  # error_message
     
@@ -356,9 +356,10 @@ class GameAnalysisEngineThread(QThread):
                         pv2_score_black,
                         pv3_score_black,
                         self._current_depth,
+                        self._current_seldepth,
                         self._current_nps,
-                    self.engine_name
-                )
+                        self.engine_name
+                    )
                     break
             
             # Reset stop current analysis flag for next analysis
