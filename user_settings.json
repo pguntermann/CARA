@@ -913,7 +913,8 @@
       ]
     ],
     "text_font_family": "Arial",
-    "text_font_size": 12
+    "text_font_size": 12,
+    "highlight_annotated_moves_in_list": true
   },
   "ai_models": {
     "openai": {

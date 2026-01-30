@@ -2,7 +2,7 @@
 
 from PyQt6.QtCore import QAbstractTableModel, Qt
 from PyQt6.QtGui import QColor, QBrush
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, TYPE_CHECKING
 
 from app.models.column_profile_model import (COL_NUM, COL_WHITE, COL_BLACK, COL_EVAL_WHITE, COL_EVAL_BLACK, COL_CPL_WHITE, COL_CPL_BLACK,
                                              COL_CPL_WHITE_2, COL_CPL_WHITE_3, COL_CPL_BLACK_2, COL_CPL_BLACK_3,
@@ -12,6 +12,9 @@ from app.models.column_profile_model import (COL_NUM, COL_WHITE, COL_BLACK, COL_
                                              COL_COMMENT, COL_ECO, COL_OPENING,
                                              COL_WHITE_CAPTURE, COL_BLACK_CAPTURE, COL_WHITE_MATERIAL, COL_BLACK_MATERIAL,
                                              COL_FEN_WHITE, COL_FEN_BLACK)
+
+if TYPE_CHECKING:
+    from app.models.annotation_model import AnnotationModel
 
 
 class MoveData:
@@ -207,6 +210,8 @@ class MovesListModel(QAbstractTableModel):
         self._active_move_ply: int = 0  # Ply index of active move (0 = starting position)
         self._highlight_color: Optional[QColor] = None  # Highlight color for active move
         self._column_visibility: Dict[int, bool] = {}  # Map column index to visibility
+        self._annotation_model: Optional["AnnotationModel"] = None
+        self._highlight_annotated_moves: bool = False
         # Initialize all columns as visible by default
         for col in range(self.columnCount()):
             self._column_visibility[col] = True
@@ -236,12 +241,83 @@ class MovesListModel(QAbstractTableModel):
     
     def set_highlight_color(self, color: Optional[QColor]) -> None:
         """Set the highlight color for active move.
-        
+
         Args:
             color: QColor for highlighting, or None to disable.
         """
         self._highlight_color = color
-    
+
+    def set_annotation_model(self, model: Optional["AnnotationModel"]) -> None:
+        """Set the annotation model for highlighting rows that have annotations.
+
+        Args:
+            model: AnnotationModel instance or None to disable annotation-based highlighting.
+        """
+        if self._annotation_model is not None:
+            try:
+                self._annotation_model.annotations_changed.disconnect(self._on_annotations_changed)
+            except (TypeError, RuntimeError):
+                pass
+        self._annotation_model = model
+        if self._annotation_model is not None:
+            self._annotation_model.annotations_changed.connect(self._on_annotations_changed)
+        self._emit_all_rows_changed()
+
+    def set_highlight_annotated_moves(self, on: bool) -> None:
+        """Enable or disable highlighting of moves that have annotations in the moves list.
+
+        Args:
+            on: True to highlight rows with annotations using dominant annotation color.
+        """
+        if self._highlight_annotated_moves != on:
+            self._highlight_annotated_moves = on
+            self._emit_all_rows_changed()
+
+    def _on_annotations_changed(self, ply_index: int) -> None:
+        """Handle annotation model change; emit dataChanged for the affected row."""
+        row = (ply_index - 1) // 2 if ply_index > 0 else -1
+        if 0 <= row < len(self._moves):
+            top_left = self.index(row, 0)
+            bottom_right = self.index(row, self.columnCount() - 1)
+            self.dataChanged.emit(top_left, bottom_right)
+
+    def _emit_all_rows_changed(self) -> None:
+        """Emit dataChanged for all rows (used when annotation model or highlight toggle changes)."""
+        if not self._moves:
+            return
+        top_left = self.index(0, 0)
+        bottom_right = self.index(len(self._moves) - 1, self.columnCount() - 1)
+        self.dataChanged.emit(top_left, bottom_right)
+
+    def _get_annotation_highlight_for_ply(self, ply_index: int) -> Optional[QColor]:
+        """Get the dominant annotation color for a single ply, or None if no annotations or feature off.
+
+        Dominant color is the average RGB of all annotations on that ply, lightened for readability.
+
+        Args:
+            ply_index: Ply index (1 = after white's first move, 2 = after black's first move, etc.).
+
+        Returns:
+            QColor for background, or None.
+        """
+        if not self._highlight_annotated_moves or self._annotation_model is None:
+            return None
+        colors: List[List[int]] = []
+        for ann in self._annotation_model.get_annotations(ply_index):
+            if ann.color and len(ann.color) >= 3:
+                colors.append(ann.color)
+        if not colors:
+            return None
+        r = sum(c[0] for c in colors) // len(colors)
+        g = sum(c[1] for c in colors) // len(colors)
+        b = sum(c[2] for c in colors) // len(colors)
+        # Lighten for readability (blend with white)
+        blend = 0.65
+        r = int(r * (1 - blend) + 255 * blend)
+        g = int(g * (1 - blend) + 255 * blend)
+        b = int(b * (1 - blend) + 255 * blend)
+        return QColor(r, g, b)
+
     def set_active_move_ply(self, ply_index: int) -> None:
         """Set the active move ply index for highlighting.
         
@@ -288,16 +364,38 @@ class MovesListModel(QAbstractTableModel):
         if logical_col < 0 or logical_col >= self.columnCount():
             return None
         
-        # Handle BackgroundRole for active move highlighting
+        # Handle BackgroundRole for active move and annotation highlighting
         if role == Qt.ItemDataRole.BackgroundRole:
-            # Check if this row corresponds to the active move
-            # ply_index = 1 -> row 0 (white move), ply_index = 2 -> row 0 (black move)
-            # ply_index = 3 -> row 1 (white move), ply_index = 4 -> row 1 (black move)
+            # Annotation highlight (when enabled): only White and Black move columns, per-ply dominant color
+            if self._highlight_annotated_moves and self._annotation_model is not None:
+                if logical_col == self.COL_WHITE:
+                    ann_color = self._get_annotation_highlight_for_ply(2 * row + 1)
+                    if ann_color is not None:
+                        return QBrush(ann_color)
+                elif logical_col == self.COL_BLACK:
+                    ann_color = self._get_annotation_highlight_for_ply(2 * row + 2)
+                    if ann_color is not None:
+                        return QBrush(ann_color)
+            # Active move highlighting (full row)
             if self._active_move_ply > 0 and self._highlight_color is not None:
                 active_row = (self._active_move_ply - 1) // 2
                 if row == active_row:
-                    # This row contains the active move - return highlight color
                     return QBrush(self._highlight_color)
+            return None
+        
+        # Handle ForegroundRole for annotation-highlighted cells: use inverse color so text is visible
+        if role == Qt.ItemDataRole.ForegroundRole:
+            if self._highlight_annotated_moves and self._annotation_model is not None:
+                ann_color = None
+                if logical_col == self.COL_WHITE:
+                    ann_color = self._get_annotation_highlight_for_ply(2 * row + 1)
+                elif logical_col == self.COL_BLACK:
+                    ann_color = self._get_annotation_highlight_for_ply(2 * row + 2)
+                if ann_color is not None:
+                    inv_r = 255 - ann_color.red()
+                    inv_g = 255 - ann_color.green()
+                    inv_b = 255 - ann_color.blue()
+                    return QBrush(QColor(inv_r, inv_g, inv_b))
             return None
         
         if role != Qt.ItemDataRole.DisplayRole:

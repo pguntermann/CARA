@@ -882,6 +882,15 @@ class MainWindow(QMainWindow):
         
         annotations_menu.addSeparator()
         
+        # Highlight annotated moves in moves list (checkable)
+        self.highlight_annotated_moves_action = QAction("Highlight annotated moves in moves list", self)
+        self.highlight_annotated_moves_action.setCheckable(True)
+        self.highlight_annotated_moves_action.setChecked(False)
+        self.highlight_annotated_moves_action.triggered.connect(self._on_highlight_annotated_moves_toggled)
+        annotations_menu.addAction(self.highlight_annotated_moves_action)
+        
+        annotations_menu.addSeparator()
+        
         setup_preferences_action = QAction("Setup Preferences...", self)
         setup_preferences_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         setup_preferences_action.triggered.connect(self._show_annotation_preferences)
@@ -2069,6 +2078,19 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'main_panel') and hasattr(self.main_panel, 'chessboard_view'):
                 if hasattr(self.main_panel.chessboard_view, 'chessboard'):
                     self.main_panel.chessboard_view.chessboard.update()
+    
+    def _on_highlight_annotated_moves_toggled(self, checked: bool) -> None:
+        """Handle Highlight annotated moves in moves list toggle.
+        
+        Args:
+            checked: True if the menu item is checked (feature enabled).
+        """
+        if not hasattr(self, '_settings_service') or self._settings_service is None:
+            return
+        self._settings_service.update_annotations({"highlight_annotated_moves_in_list": checked})
+        self._settings_service.save()
+        if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
+            self.detail_panel.moveslist_model.set_highlight_annotated_moves(checked)
     
     def _on_coordinates_visibility_changed(self, show: bool) -> None:
         """Handle coordinates visibility change to update menu toggle.
@@ -4370,6 +4392,18 @@ Visibility Settings:
             # Update menu state
             if hasattr(self, 'show_annotations_layer_action'):
                 self.show_annotations_layer_action.setChecked(show_annotations_layer)
+        
+        # Annotation moves list highlight: wire annotation model to moves list and load toggle state
+        annotations_settings = settings.get("annotations", {})
+        highlight_annotated_moves = annotations_settings.get("highlight_annotated_moves_in_list", False)
+        if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
+            moveslist_model = self.detail_panel.moveslist_model
+            annotation_controller = self.controller.get_annotation_controller() if self.controller else None
+            if annotation_controller:
+                moveslist_model.set_annotation_model(annotation_controller.get_annotation_model())
+            moveslist_model.set_highlight_annotated_moves(highlight_annotated_moves)
+        if hasattr(self, 'highlight_annotated_moves_action'):
+            self.highlight_annotated_moves_action.setChecked(highlight_annotated_moves)
         
         # ===== BOARD MENU SETTINGS (in menu order) =====
         # Show Game Info
