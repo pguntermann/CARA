@@ -25,6 +25,8 @@ COL_WHITE_IS_TOP3 = "col_white_is_top3"
 COL_BLACK_IS_TOP3 = "col_black_is_top3"
 COL_WHITE_DEPTH = "col_white_depth"
 COL_BLACK_DEPTH = "col_black_depth"
+COL_WHITE_SELDEPTH = "col_white_seldepth"
+COL_BLACK_SELDEPTH = "col_black_seldepth"
 COL_CPL_WHITE = "col_cpl_white"
 COL_CPL_BLACK = "col_cpl_black"
 COL_CPL_WHITE_2 = "col_cpl_white_2"
@@ -107,6 +109,7 @@ class ColumnProfile:
                 COL_BEST_BLACK_2: 100, COL_BEST_BLACK_3: 100,
                 COL_WHITE_IS_TOP3: 80, COL_BLACK_IS_TOP3: 80,
                 COL_WHITE_DEPTH: 70, COL_BLACK_DEPTH: 70,
+                COL_WHITE_SELDEPTH: 70, COL_BLACK_SELDEPTH: 70,
                 COL_ECO: 60, COL_OPENING: 150, COL_COMMENT: 200,
                 COL_WHITE_CAPTURE: 80, COL_BLACK_CAPTURE: 80,
                 COL_WHITE_MATERIAL: 100, COL_BLACK_MATERIAL: 100,
@@ -127,6 +130,7 @@ class ColumnProfile:
                 COL_BEST_BLACK_2: 100, COL_BEST_BLACK_3: 100,
                 COL_WHITE_IS_TOP3: 80, COL_BLACK_IS_TOP3: 80,
                 COL_WHITE_DEPTH: 70, COL_BLACK_DEPTH: 70,
+                COL_WHITE_SELDEPTH: 70, COL_BLACK_SELDEPTH: 70,
                 COL_ECO: 60, COL_OPENING: 150, COL_COMMENT: 200,
                 COL_WHITE_CAPTURE: 80, COL_BLACK_CAPTURE: 80,
                 COL_WHITE_MATERIAL: 100, COL_BLACK_MATERIAL: 100,
@@ -209,7 +213,8 @@ class ColumnProfileModel(QObject):
             COL_CPL_BLACK_2, COL_CPL_BLACK_3, COL_ASSESS_WHITE, COL_ASSESS_BLACK,
             COL_BEST_WHITE, COL_BEST_BLACK, COL_BEST_WHITE_2, COL_BEST_WHITE_3,
             COL_BEST_BLACK_2, COL_BEST_BLACK_3, COL_WHITE_IS_TOP3, COL_BLACK_IS_TOP3,
-            COL_WHITE_DEPTH, COL_BLACK_DEPTH, COL_ECO, COL_OPENING, COL_COMMENT,
+            COL_WHITE_DEPTH, COL_BLACK_DEPTH, COL_WHITE_SELDEPTH, COL_BLACK_SELDEPTH,
+            COL_ECO, COL_OPENING, COL_COMMENT,
             COL_WHITE_CAPTURE, COL_BLACK_CAPTURE, COL_WHITE_MATERIAL, COL_BLACK_MATERIAL,
             COL_FEN_WHITE, COL_FEN_BLACK
         ]
@@ -255,6 +260,8 @@ class ColumnProfileModel(QObject):
             COL_BLACK_IS_TOP3: "Black Is Top 3",
             COL_WHITE_DEPTH: "White Depth",
             COL_BLACK_DEPTH: "Black Depth",
+            COL_WHITE_SELDEPTH: "White SelDepth",
+            COL_BLACK_SELDEPTH: "Black SelDepth",
             COL_ECO: "Eco",
             COL_OPENING: "Opening Name",
             COL_COMMENT: "Comment",
@@ -307,9 +314,11 @@ class ColumnProfileModel(QObject):
             COL_BEST_BLACK_3: 100,
             COL_WHITE_IS_TOP3: 80,
             COL_BLACK_IS_TOP3: 80,
-            COL_WHITE_DEPTH: 70,
-            COL_BLACK_DEPTH: 70,
-            COL_ECO: 60,
+                COL_WHITE_DEPTH: 70,
+                COL_BLACK_DEPTH: 70,
+                COL_WHITE_SELDEPTH: 70,
+                COL_BLACK_SELDEPTH: 70,
+                COL_ECO: 60,
             COL_OPENING: 150,
             COL_WHITE_CAPTURE: 80,
             COL_BLACK_CAPTURE: 80,

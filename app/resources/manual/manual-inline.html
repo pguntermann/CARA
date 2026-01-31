@@ -2018,6 +2018,7 @@
                     <li><strong>Save Annotations:</strong> Use <span class="menu-item">Annotations → Save Annotations to current game</span> (<code>Ctrl+Alt+S</code>) to save all annotations to the active game. Annotations are compressed and stored in a PGN metadata tag, keeping the PGN move notation clean.</li>
                     <li><strong>Clear Move Annotations:</strong> Use <span class="menu-item">Annotations → Clear all Annotations for current move</span> (<code>Ctrl+Alt+D</code>) to remove all annotations for the current position.</li>
                     <li><strong>Clear All Annotations:</strong> Use <span class="menu-item">Annotations → Clear all Annotations for current game</span> (<code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>) to remove all annotations from the entire game.</li>
+                    <li><strong>Highlight in Moves List:</strong> Use <span class="menu-item">Annotations → Highlight annotated moves in moves list</span> to highlight the White and Black move cells in the Moves List with the dominant annotation color for moves that have annotations, so you can quickly see which moves are annotated.</li>
                     <li><strong>Toggle Visibility:</strong> Use <span class="menu-item">Board → Show Annotations</span> (<code>Alt+L</code> / <code>⌥+L</code>) to show or hide the annotation layer on the chessboard.</li>
                 </ul>
                 
@@ -2430,7 +2431,10 @@
                 <p><strong>Shortcut:</strong> <code>Ctrl+Alt+S</code></p>
                 <p>Saves all annotations to the active game by serializing them into a PGN metadata tag. Annotations are compressed and stored separately from the PGN move notation, keeping the PGN clean. This marks the game as modified, and annotations will be persisted when you save the database.<br>See <a href="#managing-annotations">section 5.8.3</a> for more information.</p>
                 
-                <h5>6.8.4 Setup Preferences...</h5>
+                <h5>6.8.4 Highlight annotated moves in moves list</h5>
+                <p>When checked, moves that have annotations are highlighted in the Moves List: the White and Black move columns (algebraic notation) use the dominant color from the annotations for that move as a background, with contrasting text so the move remains readable. This makes it easy to see at a glance which moves in the game have annotations. The setting is saved in your user preferences.</p>
+                
+                <h5>6.8.5 Setup Preferences...</h5>
                 <p>Opens the Annotation Preferences dialog for customizing the annotation color palette and text font settings. Changes are saved to your user settings and persist across sessions.<br>See <a href="#annotation-preferences">section 5.8.2</a> for detailed instructions.</p>
             </div>
 
@@ -2494,10 +2498,16 @@
                 <h5>6.11.1 Open Manual</h5>
                 <p>Opens the application manual in your default web browser, providing comprehensive documentation and instructions for using CARA.</p>
                 
-                <h5>6.11.2 Check for Updates...</h5>
+                <h5>6.11.2 Watch Video Tutorials</h5>
+                <p>Opens the CARA Chess YouTube channel in your default web browser, where you can watch video tutorials for using CARA.</p>
+                
+                <h5>6.11.3 Visit GitHub Repository</h5>
+                <p>Opens the CARA project repository on GitHub in your default web browser, where you can view the source code, report issues, or contribute to the project.</p>
+                
+                <h5>6.11.4 Check for Updates...</h5>
                 <p>Checks if a newer version of CARA is available.</p>
                 
-                <h5>6.11.3 About...</h5>
+                <h5>6.11.5 About...</h5>
                 <p>Opens the About dialog displaying application information, including the application name, version number, description, and copyright information. The dialog provides a quick reference for identifying the CARA version you are using.</p>
             </div>
 
@@ -3210,6 +3220,14 @@
                             <tr>
                                 <td class="column-name-cell">Black Depth</td>
                                 <td>Engine search depth for black's move analysis</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">White SelDepth</td>
+                                <td>Engine selective depth (depth of principal variation) for white's move analysis. If the engine does not report seldepth on every info line, the displayed value is at least the search depth.</td>
+                            </tr>
+                            <tr>
+                                <td class="column-name-cell">Black SelDepth</td>
+                                <td>Engine selective depth (depth of principal variation) for black's move analysis. If the engine does not report seldepth on every info line, the displayed value is at least the search depth.</td>
                             </tr>
                             <tr class="column-category-row">
                                 <td colspan="2" class="column-category-cell">Material Columns</td>

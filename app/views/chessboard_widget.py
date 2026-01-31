@@ -227,13 +227,19 @@ class ChessBoardWidget(QWidget):
     def _get_text_annotation_font(self, absolute_text_size: int) -> QFont:
         """Get font for text annotations, using user preferences if available.
         
+        Applies DPI scaling so annotation text size is consistent with other UI text
+        across different displays. The size slider (size_multiplier) is already applied
+        in the caller to absolute_text_size, so the user's chosen size is preserved.
+        
         Args:
-            absolute_text_size: Absolute text size in pixels (calculated from text_size_ratio and size_multiplier).
+            absolute_text_size: Logical text size in pixels (from text_size_ratio * square_size
+                and the user's size multiplier / slider).
         
         Returns:
             QFont configured with user preferences or defaults.
         """
         from app.services.user_settings_service import UserSettingsService
+        from app.utils.font_utils import scale_font_size
         settings_service = UserSettingsService.get_instance()
         settings = settings_service.get_settings()
         annotations_prefs = settings.get('annotations', {})
@@ -245,12 +251,10 @@ class ChessBoardWidget(QWidget):
             annotations_config = self.config.get('ui', {}).get('panels', {}).get('detail', {}).get('annotations', {})
             font_family = annotations_config.get('text_font_family', 'Arial')
         
-        # Always use the calculated absolute_text_size to maintain proper scaling with size multiplier
-        # The user's font size preference is not used here because it would break the scaling
-        # Instead, the user can adjust the size slider in the annotation view to change text size
-        # Convert pixels to points (approximate: 1 point ≈ 0.75 pixels at 96 DPI, or use 1:1 for simplicity)
-        # QFont size is in points, but we'll use pixels directly as QFont can handle it
-        font_size = absolute_text_size
+        # Convert logical pixels to approximate point size (72 pt/inch, 96 DPI reference),
+        # scale up so annotation text is ~1.75x larger overall, then apply DPI scaling
+        base_point_size = absolute_text_size * (72.0 / 96.0) * 1.75
+        font_size = max(1, scale_font_size(base_point_size))
         
         return QFont(font_family, font_size)
     

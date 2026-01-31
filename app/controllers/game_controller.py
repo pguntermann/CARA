@@ -9,7 +9,7 @@ import io
 
 from app.models.game_model import GameModel
 from app.models.database_model import GameData
-from app.models.moveslist_model import MoveData
+from app.models.moveslist_model import MoveData, MovesListModel
 from app.utils.material_tracker import get_captured_piece_letter, calculate_material_count, count_pieces
 from app.controllers.board_controller import BoardController
 from app.services.opening_service import OpeningService
@@ -92,6 +92,36 @@ class GameController:
         
         # Load the game's starting position to the board
         self._load_game_to_board(game)
+    
+    def refresh_active_game_analysis_state(self, moves_list_model: Optional[MovesListModel] = None) -> None:
+        """Refresh the active game's analysis state after bulk analysis or external storage update.
+        
+        If the active game now has analysis data in storage, loads it into the moves list
+        and sets is_game_analyzed so the Game Summary tab becomes available.
+        
+        Args:
+            moves_list_model: Optional MovesListModel to populate with loaded analysis.
+                             If None, only the is_game_analyzed flag is updated.
+        """
+        active_game = self.game_model.active_game
+        if active_game is None:
+            return
+        from app.services.analysis_data_storage_service import AnalysisDataStorageService
+        if not AnalysisDataStorageService.has_analysis_data(active_game):
+            return
+        try:
+            stored_moves = AnalysisDataStorageService.load_analysis_data(active_game)
+        except ValueError:
+            return
+        if not stored_moves:
+            return
+        if moves_list_model is not None:
+            current_ply = self.game_model.get_active_move_ply()
+            moves_list_model.clear()
+            for move in stored_moves:
+                moves_list_model.add_move(move)
+            moves_list_model.set_active_move_ply(current_ply)
+        self.game_model.set_is_game_analyzed(True)
     
     def _load_game_to_board(self, game: GameData) -> None:
         """Load a game's starting position to the board.

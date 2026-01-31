@@ -2,15 +2,19 @@
 
 from PyQt6.QtCore import QAbstractTableModel, Qt
 from PyQt6.QtGui import QColor, QBrush
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, TYPE_CHECKING
 
 from app.models.column_profile_model import (COL_NUM, COL_WHITE, COL_BLACK, COL_EVAL_WHITE, COL_EVAL_BLACK, COL_CPL_WHITE, COL_CPL_BLACK,
                                              COL_CPL_WHITE_2, COL_CPL_WHITE_3, COL_CPL_BLACK_2, COL_CPL_BLACK_3,
-                                             COL_ASSESS_WHITE, COL_ASSESS_BLACK, COL_BEST_WHITE, COL_BEST_BLACK, COL_BEST_WHITE_2, 
+                                             COL_ASSESS_WHITE, COL_ASSESS_BLACK, COL_BEST_WHITE, COL_BEST_BLACK, COL_BEST_WHITE_2,
                                              COL_BEST_WHITE_3, COL_BEST_BLACK_2, COL_BEST_BLACK_3, COL_WHITE_IS_TOP3, COL_BLACK_IS_TOP3,
-                                             COL_WHITE_DEPTH, COL_BLACK_DEPTH, COL_COMMENT, COL_ECO, COL_OPENING,
+                                             COL_WHITE_DEPTH, COL_BLACK_DEPTH, COL_WHITE_SELDEPTH, COL_BLACK_SELDEPTH,
+                                             COL_COMMENT, COL_ECO, COL_OPENING,
                                              COL_WHITE_CAPTURE, COL_BLACK_CAPTURE, COL_WHITE_MATERIAL, COL_BLACK_MATERIAL,
                                              COL_FEN_WHITE, COL_FEN_BLACK)
+
+if TYPE_CHECKING:
+    from app.models.annotation_model import AnnotationModel
 
 
 class MoveData:
@@ -40,6 +44,8 @@ class MoveData:
                  black_is_top3: bool = False,
                  white_depth: int = 0,
                  black_depth: int = 0,
+                 white_seldepth: int = 0,
+                 black_seldepth: int = 0,
                  eco: str = "",
                  opening_name: str = "",
                  comment: str = "",
@@ -85,6 +91,8 @@ class MoveData:
             black_is_top3: True if black's played move is in top 3.
             white_depth: Engine depth for white's move analysis.
             black_depth: Engine depth for black's move analysis.
+            white_seldepth: Engine selective depth for white's move (0 if engine does not report).
+            black_seldepth: Engine selective depth for black's move (0 if engine does not report).
             eco: ECO code for this position.
             opening_name: Opening name for this position.
             comment: Move comment.
@@ -128,6 +136,8 @@ class MoveData:
         self.black_is_top3 = black_is_top3
         self.white_depth = white_depth
         self.black_depth = black_depth
+        self.white_seldepth = white_seldepth
+        self.black_seldepth = black_seldepth
         self.eco = eco
         self.opening_name = opening_name
         self.comment = comment
@@ -181,6 +191,8 @@ class MovesListModel(QAbstractTableModel):
     COL_BLACK_IS_TOP3 = 20
     COL_WHITE_DEPTH = 21
     COL_BLACK_DEPTH = 22
+    COL_WHITE_SELDEPTH = 32
+    COL_BLACK_SELDEPTH = 33
     COL_ECO = 23
     COL_OPENING = 24
     COL_COMMENT = 25
@@ -198,8 +210,10 @@ class MovesListModel(QAbstractTableModel):
         self._active_move_ply: int = 0  # Ply index of active move (0 = starting position)
         self._highlight_color: Optional[QColor] = None  # Highlight color for active move
         self._column_visibility: Dict[int, bool] = {}  # Map column index to visibility
+        self._annotation_model: Optional["AnnotationModel"] = None
+        self._highlight_annotated_moves: bool = False
         # Initialize all columns as visible by default
-        for col in range(32):
+        for col in range(self.columnCount()):
             self._column_visibility[col] = True
     
     def rowCount(self, parent=None) -> int:
@@ -222,17 +236,88 @@ class MovesListModel(QAbstractTableModel):
         Returns:
             Total number of columns (always 32).
         """
-        # Always return all 32 columns - visibility is handled by view using hideSection/showSection
-        return 32
+        # Always return total columns - visibility is handled by view using hideSection/showSection
+        return 34
     
     def set_highlight_color(self, color: Optional[QColor]) -> None:
         """Set the highlight color for active move.
-        
+
         Args:
             color: QColor for highlighting, or None to disable.
         """
         self._highlight_color = color
-    
+
+    def set_annotation_model(self, model: Optional["AnnotationModel"]) -> None:
+        """Set the annotation model for highlighting rows that have annotations.
+
+        Args:
+            model: AnnotationModel instance or None to disable annotation-based highlighting.
+        """
+        if self._annotation_model is not None:
+            try:
+                self._annotation_model.annotations_changed.disconnect(self._on_annotations_changed)
+            except (TypeError, RuntimeError):
+                pass
+        self._annotation_model = model
+        if self._annotation_model is not None:
+            self._annotation_model.annotations_changed.connect(self._on_annotations_changed)
+        self._emit_all_rows_changed()
+
+    def set_highlight_annotated_moves(self, on: bool) -> None:
+        """Enable or disable highlighting of moves that have annotations in the moves list.
+
+        Args:
+            on: True to highlight rows with annotations using dominant annotation color.
+        """
+        if self._highlight_annotated_moves != on:
+            self._highlight_annotated_moves = on
+            self._emit_all_rows_changed()
+
+    def _on_annotations_changed(self, ply_index: int) -> None:
+        """Handle annotation model change; emit dataChanged for the affected row."""
+        row = (ply_index - 1) // 2 if ply_index > 0 else -1
+        if 0 <= row < len(self._moves):
+            top_left = self.index(row, 0)
+            bottom_right = self.index(row, self.columnCount() - 1)
+            self.dataChanged.emit(top_left, bottom_right)
+
+    def _emit_all_rows_changed(self) -> None:
+        """Emit dataChanged for all rows (used when annotation model or highlight toggle changes)."""
+        if not self._moves:
+            return
+        top_left = self.index(0, 0)
+        bottom_right = self.index(len(self._moves) - 1, self.columnCount() - 1)
+        self.dataChanged.emit(top_left, bottom_right)
+
+    def _get_annotation_highlight_for_ply(self, ply_index: int) -> Optional[QColor]:
+        """Get the dominant annotation color for a single ply, or None if no annotations or feature off.
+
+        Dominant color is the average RGB of all annotations on that ply, lightened for readability.
+
+        Args:
+            ply_index: Ply index (1 = after white's first move, 2 = after black's first move, etc.).
+
+        Returns:
+            QColor for background, or None.
+        """
+        if not self._highlight_annotated_moves or self._annotation_model is None:
+            return None
+        colors: List[List[int]] = []
+        for ann in self._annotation_model.get_annotations(ply_index):
+            if ann.color and len(ann.color) >= 3:
+                colors.append(ann.color)
+        if not colors:
+            return None
+        r = sum(c[0] for c in colors) // len(colors)
+        g = sum(c[1] for c in colors) // len(colors)
+        b = sum(c[2] for c in colors) // len(colors)
+        # Lighten for readability (blend with white)
+        blend = 0.65
+        r = int(r * (1 - blend) + 255 * blend)
+        g = int(g * (1 - blend) + 255 * blend)
+        b = int(b * (1 - blend) + 255 * blend)
+        return QColor(r, g, b)
+
     def set_active_move_ply(self, ply_index: int) -> None:
         """Set the active move ply index for highlighting.
         
@@ -279,16 +364,38 @@ class MovesListModel(QAbstractTableModel):
         if logical_col < 0 or logical_col >= self.columnCount():
             return None
         
-        # Handle BackgroundRole for active move highlighting
+        # Handle BackgroundRole for active move and annotation highlighting
         if role == Qt.ItemDataRole.BackgroundRole:
-            # Check if this row corresponds to the active move
-            # ply_index = 1 -> row 0 (white move), ply_index = 2 -> row 0 (black move)
-            # ply_index = 3 -> row 1 (white move), ply_index = 4 -> row 1 (black move)
+            # Annotation highlight (when enabled): only White and Black move columns, per-ply dominant color
+            if self._highlight_annotated_moves and self._annotation_model is not None:
+                if logical_col == self.COL_WHITE:
+                    ann_color = self._get_annotation_highlight_for_ply(2 * row + 1)
+                    if ann_color is not None:
+                        return QBrush(ann_color)
+                elif logical_col == self.COL_BLACK:
+                    ann_color = self._get_annotation_highlight_for_ply(2 * row + 2)
+                    if ann_color is not None:
+                        return QBrush(ann_color)
+            # Active move highlighting (full row)
             if self._active_move_ply > 0 and self._highlight_color is not None:
                 active_row = (self._active_move_ply - 1) // 2
                 if row == active_row:
-                    # This row contains the active move - return highlight color
                     return QBrush(self._highlight_color)
+            return None
+        
+        # Handle ForegroundRole for annotation-highlighted cells: use inverse color so text is visible
+        if role == Qt.ItemDataRole.ForegroundRole:
+            if self._highlight_annotated_moves and self._annotation_model is not None:
+                ann_color = None
+                if logical_col == self.COL_WHITE:
+                    ann_color = self._get_annotation_highlight_for_ply(2 * row + 1)
+                elif logical_col == self.COL_BLACK:
+                    ann_color = self._get_annotation_highlight_for_ply(2 * row + 2)
+                if ann_color is not None:
+                    inv_r = 255 - ann_color.red()
+                    inv_g = 255 - ann_color.green()
+                    inv_b = 255 - ann_color.blue()
+                    return QBrush(QColor(inv_r, inv_g, inv_b))
             return None
         
         if role != Qt.ItemDataRole.DisplayRole:
@@ -342,6 +449,13 @@ class MovesListModel(QAbstractTableModel):
             return str(move.white_depth) if move.white_depth > 0 else ""
         elif logical_col == self.COL_BLACK_DEPTH:
             return str(move.black_depth) if move.black_depth > 0 else ""
+        elif logical_col == self.COL_WHITE_SELDEPTH:
+            # If seldepth is missing or less than depth, show depth (engine may not report seldepth on every info line)
+            effective = max(move.white_seldepth, move.white_depth)
+            return str(effective) if effective > 0 else ""
+        elif logical_col == self.COL_BLACK_SELDEPTH:
+            effective = max(move.black_seldepth, move.black_depth)
+            return str(effective) if effective > 0 else ""
         elif logical_col == self.COL_ECO:
             return move.eco
         elif logical_col == self.COL_OPENING:
@@ -383,7 +497,7 @@ class MovesListModel(QAbstractTableModel):
         if orientation == Qt.Orientation.Horizontal:
             # Section is now directly the logical column index
             logical_col = section
-            if logical_col < 0 or logical_col >= 32:
+            if logical_col < 0 or logical_col >= self.columnCount():
                 return None
             
             headers = ["#", "White", "Black", "Eval White", "Eval Black",
@@ -393,7 +507,7 @@ class MovesListModel(QAbstractTableModel):
                       "Best Black 2", "Best Black 3", "White Is Top 3", "Black Is Top 3",
                       "White Depth", "Black Depth", "Eco", "Opening Name", "Comment",
                       "White Capture", "Black Capture", "White Material", "Black Material",
-                      "FEN White", "FEN Black"]
+                      "FEN White", "FEN Black", "White SelDepth", "Black SelDepth"]
             if 0 <= logical_col < len(headers):
                 return headers[logical_col]
         
@@ -473,6 +587,8 @@ class MovesListModel(QAbstractTableModel):
             COL_BLACK_IS_TOP3: self.COL_BLACK_IS_TOP3,
             COL_WHITE_DEPTH: self.COL_WHITE_DEPTH,
             COL_BLACK_DEPTH: self.COL_BLACK_DEPTH,
+            COL_WHITE_SELDEPTH: self.COL_WHITE_SELDEPTH,
+            COL_BLACK_SELDEPTH: self.COL_BLACK_SELDEPTH,
             COL_ECO: self.COL_ECO,
             COL_OPENING: self.COL_OPENING,
             COL_COMMENT: self.COL_COMMENT,
@@ -512,7 +628,8 @@ class MovesListModel(QAbstractTableModel):
         changed = False
         for move in self._moves:
             if (move.eval_white or move.eval_black or move.cpl_white or move.cpl_black or
-                move.assess_white or move.assess_black or move.best_white or move.best_black):
+                move.assess_white or move.assess_black or move.best_white or move.best_black or
+                move.white_depth or move.black_depth or move.white_seldepth or move.black_seldepth):
                 move.eval_white = ""
                 move.eval_black = ""
                 move.cpl_white = ""
@@ -521,6 +638,10 @@ class MovesListModel(QAbstractTableModel):
                 move.assess_black = ""
                 move.best_white = ""
                 move.best_black = ""
+                move.white_depth = 0
+                move.black_depth = 0
+                move.white_seldepth = 0
+                move.black_seldepth = 0
                 changed = True
         
         if changed:

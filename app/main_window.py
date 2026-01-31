@@ -882,6 +882,15 @@ class MainWindow(QMainWindow):
         
         annotations_menu.addSeparator()
         
+        # Highlight annotated moves in moves list (checkable)
+        self.highlight_annotated_moves_action = QAction("Highlight annotated moves in moves list", self)
+        self.highlight_annotated_moves_action.setCheckable(True)
+        self.highlight_annotated_moves_action.setChecked(False)
+        self.highlight_annotated_moves_action.triggered.connect(self._on_highlight_annotated_moves_toggled)
+        annotations_menu.addAction(self.highlight_annotated_moves_action)
+        
+        annotations_menu.addSeparator()
+        
         setup_preferences_action = QAction("Setup Preferences...", self)
         setup_preferences_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         setup_preferences_action.triggered.connect(self._show_annotation_preferences)
@@ -1036,6 +1045,16 @@ class MainWindow(QMainWindow):
         open_manual_action = QAction("Open Manual", self)
         open_manual_action.triggered.connect(self._open_manual)
         help_menu.addAction(open_manual_action)
+        
+        # Watch Video Tutorials action
+        watch_video_tutorials_action = QAction("Watch Video Tutorials", self)
+        watch_video_tutorials_action.triggered.connect(self._open_video_tutorials)
+        help_menu.addAction(watch_video_tutorials_action)
+        
+        # Visit GitHub Repository action
+        visit_github_action = QAction("Visit GitHub Repository", self)
+        visit_github_action.triggered.connect(self._open_github_repository)
+        help_menu.addAction(visit_github_action)
         
         help_menu.addSeparator()
         
@@ -1871,6 +1890,14 @@ class MainWindow(QMainWindow):
         url = QUrl.fromLocalFile(str(manual_path))
         QDesktopServices.openUrl(url)
     
+    def _open_video_tutorials(self) -> None:
+        """Open the CARA Chess YouTube channel in the default browser."""
+        QDesktopServices.openUrl(QUrl("https://www.youtube.com/@CARA-Chess"))
+    
+    def _open_github_repository(self) -> None:
+        """Open the CARA GitHub repository in the default browser."""
+        QDesktopServices.openUrl(QUrl("https://github.com/pguntermann/CARA"))
+    
     def _show_about_dialog(self) -> None:
         """Show the about dialog."""
         dialog = AboutDialog(self.config, self)
@@ -2051,6 +2078,19 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'main_panel') and hasattr(self.main_panel, 'chessboard_view'):
                 if hasattr(self.main_panel.chessboard_view, 'chessboard'):
                     self.main_panel.chessboard_view.chessboard.update()
+    
+    def _on_highlight_annotated_moves_toggled(self, checked: bool) -> None:
+        """Handle Highlight annotated moves in moves list toggle.
+        
+        Args:
+            checked: True if the menu item is checked (feature enabled).
+        """
+        if not hasattr(self, '_settings_service') or self._settings_service is None:
+            return
+        self._settings_service.update_annotations({"highlight_annotated_moves_in_list": checked})
+        self._settings_service.save()
+        if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
+            self.detail_panel.moveslist_model.set_highlight_annotated_moves(checked)
     
     def _on_coordinates_visibility_changed(self, show: bool) -> None:
         """Handle coordinates visibility change to update menu toggle.
@@ -2450,6 +2490,12 @@ class MainWindow(QMainWindow):
         # Set moves list model in game analysis controller
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
             self.controller.set_moves_list_model(self.detail_panel.moveslist_model)
+            # Connect bulk analysis finished so active game's Game Summary becomes available after bulk run
+            if not getattr(self, '_bulk_analysis_finished_connected', False):
+                self.controller.get_bulk_analysis_controller().finished.connect(
+                    self._on_bulk_analysis_finished_refresh_active_game
+                )
+                self._bulk_analysis_finished_connected = True
         
         # Connect to game model to update best alternative move when position changes
         game_model = self.controller.get_game_controller().get_game_model()
@@ -2958,6 +3004,7 @@ Visibility Settings:
             COL_BEST_WHITE, COL_BEST_BLACK, COL_BEST_WHITE_2, COL_BEST_WHITE_3,
             COL_BEST_BLACK_2, COL_BEST_BLACK_3, COL_WHITE_IS_TOP3, COL_BLACK_IS_TOP3,
             COL_ASSESS_WHITE, COL_ASSESS_BLACK, COL_WHITE_DEPTH, COL_BLACK_DEPTH,
+            COL_WHITE_SELDEPTH, COL_BLACK_SELDEPTH,
             COL_WHITE_CAPTURE, COL_BLACK_CAPTURE, COL_WHITE_MATERIAL, COL_BLACK_MATERIAL,
             COL_ECO, COL_OPENING, COL_FEN_WHITE, COL_FEN_BLACK
         )
@@ -2970,7 +3017,7 @@ Visibility Settings:
                 COL_BEST_WHITE, COL_BEST_BLACK, COL_BEST_WHITE_2, COL_BEST_WHITE_3,
                 COL_BEST_BLACK_2, COL_BEST_BLACK_3, COL_WHITE_IS_TOP3, COL_BLACK_IS_TOP3
             ],
-            "Analysis Columns": [COL_ASSESS_WHITE, COL_ASSESS_BLACK, COL_WHITE_DEPTH, COL_BLACK_DEPTH],
+            "Analysis Columns": [COL_ASSESS_WHITE, COL_ASSESS_BLACK, COL_WHITE_DEPTH, COL_BLACK_DEPTH, COL_WHITE_SELDEPTH, COL_BLACK_SELDEPTH],
             "Material Columns": [COL_WHITE_CAPTURE, COL_BLACK_CAPTURE, COL_WHITE_MATERIAL, COL_BLACK_MATERIAL],
             "Position Columns": [COL_ECO, COL_OPENING, COL_FEN_WHITE, COL_FEN_BLACK]
         }
@@ -4346,6 +4393,18 @@ Visibility Settings:
             if hasattr(self, 'show_annotations_layer_action'):
                 self.show_annotations_layer_action.setChecked(show_annotations_layer)
         
+        # Annotation moves list highlight: wire annotation model to moves list and load toggle state
+        annotations_settings = settings.get("annotations", {})
+        highlight_annotated_moves = annotations_settings.get("highlight_annotated_moves_in_list", False)
+        if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
+            moveslist_model = self.detail_panel.moveslist_model
+            annotation_controller = self.controller.get_annotation_controller() if self.controller else None
+            if annotation_controller:
+                moveslist_model.set_annotation_model(annotation_controller.get_annotation_model())
+            moveslist_model.set_highlight_annotated_moves(highlight_annotated_moves)
+        if hasattr(self, 'highlight_annotated_moves_action'):
+            self.highlight_annotated_moves_action.setChecked(highlight_annotated_moves)
+        
         # ===== BOARD MENU SETTINGS (in menu order) =====
         # Show Game Info
         show_game_info = board_visibility.get("show_game_info", True)
@@ -4821,6 +4880,14 @@ Visibility Settings:
         game_analysis_controller.analysis_cancelled.disconnect(self._on_game_analysis_cancelled)
         game_analysis_controller.analysis_progress.disconnect(self._on_game_analysis_progress)
         game_analysis_controller.move_analyzed.disconnect(self._on_move_analyzed)
+    
+    def _on_bulk_analysis_finished_refresh_active_game(self, success: bool, message: str) -> None:
+        """When bulk analysis finishes (success or cancel), refresh active game state so Game Summary
+        becomes available if the active game was among those already analyzed."""
+        if not hasattr(self, 'detail_panel') or not hasattr(self.detail_panel, 'moveslist_model'):
+            return
+        game_controller = self.controller.get_game_controller()
+        game_controller.refresh_active_game_analysis_state(self.detail_panel.moveslist_model)
     
     def _on_game_analysis_progress(self, current_move: int, total_moves: int, depth: int,
                                    centipawns: float, engine_name: str, threads: int, elapsed_ms: int,

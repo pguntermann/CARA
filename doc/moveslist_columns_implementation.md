@@ -39,13 +39,13 @@ Column configuration is managed through a profile-based system:
 
 ### Current Column Count
 
-- Total columns: 32 (indices 0-31)
+- Total columns: 34 (indices 0-33)
 - When adding a new column, you MUST update `columnCount()` to return the new total
 - All column-related code must use `columnCount()` instead of hardcoded values for consistency
 
 ## Current Columns Reference
 
-The following 32 columns are currently implemented, organized by category:
+The following 34 columns are currently implemented, organized by category:
 
 ### Basic Columns
 
@@ -102,6 +102,8 @@ The following 32 columns are currently implemented, organized by category:
 | 12 | `COL_ASSESS_BLACK` | "Assess Black" | Move quality assessment for black's move | See assessment below |
 | 21 | `COL_WHITE_DEPTH` | "White Depth" | Engine search depth for white's move analysis | Engine-reported depth value |
 | 22 | `COL_BLACK_DEPTH` | "Black Depth" | Engine search depth for black's move analysis | Engine-reported depth value |
+| 32 | `COL_WHITE_SELDEPTH` | "White SelDepth" | Engine selective depth for white's move analysis | Engine-reported seldepth (empty if engine does not report) |
+| 33 | `COL_BLACK_SELDEPTH` | "Black SelDepth" | Engine selective depth for black's move analysis | Engine-reported seldepth (empty if engine does not report) |
 
 **Move Assessment Calculation**: Classification hierarchy (first match wins). All thresholds are configurable via `MoveClassificationModel` and can be customized in the application settings or `config.json`:
 
