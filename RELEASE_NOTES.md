@@ -1,3 +1,27 @@
+# CARA v2.5.6 - Maintenance Release
+
+**Release Date:** 31.01.2026
+
+This release contains a number of different improvements:
+
+## New Features
+
+- **SelDepth Columns**: Added "White SelDepth" and "Black SelDepth" to the available Moves List columns for game analysis; If the engine does not report a SelDepth value, the Depth value is used instead
+- **Help Menu Links**: Added links to the CARA YouTube Video Tutorials and GitHub Repository to the Help menu
+- **Highlight Annotated Moves**: New toggle "Annotations → Highlight annotated moves in moves list" to highlight moves that have (CARA-)annotations (see Annotation-feature) in the moves list using the dominant annotation color
+
+## Enhancements
+
+- **ELO Estimate Formula**: Updated default ELO estimate formula and examples in config.json. **Big Thanks to Eric Bonneau** from the HIARCS Chess forums (https://hiarcs.net/forums) for his research on this topic and providing the updated default and example formulas
+- **Annotation Text DPI Scaling**: Annotation text on the board now uses DPI font scaling so it matches other UI text-scaling on varying dpi settings.
+- **Annotation Text Size**: Increased overall annotation text font size (about 1.5–2×) for better readability; the size slider still controls relative size
+
+## Bug Fixes
+
+- **Bulk Analysis & Game Summary**: Fixed issue where the Game Summary tab remained unavailable after a bulk analysis operation completed, even when the active game had been analyzed; the active game's analyzed state is now properly refreshed when bulk analysis finishes
+
+---
+
 # CARA v2.5.5 - Logging System, UI Improvements & Bug Fixes
 
 **Release Date:** 15.01.2026
