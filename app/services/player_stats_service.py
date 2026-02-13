@@ -218,10 +218,12 @@ class PlayerStatsService:
             games = database.get_all_games()
             for game in games:
                 # Check if player is white or black
+                # Use exact matching to preserve whitespace and special characters
+                # This ensures players with trailing/leading whitespace are correctly matched
                 is_player = False
-                if game.white and game.white.strip() == player_name:
+                if game.white and game.white == player_name:
                     is_player = True
-                elif game.black and game.black.strip() == player_name:
+                elif game.black and game.black == player_name:
                     is_player = True
                 
                 if is_player:
