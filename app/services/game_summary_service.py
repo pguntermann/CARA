@@ -637,8 +637,20 @@ class GameSummaryService:
         )
         
         # Calculate percentages
-        best_move_percentage = (best_moves / total_moves * 100) if total_moves > 0 else 0.0
-        top3_move_percentage = (top3_moves / total_moves * 100) if total_moves > 0 else 0.0
+        # Use non_book_moves as denominator for best_move_percentage and top3_move_percentage
+        # since book moves are excluded from the numerator (book moves are typically optimal)
+        # Edge case: if all moves are book moves, return 100% (all optimal moves)
+        if non_book_moves > 0:
+            best_move_percentage = (best_moves / non_book_moves * 100)
+            top3_move_percentage = (top3_moves / non_book_moves * 100)
+        elif book_moves > 0:
+            # All moves were book moves (optimal), so 100%
+            best_move_percentage = 100.0
+            top3_move_percentage = 100.0
+        else:
+            # No moves at all
+            best_move_percentage = 0.0
+            top3_move_percentage = 0.0
         blunder_rate_percentage = (blunders / total_moves * 100) if total_moves > 0 else 0.0
         
         return PlayerStatistics(
