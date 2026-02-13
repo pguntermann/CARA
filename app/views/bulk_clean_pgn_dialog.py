@@ -267,14 +267,12 @@ class BulkCleanPgnDialog(QDialog):
         self.remove_variations_check = QCheckBox("Remove Variations")
         self.remove_non_standard_tags_check = QCheckBox("Remove Non-Standard Tags")
         self.remove_annotations_check = QCheckBox("Remove Annotations")
-        self.remove_results_check = QCheckBox("Remove Results")
         
-        # Arrange checkboxes in 2 columns: 3 in first column, 2 in second column
+        # Arrange checkboxes in 2 columns: 3 in first column, 1 in second column
         options_layout.addWidget(self.remove_comments_check, 0, 0)
         options_layout.addWidget(self.remove_variations_check, 1, 0)
         options_layout.addWidget(self.remove_non_standard_tags_check, 2, 0)
         options_layout.addWidget(self.remove_annotations_check, 0, 1)
-        options_layout.addWidget(self.remove_results_check, 1, 1)
         
         options_container_layout.addLayout(options_layout)
         options_group.setLayout(QVBoxLayout())
@@ -294,7 +292,7 @@ class BulkCleanPgnDialog(QDialog):
         buttons_layout.addWidget(self.apply_button)
         
         self.cancel_button = QPushButton("Cancel")
-        self.cancel_button.clicked.connect(self.reject)
+        self.cancel_button.clicked.connect(self._on_cancel_clicked)
         buttons_layout.addWidget(self.cancel_button)
         
         # Add spacing before buttons
@@ -463,10 +461,9 @@ class BulkCleanPgnDialog(QDialog):
         remove_variations = self.remove_variations_check.isChecked()
         remove_non_standard_tags = self.remove_non_standard_tags_check.isChecked()
         remove_annotations = self.remove_annotations_check.isChecked()
-        remove_results = self.remove_results_check.isChecked()
         
         if not any([remove_comments, remove_variations, remove_non_standard_tags, 
-                   remove_annotations, remove_results]):
+                   remove_annotations]):
             from app.views.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "No Options Selected", "Please select at least one cleaning option.", self)
             return
@@ -486,7 +483,6 @@ class BulkCleanPgnDialog(QDialog):
             remove_variations,
             remove_non_standard_tags,
             remove_annotations,
-            remove_results,
             game_indices
         )
         
@@ -504,7 +500,7 @@ class BulkCleanPgnDialog(QDialog):
             )
             return
         
-        # Show success message
+        # Show success message (dialog stays open, user closes it manually)
         from app.views.message_dialog import MessageDialog
         MessageDialog.show_information(
             self.config,
@@ -515,8 +511,7 @@ class BulkCleanPgnDialog(QDialog):
             self
         )
         
-        # Close dialog on success
-        self.accept()
+        # Dialog stays open - user closes it manually
     
     def _on_select_all_clicked(self) -> None:
         """Handle Select All button click."""
@@ -524,7 +519,6 @@ class BulkCleanPgnDialog(QDialog):
         self.remove_variations_check.setChecked(True)
         self.remove_non_standard_tags_check.setChecked(True)
         self.remove_annotations_check.setChecked(True)
-        self.remove_results_check.setChecked(True)
     
     def _on_deselect_all_clicked(self) -> None:
         """Handle Deselect All button click."""
@@ -532,7 +526,10 @@ class BulkCleanPgnDialog(QDialog):
         self.remove_variations_check.setChecked(False)
         self.remove_non_standard_tags_check.setChecked(False)
         self.remove_annotations_check.setChecked(False)
-        self.remove_results_check.setChecked(False)
+    
+    def _on_cancel_clicked(self) -> None:
+        """Handle Cancel button click."""
+        self.reject()
     
     def _set_controls_enabled(self, enabled: bool) -> None:
         """Enable or disable dialog controls.
@@ -544,7 +541,6 @@ class BulkCleanPgnDialog(QDialog):
         self.remove_variations_check.setEnabled(enabled)
         self.remove_non_standard_tags_check.setEnabled(enabled)
         self.remove_annotations_check.setEnabled(enabled)
-        self.remove_results_check.setEnabled(enabled)
         self.apply_button.setEnabled(enabled)
         self.cancel_button.setEnabled(enabled)
         if self.quick_select_enabled and hasattr(self, 'select_all_button'):

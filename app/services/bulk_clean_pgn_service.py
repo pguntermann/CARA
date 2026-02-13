@@ -7,7 +7,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from app.models.database_model import DatabaseModel, GameData
 from app.services.pgn_cleaning_service import PgnCleaningService
-from app.services.logging_service import LoggingService
+from app.services.logging_service import LoggingService, init_worker_logging
 
 
 @dataclass
@@ -26,8 +26,7 @@ def _process_game_for_cleaning(
     remove_comments: bool,
     remove_variations: bool,
     remove_non_standard_tags: bool,
-    remove_annotations: bool,
-    remove_results: bool
+    remove_annotations: bool
 ) -> Tuple[Optional[str], bool]:
     """Process a single game for PGN cleaning (for parallel execution).
     
@@ -37,7 +36,6 @@ def _process_game_for_cleaning(
         remove_variations: If True, remove variations from PGN.
         remove_non_standard_tags: If True, remove non-standard tags from PGN.
         remove_annotations: If True, remove annotations from PGN.
-        remove_results: If True, remove results from PGN.
         
     Returns:
         Tuple of (new_pgn, updated) or (None, False) if failed.
@@ -68,10 +66,6 @@ def _process_game_for_cleaning(
             if PgnCleaningService.remove_annotations_from_game(temp_game):
                 game_modified = True
         
-        if remove_results:
-            if PgnCleaningService.remove_results_from_game(temp_game):
-                game_modified = True
-        
         if game_modified:
             return (temp_game.pgn, True)
         else:
@@ -99,7 +93,6 @@ class BulkCleanPgnService:
         remove_variations: bool = False,
         remove_non_standard_tags: bool = False,
         remove_annotations: bool = False,
-        remove_results: bool = False,
         game_indices: Optional[List[int]] = None,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
         cancellation_check: Optional[Callable[[], bool]] = None
@@ -112,7 +105,6 @@ class BulkCleanPgnService:
             remove_variations: If True, remove variations from PGN.
             remove_non_standard_tags: If True, remove non-standard tags from PGN.
             remove_annotations: If True, remove annotations from PGN.
-            remove_results: If True, remove results from PGN.
             game_indices: Optional list of game indices to process (None = all games).
             progress_callback: Optional callback function(game_index, total, message).
             cancellation_check: Optional function that returns True if operation should be cancelled.
@@ -144,7 +136,7 @@ class BulkCleanPgnService:
         
         # If no cleaning options selected, return early
         if not any([remove_comments, remove_variations, remove_non_standard_tags, 
-                   remove_annotations, remove_results]):
+                   remove_annotations]):
             if progress_callback:
                 progress_callback(0, total_games, "No cleaning options selected")
             return BulkCleanPgnResult(
@@ -165,7 +157,13 @@ class BulkCleanPgnService:
         
         executor = None
         try:
-            executor = ProcessPoolExecutor(max_workers=max_workers)
+            # Initialize logging for worker processes since PgnCleaningService methods use LoggingService
+            log_queue = LoggingService.get_queue()
+            executor = ProcessPoolExecutor(
+                max_workers=max_workers,
+                initializer=init_worker_logging,
+                initargs=(log_queue,)
+            )
             
             # Submit all games for processing
             future_to_game = {
@@ -175,8 +173,7 @@ class BulkCleanPgnService:
                     remove_comments,
                     remove_variations,
                     remove_non_standard_tags,
-                    remove_annotations,
-                    remove_results
+                    remove_annotations
                 ): game
                 for game in games_to_process
             }
@@ -194,9 +191,6 @@ class BulkCleanPgnService:
                 game = future_to_game[future]
                 completed += 1
                 
-                if progress_callback:
-                    progress_callback(completed, total_games, f"Cleaning game {completed}/{total_games}")
-                
                 try:
                     new_pgn, updated = future.result()
                     
@@ -212,10 +206,34 @@ class BulkCleanPgnService:
                         pass
                 except Exception:
                     games_failed += 1
+                
+                # Update progress AFTER processing result to ensure accurate count
+                if progress_callback:
+                    progress_callback(completed, total_games, f"Cleaning game {completed}/{total_games}")
+                    # Process events to keep UI responsive
+                    from PyQt6.QtWidgets import QApplication
+                    QApplication.processEvents()
+            
+            # Ensure all futures are complete before shutdown
+            # Wait for any remaining futures that might not have been processed
+            for future in future_to_game:
+                if not future.done():
+                    try:
+                        future.result(timeout=1.0)
+                    except Exception:
+                        pass
         
         finally:
             if executor:
+                # Process events before shutdown to ensure UI updates
+                from PyQt6.QtWidgets import QApplication
+                QApplication.processEvents()
+                
+                # Shutdown executor and wait for processes to finish
                 executor.shutdown(wait=True)
+                
+                # Process events after shutdown to ensure UI can update
+                QApplication.processEvents()
         
         # Batch update all modified games with a single dataChanged signal
         if updated_games:
@@ -232,8 +250,6 @@ class BulkCleanPgnService:
             options.append("non_standard_tags")
         if remove_annotations:
             options.append("annotations")
-        if remove_results:
-            options.append("results")
         options_str = ", ".join(options) if options else "none"
         logging_service.info(f"Bulk clean PGN operation completed: options=[{options_str}], games_processed={total_games}, games_updated={games_updated}, games_failed={games_failed}")
         
@@ -244,4 +260,5 @@ class BulkCleanPgnService:
             games_failed=games_failed,
             games_skipped=total_games - games_updated - games_failed
         )
+    
 

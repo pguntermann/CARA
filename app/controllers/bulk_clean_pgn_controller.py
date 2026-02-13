@@ -55,7 +55,6 @@ class BulkCleanPgnController(QObject):
         remove_variations: bool = False,
         remove_non_standard_tags: bool = False,
         remove_annotations: bool = False,
-        remove_results: bool = False,
         game_indices: Optional[List[int]] = None
     ) -> BulkCleanPgnResult:
         """Clean PGN notation for games in a database.
@@ -66,7 +65,6 @@ class BulkCleanPgnController(QObject):
             remove_variations: If True, remove variations from PGN.
             remove_non_standard_tags: If True, remove non-standard tags from PGN.
             remove_annotations: If True, remove annotations from PGN.
-            remove_results: If True, remove results from PGN.
             game_indices: Optional list of game indices to process (None = all games).
             
         Returns:
@@ -98,7 +96,6 @@ class BulkCleanPgnController(QObject):
             remove_variations,
             remove_non_standard_tags,
             remove_annotations,
-            remove_results,
             game_indices,
             progress_callback,
             cancel_flag
