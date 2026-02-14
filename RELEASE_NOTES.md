@@ -1,3 +1,20 @@
+# CARA v2.5.7 - Maintenance Release
+
+**Release Date:** 14.02.2026
+
+This release addresses a UI lockup during bulk operations, fixes player stats dropdown behaviour for names with whitespace, and improves accuracy percentage calculations.
+
+## Bug Fixes
+
+- **Bulk Cleanup UI Lockup**: Fixed UI lockup issue which could occur during PGN bulk cleanup operations
+- **Player Stats Dropdown**: Fixed issue with player stats dropdown omitting player names containing a leading or trailing whitespace character
+
+## Enhancements
+
+- **Accuracy Percentages**: Improved best_move_percentage and top3_move_percentage calculation logic. Since CARA differentiates between book moves and best moves, previously these calculations used best moves (excluding book moves) as the numerator but total moves (including book moves) as the denominator. As a result, when a player followed known opening theory, values could be lower than expected. The new calculation uses non_book_moves as the denominator so the values better match user expectations.
+
+---
+
 # CARA v2.5.6 - Maintenance Release
 
 **Release Date:** 31.01.2026
