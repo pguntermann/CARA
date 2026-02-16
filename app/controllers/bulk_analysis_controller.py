@@ -722,9 +722,11 @@ class BulkAnalysisController(QObject):
                 if not engines:
                     title = "No Engine Configured"
                     message = "Please add at least one UCI chess engine before starting bulk analysis.\n\nGo to Engines → Add Engine... to configure an engine."
+                    message += '<br><br><a href="manual://adding-first-engine">Learn how to add an engine</a>'
                 else:
                     title = "No Engine Assigned"
                     message = "Please assign an engine to the Game Analysis task before starting bulk analysis.\n\nGo to Engines → [Engine Name] → Assign to Game Analysis."
+                    message += '<br><br><a href="manual://adding-additional-engines">Learn how to assign engines to tasks</a>'
             
             return (False, title, message)
         

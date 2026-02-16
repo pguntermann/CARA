@@ -350,18 +350,25 @@ class AIModelSettingsDialog(QDialog):
         )
     
     def _refresh_all_models(self) -> None:
-        """Refresh model lists for all providers that have API keys."""
+        """Refresh model lists for all providers that have API keys.
+        Providers without API keys will have their models cleared."""
         providers_to_refresh = []
         
         # Check OpenAI
         openai_api_key = self.openai_api_key_input.text().strip()
         if openai_api_key:
             providers_to_refresh.append(("openai", openai_api_key))
+        else:
+            # Clear models if no API key
+            self._populate_model_combo("openai", [], "")
         
         # Check Anthropic
         anthropic_api_key = self.anthropic_api_key_input.text().strip()
         if anthropic_api_key:
             providers_to_refresh.append(("anthropic", anthropic_api_key))
+        else:
+            # Clear models if no API key
+            self._populate_model_combo("anthropic", [], "")
         
         if not providers_to_refresh:
             from app.views.message_dialog import MessageDialog
@@ -400,9 +407,6 @@ class AIModelSettingsDialog(QDialog):
         self._refresh_count = len(providers_to_refresh)
         self._refresh_completed = 0
         self._refresh_results = []  # Store results for combined status message
-        
-        # Clear cache before refreshing to ensure we get updated model lists
-        self.discovery_service.clear_cache()
         
         # Start discovery threads for each provider
         for provider_key, api_key in providers_to_refresh:

@@ -1988,6 +1988,22 @@ class MainWindow(QMainWindow):
         logging_service = LoggingService.get_instance()
         logging_service.info("Application closing: saving settings, cleaning up")
         
+        # Stop evaluation and manual analysis synchronously before shutdown
+        # This ensures threads and processes are cleaned up properly, preventing macOS crash reports
+        try:
+            # Stop evaluation if running
+            evaluation_controller = self.controller.get_evaluation_controller()
+            if evaluation_controller:
+                evaluation_controller.stop_evaluation()
+            
+            # Stop manual analysis if running (synchronous=True to wait for cleanup)
+            manual_analysis_controller = self.controller.get_manual_analysis_controller()
+            if manual_analysis_controller:
+                manual_analysis_controller.stop_analysis(synchronous=True)
+        except Exception as e:
+            # Log error but don't prevent shutdown
+            logging_service.error(f"Error during cleanup on shutdown: {e}", exc_info=e)
+        
         self._save_user_settings()
         event.accept()
     
@@ -2062,6 +2078,7 @@ class MainWindow(QMainWindow):
         dialog = AIModelSettingsDialog(self.config, settings_service, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self._refresh_ai_summary_models()
+            self._refresh_ai_summary_menu_state()
     
     def _show_annotation_preferences(self) -> None:
         """Show annotation preferences dialog."""
@@ -4042,6 +4059,25 @@ Visibility Settings:
             ai_chat_view = self.detail_panel.ai_chat_view
             if hasattr(ai_chat_view, 'refresh_model_list'):
                 ai_chat_view.refresh_model_list()
+    
+    def _refresh_ai_summary_menu_state(self) -> None:
+        """Refresh the AI Summary menu checkboxes based on current settings."""
+        from app.services.user_settings_service import UserSettingsService
+        settings_service = UserSettingsService.get_instance()
+        settings = settings_service.get_settings()
+        ai_summary_settings = settings.get("ai_summary", {})
+        use_openai = ai_summary_settings.get("use_openai_models", True)
+        use_anthropic = ai_summary_settings.get("use_anthropic_models", False)
+        
+        # Enforce exclusivity: if both or neither are selected, default to OpenAI
+        if use_openai == use_anthropic:
+            use_openai = True
+            use_anthropic = False
+        
+        if hasattr(self, 'ai_summary_use_openai_action'):
+            self.ai_summary_use_openai_action.setChecked(use_openai)
+        if hasattr(self, 'ai_summary_use_anthropic_action'):
+            self.ai_summary_use_anthropic_action.setChecked(use_anthropic)
     
     def _on_manual_analysis_state_changed(self, is_analyzing: bool) -> None:
         """Handle manual analysis state change to update menu toggle.

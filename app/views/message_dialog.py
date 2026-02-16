@@ -7,7 +7,9 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
 )
-from PyQt6.QtGui import QPalette, QColor
+from PyQt6.QtGui import QPalette, QColor, QDesktopServices
+from PyQt6.QtCore import Qt, QUrl
+from pathlib import Path
 from typing import Dict, Any, Literal
 
 
@@ -80,12 +82,20 @@ class MessageDialog(QDialog):
         message_text_color = message_config.get('text_color', [200, 200, 200])
         message_label = QLabel(message)
         message_label.setWordWrap(True)
+        # Enable rich text/HTML support for links
+        message_label.setTextFormat(Qt.TextFormat.RichText)
+        # Handle link clicks manually to support local file anchors
+        message_label.setOpenExternalLinks(False)
+        message_label.linkActivated.connect(self._on_link_activated)
         # Set minimum width to ensure proper word wrapping calculation
         message_label.setMinimumWidth(dialog_width - layout_margins[0] - layout_margins[2] - (message_padding * 2))
+        # Get link color from config or use a slightly lighter shade of text color
+        link_color = message_config.get('link_color', [150, 180, 255])
         message_label.setStyleSheet(
             f"font-size: {message_font_size}pt; "
             f"padding: {message_padding}px; "
             f"color: rgb({message_text_color[0]}, {message_text_color[1]}, {message_text_color[2]});"
+            f"QLabel a {{ color: rgb({link_color[0]}, {link_color[1]}, {link_color[2]}); text-decoration: underline; }}"
         )
         layout.addWidget(message_label)
         
@@ -129,6 +139,29 @@ class MessageDialog(QDialog):
         if self.height() < min_height:
             self.setMinimumHeight(min_height)
             self.resize(self.width(), min_height)
+    
+    def _on_link_activated(self, link: str) -> None:
+        """Handle link activation in message text.
+        
+        Args:
+            link: The link URL that was clicked.
+        """
+        # Handle manual:// links (custom scheme for manual anchors)
+        if link.startswith("manual://"):
+            # Extract anchor (everything after manual://)
+            anchor = link.replace("manual://", "")
+            # Get the path to the manual HTML file
+            # __file__ is app/views/message_dialog.py, so parent is app/, then resources/manual/index.html
+            manual_path = Path(__file__).resolve().parent.parent / "resources" / "manual" / "index.html"
+            # Convert to QUrl and add fragment (anchor)
+            url = QUrl.fromLocalFile(str(manual_path))
+            if anchor:
+                url.setFragment(anchor)
+            # Open in default browser
+            QDesktopServices.openUrl(url)
+        else:
+            # For other links, use default behavior
+            QDesktopServices.openUrl(QUrl(link))
     
     @staticmethod
     def show_warning(config: Dict[str, Any], title: str, message: str, parent=None) -> None:

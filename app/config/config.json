@@ -457,7 +457,9 @@
             "max_depth_evaluation": 0,
             "padding_left": 40,
             "update_interval_ms": 500,
-            "max_threads": 6,
+            "default_threads_formula": {
+              "formula": "max(1, min(4, (cpu_count - reserved_cores) // 2))"
+            },
             "colors": {
               "white": [
                 255,
@@ -1490,7 +1492,9 @@
               "offset_y": 20
             }
           },
-          "max_threads": 6,
+          "default_threads_formula": {
+            "formula": "max(1, min(6, cpu_count - reserved_cores))"
+          },
           "update_interval_ms": 100,
           "max_depth": null
         },
@@ -4595,7 +4599,9 @@
   "game_analysis": {
     "max_depth": 0,
     "time_limit_per_move_ms": 300,
-    "max_threads": 8,
+    "default_threads_formula": {
+      "formula": "max(1, min(8, cpu_count - reserved_cores))"
+    },
     "progress_update_interval_ms": 100,
     "assessment_thresholds": {
       "good_move_max_cpl": 50,

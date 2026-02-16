@@ -705,6 +705,16 @@ class AppController:
         # Format message
         message = message_template.format(action=action, task=task_display)
         
+        # Add manual link based on error type
+        if error_type == "no_engines":
+            # Link to "Adding Your First Engine" section
+            manual_link = '<br><br><a href="manual://adding-first-engine">Learn how to add an engine</a>'
+            message = message + manual_link
+        elif error_type == "no_assignment":
+            # Link to "Adding Additional Engines" section (which covers task assignment)
+            manual_link = '<br><br><a href="manual://adding-additional-engines">Learn how to assign engines to tasks</a>'
+            message = message + manual_link
+        
         return (title, message)
     
     def get_evaluation_controller(self) -> EvaluationController:

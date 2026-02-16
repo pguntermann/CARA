@@ -267,8 +267,13 @@ class ManualAnalysisController:
         
         return True
     
-    def stop_analysis(self) -> None:
-        """Stop current analysis."""
+    def stop_analysis(self, synchronous: bool = False) -> None:
+        """Stop current analysis.
+        
+        Args:
+            synchronous: If True, stop synchronously (wait for cleanup to complete).
+                        If False, stop asynchronously using QTimer (default, for UI responsiveness).
+        """
         # Stop debounce timer
         self._position_update_timer.stop()
         self._pending_position_fen = None
@@ -290,12 +295,17 @@ class ManualAnalysisController:
         logging_service = LoggingService.get_instance()
         logging_service.info("Manual analysis stopped")
         
-        # Stop service in background (non-blocking) using QTimer
-        # Always shut down the engine when user stops manual analysis
-        QTimer.singleShot(0, lambda: self._stop_service_in_background(keep_engine_alive=False))
+        # Stop service - synchronously or asynchronously based on parameter
+        if synchronous:
+            # Synchronous stop (for shutdown) - call directly
+            self._stop_service_in_background(keep_engine_alive=False)
+        else:
+            # Asynchronous stop (for normal UI interaction) - use QTimer
+            QTimer.singleShot(0, lambda: self._stop_service_in_background(keep_engine_alive=False))
         
         # If evaluation bar is visible and using manual analysis, switch it back to evaluation engine
-        if self._evaluation_controller:
+        # Skip this during synchronous shutdown to avoid restarting evaluation
+        if not synchronous and self._evaluation_controller:
             board_model = self.game_controller.board_controller.get_board_model()
             if board_model.show_evaluation_bar:
                 # Switch evaluation bar back to evaluation engine
