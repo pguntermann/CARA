@@ -1,3 +1,23 @@
+# CARA v2.5.8 - Bug Fixes and User Experience Improvements
+
+**Release Date:** 16.02.2026
+
+This release fixes several bugs including an error pattern percentage calculation issue, addresses a macOS crash when closing the application, improves default engine thread settings, and enhances the user experience with better help links and AI model discovery.
+
+## Bug Fixes
+
+- **Error Pattern Percentage Calculation**: Fixed bug where error pattern percentage values were incorrectly calculated, leading to displayed percentages that were too high. The calculation now correctly sums phase blunders (opening, middlegame, endgame) instead of using aggregated total blunders, ensuring consistent and accurate percentage values
+- **macOS Application Crash**: Fixed crash that could occur on macOS when closing the application with the evaluation bar or manual analysis active. The application now properly synchronizes cleanup of engine threads and processes before shutdown
+- **macOS Manual Anchor Links**: Fixed macOS-specific issue where manual HTML chapter anchor links were not being correctly opened in Safari. Anchor links now properly navigate to the correct sections in the manual
+
+## Enhancements
+
+- **Default Engine Thread Settings**: Implemented better, more sensible default thread settings when adding new UCI engines. Default thread counts are now calculated using formulas based on CPU count, reserving cores for UI responsiveness and providing appropriate defaults for game analysis, evaluation, and manual analysis tasks
+- **AI Model Discovery**: Removed redundant AI discovered models cache and improved AI settings user experience for discovering and configuring AI models
+- **Help Links in Error Messages**: Added helpful links to the HTML manual in "No Engine configured" message boxes, improving the experience for new users by providing direct access to relevant documentation sections
+
+---
+
 # CARA v2.5.7 - Maintenance Release
 
 **Release Date:** 14.02.2026

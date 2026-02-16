@@ -149,6 +149,32 @@
             background: linear-gradient(135deg, rgb(120, 120, 130) 0%, rgb(90, 90, 100) 100%);
         }
         
+        .download-button.disabled {
+            background: linear-gradient(135deg, rgb(50, 50, 55) 0%, rgb(40, 40, 45) 100%);
+            color: rgb(120, 120, 120);
+            cursor: not-allowed;
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        
+        .download-button.disabled:hover {
+            background: linear-gradient(135deg, rgb(50, 50, 55) 0%, rgb(40, 40, 45) 100%);
+            transform: none;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .download-status {
+            color: rgb(180, 180, 180);
+            font-size: 0.9em;
+            margin-top: 10px;
+            min-height: 1.5em;
+            line-height: 1.5;
+        }
+        
+        .download-status.unavailable {
+            color: rgb(200, 150, 100);
+        }
+        
         .gatekeeper-note {
             color: rgb(140, 140, 140);
             font-size: 0.7em;
@@ -389,7 +415,7 @@
         <img src="appicon.svg" alt="CARA Logo" class="logo">
         <h1>CARA</h1>
         <p class="subtitle">Chess Analysis and Review Application</p>
-        <p class="version">Version 2.5.7</p>
+        <p class="version">Version 2.5.8</p>
         <p class="description">
             A full-featured desktop application for analyzing and reviewing chess games. 
             CARA helps you understand your games, identify mistakes, recognize patterns, 
@@ -404,26 +430,33 @@
         </div>
         
         <!-- Download Section -->
-        <div class="download-section">
+        <!-- Set data-downloads-available="false" to disable buttons and show "available shortly" message -->
+        <!-- Set data-downloads-available="true" (or remove attribute) to enable buttons -->
+        <div class="download-section" data-downloads-available="false">
             <h2>Download as App Bundle</h2>
             <p class="download-info">
                 Pre-built application bundles are available for Windows and macOS. 
                 These bundles include all dependencies and can be run directly without Python installation.
             </p>
             <div class="download-buttons">
-                <a href="https://github.com/pguntermann/CARA/releases/download/2.5.7/CARA.2.5.7.windows.AppBundle.zip" 
+                <a href="https://github.com/pguntermann/CARA/releases/download/2.5.8/CARA.2.5.8.windows.AppBundle.zip" 
                    class="download-button" 
+                   id="download-windows"
+                   data-platform="windows"
                    target="_blank" 
                    rel="noopener noreferrer">
                     Download for Windows
                 </a>
-                <a href="https://github.com/pguntermann/CARA/releases/download/2.5.7/CARA.2.5.7.macOS.AppBundle.zip" 
+                <a href="https://github.com/pguntermann/CARA/releases/download/2.5.8/CARA.2.5.8.macOS.AppBundle.zip" 
                    class="download-button macos" 
+                   id="download-macos"
+                   data-platform="macos"
                    target="_blank" 
                    rel="noopener noreferrer">
                     Download for macOS
                 </a>
             </div>
+            <div class="download-status" id="download-status"></div>
             <p class="gatekeeper-note">
                 <strong>macOS users:</strong> If you encounter a security warning when opening the app, see the <a href="manual.html#installation" style="color: rgb(100, 150, 255); text-decoration: underline;">installation instructions in the manual</a> for detailed steps on allowing the app to run.
             </p>
@@ -475,5 +508,57 @@
             </p>
         </div>
     </div>
+    
+    <script>
+        (function() {
+            // Simple toggle mechanism: read data-downloads-available attribute
+            function updateDownloadButtons() {
+                const downloadSection = document.querySelector('.download-section');
+                const statusDiv = document.getElementById('download-status');
+                const buttons = document.querySelectorAll('.download-button[data-platform]');
+                
+                if (!downloadSection) return;
+                
+                // Check if downloads are available (default to true if attribute not set)
+                const downloadsAvailable = downloadSection.getAttribute('data-downloads-available') !== 'false';
+                
+                buttons.forEach(button => {
+                    if (downloadsAvailable) {
+                        button.classList.remove('disabled');
+                        button.style.pointerEvents = 'auto';
+                        button.style.cursor = 'pointer';
+                        button.onclick = null;
+                    } else {
+                        button.classList.add('disabled');
+                        button.style.pointerEvents = 'none';
+                        button.style.cursor = 'not-allowed';
+                        button.onclick = function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            return false;
+                        };
+                    }
+                });
+                
+                // Update status message
+                if (statusDiv) {
+                    if (downloadsAvailable) {
+                        statusDiv.textContent = '';
+                        statusDiv.classList.remove('unavailable');
+                    } else {
+                        statusDiv.textContent = 'A new release is currently being prepared. Downloads will be available shortly.';
+                        statusDiv.classList.add('unavailable');
+                    }
+                }
+            }
+            
+            // Update on page load
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', updateDownloadButtons);
+            } else {
+                updateDownloadButtons();
+            }
+        })();
+    </script>
 </body>
 </html>
