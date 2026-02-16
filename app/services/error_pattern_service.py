@@ -125,14 +125,17 @@ class ErrorPatternService:
         """Detect blunder patterns by phase."""
         patterns: List[ErrorPattern] = []
         
-        total_blunders = aggregated_stats.player_stats.blunders
-        if total_blunders == 0:
-            return patterns
-        
         # Count blunders by phase
         opening_blunders = aggregated_stats.opening_stats.blunders
         middlegame_blunders = aggregated_stats.middlegame_stats.blunders
         endgame_blunders = aggregated_stats.endgame_stats.blunders
+        
+        # Calculate total blunders as sum of phase blunders to ensure consistency
+        # This ensures total_blunders includes blunders from all games (both colors),
+        # matching how phase blunders are counted
+        total_blunders = opening_blunders + middlegame_blunders + endgame_blunders
+        if total_blunders == 0:
+            return patterns
         
         # Find the phase with the most blunders
         phase_blunders = [

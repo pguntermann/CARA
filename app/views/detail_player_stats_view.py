@@ -1830,7 +1830,7 @@ class DetailPlayerStatsView(QWidget):
         text_column.addWidget(desc_label)
         
         # Frequency/percentage - compact display
-        freq_text = f"({pattern.frequency}, {pattern.percentage:.1f}%)"
+        freq_text = f"({pattern.frequency} occurrences, {pattern.percentage:.1f}%)"
         freq_label = QLabel(freq_text)
         freq_label.setFont(value_font)
         freq_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
