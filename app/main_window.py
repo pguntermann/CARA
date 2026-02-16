@@ -1988,6 +1988,22 @@ class MainWindow(QMainWindow):
         logging_service = LoggingService.get_instance()
         logging_service.info("Application closing: saving settings, cleaning up")
         
+        # Stop evaluation and manual analysis synchronously before shutdown
+        # This ensures threads and processes are cleaned up properly, preventing macOS crash reports
+        try:
+            # Stop evaluation if running
+            evaluation_controller = self.controller.get_evaluation_controller()
+            if evaluation_controller:
+                evaluation_controller.stop_evaluation()
+            
+            # Stop manual analysis if running (synchronous=True to wait for cleanup)
+            manual_analysis_controller = self.controller.get_manual_analysis_controller()
+            if manual_analysis_controller:
+                manual_analysis_controller.stop_analysis(synchronous=True)
+        except Exception as e:
+            # Log error but don't prevent shutdown
+            logging_service.error(f"Error during cleanup on shutdown: {e}", exc_info=e)
+        
         self._save_user_settings()
         event.accept()
     
