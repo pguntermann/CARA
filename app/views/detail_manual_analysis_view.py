@@ -1073,18 +1073,22 @@ class DetailManualAnalysisView(QWidget):
                         if error_type == "no_engines":
                             title = "No Engine Configured"
                             message = "Please add at least one UCI chess engine before starting manual analysis.\n\nGo to Engines → Add Engine... to configure an engine."
+                            message += '<br><br><a href="manual://adding-first-engine">Learn how to add an engine</a>'
                         else:
                             title = "No Engine Assigned"
                             message = "Please assign an engine to the Manual Analysis task before starting analysis.\n\nGo to Engines → [Engine Name] → Assign to Manual Analysis."
+                            message += '<br><br><a href="manual://adding-additional-engines">Learn how to assign engines to tasks</a>'
                     MessageDialog.show_warning(self.config, title, message, self)
                 except Exception:
                     # Fallback message if something goes wrong
                     if error_type == "no_engines":
                         title = "No Engine Configured"
                         message = "Please add at least one UCI chess engine before starting manual analysis.\n\nGo to Engines → Add Engine... to configure an engine."
+                        message += '<br><br><a href="manual://adding-first-engine">Learn how to add an engine</a>'
                     else:
                         title = "No Engine Assigned"
                         message = "Please assign an engine to the Manual Analysis task before starting analysis.\n\nGo to Engines → [Engine Name] → Assign to Manual Analysis."
+                        message += '<br><br><a href="manual://adding-additional-engines">Learn how to assign engines to tasks</a>'
                     MessageDialog.show_warning(self.config, title, message, self)
                 return
             
