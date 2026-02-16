@@ -33,8 +33,7 @@ The AI chat system follows a **Model-Controller-Service-View** pattern with **th
 **AIModelDiscoveryService** (`app/services/ai_model_discovery_service.py`):
 - Discovers available models from OpenAI and Anthropic APIs
 - Filters models based on configurable exclusion rules
-- Caches model lists for 24 hours to reduce API calls
-- Supports fallback to cached data when API calls fail
+- Returns discovered models which are persisted in user_settings.json
 
 **DetailAIChatView** (`app/views/detail_ai_chat_view.py`):
 - UI widget displaying chat messages and input controls
@@ -92,14 +91,15 @@ The AI chat system follows a **Model-Controller-Service-View** pattern with **th
 
 **Model Discovery Flow**:
 1. User opens AI Model Settings dialog
-2. Dialog calls `AIModelDiscoveryService.get_openai_models(api_key)` or `get_anthropic_models(api_key)`
-3. Service checks cache (24-hour validity)
-4. If cache valid, returns cached models
-5. If cache invalid or missing, makes API request to provider
+2. Dialog loads previously discovered models from `user_settings.json` (if available)
+3. User enters API key and clicks "Refresh Models" button
+4. Dialog calls `AIModelDiscoveryService.get_openai_models(api_key)` or `get_anthropic_models(api_key)`
+5. Service makes API request to provider
 6. Service filters models using exclusion rules (prefixes, contains, exact matches)
-7. Service caches filtered models with timestamp
-8. Service returns list of model IDs
-9. Dialog displays models in dropdown
+7. Service returns list of model IDs
+8. Dialog displays models in dropdown
+9. When user clicks "Save", discovered models are persisted to `user_settings.json`
+10. On subsequent dialog opens, models are loaded from `user_settings.json` until user refreshes them
 
 ## System Prompt Generation
 
@@ -243,25 +243,26 @@ The system supports two AI providers:
 }
 ```
 
-## Model Discovery and Caching
+## Model Discovery and Persistence
 
 ### Discovery Process
 
-1. User provides API key in settings
-2. `AIModelDiscoveryService` makes API request to provider
-3. Service filters models using exclusion rules:
+1. User provides API key in settings dialog
+2. User clicks "Refresh Models" button
+3. `AIModelDiscoveryService` makes API request to provider
+4. Service filters models using exclusion rules:
    - **Exclude Prefixes**: e.g., "o1-pro-", "text-", "davinci"
    - **Exclude Contains**: e.g., "audio", "realtime", "image"
    - **Exclude Exact**: Specific model IDs to exclude
-4. Service caches filtered models with timestamp
 5. Service returns list of model IDs
+6. Discovered models are saved to `user_settings.json` when user clicks "Save"
 
-### Caching Strategy
+### Model Persistence
 
-- **Cache Duration**: 24 hours
-- **Cache Location**: `.cache/openai_models.json` and `.cache/anthropic_models.json`
-- **Fallback**: If API call fails, uses cached data if available
-- **Cache Invalidation**: Manual clear via `clear_cache()` method
+- **Storage Location**: Models are stored in `user_settings.json` under `ai_models.openai.models` and `ai_models.anthropic.models`
+- **Persistence**: Models persist across application sessions until user refreshes them
+- **Refresh**: Users can refresh models at any time via the "Refresh Models" button, which will replace the existing model list
+- **No Time-Based Expiry**: Models remain in settings until manually refreshed
 
 ### Filter Configuration
 

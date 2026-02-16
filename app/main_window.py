@@ -2062,6 +2062,7 @@ class MainWindow(QMainWindow):
         dialog = AIModelSettingsDialog(self.config, settings_service, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self._refresh_ai_summary_models()
+            self._refresh_ai_summary_menu_state()
     
     def _show_annotation_preferences(self) -> None:
         """Show annotation preferences dialog."""
@@ -4042,6 +4043,25 @@ Visibility Settings:
             ai_chat_view = self.detail_panel.ai_chat_view
             if hasattr(ai_chat_view, 'refresh_model_list'):
                 ai_chat_view.refresh_model_list()
+    
+    def _refresh_ai_summary_menu_state(self) -> None:
+        """Refresh the AI Summary menu checkboxes based on current settings."""
+        from app.services.user_settings_service import UserSettingsService
+        settings_service = UserSettingsService.get_instance()
+        settings = settings_service.get_settings()
+        ai_summary_settings = settings.get("ai_summary", {})
+        use_openai = ai_summary_settings.get("use_openai_models", True)
+        use_anthropic = ai_summary_settings.get("use_anthropic_models", False)
+        
+        # Enforce exclusivity: if both or neither are selected, default to OpenAI
+        if use_openai == use_anthropic:
+            use_openai = True
+            use_anthropic = False
+        
+        if hasattr(self, 'ai_summary_use_openai_action'):
+            self.ai_summary_use_openai_action.setChecked(use_openai)
+        if hasattr(self, 'ai_summary_use_anthropic_action'):
+            self.ai_summary_use_anthropic_action.setChecked(use_anthropic)
     
     def _on_manual_analysis_state_changed(self, is_analyzing: bool) -> None:
         """Handle manual analysis state change to update menu toggle.
