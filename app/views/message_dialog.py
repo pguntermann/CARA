@@ -11,6 +11,8 @@ from PyQt6.QtGui import QPalette, QColor, QDesktopServices
 from PyQt6.QtCore import Qt, QUrl
 from pathlib import Path
 from typing import Dict, Any, Literal
+import sys
+import subprocess
 
 
 class MessageDialog(QDialog):
@@ -153,12 +155,24 @@ class MessageDialog(QDialog):
             # Get the path to the manual HTML file
             # __file__ is app/views/message_dialog.py, so parent is app/, then resources/manual/index.html
             manual_path = Path(__file__).resolve().parent.parent / "resources" / "manual" / "index.html"
-            # Convert to QUrl and add fragment (anchor)
-            url = QUrl.fromLocalFile(str(manual_path))
-            if anchor:
-                url.setFragment(anchor)
-            # Open in default browser
-            QDesktopServices.openUrl(url)
+            
+            # On macOS, use osascript to preserve URL fragments (QDesktopServices strips them)
+            if sys.platform == "darwin":
+                url_string = f"file://{manual_path.resolve()}"
+                if anchor:
+                    url_string += f"#{anchor}"
+                # Use osascript to explicitly tell Safari to open location, which preserves fragments
+                # Also activate Safari to bring it to the front
+                # Escape quotes in URL string for AppleScript
+                escaped_url = url_string.replace('"', '\\"')
+                apple_script = f'tell application "Safari" to activate\ntell application "Safari" to open location "{escaped_url}"'
+                subprocess.run(["osascript", "-e", apple_script], check=False)
+            else:
+                # On other platforms, use QDesktopServices which preserves fragments
+                url = QUrl.fromLocalFile(str(manual_path))
+                if anchor:
+                    url.setFragment(anchor)
+                QDesktopServices.openUrl(url)
         else:
             # For other links, use default behavior
             QDesktopServices.openUrl(QUrl(link))
