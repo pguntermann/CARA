@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
+from asteval import Interpreter
+from app.services.logging_service import LoggingService
 
 
 class TaskType(Enum):
@@ -58,30 +60,89 @@ class EngineConfigurationService:
         self._load_recommended_defaults()
     
     def _load_recommended_defaults(self) -> None:
-        """Load recommended default values from config.json."""
+        """Load recommended default values from config.json using formulas."""
+        # Get CPU count for formula evaluation
+        cpu_count = os.cpu_count() or 4
+        reserved_cores = 2  # Reserve cores for UI responsiveness
+        
         # Game Analysis defaults
         game_analysis_config = self.config.get("game_analysis", {})
+        threads_formula_config = game_analysis_config.get("default_threads_formula", {})
+        threads_formula = threads_formula_config.get("formula")
+        if not threads_formula:
+            raise ValueError("default_threads_formula.formula is required in config.json under game_analysis")
+        threads_value = self._evaluate_thread_formula(threads_formula, cpu_count, reserved_cores, "game_analysis")
+        
         self.game_analysis_defaults = {
-            "threads": game_analysis_config.get("max_threads", 8),
+            "threads": threads_value,
             "depth": game_analysis_config.get("max_depth", 40),
             "movetime": game_analysis_config.get("time_limit_per_move_ms", 1000)
         }
         
         # Evaluation defaults
         evaluation_config = self.config.get("ui", {}).get("panels", {}).get("main", {}).get("board", {}).get("evaluation_bar", {})
+        threads_formula_config = evaluation_config.get("default_threads_formula", {})
+        threads_formula = threads_formula_config.get("formula")
+        if not threads_formula:
+            raise ValueError("default_threads_formula.formula is required in config.json under ui.panels.main.board.evaluation_bar")
+        threads_value = self._evaluate_thread_formula(threads_formula, cpu_count, reserved_cores, "evaluation")
+        
         self.evaluation_defaults = {
-            "threads": evaluation_config.get("max_threads", 6),
+            "threads": threads_value,
             "depth": evaluation_config.get("max_depth_evaluation", 0),
             "movetime": 0  # No movetime for evaluation
         }
         
         # Manual Analysis defaults
         manual_analysis_config = self.config.get("ui", {}).get("panels", {}).get("detail", {}).get("manual_analysis", {})
+        threads_formula_config = manual_analysis_config.get("default_threads_formula", {})
+        threads_formula = threads_formula_config.get("formula")
+        if not threads_formula:
+            raise ValueError("default_threads_formula.formula is required in config.json under ui.panels.detail.manual_analysis")
+        threads_value = self._evaluate_thread_formula(threads_formula, cpu_count, reserved_cores, "manual_analysis")
+        
         self.manual_analysis_defaults = {
-            "threads": manual_analysis_config.get("max_threads", 6),
+            "threads": threads_value,
             "depth": 0,  # No depth for manual analysis
             "movetime": 0  # No movetime for manual analysis
         }
+    
+    def _evaluate_thread_formula(self, formula: str, cpu_count: int, reserved_cores: int, task_type: str) -> int:
+        """Evaluate thread count formula using asteval.
+        
+        Args:
+            formula: Formula string to evaluate.
+            cpu_count: Available CPU thread count.
+            reserved_cores: Number of cores to reserve for UI responsiveness.
+            task_type: Task type name for logging.
+            
+        Returns:
+            Calculated thread count (clamped to >= 1).
+        """
+        try:
+            aeval = Interpreter()
+            # Set variables for formula evaluation
+            aeval.symtable['cpu_count'] = cpu_count
+            aeval.symtable['reserved_cores'] = reserved_cores
+            aeval.symtable['task_type'] = task_type
+            # Add built-in functions
+            aeval.symtable['min'] = min
+            aeval.symtable['max'] = max
+            aeval.symtable['abs'] = abs
+            aeval.symtable['int'] = int
+            # Evaluate the formula
+            result = aeval(formula)
+            if result is None:
+                # Fallback to safe default
+                return max(1, min(4, cpu_count - reserved_cores))
+            # Ensure result is at least 1
+            result = max(1, int(result))
+            return result
+        except Exception as e:
+            # Log error and return safe default
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Error evaluating thread formula for {task_type}: {e}", exc_info=e)
+            return max(1, min(4, cpu_count - reserved_cores))
     
     def get_recommended_defaults(self, task: TaskType) -> Dict[str, Any]:
         """Get recommended default values for a specific task.
