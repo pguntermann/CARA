@@ -481,8 +481,9 @@ class DetailPgnView(QWidget):
             formatting = pgn_config.get('formatting', {})
             active_move_config = formatting.get('active_move', {})
             
-            # Find the move using the invisible ply sentinel embedded by the formatter
-            sentinel = make_ply_sentinel(self._active_move_ply)
+            # Find the move using the invisible ply sentinel embedded by the formatter.
+            # Formatter emits sentinel(ply+1) before the ply-th move (1st move gets sentinel(2), etc.).
+            sentinel = make_ply_sentinel(self._active_move_ply + 1)
             regex = QRegularExpression(re.escape(sentinel))
             search_cursor = QTextCursor(document)
             search_cursor.movePosition(QTextCursor.MoveOperation.Start)
@@ -587,8 +588,10 @@ class DetailPgnView(QWidget):
         search_cursor = QTextCursor(document)
         search_cursor.movePosition(QTextCursor.MoveOperation.Start)
         
+        # Formatter emits sentinel(ply+1) before the ply-th move (1st move gets sentinel(2), etc.)
         for ply in range(1, len(self._move_info) + 1):
-            sentinel = make_ply_sentinel(ply)
+            sentinel_ply = ply + 1
+            sentinel = make_ply_sentinel(sentinel_ply)
             regex = QRegularExpression(re.escape(sentinel))
             found_cursor = document.find(regex, search_cursor)
             if found_cursor.isNull():

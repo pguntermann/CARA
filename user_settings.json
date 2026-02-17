@@ -835,7 +835,6 @@
     "return_to_first_move_after_analysis": true,
     "switch_to_summary_after_analysis": true,
     "normalized_evaluation_graph": true,
-    "post_game_brilliancy_refinement": true,
     "store_analysis_results_in_pgn_tag": true,
     "switch_to_moves_list_at_start_of_analysis": true,
     "brilliant_move_detection": true
@@ -847,7 +846,7 @@
       "mistake_max_cpl": 200
     },
     "brilliant_criteria": {
-      "shallow_depth_min": 2,
+      "shallow_depth_min": 3,
       "shallow_depth_max": 6,
       "min_depths_show_error": 2
     }

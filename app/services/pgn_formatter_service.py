@@ -1379,7 +1379,7 @@ class PgnFormatterService:
         in_comment_span = False
         comment_span_depth = 0
         span_stack: List[str] = []
-        main_line_ply = 1  # 1-based ply for sentinel injection (main-line moves only)
+        main_line_ply = 1  # Increment before use so 1st move gets sentinel(2); view searches for sentinel(ply+1)
         
         def _recompute_move_span_flags() -> None:
             nonlocal in_variation_span, in_header_span, in_comment_span, comment_span_depth
@@ -1457,10 +1457,10 @@ class PgnFormatterService:
                     # Don't format if immediately after a digit (could be part of move number)
                     if not (i > 0 and formatted[i-1].isdigit()):
                         move_san = match.group(1)
+                        main_line_ply += 1  # 1st move -> sentinel(2), 2nd -> sentinel(3); view uses ply+1 to find
                         sentinel = make_ply_sentinel(main_line_ply)
                         move_formatted = span(sentinel + move_san, move_color, move_bold)
                         result_parts.append(move_formatted)
-                        main_line_ply += 1
                         i = match.end()
                     else:
                         result_parts.append(formatted[i])

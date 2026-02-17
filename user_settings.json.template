@@ -852,9 +852,9 @@
       "mistake_max_cpl": 200
     },
     "brilliant_criteria": {
-      "shallow_depth_min": 2,
+      "shallow_depth_min": 3,
       "shallow_depth_max": 6,
-      "min_depths_show_error": 1
+      "min_depths_show_error": 2
     }
   },
   "manual_analysis": {

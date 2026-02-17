@@ -63,6 +63,10 @@ def run_brilliant_move_detection(
     _is_cancelled = is_cancelled if is_cancelled else lambda: False
     _on_progress = on_progress if on_progress else lambda _: None
 
+    # Ensure min_depths_show_error is an int and cannot require more depths than we actually check
+    total_depths_in_range = max(0, shallow_depth_max - shallow_depth_min + 1)
+    min_depths_required = max(1, min(int(min_depths_show_error), total_depths_in_range)) if total_depths_in_range else 1
+
     shallow_time_limit_ms = max(500, time_limit_ms // 3)
     service: Optional[BrilliantMoveDetectionAnalysisService] = BrilliantMoveDetectionAnalysisService(
         engine_path,
@@ -95,7 +99,8 @@ def run_brilliant_move_detection(
 
         total_candidates = len(candidate_moves)
         logging_service.info(
-            f"Brilliant move detection: Checking {total_candidates} candidate moves (Best Move only)"
+            f"Brilliant move detection: Checking {total_candidates} candidate moves (Best Move only), "
+            f"min_depths_required={min_depths_required} (depths {shallow_depth_min}-{shallow_depth_max})"
         )
 
         for candidate_idx, (move_idx, move_info, move_data, is_white_move, row_index) in enumerate(
@@ -109,6 +114,12 @@ def run_brilliant_move_detection(
             if not fen_before or not played_move_san:
                 continue
 
+            move_number = move_info.get("move_number", 0)
+            color = "white" if is_white_move else "black"
+            logging_service.debug(
+                f"Brilliant candidate: move {move_number} ({color}) {played_move_san}"
+            )
+
             depths_show_error = 0
             brilliant_depths: List[int] = []
             for depth in range(shallow_depth_min, shallow_depth_max + 1):
@@ -118,6 +129,9 @@ def run_brilliant_move_detection(
                     service, fen_before, move_info.get("move_number", 0), depth, shallow_time_limit_ms
                 )
                 if analysis_result is None:
+                    logging_service.debug(
+                        f"  depth {depth}: skip (position analysis failed)"
+                    )
                     continue
                 shallow_eval, shallow_is_mate, shallow_mate_moves, shallow_best_move_san = analysis_result
                 played_move_normalized = MoveAnalysisService.normalize_move(played_move_san)
@@ -131,9 +145,13 @@ def run_brilliant_move_detection(
                     and played_move_normalized == shallow_best_move_normalized
                 )
                 if moves_match_at_shallow:
+                    logging_service.debug(
+                        f"  depth {depth}: skip (played move = engine best)"
+                    )
                     continue
                 board_before = move_info.get("board_before")
                 if board_before is None:
+                    logging_service.debug(f"  depth {depth}: skip (no board)")
                     continue
                 try:
                     board_after = board_before.copy()
@@ -144,6 +162,9 @@ def run_brilliant_move_detection(
                         service, fen_after, move_info.get("move_number", 0), depth, shallow_time_limit_ms
                     )
                     if after_result is None:
+                        logging_service.debug(
+                            f"  depth {depth}: skip (position-after analysis failed)"
+                        )
                         continue
                     (
                         eval_after_shallow,
@@ -183,14 +204,27 @@ def run_brilliant_move_detection(
                         classification_thresholds,
                         material_sacrifice=0,
                     )
-                    if shallow_assessment in ["Mistake", "Blunder"]:
+                    counted = shallow_assessment in ["Mistake", "Blunder"]
+                    if counted:
                         depths_show_error += 1
                         brilliant_depths.append(depth)
+                    logging_service.debug(
+                        f"  depth {depth}: CPL={shallow_cpl:.0f} assessment={shallow_assessment} "
+                        f"(counted={'yes' if counted else 'no'})"
+                    )
                 except Exception as e:
-                    logging_service.debug(f"Error analyzing position after move: {e}")
+                    logging_service.debug(
+                        f"  depth {depth}: error - {e}"
+                    )
                     continue
 
-            if depths_show_error >= min_depths_show_error:
+            qualified = depths_show_error >= min_depths_required
+            logging_service.debug(
+                f"  => depths_show_error={depths_show_error}, required={min_depths_required}, "
+                f"qualified={'yes' if qualified else 'no'}"
+            )
+
+            if depths_show_error >= min_depths_required:
                 current_assessment = move_data.assess_white if is_white_move else move_data.assess_black
                 if not current_assessment.startswith("Brilliant"):
                     assessment_text = (
