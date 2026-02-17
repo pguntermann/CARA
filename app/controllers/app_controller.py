@@ -1184,7 +1184,7 @@ class AppController:
                 "switch_to_moves_list_at_start_of_analysis": game_analysis.get('switch_to_moves_list_at_start_of_analysis', True),
                 "switch_to_summary_after_analysis": game_analysis.get('switch_to_summary_after_analysis', False),
                 "normalized_evaluation_graph": game_analysis.get('normalized_evaluation_graph', False),
-                "post_game_brilliancy_refinement": game_analysis.get('post_game_brilliancy_refinement', False)
+                "brilliant_move_detection": game_analysis.get('brilliant_move_detection', game_analysis.get('post_game_brilliancy_refinement', False))  # Backward compatibility
             })
         
         # Update engines settings through UserSettingsService

@@ -664,11 +664,11 @@ class MainWindow(QMainWindow):
         # Separator
         game_analysis_menu.addSeparator()
         
-        # Post-Game Brilliancy Refinement toggle
-        self.post_game_brilliancy_refinement_action = QAction("Post‑Game Brilliancy Refinement", self)
-        self.post_game_brilliancy_refinement_action.setCheckable(True)
-        self.post_game_brilliancy_refinement_action.triggered.connect(self._on_post_game_brilliancy_refinement_toggled)
-        game_analysis_menu.addAction(self.post_game_brilliancy_refinement_action)
+        # Brilliant Move Detection toggle
+        self.brilliant_move_detection_action = QAction("Brilliant Move Detection", self)
+        self.brilliant_move_detection_action.setCheckable(True)
+        self.brilliant_move_detection_action.triggered.connect(self._on_brilliant_move_detection_toggled)
+        game_analysis_menu.addAction(self.brilliant_move_detection_action)
         
         # Return to PLY 0 after analysis completes
         self.return_to_first_move_action = QAction("Return to PLY 0 after analysis completes", self)
@@ -3749,18 +3749,18 @@ Visibility Settings:
         """
         # Settings will be saved automatically on application exit
     
-    def _on_post_game_brilliancy_refinement_toggled(self, checked: bool) -> None:
-        """Handle Post‑Game Brilliancy Refinement toggle.
+    def _on_brilliant_move_detection_toggled(self, checked: bool) -> None:
+        """Handle Brilliant Move Detection toggle.
         
         Args:
-            checked: True if post-game brilliancy refinement is enabled, False otherwise.
+            checked: True if brilliant move detection is enabled, False otherwise.
         """
         # Update in-memory settings immediately
         if hasattr(self, '_settings_service'):
-            self._settings_service.update_game_analysis({"post_game_brilliancy_refinement": checked})
+            self._settings_service.update_game_analysis({"brilliant_move_detection": checked})
         # Pass setting to game analysis controller
         if hasattr(self.controller, 'game_analysis_controller'):
-            self.controller.game_analysis_controller.set_post_game_brilliancy_refinement(checked)
+            self.controller.game_analysis_controller.set_brilliant_move_detection(checked)
         # Settings will be saved automatically on application exit
         # No immediate action needed - behavior is handled in _on_game_analysis_completed
     
@@ -4566,13 +4566,13 @@ Visibility Settings:
             # Apply setting to evaluation graph widget
             self._update_evaluation_graph_mode(normalized_graph)
         
-        # Post-Game Brilliancy Refinement
-        post_game_brilliancy_refinement = game_analysis_settings.get("post_game_brilliancy_refinement", False)
-        if hasattr(self, 'post_game_brilliancy_refinement_action'):
-            self.post_game_brilliancy_refinement_action.setChecked(post_game_brilliancy_refinement)
+        # Brilliant Move Detection
+        brilliant_move_detection = game_analysis_settings.get("brilliant_move_detection", False)
+        if hasattr(self, 'brilliant_move_detection_action'):
+            self.brilliant_move_detection_action.setChecked(brilliant_move_detection)
         # Pass setting to game analysis controller
         if hasattr(self.controller, 'game_analysis_controller'):
-            self.controller.game_analysis_controller.set_post_game_brilliancy_refinement(post_game_brilliancy_refinement)
+            self.controller.game_analysis_controller.set_brilliant_move_detection(brilliant_move_detection)
         
         # Return to PLY 0 after analysis completes
         return_to_first_move = game_analysis_settings.get("return_to_first_move_after_analysis", False)
@@ -4711,7 +4711,7 @@ Visibility Settings:
                 "switch_to_moves_list_at_start_of_analysis": self.switch_to_moves_list_action.isChecked() if hasattr(self, 'switch_to_moves_list_action') else True,
                 "switch_to_summary_after_analysis": self.switch_to_summary_action.isChecked() if hasattr(self, 'switch_to_summary_action') else False,
                 "normalized_evaluation_graph": self.normalized_graph_action.isChecked() if hasattr(self, 'normalized_graph_action') else False,
-                "post_game_brilliancy_refinement": self.post_game_brilliancy_refinement_action.isChecked() if hasattr(self, 'post_game_brilliancy_refinement_action') else False,
+                "brilliant_move_detection": self.brilliant_move_detection_action.isChecked() if hasattr(self, 'brilliant_move_detection_action') else False,
                 "store_analysis_results_in_pgn_tag": self.store_analysis_results_action.isChecked() if hasattr(self, 'store_analysis_results_action') else False
             }
         

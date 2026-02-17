@@ -2158,7 +2158,7 @@
     "dialogs": {
       "classification_settings": {
         "width": 480,
-        "height": 650,
+        "height": 520,
         "layout": {
           "spacing": 15,
           "margins": [
@@ -2167,7 +2167,7 @@
             20,
             20
           ],
-          "section_spacing": 20
+          "section_spacing": 10
         },
         "groups": {
           "title_font_family": "Helvetica Neue",
@@ -4675,12 +4675,9 @@
       }
     },
     "brilliant_criteria": {
-      "min_eval_swing": 50,
-      "min_material_sacrifice": 300,
-      "max_eval_before": 500,
-      "exclude_already_winning": false,
-      "require_deeper_analysis": false,
-      "material_sacrifice_lookahead_plies": 3
+      "shallow_depth_min": 2,
+      "shallow_depth_max": 6,
+      "min_depths_show_error": 1
     },
     "book_move_detection": {
       "use_eco_lookup": true,
@@ -4719,7 +4716,7 @@
     }
   },
   "debug": {
-    "show_debug_menu": false,
+    "show_debug_menu": true,
     "enable_debug_backgrounds": false,
     "background_color_debug_mainpanel": [
       255,

@@ -327,22 +327,11 @@ class MoveAnalysisService:
                 - good_move_max_cpl: Maximum CPL for "Good Move"
                 - inaccuracy_max_cpl: Maximum CPL for "Inaccuracy"
                 - mistake_max_cpl: Maximum CPL for "Mistake"
-                - min_eval_swing: Minimum eval swing for brilliant
-                - min_material_sacrifice: Minimum material sacrifice for brilliant
-                - max_eval_before: Maximum eval before move for brilliant
-                - exclude_already_winning: Whether to exclude already winning positions
-            material_sacrifice: Material sacrifice in centipawns (for brilliant detection).
+            material_sacrifice: Material sacrifice in centipawns (unused, kept for compatibility).
             
         Returns:
             Assessment string (e.g., "Best Move", "Good Move", etc.).
         """
-        # Check for brilliant move
-        if MoveAnalysisService.is_brilliant_move(
-            eval_before, eval_after, move_info, best_move_san, cpl,
-            classification_thresholds, material_sacrifice
-        ):
-            return "Brilliant"
-        
         # Check if played move matches best move - this is always Best Move
         if moves_match:
             return "Best Move"

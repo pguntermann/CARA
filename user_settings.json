@@ -837,7 +837,8 @@
     "normalized_evaluation_graph": true,
     "post_game_brilliancy_refinement": true,
     "store_analysis_results_in_pgn_tag": true,
-    "switch_to_moves_list_at_start_of_analysis": true
+    "switch_to_moves_list_at_start_of_analysis": true,
+    "brilliant_move_detection": true
   },
   "game_analysis_settings": {
     "assessment_thresholds": {
@@ -846,11 +847,9 @@
       "mistake_max_cpl": 200
     },
     "brilliant_criteria": {
-      "min_eval_swing": 50,
-      "min_material_sacrifice": 300,
-      "max_eval_before": 500,
-      "exclude_already_winning": false,
-      "material_sacrifice_lookahead_plies": 3
+      "shallow_depth_min": 2,
+      "shallow_depth_max": 6,
+      "min_depths_show_error": 2
     }
   },
   "manual_analysis": {

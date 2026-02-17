@@ -8,13 +8,11 @@ from PyQt6.QtWidgets import (
     QSpinBox,
     QCheckBox,
     QPushButton,
-    QScrollArea,
     QWidget,
     QGroupBox,
     QFormLayout,
     QSizePolicy,
     QApplication,
-    QFrame,
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QShowEvent, QColor, QPalette, QPainter, QPen, QFont, QFontMetrics
@@ -328,14 +326,9 @@ class ClassificationSettingsDialog(QDialog):
         self.inaccuracy_spinbox.setValue(self.current_thresholds.get("inaccuracy_max_cpl", 100))
         self.mistake_spinbox.setValue(self.current_thresholds.get("mistake_max_cpl", 200))
         
-        self.material_sacrifice_spinbox.setValue(self.current_brilliant.get("min_material_sacrifice", 300))
-        self.eval_swing_spinbox.setValue(self.current_brilliant.get("min_eval_swing", 50))
-        self.exclude_winning_check.setChecked(self.current_brilliant.get("exclude_already_winning", True))
-        self.max_eval_before_spinbox.setValue(self.current_brilliant.get("max_eval_before", 500))
-        self.lookahead_plies_spinbox.setValue(self.current_brilliant.get("material_sacrifice_lookahead_plies", 3))
-        
-        # Update enabled state and styling for max_eval_before
-        self._on_exclude_winning_toggled(self.exclude_winning_check.isChecked())
+        self.shallow_depth_min_spinbox.setValue(self.current_brilliant.get("shallow_depth_min", 2))
+        self.shallow_depth_max_spinbox.setValue(self.current_brilliant.get("shallow_depth_max", 6))
+        self.min_depths_show_error_spinbox.setValue(self.current_brilliant.get("min_depths_show_error", 1))
         
         # Update CPL scale
         self._update_cpl_scale()
@@ -358,37 +351,19 @@ class ClassificationSettingsDialog(QDialog):
         layout.setSpacing(layout_spacing)
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
-        # Create scroll area for form
-        scroll = QScrollArea()
-        scroll.setFrameShape(QFrame.Shape.NoFrame)  # Remove border on macOS
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        
-        scroll_widget = QWidget()
-        scroll_layout = QVBoxLayout(scroll_widget)
-        scroll_layout.setSpacing(section_spacing)
-        scroll_layout.setContentsMargins(0, 0, 0, 0)
-        
         # Move Quality Thresholds group
         thresholds_group = self._create_thresholds_group()
-        scroll_layout.addWidget(thresholds_group)
+        layout.addWidget(thresholds_group)
         
         # CPL Scale visualization
         self.cpl_scale_widget = self._create_cpl_scale_widget()
-        scroll_layout.addWidget(self.cpl_scale_widget)
+        layout.addWidget(self.cpl_scale_widget)
         
         # Brilliant Move Criteria group
         brilliant_group = self._create_brilliant_group()
-        scroll_layout.addWidget(brilliant_group)
+        layout.addWidget(brilliant_group)
         
-        scroll_layout.addStretch()
-        
-        scroll.setWidget(scroll_widget)
-        layout.addWidget(scroll)
-        
-        # Store scroll area for styling
-        self.scroll_area = scroll
+        layout.addStretch()
         
         # Buttons
         button_layout = QHBoxLayout()
@@ -627,50 +602,32 @@ class ClassificationSettingsDialog(QDialog):
             container_layout.addWidget(checkbox)
             return container
         
-        # Material Sacrifice
-        self.material_sacrifice_spinbox = QSpinBox()
-        self.material_sacrifice_spinbox.setRange(0, 10000)
-        self.material_sacrifice_spinbox.setValue(self.current_brilliant.get("min_material_sacrifice", 300))
-        self.material_sacrifice_spinbox.setFixedWidth(input_width)
-        self.material_sacrifice_spinbox.setMinimumHeight(25)
-        self.material_sacrifice_spinbox.setToolTip("Minimum material sacrifice (centipawns) required for brilliancy")
-        form_layout.addRow(create_label("Min Material Sacrifice:"), create_input_widget(self.material_sacrifice_spinbox))
+        # Shallow Depth Min
+        self.shallow_depth_min_spinbox = QSpinBox()
+        self.shallow_depth_min_spinbox.setRange(1, 10)
+        self.shallow_depth_min_spinbox.setValue(self.current_brilliant.get("shallow_depth_min", 2))
+        self.shallow_depth_min_spinbox.setFixedWidth(input_width)
+        self.shallow_depth_min_spinbox.setMinimumHeight(25)
+        self.shallow_depth_min_spinbox.setToolTip("Minimum shallow depth to check for brilliancy detection. Moves classified as Best Move or Good Move at normal depth will be re-analyzed starting at this depth.")
+        form_layout.addRow(create_label("Shallow Depth Min:"), create_input_widget(self.shallow_depth_min_spinbox))
         
-        # Eval Swing
-        self.eval_swing_spinbox = QSpinBox()
-        self.eval_swing_spinbox.setRange(0, 10000)
-        self.eval_swing_spinbox.setValue(self.current_brilliant.get("min_eval_swing", 50))
-        self.eval_swing_spinbox.setFixedWidth(input_width)
-        self.eval_swing_spinbox.setMinimumHeight(25)
-        self.eval_swing_spinbox.setToolTip("Minimum evaluation swing (centipawns) required for brilliancy")
-        form_layout.addRow(create_label("Min Eval Swing:"), create_input_widget(self.eval_swing_spinbox))
+        # Shallow Depth Max
+        self.shallow_depth_max_spinbox = QSpinBox()
+        self.shallow_depth_max_spinbox.setRange(1, 10)
+        self.shallow_depth_max_spinbox.setValue(self.current_brilliant.get("shallow_depth_max", 6))
+        self.shallow_depth_max_spinbox.setFixedWidth(input_width)
+        self.shallow_depth_max_spinbox.setMinimumHeight(25)
+        self.shallow_depth_max_spinbox.setToolTip("Maximum shallow depth to check for brilliancy detection. Moves will be checked iteratively from Shallow Depth Min up to this depth.")
+        form_layout.addRow(create_label("Shallow Depth Max:"), create_input_widget(self.shallow_depth_max_spinbox))
         
-        # Exclude Already Winning (must come before Max Eval Before to show dependency)
-        self.exclude_winning_check = QCheckBox()
-        self.exclude_winning_check.setChecked(self.current_brilliant.get("exclude_already_winning", True))
-        self.exclude_winning_check.setToolTip("Exclude moves from already winning positions. When enabled, uses 'Max Eval Before' threshold to determine if position is already winning.")
-        form_layout.addRow(create_label("Exclude Already Winning:"), create_checkbox_widget(self.exclude_winning_check))
-        
-        # Max Eval Before (only used when Exclude Already Winning is enabled)
-        self.max_eval_before_spinbox = QSpinBox()
-        self.max_eval_before_spinbox.setRange(-10000, 10000)
-        self.max_eval_before_spinbox.setValue(self.current_brilliant.get("max_eval_before", 500))
-        self.max_eval_before_spinbox.setFixedWidth(input_width)
-        self.max_eval_before_spinbox.setMinimumHeight(25)
-        self.max_eval_before_spinbox.setToolTip("Maximum evaluation before move (centipawns). Only used when 'Exclude Already Winning' is enabled. Moves from positions with eval above this threshold are excluded from brilliancy.")
-        # Connect checkbox to enable/disable this field and update styling
-        self.exclude_winning_check.toggled.connect(self._on_exclude_winning_toggled)
-        self.max_eval_before_spinbox.setEnabled(self.exclude_winning_check.isChecked())
-        form_layout.addRow(create_label("Max Eval Before:"), create_input_widget(self.max_eval_before_spinbox))
-        
-        # Material Sacrifice Lookahead Plies
-        self.lookahead_plies_spinbox = QSpinBox()
-        self.lookahead_plies_spinbox.setRange(1, 5)
-        self.lookahead_plies_spinbox.setValue(self.current_brilliant.get("material_sacrifice_lookahead_plies", 3))
-        self.lookahead_plies_spinbox.setFixedWidth(input_width)
-        self.lookahead_plies_spinbox.setMinimumHeight(25)
-        self.lookahead_plies_spinbox.setToolTip("Number of plies to look ahead when detecting material sacrifice. This setting is relevant only if 'Post-Game Brilliancy Refinement' is enabled. Higher values can catch delayed sacrifices but may also attribute opponent mistakes to brilliance.")
-        form_layout.addRow(create_label("Material Sacrifice Lookahead:"), create_input_widget(self.lookahead_plies_spinbox))
+        # Min Agreement
+        self.min_depths_show_error_spinbox = QSpinBox()
+        self.min_depths_show_error_spinbox.setRange(1, 10)
+        self.min_depths_show_error_spinbox.setValue(self.current_brilliant.get("min_depths_show_error", 1))
+        self.min_depths_show_error_spinbox.setFixedWidth(input_width)
+        self.min_depths_show_error_spinbox.setMinimumHeight(25)
+        self.min_depths_show_error_spinbox.setToolTip("Minimum number of shallow depths (between Min and Max) at which the move must look like a Mistake or Blunder to be marked brilliant. Higher values reduce false positives.")
+        form_layout.addRow(create_label("Min Agreement:"), create_input_widget(self.min_depths_show_error_spinbox))
         
         group.setLayout(form_layout)
         return group
@@ -787,16 +744,6 @@ class ClassificationSettingsDialog(QDialog):
                 padding=spinbox_padding
             )
         
-        # Store disabled background color for max_eval_before_spinbox updates
-        disabled_bg_color = fields_config.get('disabled_background_color', [35, 35, 40])
-        self._disabled_bg_color = disabled_bg_color
-        self._enabled_bg_color = [dialog_bg_color[0] + input_background_offset, dialog_bg_color[1] + input_background_offset, dialog_bg_color[2] + input_background_offset]
-        self._text_color = text_color
-        self._border_color = border_color
-        
-        # Apply initial styling to max_eval_before_spinbox based on enabled state
-        if hasattr(self, 'max_eval_before_spinbox') and hasattr(self, 'exclude_winning_check'):
-            self._on_exclude_winning_toggled(self.exclude_winning_check.isChecked())
         
         # Apply checkbox styling using StyleManager
         from app.views.style import StyleManager
@@ -910,64 +857,14 @@ class ClassificationSettingsDialog(QDialog):
         # Update scale
         self._update_cpl_scale()
         
-        self.material_sacrifice_spinbox.setValue(brilliant.get("min_material_sacrifice", 300))
-        self.eval_swing_spinbox.setValue(brilliant.get("min_eval_swing", 50))
-        self.exclude_winning_check.setChecked(brilliant.get("exclude_already_winning", True))
-        self.max_eval_before_spinbox.setValue(brilliant.get("max_eval_before", 500))
-        self.lookahead_plies_spinbox.setValue(brilliant.get("material_sacrifice_lookahead_plies", 3))
-        # Update enabled state and styling based on checkbox
-        self._on_exclude_winning_toggled(self.exclude_winning_check.isChecked())
+        self.shallow_depth_min_spinbox.setValue(brilliant.get("shallow_depth_min", 2))
+        self.shallow_depth_max_spinbox.setValue(brilliant.get("shallow_depth_max", 6))
+        self.min_depths_show_error_spinbox.setValue(brilliant.get("min_depths_show_error", 1))
         
         # Hide progress bar and set final status through controller
         self.controller.hide_progress()
         self.controller.set_status("Classification settings reset to defaults")
         QApplication.processEvents()  # Process events to update status
-    
-    def _on_exclude_winning_toggled(self, checked: bool) -> None:
-        """Handle exclude winning checkbox toggle."""
-        self.max_eval_before_spinbox.setEnabled(checked)
-        # Update styling to show disabled state
-        if hasattr(self, '_disabled_bg_color') and hasattr(self, '_enabled_bg_color'):
-            if checked:
-                bg_color = self._enabled_bg_color
-                text_color = self._text_color
-            else:
-                bg_color = self._disabled_bg_color
-                text_color = [self._text_color[0] // 2 + 64, self._text_color[1] // 2 + 64, self._text_color[2] // 2 + 64]
-            
-            # Get scaled font size for disabled style
-            fields_config = self.config.get('ui', {}).get('dialogs', {}).get('classification_settings', {}).get('fields', {})
-            disabled_font_size = scale_font_size(fields_config.get('font_size', 10))
-            disabled_style = (
-                f"QSpinBox {{"
-                f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
-                f"font-size: {disabled_font_size}pt;"
-                f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
-                f"border: 1px solid rgb({self._border_color[0]}, {self._border_color[1]}, {self._border_color[2]});"
-                f"border-radius: 3px;"
-                f"padding: 3px;"
-                f"}}"
-                f"QSpinBox::up-button, QSpinBox::down-button {{"
-                f"width: 0px;"
-                f"}}"
-            )
-            self.max_eval_before_spinbox.setStyleSheet(disabled_style)
-        
-        # Apply scrollbar styling to scroll area
-        if hasattr(self, 'scroll_area'):
-            from app.views.style import StyleManager
-            dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('classification_settings', {})
-            dialog_bg_color = dialog_config.get('background_color', [40, 40, 45])
-            groups_config = dialog_config.get('groups', {})
-            border_color = groups_config.get('border_color', [60, 60, 65])
-            border_radius = groups_config.get('border_radius', 5)
-            StyleManager.style_scroll_area(
-                self.scroll_area,
-                self.config,
-                dialog_bg_color,
-                border_color,
-                border_radius
-            )
     
     def _on_save(self) -> None:
         """Handle save button click."""
@@ -992,12 +889,10 @@ class ClassificationSettingsDialog(QDialog):
         thresholds = self._get_threshold_values()
         
         brilliant = {
-                "min_material_sacrifice": self.material_sacrifice_spinbox.value(),
-                "min_eval_swing": self.eval_swing_spinbox.value(),
-                "max_eval_before": self.max_eval_before_spinbox.value(),
-                "exclude_already_winning": self.exclude_winning_check.isChecked(),
-                "material_sacrifice_lookahead_plies": self.lookahead_plies_spinbox.value()
-        }
+                "shallow_depth_min": self.shallow_depth_min_spinbox.value(),
+                "shallow_depth_max": self.shallow_depth_max_spinbox.value(),
+                "min_depths_show_error": self.min_depths_show_error_spinbox.value()
+            }
         
         # Save via classification controller
         if not self.classification_controller.update_all_settings(thresholds, brilliant):

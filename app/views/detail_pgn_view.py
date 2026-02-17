@@ -6,7 +6,7 @@ from PyQt6.QtCore import Qt, QRegularExpression
 from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING, Callable
 import re
 
-from app.services.pgn_formatter_service import PgnFormatterService
+from app.services.pgn_formatter_service import PgnFormatterService, make_ply_sentinel
 from app.models.game_model import GameModel
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.views.style.style_manager import StyleManager
@@ -474,9 +474,6 @@ class DetailPgnView(QWidget):
         if (self._active_move_ply > 0 and 
             len(self._move_info) > 0 and 
             self._active_move_ply <= len(self._move_info)):
-            move_pos_index = self._active_move_ply - 1  # Convert ply to 0-based index
-            move_san, move_number, is_white = self._move_info[move_pos_index]
-            
             # Get highlight colors from config
             ui_config = self.config.get('ui', {})
             panel_config = ui_config.get('panels', {}).get('detail', {})
@@ -484,286 +481,27 @@ class DetailPgnView(QWidget):
             formatting = pgn_config.get('formatting', {})
             active_move_config = formatting.get('active_move', {})
             
-            # Find the move text in the document by searching sequentially through moves
-            # This ensures we find moves in the main line, not in variations/comments
-            # Strategy: Search for all moves in order, counting only main-line moves
-            cursor = QTextCursor(document)
-            cursor.movePosition(QTextCursor.MoveOperation.Start)
-            
-            found = False
-            
-            # Build patterns for all moves up to and including the target move
-            # This allows us to search sequentially and find the correct position
+            # Find the move using the invisible ply sentinel embedded by the formatter
+            sentinel = make_ply_sentinel(self._active_move_ply)
+            regex = QRegularExpression(re.escape(sentinel))
             search_cursor = QTextCursor(document)
             search_cursor.movePosition(QTextCursor.MoveOperation.Start)
-            
-            # Search for moves sequentially until we reach the target move
-            # Sequential search is always used because it correctly identifies moves by position
-            # even when variations/annotations/results are filtered out
+            found_cursor = document.find(regex, search_cursor)
             found = False
-            
-            # Always use sequential search to correctly identify moves by position
-            # This ensures we find the correct move even when the same move string appears multiple times
-            if True:
-                for i in range(move_pos_index + 1):
-                    target_move_san, target_move_number, target_is_white = self._move_info[i]
-                    
-                    # Strip any annotations from move_san (they might be filtered out)
-                    move_san_clean = re.sub(r'[!?]{1,2}$', '', target_move_san)
-                    
-                    if target_is_white:
-                        # White move: search for "move_number. move_san"
-                        # Note: move_san is already escaped, so special chars like +, # are handled
-                        escaped_move = re.escape(move_san_clean)
-                        escaped_number = re.escape(str(target_move_number))
-                        # Pattern: move_number followed by period, space(s), then move_san (without annotations)
-                        # Don't use word boundary for move_san since it might end with + or #
-                        # Instead, look for it followed by whitespace, punctuation, or end
-                        # Note: Annotations (!, ?) might be filtered out, so allow them as optional
-                        # Also allow for variations being removed (no closing parenthesis needed)
-                        pattern = rf'\b{escaped_number}\.\s+{escaped_move}(?:[!?]{{1,2}})?(?=\s|$|\.|,|;|</span>|>|<|\))'
-                    else:
-                        # Black move: search for move_san (but need to find it after the previous white move)
-                        escaped_move = re.escape(move_san_clean)
-                        # Don't use word boundary for move_san since it might end with + or #
-                        # Instead, look for it followed by whitespace, punctuation, or end
-                        # Note: Annotations (!, ?) might be filtered out, so allow them as optional
-                        # Also allow for variations being removed (no closing parenthesis needed)
-                        pattern = rf'\b{escaped_move}(?:[!?]{{1,2}})?(?=\s|$|\.|,|;|</span>|>|<|\))'
-                    
-                    regex = QRegularExpression(pattern)
-                    
-                    # Find the next occurrence of this move
-                    # For sequential counting, we need to find main-line moves
-                    # But for highlighting, we can also highlight variation moves
-                    found_cursor = document.find(regex, search_cursor)
-                    move_found = False
-                    variation_found_cursor = None
-                    
-                    # Search for moves - prioritize main-line for sequential counting
-                    while not found_cursor.isNull():
-                        format_at_pos = found_cursor.charFormat()
-                        is_italic = format_at_pos.fontItalic()
-                        
-                        if not is_italic:
-                            # Found main-line move
-                            move_found = True
-                            
-                            if i == move_pos_index:
-                                # This is the move we're looking for in main line!
-                                # For white moves, adjust selection to exclude move number
-                                if target_is_white:
-                                    cursor = QTextCursor(found_cursor)
-                                    match_start = found_cursor.selectionStart()
-                                    match_text = found_cursor.selectedText()
-                                    move_number_str = str(target_move_number) + "."
-                                    move_text_start_in_match = match_text.find(move_number_str)
-                                    if move_text_start_in_match >= 0:
-                                        move_text_start_in_match += len(move_number_str)
-                                        while (move_text_start_in_match < len(match_text) and 
-                                               match_text[move_text_start_in_match] in [' ', '\t']):
-                                            move_text_start_in_match += 1
-                                        cursor.setPosition(match_start + move_text_start_in_match)
-                                        cursor.setPosition(found_cursor.selectionEnd(), QTextCursor.MoveMode.KeepAnchor)
-                                    else:
-                                        cursor = found_cursor
-                                else:
-                                    cursor = found_cursor
-                                found = True
-                                break
-                            
-                            # Update search position to continue after this move
-                            search_cursor = QTextCursor(found_cursor)
-                            search_cursor.setPosition(found_cursor.selectionEnd())
-                            # Skip annotations, spaces, and HTML tags after the move
-                            while search_cursor.position() < document.characterCount() - 1:
-                                char = document.characterAt(search_cursor.position())
-                                if char in ['+', '#', '!', '?']:
-                                    search_cursor.movePosition(QTextCursor.MoveOperation.NextCharacter)
-                                elif char == ' ' or char == '\t' or char == '\n':
-                                    search_cursor.movePosition(QTextCursor.MoveOperation.NextCharacter)
-                                elif char == '<':
-                                    # Skip HTML tags
-                                    tag_end = search_cursor.position()
-                                    while tag_end < document.characterCount() - 1:
-                                        if document.characterAt(tag_end) == '>':
-                                            search_cursor.setPosition(tag_end + 1)
-                                            break
-                                        tag_end += 1
-                                    if tag_end >= document.characterCount() - 1:
-                                        break
-                                else:
-                                    break
-                            break
-                        else:
-                            # Found move in variation
-                            # For sequential counting, we need main-line moves, so continue searching
-                            # But store variation move if this is the target move
-                            if i == move_pos_index and variation_found_cursor is None:
-                                variation_found_cursor = QTextCursor(found_cursor)
-                        
-                        # Continue searching for main-line move
-                        search_cursor = QTextCursor(found_cursor)
-                        search_cursor.setPosition(found_cursor.selectionEnd())
-                        # Skip annotations, spaces, and HTML tags
-                        while search_cursor.position() < document.characterCount() - 1:
-                            char = document.characterAt(search_cursor.position())
-                            if char in ['+', '#', '!', '?']:
-                                search_cursor.movePosition(QTextCursor.MoveOperation.NextCharacter)
-                            elif char == ' ' or char == '\t' or char == '\n':
-                                search_cursor.movePosition(QTextCursor.MoveOperation.NextCharacter)
-                            elif char == '<':
-                                # Skip HTML tags
-                                tag_end = search_cursor.position()
-                                while tag_end < document.characterCount() - 1:
-                                    if document.characterAt(tag_end) == '>':
-                                        search_cursor.setPosition(tag_end + 1)
-                                        break
-                                    tag_end += 1
-                                if tag_end >= document.characterCount() - 1:
-                                    break
-                            else:
-                                break
-                        found_cursor = document.find(regex, search_cursor)
-                    
-                    # If we didn't find main-line move but found variation move for target, use that
-                    if not found and variation_found_cursor is not None and i == move_pos_index:
-                        found_cursor = variation_found_cursor
-                        # For white moves, adjust selection to exclude move number
-                        if target_is_white:
-                            cursor = QTextCursor(found_cursor)
-                            match_start = found_cursor.selectionStart()
-                            match_text = found_cursor.selectedText()
-                            move_number_str = str(target_move_number) + "."
-                            move_text_start_in_match = match_text.find(move_number_str)
-                            if move_text_start_in_match >= 0:
-                                move_text_start_in_match += len(move_number_str)
-                                while (move_text_start_in_match < len(match_text) and 
-                                       match_text[move_text_start_in_match] in [' ', '\t']):
-                                    move_text_start_in_match += 1
-                                cursor.setPosition(match_start + move_text_start_in_match)
-                                cursor.setPosition(found_cursor.selectionEnd(), QTextCursor.MoveMode.KeepAnchor)
-                            else:
-                                cursor = found_cursor
-                        else:
-                            cursor = found_cursor
-                        found = True
-                    
-                    if found:
+            cursor = QTextCursor(document)
+            if not found_cursor.isNull():
+                # Select from end of sentinel to end of move (SAN + optional !? etc.)
+                cursor.setPosition(found_cursor.selectionEnd())
+                move_end = cursor.position()
+                while move_end < document_length:
+                    ch = document.characterAt(move_end)
+                    if ch in ' \t\n<>()':
                         break
-                    
-                    # If we didn't find the move at all, something is wrong
-                    # For sequential counting, we need main-line moves (except for target move which can be variation)
-                    if not move_found and (i < move_pos_index or variation_found_cursor is None):
-                        # Couldn't find this move - this might happen if filtering changed the structure
-                        # When variations are removed, intermediate moves might not be found in order
-                        # For intermediate moves (i < move_pos_index), try to continue by moving forward
-                        # For the target move (i == move_pos_index), we'll try a direct search as fallback
-                        if i < move_pos_index:
-                            # This is an intermediate move we couldn't find - skip it and try to continue
-                            # Move search cursor forward to try to find the next move
-                            if search_cursor.position() < document_length - 1:
-                                # Try to advance past potential HTML/whitespace to find next move
-                                for _ in range(10):  # Limit advancement to avoid going too far
-                                    if search_cursor.position() >= document_length - 1:
-                                        break
-                                    search_cursor.movePosition(QTextCursor.MoveOperation.NextCharacter)
-                            else:
-                                # Reached end of document
-                                break
-                        elif i == move_pos_index:
-                            # This is the target move we couldn't find - this is a problem
-                            # We'll try a direct search as fallback after the loop
-                            break
-                    
-                    # Continue to next move in sequence
-                    # search_cursor is already positioned after the found move (or last searched position)
-            
-            # If we didn't find the target move through sequential search, try direct search as fallback
-            # For black moves, we need to count moves sequentially to find the correct occurrence
-            if not found and move_pos_index < len(self._move_info):
-                target_move_san, target_move_number, target_is_white = self._move_info[move_pos_index]
-                
-                # Strip any annotations from move_san (they might be filtered out)
-                move_san_clean = re.sub(r'[!?]{1,2}$', '', target_move_san)
-                
-                if target_is_white:
-                    # For white moves, use move number to uniquely identify the move
-                    escaped_move = re.escape(move_san_clean)
-                    escaped_number = re.escape(str(target_move_number))
-                    pattern = rf'\b{escaped_number}\.\s+{escaped_move}(?:[!?]{{1,2}})?(?=\s|$|\.|,|;|</span>|>|<|\))'
-                    
-                    regex = QRegularExpression(pattern)
-                    direct_cursor = QTextCursor(document)
-                    direct_cursor.movePosition(QTextCursor.MoveOperation.Start)
-                    direct_found = document.find(regex, direct_cursor)
-                    
-                    # Find first non-italic match (main-line move)
-                    while not direct_found.isNull():
-                        format_at_pos = direct_found.charFormat()
-                        is_italic = format_at_pos.fontItalic()
-                        if not is_italic:
-                            cursor = QTextCursor(direct_found)
-                            match_start = direct_found.selectionStart()
-                            match_text = direct_found.selectedText()
-                            move_number_str = str(target_move_number) + "."
-                            move_text_start_in_match = match_text.find(move_number_str)
-                            if move_text_start_in_match >= 0:
-                                move_text_start_in_match += len(move_number_str)
-                                while (move_text_start_in_match < len(match_text) and 
-                                       match_text[move_text_start_in_match] in [' ', '\t']):
-                                    move_text_start_in_match += 1
-                                cursor.setPosition(match_start + move_text_start_in_match)
-                                cursor.setPosition(direct_found.selectionEnd(), QTextCursor.MoveMode.KeepAnchor)
-                            else:
-                                cursor = direct_found
-                            found = True
-                            break
-                        search_pos = QTextCursor(direct_found)
-                        search_pos.setPosition(direct_found.selectionEnd())
-                        direct_found = document.find(regex, search_pos)
-                else:
-                    # For black moves, we need to count moves sequentially to find the correct occurrence
-                    # Count how many times this move string appears before the target move
-                    # We need to find the nth occurrence where n is determined by counting moves sequentially
-                    escaped_move = re.escape(move_san_clean)
-                    pattern = rf'\b{escaped_move}(?:[!?]{{1,2}})?(?=\s|$|\.|,|;|</span>|>|<|\))'
-                    
-                    regex = QRegularExpression(pattern)
-                    direct_cursor = QTextCursor(document)
-                    direct_cursor.movePosition(QTextCursor.MoveOperation.Start)
-                    direct_found = document.find(regex, direct_cursor)
-                    
-                    # Count moves sequentially to find the correct occurrence
-                    # We need to count how many times this move string appears before the target move
-                    # Count all previous moves (both white and black) that match the target move string
-                    occurrences_to_skip = 0
-                    for i in range(move_pos_index):
-                        prev_move_san, prev_move_number, prev_is_white = self._move_info[i]
-                        # Count all moves (both white and black) that match the target move string
-                        # We need to strip annotations for comparison
-                        prev_move_clean = re.sub(r'[!?]{1,2}$', '', prev_move_san)
-                        if prev_move_clean == move_san_clean:
-                            # This is a previous occurrence of the same move string
-                            occurrences_to_skip += 1
-                    
-                    # Find all matches and select the (occurrences_to_skip + 1)th non-italic match
-                    matches_found = []
-                    while not direct_found.isNull():
-                        format_at_pos = direct_found.charFormat()
-                        is_italic = format_at_pos.fontItalic()
-                        if not is_italic:
-                            matches_found.append(direct_found)
-                        search_pos = QTextCursor(direct_found)
-                        search_pos.setPosition(direct_found.selectionEnd())
-                        direct_found = document.find(regex, search_pos)
-                    
-                    # Select the correct occurrence (occurrences_to_skip + 1)th match
-                    if occurrences_to_skip < len(matches_found):
-                        match_cursor = matches_found[occurrences_to_skip]
-                        cursor = match_cursor
-                        found = True
-            
+                    move_end += 1
+                cursor.setPosition(found_cursor.selectionEnd())
+                cursor.setPosition(move_end, QTextCursor.MoveMode.KeepAnchor)
+                found = True
+
             if found:
                 # Found the move - select it
                 move_start = cursor.selectionStart()
@@ -829,7 +567,7 @@ class DetailPgnView(QWidget):
     def _find_mainline_move_at_position(self, position: int) -> int:
         """Find ply index of main-line move at given document position.
         
-        Only returns ply index for main-line moves, not variation moves.
+        Uses the invisible ply sentinel embedded by the formatter.
         Returns 0 if no main-line move found at position.
         
         Args:
@@ -838,141 +576,32 @@ class DetailPgnView(QWidget):
         Returns:
             Ply index (1-based) if main-line move found, 0 otherwise.
         """
-        # Ensure document is ready
-        if not self.pgn_text.document():
+        if not self.pgn_text.document() or not self._move_info:
             return 0
         
         document = self.pgn_text.document()
         document_length = document.characterCount()
-        
-        # If document is empty or position is out of bounds, nothing to find
         if document_length == 0 or position < 0 or position >= document_length:
             return 0
         
-        # If no move info available, can't find move
-        if not self._move_info:
-            return 0
-        
-        # Search through all moves sequentially to find which one contains the click position
-        # We need to find main-line moves only (not variations)
         search_cursor = QTextCursor(document)
         search_cursor.movePosition(QTextCursor.MoveOperation.Start)
         
-        # Iterate through moves in order
-        for move_pos_index in range(len(self._move_info)):
-            move_san, move_number, is_white = self._move_info[move_pos_index]
-            
-            # Strip any annotations from move_san (they might be filtered out)
-            move_san_clean = re.sub(r'[!?]{1,2}$', '', move_san)
-            
-            # Build regex pattern for this move
-            if is_white:
-                # White move: search for "move_number. move_san"
-                escaped_move = re.escape(move_san_clean)
-                escaped_number = re.escape(str(move_number))
-                pattern = rf'\b{escaped_number}\.\s+{escaped_move}(?:[!?]{{1,2}})?(?=\s|$|\.|,|;|</span>|>|<|\))'
-            else:
-                # Black move: search for move_san
-                escaped_move = re.escape(move_san_clean)
-                pattern = rf'\b{escaped_move}(?:[!?]{{1,2}})?(?=\s|$|\.|,|;|</span>|>|<|\))'
-            
-            regex = QRegularExpression(pattern)
-            
-            # Find all occurrences of this move, but only consider main-line moves
+        for ply in range(1, len(self._move_info) + 1):
+            sentinel = make_ply_sentinel(ply)
+            regex = QRegularExpression(re.escape(sentinel))
             found_cursor = document.find(regex, search_cursor)
-            mainline_move_found = False
-            
-            while not found_cursor.isNull():
-                # Check if this is a main-line move (not italic = not in variation)
-                format_at_pos = found_cursor.charFormat()
-                is_italic = format_at_pos.fontItalic()
-                
-                if not is_italic:
-                    # Found main-line move - check if click position is within this move
-                    move_start = found_cursor.selectionStart()
-                    move_end = found_cursor.selectionEnd()
-                    
-                    # For white moves, the match might include the move number
-                    # We want to check if position is within the actual move text
-                    if is_white:
-                        # Adjust start position to exclude move number
-                        match_text = found_cursor.selectedText()
-                        move_number_str = str(move_number) + "."
-                        move_text_start_in_match = match_text.find(move_number_str)
-                        if move_text_start_in_match >= 0:
-                            move_text_start_in_match += len(move_number_str)
-                            # Skip whitespace after move number
-                            while (move_text_start_in_match < len(match_text) and 
-                                   match_text[move_text_start_in_match] in [' ', '\t']):
-                                move_text_start_in_match += 1
-                            move_start = found_cursor.selectionStart() + move_text_start_in_match
-                    
-                    # Check if click position is within this move's text range
-                    if move_start <= position <= move_end:
-                        # Found the move! Return ply index (1-based)
-                        ply_index = move_pos_index + 1
-                        return ply_index
-                    
-                    # Update search position to continue after this move
-                    search_cursor = QTextCursor(found_cursor)
-                    search_cursor.setPosition(found_cursor.selectionEnd())
-                    # Skip annotations, spaces, and HTML tags after the move
-                    while search_cursor.position() < document_length - 1:
-                        char = document.characterAt(search_cursor.position())
-                        if char in ['+', '#', '!', '?']:
-                            search_cursor.movePosition(QTextCursor.MoveOperation.NextCharacter)
-                        elif char == ' ' or char == '\t' or char == '\n':
-                            search_cursor.movePosition(QTextCursor.MoveOperation.NextCharacter)
-                        elif char == '<':
-                            # Skip HTML tags
-                            tag_end = search_cursor.position()
-                            while tag_end < document_length - 1:
-                                if document.characterAt(tag_end) == '>':
-                                    search_cursor.setPosition(tag_end + 1)
-                                    break
-                                tag_end += 1
-                            if tag_end >= document_length - 1:
-                                break
-                        else:
-                            break
-                    mainline_move_found = True
-                    break  # Found main-line move, move to next move in sequence
-                
-                # This is a variation move, continue searching for main-line move
-                # Advance search position past this variation move
-                search_pos = QTextCursor(found_cursor)
-                search_pos.setPosition(found_cursor.selectionEnd())
-                # Skip annotations, spaces, and HTML tags
-                while search_pos.position() < document_length - 1:
-                    char = document.characterAt(search_pos.position())
-                    if char in ['+', '#', '!', '?']:
-                        search_pos.movePosition(QTextCursor.MoveOperation.NextCharacter)
-                    elif char == ' ' or char == '\t' or char == '\n':
-                        search_pos.movePosition(QTextCursor.MoveOperation.NextCharacter)
-                    elif char == '<':
-                        # Skip HTML tags
-                        tag_end = search_pos.position()
-                        while tag_end < document_length - 1:
-                            if document.characterAt(tag_end) == '>':
-                                search_pos.setPosition(tag_end + 1)
-                                break
-                            tag_end += 1
-                        if tag_end >= document_length - 1:
-                            break
-                    else:
-                        break
-                found_cursor = document.find(regex, search_pos)
-            
-            # If we didn't find a main-line move for this move_pos_index,
-            # we need to advance the search cursor to avoid getting stuck
-            if not mainline_move_found:
-                # Couldn't find this move - advance search cursor
-                if search_cursor.position() < document_length - 1:
-                    # Try to advance past potential HTML/whitespace to find next move
-                    for _ in range(10):  # Limit advancement to avoid going too far
-                        if search_cursor.position() >= document_length - 1:
-                            break
-                        search_cursor.movePosition(QTextCursor.MoveOperation.NextCharacter)
+            if found_cursor.isNull():
+                break
+            move_start = found_cursor.selectionEnd()
+            move_end = move_start
+            while move_end < document_length:
+                ch = document.characterAt(move_end)
+                if ch in ' \t\n<>()':
+                    break
+                move_end += 1
+            if move_start <= position <= move_end:
+                return ply
+            search_cursor.setPosition(move_end)
         
-        # No main-line move found at this position
         return 0

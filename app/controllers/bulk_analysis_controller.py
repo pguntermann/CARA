@@ -572,6 +572,10 @@ class BulkAnalysisThread(QThread):
             for i in range(parallel_games):
                 # Use dynamic thread distribution - each game may get different thread count
                 threads_for_this_game = threads_per_engine_list[i] if i < len(threads_per_engine_list) else threads_per_engine_list[0]
+                brilliant_move_detection = (
+                    self.analysis_controller.is_brilliant_move_detection_enabled()
+                    if self.analysis_controller else False
+                )
                 service = BulkAnalysisService(
                     self.config,
                     self.engine_model,
@@ -579,7 +583,8 @@ class BulkAnalysisThread(QThread):
                     self.book_move_service,
                     self.classification_model,
                     threads_override=threads_for_this_game,
-                    movetime_override=self.movetime_override
+                    movetime_override=self.movetime_override,
+                    brilliant_move_detection=brilliant_move_detection,
                 )
                 self._analysis_services.append(service)
             

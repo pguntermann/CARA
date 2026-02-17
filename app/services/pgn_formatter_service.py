@@ -5,6 +5,18 @@ import io
 from typing import Dict, Any, Tuple, List, Optional
 from app.services.logging_service import LoggingService
 
+# Invisible sentinel for PGN move highlighting: no visible characters.
+# Encode ply as a run of U+200B (zero-width space) wrapped in ZWNJ+ZWJ so the view can find the move.
+# Format: PREFIX + (U+200B repeated ply times) + SUFFIX. All characters are zero-width/invisible.
+PGN_PLY_SENTINEL_PREFIX = "\u200C\u200D"   # zero-width non-joiner, zero-width joiner
+PGN_PLY_SENTINEL_SUFFIX = "\u200D\u200C"   # zero-width joiner, zero-width non-joiner
+_PLY_SENTINEL_ZERO_WIDTH = "\u200B"         # zero-width space (one per ply)
+
+
+def make_ply_sentinel(ply: int) -> str:
+    """Return the invisible sentinel string for the given ply (1-based)."""
+    return PGN_PLY_SENTINEL_PREFIX + (_PLY_SENTINEL_ZERO_WIDTH * ply) + PGN_PLY_SENTINEL_SUFFIX
+
 
 # NAG (Numeric Annotation Glyph) mapping
 # Based on PGN standard: https://wimnij.home.xs4all.nl/euwe/NAGS.html
@@ -1355,8 +1367,8 @@ class PgnFormatterService:
             r'(?:[=][NBRQ])?'  # Promotion
             r'(?:[+#]|e\.p\.)?'  # Check, mate, or en passant
             r')|'
-            r'(?:O-O(?:-O)?)'  # Castling: O-O or O-O-O
-            r')(?=\s|$|[!?])'  # Must be followed by space, end of string, or annotation symbol
+            r'(?:O-O-O|O-O)'  # Castling: try long (O-O-O) before short (O-O) so one SAN gets one sentinel
+            r')(?=\s|$|[!?]|\d|<)'  # Followed by space, end, !?, digit, or < (HTML tag, e.g. "O-O-O<span> 14.")
         )
         
         result_parts = []
@@ -1367,6 +1379,7 @@ class PgnFormatterService:
         in_comment_span = False
         comment_span_depth = 0
         span_stack: List[str] = []
+        main_line_ply = 1  # 1-based ply for sentinel injection (main-line moves only)
         
         def _recompute_move_span_flags() -> None:
             nonlocal in_variation_span, in_header_span, in_comment_span, comment_span_depth
@@ -1444,8 +1457,10 @@ class PgnFormatterService:
                     # Don't format if immediately after a digit (could be part of move number)
                     if not (i > 0 and formatted[i-1].isdigit()):
                         move_san = match.group(1)
-                        move_formatted = span(move_san, move_color, move_bold)
+                        sentinel = make_ply_sentinel(main_line_ply)
+                        move_formatted = span(sentinel + move_san, move_color, move_bold)
                         result_parts.append(move_formatted)
+                        main_line_ply += 1
                         i = match.end()
                     else:
                         result_parts.append(formatted[i])

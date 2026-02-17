@@ -1,0 +1,271 @@
+"""Service for brilliant move detection. Shared logic used by game analysis and bulk analysis."""
+
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+from app.models.moveslist_model import MoveData
+from app.services.brilliant_move_detection_analysis_service import BrilliantMoveDetectionAnalysisService
+from app.services.move_analysis_service import MoveAnalysisService
+from app.services.logging_service import LoggingService
+
+
+def run_brilliant_move_detection(
+    move_infos: List[Dict[str, Any]],
+    get_move_data: Callable[[int], Optional[MoveData]],
+    on_brilliant: Callable[[int, bool, str], None],
+    shallow_depth_min: int,
+    shallow_depth_max: int,
+    min_depths_show_error: int,
+    good_move_max_cpl: int,
+    inaccuracy_max_cpl: int,
+    mistake_max_cpl: int,
+    engine_path: Path,
+    time_limit_ms: int,
+    max_threads: Optional[int],
+    engine_name: str,
+    engine_options: Dict[str, Any],
+    config: Dict[str, Any],
+    on_progress: Optional[Callable[[str], None]] = None,
+    is_cancelled: Optional[Callable[[], bool]] = None,
+) -> int:
+    """Run brilliancy detection on a list of move infos and update assessments via callbacks.
+
+    Candidates are moves classified as "Best Move" at full depth. For each candidate,
+    positions are analyzed at shallow depths; if at least min_depths_show_error depths
+    classify the move as Mistake/Blunder, the move is marked brilliant.
+
+    Args:
+        move_infos: List of move info dicts (fen_before, move_san, board_before, eval_before,
+            eval_after, is_mate_before, mate_moves_before, move_number, is_white_move).
+        get_move_data: Callable(row_index) -> MoveData or None.
+        on_brilliant: Callable(row_index, is_white_move, assessment_text) when a move is brilliant.
+        shallow_depth_min: Minimum shallow depth to check.
+        shallow_depth_max: Maximum shallow depth to check.
+        min_depths_show_error: Minimum number of depths that must show Mistake/Blunder.
+        good_move_max_cpl: CPL threshold for good move (classification).
+        inaccuracy_max_cpl: CPL threshold for inaccuracy (classification).
+        mistake_max_cpl: CPL threshold for mistake (classification).
+        engine_path: Path to UCI engine.
+        time_limit_ms: Time limit per position for shallow analysis.
+        max_threads: Engine threads (optional).
+        engine_name: Engine name for logging.
+        engine_options: Engine options dict.
+        config: App config dict.
+        on_progress: Optional callback(message) for progress updates.
+        is_cancelled: Optional callable() -> bool to check for cancellation.
+
+    Returns:
+        Number of moves marked brilliant.
+    """
+    if not move_infos:
+        return 0
+    logging_service = LoggingService.get_instance()
+    _is_cancelled = is_cancelled if is_cancelled else lambda: False
+    _on_progress = on_progress if on_progress else lambda _: None
+
+    shallow_time_limit_ms = max(500, time_limit_ms // 3)
+    service: Optional[BrilliantMoveDetectionAnalysisService] = BrilliantMoveDetectionAnalysisService(
+        engine_path,
+        shallow_time_limit_ms,
+        max_threads,
+        engine_name,
+        engine_options,
+        config,
+    )
+    if not service.start_engine():
+        logging_service.error("Brilliant move detection: Failed to start engine")
+        return 0
+
+    brilliant_count = 0
+    candidates_checked = 0
+    try:
+        candidate_moves: List[Tuple[int, Dict[str, Any], MoveData, bool, int]] = []
+        for i, move_info in enumerate(move_infos):
+            if _is_cancelled():
+                return brilliant_count
+            move_number = move_info.get("move_number", 0)
+            is_white_move = move_info.get("is_white_move", True)
+            row_index = move_number - 1
+            move_data = get_move_data(row_index)
+            if move_data is None:
+                continue
+            current_assessment = move_data.assess_white if is_white_move else move_data.assess_black
+            if current_assessment == "Best Move":
+                candidate_moves.append((i, move_info, move_data, is_white_move, row_index))
+
+        total_candidates = len(candidate_moves)
+        logging_service.info(
+            f"Brilliant move detection: Checking {total_candidates} candidate moves (Best Move only)"
+        )
+
+        for candidate_idx, (move_idx, move_info, move_data, is_white_move, row_index) in enumerate(
+            candidate_moves
+        ):
+            if _is_cancelled():
+                return brilliant_count
+            candidates_checked += 1
+            fen_before = move_info.get("fen_before", "")
+            played_move_san = move_info.get("move_san", "")
+            if not fen_before or not played_move_san:
+                continue
+
+            depths_show_error = 0
+            brilliant_depths: List[int] = []
+            for depth in range(shallow_depth_min, shallow_depth_max + 1):
+                if _is_cancelled():
+                    return brilliant_count
+                analysis_result = _analyze_at_shallow_depth(
+                    service, fen_before, move_info.get("move_number", 0), depth, shallow_time_limit_ms
+                )
+                if analysis_result is None:
+                    continue
+                shallow_eval, shallow_is_mate, shallow_mate_moves, shallow_best_move_san = analysis_result
+                played_move_normalized = MoveAnalysisService.normalize_move(played_move_san)
+                shallow_best_move_normalized = (
+                    MoveAnalysisService.normalize_move(shallow_best_move_san)
+                    if shallow_best_move_san
+                    else ""
+                )
+                moves_match_at_shallow = bool(
+                    shallow_best_move_normalized
+                    and played_move_normalized == shallow_best_move_normalized
+                )
+                if moves_match_at_shallow:
+                    continue
+                board_before = move_info.get("board_before")
+                if board_before is None:
+                    continue
+                try:
+                    board_after = board_before.copy()
+                    move_uci = board_after.parse_san(played_move_san)
+                    board_after.push(move_uci)
+                    fen_after = board_after.fen()
+                    after_result = _analyze_at_shallow_depth(
+                        service, fen_after, move_info.get("move_number", 0), depth, shallow_time_limit_ms
+                    )
+                    if after_result is None:
+                        continue
+                    (
+                        eval_after_shallow,
+                        is_mate_after_shallow,
+                        mate_moves_after_shallow,
+                        _,
+                    ) = after_result
+                    eval_before_normal = move_info.get("eval_before", 0.0)
+                    is_mate_before_normal = move_info.get("is_mate_before", False)
+                    mate_moves_before_normal = move_info.get("mate_moves_before", 0)
+                    shallow_cpl = MoveAnalysisService.calculate_cpl(
+                        eval_before=eval_before_normal,
+                        eval_after=eval_after_shallow,
+                        eval_after_best_move=shallow_eval,
+                        is_white_move=is_white_move,
+                        is_mate=is_mate_after_shallow,
+                        is_mate_before=is_mate_before_normal,
+                        is_mate_after_best=shallow_is_mate,
+                        mate_moves=mate_moves_after_shallow,
+                        mate_moves_before=mate_moves_before_normal,
+                        mate_moves_after_best=shallow_mate_moves,
+                        moves_match=moves_match_at_shallow,
+                    )
+                    classification_thresholds = {
+                        "good_move_max_cpl": good_move_max_cpl,
+                        "inaccuracy_max_cpl": inaccuracy_max_cpl,
+                        "mistake_max_cpl": mistake_max_cpl,
+                        "best_move_is_mate": False,
+                    }
+                    shallow_assessment = MoveAnalysisService.assess_move_quality(
+                        shallow_cpl,
+                        eval_before_normal,
+                        eval_after_shallow,
+                        move_info,
+                        shallow_best_move_san,
+                        moves_match_at_shallow,
+                        classification_thresholds,
+                        material_sacrifice=0,
+                    )
+                    if shallow_assessment in ["Mistake", "Blunder"]:
+                        depths_show_error += 1
+                        brilliant_depths.append(depth)
+                except Exception as e:
+                    logging_service.debug(f"Error analyzing position after move: {e}")
+                    continue
+
+            if depths_show_error >= min_depths_show_error:
+                current_assessment = move_data.assess_white if is_white_move else move_data.assess_black
+                if not current_assessment.startswith("Brilliant"):
+                    assessment_text = (
+                        f"Brilliant ({','.join(map(str, sorted(brilliant_depths)))})"
+                        if brilliant_depths
+                        else "Brilliant"
+                    )
+                    if is_white_move:
+                        move_data.assess_white = assessment_text
+                    else:
+                        move_data.assess_black = assessment_text
+                    on_brilliant(row_index, is_white_move, assessment_text)
+                    brilliant_count += 1
+
+            if (candidate_idx + 1) % 5 == 0 or candidate_idx == total_candidates - 1:
+                _on_progress(
+                    f"Detecting brilliant moves: {candidate_idx + 1}/{total_candidates} candidates checked ({brilliant_count} brilliant)"
+                )
+    finally:
+        if service:
+            service.cleanup()
+
+    if brilliant_count > 0:
+        logging_service.info(
+            f"Brilliant move detection completed: {brilliant_count} brilliant move(s) detected from {candidates_checked} candidates"
+        )
+    else:
+        logging_service.info(
+            f"Brilliant move detection completed: No brilliant moves detected from {candidates_checked} candidates"
+        )
+    return brilliant_count
+
+
+def _analyze_at_shallow_depth(
+    service: BrilliantMoveDetectionAnalysisService,
+    fen: str,
+    move_number: int,
+    depth: int,
+    time_limit_ms: int,
+) -> Optional[Tuple[float, bool, int, str]]:
+    """Analyze a position at shallow depth synchronously."""
+    from PyQt6.QtCore import QEventLoop, QTimer
+
+    loop = QEventLoop()
+    result_container: Dict[str, Any] = {"result": None, "error": None}
+
+    def on_analysis_complete(
+        centipawns: float, is_mate: bool, mate_moves: int, best_move_san: str, analysis_depth: int
+    ):
+        if analysis_depth == depth:
+            result_container["result"] = (centipawns, is_mate, mate_moves, best_move_san)
+            loop.quit()
+
+    def on_error(error_message: str):
+        result_container["error"] = error_message
+        loop.quit()
+
+    analysis_thread = service.analyze_position(fen, move_number, depth)
+    if not analysis_thread:
+        return None
+    analysis_thread.analysis_complete.connect(on_analysis_complete)
+    analysis_thread.error_occurred.connect(on_error)
+    timeout_timer = QTimer()
+    timeout_timer.setSingleShot(True)
+    timeout_timer.timeout.connect(loop.quit)
+    timeout_timer.start(time_limit_ms * 2)
+    loop.exec()
+    try:
+        analysis_thread.analysis_complete.disconnect(on_analysis_complete)
+        analysis_thread.error_occurred.disconnect(on_error)
+    except Exception:
+        pass
+    if result_container["error"]:
+        LoggingService.get_instance().debug(
+            f"Error analyzing at depth {depth}: {result_container['error']}"
+        )
+        return None
+    return result_container["result"]

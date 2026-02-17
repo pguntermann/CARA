@@ -16,6 +16,7 @@ from app.models.move_classification_model import MoveClassificationModel
 from app.models.moveslist_model import MoveData
 from app.services.game_analysis_engine_service import GameAnalysisEngineService
 from app.services.move_analysis_service import MoveAnalysisService
+from app.services.brilliant_move_detection_service import run_brilliant_move_detection
 from app.services.book_move_service import BookMoveService
 from app.services.opening_service import OpeningService
 from app.services.analysis_data_storage_service import AnalysisDataStorageService
@@ -35,7 +36,8 @@ class BulkAnalysisService(QObject):
                  opening_service: OpeningService, book_move_service: BookMoveService,
                  classification_model: Optional[MoveClassificationModel] = None,
                  threads_override: Optional[int] = None,
-                 movetime_override: Optional[int] = None) -> None:
+                 movetime_override: Optional[int] = None,
+                 brilliant_move_detection: bool = False) -> None:
         """Initialize bulk analysis service.
         
         Args:
@@ -45,6 +47,8 @@ class BulkAnalysisService(QObject):
             book_move_service: BookMoveService instance.
             classification_model: Optional MoveClassificationModel instance for classification settings.
             threads_override: Optional override for engine threads (used for parallel analysis).
+            movetime_override: Optional override for movetime in ms.
+            brilliant_move_detection: Whether to run brilliancy detection after each game.
         """
         super().__init__()
         self.config = config
@@ -56,7 +60,8 @@ class BulkAnalysisService(QObject):
         self._engine_service: Optional[GameAnalysisEngineService] = None
         self._threads_override = threads_override
         self._movetime_override = movetime_override
-        
+        self._brilliant_move_detection = brilliant_move_detection
+
         # Note: Opening service should be loaded before creating BulkAnalysisService instances
         # to avoid blocking during analysis. We don't load it here to avoid blocking worker threads.
         
@@ -121,26 +126,23 @@ class BulkAnalysisService(QObject):
     
     def _load_classification_thresholds(self) -> None:
         """Load classification thresholds from model or config."""
+        brilliant_criteria = self.config.get("game_analysis", {}).get("brilliant_criteria", {})
         if self.classification_model:
             self.good_move_max_cpl = self.classification_model.good_move_max_cpl
             self.inaccuracy_max_cpl = self.classification_model.inaccuracy_max_cpl
             self.mistake_max_cpl = self.classification_model.mistake_max_cpl
-            self.min_eval_swing = self.classification_model.min_eval_swing
-            self.min_material_sacrifice = self.classification_model.min_material_sacrifice
-            self.max_eval_before = self.classification_model.max_eval_before
-            self.exclude_already_winning = self.classification_model.exclude_already_winning
-            self.material_sacrifice_lookahead_plies = self.classification_model.material_sacrifice_lookahead_plies
+            self.shallow_depth_min = self.classification_model.shallow_depth_min
+            self.shallow_depth_max = self.classification_model.shallow_depth_max
+            self.min_depths_show_error = self.classification_model.min_depths_show_error
         else:
             # Fallback to config defaults
             classification_config = self.config.get("game_analysis", {}).get("move_classification", {})
             self.good_move_max_cpl = classification_config.get("good_move_max_cpl", 50)
             self.inaccuracy_max_cpl = classification_config.get("inaccuracy_max_cpl", 100)
             self.mistake_max_cpl = classification_config.get("mistake_max_cpl", 200)
-            self.min_eval_swing = classification_config.get("min_eval_swing", 200)
-            self.min_material_sacrifice = classification_config.get("min_material_sacrifice", 100)
-            self.max_eval_before = classification_config.get("max_eval_before", 500)
-            self.exclude_already_winning = classification_config.get("exclude_already_winning", True)
-            self.material_sacrifice_lookahead_plies = classification_config.get("material_sacrifice_lookahead_plies", 3)
+            self.shallow_depth_min = classification_config.get("shallow_depth_min", 2)
+            self.shallow_depth_max = classification_config.get("shallow_depth_max", 6)
+            self.min_depths_show_error = brilliant_criteria.get("min_depths_show_error", 1)
     
     def cancel(self) -> None:
         """Cancel the current analysis."""
@@ -154,7 +156,57 @@ class BulkAnalysisService(QObject):
         if self._engine_service:
             self._engine_service.cleanup()
             self._engine_service = None
-    
+
+    def _perform_brilliant_move_detection_bulk(
+        self,
+        move_infos: List[Dict[str, Any]],
+        analyzed_moves: List[MoveData],
+        progress_callback=None,
+        total_moves: int = 0,
+    ) -> None:
+        """Run brilliancy detection on analyzed moves (bulk analysis) via shared orchestrator."""
+        if not move_infos or not analyzed_moves:
+            return
+        engine_assignment = self.engine_model.get_assignment(EngineModel.TASK_GAME_ANALYSIS)
+        if engine_assignment is None:
+            return
+        engine = self.engine_model.get_engine(engine_assignment)
+        if engine is None or not engine.is_valid:
+            return
+        engine_path = Path(engine.path) if not isinstance(engine.path, Path) else engine.path
+        engine_options = {}
+        if self.max_threads:
+            engine_options["Threads"] = self.max_threads
+
+        def get_move_data(row_index: int):
+            if 0 <= row_index < len(analyzed_moves):
+                return analyzed_moves[row_index]
+            return None
+
+        def on_progress(msg: str) -> None:
+            if progress_callback:
+                progress_callback(total_moves - 1, total_moves, 0, True, msg, None)
+
+        run_brilliant_move_detection(
+            move_infos=move_infos,
+            get_move_data=get_move_data,
+            on_brilliant=lambda row_index, is_white_move, assessment_text: None,
+            shallow_depth_min=self.shallow_depth_min,
+            shallow_depth_max=self.shallow_depth_max,
+            min_depths_show_error=self.min_depths_show_error,
+            good_move_max_cpl=self.good_move_max_cpl,
+            inaccuracy_max_cpl=self.inaccuracy_max_cpl,
+            mistake_max_cpl=self.mistake_max_cpl,
+            engine_path=engine_path,
+            time_limit_ms=self.time_limit_ms,
+            max_threads=self.max_threads,
+            engine_name=engine.name,
+            engine_options=engine_options,
+            config=self.config,
+            on_progress=on_progress,
+            is_cancelled=lambda: self._cancelled,
+        )
+
     def analyze_game(self, game: GameData, progress_callback=None) -> bool:
         """Analyze a single game without making it active.
         
@@ -206,7 +258,8 @@ class BulkAnalysisService(QObject):
             previous_move_eco = None
             previous_move_opening_name = None
             opening_repeat_indicator = self.config.get('resources', {}).get('opening_repeat_indicator', '*')
-            
+            move_infos_for_brilliancy: List[Dict[str, Any]] = []
+
             for move_index, move_info in enumerate(moves_data):
                 if self._cancelled:
                     return False
@@ -263,7 +316,16 @@ class BulkAnalysisService(QObject):
                     eval_after, is_mate, mate_moves, best_move_san_next, pv2_move_san_next, pv3_move_san_next,
                     pv2_score_next, pv3_score_next, pv2_score_black_next, pv3_score_black_next, depth_after, seldepth_after
                 )
-                
+
+                # Collect move info for brilliancy detection (if enabled)
+                move_infos_for_brilliancy.append({
+                    **move_info,
+                    "eval_before": previous_eval,
+                    "eval_after": eval_after,
+                    "is_mate_before": previous_is_mate,
+                    "mate_moves_before": previous_mate_moves,
+                })
+
                 # Calculate CPL
                 played_move_san = move_info["move_san"]
                 moves_match = MoveAnalysisService.normalize_move(played_move_san) == MoveAnalysisService.normalize_move(best_move_san) if best_move_san else False
@@ -285,20 +347,11 @@ class BulkAnalysisService(QObject):
                 # Check if book move
                 is_book_move = self.book_move_service.is_book_move(move_info["board_before"], move_info["move"])
                 
-                # Calculate material sacrifice for brilliant detection
-                material_sacrifice = MoveAnalysisService.calculate_material_sacrifice(
-                    move_info, moves_data, move_index, lookahead_plies=1
-                )
-                
                 # Assess move quality
                 classification_thresholds = {
                     "good_move_max_cpl": self.good_move_max_cpl,
                     "inaccuracy_max_cpl": self.inaccuracy_max_cpl,
                     "mistake_max_cpl": self.mistake_max_cpl,
-                    "min_eval_swing": self.min_eval_swing,
-                    "min_material_sacrifice": self.min_material_sacrifice,
-                    "max_eval_before": self.max_eval_before,
-                    "exclude_already_winning": self.exclude_already_winning,
                     "best_move_is_mate": best_move_is_mate
                 }
                 
@@ -307,7 +360,7 @@ class BulkAnalysisService(QObject):
                 else:
                     assess = MoveAnalysisService.assess_move_quality(
                         cpl, previous_eval, eval_after, move_info, best_move_san, moves_match,
-                        classification_thresholds, material_sacrifice
+                        classification_thresholds, material_sacrifice=0
                     )
                 
                 # Calculate PV CPL
@@ -476,7 +529,13 @@ class BulkAnalysisService(QObject):
                 previous_eval = eval_after
                 previous_is_mate = is_mate
                 previous_mate_moves = mate_moves
-            
+
+            # Brilliancy detection (if enabled)
+            if self._brilliant_move_detection and move_infos_for_brilliancy and analyzed_moves and not self._cancelled:
+                self._perform_brilliant_move_detection_bulk(
+                    move_infos_for_brilliancy, analyzed_moves, progress_callback, total_moves
+                )
+
             # Store analysis results
             if analyzed_moves:
                 # Update game ECO from the last move with opening information (excluding repeat indicator)
