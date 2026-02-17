@@ -1964,15 +1964,19 @@ class PgnFormatterService:
         Returns:
             Formatted text with moves individually styled.
         """
-        # Pattern to match moves in variations
-        # Matches: optional move number (e.g., "13. " or "13... "), then move SAN, preserving whitespace after
-        # Move SAN can include: piece, source square, capture, destination, promotion, check/mate, annotations
+        # Pattern to match moves in variations (must include castling so variation castling gets
+        # variation styling and does not consume a main-line sentinel, which would break navigation to the last move).
+        # Matches: optional move number (e.g., "13.", "13. ", or "13... "), then move SAN, preserving whitespace after.
         move_pattern = re.compile(
-            r'(?:(\d+\.\s+)|(\d+\.\.\.\s+))?'  # Optional move number like "13. " or "13... " (with space)
-            r'([NBRQK]?[a-h]?[1-8]?[x\-]?[a-h][1-8]'  # Basic move pattern
+            r'(?:(\d+\.\s*)|(\d+\.\.\.\s*))?'  # Optional move number; \s* allows "13.Ned3" to be captured
+            r'('
+            r'(?:[NBRQK]?[a-h]?[1-8]?[x\-]?[a-h][1-8]'  # Standard moves
             r'(?:[=][NBRQ])?'  # Promotion
             r'(?:[+#]|e\.p\.)?'  # Check, mate, or en passant
             r'[!?]{0,2})'  # Optional annotations
+            r'|'
+            r'(?:O-O-O|O-O)'  # Castling (long before short)
+            r'[!?]{0,2})'  # Optional annotations after castling
             r'(\s*)'  # Capture trailing whitespace
         )
         
@@ -2039,7 +2043,9 @@ class PgnFormatterService:
                     move_number = white_move_number or black_move_number
                     if move_number:
                         result_parts.append(span_func(move_number.rstrip(), variation_color, italic=variation_italic))
-                        result_parts.append(' ')  # Add space after move number
+                        # Only add space after move number if the original had trailing space (avoid inserting space in "13.Ned3")
+                        if move_number.rstrip() != move_number:
+                            result_parts.append(' ')
                     
                     # Format move SAN with variation styling
                     result_parts.append(span_func(move_san, variation_color, italic=variation_italic))
