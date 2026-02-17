@@ -1275,8 +1275,10 @@ class PgnFormatterService:
         # Match move numbers outside HTML tags, header spans, and variation spans
         # Header spans have color rgb(100, 150, 255)
         # Variation spans have color rgb(180, 180, 180) and italic style
-        # Pattern matches: optional whitespace, digit(s) followed by period and optional space, not preceded by a digit
-        move_number_pattern = re.compile(r'(?<![0-9])(\s*\d+\.\s*)')
+        # Pattern matches: optional whitespace, digit(s) followed by period and optional space.
+        # Not preceded by a digit (avoid "12. " matching "2. "). Not preceded by a letter so we don't
+        # treat the rank in a square (e.g. the "6" in hxg6) as the start of a move number like "69. ".
+        move_number_pattern = re.compile(r'(?<![0-9])(?<![a-zA-Z])(\s*\d+\.\s*)')
         result_parts = []
         i = 0
         in_tag = False
