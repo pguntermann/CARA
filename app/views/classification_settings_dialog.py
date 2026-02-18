@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QSpinBox,
     QCheckBox,
+    QComboBox,
     QPushButton,
     QWidget,
     QGroupBox,
@@ -329,6 +330,8 @@ class ClassificationSettingsDialog(QDialog):
         self.shallow_depth_min_spinbox.setValue(self.current_brilliant.get("shallow_depth_min", 2))
         self.shallow_depth_max_spinbox.setValue(self.current_brilliant.get("shallow_depth_max", 6))
         self.min_depths_show_error_spinbox.setValue(self.current_brilliant.get("min_depths_show_error", 1))
+        require_blunder_only = self.current_brilliant.get("require_blunder_only", False)
+        self.error_severity_combobox.setCurrentIndex(1 if require_blunder_only else 0)
         
         # Update CPL scale
         self._update_cpl_scale()
@@ -602,6 +605,16 @@ class ClassificationSettingsDialog(QDialog):
             container_layout.addWidget(checkbox)
             return container
         
+        # Helper to wrap combobox to align with input fields
+        def create_combobox_widget(combobox: QComboBox) -> QWidget:
+            container = QWidget()
+            container_layout = QHBoxLayout(container)
+            container_layout.setContentsMargins(0, 0, right_padding, 0)
+            container_layout.setSpacing(0)
+            container_layout.addStretch()
+            container_layout.addWidget(combobox)
+            return container
+        
         # Shallow Depth Min
         self.shallow_depth_min_spinbox = QSpinBox()
         self.shallow_depth_min_spinbox.setRange(1, 10)
@@ -628,6 +641,18 @@ class ClassificationSettingsDialog(QDialog):
         self.min_depths_show_error_spinbox.setMinimumHeight(25)
         self.min_depths_show_error_spinbox.setToolTip("Minimum number of shallow depths (between Min and Max) at which the move must look like a Mistake or Blunder to be marked brilliant. Higher values reduce false positives.")
         form_layout.addRow(create_label("Min Agreement:"), create_input_widget(self.min_depths_show_error_spinbox))
+        
+        # Error Severity Requirement
+        self.error_severity_combobox = QComboBox()
+        self.error_severity_combobox.addItems(["Mistake or Blunder", "Blunder"])
+        require_blunder_only = self.current_brilliant.get("require_blunder_only", False)
+        self.error_severity_combobox.setCurrentIndex(1 if require_blunder_only else 0)
+        # Make combobox wider to display full "Mistake or Blunder" text (about 75% wider)
+        combobox_width = int(input_width * 1.75)
+        self.error_severity_combobox.setFixedWidth(combobox_width)
+        self.error_severity_combobox.setMinimumHeight(25)
+        self.error_severity_combobox.setToolTip("Choose which error severity to count: 'Mistake or Blunder' counts both Mistake and Blunder assessments, 'Blunder' counts only Blunder assessments (stricter, reduces false positives).")
+        form_layout.addRow(create_label("Error Severity:"), create_combobox_widget(self.error_severity_combobox))
         
         group.setLayout(form_layout)
         return group
@@ -774,6 +799,28 @@ class ClassificationSettingsDialog(QDialog):
             checkmark_path
         )
         
+        # Apply combobox styling (similar to spinboxes)
+        comboboxes = list(self.findChildren(QComboBox))
+        if comboboxes:
+            # Get selection colors from config or use defaults
+            selection_bg_color = fields_config.get('selection_background_color', [70, 90, 130])
+            selection_text_color = fields_config.get('selection_text_color', [240, 240, 240])
+            StyleManager.style_comboboxes(
+                comboboxes,
+                self.config,
+                text_color=text_color,
+                font_family=font_family,
+                font_size=font_size,
+                bg_color=spinbox_bg_color,
+                border_color=border_color,
+                focus_border_color=focus_border_color,
+                selection_bg_color=selection_bg_color,
+                selection_text_color=selection_text_color,
+                border_width=input_border_width,
+                border_radius=input_border_radius,
+                padding=spinbox_padding
+            )
+        
         # Apply button styling using StyleManager (uses unified config)
         button_width = buttons_config.get('width', 120)
         button_height = buttons_config.get('height', 30)
@@ -860,6 +907,8 @@ class ClassificationSettingsDialog(QDialog):
         self.shallow_depth_min_spinbox.setValue(brilliant.get("shallow_depth_min", 2))
         self.shallow_depth_max_spinbox.setValue(brilliant.get("shallow_depth_max", 6))
         self.min_depths_show_error_spinbox.setValue(brilliant.get("min_depths_show_error", 1))
+        require_blunder_only = brilliant.get("require_blunder_only", False)
+        self.error_severity_combobox.setCurrentIndex(1 if require_blunder_only else 0)
         
         # Hide progress bar and set final status through controller
         self.controller.hide_progress()
@@ -891,7 +940,8 @@ class ClassificationSettingsDialog(QDialog):
         brilliant = {
                 "shallow_depth_min": self.shallow_depth_min_spinbox.value(),
                 "shallow_depth_max": self.shallow_depth_max_spinbox.value(),
-                "min_depths_show_error": self.min_depths_show_error_spinbox.value()
+                "min_depths_show_error": self.min_depths_show_error_spinbox.value(),
+                "require_blunder_only": self.error_severity_combobox.currentIndex() == 1
             }
         
         # Save via classification controller

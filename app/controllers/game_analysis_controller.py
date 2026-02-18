@@ -146,6 +146,7 @@ class GameAnalysisController(QObject):
         self._shallow_depth_min = default_brilliant.get("shallow_depth_min", 2)
         self._shallow_depth_max = default_brilliant.get("shallow_depth_max", 6)
         self._min_depths_show_error = default_brilliant.get("min_depths_show_error", 1)
+        self._require_blunder_only = default_brilliant.get("require_blunder_only", False)
 
         # Override with user settings if available
         if self.user_settings_service:
@@ -165,6 +166,7 @@ class GameAnalysisController(QObject):
                 self._shallow_depth_min = user_brilliant.get("shallow_depth_min", self._shallow_depth_min)
                 self._shallow_depth_max = user_brilliant.get("shallow_depth_max", self._shallow_depth_max)
                 self._min_depths_show_error = user_brilliant.get("min_depths_show_error", self._min_depths_show_error)
+                self._require_blunder_only = user_brilliant.get("require_blunder_only", self._require_blunder_only)
     
     def reload_settings(self) -> None:
         """Reload settings from config and user settings."""
@@ -220,6 +222,13 @@ class GameAnalysisController(QObject):
         if self.classification_model:
             return self.classification_model.min_depths_show_error
         return getattr(self, '_min_depths_show_error', 1)
+
+    @property
+    def require_blunder_only(self) -> bool:
+        """Get whether only Blunder (not Mistake) should be counted for brilliancy detection."""
+        if self.classification_model:
+            return self.classification_model.require_blunder_only
+        return getattr(self, '_require_blunder_only', False)
 
     @property
     def is_analyzing(self) -> bool:
@@ -1436,6 +1445,7 @@ class GameAnalysisController(QObject):
             engine_name=engine.name,
             engine_options=engine_options,
             config=self.config,
+            require_blunder_only=self.require_blunder_only,
             on_progress=progress_service.set_status,
             is_cancelled=lambda: False,
         )

@@ -848,7 +848,8 @@
     "brilliant_criteria": {
       "shallow_depth_min": 3,
       "shallow_depth_max": 6,
-      "min_depths_show_error": 2
+      "min_depths_show_error": 2,
+      "require_blunder_only": true
     }
   },
   "manual_analysis": {

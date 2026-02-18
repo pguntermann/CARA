@@ -25,6 +25,7 @@ def run_brilliant_move_detection(
     engine_name: str,
     engine_options: Dict[str, Any],
     config: Dict[str, Any],
+    require_blunder_only: bool = False,
     on_progress: Optional[Callable[[str], None]] = None,
     is_cancelled: Optional[Callable[[], bool]] = None,
 ) -> int:
@@ -32,7 +33,8 @@ def run_brilliant_move_detection(
 
     Candidates are moves classified as "Best Move" at full depth. For each candidate,
     positions are analyzed at shallow depths; if at least min_depths_show_error depths
-    classify the move as Mistake/Blunder, the move is marked brilliant.
+    classify the move as Mistake/Blunder (or Blunder only if require_blunder_only=True),
+    the move is marked brilliant.
 
     Args:
         move_infos: List of move info dicts (fen_before, move_san, board_before, eval_before,
@@ -98,9 +100,11 @@ def run_brilliant_move_detection(
                 candidate_moves.append((i, move_info, move_data, is_white_move, row_index))
 
         total_candidates = len(candidate_moves)
+        error_severity_text = "Blunder" if require_blunder_only else "Mistake or Blunder"
         logging_service.info(
             f"Brilliant move detection: Checking {total_candidates} candidate moves (Best Move only), "
-            f"min_depths_required={min_depths_required} (depths {shallow_depth_min}-{shallow_depth_max})"
+            f"min_depths_required={min_depths_required} (depths {shallow_depth_min}-{shallow_depth_max}), "
+            f"error_severity={error_severity_text}"
         )
 
         for candidate_idx, (move_idx, move_info, move_data, is_white_move, row_index) in enumerate(
@@ -235,7 +239,10 @@ def run_brilliant_move_detection(
                         classification_thresholds,
                         material_sacrifice=0,
                     )
-                    counted = shallow_assessment in ["Mistake", "Blunder"]
+                    if require_blunder_only:
+                        counted = shallow_assessment == "Blunder"
+                    else:
+                        counted = shallow_assessment in ["Mistake", "Blunder"]
                     if counted:
                         depths_show_error += 1
                         brilliant_depths.append(depth)
@@ -243,7 +250,7 @@ def run_brilliant_move_detection(
                         f"  depth {depth}: best={shallow_best_move_san} (eval={eval_after_best_shallow:.0f}), "
                         f"played={played_move_san} (eval={eval_after_shallow:.0f}), "
                         f"CPL={shallow_cpl:.0f} → {shallow_assessment} "
-                        f"(counted={'yes' if counted else 'no'})"
+                        f"(counted={'yes' if counted else 'no'}, require_blunder_only={require_blunder_only})"
                     )
                 except Exception as e:
                     logging_service.debug(

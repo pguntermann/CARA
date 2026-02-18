@@ -2158,7 +2158,7 @@
     "dialogs": {
       "classification_settings": {
         "width": 480,
-        "height": 520,
+        "height": 550,
         "layout": {
           "spacing": 15,
           "margins": [
@@ -4676,8 +4676,9 @@
     },
     "brilliant_criteria": {
       "shallow_depth_min": 2,
-      "shallow_depth_max": 6,
-      "min_depths_show_error": 1
+      "shallow_depth_max": 5,
+      "min_depths_show_error": 2,
+      "require_blunder_only": true
     },
     "book_move_detection": {
       "use_eco_lookup": true,

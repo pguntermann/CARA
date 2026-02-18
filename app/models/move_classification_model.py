@@ -27,6 +27,7 @@ class MoveClassificationModel(QObject):
         self._shallow_depth_min: int = 2
         self._shallow_depth_max: int = 6
         self._min_depths_show_error: int = 1  # Min number of shallow depths that must show move as Mistake/Blunder
+        self._require_blunder_only: bool = False  # If True, only count Blunder; if False, count Mistake or Blunder
 
     # Assessment thresholds properties
     @property
@@ -60,6 +61,11 @@ class MoveClassificationModel(QObject):
         """Get minimum number of shallow depths that must show the move as Mistake/Blunder (min agreement)."""
         return self._min_depths_show_error
 
+    @property
+    def require_blunder_only(self) -> bool:
+        """Get whether only Blunder (not Mistake) should be counted for brilliancy detection."""
+        return self._require_blunder_only
+
     def load_settings(self, assessment_thresholds: Dict[str, int], 
                       brilliant_criteria: Dict[str, Any]) -> None:
         """Load settings from dictionaries.
@@ -77,6 +83,7 @@ class MoveClassificationModel(QObject):
         self._shallow_depth_min = brilliant_criteria.get("shallow_depth_min", 2)
         self._shallow_depth_max = brilliant_criteria.get("shallow_depth_max", 6)
         self._min_depths_show_error = brilliant_criteria.get("min_depths_show_error", 1)
+        self._require_blunder_only = brilliant_criteria.get("require_blunder_only", False)
 
         # Emit signal that settings changed
         self.settings_changed.emit()
@@ -124,6 +131,10 @@ class MoveClassificationModel(QObject):
             self._min_depths_show_error = criteria["min_depths_show_error"]
             changed = True
 
+        if "require_blunder_only" in criteria and criteria["require_blunder_only"] != self._require_blunder_only:
+            self._require_blunder_only = criteria["require_blunder_only"]
+            changed = True
+
         if changed:
             self.settings_changed.emit()
     
@@ -148,6 +159,7 @@ class MoveClassificationModel(QObject):
         return {
             "shallow_depth_min": self._shallow_depth_min,
             "shallow_depth_max": self._shallow_depth_max,
-            "min_depths_show_error": self._min_depths_show_error
+            "min_depths_show_error": self._min_depths_show_error,
+            "require_blunder_only": self._require_blunder_only
         }
 
