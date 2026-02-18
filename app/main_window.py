@@ -2000,7 +2000,7 @@ class MainWindow(QMainWindow):
             MessageDialog.show_error(
                 self.config,
                 "Update Check Failed",
-                f"Could not check for updates:\n\n{error_message}",
+                f"Could not check for updates:<br><br>{error_message}",
                 self
             )
         elif is_newer:
@@ -2026,7 +2026,7 @@ class MainWindow(QMainWindow):
             MessageDialog.show_information(
                 self.config,
                 "Up to Date",
-                f"You are using the latest version.\n\nCurrent version: {current_version}",
+                f"You are using the latest version.<br><br>Current version: {current_version}",
                 self
             )
     

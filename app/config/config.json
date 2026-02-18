@@ -3586,6 +3586,7 @@
       },
       "message_dialog": {
         "width": 400,
+        "max_width": 600,
         "height": 150,
         "background_color": [
           40,

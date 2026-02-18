@@ -587,7 +587,7 @@ class EngineDialog(QDialog):
             MessageDialog.show_warning(
                 self.config,
                 "Validation Failed",
-                f"Failed to validate engine:\n\n{error}",
+                f"Failed to validate engine:<br><br>{error}",
                 self
             )
     
@@ -635,7 +635,7 @@ class EngineDialog(QDialog):
             MessageDialog.show_warning(
                 self.config,
                 "Add Engine Failed",
-                f"Failed to add engine:\n\n{message}",
+                f"Failed to add engine:<br><br>{message}",
                 self
             )
     

@@ -7,8 +7,9 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
 )
-from PyQt6.QtGui import QPalette, QColor, QDesktopServices
+from PyQt6.QtGui import QPalette, QColor, QDesktopServices, QFont, QFontMetrics
 from PyQt6.QtCore import Qt, QUrl
+import re
 from pathlib import Path
 from typing import Dict, Any, Literal
 import sys
@@ -42,7 +43,26 @@ class MessageDialog(QDialog):
         
         # Set dialog properties
         self.setWindowTitle(title)
-        dialog_width = dialog_config.get('width', 400)
+        layout_margins_for_width = layout_config.get('margins', [15, 15, 15, 15])
+        margin_h = layout_margins_for_width[0] + layout_margins_for_width[2]
+        message_padding_for_width = message_config.get('padding', 5) * 2
+        min_width = dialog_config.get('width', 400)
+        max_width = dialog_config.get('max_width', 600)
+        # Compute width from message content (strip HTML, measure longest line)
+        from app.utils.font_utils import scale_font_size
+        msg_font_size = scale_font_size(message_config.get('font_size', 11))
+        msg_font = QFont()
+        msg_font.setPointSize(msg_font_size)
+        fm = QFontMetrics(msg_font)
+        # Normalise <br> to newline, then strip remaining HTML for measurement
+        text_for_lines = re.sub(r'<br\s*/?>', '\n', message, flags=re.IGNORECASE)
+        plain = re.sub(r'<[^>]+>', ' ', text_for_lines).replace('&nbsp;', ' ')
+        lines = re.split(r'[\n\r]+', plain)
+        content_w = 0
+        for line in lines:
+            content_w = max(content_w, fm.horizontalAdvance(line.strip()))
+        # Clamp to min/max and add padding
+        dialog_width = max(min_width, min(max_width, content_w + margin_h + message_padding_for_width + 40))
         
         # Set dialog background color
         bg_color = dialog_config.get('background_color', [40, 40, 45])
@@ -79,7 +99,7 @@ class MessageDialog(QDialog):
         layout.addWidget(title_label)
         
         # Message
-        message_font_size = scale_font_size(message_config.get('font_size', 11))
+        message_font_size = msg_font_size
         message_padding = message_config.get('padding', 5)
         message_text_color = message_config.get('text_color', [200, 200, 200])
         message_label = QLabel(message)
@@ -141,6 +161,8 @@ class MessageDialog(QDialog):
         if self.height() < min_height:
             self.setMinimumHeight(min_height)
             self.resize(self.width(), min_height)
+        # Fix size so the user cannot resize the dialog
+        self.setFixedSize(self.size())
     
     def _on_link_activated(self, link: str) -> None:
         """Handle link activation in message text.

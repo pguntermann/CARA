@@ -471,7 +471,7 @@ class AIModelSettingsDialog(QDialog):
         MessageDialog.show_warning(
             self.config,
             "Model Discovery Failed",
-            f"Failed to discover models for {provider.capitalize()}:\n{error}\n\n"
+            f"Failed to discover models for {provider.capitalize()}:<br>{error}<br><br>"
             "Please check your API key and try again.",
             self
         )
