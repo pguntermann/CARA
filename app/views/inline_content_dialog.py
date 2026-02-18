@@ -279,7 +279,9 @@ class InlineContentDialog(QDialog):
         pre_padding = f"{float(padding_em[0])}em {float(padding_em[1])}em"
         pre_margin_top = pre_block.get("margin_top_em", 0.6)
         pre_margin_bottom = pre_block.get("margin_bottom_em", 0.8)
-        pre_font_family = pre_block.get("font_family") or "Consolas, \"Liberation Mono\", Monaco, monospace"
+        pre_font_family = resolve_font_family(
+            pre_block.get("font_family") or "Monaco, Menlo, \"Liberation Mono\", Consolas, monospace"
+        )
         try:
             pre_font_size_offset = int(pre_block.get("font_size_offset") or -1)
         except (TypeError, ValueError):

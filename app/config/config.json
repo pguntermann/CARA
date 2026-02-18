@@ -4212,7 +4212,7 @@
             255
           ],
           "pre_block": {
-            "font_family": "Consolas, \"Liberation Mono\", Monaco, monospace",
+            "font_family": "Monaco, Menlo, \"Liberation Mono\", Consolas, monospace",
             "font_size_offset": -1,
             "background_color_offset": [-8, -8, 5],
             "border_color_offset": [-15, -15, 10],
