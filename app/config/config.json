@@ -4678,7 +4678,8 @@
       "shallow_depth_min": 2,
       "shallow_depth_max": 5,
       "min_depths_show_error": 2,
-      "require_blunder_only": true
+      "require_blunder_only": true,
+      "disable_skip_playedmove_match_bestmove": false
     },
     "book_move_detection": {
       "use_eco_lookup": true,

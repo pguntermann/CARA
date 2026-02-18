@@ -101,6 +101,10 @@ def run_brilliant_move_detection(
 
         total_candidates = len(candidate_moves)
         error_severity_text = "Blunder" if require_blunder_only else "Mistake or Blunder"
+        brilliant_criteria_config = config.get("game_analysis", {}).get("brilliant_criteria", {})
+        disable_skip_playedmove_match_bestmove = brilliant_criteria_config.get(
+            "disable_skip_playedmove_match_bestmove", False
+        )
         logging_service.info(
             f"Brilliant move detection: Checking {total_candidates} candidate moves (Best Move only), "
             f"min_depths_required={min_depths_required} (depths {shallow_depth_min}-{shallow_depth_max}), "
@@ -148,7 +152,7 @@ def run_brilliant_move_detection(
                     shallow_best_move_normalized
                     and played_move_normalized == shallow_best_move_normalized
                 )
-                if moves_match_at_shallow:
+                if moves_match_at_shallow and not disable_skip_playedmove_match_bestmove:
                     logging_service.debug(
                         f"  depth {depth}: skip (played move matches shallow best move {shallow_best_move_san})"
                     )
