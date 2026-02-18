@@ -130,7 +130,7 @@ def run_brilliant_move_detection(
                 )
                 if analysis_result is None:
                     logging_service.debug(
-                        f"  depth {depth}: skip (position analysis failed)"
+                        f"  depth {depth}: skip (analysis of position before move failed)"
                     )
                     continue
                 shallow_eval, shallow_is_mate, shallow_mate_moves, shallow_best_move_san = analysis_result
@@ -146,14 +146,45 @@ def run_brilliant_move_detection(
                 )
                 if moves_match_at_shallow:
                     logging_service.debug(
-                        f"  depth {depth}: skip (played move = engine best)"
+                        f"  depth {depth}: skip (played move matches shallow best move {shallow_best_move_san})"
                     )
                     continue
                 board_before = move_info.get("board_before")
                 if board_before is None:
-                    logging_service.debug(f"  depth {depth}: skip (no board)")
+                    logging_service.debug(f"  depth {depth}: skip (board_before missing)")
+                    continue
+                if not shallow_best_move_san:
+                    logging_service.debug(f"  depth {depth}: skip (no best move from shallow analysis)")
                     continue
                 try:
+                    # Analyze position after playing the best move (at shallow depth)
+                    board_best = board_before.copy()
+                    try:
+                        best_move_uci = board_best.parse_san(shallow_best_move_san)
+                        board_best.push(best_move_uci)
+                        fen_after_best = board_best.fen()
+                    except Exception:
+                        logging_service.debug(
+                            f"  depth {depth}: skip (failed to parse/play best move {shallow_best_move_san})"
+                        )
+                        continue
+                    
+                    best_result = _analyze_at_shallow_depth(
+                        service, fen_after_best, move_info.get("move_number", 0), depth, shallow_time_limit_ms
+                    )
+                    if best_result is None:
+                        logging_service.debug(
+                            f"  depth {depth}: skip (analysis after best move {shallow_best_move_san} failed)"
+                        )
+                        continue
+                    (
+                        eval_after_best_shallow,
+                        is_mate_after_best_shallow,
+                        mate_moves_after_best_shallow,
+                        _,
+                    ) = best_result
+                    
+                    # Analyze position after playing the actual move (at shallow depth)
                     board_after = board_before.copy()
                     move_uci = board_after.parse_san(played_move_san)
                     board_after.push(move_uci)
@@ -163,7 +194,7 @@ def run_brilliant_move_detection(
                     )
                     if after_result is None:
                         logging_service.debug(
-                            f"  depth {depth}: skip (position-after analysis failed)"
+                            f"  depth {depth}: skip (analysis after played move {played_move_san} failed)"
                         )
                         continue
                     (
@@ -178,14 +209,14 @@ def run_brilliant_move_detection(
                     shallow_cpl = MoveAnalysisService.calculate_cpl(
                         eval_before=eval_before_normal,
                         eval_after=eval_after_shallow,
-                        eval_after_best_move=shallow_eval,
+                        eval_after_best_move=eval_after_best_shallow,
                         is_white_move=is_white_move,
                         is_mate=is_mate_after_shallow,
                         is_mate_before=is_mate_before_normal,
-                        is_mate_after_best=shallow_is_mate,
+                        is_mate_after_best=is_mate_after_best_shallow,
                         mate_moves=mate_moves_after_shallow,
                         mate_moves_before=mate_moves_before_normal,
-                        mate_moves_after_best=shallow_mate_moves,
+                        mate_moves_after_best=mate_moves_after_best_shallow,
                         moves_match=moves_match_at_shallow,
                     )
                     classification_thresholds = {
@@ -209,18 +240,21 @@ def run_brilliant_move_detection(
                         depths_show_error += 1
                         brilliant_depths.append(depth)
                     logging_service.debug(
-                        f"  depth {depth}: CPL={shallow_cpl:.0f} assessment={shallow_assessment} "
+                        f"  depth {depth}: best={shallow_best_move_san} (eval={eval_after_best_shallow:.0f}), "
+                        f"played={played_move_san} (eval={eval_after_shallow:.0f}), "
+                        f"CPL={shallow_cpl:.0f} → {shallow_assessment} "
                         f"(counted={'yes' if counted else 'no'})"
                     )
                 except Exception as e:
                     logging_service.debug(
-                        f"  depth {depth}: error - {e}"
+                        f"  depth {depth}: error analyzing {played_move_san} - {e}"
                     )
                     continue
 
             qualified = depths_show_error >= min_depths_required
             logging_service.debug(
-                f"  => depths_show_error={depths_show_error}, required={min_depths_required}, "
+                f"  => {depths_show_error}/{min_depths_required} depths show error "
+                f"(depths: {sorted(brilliant_depths) if brilliant_depths else 'none'}), "
                 f"qualified={'yes' if qualified else 'no'}"
             )
 
