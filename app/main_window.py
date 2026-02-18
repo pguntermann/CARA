@@ -29,6 +29,7 @@ from app.views.engine_dialog import EngineDialog
 from app.views.engine_configuration_dialog import EngineConfigurationDialog
 from app.views.classification_settings_dialog import ClassificationSettingsDialog
 from app.views.about_dialog import AboutDialog
+from app.views.inline_content_dialog import InlineContentDialog
 from app.views.message_dialog import MessageDialog
 from app.views.confirmation_dialog import ConfirmationDialog
 from app.controllers.app_controller import AppController
@@ -1058,6 +1059,23 @@ class MainWindow(QMainWindow):
         
         help_menu.addSeparator()
         
+        # Release Notes action
+        release_notes_action = QAction("View Release Notes", self)
+        release_notes_action.triggered.connect(self._show_release_notes_dialog)
+        help_menu.addAction(release_notes_action)
+        
+        # License action
+        license_action = QAction("View License", self)
+        license_action.triggered.connect(self._show_license_dialog)
+        help_menu.addAction(license_action)
+        
+        # Third Party Licenses action
+        third_party_licenses_action = QAction("View Third Party Licenses", self)
+        third_party_licenses_action.triggered.connect(self._show_third_party_licenses_dialog)
+        help_menu.addAction(third_party_licenses_action)
+        
+        help_menu.addSeparator()
+        
         # Check for Updates action
         check_updates_action = QAction("Check for Updates...", self)
         check_updates_action.triggered.connect(self._check_for_updates)
@@ -1901,6 +1919,46 @@ class MainWindow(QMainWindow):
     def _show_about_dialog(self) -> None:
         """Show the about dialog."""
         dialog = AboutDialog(self.config, self)
+        dialog.exec()
+    
+    def _show_release_notes_dialog(self) -> None:
+        """Show the release notes dialog with RELEASE_NOTES.md content."""
+        dialog = InlineContentDialog(
+            self.config,
+            window_title="Release Notes",
+            content_path=Path("RELEASE_NOTES.md"),
+            content_format="markdown",
+            fallback_message=(
+                "Release notes file not found. Please visit the GitHub repository for the latest release information."
+            ),
+            parent=self,
+        )
+        dialog.exec()
+    
+    def _show_license_dialog(self) -> None:
+        """Show the License (GPL-3.0) dialog."""
+        dialog = InlineContentDialog(
+            self.config,
+            window_title="License",
+            content_path=Path("LICENSE"),
+            content_format="plain",
+            fallback_message="License file not found. Please see the project repository for license information.",
+            parent=self,
+        )
+        dialog.exec()
+    
+    def _show_third_party_licenses_dialog(self) -> None:
+        """Show the Third Party Licenses dialog."""
+        dialog = InlineContentDialog(
+            self.config,
+            window_title="Third Party Licenses",
+            content_path=Path("THIRD_PARTY_LICENSES.md"),
+            content_format="markdown",
+            fallback_message=(
+                "Third party licenses file not found. Please see the project repository for license information."
+            ),
+            parent=self,
+        )
         dialog.exec()
     
     def _check_for_updates(self) -> None:

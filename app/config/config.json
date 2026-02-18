@@ -4054,23 +4054,23 @@
       },
       "about_dialog": {
         "width": 550,
-        "height": 450,
+        "height": 360,
         "background_color": [
           40,
           40,
           45
         ],
         "layout": {
-          "spacing": 25,
+          "spacing": 12,
           "margins": [
             30,
             30,
             30,
-            30
+            20
           ],
           "icon_text_gap": 25,
           "text_element_spacing": 10,
-          "button_section_top_margin": 25
+          "button_section_top_margin": 12
         },
         "icon": {
           "size": 120,
@@ -4118,7 +4118,7 @@
           ],
           "line_height": 1.5,
           "text": "A comprehensive chess analysis and review application for studying games and improving your play.",
-          "margin_bottom": 15,
+          "margin_bottom": 6,
           "max_width": 600
         },
         "copyright": {
@@ -4171,6 +4171,84 @@
             65
           ],
           "alignment": "right"
+        }
+      },
+      "inline_content_dialog": {
+        "width": 700,
+        "height": 500,
+        "minimum_width": 500,
+        "minimum_height": 400,
+        "background_color": [
+          40,
+          40,
+          45
+        ],
+        "border_color": [
+          60,
+          60,
+          65
+        ],
+        "layout": {
+          "spacing": 15,
+          "margins": [
+            20,
+            20,
+            20,
+            20
+          ],
+          "button_section_top_margin": 15
+        },
+        "content": {
+          "font_family": "Helvetica Neue",
+          "font_size": 11,
+          "text_color": [
+            200,
+            200,
+            200
+          ],
+          "link_color": [
+            100,
+            150,
+            255
+          ],
+          "pre_block": {
+            "font_family": "Consolas, \"Liberation Mono\", Monaco, monospace",
+            "font_size_offset": -1,
+            "background_color_offset": [-8, -8, 5],
+            "border_color_offset": [-15, -15, 10],
+            "border_radius": 4,
+            "padding_em": [0.75, 1],
+            "margin_top_em": 0.6,
+            "margin_bottom_em": 0.8
+          },
+          "headings": {
+            "h1": { "margin_top_em": 0.75, "margin_bottom_em": 0.5, "font_size_em": 1.1 },
+            "h2": { "margin_top_em": 1, "margin_bottom_em": 0.4, "font_size_em": 1.35 },
+            "h3": { "margin_top_em": 0.85, "margin_bottom_em": 0.35, "font_size_em": 1.2 },
+            "h4": { "margin_top_em": 0.75, "margin_bottom_em": 0.3, "font_size_em": 1.05 },
+            "h5": { "margin_top_em": 0.65, "margin_bottom_em": 0.25, "font_size_em": 1 },
+            "h6": { "margin_top_em": 0.55, "margin_bottom_em": 0.2, "font_size_em": 0.95 }
+          },
+          "paragraph": {
+            "margin_top_em": 0.4,
+            "margin_bottom_em": 0.6
+          },
+          "lists": {
+            "margin_top_em": 0.4,
+            "margin_bottom_em": 0.6,
+            "padding_left_em": 1.5,
+            "li_margin_bottom_em": 0.2
+          }
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "border_color": [
+            60,
+            60,
+            65
+          ]
         }
       },
       "moveslist_profile_setup": {

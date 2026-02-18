@@ -2,32 +2,39 @@
 
 CARA relies on the third-party components listed below. End users normally install the Python dependencies themselves via `pip`, but if you redistribute CARA with those libraries bundled (e.g., in a binary installer), you must also provide the corresponding license text. The document therefore collects the required licenses (or points to the copy already provided in `LICENSE`) so downstream packages cannot omit the necessary notices. Assets that ship directly with CARA (SVG chess pieces, ECO data, Polyglot books, etc.) are listed separately.
 
+License texts below are reproduced **verbatim** (including original whitespace) to avoid accidentally changing legal text.
+
+## Contents
+
+- [Software Dependencies](#software-dependencies)
+- [Assets and Data](#assets-and-data)
+
 ## Software Dependencies
 
 ### PyQt6 (>= 6.6.0)
-- Source: https://www.riverbankcomputing.com/software/pyqt/
-- License: GNU General Public License v3.0 (GPL-3.0)
-- Notes: The complete GPL-3.0 text is shipped in the project root `LICENSE` file and applies both to CARA and the bundled PyQt6 components.
+- **Source**: https://www.riverbankcomputing.com/software/pyqt/
+- **License**: GNU General Public License v3.0 (GPL-3.0)
+- **Notes**: The complete GPL-3.0 text is shipped in the project root `LICENSE` file and applies both to CARA and the bundled PyQt6 components.
 
 ### python-chess (>= 1.999)
-- Source: https://github.com/niklasf/python-chess
-- License: GNU General Public License v3.0 (GPL-3.0)
-- Notes: Covered by the same GPL-3.0 text provided in the root `LICENSE` file.
+- **Source**: https://github.com/niklasf/python-chess
+- **License**: GNU General Public License v3.0 (GPL-3.0)
+- **Notes**: Covered by the same GPL-3.0 text provided in the root `LICENSE` file.
 
 ### Requests (>= 2.31.0)
-- Source: https://requests.readthedocs.io/
-- License: Apache License 2.0
+- **Source**: https://requests.readthedocs.io/
+- **License**: Apache License 2.0
 
 ### asteval (>= 0.9.31)
-- Source: https://github.com/newville/asteval
-- License: MIT License
-- Notes: The MIT License text is provided below in the "ECO Database" section.
+- **Source**: https://github.com/newville/asteval
+- **License**: MIT License
+- **Notes**: The MIT License text is provided below in the "ECO Database" section.
 
 ### charset-normalizer (>= 3.0.0)
-- Source: https://github.com/Ousret/charset_normalizer
-- License: MIT License
-- Copyright: Copyright © Ahmed TAHRI @Ousret. Characters frequencies used in this project © 2012 Denny Vrandečić
-- Notes: The MIT License text is provided below in the "ECO Database" section.
+- **Source**: https://github.com/Ousret/charset_normalizer
+- **License**: MIT License
+- **Copyright**: Copyright © Ahmed TAHRI @Ousret. Characters frequencies used in this project © 2012 Denny Vrandečić
+- **Notes**: The MIT License text is provided below in the "ECO Database" section.
 
 #### Apache License 2.0
 ```
@@ -109,8 +116,8 @@ limitations under the License.
 ## Assets and Data
 
 ### cburnett SVG Chess Pieces
-- Source: https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces (original artwork by https://commons.wikimedia.org/wiki/User:Cburnett)
-- License: Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0) **and** GNU Free Documentation License 1.2
+- **Source**: https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces (original artwork by https://commons.wikimedia.org/wiki/User:Cburnett)
+- **License**: Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0) **and** GNU Free Documentation License 1.2
 
 #### Creative Commons Attribution-ShareAlike 3.0 Unported
 ```
@@ -472,7 +479,8 @@ Creative Commons Notice
     available upon request from time to time. For the avoidance of doubt,
     this trademark restriction does not form part of the License.
 
-    Creative Commons may be contacted at https://creativecommons.org/.```
+    Creative Commons may be contacted at https://creativecommons.org/.
+```
 
 #### GNU Free Documentation License 1.2
 ```
@@ -605,11 +613,12 @@ If you have Invariant Sections, Front-Cover Texts and Back-Cover Texts, replace 
 
 If you have Invariant Sections without Cover Texts, or some other combination of the three, merge those two alternatives to suit the situation.
 
-If your document contains nontrivial examples of program code, we recommend releasing these examples in parallel under your choice of free software license, such as the GNU General Public License, to permit their use in free software.```
+If your document contains nontrivial examples of program code, we recommend releasing these examples in parallel under your choice of free software license, such as the GNU General Public License, to permit their use in free software.
+```
 
 ### ECO Database (eco_base.json, eco_interpolated.json, fromTo.json)
-- Source: https://github.com/hayatbiralem/eco.json (compiled by Ömür Yanıkoğlu; MIT License)
-- License: MIT License
+- **Source**: https://github.com/hayatbiralem/eco.json (compiled by Ömür Yanıkoğlu; MIT License)
+- **License**: MIT License
 
 ```
 MIT License
@@ -629,12 +638,13 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
 EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-USE OR OTHER DEALINGS IN THE SOFTWARE.```
+USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
 
 ### Polyglot Opening Books and Tooling
-- Source: PolyGlot opening-book generator by Fabien Letouzey (https://github.com/sshivaji/polyglot)
-- License: GNU General Public License v2.0 (GPL-2.0)
-- Notes: The `.bin` opening books bundled with CARA were generated by the author using public-domain PGN sources and the GPL-2.0-licensed PolyGlot tool. Any redistribution of the tool or modified versions must continue to honor GPL-2.0.
+- **Source**: PolyGlot opening-book generator by Fabien Letouzey (https://github.com/sshivaji/polyglot)
+- **License**: GNU General Public License v2.0 (GPL-2.0)
+- **Notes**: The `.bin` opening books bundled with CARA were generated by the author using public-domain PGN sources and the GPL-2.0-licensed PolyGlot tool. Any redistribution of the tool or modified versions must continue to honor GPL-2.0.
 
 #### GNU General Public License v2.0
 ```

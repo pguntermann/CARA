@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
 )
-from PyQt6.QtGui import QColor, QIcon, QFontMetrics
+from PyQt6.QtGui import QColor, QIcon
 from PyQt6.QtCore import Qt
 from typing import Dict, Any
 from app.utils.font_utils import resolve_font_family, scale_font_size
@@ -33,10 +33,8 @@ class AboutDialog(QDialog):
         # Set dialog properties
         self.setWindowTitle("About CARA")
         dialog_width = dialog_config.get('width', 550)
-        dialog_height = dialog_config.get('height', 300)
-        # Use setMinimumSize instead of setFixedSize to allow dialog to grow if needed
-        self.setMinimumSize(dialog_width, dialog_height)
-        self.resize(dialog_width, dialog_height)
+        # About dialog should not be resizable; we fix the size after layout is built.
+        self.setFixedWidth(dialog_width)
         
         # Set dialog background color
         bg_color = dialog_config.get('background_color', [40, 40, 45])
@@ -161,28 +159,9 @@ class AboutDialog(QDialog):
         layout_margins = layout_config.get('margins', [30, 30, 30, 30])
         icon_size = icon_config.get('size', 120)
         icon_text_gap = layout_config.get('icon_text_gap', 25)
-        available_width = dialog_width - layout_margins[0] - layout_margins[2] - icon_size - icon_text_gap
-        
-        # Calculate minimum height needed for the text with word wrap
-        from PyQt6.QtGui import QFont, QTextDocument
-        from PyQt6.QtCore import QSizeF
-        font = QFont(description_font_family, int(description_font_size))
-        font_metrics = QFontMetrics(font)
-        
-        # Use QTextDocument to properly calculate height with word wrap
-        doc = QTextDocument()
-        doc.setDefaultFont(font)
-        doc.setTextWidth(available_width)
-        doc.setPlainText(description_text)
-        # Account for line-height multiplier and add small buffer
-        base_height = doc.size().height()
-        min_height = int(base_height * description_line_height) + 5  # Add small buffer
-        
-        # Set size policy to allow expansion and set minimum height
+        # No minimum height: let description use only the space it needs (avoids gap below text)
         from PyQt6.QtWidgets import QSizePolicy
-        description_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        description_label.setMinimumHeight(min_height)
-        # Don't set maximum height - allow it to expand if needed
+        description_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         
         description_label.setStyleSheet(
             f"font-family: {description_font_family}; "
@@ -287,10 +266,7 @@ class AboutDialog(QDialog):
         
         main_layout.addLayout(content_layout)
         
-        # Button section
-        button_section_top_margin = layout_config.get('button_section_top_margin', 25)
-        main_layout.addSpacing(button_section_top_margin)
-        
+        # Button section (no extra spacing; main_layout spacing already separates from content)
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
@@ -319,4 +295,8 @@ class AboutDialog(QDialog):
         )
         
         main_layout.addLayout(button_layout)
+
+        # Finalize size: use content height so there is no extra space below the button
+        self.adjustSize()
+        self.setFixedSize(dialog_width, self.sizeHint().height())
 
