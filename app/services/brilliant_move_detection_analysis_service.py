@@ -493,6 +493,36 @@ class BrilliantMoveDetectionAnalysisService(QObject):
                 # Thread not running, safe to delete immediately
                 self.analysis_thread = None
     
+    def clear_hash(self, engine_supports_clear_hash: bool = False) -> bool:
+        """Clear the engine's hash table.
+        
+        Args:
+            engine_supports_clear_hash: Whether the engine supports the "Clear Hash" option.
+            
+        Returns:
+            True if hash was cleared successfully, False otherwise.
+        """
+        if not self.analysis_thread or not self.analysis_thread.isRunning():
+            return False
+        
+        uci = self.analysis_thread.uci
+        if not uci or not uci.is_process_alive():
+            return False
+        
+        try:
+            if engine_supports_clear_hash:
+                # Use Clear Hash option if supported (button type, no value needed)
+                # For button options in UCI, we send "setoption name Clear Hash" without a value
+                command = "setoption name Clear Hash"
+                return uci.send_command(command)
+            else:
+                # Fallback to ucinewgame command (clears hash and resets game state)
+                return uci.send_command("ucinewgame")
+        except Exception as e:
+            logging_service = LoggingService.get_instance()
+            logging_service.debug(f"Failed to clear hash: {e}")
+            return False
+    
     def cleanup(self) -> None:
         """Cleanup resources."""
         self.shutdown()

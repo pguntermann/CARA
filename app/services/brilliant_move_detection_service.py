@@ -7,6 +7,7 @@ from app.models.moveslist_model import MoveData
 from app.services.brilliant_move_detection_analysis_service import BrilliantMoveDetectionAnalysisService
 from app.services.move_analysis_service import MoveAnalysisService
 from app.services.logging_service import LoggingService
+from app.services.engine_parameters_service import EngineParametersService
 
 
 def run_brilliant_move_detection(
@@ -81,6 +82,25 @@ def run_brilliant_move_detection(
     if not service.start_engine():
         logging_service.error("Brilliant move detection: Failed to start engine")
         return 0
+    
+    # Check if engine supports "Clear Hash" option
+    engine_supports_clear_hash = False
+    try:
+        parameters_service = EngineParametersService.get_instance()
+        parameters_service.load()
+        engine_options_list = parameters_service.get_engine_options(str(engine_path))
+        # Check if any option has name "Clear Hash" (case-insensitive check)
+        engine_supports_clear_hash = any(
+            opt.get("name", "").lower() == "clear hash" 
+            for opt in engine_options_list
+        )
+        if engine_supports_clear_hash:
+            logging_service.debug("Brilliant move detection: Engine supports 'Clear Hash' option")
+        else:
+            logging_service.debug("Brilliant move detection: Engine does not support 'Clear Hash' option, will use ucinewgame")
+    except Exception as e:
+        logging_service.debug(f"Brilliant move detection: Could not check for Clear Hash option: {e}, will use ucinewgame")
+        engine_supports_clear_hash = False
 
     brilliant_count = 0
     candidates_checked = 0
@@ -130,9 +150,18 @@ def run_brilliant_move_detection(
 
             depths_show_error = 0
             brilliant_depths: List[int] = []
+            previous_depth = None
             for depth in range(shallow_depth_min, shallow_depth_max + 1):
                 if _is_cancelled():
                     return brilliant_count
+                
+                # Clear hash before each new depth search to prevent contamination from previous searches
+                # This ensures each shallow depth analysis starts with a clean hash table
+                if previous_depth is None or depth != previous_depth:
+                    service.clear_hash(engine_supports_clear_hash)
+                    logging_service.debug(f"  Cleared hash before depth {depth} analysis")
+                
+                previous_depth = depth
                 analysis_result = _analyze_at_shallow_depth(
                     service, fen_before, move_info.get("move_number", 0), depth, shallow_time_limit_ms
                 )
