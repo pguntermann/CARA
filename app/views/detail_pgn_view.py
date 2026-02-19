@@ -1,12 +1,12 @@
 """PGN Notation view for detail panel."""
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTextEdit
-from PyQt6.QtGui import QPalette, QColor, QFont, QTextCursor, QTextCharFormat, QMouseEvent
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QMenu
+from PyQt6.QtGui import QPalette, QColor, QFont, QTextCursor, QTextCharFormat, QMouseEvent, QContextMenuEvent, QAction, QKeyEvent, QKeySequence, QShortcut
 from PyQt6.QtCore import Qt, QRegularExpression
 from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING, Callable
 import re
 
-from app.services.pgn_formatter_service import PgnFormatterService, make_ply_sentinel
+from app.services.pgn_formatter_service import PgnFormatterService, make_ply_sentinel, clean_pgn_text
 from app.models.game_model import GameModel
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.views.style.style_manager import StyleManager
@@ -27,6 +27,14 @@ class ClickablePgnTextEdit(QTextEdit):
         super().__init__(parent)
         self._click_handler: Optional[Callable[[int], int]] = None
         self._move_checker: Optional[Callable[[int], int]] = None
+        
+        # Install a shortcut to override default Ctrl+C behavior
+        # This ensures our custom copy() method is called even if Qt handles the shortcut
+        copy_shortcut = QShortcut(QKeySequence("Ctrl+C"), self)
+        copy_shortcut.activated.connect(self.copy)
+        # Also handle Cmd+C on macOS
+        copy_shortcut_mac = QShortcut(QKeySequence("Meta+C"), self)
+        copy_shortcut_mac.activated.connect(self.copy)
     
     def set_click_handler(self, handler: Callable[[int], int]) -> None:
         """Set the handler function to call when a move is clicked.
@@ -89,6 +97,93 @@ class ClickablePgnTextEdit(QTextEdit):
                 self.setCursor(Qt.CursorShape.IBeamCursor)
         
         super().mouseMoveEvent(event)
+    
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        """Override key press to intercept Ctrl+C (or Cmd+C on macOS) and use our custom copy.
+        
+        Args:
+            event: Key event.
+        """
+        # Check for Ctrl+C (or Cmd+C on macOS)
+        # ControlModifier works for both Ctrl on Windows/Linux and Cmd on macOS
+        if event.key() == Qt.Key.Key_C and (event.modifiers() & Qt.KeyboardModifier.ControlModifier):
+            # Call our custom copy method
+            self.copy()
+            event.accept()
+            return
+        
+        # For all other keys, use default behavior
+        super().keyPressEvent(event)
+    
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        """Override context menu to ensure copy action uses our cleaned text.
+        
+        Args:
+            event: Context menu event.
+        """
+        # Create standard context menu
+        menu = self.createStandardContextMenu()
+        
+        # Find and replace the copy action to use our custom copy method
+        copy_action = None
+        for action in menu.actions():
+            # Check for copy action by text (handles different locales)
+            action_text = action.text().lower().replace('&', '')
+            if 'copy' in action_text:
+                copy_action = action
+                break
+        
+        if copy_action:
+            # Disconnect any existing connections (ignore errors if not connected)
+            try:
+                copy_action.triggered.disconnect()
+            except TypeError:
+                # Action wasn't connected, that's fine
+                pass
+            # Connect to our custom copy method
+            copy_action.triggered.connect(self.copy)
+        
+        # Show the menu
+        menu.exec(event.globalPos())
+    
+    def copy(self) -> None:
+        """Override copy method to clean invisible sentinel characters before copying.
+        
+        This intercepts both keyboard shortcuts (Ctrl+C) and context menu copy actions,
+        removes invisible sentinel characters used for move identification, and places
+        the cleaned text on the clipboard.
+        """
+        # Get selected text or all text if no selection
+        cursor = self.textCursor()
+        if cursor.hasSelection():
+            # For selections, use selectedText() (HTML formatting is stripped)
+            # Note: This may lose some formatting, but we'll do our best to clean it
+            text_to_copy = cursor.selectedText()
+        else:
+            # If no selection, use the original PGN text from parent view
+            # This preserves the original formatting and structure
+            parent_view = self.parent()
+            if parent_view and hasattr(parent_view, '_current_pgn_text'):
+                text_to_copy = parent_view._current_pgn_text
+            else:
+                # Fallback to toPlainText() if parent view not available
+                text_to_copy = self.toPlainText()
+        
+        # Clean and format the text (removes invisible chars, adds CRLF, applies fixed-width)
+        cleaned_text = clean_pgn_text(text_to_copy)
+        
+        # Set clipboard directly (don't call super().copy() to avoid copying uncleaned text)
+        from PyQt6.QtWidgets import QApplication
+        clipboard = QApplication.clipboard()
+        clipboard.setText(cleaned_text)
+        
+        # Show status message to user
+        from app.services.progress_service import ProgressService
+        progress_service = ProgressService.get_instance()
+        if cursor.hasSelection():
+            progress_service.set_status("Copied selected PGN text to clipboard")
+        else:
+            progress_service.set_status("Copied PGN to clipboard")
 
 
 class DetailPgnView(QWidget):

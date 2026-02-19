@@ -18,6 +18,151 @@ def make_ply_sentinel(ply: int) -> str:
     return PGN_PLY_SENTINEL_PREFIX + (_PLY_SENTINEL_ZERO_WIDTH * ply) + PGN_PLY_SENTINEL_SUFFIX
 
 
+def clean_pgn_text(text: str) -> str:
+    """Clean and format PGN text for copying to clipboard.
+    
+    This function:
+    1. Separates metadata tags from move notation (adds CRLF between them)
+    2. Applies fixed-width formatting using export config settings
+    3. Removes invisible sentinel characters used for move identification/highlighting
+    4. Normalizes line endings to CRLF
+    
+    Args:
+        text: PGN text that may contain invisible sentinel characters.
+        
+    Returns:
+        Cleaned and formatted PGN text safe for copying to clipboard.
+    """
+    if not text:
+        return text
+    
+    # Step 1: Remove invisible sentinel characters first (before processing)
+    # Remove sentinel pattern: ZWNJ+ZWJ + (zero-width spaces) + ZWJ+ZWNJ
+    # Pattern matches: PREFIX + (zero or more zero-width spaces) + SUFFIX
+    pattern = re.escape(PGN_PLY_SENTINEL_PREFIX) + r'\u200B*' + re.escape(PGN_PLY_SENTINEL_SUFFIX)
+    text = re.sub(pattern, '', text)
+    
+    # Also remove any remaining standalone invisible characters that might have been left
+    # This ensures we catch any edge cases where sentinels might be malformed
+    # Also remove line separator (U+2028) and paragraph separator (U+2029) which might appear
+    text = re.sub(r'[\u200B\u200C\u200D\u2028\u2029]', '', text)
+    
+    # Step 2: Separate metadata tags from move notation and ensure blank line between them
+    # Pattern to match metadata tags: [Key "Value"]
+    metadata_tag_pattern = re.compile(r'\[([A-Za-z0-9][A-Za-z0-9_]*)\s+"([^"]*)"\]')
+    # Pattern to match move notation start: number followed by dot and space or move notation
+    # More specific: must be after all metadata tags, and match actual move format
+    move_pattern = re.compile(r'\b([1-9]\d{0,2}|0)\.(?:\.\.| |[a-hNBRQKO][a-h1-8x=+#]?[a-h1-8]?)')
+    
+    # Find all metadata tags first
+    metadata_matches = list(metadata_tag_pattern.finditer(text))
+    
+    if metadata_matches:
+        # Find the position after the last metadata tag
+        last_metadata_end = metadata_matches[-1].end()
+        
+        # Only search for moves AFTER the last metadata tag to avoid false matches in dates/metadata
+        text_after_metadata = text[last_metadata_end:]
+        move_match = move_pattern.search(text_after_metadata)
+        
+        if move_match:
+            # Adjust position to account for the offset
+            first_move_start = last_metadata_end + move_match.start()
+            
+            # Split metadata and moves with \n\n (first_move_start is always > last_metadata_end if we found it)
+            metadata_part = text[:first_move_start].rstrip()
+            moves_part = text[first_move_start:].lstrip()
+            text = metadata_part + '\n\n' + moves_part
+    else:
+        # No metadata tags found - handle multi-line case where metadata might be on separate lines
+        # This handles edge cases but the main logic above should cover most scenarios
+        if '\n' in text:
+            lines = text.split('\n')
+            metadata_end_idx = -1
+            
+            # Find last line with metadata tags
+            for i in range(len(lines)):
+                line = lines[i].strip()
+                if line and PgnFormatterService._is_metadata_only_line(line):
+                    metadata_end_idx = i
+            
+            # Check if any line has both metadata and moves (need to split)
+            for i in range(len(lines)):
+                line = lines[i].strip()
+                if not line:
+                    continue
+                
+                metadata_matches = list(metadata_tag_pattern.finditer(line))
+                move_match = move_pattern.search(line)
+                
+                if metadata_matches and move_match:
+                    last_metadata_end = metadata_matches[-1].end()
+                    first_move_start = move_match.start()
+                    
+                    if first_move_start > last_metadata_end:
+                        # Split the line
+                        metadata_part = line[:first_move_start].rstrip()
+                        moves_part = line[first_move_start:].lstrip()
+                        lines[i] = metadata_part
+                        lines.insert(i + 1, moves_part)
+                        metadata_end_idx = i
+                        break
+            
+            # Ensure blank line between metadata and moves
+            if metadata_end_idx >= 0:
+                next_line_idx = metadata_end_idx + 1
+                while next_line_idx < len(lines) and not lines[next_line_idx].strip():
+                    next_line_idx += 1
+                
+                if next_line_idx < len(lines) and next_line_idx == metadata_end_idx + 1:
+                    # No blank line exists - insert one
+                    lines.insert(metadata_end_idx + 1, '')
+                
+                text = '\n'.join(lines)
+            
+            # Ensure we have \n\n separator (needed for _normalize_pgn_line_breaks)
+            if '\n\n' not in text and metadata_end_idx >= 0:
+                # Find first move line
+                for i in range(len(lines)):
+                    line = lines[i].strip()
+                    if line and move_pattern.search(line):
+                        # Ensure blank line before this line
+                        if i > 0 and lines[i - 1].strip():
+                            lines.insert(i, '')
+                        text = '\n'.join(lines)
+                        break
+    
+    # Step 3: Apply fixed-width formatting using export config
+    try:
+        from app.services.pgn_service import PgnService
+        use_fixed_width, fixed_width = PgnService._get_export_config()
+        
+        # Check if text has \n\n separator (needed for _normalize_pgn_line_breaks)
+        if '\n\n' not in text:
+            # No separator - text might be all moves (metadata hidden) or single line
+            # Try to apply formatting directly to moves
+            if not use_fixed_width:
+                # Single line: just clean up spaces
+                text = text.replace('\n', ' ').replace('  ', ' ').strip()
+            else:
+                # Fixed width: apply formatting to entire text as moves
+                text = PgnService._normalize_moves_with_fixed_width(text, fixed_width)
+        else:
+            # Has separator - use normal normalization
+            text = PgnService._normalize_pgn_line_breaks(text, use_fixed_width, fixed_width)
+    except Exception:
+        # If formatting fails, continue with original text
+        pass
+    
+    # Step 4: Normalize line endings to CRLF for Windows compatibility
+    # Replace any existing line endings with CRLF
+    text = text.replace('\r\n', '\n')  # Normalize CRLF to LF first
+    text = text.replace('\r', '\n')    # Normalize CR to LF
+    text = text.replace('\n', '\r\n')   # Convert all LF to CRLF
+    
+    return text
+
+
 # NAG (Numeric Annotation Glyph) mapping
 # Based on PGN standard: https://wimnij.home.xs4all.nl/euwe/NAGS.html
 NAG_MEANINGS: Dict[int, str] = {
