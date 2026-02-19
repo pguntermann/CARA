@@ -1076,6 +1076,13 @@ class MainWindow(QMainWindow):
         
         help_menu.addSeparator()
         
+        # Open user data directory action
+        open_user_data_dir_action = QAction("Open user data directory", self)
+        open_user_data_dir_action.triggered.connect(self._open_user_data_directory)
+        help_menu.addAction(open_user_data_dir_action)
+        
+        help_menu.addSeparator()
+        
         # Check for Updates action
         check_updates_action = QAction("Check for Updates...", self)
         check_updates_action.triggered.connect(self._check_for_updates)
@@ -1915,6 +1922,22 @@ class MainWindow(QMainWindow):
     def _open_github_repository(self) -> None:
         """Open the CARA GitHub repository in the default browser."""
         QDesktopServices.openUrl(QUrl("https://github.com/pguntermann/CARA"))
+    
+    def _open_user_data_directory(self) -> None:
+        """Open the user data directory in the file explorer/finder."""
+        from app.utils.path_resolver import resolve_data_file_path
+        
+        # Get the resolved path for a user data file to determine the actual directory being used
+        # This works correctly whether in portable mode or user data directory mode
+        user_data_file_path, _ = resolve_data_file_path("user_settings.json")
+        user_data_dir = user_data_file_path.parent
+        
+        # Ensure the directory exists
+        user_data_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Open the directory in the file explorer/finder
+        url = QUrl.fromLocalFile(str(user_data_dir))
+        QDesktopServices.openUrl(url)
     
     def _show_about_dialog(self) -> None:
         """Show the about dialog."""
