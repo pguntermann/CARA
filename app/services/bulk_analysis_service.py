@@ -135,16 +135,18 @@ class BulkAnalysisService(QObject):
             self.shallow_depth_max = self.classification_model.shallow_depth_max
             self.min_depths_show_error = self.classification_model.min_depths_show_error
             self.require_blunder_only = self.classification_model.require_blunder_only
+            self.candidate_selection = self.classification_model.candidate_selection
         else:
             # Fallback to config defaults
             classification_config = self.config.get("game_analysis", {}).get("move_classification", {})
             self.good_move_max_cpl = classification_config.get("good_move_max_cpl", 50)
             self.inaccuracy_max_cpl = classification_config.get("inaccuracy_max_cpl", 100)
             self.mistake_max_cpl = classification_config.get("mistake_max_cpl", 200)
-            self.shallow_depth_min = classification_config.get("shallow_depth_min", 2)
-            self.shallow_depth_max = classification_config.get("shallow_depth_max", 6)
-            self.min_depths_show_error = brilliant_criteria.get("min_depths_show_error", 1)
+            self.shallow_depth_min = classification_config.get("shallow_depth_min", 3)
+            self.shallow_depth_max = classification_config.get("shallow_depth_max", 7)
+            self.min_depths_show_error = brilliant_criteria.get("min_depths_show_error", 3)
             self.require_blunder_only = brilliant_criteria.get("require_blunder_only", False)
+            self.candidate_selection = brilliant_criteria.get("candidate_selection", "best_move_only")
     
     def cancel(self) -> None:
         """Cancel the current analysis."""
@@ -206,6 +208,7 @@ class BulkAnalysisService(QObject):
             engine_options=engine_options,
             config=self.config,
             require_blunder_only=self.require_blunder_only,
+            candidate_selection=self.candidate_selection,
             on_progress=on_progress,
             is_cancelled=lambda: self._cancelled,
         )

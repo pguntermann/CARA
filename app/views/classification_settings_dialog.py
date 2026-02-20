@@ -327,11 +327,11 @@ class ClassificationSettingsDialog(QDialog):
         self.inaccuracy_spinbox.setValue(self.current_thresholds.get("inaccuracy_max_cpl", 100))
         self.mistake_spinbox.setValue(self.current_thresholds.get("mistake_max_cpl", 200))
         
-        self.shallow_depth_min_spinbox.setValue(self.current_brilliant.get("shallow_depth_min", 2))
-        self.shallow_depth_max_spinbox.setValue(self.current_brilliant.get("shallow_depth_max", 6))
-        self.min_depths_show_error_spinbox.setValue(self.current_brilliant.get("min_depths_show_error", 1))
-        require_blunder_only = self.current_brilliant.get("require_blunder_only", False)
-        self.error_severity_combobox.setCurrentIndex(1 if require_blunder_only else 0)
+        self.shallow_depth_min_spinbox.setValue(self.current_brilliant.get("shallow_depth_min", 3))
+        self.shallow_depth_max_spinbox.setValue(self.current_brilliant.get("shallow_depth_max", 7))
+        self.min_depths_show_error_spinbox.setValue(self.current_brilliant.get("min_depths_show_error", 3))
+        candidate_selection = self.current_brilliant.get("candidate_selection", "best_move_only")
+        self.candidate_selection_combobox.setCurrentIndex(0 if candidate_selection == "best_move_only" else 1)
         
         # Update CPL scale
         self._update_cpl_scale()
@@ -618,7 +618,7 @@ class ClassificationSettingsDialog(QDialog):
         # Shallow Depth Min
         self.shallow_depth_min_spinbox = QSpinBox()
         self.shallow_depth_min_spinbox.setRange(1, 10)
-        self.shallow_depth_min_spinbox.setValue(self.current_brilliant.get("shallow_depth_min", 2))
+        self.shallow_depth_min_spinbox.setValue(self.current_brilliant.get("shallow_depth_min", 3))
         self.shallow_depth_min_spinbox.setFixedWidth(input_width)
         self.shallow_depth_min_spinbox.setMinimumHeight(25)
         self.shallow_depth_min_spinbox.setToolTip("Minimum shallow depth to check for brilliancy detection. Moves classified as Best Move or Good Move at normal depth will be re-analyzed starting at this depth.")
@@ -627,7 +627,7 @@ class ClassificationSettingsDialog(QDialog):
         # Shallow Depth Max
         self.shallow_depth_max_spinbox = QSpinBox()
         self.shallow_depth_max_spinbox.setRange(1, 10)
-        self.shallow_depth_max_spinbox.setValue(self.current_brilliant.get("shallow_depth_max", 6))
+        self.shallow_depth_max_spinbox.setValue(self.current_brilliant.get("shallow_depth_max", 7))
         self.shallow_depth_max_spinbox.setFixedWidth(input_width)
         self.shallow_depth_max_spinbox.setMinimumHeight(25)
         self.shallow_depth_max_spinbox.setToolTip("Maximum shallow depth to check for brilliancy detection. Moves will be checked iteratively from Shallow Depth Min up to this depth.")
@@ -636,23 +636,23 @@ class ClassificationSettingsDialog(QDialog):
         # Min Agreement
         self.min_depths_show_error_spinbox = QSpinBox()
         self.min_depths_show_error_spinbox.setRange(1, 10)
-        self.min_depths_show_error_spinbox.setValue(self.current_brilliant.get("min_depths_show_error", 1))
+        self.min_depths_show_error_spinbox.setValue(self.current_brilliant.get("min_depths_show_error", 3))
         self.min_depths_show_error_spinbox.setFixedWidth(input_width)
         self.min_depths_show_error_spinbox.setMinimumHeight(25)
         self.min_depths_show_error_spinbox.setToolTip("Minimum number of shallow depths (between Min and Max) at which the move must look like a Mistake or Blunder to be marked brilliant. Higher values reduce false positives.")
         form_layout.addRow(create_label("Min Agreement:"), create_input_widget(self.min_depths_show_error_spinbox))
         
-        # Error Severity Requirement
-        self.error_severity_combobox = QComboBox()
-        self.error_severity_combobox.addItems(["Mistake or Blunder", "Blunder"])
-        require_blunder_only = self.current_brilliant.get("require_blunder_only", False)
-        self.error_severity_combobox.setCurrentIndex(1 if require_blunder_only else 0)
-        # Make combobox wider to display full "Mistake or Blunder" text (about 75% wider)
+        # Move Candidate Selection
+        self.candidate_selection_combobox = QComboBox()
+        self.candidate_selection_combobox.addItems(["Best Move only", "Best or Good Move"])
+        candidate_selection = self.current_brilliant.get("candidate_selection", "best_move_only")
+        self.candidate_selection_combobox.setCurrentIndex(0 if candidate_selection == "best_move_only" else 1)
+        # Make combobox wider to display full "Best or Good Move" text (about 75% wider)
         combobox_width = int(input_width * 1.75)
-        self.error_severity_combobox.setFixedWidth(combobox_width)
-        self.error_severity_combobox.setMinimumHeight(25)
-        self.error_severity_combobox.setToolTip("Choose which error severity to count: 'Mistake or Blunder' counts both Mistake and Blunder assessments, 'Blunder' counts only Blunder assessments (stricter, reduces false positives).")
-        form_layout.addRow(create_label("Error Severity:"), create_combobox_widget(self.error_severity_combobox))
+        self.candidate_selection_combobox.setFixedWidth(combobox_width)
+        self.candidate_selection_combobox.setMinimumHeight(25)
+        self.candidate_selection_combobox.setToolTip("Choose which moves to check for brilliancy: 'Best Move only' checks only moves classified as Best Move, 'Best or Good Move' also includes Good Move assessments (may increase detection time).")
+        form_layout.addRow(create_label("Move Candidate:"), create_combobox_widget(self.candidate_selection_combobox))
         
         group.setLayout(form_layout)
         return group
@@ -904,11 +904,11 @@ class ClassificationSettingsDialog(QDialog):
         # Update scale
         self._update_cpl_scale()
         
-        self.shallow_depth_min_spinbox.setValue(brilliant.get("shallow_depth_min", 2))
-        self.shallow_depth_max_spinbox.setValue(brilliant.get("shallow_depth_max", 6))
-        self.min_depths_show_error_spinbox.setValue(brilliant.get("min_depths_show_error", 1))
-        require_blunder_only = brilliant.get("require_blunder_only", False)
-        self.error_severity_combobox.setCurrentIndex(1 if require_blunder_only else 0)
+        self.shallow_depth_min_spinbox.setValue(brilliant.get("shallow_depth_min", 3))
+        self.shallow_depth_max_spinbox.setValue(brilliant.get("shallow_depth_max", 7))
+        self.min_depths_show_error_spinbox.setValue(brilliant.get("min_depths_show_error", 3))
+        candidate_selection = brilliant.get("candidate_selection", "best_move_only")
+        self.candidate_selection_combobox.setCurrentIndex(0 if candidate_selection == "best_move_only" else 1)
         
         # Hide progress bar and set final status through controller
         self.controller.hide_progress()
@@ -941,7 +941,7 @@ class ClassificationSettingsDialog(QDialog):
                 "shallow_depth_min": self.shallow_depth_min_spinbox.value(),
                 "shallow_depth_max": self.shallow_depth_max_spinbox.value(),
                 "min_depths_show_error": self.min_depths_show_error_spinbox.value(),
-                "require_blunder_only": self.error_severity_combobox.currentIndex() == 1
+                "candidate_selection": "best_move_only" if self.candidate_selection_combobox.currentIndex() == 0 else "best_or_good_move"
             }
         
         # Save via classification controller

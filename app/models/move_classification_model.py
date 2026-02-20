@@ -24,10 +24,11 @@ class MoveClassificationModel(QObject):
         self._mistake_max_cpl: int = 200
         
         # Brilliant criteria
-        self._shallow_depth_min: int = 2
-        self._shallow_depth_max: int = 6
-        self._min_depths_show_error: int = 1  # Min number of shallow depths that must show move as Mistake/Blunder
-        self._require_blunder_only: bool = False  # If True, only count Blunder; if False, count Mistake or Blunder
+        self._shallow_depth_min: int = 3
+        self._shallow_depth_max: int = 7
+        self._min_depths_show_error: int = 3  # Min number of shallow depths that must show move as Mistake/Blunder
+        self._require_blunder_only: bool = False  # If True, only count Blunder; if False, count Mistake or Blunder (config-only)
+        self._candidate_selection: str = "best_move_only"  # "best_move_only" or "best_or_good_move"
 
     # Assessment thresholds properties
     @property
@@ -66,6 +67,11 @@ class MoveClassificationModel(QObject):
         """Get whether only Blunder (not Mistake) should be counted for brilliancy detection."""
         return self._require_blunder_only
 
+    @property
+    def candidate_selection(self) -> str:
+        """Get candidate selection mode for brilliancy detection ("best_move_only" or "best_or_good_move")."""
+        return self._candidate_selection
+
     def load_settings(self, assessment_thresholds: Dict[str, int], 
                       brilliant_criteria: Dict[str, Any]) -> None:
         """Load settings from dictionaries.
@@ -84,6 +90,7 @@ class MoveClassificationModel(QObject):
         self._shallow_depth_max = brilliant_criteria.get("shallow_depth_max", 6)
         self._min_depths_show_error = brilliant_criteria.get("min_depths_show_error", 1)
         self._require_blunder_only = brilliant_criteria.get("require_blunder_only", False)
+        self._candidate_selection = brilliant_criteria.get("candidate_selection", "best_move_only")
 
         # Emit signal that settings changed
         self.settings_changed.emit()
@@ -135,6 +142,10 @@ class MoveClassificationModel(QObject):
             self._require_blunder_only = criteria["require_blunder_only"]
             changed = True
 
+        if "candidate_selection" in criteria and criteria["candidate_selection"] != self._candidate_selection:
+            self._candidate_selection = criteria["candidate_selection"]
+            changed = True
+
         if changed:
             self.settings_changed.emit()
     
@@ -160,6 +171,7 @@ class MoveClassificationModel(QObject):
             "shallow_depth_min": self._shallow_depth_min,
             "shallow_depth_max": self._shallow_depth_max,
             "min_depths_show_error": self._min_depths_show_error,
-            "require_blunder_only": self._require_blunder_only
+            "require_blunder_only": self._require_blunder_only,
+            "candidate_selection": self._candidate_selection
         }
 

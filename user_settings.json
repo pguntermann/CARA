@@ -90,6 +90,14 @@
           "visible": false,
           "width": 0
         },
+        "col_white_seldepth": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_seldepth": {
+          "visible": false,
+          "width": 0
+        },
         "col_white_capture": {
           "visible": false,
           "width": 80
@@ -129,14 +137,6 @@
         "col_cpl_black_3": {
           "visible": false,
           "width": 90
-        },
-        "col_white_seldepth": {
-          "visible": false,
-          "width": 0
-        },
-        "col_black_seldepth": {
-          "visible": false,
-          "width": 0
         }
       }
     },
@@ -230,6 +230,14 @@
           "visible": false,
           "width": 0
         },
+        "col_white_seldepth": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_seldepth": {
+          "visible": false,
+          "width": 0
+        },
         "col_white_capture": {
           "visible": false,
           "width": 80
@@ -267,14 +275,6 @@
           "width": 0
         },
         "col_cpl_black_3": {
-          "visible": false,
-          "width": 0
-        },
-        "col_white_seldepth": {
-          "visible": false,
-          "width": 0
-        },
-        "col_black_seldepth": {
           "visible": false,
           "width": 0
         }
@@ -370,6 +370,14 @@
           "visible": true,
           "width": 0
         },
+        "col_white_seldepth": {
+          "visible": false,
+          "width": 0
+        },
+        "col_black_seldepth": {
+          "visible": false,
+          "width": 0
+        },
         "col_white_capture": {
           "visible": false,
           "width": 80
@@ -409,14 +417,6 @@
         "col_cpl_black_3": {
           "visible": false,
           "width": 0
-        },
-        "col_white_seldepth": {
-          "visible": false,
-          "width": 0
-        },
-        "col_black_seldepth": {
-          "visible": false,
-          "width": 0
         }
       },
       "column_order": [
@@ -435,6 +435,8 @@
         "col_black_is_top3",
         "col_white_depth",
         "col_black_depth",
+        "col_white_seldepth",
+        "col_black_seldepth",
         "col_best_white_2",
         "col_best_white_3",
         "col_best_black_2",
@@ -819,6 +821,10 @@
     "show_results": true,
     "show_non_standard_tags": false
   },
+  "pgn_notation": {
+    "use_symbols_for_nags": true,
+    "show_nag_text": false
+  },
   "engines": [],
   "engine_assignments": {
     "game_analysis": null,
@@ -835,9 +841,9 @@
     "return_to_first_move_after_analysis": true,
     "switch_to_summary_after_analysis": true,
     "normalized_evaluation_graph": true,
+    "brilliant_move_detection": true,
     "store_analysis_results_in_pgn_tag": true,
-    "switch_to_moves_list_at_start_of_analysis": true,
-    "brilliant_move_detection": true
+    "switch_to_moves_list_at_start_of_analysis": true
   },
   "game_analysis_settings": {
     "assessment_thresholds": {
@@ -847,9 +853,9 @@
     },
     "brilliant_criteria": {
       "shallow_depth_min": 3,
-      "shallow_depth_max": 6,
-      "min_depths_show_error": 2,
-      "require_blunder_only": true
+      "shallow_depth_max": 7,
+      "min_depths_show_error": 3,
+      "candidate_selection": "best_move_only"
     }
   },
   "manual_analysis": {
@@ -932,9 +938,5 @@
     "use_anthropic_models": false,
     "include_analysis_data_in_preprompt": true,
     "include_metadata_in_preprompt": true
-  },
-  "pgn_notation": {
-    "use_symbols_for_nags": true,
-    "show_nag_text": false
   }
 }

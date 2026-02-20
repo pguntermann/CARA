@@ -27,15 +27,16 @@ def run_brilliant_move_detection(
     engine_options: Dict[str, Any],
     config: Dict[str, Any],
     require_blunder_only: bool = False,
+    candidate_selection: str = "best_move_only",
     on_progress: Optional[Callable[[str], None]] = None,
     is_cancelled: Optional[Callable[[], bool]] = None,
 ) -> int:
     """Run brilliancy detection on a list of move infos and update assessments via callbacks.
 
-    Candidates are moves classified as "Best Move" at full depth. For each candidate,
-    positions are analyzed at shallow depths; if at least min_depths_show_error depths
-    classify the move as Mistake/Blunder (or Blunder only if require_blunder_only=True),
-    the move is marked brilliant.
+    Candidates are moves classified as "Best Move" (or "Best Move" and "Good Move" if candidate_selection
+    is "best_or_good_move") at full depth. For each candidate, positions are analyzed at shallow depths;
+    if at least min_depths_show_error depths classify the move as Mistake/Blunder (or Blunder only if
+    require_blunder_only=True), the move is marked brilliant.
 
     Args:
         move_infos: List of move info dicts (fen_before, move_san, board_before, eval_before,
@@ -116,17 +117,22 @@ def run_brilliant_move_detection(
             if move_data is None:
                 continue
             current_assessment = move_data.assess_white if is_white_move else move_data.assess_black
-            if current_assessment == "Best Move":
-                candidate_moves.append((i, move_info, move_data, is_white_move, row_index))
+            if candidate_selection == "best_or_good_move":
+                if current_assessment in ["Best Move", "Good Move"]:
+                    candidate_moves.append((i, move_info, move_data, is_white_move, row_index))
+            else:  # best_move_only
+                if current_assessment == "Best Move":
+                    candidate_moves.append((i, move_info, move_data, is_white_move, row_index))
 
         total_candidates = len(candidate_moves)
         error_severity_text = "Blunder" if require_blunder_only else "Mistake or Blunder"
+        candidate_text = "Best Move or Good Move" if candidate_selection == "best_or_good_move" else "Best Move only"
         brilliant_criteria_config = config.get("game_analysis", {}).get("brilliant_criteria", {})
         disable_skip_playedmove_match_bestmove = brilliant_criteria_config.get(
             "disable_skip_playedmove_match_bestmove", False
         )
         logging_service.info(
-            f"Brilliant move detection: Checking {total_candidates} candidate moves (Best Move only), "
+            f"Brilliant move detection: Checking {total_candidates} candidate moves ({candidate_text}), "
             f"min_depths_required={min_depths_required} (depths {shallow_depth_min}-{shallow_depth_max}), "
             f"error_severity={error_severity_text}"
         )

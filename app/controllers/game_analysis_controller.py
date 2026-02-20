@@ -143,10 +143,11 @@ class GameAnalysisController(QObject):
         
         # Load defaults for brilliant criteria
         default_brilliant = game_analysis_config.get("brilliant_criteria", {})
-        self._shallow_depth_min = default_brilliant.get("shallow_depth_min", 2)
-        self._shallow_depth_max = default_brilliant.get("shallow_depth_max", 6)
-        self._min_depths_show_error = default_brilliant.get("min_depths_show_error", 1)
+        self._shallow_depth_min = default_brilliant.get("shallow_depth_min", 3)
+        self._shallow_depth_max = default_brilliant.get("shallow_depth_max", 7)
+        self._min_depths_show_error = default_brilliant.get("min_depths_show_error", 3)
         self._require_blunder_only = default_brilliant.get("require_blunder_only", False)
+        self._candidate_selection = default_brilliant.get("candidate_selection", "best_move_only")
 
         # Override with user settings if available
         if self.user_settings_service:
@@ -160,13 +161,13 @@ class GameAnalysisController(QObject):
                 self._inaccuracy_max_cpl = user_thresholds.get("inaccuracy_max_cpl", self._inaccuracy_max_cpl)
                 self._mistake_max_cpl = user_thresholds.get("mistake_max_cpl", self._mistake_max_cpl)
             
-            # Override brilliant criteria
+            # Override brilliant criteria (require_blunder_only is config-only, not overridden)
             user_brilliant = user_game_analysis.get("brilliant_criteria", {})
             if user_brilliant:
                 self._shallow_depth_min = user_brilliant.get("shallow_depth_min", self._shallow_depth_min)
                 self._shallow_depth_max = user_brilliant.get("shallow_depth_max", self._shallow_depth_max)
                 self._min_depths_show_error = user_brilliant.get("min_depths_show_error", self._min_depths_show_error)
-                self._require_blunder_only = user_brilliant.get("require_blunder_only", self._require_blunder_only)
+                self._candidate_selection = user_brilliant.get("candidate_selection", self._candidate_selection)
     
     def reload_settings(self) -> None:
         """Reload settings from config and user settings."""
@@ -229,6 +230,13 @@ class GameAnalysisController(QObject):
         if self.classification_model:
             return self.classification_model.require_blunder_only
         return getattr(self, '_require_blunder_only', False)
+
+    @property
+    def candidate_selection(self) -> str:
+        """Get candidate selection mode for brilliancy detection ("best_move_only" or "best_or_good_move")."""
+        if self.classification_model:
+            return self.classification_model.candidate_selection
+        return getattr(self, '_candidate_selection', "best_move_only")
 
     @property
     def is_analyzing(self) -> bool:
@@ -1446,6 +1454,7 @@ class GameAnalysisController(QObject):
             engine_options=engine_options,
             config=self.config,
             require_blunder_only=self.require_blunder_only,
+            candidate_selection=self.candidate_selection,
             on_progress=progress_service.set_status,
             is_cancelled=lambda: False,
         )
