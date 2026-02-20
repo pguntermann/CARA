@@ -1,5 +1,6 @@
 """Central application controller for orchestrating business logic."""
 
+from io import StringIO
 from typing import Dict, Any, Optional, Tuple
 
 from app.models.progress_model import ProgressModel
@@ -867,16 +868,49 @@ class AppController:
         board_model = self.board_controller.get_board_model()
         board_model.position_changed.connect(self._on_board_position_changed)
         board_model.evaluation_bar_visibility_changed.connect(self._on_evaluation_bar_visibility_changed)
-    
-    def _on_board_position_changed(self) -> None:
-        """Handle board position change."""
-        # Update evaluation if bar is visible
+        # When a game is active, drive evaluation from active_move_changed (game tree FEN)
+        # so we get reliable updates when navigating (e.g. PGN click), same as manual analysis
+        game_model = self.game_controller.get_game_model()
+        game_model.active_move_changed.connect(self._on_active_move_changed_for_evaluation)
+
+    def _on_active_move_changed_for_evaluation(self, ply_index: int) -> None:
+        """Update evaluation from game tree when active move changes (reliable for PGN navigation)."""
         board_model = self.board_controller.get_board_model()
-        if board_model.show_evaluation_bar:
-            fen = board_model.get_fen()
-            # Always update position - this will start evaluation if not running
-            self.evaluation_controller.update_position(fen)
-    
+        if not board_model.show_evaluation_bar:
+            return
+        game_model = self.game_controller.get_game_model()
+        active_game = game_model.active_game if game_model else None
+        if not active_game or ply_index < 0:
+            return
+        try:
+            import chess.pgn
+            pgn_io = StringIO(active_game.pgn)
+            chess_game = chess.pgn.read_game(pgn_io)
+            if chess_game:
+                node = chess_game
+                for _ in range(ply_index):
+                    if not node.variations:
+                        break
+                    node = node.variation(0)
+                fen = node.board().fen()
+            else:
+                fen = self.board_controller.get_position_fen()
+        except Exception:
+            fen = self.board_controller.get_position_fen()
+        self.evaluation_controller.update_position(fen)
+
+    def _on_board_position_changed(self) -> None:
+        """Handle board position change. Only drive evaluation when no active game."""
+        board_model = self.board_controller.get_board_model()
+        if not board_model.show_evaluation_bar:
+            return
+        # When a game is active, evaluation is driven by active_move_changed (game tree FEN)
+        game_model = self.game_controller.get_game_model()
+        if game_model.active_game is not None:
+            return
+        fen = board_model.get_fen()
+        self.evaluation_controller.update_position(fen)
+
     def _on_evaluation_bar_visibility_changed(self, show: bool) -> None:
         """Handle evaluation bar visibility change.
         

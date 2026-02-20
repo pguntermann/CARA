@@ -169,19 +169,14 @@ class EvaluationController:
         if thread_exists:
             thread_is_running = self.evaluation_service.evaluation_thread.running
         
-        # Reset evaluation model to clear old values first (before updating position)
-        # This ensures the bar shows empty/zero while new evaluation starts
-        self.evaluation_model.reset()
-        
-        # If thread exists, always update position (never restart)
         if thread_exists:
-            # Update position in service
+            # Just updating position: don't reset the model (keep previous eval visible until
+            # engine sends new one). Matches manual analysis behavior and avoids bar stuck at 0.
             self.evaluation_service.update_position(fen)
-            # Mark as evaluating again (reset() might have cleared it)
             self.evaluation_model.is_evaluating = True
         else:
-            # No thread exists - start evaluation
-            # This handles the case where evaluation stopped but bar is still visible
+            # No thread - starting fresh: reset then start evaluation
+            self.evaluation_model.reset()
             self.start_evaluation(fen)
     
     def stop_evaluation(self) -> None:
@@ -227,15 +222,21 @@ class EvaluationController:
         if self._using_manual_analysis:
             return
         
-        # Update model (this will trigger UI updates)
+        # Defer both model and status update to the same timer so they run together
+        QTimer.singleShot(
+            0,
+            lambda c=centipawns, i=is_mate, m=mate_moves, d=depth, n=nps, h=hashfull, pv_val=pv: self._apply_evaluation_update(c, i, m, d, n, h, pv_val),
+        )
+    
+    def _apply_evaluation_update(self, centipawns: float, is_mate: bool, mate_moves: int, depth: int, nps: int, hashfull: int, pv: str) -> None:
+        """Update evaluation model and progress status (called from singleShot)."""
+        if self._using_manual_analysis:
+            return
         self.evaluation_model.centipawns = centipawns
         self.evaluation_model.is_mate = is_mate
         self.evaluation_model.mate_moves = mate_moves
         self.evaluation_model.depth = depth
-        
-        # Update progress bar with evaluation details
-        # Use a timer to defer the status update, allowing UI to process events
-        QTimer.singleShot(0, lambda: self._update_progress_status(depth, centipawns, is_mate, mate_moves, nps, hashfull, pv))
+        self._update_progress_status(depth, centipawns, is_mate, mate_moves, nps, hashfull, pv)
     
     def _update_progress_status(self, depth: int, centipawns: float, is_mate: bool, mate_moves: int, nps: int, hashfull: int, pv: str) -> None:
         """Update progress bar status with evaluation details.

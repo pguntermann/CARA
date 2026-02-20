@@ -174,7 +174,7 @@ class EvaluationEngineThread(QThread):
             
             self._go_sent_after_position = True
             
-            # Reset depth tracking for new position
+            # Reset depth and score tracking for new position
             self._current_depth = 0
             self._best_score = None
             self._best_is_mate = False
@@ -182,6 +182,10 @@ class EvaluationEngineThread(QThread):
             self._current_nps = -1
             self._current_hashfull = -1
             self._current_pv = ""
+            self._pending_update = None  # Don't emit stale throttled update from previous position
+            # Reset throttle so the first update for this position is emitted immediately
+            # (avoids bar stuck on previous eval when new position has only one quick update, e.g. mate)
+            self._last_update_time = 0.0
         except Exception as e:
             self.error_occurred.emit(f"Failed to update position: {str(e)}")
     

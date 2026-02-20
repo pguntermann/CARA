@@ -136,8 +136,12 @@ class EvaluationModel(QObject):
         if self._is_mate:
             if self._mate_moves > 0:
                 return scale_max  # White mate
-            else:
+            elif self._mate_moves < 0:
                 return -scale_max  # Black mate
+            else:
+                # Mate 0 (checkmate on board): winner is opposite of side to move.
+                # Service already flips centipawns for Black to move, so use sign of centipawns.
+                return scale_max if self._centipawns >= 0 else -scale_max
         else:
             # Convert centipawns to pawns and clamp to scale
             pawns = self._centipawns / 100.0
