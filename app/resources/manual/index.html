@@ -40,6 +40,7 @@
                         <li><a href="#chess-pieces">2.2 Chess Pieces</a></li>
                         <li><a href="#opening-books-eco">2.3 Opening Books and ECO Database</a></li>
                         <li><a href="#cara-license">2.4 CARA License</a></li>
+                        <li><a href="#special-mentions">2.5 Special Mentions</a></li>
                     </ul>
                 </li>
                 <li><a href="#installation">3. Installation</a>
@@ -164,7 +165,7 @@
                     
                     <li><strong>Interactive Chessboard:</strong> Beautiful, feature-rich chessboard at the heart of the application, providing an intuitive visual interface for game review and analysis. The board integrates seamlessly with game analysis and manual analysis through extensive visual indicators. Played move arrows highlight the last move made in the game, while best alternative move arrows indicate superior moves found during analysis. During manual analysis, PV1, PV2, and PV3 arrows display the principal variations from MultiPV analysis, allowing you to explore multiple candidate moves simultaneously. All arrows can be individually shown or hidden to customize the display according to your analysis needs. The board features a positional heatmap overlay that visualizes positional factors like weak squares, passed pawns, outposts, piece activity, and king safety through color-coded gradients. Additional toggleable elements include coordinate labels, turn indicator, game information panel, evaluation bar, and material widget. All visual elements are fully customizable through the configuration system.</li>
                     
-                    <li><strong>Game Analysis:</strong> Automatic analysis of chess games using UCI-compatible chess engines, with sophisticated move assessment through MultiPV (Multiple Principal Variations) analysis and before-and-after position evaluation. The system analyzes each move by comparing the position before and after the move, evaluating multiple candidate moves simultaneously, and calculating Centipawn Loss (CPL) to classify moves as Good, Inaccuracy, Mistake, Blunder, or Brilliancy. This thorough approach provides detailed evaluation metrics and move quality assessments. Supports both single game analysis and bulk analysis of entire databases.</li>
+                    <li><strong>Game Analysis:</strong> Automatic analysis of chess games using UCI-compatible chess engines, with move assessment through MultiPV (Multiple Principal Variations) analysis and before-and-after position evaluation. The system analyzes each move by comparing the position before and after the move, evaluating multiple candidate moves simultaneously, and calculating Centipawn Loss (CPL) to classify moves as Good, Inaccuracy, Mistake, Blunder, or Brilliant. An optional brilliancy detection system uses shallow depth analysis to identify exceptional moves. This approach provides detailed evaluation metrics and move quality assessments. Supports both single game analysis and bulk analysis of entire databases.</li>
                     
                     <li><strong>Game Summary:</strong> Complete game overview combining statistical analysis, key moments, and visual insights. The summary provides per-player statistics (accuracy, average CPL, move counts by classification), phase-by-phase performance breakdowns (Opening, Middlegame, Endgame), identification of top best and worst moves for each player, evaluation graph data, and automatically detected game highlights. The summary synthesizes all analysis data into a cohesive overview that helps you quickly understand the flow of the game, identify critical moments, and assess each player's performance across different phases of play.</li>
                     
@@ -275,6 +276,15 @@
                 </ul>
                 
                 <p>For the complete license text, see the <code>LICENSE</code> file in the CARA distribution or visit <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank">gnu.org/licenses/gpl-3.0.html</a>.</p>
+            </div>
+            
+            <div class="outline-item">
+                <h4 id="special-mentions">2.5 Special Mentions</h4>
+                <p>Special thanks to the members of the <a href="https://hiarcs.net/forums/" target="_blank">HIARCS chess forum</a> for their help in testing and refining the application.</p>
+                <ul>
+                    <li><strong>Tibono2:</strong> For his work on the ELO estimation formulas, the brilliancy detection system, testing and identifying bugs.</li>
+                    <li><strong>Leto:</strong> For his feature suggestions and also testing and identifying bugs.</li>
+                </ul>
             </div>
         </section>
 
@@ -1233,7 +1243,7 @@
                     <li><strong>Move Classification:</strong> Each move is classified as one of:
                         <ul>
                             <li><strong>Book Move:</strong> A move found in the opening book database</li>
-                            <li><strong>Brilliant:</strong> An exceptional move involving material sacrifice that leads to a significant advantage</li>
+                            <li><strong>Brilliant:</strong> An exceptional move identified through shallow depth analysis. See <a href="#brilliant-move-detection">section 5.5.3</a> for details on how brilliancy detection works.</li>
                             <li><strong>Best Move:</strong> The engine's recommended move was played</li>
                             <li><strong>Good Move:</strong> A solid move with low CPL</li>
                             <li><strong>Inaccuracy:</strong> A suboptimal move that loses some evaluation but doesn't significantly change the game</li>
@@ -1252,7 +1262,40 @@
                 
                 <p>You can review this information in the Moves List, or switch to the <span class="menu-item">Game Summary</span> tab (<code>F4</code>) for a condensed overview of key game moments, statistics, and highlights.</p>
                 
-                <h5 id="analysis-settings">5.5.3 Analysis Settings</h5>
+                <h5 id="brilliant-move-detection">5.5.3 Brilliant Move Detection</h5>
+                <p>CARA includes a brilliancy detection system that identifies exceptional moves by analyzing them at shallow engine depths.</p>
+                
+                <p><strong>How Brilliancy Detection Works:</strong></p>
+                <p>When brilliancy detection is enabled, CARA performs an additional analysis pass after the main game analysis completes. This process:</p>
+                <ol>
+                    <li><strong>Identifies candidate moves:</strong> Selects moves that were classified as "Best Move" (or "Best Move" and "Good Move" depending on settings) at full analysis depth.</li>
+                    <li><strong>Re-analyzes at shallow depths:</strong> For each candidate move, CARA re-analyzes the position at multiple shallow engine depths (typically depths 3-7, configurable).</li>
+                    <li><strong>Checks for errors at shallow depths:</strong> At each shallow depth, the system checks whether the candidate move would be classified as a "Mistake" or "Blunder" if evaluated at that depth.</li>
+                    <li><strong>Requires agreement across depths:</strong> A move is marked as "Brilliant" only if it shows an error (Mistake/Blunder) at a minimum number of shallow depths (configurable, default: 3 depths). This ensures that the move truly appears suboptimal at shallow depths but is actually strong when analyzed more deeply.</li>
+                </ol>
+                
+                <p><strong>Why This Works:</strong></p>
+                <p>Brilliant moves often involve material sacrifices or complex tactical sequences that appear bad at shallow depths but reveal their strength when analyzed more deeply. By requiring that a move shows as an error at multiple shallow depths, the system identifies moves that are counterintuitive and require deeper calculation to appreciate.</p>
+                
+                <p><strong>Configuration:</strong></p>
+                <p>Brilliancy detection can be enabled/disabled via <span class="menu-item">Game Analysis → Brilliant Move Detection</span>. The detection criteria can be customized in the Classification Settings dialog (<span class="menu-item">Game Analysis → Configure Classification Settings...</span>), including:</p>
+                <ul>
+                    <li><strong>Shallow Depth Min/Max:</strong> The range of shallow depths to check (default: 3-7)</li>
+                    <li><strong>Min Agreement:</strong> Minimum number of shallow depths that must show the move as an error (default: 3)</li>
+                    <li><strong>Move Candidate:</strong> Which moves to check - "Best Move only" or "Best or Good Move" (default: Best Move only)</li>
+                </ul>
+                
+                <p>See <a href="#classification-settings">section 6.6.4</a> for more information about configuring brilliancy detection settings.</p>
+                
+                <div class="tip-box">
+                    <strong>Advanced Configuration:</strong><br><br>
+                    Additional settings are available in <code>config.json</code> under <code>game_analysis.brilliant_criteria</code>:<br><br>
+                    • <code>append_depthlevels_to_classification_text</code>: Appends the shallow depth levels at which the move was still considered an error to the Move Classification text. This can be useful when you want to fine-tune the settings and understand at which levels the move matched the criteria.<br><br>
+                    • <code>require_blunder_only</code>: Only counts moves as errors if they are classified as "Blunder" at shallow depths, not "Mistake". This makes the detection stricter and reduces false positives. Enable this if you are using shorter move times and experience too many false positives.<br><br>
+                    • <code>incompatible_engines</code>: List of engine name keywords that should skip brilliancy detection. Neural network engines like lc0 or Maia are usually too slow for this process, due to how they work in terms of their calculation depth. Remove/Re-enable at your own risk.
+                </div>
+                
+                <h5 id="analysis-settings">5.5.4 Analysis Settings</h5>
                 <p>CARA provides several settings to customize the analysis workflow:</p>
                 <ul>
                     <li><strong>Switch to Moves List at Start of Analysis:</strong> Automatically switches to the Moves List tab when analysis begins (enabled by default).</li>
@@ -1262,10 +1305,10 @@
                 </ul>
                 <p>These settings can be toggled in the <span class="menu-item">Game Analysis</span> menu and are saved in your user settings.</p>
                 
-                <h5 id="cancelling-analysis">5.5.4 Cancelling Analysis</h5>
+                <h5 id="cancelling-analysis">5.5.5 Cancelling Analysis</h5>
                 <p>You can cancel an ongoing analysis at any time using <span class="menu-item">Game Analysis → Cancel Game Analysis</span> or press <code>Escape</code>. When cancelled, analysis stops at the current move, and all moves analyzed up to that point retain their analysis data.</p>
                 
-                <h5 id="bulk-analysis">5.5.5 Bulk Analysis</h5>
+                <h5 id="bulk-analysis">5.5.6 Bulk Analysis</h5>
                 <p>To analyze multiple games at once, use <span class="menu-item">Game Analysis → Bulk Analyze Database...</span>.</p>
                 <img src="screenshots/bulk_analyze_dialog.png" alt="CARA Bulk Analysis Dialog - Dialog for analyzing multiple games with game selection options, analysis settings, and progress tracking" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 <p>CARA automatically optimizes available CPU cores to analyze multiple games in parallel, maximizing analysis speed. Progress and estimated time remaining are displayed in the status bar, and you can cancel and resume bulk analysis at any time.</p>
@@ -1732,16 +1775,16 @@
                 <h5>6.6.3 Bulk Analyze Database...</h5>
                 <p>Opens a dialog to analyze multiple games at once. CARA automatically optimizes available CPU cores to analyze multiple games in parallel, maximizing analysis speed. Progress and estimated time remaining are displayed in the status bar, and you can cancel and resume bulk analysis at any time.<br>See <a href="#bulk-analysis">section 5.5.5</a> for detailed instructions.</p>
                 
-                <h5>6.6.4 Configure Classification Settings...</h5>
+                <h5 id="classification-settings">6.6.4 Configure Classification Settings...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+K</code> / <code>⌘+Shift+K</code></p>
-                <p>Opens a dialog to customize the thresholds used for move classification (Brilliant, Best Move, Good Move, Inaccuracy, Mistake, Blunder). These thresholds determine how moves are categorized based on Centipawn Loss (CPL) values.<br>See <a href="#analysis-results">section 5.5.2</a> for more information about move classifications.</p>
+                <p>Opens a dialog to customize the thresholds used for move classification (Brilliant, Best Move, Good Move, Inaccuracy, Mistake, Blunder). These thresholds determine how moves are categorized based on Centipawn Loss (CPL) values. The dialog also includes settings for brilliancy detection, including shallow depth ranges, minimum agreement requirements, and candidate move selection. See <a href="#analysis-results">section 5.5.2</a> for more information about move classifications and <a href="#brilliant-move-detection">section 5.5.3</a> for details on brilliancy detection.</p>
                 
                 <h5>6.6.5 Normalized Evaluation Graph</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+N</code> / <code>⌘+Shift+N</code></p>
                 <p>Toggles the normalized evaluation graph display mode in the Moves List. When enabled, evaluation values are normalized to a scale that better highlights relative evaluation changes throughout the game, making it easier to identify critical moments and evaluation swings.</p>
                 
-                <h5>6.6.6 Post-Game Brilliancy Refinement</h5>
-                <p>Toggles whether CARA performs an additional, deeper analysis after initial game analysis specifically to identify "Brilliant" moves. Brilliant moves often involve material sacrifices and may require deeper analysis to be properly classified. When enabled, this refinement step runs automatically after the main analysis completes.</p>
+                <h5>6.6.6 Brilliant Move Detection</h5>
+                <p>Toggles whether CARA performs brilliancy detection after initial game analysis. When enabled, CARA analyzes candidate moves at shallow engine depths to identify exceptional moves that appear suboptimal at shallow depths but are actually strong when analyzed more deeply. This detection step runs automatically after the main analysis completes. See <a href="#brilliant-move-detection">section 5.5.3</a> for a detailed explanation of how brilliancy detection works.</p>
                 
                 <h5>6.6.7 Return to PLY 0 after analysis completes</h5>
                 <p>Toggles whether CARA automatically navigates to the starting position (PLY 0) when analysis completes. When enabled, the board and Moves List automatically return to PLY 0 after analysis finishes.</p>
