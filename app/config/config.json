@@ -4697,7 +4697,7 @@
   },
   "game_analysis": {
     "max_depth": 0,
-    "time_limit_per_move_ms": 300,
+    "time_limit_per_move_ms": 450,
     "default_threads_formula": {
       "formula": "max(1, min(8, cpu_count - reserved_cores))"
     },
