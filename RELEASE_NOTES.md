@@ -1,3 +1,5 @@
+# Release Notes
+
 # CARA v2.5.8 - Bug Fixes and User Experience Improvements
 
 **Release Date:** 16.02.2026

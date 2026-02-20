@@ -5,6 +5,163 @@ import io
 from typing import Dict, Any, Tuple, List, Optional
 from app.services.logging_service import LoggingService
 
+# Invisible sentinel for PGN move highlighting: no visible characters.
+# Encode ply as a run of U+200B (zero-width space) wrapped in ZWNJ+ZWJ so the view can find the move.
+# Format: PREFIX + (U+200B repeated ply times) + SUFFIX. All characters are zero-width/invisible.
+PGN_PLY_SENTINEL_PREFIX = "\u200C\u200D"   # zero-width non-joiner, zero-width joiner
+PGN_PLY_SENTINEL_SUFFIX = "\u200D\u200C"   # zero-width joiner, zero-width non-joiner
+_PLY_SENTINEL_ZERO_WIDTH = "\u200B"         # zero-width space (one per ply)
+
+
+def make_ply_sentinel(ply: int) -> str:
+    """Return the invisible sentinel string for the given ply (1-based)."""
+    return PGN_PLY_SENTINEL_PREFIX + (_PLY_SENTINEL_ZERO_WIDTH * ply) + PGN_PLY_SENTINEL_SUFFIX
+
+
+def clean_pgn_text(text: str) -> str:
+    """Clean and format PGN text for copying to clipboard.
+    
+    This function:
+    1. Separates metadata tags from move notation (adds CRLF between them)
+    2. Applies fixed-width formatting using export config settings
+    3. Removes invisible sentinel characters used for move identification/highlighting
+    4. Normalizes line endings to CRLF
+    
+    Args:
+        text: PGN text that may contain invisible sentinel characters.
+        
+    Returns:
+        Cleaned and formatted PGN text safe for copying to clipboard.
+    """
+    if not text:
+        return text
+    
+    # Step 1: Remove invisible sentinel characters first (before processing)
+    # Remove sentinel pattern: ZWNJ+ZWJ + (zero-width spaces) + ZWJ+ZWNJ
+    # Pattern matches: PREFIX + (zero or more zero-width spaces) + SUFFIX
+    pattern = re.escape(PGN_PLY_SENTINEL_PREFIX) + r'\u200B*' + re.escape(PGN_PLY_SENTINEL_SUFFIX)
+    text = re.sub(pattern, '', text)
+    
+    # Also remove any remaining standalone invisible characters that might have been left
+    # This ensures we catch any edge cases where sentinels might be malformed
+    # Also remove line separator (U+2028) and paragraph separator (U+2029) which might appear
+    text = re.sub(r'[\u200B\u200C\u200D\u2028\u2029]', '', text)
+    
+    # Step 2: Separate metadata tags from move notation and ensure blank line between them
+    # Pattern to match metadata tags: [Key "Value"]
+    metadata_tag_pattern = re.compile(r'\[([A-Za-z0-9][A-Za-z0-9_]*)\s+"([^"]*)"\]')
+    # Pattern to match move notation start: number followed by dot and space or move notation
+    # More specific: must be after all metadata tags, and match actual move format
+    move_pattern = re.compile(r'\b([1-9]\d{0,2}|0)\.(?:\.\.| |[a-hNBRQKO][a-h1-8x=+#]?[a-h1-8]?)')
+    
+    # Find all metadata tags first
+    metadata_matches = list(metadata_tag_pattern.finditer(text))
+    
+    if metadata_matches:
+        # Find the position after the last metadata tag
+        last_metadata_end = metadata_matches[-1].end()
+        
+        # Only search for moves AFTER the last metadata tag to avoid false matches in dates/metadata
+        text_after_metadata = text[last_metadata_end:]
+        move_match = move_pattern.search(text_after_metadata)
+        
+        if move_match:
+            # Adjust position to account for the offset
+            first_move_start = last_metadata_end + move_match.start()
+            
+            # Split metadata and moves with \n\n (first_move_start is always > last_metadata_end if we found it)
+            metadata_part = text[:first_move_start].rstrip()
+            moves_part = text[first_move_start:].lstrip()
+            text = metadata_part + '\n\n' + moves_part
+    else:
+        # No metadata tags found - handle multi-line case where metadata might be on separate lines
+        # This handles edge cases but the main logic above should cover most scenarios
+        if '\n' in text:
+            lines = text.split('\n')
+            metadata_end_idx = -1
+            
+            # Find last line with metadata tags
+            for i in range(len(lines)):
+                line = lines[i].strip()
+                if line and PgnFormatterService._is_metadata_only_line(line):
+                    metadata_end_idx = i
+            
+            # Check if any line has both metadata and moves (need to split)
+            for i in range(len(lines)):
+                line = lines[i].strip()
+                if not line:
+                    continue
+                
+                metadata_matches = list(metadata_tag_pattern.finditer(line))
+                move_match = move_pattern.search(line)
+                
+                if metadata_matches and move_match:
+                    last_metadata_end = metadata_matches[-1].end()
+                    first_move_start = move_match.start()
+                    
+                    if first_move_start > last_metadata_end:
+                        # Split the line
+                        metadata_part = line[:first_move_start].rstrip()
+                        moves_part = line[first_move_start:].lstrip()
+                        lines[i] = metadata_part
+                        lines.insert(i + 1, moves_part)
+                        metadata_end_idx = i
+                        break
+            
+            # Ensure blank line between metadata and moves
+            if metadata_end_idx >= 0:
+                next_line_idx = metadata_end_idx + 1
+                while next_line_idx < len(lines) and not lines[next_line_idx].strip():
+                    next_line_idx += 1
+                
+                if next_line_idx < len(lines) and next_line_idx == metadata_end_idx + 1:
+                    # No blank line exists - insert one
+                    lines.insert(metadata_end_idx + 1, '')
+                
+                text = '\n'.join(lines)
+            
+            # Ensure we have \n\n separator (needed for _normalize_pgn_line_breaks)
+            if '\n\n' not in text and metadata_end_idx >= 0:
+                # Find first move line
+                for i in range(len(lines)):
+                    line = lines[i].strip()
+                    if line and move_pattern.search(line):
+                        # Ensure blank line before this line
+                        if i > 0 and lines[i - 1].strip():
+                            lines.insert(i, '')
+                        text = '\n'.join(lines)
+                        break
+    
+    # Step 3: Apply fixed-width formatting using export config
+    try:
+        from app.services.pgn_service import PgnService
+        use_fixed_width, fixed_width = PgnService._get_export_config()
+        
+        # Check if text has \n\n separator (needed for _normalize_pgn_line_breaks)
+        if '\n\n' not in text:
+            # No separator - text might be all moves (metadata hidden) or single line
+            # Try to apply formatting directly to moves
+            if not use_fixed_width:
+                # Single line: just clean up spaces
+                text = text.replace('\n', ' ').replace('  ', ' ').strip()
+            else:
+                # Fixed width: apply formatting to entire text as moves
+                text = PgnService._normalize_moves_with_fixed_width(text, fixed_width)
+        else:
+            # Has separator - use normal normalization
+            text = PgnService._normalize_pgn_line_breaks(text, use_fixed_width, fixed_width)
+    except Exception:
+        # If formatting fails, continue with original text
+        pass
+    
+    # Step 4: Normalize line endings to CRLF for Windows compatibility
+    # Replace any existing line endings with CRLF
+    text = text.replace('\r\n', '\n')  # Normalize CRLF to LF first
+    text = text.replace('\r', '\n')    # Normalize CR to LF
+    text = text.replace('\n', '\r\n')   # Convert all LF to CRLF
+    
+    return text
+
 
 # NAG (Numeric Annotation Glyph) mapping
 # Based on PGN standard: https://wimnij.home.xs4all.nl/euwe/NAGS.html
@@ -1263,8 +1420,10 @@ class PgnFormatterService:
         # Match move numbers outside HTML tags, header spans, and variation spans
         # Header spans have color rgb(100, 150, 255)
         # Variation spans have color rgb(180, 180, 180) and italic style
-        # Pattern matches: optional whitespace, digit(s) followed by period and optional space, not preceded by a digit
-        move_number_pattern = re.compile(r'(?<![0-9])(\s*\d+\.\s*)')
+        # Pattern matches: optional whitespace, digit(s) followed by period and optional space.
+        # Not preceded by a digit (avoid "12. " matching "2. "). Not preceded by a letter so we don't
+        # treat the rank in a square (e.g. the "6" in hxg6) as the start of a move number like "69. ".
+        move_number_pattern = re.compile(r'(?<![0-9])(?<![a-zA-Z])(\s*\d+\.\s*)')
         result_parts = []
         i = 0
         in_tag = False
@@ -1355,8 +1514,8 @@ class PgnFormatterService:
             r'(?:[=][NBRQ])?'  # Promotion
             r'(?:[+#]|e\.p\.)?'  # Check, mate, or en passant
             r')|'
-            r'(?:O-O(?:-O)?)'  # Castling: O-O or O-O-O
-            r')(?=\s|$|[!?])'  # Must be followed by space, end of string, or annotation symbol
+            r'(?:O-O-O|O-O)'  # Castling: try long (O-O-O) before short (O-O) so one SAN gets one sentinel
+            r')(?=\s|$|[!?]|\d|<)'  # Followed by space, end, !?, digit, or < (HTML tag, e.g. "O-O-O<span> 14.")
         )
         
         result_parts = []
@@ -1367,6 +1526,7 @@ class PgnFormatterService:
         in_comment_span = False
         comment_span_depth = 0
         span_stack: List[str] = []
+        main_line_ply = 1  # Increment before use so 1st move gets sentinel(2); view searches for sentinel(ply+1)
         
         def _recompute_move_span_flags() -> None:
             nonlocal in_variation_span, in_header_span, in_comment_span, comment_span_depth
@@ -1444,7 +1604,9 @@ class PgnFormatterService:
                     # Don't format if immediately after a digit (could be part of move number)
                     if not (i > 0 and formatted[i-1].isdigit()):
                         move_san = match.group(1)
-                        move_formatted = span(move_san, move_color, move_bold)
+                        main_line_ply += 1  # 1st move -> sentinel(2), 2nd -> sentinel(3); view uses ply+1 to find
+                        sentinel = make_ply_sentinel(main_line_ply)
+                        move_formatted = span(sentinel + move_san, move_color, move_bold)
                         result_parts.append(move_formatted)
                         i = match.end()
                     else:
@@ -1949,15 +2111,19 @@ class PgnFormatterService:
         Returns:
             Formatted text with moves individually styled.
         """
-        # Pattern to match moves in variations
-        # Matches: optional move number (e.g., "13. " or "13... "), then move SAN, preserving whitespace after
-        # Move SAN can include: piece, source square, capture, destination, promotion, check/mate, annotations
+        # Pattern to match moves in variations (must include castling so variation castling gets
+        # variation styling and does not consume a main-line sentinel, which would break navigation to the last move).
+        # Matches: optional move number (e.g., "13.", "13. ", or "13... "), then move SAN, preserving whitespace after.
         move_pattern = re.compile(
-            r'(?:(\d+\.\s+)|(\d+\.\.\.\s+))?'  # Optional move number like "13. " or "13... " (with space)
-            r'([NBRQK]?[a-h]?[1-8]?[x\-]?[a-h][1-8]'  # Basic move pattern
+            r'(?:(\d+\.\s*)|(\d+\.\.\.\s*))?'  # Optional move number; \s* allows "13.Ned3" to be captured
+            r'('
+            r'(?:[NBRQK]?[a-h]?[1-8]?[x\-]?[a-h][1-8]'  # Standard moves
             r'(?:[=][NBRQ])?'  # Promotion
             r'(?:[+#]|e\.p\.)?'  # Check, mate, or en passant
             r'[!?]{0,2})'  # Optional annotations
+            r'|'
+            r'(?:O-O-O|O-O)'  # Castling (long before short)
+            r'[!?]{0,2})'  # Optional annotations after castling
             r'(\s*)'  # Capture trailing whitespace
         )
         
@@ -2024,7 +2190,9 @@ class PgnFormatterService:
                     move_number = white_move_number or black_move_number
                     if move_number:
                         result_parts.append(span_func(move_number.rstrip(), variation_color, italic=variation_italic))
-                        result_parts.append(' ')  # Add space after move number
+                        # Only add space after move number if the original had trailing space (avoid inserting space in "13.Ned3")
+                        if move_number.rstrip() != move_number:
+                            result_parts.append(' ')
                     
                     # Format move SAN with variation styling
                     result_parts.append(span_func(move_san, variation_color, italic=variation_italic))

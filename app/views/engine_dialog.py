@@ -569,8 +569,16 @@ class EngineDialog(QDialog):
             self.engine_version = self.controller.extract_version(author, name)
             
             self.name_input.setText(name)
-            self.author_input.setText(author)
-            self.version_input.setText(self.engine_version)
+            # If no author found, show a message instead of leaving placeholder
+            if author:
+                self.author_input.setText(author)
+            else:
+                self.author_input.setText("No author information available")
+            # If no version found, show a message instead of leaving placeholder
+            if self.engine_version:
+                self.version_input.setText(self.engine_version)
+            else:
+                self.version_input.setText("No version information available")
             
             # Enable add button
             self.add_button.setEnabled(True)
@@ -587,7 +595,7 @@ class EngineDialog(QDialog):
             MessageDialog.show_warning(
                 self.config,
                 "Validation Failed",
-                f"Failed to validate engine:\n\n{error}",
+                f"Failed to validate engine:<br><br>{error}",
                 self
             )
     
@@ -635,7 +643,7 @@ class EngineDialog(QDialog):
             MessageDialog.show_warning(
                 self.config,
                 "Add Engine Failed",
-                f"Failed to add engine:\n\n{message}",
+                f"Failed to add engine:<br><br>{message}",
                 self
             )
     

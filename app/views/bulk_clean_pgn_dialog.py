@@ -505,8 +505,8 @@ class BulkCleanPgnDialog(QDialog):
         MessageDialog.show_information(
             self.config,
             "Bulk Clean PGN Complete",
-            f"Processed {result.games_processed} game(s).\n"
-            f"Updated {result.games_updated} game(s).\n"
+            f"Processed {result.games_processed} game(s).<br>"
+            f"Updated {result.games_updated} game(s).<br>"
             f"Failed {result.games_failed} game(s).",
             self
         )

@@ -510,7 +510,7 @@ class GameSummaryService:
             # Count classifications
             if assessment == "Book Move":
                 book_moves += 1
-            elif assessment == "Brilliant":
+            elif assessment.startswith("Brilliant"):
                 brilliant_moves += 1
                 non_book_moves += 1
             elif assessment == "Best Move":
@@ -1127,7 +1127,7 @@ class GameSummaryService:
             # Count classifications
             if assessment == "Book Move":
                 book_moves += 1
-            elif assessment == "Brilliant":
+            elif assessment.startswith("Brilliant"):
                 brilliant_moves += 1
             elif assessment == "Best Move":
                 best_moves += 1
@@ -1350,8 +1350,8 @@ class GameSummaryService:
                 continue
         
         # Sort to prioritize brilliant moves: brilliant moves first (by CPL ascending), then others (by CPL ascending)
-        brilliant_moves = [m for m in critical_moves if m.assessment == "Brilliant"]
-        other_moves = [m for m in critical_moves if m.assessment != "Brilliant"]
+        brilliant_moves = [m for m in critical_moves if m.assessment.startswith("Brilliant")]
+        other_moves = [m for m in critical_moves if not m.assessment.startswith("Brilliant")]
         
         # Sort each group by CPL ascending
         brilliant_moves.sort(key=lambda x: x.cpl)

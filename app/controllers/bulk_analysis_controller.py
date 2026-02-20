@@ -572,6 +572,10 @@ class BulkAnalysisThread(QThread):
             for i in range(parallel_games):
                 # Use dynamic thread distribution - each game may get different thread count
                 threads_for_this_game = threads_per_engine_list[i] if i < len(threads_per_engine_list) else threads_per_engine_list[0]
+                brilliant_move_detection = (
+                    self.analysis_controller.is_brilliant_move_detection_enabled()
+                    if self.analysis_controller else False
+                )
                 service = BulkAnalysisService(
                     self.config,
                     self.engine_model,
@@ -579,7 +583,8 @@ class BulkAnalysisThread(QThread):
                     self.book_move_service,
                     self.classification_model,
                     threads_override=threads_for_this_game,
-                    movetime_override=self.movetime_override
+                    movetime_override=self.movetime_override,
+                    brilliant_move_detection=brilliant_move_detection,
                 )
                 self._analysis_services.append(service)
             
@@ -721,11 +726,11 @@ class BulkAnalysisController(QObject):
                 # Fallback message
                 if not engines:
                     title = "No Engine Configured"
-                    message = "Please add at least one UCI chess engine before starting bulk analysis.\n\nGo to Engines → Add Engine... to configure an engine."
+                    message = "Please add at least one UCI chess engine before starting bulk analysis.<br><br>Go to Engines → Add Engine... to configure an engine."
                     message += '<br><br><a href="manual://adding-first-engine">Learn how to add an engine</a>'
                 else:
                     title = "No Engine Assigned"
-                    message = "Please assign an engine to the Game Analysis task before starting bulk analysis.\n\nGo to Engines → [Engine Name] → Assign to Game Analysis."
+                    message = "Please assign an engine to the Game Analysis task before starting bulk analysis.<br><br>Go to Engines → [Engine Name] → Assign to Game Analysis."
                     message += '<br><br><a href="manual://adding-additional-engines">Learn how to assign engines to tasks</a>'
             
             return (False, title, message)

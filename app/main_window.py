@@ -29,6 +29,7 @@ from app.views.engine_dialog import EngineDialog
 from app.views.engine_configuration_dialog import EngineConfigurationDialog
 from app.views.classification_settings_dialog import ClassificationSettingsDialog
 from app.views.about_dialog import AboutDialog
+from app.views.inline_content_dialog import InlineContentDialog
 from app.views.message_dialog import MessageDialog
 from app.views.confirmation_dialog import ConfirmationDialog
 from app.controllers.app_controller import AppController
@@ -38,6 +39,7 @@ from app.models.database_model import DatabaseModel, GameData
 from app.controllers.engine_controller import TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS
 from app.services.pgn_cleaning_service import PgnCleaningService
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.tooltip_utils import wrap_tooltip_text
 from typing import Dict, Any, Optional, List
 
 
@@ -103,8 +105,8 @@ class MainWindow(QMainWindow):
     
     def _setup_tooltip_styling(self) -> None:
         """Setup QToolTip styling to ensure proper colors regardless of OS theme."""
-        # Get tooltip configuration
-        tooltip_config = self.config.get('ui', {}).get('positional_heatmap', {}).get('tooltip', {})
+        # Get general tooltip configuration
+        tooltip_config = self.config.get('ui', {}).get('styles', {}).get('tooltip', {})
         
         # Extract colors with defaults
         bg_color = tooltip_config.get('background_color', [45, 45, 50])
@@ -115,6 +117,8 @@ class MainWindow(QMainWindow):
         padding = tooltip_config.get('padding', 10)
         
         # Create QToolTip stylesheet
+        # Tooltip text must be wrapped in HTML for word-wrapping to work
+        # See wrap_tooltip_text() utility function
         tooltip_stylesheet = f"""
             QToolTip {{
                 background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});
@@ -664,11 +668,11 @@ class MainWindow(QMainWindow):
         # Separator
         game_analysis_menu.addSeparator()
         
-        # Post-Game Brilliancy Refinement toggle
-        self.post_game_brilliancy_refinement_action = QAction("Post‑Game Brilliancy Refinement", self)
-        self.post_game_brilliancy_refinement_action.setCheckable(True)
-        self.post_game_brilliancy_refinement_action.triggered.connect(self._on_post_game_brilliancy_refinement_toggled)
-        game_analysis_menu.addAction(self.post_game_brilliancy_refinement_action)
+        # Brilliant Move Detection toggle
+        self.brilliant_move_detection_action = QAction("Brilliant Move Detection", self)
+        self.brilliant_move_detection_action.setCheckable(True)
+        self.brilliant_move_detection_action.triggered.connect(self._on_brilliant_move_detection_toggled)
+        game_analysis_menu.addAction(self.brilliant_move_detection_action)
         
         # Return to PLY 0 after analysis completes
         self.return_to_first_move_action = QAction("Return to PLY 0 after analysis completes", self)
@@ -1055,6 +1059,30 @@ class MainWindow(QMainWindow):
         visit_github_action = QAction("Visit GitHub Repository", self)
         visit_github_action.triggered.connect(self._open_github_repository)
         help_menu.addAction(visit_github_action)
+        
+        help_menu.addSeparator()
+        
+        # Release Notes action
+        release_notes_action = QAction("View Release Notes", self)
+        release_notes_action.triggered.connect(self._show_release_notes_dialog)
+        help_menu.addAction(release_notes_action)
+        
+        # License action
+        license_action = QAction("View License", self)
+        license_action.triggered.connect(self._show_license_dialog)
+        help_menu.addAction(license_action)
+        
+        # Third Party Licenses action
+        third_party_licenses_action = QAction("View Third Party Licenses", self)
+        third_party_licenses_action.triggered.connect(self._show_third_party_licenses_dialog)
+        help_menu.addAction(third_party_licenses_action)
+        
+        help_menu.addSeparator()
+        
+        # Open user data directory action
+        open_user_data_dir_action = QAction("Open user data directory", self)
+        open_user_data_dir_action.triggered.connect(self._open_user_data_directory)
+        help_menu.addAction(open_user_data_dir_action)
         
         help_menu.addSeparator()
         
@@ -1898,9 +1926,65 @@ class MainWindow(QMainWindow):
         """Open the CARA GitHub repository in the default browser."""
         QDesktopServices.openUrl(QUrl("https://github.com/pguntermann/CARA"))
     
+    def _open_user_data_directory(self) -> None:
+        """Open the user data directory in the file explorer/finder."""
+        from app.utils.path_resolver import resolve_data_file_path
+        
+        # Get the resolved path for a user data file to determine the actual directory being used
+        # This works correctly whether in portable mode or user data directory mode
+        user_data_file_path, _ = resolve_data_file_path("user_settings.json")
+        user_data_dir = user_data_file_path.parent
+        
+        # Ensure the directory exists
+        user_data_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Open the directory in the file explorer/finder
+        url = QUrl.fromLocalFile(str(user_data_dir))
+        QDesktopServices.openUrl(url)
+    
     def _show_about_dialog(self) -> None:
         """Show the about dialog."""
         dialog = AboutDialog(self.config, self)
+        dialog.exec()
+    
+    def _show_release_notes_dialog(self) -> None:
+        """Show the release notes dialog with RELEASE_NOTES.md content."""
+        dialog = InlineContentDialog(
+            self.config,
+            window_title="Release Notes",
+            content_path=Path("RELEASE_NOTES.md"),
+            content_format="markdown",
+            fallback_message=(
+                "Release notes file not found. Please visit the GitHub repository for the latest release information."
+            ),
+            parent=self,
+        )
+        dialog.exec()
+    
+    def _show_license_dialog(self) -> None:
+        """Show the License (GPL-3.0) dialog."""
+        dialog = InlineContentDialog(
+            self.config,
+            window_title="License",
+            content_path=Path("LICENSE"),
+            content_format="plain",
+            fallback_message="License file not found. Please see the project repository for license information.",
+            parent=self,
+        )
+        dialog.exec()
+    
+    def _show_third_party_licenses_dialog(self) -> None:
+        """Show the Third Party Licenses dialog."""
+        dialog = InlineContentDialog(
+            self.config,
+            window_title="Third Party Licenses",
+            content_path=Path("THIRD_PARTY_LICENSES.md"),
+            content_format="markdown",
+            fallback_message=(
+                "Third party licenses file not found. Please see the project repository for license information."
+            ),
+            parent=self,
+        )
         dialog.exec()
     
     def _check_for_updates(self) -> None:
@@ -1942,7 +2026,7 @@ class MainWindow(QMainWindow):
             MessageDialog.show_error(
                 self.config,
                 "Update Check Failed",
-                f"Could not check for updates:\n\n{error_message}",
+                f"Could not check for updates:<br><br>{error_message}",
                 self
             )
         elif is_newer:
@@ -1968,7 +2052,7 @@ class MainWindow(QMainWindow):
             MessageDialog.show_information(
                 self.config,
                 "Up to Date",
-                f"You are using the latest version.\n\nCurrent version: {current_version}",
+                f"You are using the latest version.<br><br>Current version: {current_version}",
                 self
             )
     
@@ -3749,18 +3833,18 @@ Visibility Settings:
         """
         # Settings will be saved automatically on application exit
     
-    def _on_post_game_brilliancy_refinement_toggled(self, checked: bool) -> None:
-        """Handle Post‑Game Brilliancy Refinement toggle.
+    def _on_brilliant_move_detection_toggled(self, checked: bool) -> None:
+        """Handle Brilliant Move Detection toggle.
         
         Args:
-            checked: True if post-game brilliancy refinement is enabled, False otherwise.
+            checked: True if brilliant move detection is enabled, False otherwise.
         """
         # Update in-memory settings immediately
         if hasattr(self, '_settings_service'):
-            self._settings_service.update_game_analysis({"post_game_brilliancy_refinement": checked})
+            self._settings_service.update_game_analysis({"brilliant_move_detection": checked})
         # Pass setting to game analysis controller
         if hasattr(self.controller, 'game_analysis_controller'):
-            self.controller.game_analysis_controller.set_post_game_brilliancy_refinement(checked)
+            self.controller.game_analysis_controller.set_brilliant_move_detection(checked)
         # Settings will be saved automatically on application exit
         # No immediate action needed - behavior is handled in _on_game_analysis_completed
     
@@ -4566,13 +4650,13 @@ Visibility Settings:
             # Apply setting to evaluation graph widget
             self._update_evaluation_graph_mode(normalized_graph)
         
-        # Post-Game Brilliancy Refinement
-        post_game_brilliancy_refinement = game_analysis_settings.get("post_game_brilliancy_refinement", False)
-        if hasattr(self, 'post_game_brilliancy_refinement_action'):
-            self.post_game_brilliancy_refinement_action.setChecked(post_game_brilliancy_refinement)
+        # Brilliant Move Detection
+        brilliant_move_detection = game_analysis_settings.get("brilliant_move_detection", False)
+        if hasattr(self, 'brilliant_move_detection_action'):
+            self.brilliant_move_detection_action.setChecked(brilliant_move_detection)
         # Pass setting to game analysis controller
         if hasattr(self.controller, 'game_analysis_controller'):
-            self.controller.game_analysis_controller.set_post_game_brilliancy_refinement(post_game_brilliancy_refinement)
+            self.controller.game_analysis_controller.set_brilliant_move_detection(brilliant_move_detection)
         
         # Return to PLY 0 after analysis completes
         return_to_first_move = game_analysis_settings.get("return_to_first_move_after_analysis", False)
@@ -4711,7 +4795,7 @@ Visibility Settings:
                 "switch_to_moves_list_at_start_of_analysis": self.switch_to_moves_list_action.isChecked() if hasattr(self, 'switch_to_moves_list_action') else True,
                 "switch_to_summary_after_analysis": self.switch_to_summary_action.isChecked() if hasattr(self, 'switch_to_summary_action') else False,
                 "normalized_evaluation_graph": self.normalized_graph_action.isChecked() if hasattr(self, 'normalized_graph_action') else False,
-                "post_game_brilliancy_refinement": self.post_game_brilliancy_refinement_action.isChecked() if hasattr(self, 'post_game_brilliancy_refinement_action') else False,
+                "brilliant_move_detection": self.brilliant_move_detection_action.isChecked() if hasattr(self, 'brilliant_move_detection_action') else False,
                 "store_analysis_results_in_pgn_tag": self.store_analysis_results_action.isChecked() if hasattr(self, 'store_analysis_results_action') else False
             }
         

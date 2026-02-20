@@ -24,12 +24,12 @@ class MoveClassificationModel(QObject):
         self._mistake_max_cpl: int = 200
         
         # Brilliant criteria
-        self._min_eval_swing: int = 50
-        self._min_material_sacrifice: int = 300
-        self._max_eval_before: int = 500
-        self._exclude_already_winning: bool = True
-        self._material_sacrifice_lookahead_plies: int = 3
-    
+        self._shallow_depth_min: int = 3
+        self._shallow_depth_max: int = 7
+        self._min_depths_show_error: int = 3  # Min number of shallow depths that must show move as Mistake/Blunder
+        self._require_blunder_only: bool = False  # If True, only count Blunder; if False, count Mistake or Blunder (config-only)
+        self._candidate_selection: str = "best_move_only"  # "best_move_only" or "best_or_good_move"
+
     # Assessment thresholds properties
     @property
     def good_move_max_cpl(self) -> int:
@@ -48,31 +48,30 @@ class MoveClassificationModel(QObject):
     
     # Brilliant criteria properties
     @property
-    def min_eval_swing(self) -> int:
-        """Get minimum eval swing for brilliancy."""
-        return self._min_eval_swing
+    def shallow_depth_min(self) -> int:
+        """Get minimum shallow depth for brilliancy detection."""
+        return self._shallow_depth_min
     
     @property
-    def min_material_sacrifice(self) -> int:
-        """Get minimum material sacrifice for brilliancy."""
-        return self._min_material_sacrifice
-    
+    def shallow_depth_max(self) -> int:
+        """Get maximum shallow depth for brilliancy detection."""
+        return self._shallow_depth_max
+
     @property
-    def max_eval_before(self) -> int:
-        """Get maximum eval before move for brilliancy."""
-        return self._max_eval_before
-    
+    def min_depths_show_error(self) -> int:
+        """Get minimum number of shallow depths that must show the move as Mistake/Blunder (min agreement)."""
+        return self._min_depths_show_error
+
     @property
-    def exclude_already_winning(self) -> bool:
-        """Get exclude already winning flag for brilliancy."""
-        return self._exclude_already_winning
-    
+    def require_blunder_only(self) -> bool:
+        """Get whether only Blunder (not Mistake) should be counted for brilliancy detection."""
+        return self._require_blunder_only
+
     @property
-    def material_sacrifice_lookahead_plies(self) -> int:
-        """Get material sacrifice lookahead plies for brilliancy."""
-        return self._material_sacrifice_lookahead_plies
-    
-    
+    def candidate_selection(self) -> str:
+        """Get candidate selection mode for brilliancy detection ("best_move_only" or "best_or_good_move")."""
+        return self._candidate_selection
+
     def load_settings(self, assessment_thresholds: Dict[str, int], 
                       brilliant_criteria: Dict[str, Any]) -> None:
         """Load settings from dictionaries.
@@ -87,12 +86,12 @@ class MoveClassificationModel(QObject):
         self._mistake_max_cpl = assessment_thresholds.get("mistake_max_cpl", 200)
         
         # Load brilliant criteria
-        self._min_eval_swing = brilliant_criteria.get("min_eval_swing", 50)
-        self._min_material_sacrifice = brilliant_criteria.get("min_material_sacrifice", 300)
-        self._max_eval_before = brilliant_criteria.get("max_eval_before", 500)
-        self._exclude_already_winning = brilliant_criteria.get("exclude_already_winning", True)
-        self._material_sacrifice_lookahead_plies = brilliant_criteria.get("material_sacrifice_lookahead_plies", 3)
-        
+        self._shallow_depth_min = brilliant_criteria.get("shallow_depth_min", 2)
+        self._shallow_depth_max = brilliant_criteria.get("shallow_depth_max", 6)
+        self._min_depths_show_error = brilliant_criteria.get("min_depths_show_error", 1)
+        self._require_blunder_only = brilliant_criteria.get("require_blunder_only", False)
+        self._candidate_selection = brilliant_criteria.get("candidate_selection", "best_move_only")
+
         # Emit signal that settings changed
         self.settings_changed.emit()
     
@@ -127,26 +126,26 @@ class MoveClassificationModel(QObject):
         """
         changed = False
         
-        if "min_eval_swing" in criteria and criteria["min_eval_swing"] != self._min_eval_swing:
-            self._min_eval_swing = criteria["min_eval_swing"]
+        if "shallow_depth_min" in criteria and criteria["shallow_depth_min"] != self._shallow_depth_min:
+            self._shallow_depth_min = criteria["shallow_depth_min"]
             changed = True
         
-        if "min_material_sacrifice" in criteria and criteria["min_material_sacrifice"] != self._min_material_sacrifice:
-            self._min_material_sacrifice = criteria["min_material_sacrifice"]
+        if "shallow_depth_max" in criteria and criteria["shallow_depth_max"] != self._shallow_depth_max:
+            self._shallow_depth_max = criteria["shallow_depth_max"]
             changed = True
-        
-        if "max_eval_before" in criteria and criteria["max_eval_before"] != self._max_eval_before:
-            self._max_eval_before = criteria["max_eval_before"]
+
+        if "min_depths_show_error" in criteria and criteria["min_depths_show_error"] != self._min_depths_show_error:
+            self._min_depths_show_error = criteria["min_depths_show_error"]
             changed = True
-        
-        if "exclude_already_winning" in criteria and criteria["exclude_already_winning"] != self._exclude_already_winning:
-            self._exclude_already_winning = criteria["exclude_already_winning"]
+
+        if "require_blunder_only" in criteria and criteria["require_blunder_only"] != self._require_blunder_only:
+            self._require_blunder_only = criteria["require_blunder_only"]
             changed = True
-        
-        if "material_sacrifice_lookahead_plies" in criteria and criteria["material_sacrifice_lookahead_plies"] != self._material_sacrifice_lookahead_plies:
-            self._material_sacrifice_lookahead_plies = criteria["material_sacrifice_lookahead_plies"]
+
+        if "candidate_selection" in criteria and criteria["candidate_selection"] != self._candidate_selection:
+            self._candidate_selection = criteria["candidate_selection"]
             changed = True
-        
+
         if changed:
             self.settings_changed.emit()
     
@@ -169,10 +168,10 @@ class MoveClassificationModel(QObject):
             Dictionary with all criteria values.
         """
         return {
-            "min_eval_swing": self._min_eval_swing,
-            "min_material_sacrifice": self._min_material_sacrifice,
-            "max_eval_before": self._max_eval_before,
-            "exclude_already_winning": self._exclude_already_winning,
-            "material_sacrifice_lookahead_plies": self._material_sacrifice_lookahead_plies
+            "shallow_depth_min": self._shallow_depth_min,
+            "shallow_depth_max": self._shallow_depth_max,
+            "min_depths_show_error": self._min_depths_show_error,
+            "require_blunder_only": self._require_blunder_only,
+            "candidate_selection": self._candidate_selection
         }
 

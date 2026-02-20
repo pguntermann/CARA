@@ -5,8 +5,9 @@ import chess
 import chess.pgn
 import time
 import sys
-from typing import Dict, Any, Optional, List
-from PyQt6.QtCore import QObject, pyqtSignal, QTimer
+from pathlib import Path
+from typing import Dict, Any, Optional, List, Tuple
+from PyQt6.QtCore import QObject, pyqtSignal, QTimer, QModelIndex, Qt
 
 from app.models.game_model import GameModel
 from app.models.moveslist_model import MovesListModel
@@ -14,6 +15,7 @@ from app.models.engine_model import EngineModel
 from app.models.move_classification_model import MoveClassificationModel
 from app.models.database_model import DatabaseModel, GameData
 from app.services.game_analysis_engine_service import GameAnalysisEngineService
+from app.services.brilliant_move_detection_service import run_brilliant_move_detection
 from app.services.book_move_service import BookMoveService
 from app.services.opening_service import OpeningService
 from app.services.progress_service import ProgressService
@@ -107,7 +109,7 @@ class GameAnalysisController(QObject):
         self._move_depth = 0  # Store depth from position after analysis
         self._move_seldepth = 0  # Store seldepth from position after analysis (0 if engine does not report)
         self._consecutive_errors = 0  # Track consecutive errors to detect engine failure
-        self._post_game_brilliancy_refinement = False  # Post-game brilliancy refinement toggle
+        self._brilliant_move_detection = False  # Brilliant move detection toggle
         
         # Progress tracking
         self._last_progress_depth = 0
@@ -141,12 +143,12 @@ class GameAnalysisController(QObject):
         
         # Load defaults for brilliant criteria
         default_brilliant = game_analysis_config.get("brilliant_criteria", {})
-        self._min_eval_swing = default_brilliant.get("min_eval_swing", 50)
-        self._min_material_sacrifice = default_brilliant.get("min_material_sacrifice", 300)
-        self._max_eval_before = default_brilliant.get("max_eval_before", 500)
-        self._exclude_already_winning = default_brilliant.get("exclude_already_winning", True)
-        self._material_sacrifice_lookahead_plies = default_brilliant.get("material_sacrifice_lookahead_plies", 3)
-        
+        self._shallow_depth_min = default_brilliant.get("shallow_depth_min", 3)
+        self._shallow_depth_max = default_brilliant.get("shallow_depth_max", 7)
+        self._min_depths_show_error = default_brilliant.get("min_depths_show_error", 3)
+        self._require_blunder_only = default_brilliant.get("require_blunder_only", False)
+        self._candidate_selection = default_brilliant.get("candidate_selection", "best_move_only")
+
         # Override with user settings if available
         if self.user_settings_service:
             user_settings = self.user_settings_service.get_settings()
@@ -159,14 +161,13 @@ class GameAnalysisController(QObject):
                 self._inaccuracy_max_cpl = user_thresholds.get("inaccuracy_max_cpl", self._inaccuracy_max_cpl)
                 self._mistake_max_cpl = user_thresholds.get("mistake_max_cpl", self._mistake_max_cpl)
             
-            # Override brilliant criteria
+            # Override brilliant criteria (require_blunder_only is config-only, not overridden)
             user_brilliant = user_game_analysis.get("brilliant_criteria", {})
             if user_brilliant:
-                self._min_eval_swing = user_brilliant.get("min_eval_swing", self._min_eval_swing)
-                self._min_material_sacrifice = user_brilliant.get("min_material_sacrifice", self._min_material_sacrifice)
-                self._max_eval_before = user_brilliant.get("max_eval_before", self._max_eval_before)
-                self._exclude_already_winning = user_brilliant.get("exclude_already_winning", self._exclude_already_winning)
-                self._material_sacrifice_lookahead_plies = user_brilliant.get("material_sacrifice_lookahead_plies", self._material_sacrifice_lookahead_plies)
+                self._shallow_depth_min = user_brilliant.get("shallow_depth_min", self._shallow_depth_min)
+                self._shallow_depth_max = user_brilliant.get("shallow_depth_max", self._shallow_depth_max)
+                self._min_depths_show_error = user_brilliant.get("min_depths_show_error", self._min_depths_show_error)
+                self._candidate_selection = user_brilliant.get("candidate_selection", self._candidate_selection)
     
     def reload_settings(self) -> None:
         """Reload settings from config and user settings."""
@@ -203,40 +204,40 @@ class GameAnalysisController(QObject):
         return getattr(self, '_mistake_max_cpl', 200)
     
     @property
-    def min_eval_swing(self) -> int:
-        """Get minimum eval swing for brilliancy."""
+    def shallow_depth_min(self) -> int:
+        """Get minimum shallow depth for brilliancy detection."""
         if self.classification_model:
-            return self.classification_model.min_eval_swing
-        return getattr(self, '_min_eval_swing', 50)
+            return self.classification_model.shallow_depth_min
+        return getattr(self, '_shallow_depth_min', 2)
     
     @property
-    def min_material_sacrifice(self) -> int:
-        """Get minimum material sacrifice for brilliancy."""
+    def shallow_depth_max(self) -> int:
+        """Get maximum shallow depth for brilliancy detection."""
         if self.classification_model:
-            return self.classification_model.min_material_sacrifice
-        return getattr(self, '_min_material_sacrifice', 300)
-    
+            return self.classification_model.shallow_depth_max
+        return getattr(self, '_shallow_depth_max', 6)
+
     @property
-    def max_eval_before(self) -> int:
-        """Get maximum eval before move for brilliancy."""
+    def min_depths_show_error(self) -> int:
+        """Get minimum number of shallow depths that must show the move as Mistake/Blunder (min agreement)."""
         if self.classification_model:
-            return self.classification_model.max_eval_before
-        return getattr(self, '_max_eval_before', 500)
-    
+            return self.classification_model.min_depths_show_error
+        return getattr(self, '_min_depths_show_error', 1)
+
     @property
-    def exclude_already_winning(self) -> bool:
-        """Get exclude already winning flag for brilliancy."""
+    def require_blunder_only(self) -> bool:
+        """Get whether only Blunder (not Mistake) should be counted for brilliancy detection."""
         if self.classification_model:
-            return self.classification_model.exclude_already_winning
-        return getattr(self, '_exclude_already_winning', True)
-    
+            return self.classification_model.require_blunder_only
+        return getattr(self, '_require_blunder_only', False)
+
     @property
-    def material_sacrifice_lookahead_plies(self) -> int:
-        """Get material sacrifice lookahead plies for brilliancy."""
+    def candidate_selection(self) -> str:
+        """Get candidate selection mode for brilliancy detection ("best_move_only" or "best_or_good_move")."""
         if self.classification_model:
-            return self.classification_model.material_sacrifice_lookahead_plies
-        return getattr(self, '_material_sacrifice_lookahead_plies', 3)
-    
+            return self.classification_model.candidate_selection
+        return getattr(self, '_candidate_selection', "best_move_only")
+
     @property
     def is_analyzing(self) -> bool:
         """Check if analysis is currently running.
@@ -553,10 +554,10 @@ class GameAnalysisController(QObject):
                 # Analysis completed successfully
                 progress_service.set_status(f"Game Analysis completed: Analyzed {total_full_moves} moves")
                 
-                # If post-game brilliancy refinement is enabled, perform secondary pass
-                if self._post_game_brilliancy_refinement:
-                    progress_service.set_status("Performing post-game brilliancy refinement...")
-                    self._perform_post_game_brilliancy_refinement()
+                # If brilliant move detection is enabled, perform secondary pass
+                if self._brilliant_move_detection:
+                    progress_service.set_status("Performing brilliant move detection...")
+                    self._perform_brilliant_move_detection()
                 
                 # Set flag to True after refinement (if enabled) completes
                 self.game_model.set_is_game_analyzed(True)
@@ -856,29 +857,24 @@ class GameAnalysisController(QObject):
         move_info["eval_after"] = eval_after
         move_info["best_move_san"] = best_alternative_move
         move_info["cpl"] = cpl
+        move_info["is_mate_before"] = is_mate_before
+        move_info["mate_moves_before"] = mate_moves_before
         
         # Assess move quality
         if is_book_move:
             assess = "Book Move"
         else:
-            # Calculate material sacrifice for brilliant detection
-            material_sacrifice = self._calculate_material_sacrifice_for_brilliance(move_info)
-            
             # Prepare classification thresholds
             classification_thresholds = {
                 "good_move_max_cpl": self.good_move_max_cpl,
                 "inaccuracy_max_cpl": self.inaccuracy_max_cpl,
                 "mistake_max_cpl": self.mistake_max_cpl,
-                "min_eval_swing": self.min_eval_swing,
-                "min_material_sacrifice": self.min_material_sacrifice,
-                "max_eval_before": self.max_eval_before,
-                "exclude_already_winning": self.exclude_already_winning,
                 "best_move_is_mate": self._best_move_is_mate
             }
             
             assess = MoveAnalysisService.assess_move_quality(
                 cpl, eval_before, eval_after, move_info, best_alternative_move, moves_match,
-                classification_thresholds, material_sacrifice
+                classification_thresholds, material_sacrifice=0
             )
         
         # Calculate CPL for PV2 and PV3
@@ -1362,13 +1358,21 @@ class GameAnalysisController(QObject):
     
     
     
-    def set_post_game_brilliancy_refinement(self, enabled: bool) -> None:
-        """Set post-game brilliancy refinement toggle.
-        
+    def set_brilliant_move_detection(self, enabled: bool) -> None:
+        """Set brilliant move detection toggle.
+
         Args:
-            enabled: True if post-game brilliancy refinement is enabled, False otherwise.
+            enabled: True if brilliant move detection is enabled, False otherwise.
         """
-        self._post_game_brilliancy_refinement = enabled
+        self._brilliant_move_detection = enabled
+
+    def is_brilliant_move_detection_enabled(self) -> bool:
+        """Return whether brilliant move detection is enabled (e.g. for bulk analysis)."""
+        return self._brilliant_move_detection
+
+    def is_brilliant_move_detection_enabled(self) -> bool:
+        """Return whether brilliant move detection is enabled (e.g. for bulk analysis)."""
+        return self._brilliant_move_detection
     
     def _calculate_material_sacrifice_with_lookahead(self, move_info: Dict[str, Any], lookahead_plies: int = 3) -> int:
         """Calculate material sacrifice using multi-ply look-ahead.
@@ -1393,103 +1397,93 @@ class GameAnalysisController(QObject):
             move_info, self._moves_to_analyze, current_index, lookahead_plies
         )
     
-    def _perform_post_game_brilliancy_refinement(self) -> None:
-        """Perform post-game brilliancy refinement using multi-ply look-ahead.
+    def _perform_brilliant_move_detection(self) -> None:
+        """Perform brilliant move detection by analyzing moves at shallow depths.
         
-        This method re-checks all moves for brilliancy using a 2-3 ply look-ahead
-        for material sacrifice detection, which can catch sacrifices that aren't
-        immediately recaptured.
+        Uses the shared orchestrator; moves classified as "Best Move" at full depth
+        are re-analyzed at shallow depths and marked brilliant when appropriate.
         """
         if not self._moves_to_analyze:
             return
-        
-        from app.services.progress_service import ProgressService
-        from PyQt6.QtCore import QModelIndex, Qt
+
         progress_service = ProgressService.get_instance()
-        
-        moves_count = len(self._moves_to_analyze)
-        brilliant_count = 0
-        
-        # Re-check each move for brilliancy using refined material sacrifice calculation
-        for i, move_info in enumerate(self._moves_to_analyze):
-            # Get stored evaluation data
-            eval_before = move_info.get("eval_before", 0.0)
-            eval_after = move_info.get("eval_after", 0.0)
-            best_move_san = move_info.get("best_move_san", "")
-            cpl = move_info.get("cpl", 0.0)
+        logging_service = LoggingService.get_instance()
+
+        engine_assignment = self.engine_model.get_assignment(EngineModel.TASK_GAME_ANALYSIS)
+        if engine_assignment is None:
+            logging_service.warning("Brilliant move detection: No engine assigned to game analysis task")
+            return
+
+        engine = self.engine_model.get_engine(engine_assignment)
+        if engine is None or not engine.is_valid:
+            logging_service.warning("Brilliant move detection: Engine not available or invalid")
+            return
+
+        # Check if engine is incompatible with brilliancy detection
+        from app.services.brilliant_move_detection_service import is_engine_incompatible
+        if is_engine_incompatible(engine.name, self.config):
+            logging_service.warning(f"Brilliant move detection skipped: Engine '{engine.name}' is incompatible")
+            progress_service.set_status("Brilliant move detection skipped: incompatible engine")
             
-            # Calculate material sacrifice using multi-ply look-ahead
-            material_loss = self._calculate_material_sacrifice_with_lookahead(move_info, lookahead_plies=self.material_sacrifice_lookahead_plies)
+            # Show message dialog
+            from PyQt6.QtWidgets import QApplication
+            from app.views.message_dialog import MessageDialog
             
-            # Re-check brilliancy with refined material sacrifice
-            # Temporarily override material sacrifice calculation
-            original_method = self._calculate_material_sacrifice_for_brilliance
-            self._calculate_material_sacrifice_for_brilliance = lambda mi: material_loss if mi == move_info else original_method(mi)
-            
-            # Calculate material sacrifice for brilliant detection
-            material_sacrifice = self._calculate_material_sacrifice_for_brilliance(move_info)
-            
-            # Prepare classification thresholds
-            classification_thresholds = {
-                "good_move_max_cpl": self.good_move_max_cpl,
-                "inaccuracy_max_cpl": self.inaccuracy_max_cpl,
-                "mistake_max_cpl": self.mistake_max_cpl,
-                "min_eval_swing": self.min_eval_swing,
-                "min_material_sacrifice": self.min_material_sacrifice,
-                "max_eval_before": self.max_eval_before,
-                "exclude_already_winning": self.exclude_already_winning
-            }
-            
-            is_brilliant = MoveAnalysisService.is_brilliant_move(
-                eval_before, eval_after, move_info, best_move_san, cpl,
-                classification_thresholds, material_sacrifice
+            main_window = QApplication.activeWindow()
+            MessageDialog.show_information(
+                self.config,
+                "Brilliant Move Detection Skipped",
+                "Brilliant Move Detection requires a conventional engine. "
+                "Neural network-based engines (like lc0 or Maia) are too slow for this process.",
+                main_window
             )
-            
-            # Restore original method
-            self._calculate_material_sacrifice_for_brilliance = original_method
-            
-            # If move is now brilliant, update assessment
-            if is_brilliant:
-                move_number = move_info.get("move_number", 0)
-                is_white_move = move_info.get("is_white_move", True)
-                row_index = move_number - 1
-                
-                # Validate row_index
-                if 0 <= row_index < self.moves_list_model.rowCount():
-                    move_data = self.moves_list_model.get_move(row_index)
-                    if move_data:
-                        # Check current assessment
-                        current_assessment = move_data.assess_white if is_white_move else move_data.assess_black
-                        if current_assessment != "Brilliant":
-                            # Update assessment
-                            if is_white_move:
-                                move_data.assess_white = "Brilliant"
-                            else:
-                                move_data.assess_black = "Brilliant"
-                            
-                            brilliant_count += 1
-                            
-                            # Emit data changed signal
-                            parent = QModelIndex()
-                            top_left = self.moves_list_model.index(row_index, 0, parent)
-                            column_count = self.moves_list_model.columnCount(parent)
-                            if column_count > 0:
-                                bottom_right = self.moves_list_model.index(row_index, column_count - 1, parent)
-                            else:
-                                bottom_right = top_left
-                            
-                            if top_left.isValid() and bottom_right.isValid():
-                                self.moves_list_model.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
-            
-            # Update progress
-            if (i + 1) % 10 == 0 or i == moves_count - 1:
-                progress_service.set_status(f"Refining brilliancy: {i + 1}/{moves_count} moves checked")
-        
+            return
+
+        engine_path = engine.path if isinstance(engine.path, Path) else Path(engine.path)
+        engine_options = {}
+        if self.max_threads:
+            engine_options["Threads"] = self.max_threads
+
+        def get_move_data(row_index: int):
+            if 0 <= row_index < self.moves_list_model.rowCount():
+                return self.moves_list_model.get_move(row_index)
+            return None
+
+        def on_brilliant(row_index: int, is_white_move: bool, assessment_text: str) -> None:
+            parent = QModelIndex()
+            top_left = self.moves_list_model.index(row_index, 0, parent)
+            column_count = self.moves_list_model.columnCount(parent)
+            bottom_right = self.moves_list_model.index(row_index, column_count - 1, parent) if column_count > 0 else top_left
+            if top_left.isValid() and bottom_right.isValid():
+                self.moves_list_model.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
+
+        brilliant_count = run_brilliant_move_detection(
+            move_infos=self._moves_to_analyze,
+            get_move_data=get_move_data,
+            on_brilliant=on_brilliant,
+            shallow_depth_min=self.shallow_depth_min,
+            shallow_depth_max=self.shallow_depth_max,
+            min_depths_show_error=self.min_depths_show_error,
+            good_move_max_cpl=self.good_move_max_cpl,
+            inaccuracy_max_cpl=self.inaccuracy_max_cpl,
+            mistake_max_cpl=self.mistake_max_cpl,
+            engine_path=engine_path,
+            time_limit_ms=self.time_limit_ms,
+            max_threads=self.max_threads,
+            engine_name=engine.name,
+            engine_options=engine_options,
+            config=self.config,
+            require_blunder_only=self.require_blunder_only,
+            candidate_selection=self.candidate_selection,
+            on_progress=progress_service.set_status,
+            is_cancelled=lambda: False,
+        )
+
         if brilliant_count > 0:
-            progress_service.set_status(f"Post-game refinement: {brilliant_count} additional brilliant move(s) detected")
+            progress_service.set_status(f"Brilliant move detection: {brilliant_count} brilliant move(s) detected")
         else:
-            progress_service.set_status("Post-game refinement: No additional brilliant moves detected")
-    
+            progress_service.set_status("Brilliant move detection: No brilliant moves detected")
+
     def _find_database_model_for_game(self, game) -> Optional[DatabaseModel]:
         """Find the database model that contains the given game.
         
@@ -1522,7 +1516,7 @@ class GameAnalysisController(QObject):
         if self._engine_service:
             self._engine_service.cleanup()
             self._engine_service = None
-        
+
         if self._progress_timer:
             self._progress_timer.stop()
             self._progress_timer = None
