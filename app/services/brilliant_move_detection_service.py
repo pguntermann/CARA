@@ -10,6 +10,30 @@ from app.services.logging_service import LoggingService
 from app.services.engine_parameters_service import EngineParametersService
 
 
+def is_engine_incompatible(engine_name: str, config: Dict[str, Any]) -> bool:
+    """Check if engine is incompatible with brilliancy detection.
+    
+    Args:
+        engine_name: Engine name to check.
+        config: Configuration dictionary.
+        
+    Returns:
+        True if engine is incompatible, False otherwise.
+    """
+    brilliant_criteria = config.get("game_analysis", {}).get("brilliant_criteria", {})
+    incompatible_keywords = brilliant_criteria.get("incompatible_engines", [])
+    
+    if not incompatible_keywords or not engine_name:
+        return False
+    
+    engine_name_lower = engine_name.lower()
+    for keyword in incompatible_keywords:
+        if keyword.lower() in engine_name_lower:
+            return True
+    
+    return False
+
+
 def run_brilliant_move_detection(
     move_infos: List[Dict[str, Any]],
     get_move_data: Callable[[int], Optional[MoveData]],

@@ -177,6 +177,15 @@ class BulkAnalysisService(QObject):
         engine = self.engine_model.get_engine(engine_assignment)
         if engine is None or not engine.is_valid:
             return
+        
+        # Check if engine is incompatible with brilliancy detection
+        from app.services.brilliant_move_detection_service import is_engine_incompatible
+        if is_engine_incompatible(engine.name, self.config):
+            from app.services.logging_service import LoggingService
+            logging_service = LoggingService.get_instance()
+            logging_service.warning(f"Brilliant move detection skipped: Engine '{engine.name}' is incompatible")
+            return  # Skip silently, no message dialog
+        
         engine_path = Path(engine.path) if not isinstance(engine.path, Path) else engine.path
         engine_options = {}
         if self.max_threads:

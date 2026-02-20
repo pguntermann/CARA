@@ -1419,6 +1419,26 @@ class GameAnalysisController(QObject):
             logging_service.warning("Brilliant move detection: Engine not available or invalid")
             return
 
+        # Check if engine is incompatible with brilliancy detection
+        from app.services.brilliant_move_detection_service import is_engine_incompatible
+        if is_engine_incompatible(engine.name, self.config):
+            logging_service.warning(f"Brilliant move detection skipped: Engine '{engine.name}' is incompatible")
+            progress_service.set_status("Brilliant move detection skipped: incompatible engine")
+            
+            # Show message dialog
+            from PyQt6.QtWidgets import QApplication
+            from app.views.message_dialog import MessageDialog
+            
+            main_window = QApplication.activeWindow()
+            MessageDialog.show_information(
+                self.config,
+                "Brilliant Move Detection Skipped",
+                "Brilliant Move Detection requires a conventional engine. "
+                "Neural network-based engines (like lc0 or Maia) are too slow for this process.",
+                main_window
+            )
+            return
+
         engine_path = engine.path if isinstance(engine.path, Path) else Path(engine.path)
         engine_options = {}
         if self.max_threads:
