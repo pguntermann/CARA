@@ -1,5 +1,5 @@
 {
-  "version": "2.5.8",
+  "version": "2.5.9",
   "ui": {
     "styles": {
       "scrollbar": {
@@ -4235,20 +4235,55 @@
           "pre_block": {
             "font_family": "Monaco, Menlo, \"Liberation Mono\", Consolas, monospace",
             "font_size_offset": -1,
-            "background_color_offset": [-8, -8, 5],
-            "border_color_offset": [-15, -15, 10],
+            "background_color_offset": [
+              -8,
+              -8,
+              5
+            ],
+            "border_color_offset": [
+              -15,
+              -15,
+              10
+            ],
             "border_radius": 4,
-            "padding_em": [0.75, 1],
+            "padding_em": [
+              0.75,
+              1
+            ],
             "margin_top_em": 0.6,
             "margin_bottom_em": 0.8
           },
           "headings": {
-            "h1": { "margin_top_em": 0.75, "margin_bottom_em": 0.5, "font_size_em": 1.1 },
-            "h2": { "margin_top_em": 1, "margin_bottom_em": 0.4, "font_size_em": 1.35 },
-            "h3": { "margin_top_em": 0.85, "margin_bottom_em": 0.35, "font_size_em": 1.2 },
-            "h4": { "margin_top_em": 0.75, "margin_bottom_em": 0.3, "font_size_em": 1.05 },
-            "h5": { "margin_top_em": 0.65, "margin_bottom_em": 0.25, "font_size_em": 1 },
-            "h6": { "margin_top_em": 0.55, "margin_bottom_em": 0.2, "font_size_em": 0.95 }
+            "h1": {
+              "margin_top_em": 0.75,
+              "margin_bottom_em": 0.5,
+              "font_size_em": 1.1
+            },
+            "h2": {
+              "margin_top_em": 1,
+              "margin_bottom_em": 0.4,
+              "font_size_em": 1.35
+            },
+            "h3": {
+              "margin_top_em": 0.85,
+              "margin_bottom_em": 0.35,
+              "font_size_em": 1.2
+            },
+            "h4": {
+              "margin_top_em": 0.75,
+              "margin_bottom_em": 0.3,
+              "font_size_em": 1.05
+            },
+            "h5": {
+              "margin_top_em": 0.65,
+              "margin_bottom_em": 0.25,
+              "font_size_em": 1
+            },
+            "h6": {
+              "margin_top_em": 0.55,
+              "margin_bottom_em": 0.2,
+              "font_size_em": 0.95
+            }
           },
           "paragraph": {
             "margin_top_em": 0.4,

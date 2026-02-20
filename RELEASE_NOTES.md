@@ -1,5 +1,36 @@
 # Release Notes
 
+# CARA v2.5.9 - Improved Brilliant Move Detection
+
+**Release Date:** 20.02.2026
+
+This release introduces significant improvements to the brilliant move detection system and includes various bug fixes and UI enhancements. The evaluation bar now updates more smoothly when navigating moves, and no longer shows wrong or no updates in mating positions. Some PGN formatting edge-cases have been fixed.
+
+## Enhancements
+
+### Brilliant Move Detection
+**Big Thanks to Tibono2** from the HIARCS Chess forums (https://hiarcs.net/forums) for the idea and his subsequent vital contributions to make this feature possible.
+
+CARA's brilliant move detection system has been significantly improved with better accuracy and reliability. The system is based on the principle idea that brilliant moves often appear suboptimal when analyzed superficially but reveal their strength only through deeper calculation. By re-analyzing moves that were identified as very strong moves at full depth, but checking how they appear at shallow analysis depths, the system identifies those moves, which require deeper understanding to appreciate. 
+
+Users can fine-tune the detection system through the Move Classification Settings dialog. The shallow depth range (default: depths 3-7) determines which analysis depths are checked, while the minimum agreement requirement (default: 3 depths) controls how many shallow depths must classify the move as an error before it's marked as brilliant.
+
+### Minor Improvements
+- **Increased Default Movetime**: Increased default movetime when adding new engines from 300ms to 750ms, providing more accurate analysis results by default. Of course users may still change the engine configurations at any time in the engine configuration dialog.
+- **Improved Tooltips**: Minor improvements to tooltip formatting
+- **Improved PGN Copying**: Enhanced copying of filtered PGN text from the PGN pane, ensuring proper formatting and content preservation. (Please note that in most cases, copying the PGN using the Edit menu / Copy PGN should be preferred)
+- **Open User Data Directory**: Added option in the Help menu to open the resolved user data directory in Explorer (Windows) or Finder (macOS), making it easier to access configuration files and user data
+- **Documentation Viewer**: Added a dialog accessible from the Help menu to view RELEASE_NOTES, LICENSE, and THIRD_PARTY_LICENSES documents directly within the application
+- **Manual Updates**: Updated the HTML manual with the latest features and improvements
+
+## Bug Fixes
+
+- **Evaluation Bar Updates**: Fixed several bugs where the evaluation bar would not correctly update or show a wrong evaluation after navigating moves, especially in mating positions.
+- **PGN Formatting**: Fixed multiple bugs in PGN pane formatting logic and PGN formatter that could cause incorrect formatting or display issues
+- **Misc UI Fixes**: Fixed several minor UI issues, especially concerning message-dialogs.
+
+---
+
 # CARA v2.5.8 - Bug Fixes and User Experience Improvements
 
 **Release Date:** 16.02.2026

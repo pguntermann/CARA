@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-lightgrey.svg)]()
 
-**Version 2.5.8**
+**Version 2.5.9**
 
 CARA is a full-featured desktop application designed for analyzing and reviewing chess games. Unlike chess playing applications or puzzle solvers, CARA focuses exclusively on post-game analysis and review, helping you understand your games, identify mistakes, recognize patterns, and improve your chess understanding.
 
@@ -298,6 +298,13 @@ CARA relies on several open-source projects and resources:
   - **Polyglot Opening Books**: Polyglot format originally developed by Fabien Letouzey; see the [Polyglot repository](https://github.com/sshivaji/polyglot) maintained by sshivaji
 
 The author expresses sincere appreciation to the developers and maintainers of these open-source projects and resources.
+
+## Special Mentions
+
+Special thanks to the members of the [HIARCS chess forum](https://hiarcs.net/forums/) for their help in testing and refining the application.
+
+- **Tibono2:** For his work on the ELO estimation formulas, the brilliancy detection system, testing and identifying bugs.
+- **Leto:** For his feature suggestions and also testing and identifying bugs.
 
 ---
 
