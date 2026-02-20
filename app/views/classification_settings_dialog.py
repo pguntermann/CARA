@@ -22,6 +22,7 @@ from typing import Optional, Dict, Any, Tuple
 from app.controllers.move_classification_controller import MoveClassificationController
 from app.controllers.classification_settings_controller import ClassificationSettingsController
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.tooltip_utils import wrap_tooltip_text
 
 
 class CPLScaleWidget(QWidget):
@@ -621,7 +622,7 @@ class ClassificationSettingsDialog(QDialog):
         self.shallow_depth_min_spinbox.setValue(self.current_brilliant.get("shallow_depth_min", 3))
         self.shallow_depth_min_spinbox.setFixedWidth(input_width)
         self.shallow_depth_min_spinbox.setMinimumHeight(25)
-        self.shallow_depth_min_spinbox.setToolTip("Minimum shallow depth to check for brilliancy detection. Moves classified as Best Move or Good Move at normal depth will be re-analyzed starting at this depth.")
+        self.shallow_depth_min_spinbox.setToolTip(wrap_tooltip_text("Minimum shallow depth to check for brilliancy detection. Candidate moves will be re-analyzed starting at this depth."))
         form_layout.addRow(create_label("Shallow Depth Min:"), create_input_widget(self.shallow_depth_min_spinbox))
         
         # Shallow Depth Max
@@ -630,7 +631,7 @@ class ClassificationSettingsDialog(QDialog):
         self.shallow_depth_max_spinbox.setValue(self.current_brilliant.get("shallow_depth_max", 7))
         self.shallow_depth_max_spinbox.setFixedWidth(input_width)
         self.shallow_depth_max_spinbox.setMinimumHeight(25)
-        self.shallow_depth_max_spinbox.setToolTip("Maximum shallow depth to check for brilliancy detection. Moves will be checked iteratively from Shallow Depth Min up to this depth.")
+        self.shallow_depth_max_spinbox.setToolTip(wrap_tooltip_text("Maximum shallow depth to check for brilliancy detection. Candidate moves will be checked iteratively from Shallow Depth Min up to this depth."))
         form_layout.addRow(create_label("Shallow Depth Max:"), create_input_widget(self.shallow_depth_max_spinbox))
         
         # Min Agreement
@@ -639,7 +640,7 @@ class ClassificationSettingsDialog(QDialog):
         self.min_depths_show_error_spinbox.setValue(self.current_brilliant.get("min_depths_show_error", 3))
         self.min_depths_show_error_spinbox.setFixedWidth(input_width)
         self.min_depths_show_error_spinbox.setMinimumHeight(25)
-        self.min_depths_show_error_spinbox.setToolTip("Minimum number of shallow depths (between Min and Max) at which the move must look like a Mistake or Blunder to be marked brilliant. Higher values reduce false positives.")
+        self.min_depths_show_error_spinbox.setToolTip(wrap_tooltip_text("Minimum number of shallow depths (between Min and Max) at which a candidate move must show an error to be marked brilliant. Higher values reduce false positives."))
         form_layout.addRow(create_label("Min Agreement:"), create_input_widget(self.min_depths_show_error_spinbox))
         
         # Move Candidate Selection
@@ -651,7 +652,7 @@ class ClassificationSettingsDialog(QDialog):
         combobox_width = int(input_width * 1.75)
         self.candidate_selection_combobox.setFixedWidth(combobox_width)
         self.candidate_selection_combobox.setMinimumHeight(25)
-        self.candidate_selection_combobox.setToolTip("Choose which moves to check for brilliancy: 'Best Move only' checks only moves classified as Best Move, 'Best or Good Move' also includes Good Move assessments (may increase detection time).")
+        self.candidate_selection_combobox.setToolTip(wrap_tooltip_text("Choose which candidate moves to check for brilliancy detection. Selecting \"Best or Good Move\" may increase detection time."))
         form_layout.addRow(create_label("Move Candidate:"), create_combobox_widget(self.candidate_selection_combobox))
         
         group.setLayout(form_layout)

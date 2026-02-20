@@ -39,6 +39,7 @@ from app.models.database_model import DatabaseModel, GameData
 from app.controllers.engine_controller import TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS
 from app.services.pgn_cleaning_service import PgnCleaningService
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.tooltip_utils import wrap_tooltip_text
 from typing import Dict, Any, Optional, List
 
 
@@ -104,8 +105,8 @@ class MainWindow(QMainWindow):
     
     def _setup_tooltip_styling(self) -> None:
         """Setup QToolTip styling to ensure proper colors regardless of OS theme."""
-        # Get tooltip configuration
-        tooltip_config = self.config.get('ui', {}).get('positional_heatmap', {}).get('tooltip', {})
+        # Get general tooltip configuration
+        tooltip_config = self.config.get('ui', {}).get('styles', {}).get('tooltip', {})
         
         # Extract colors with defaults
         bg_color = tooltip_config.get('background_color', [45, 45, 50])
@@ -116,6 +117,8 @@ class MainWindow(QMainWindow):
         padding = tooltip_config.get('padding', 10)
         
         # Create QToolTip stylesheet
+        # Tooltip text must be wrapped in HTML for word-wrapping to work
+        # See wrap_tooltip_text() utility function
         tooltip_stylesheet = f"""
             QToolTip {{
                 background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});

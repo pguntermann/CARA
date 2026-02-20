@@ -222,6 +222,26 @@
           2,
           4
         ]
+      },
+      "tooltip": {
+        "background_color": [
+          45,
+          45,
+          50
+        ],
+        "border_color": [
+          60,
+          60,
+          65
+        ],
+        "border_width": 1,
+        "border_radius": 5,
+        "padding": 10,
+        "text_color": [
+          220,
+          220,
+          220
+        ]
       }
     },
     "window": {
