@@ -131,6 +131,9 @@ def run_brilliant_move_detection(
         disable_skip_playedmove_match_bestmove = brilliant_criteria_config.get(
             "disable_skip_playedmove_match_bestmove", False
         )
+        append_depthlevels = brilliant_criteria_config.get(
+            "append_depthlevels_to_classification_text", False
+        )
         logging_service.info(
             f"Brilliant move detection: Checking {total_candidates} candidate moves ({candidate_text}), "
             f"min_depths_required={min_depths_required} (depths {shallow_depth_min}-{shallow_depth_max}), "
@@ -307,11 +310,10 @@ def run_brilliant_move_detection(
             if depths_show_error >= min_depths_required:
                 current_assessment = move_data.assess_white if is_white_move else move_data.assess_black
                 if not current_assessment.startswith("Brilliant"):
-                    assessment_text = (
-                        f"Brilliant ({','.join(map(str, sorted(brilliant_depths)))})"
-                        if brilliant_depths
-                        else "Brilliant"
-                    )
+                    if append_depthlevels and brilliant_depths:
+                        assessment_text = f"Brilliant ({','.join(map(str, sorted(brilliant_depths)))})"
+                    else:
+                        assessment_text = "Brilliant"
                     if is_white_move:
                         move_data.assess_white = assessment_text
                     else:
