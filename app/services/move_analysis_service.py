@@ -97,20 +97,9 @@ class MoveAnalysisService:
                     signed_cpl = eval_after - eval_after_best_move  # Black lost if White's eval rose
                 return max(0.0, signed_cpl)
             else:
-                # Fallback to old method: compare eval_before vs. eval_after
-                # For white moves, if eval decreases, white lost centipawns
-                # For black moves, if eval increases, black lost centipawns
-                if is_white_move:
-                    # White just moved - eval should be from white's perspective
-                    # If eval_before was positive and eval_after is less positive, white lost
-                    eval_change = eval_before - eval_after
-                else:
-                    # Black just moved - eval should be from black's perspective
-                    # If eval_before was negative and eval_after is less negative, black lost
-                    eval_change = eval_after - eval_before
-                
-                # CPL is the absolute value of the loss
-                return abs(eval_change)
+                # No best-move eval: compare position before move vs after (played) move.
+                # CPL = loss relative to previous position (different from branch above, which uses best-move result as reference).
+                return MoveAnalysisService._cpl_signed_eval(eval_before, eval_after, is_white_move)
     
     @staticmethod
     def _cpl_signed_eval(eval_before: float, eval_after: float, is_white_move: bool) -> float:
@@ -165,7 +154,8 @@ class MoveAnalysisService:
                 mate_distance_after = abs(mate_moves_after)
                 mate_distance_change = mate_distance_after - mate_distance_before
                 mover_winning = (is_white_move and mate_moves_after > 0) or (not is_white_move and mate_moves_after < 0)
-                good_move = (mover_winning and mate_distance_change <= 0) or (not mover_winning and mate_distance_change < 0)
+                # Winner: good = mate got closer (change <= 0). Loser: good = mate got further away (change > 0).
+                good_move = (mover_winning and mate_distance_change <= 0) or (not mover_winning and mate_distance_change > 0)
                 return abs(mate_distance_change) * 50 if good_move else max(0, mate_distance_change) * 100
             
             # Mate switched sides
