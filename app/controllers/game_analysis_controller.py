@@ -889,18 +889,18 @@ class GameAnalysisController(QObject):
             if is_white_move:
                 # For white moves, use pv2_score and pv3_score (from white's perspective)
                 if pv2_score != 0.0:  # Only calculate if PV2 score is available
-                    cpl_2 = MoveAnalysisService.calculate_pv_cpl(pv2_score, eval_after)
+                    cpl_2 = MoveAnalysisService.calculate_pv_cpl(pv2_score, eval_after, is_white_move)
                     cpl_white_2_str = MoveAnalysisService.format_cpl(cpl_2)
                 if pv3_score != 0.0:  # Only calculate if PV3 score is available
-                    cpl_3 = MoveAnalysisService.calculate_pv_cpl(pv3_score, eval_after)
+                    cpl_3 = MoveAnalysisService.calculate_pv_cpl(pv3_score, eval_after, is_white_move)
                     cpl_white_3_str = MoveAnalysisService.format_cpl(cpl_3)
             else:
-                # For black moves, use pv2_score_black and pv3_score_black (from black's perspective)
+                # For black moves, use pv2_score_black and pv3_score_black (White's perspective)
                 if pv2_score_black != 0.0:  # Only calculate if PV2 score is available
-                    cpl_2 = MoveAnalysisService.calculate_pv_cpl(pv2_score_black, eval_after)
+                    cpl_2 = MoveAnalysisService.calculate_pv_cpl(pv2_score_black, eval_after, is_white_move)
                     cpl_black_2_str = MoveAnalysisService.format_cpl(cpl_2)
                 if pv3_score_black != 0.0:  # Only calculate if PV3 score is available
-                    cpl_3 = MoveAnalysisService.calculate_pv_cpl(pv3_score_black, eval_after)
+                    cpl_3 = MoveAnalysisService.calculate_pv_cpl(pv3_score_black, eval_after, is_white_move)
                     cpl_black_3_str = MoveAnalysisService.format_cpl(cpl_3)
         
         # Format evaluation

@@ -113,6 +113,15 @@ class MoveAnalysisService:
                 return abs(eval_change)
     
     @staticmethod
+    def _cpl_signed_eval(eval_before: float, eval_after: float, is_white_move: bool) -> float:
+        """Return CPL from signed comparison (eval from White's perspective)."""
+        if is_white_move:
+            signed_cpl = eval_before - eval_after  # White lost if eval dropped
+        else:
+            signed_cpl = eval_after - eval_before  # Black lost if White's eval rose
+        return max(0.0, signed_cpl)
+    
+    @staticmethod
     def calculate_cpl_for_mate(
         is_white_move: bool,
         eval_before: float,
@@ -136,13 +145,10 @@ class MoveAnalysisService:
         Returns:
             CPL value in centipawns.
         """
-        # If neither position is mate, this shouldn't be called, but handle it
+        # Neither position is mate (e.g. mate branch was entered due to main-analysis is_mate_before
+        # while shallow analysis sees no mate in either resulting position).
         if not is_mate_before and not is_mate_after:
-            # Fall back to normal calculation
-            if is_white_move:
-                return abs(eval_before - eval_after)
-            else:
-                return abs(eval_after - eval_before)
+            return MoveAnalysisService._cpl_signed_eval(eval_before, eval_after, is_white_move)
         
         # Both positions are mate
         if is_mate_before and is_mate_after:
@@ -152,135 +158,47 @@ class MoveAnalysisService:
                 # Checkmate achieved - this is the best move
                 return 0.0
             
-            # Mate moves: positive = white winning, negative = black winning
-            # If mate is for the same side, compare distances
-            # Same side is winning - calculate difference in mate distance
+            # Mate moves: positive = white winning, negative = black winning.
+            # Same side winning: compare mate distance (smaller = closer to mate = better).
             if (mate_moves_before > 0 and mate_moves_after > 0) or (mate_moves_before < 0 and mate_moves_after < 0):
-                # Same side is winning - calculate difference in mate distance
-                # Note: mate_moves is the number of moves TO mate, so smaller = closer to mate = better
                 mate_distance_before = abs(mate_moves_before)
                 mate_distance_after = abs(mate_moves_after)
                 mate_distance_change = mate_distance_after - mate_distance_before
-                
-                # Calculate CPL based on whether the move improved or worsened the position
-                # mate_distance_change > 0 means mate got further away (worse for the winning side)
-                # mate_distance_change < 0 means mate got closer (better for the winning side)
-                
-                # For the winning side: negative change (closer to mate) = good, positive change (further) = bad
-                # For the losing side: any change that makes mate further away is good
-                
-                if is_white_move:
-                    # White just moved
-                    if mate_moves_after > 0:
-                        # White is winning
-                        # Negative change = closer to mate (good) = low CPL
-                        # Positive change = further from mate (bad) = high CPL
-                        if mate_distance_change <= 0:
-                            # Mate got closer or stayed same - good move
-                            return abs(mate_distance_change) * 50  # Small CPL
-                        else:
-                            # Mate got further away - bad move
-                            return mate_distance_change * 100
-                    else:
-                        # Black is winning (white is losing)
-                        # Negative change = mate got further away (good for white) = low CPL
-                        # Positive change = mate got closer (bad for white) = high CPL
-                        if mate_distance_change >= 0:
-                            # Mate got closer or stayed same - bad for white
-                            return mate_distance_change * 100
-                        else:
-                            # Mate got further away - good for white
-                            return abs(mate_distance_change) * 50
-                else:
-                    # Black just moved
-                    if mate_moves_after < 0:
-                        # Black is winning
-                        # Negative change = closer to mate (good) = low CPL
-                        # Positive change = further from mate (bad) = high CPL
-                        if mate_distance_change <= 0:
-                            # Mate got closer or stayed same - good move
-                            return abs(mate_distance_change) * 50
-                        else:
-                            # Mate got further away - bad move
-                            return mate_distance_change * 100
-                    else:
-                        # White is winning (black is losing)
-                        # Negative change = mate got further away (good for black) = low CPL
-                        # Positive change = mate got closer (bad for black) = high CPL
-                        if mate_distance_change >= 0:
-                            # Mate got closer or stayed same - bad for black
-                            return mate_distance_change * 100
-                        else:
-                            # Mate got further away - good for black
-                            return abs(mate_distance_change) * 50
+                mover_winning = (is_white_move and mate_moves_after > 0) or (not is_white_move and mate_moves_after < 0)
+                good_move = (mover_winning and mate_distance_change <= 0) or (not mover_winning and mate_distance_change < 0)
+                return abs(mate_distance_change) * 50 if good_move else max(0, mate_distance_change) * 100
             
-            else:
-                # Mate switched sides - this is a huge mistake
-                # Use the evaluation difference as CPL
-                if is_white_move:
-                    return abs(eval_before - eval_after)
-                else:
-                    return abs(eval_after - eval_before)
+            # Mate switched sides
+            return MoveAnalysisService._cpl_signed_eval(eval_before, eval_after, is_white_move)
         
         # Only position before is mate
         elif is_mate_before:
-            # Position before was mate, after is not
-            # This means the move escaped mate (or the engine evaluation changed)
-            # Calculate based on evaluation change
-            if is_white_move:
-                return abs(eval_before - eval_after)
-            else:
-                return abs(eval_after - eval_before)
+            return MoveAnalysisService._cpl_signed_eval(eval_before, eval_after, is_white_move)
         
-        # Only position after is mate
+        # Only position after is mate (creating mate = 0 CPL, allowing mate = blunder)
         else:  # is_mate_after
-            # Position before was not mate, after is mate
-            # This could be a good move (creating mate) or a bad move (allowing mate)
-            
-            # Check if mate is for the side that just moved (creating mate) or opponent (allowing mate)
-            # mate_moves_after = 0 means checkmate for the side to move
-            # If white just moved and mate_moves_after = 0, then black is to move and black is mated → white created checkmate
-            # If black just moved and mate_moves_after = 0, then white is to move and white is mated → black created checkmate
-            if is_white_move:
-                # White just moved - check if mate benefits white
-                if mate_moves_after > 0:
-                    # White created mate in N moves - this is a GOOD move
-                    return 0.0
-                elif mate_moves_after == 0:
-                    # mate_moves_after = 0 means checkmate for the side to move (Black)
-                    # Since White just moved, Black is to move and Black is mated → White created checkmate
-                    # This is the BEST move - CPL should be 0
-                    return 0.0
-                else:
-                    # White allowed mate for black (mate_moves_after < 0) - this is a BLUNDER
-                    # CPL = difference in evaluation
-                    return abs(eval_before - eval_after)
-            else:
-                # Black just moved - check if mate benefits black
-                if mate_moves_after < 0:
-                    # Black created mate in N moves - this is a GOOD move
-                    return 0.0
-                elif mate_moves_after == 0:
-                    # mate_moves_after = 0 means checkmate for the side to move (White)
-                    # Since Black just moved, White is to move and White is mated → Black created checkmate
-                    # This is the BEST move - CPL should be 0
-                    return 0.0
-                else:
-                    # Black allowed mate for white (mate_moves_after > 0) - this is a BLUNDER
-                    return abs(eval_after - eval_before)
+            mate_benefits_mover = (is_white_move and mate_moves_after >= 0) or (not is_white_move and mate_moves_after <= 0)
+            if mate_benefits_mover:
+                return 0.0
+            return MoveAnalysisService._cpl_signed_eval(eval_before, eval_after, is_white_move)
     
     @staticmethod
-    def calculate_pv_cpl(pv_score: float, eval_after: float) -> float:
+    def calculate_pv_cpl(pv_score: float, eval_after: float, is_white_move: bool) -> float:
         """Calculate CPL for PV2/PV3 moves.
         
         Args:
-            pv_score: Evaluation score for the PV move (centipawns).
-            eval_after: Evaluation after the played move (centipawns).
+            pv_score: Evaluation score for the PV move (centipawns, White's perspective).
+            eval_after: Evaluation after the played move (centipawns, White's perspective).
+            is_white_move: True if white just moved, False if black.
             
         Returns:
-            CPL value in centipawns.
+            CPL value in centipawns (0 if played move is better than or equal to PV).
         """
-        return abs(pv_score - eval_after)
+        if is_white_move:
+            signed_cpl = pv_score - eval_after  # White lost if eval dropped vs PV
+        else:
+            signed_cpl = eval_after - pv_score  # Black lost if White's eval rose vs PV
+        return max(0.0, signed_cpl)
     
     @staticmethod
     def is_move_in_top3(
