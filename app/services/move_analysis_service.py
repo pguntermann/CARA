@@ -88,8 +88,14 @@ class MoveAnalysisService:
             # Normal centipawn evaluation
             # Use best move evaluation if available for more accurate comparison
             if eval_after_best_move is not None:
-                # CPL = difference between evaluation after best move vs. evaluation after played move
-                return abs(eval_after_best_move - eval_after)
+                # Signed comparison: loss from the mover's perspective (eval is from White's view).
+                # Only positive loss counts as CPL; if played move is better than "best", CPL = 0.
+                # Required when "best" is from a separate shallow run (e.g. brilliancy check).
+                if is_white_move:
+                    signed_cpl = eval_after_best_move - eval_after  # White lost if eval dropped
+                else:
+                    signed_cpl = eval_after - eval_after_best_move  # Black lost if White's eval rose
+                return max(0.0, signed_cpl)
             else:
                 # Fallback to old method: compare eval_before vs. eval_after
                 # For white moves, if eval decreases, white lost centipawns
