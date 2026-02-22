@@ -4,12 +4,12 @@
 
 **Release Date:** 22.02.2026
 
-This is a patch release that fixes two bugs in the brilliant move detection system: a CPL (Centipawn Loss) calculation bug that could affect which moves were classified as brilliant, and an issue where missed moves were not counted as errors during brilliant move detection.
+This is a patch release that fixes two bugs in the brilliant move detection system: a CPL (Centipawn Loss) calculation bug that could lead to some false positives, and an issue where missed moves were not counted as errors.
 
 ## Bug Fixes
 
-- **CPL Calculation (Brilliant Move Detection)**: Fixed a bug in the CPL comparison logic used during brilliant move detection. The CPL calculation methods in the move analysis service were refactored and simplified, including the handling of mating positions (`calculate_cpl_for_mate`), ensuring correct comparisons when determining whether a move qualifies as brilliant.
-- **Missed Moves as Errors (Brilliant Move Detection)**: Fixed brilliant move detection not considering missed moves as errors. The system now correctly treats missed moves (e.g. when the player did not play the best move) as errors when evaluating shallow-depth classifications, so brilliant move detection behaves as intended. (Closes #51)
+- **CPL Calculation**: Fixed a bug in the CPL comparison logic used during brilliant move detection. The CPL calculation methods in the move analysis service were refactored and simplified, including the handling of mating positions (`calculate_cpl_for_mate`), ensuring correct comparisons when determining whether a move qualifies as brilliant.
+- **Missed Moves as Errors**: The system now treats missed moves as errors by default. This can be customized in the config.json configuration file.
 
 ---
 
