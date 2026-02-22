@@ -48,8 +48,8 @@ class MoveClassificationController:
         thresholds = {**default_thresholds, **user_thresholds}
         brilliant = {**default_brilliant, **user_brilliant}
         
-        # require_blunder_only is config-only, always use from config
-        brilliant["require_blunder_only"] = default_brilliant.get("require_blunder_only", False)
+        # shallow_error_classifications is config-only, always use from config
+        brilliant["shallow_error_classifications"] = default_brilliant.get("shallow_error_classifications", ["Mistake", "Blunder", "Miss"])
         
         # Load into model
         self.classification_model.load_settings(thresholds, brilliant)
@@ -60,8 +60,9 @@ class MoveClassificationController:
         Returns:
             True if save was successful, False otherwise.
         """
-        # Update settings through UserSettingsService
-        # Note: require_blunder_only is included but will be ignored on load (read from config only)
+        # Update settings through UserSettingsService. brilliant_criteria comes from
+        # get_brilliant_criteria() (so it contains shallow_error_classifications); on load we
+        # overwrite shallow_error_classifications from config only.
         self.settings_service.update_game_analysis_settings({
             "assessment_thresholds": self.classification_model.get_assessment_thresholds(),
             "brilliant_criteria": self.classification_model.get_brilliant_criteria()

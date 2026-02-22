@@ -1291,7 +1291,7 @@
                     <strong>Advanced Configuration:</strong><br><br>
                     Additional settings are available in <code>config.json</code> under <code>game_analysis.brilliant_criteria</code>:<br><br>
                     • <code>append_depthlevels_to_classification_text</code>: Appends the shallow depth levels at which the move was still considered an error to the Move Classification text. This can be useful when you want to fine-tune the settings and understand at which levels the move matched the criteria.<br><br>
-                    • <code>require_blunder_only</code>: Only counts moves as errors if they are classified as "Blunder" at shallow depths, not "Mistake". This makes the detection stricter and reduces false positives. Enable this if you are using shorter move times and experience too many false positives.<br><br>
+                    • <code>shallow_error_classifications</code>: Array of move classification names that count as an error at shallow depth (e.g. <code>["Mistake", "Blunder", "Miss"]</code>). A candidate move is marked brilliant only if at least Min Agreement shallow depths classify it as one of these. Default includes Miss, Mistake, and Blunder. Use e.g. <code>["Blunder"]</code> for stricter detection.<br><br>
                     • <code>incompatible_engines</code>: List of engine name keywords that should skip brilliancy detection. Neural network engines like lc0 or Maia are usually too slow for this process, due to how they work in terms of their calculation depth. Remove/Re-enable at your own risk.
                 </div>
                 

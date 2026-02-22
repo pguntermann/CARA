@@ -4812,7 +4812,7 @@
       "shallow_depth_min": 3,
       "shallow_depth_max": 7,
       "min_depths_show_error": 3,
-      "require_blunder_only": false,
+      "shallow_error_classifications": ["Mistake", "Blunder", "Miss"],
       "disable_skip_playedmove_match_bestmove": false,
       "append_depthlevels_to_classification_text": false,
       "incompatible_engines": [

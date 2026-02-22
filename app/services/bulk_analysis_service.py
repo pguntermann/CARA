@@ -134,7 +134,7 @@ class BulkAnalysisService(QObject):
             self.shallow_depth_min = self.classification_model.shallow_depth_min
             self.shallow_depth_max = self.classification_model.shallow_depth_max
             self.min_depths_show_error = self.classification_model.min_depths_show_error
-            self.require_blunder_only = self.classification_model.require_blunder_only
+            self.shallow_error_classifications = self.classification_model.shallow_error_classifications
             self.candidate_selection = self.classification_model.candidate_selection
         else:
             # Fallback to config defaults
@@ -145,7 +145,7 @@ class BulkAnalysisService(QObject):
             self.shallow_depth_min = classification_config.get("shallow_depth_min", 3)
             self.shallow_depth_max = classification_config.get("shallow_depth_max", 7)
             self.min_depths_show_error = brilliant_criteria.get("min_depths_show_error", 3)
-            self.require_blunder_only = brilliant_criteria.get("require_blunder_only", False)
+            self.shallow_error_classifications = brilliant_criteria.get("shallow_error_classifications", ["Mistake", "Blunder", "Miss"])
             self.candidate_selection = brilliant_criteria.get("candidate_selection", "best_move_only")
     
     def cancel(self) -> None:
@@ -216,7 +216,7 @@ class BulkAnalysisService(QObject):
             engine_name=engine.name,
             engine_options=engine_options,
             config=self.config,
-            require_blunder_only=self.require_blunder_only,
+            error_classifications=self.shallow_error_classifications,
             candidate_selection=self.candidate_selection,
             on_progress=on_progress,
             is_cancelled=lambda: self._cancelled,

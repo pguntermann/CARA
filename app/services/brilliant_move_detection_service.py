@@ -50,7 +50,7 @@ def run_brilliant_move_detection(
     engine_name: str,
     engine_options: Dict[str, Any],
     config: Dict[str, Any],
-    require_blunder_only: bool = False,
+    error_classifications: Optional[List[str]] = None,
     candidate_selection: str = "best_move_only",
     on_progress: Optional[Callable[[str], None]] = None,
     is_cancelled: Optional[Callable[[], bool]] = None,
@@ -59,8 +59,8 @@ def run_brilliant_move_detection(
 
     Candidates are moves classified as "Best Move" (or "Best Move" and "Good Move" if candidate_selection
     is "best_or_good_move") at full depth. For each candidate, positions are analyzed at shallow depths;
-    if at least min_depths_show_error depths classify the move as Mistake/Blunder (or Blunder only if
-    require_blunder_only=True), the move is marked brilliant.
+    if at least min_depths_show_error depths classify the move as one of the error_classifications
+    (e.g. Mistake, Blunder, Miss), the move is marked brilliant.
 
     Args:
         move_infos: List of move info dicts (fen_before, move_san, board_before, eval_before,
@@ -69,7 +69,7 @@ def run_brilliant_move_detection(
         on_brilliant: Callable(row_index, is_white_move, assessment_text) when a move is brilliant.
         shallow_depth_min: Minimum shallow depth to check.
         shallow_depth_max: Maximum shallow depth to check.
-        min_depths_show_error: Minimum number of depths that must show Mistake/Blunder.
+        min_depths_show_error: Minimum number of depths that must show an error (classification in error_classifications).
         good_move_max_cpl: CPL threshold for good move (classification).
         inaccuracy_max_cpl: CPL threshold for inaccuracy (classification).
         mistake_max_cpl: CPL threshold for mistake (classification).
@@ -87,6 +87,8 @@ def run_brilliant_move_detection(
     """
     if not move_infos:
         return 0
+    if error_classifications is None:
+        error_classifications = ["Mistake", "Blunder", "Miss"]
     logging_service = LoggingService.get_instance()
     _is_cancelled = is_cancelled if is_cancelled else lambda: False
     _on_progress = on_progress if on_progress else lambda _: None
@@ -149,7 +151,7 @@ def run_brilliant_move_detection(
                     candidate_moves.append((i, move_info, move_data, is_white_move, row_index))
 
         total_candidates = len(candidate_moves)
-        error_severity_text = "Blunder" if require_blunder_only else "Mistake or Blunder"
+        error_severity_text = ", ".join(error_classifications) if error_classifications else "Mistake, Blunder, Miss"
         candidate_text = "Best Move or Good Move" if candidate_selection == "best_or_good_move" else "Best Move only"
         brilliant_criteria_config = config.get("game_analysis", {}).get("brilliant_criteria", {})
         disable_skip_playedmove_match_bestmove = brilliant_criteria_config.get(
@@ -305,10 +307,7 @@ def run_brilliant_move_detection(
                         classification_thresholds,
                         material_sacrifice=0,
                     )
-                    if require_blunder_only:
-                        counted = shallow_assessment == "Blunder"
-                    else:
-                        counted = shallow_assessment in ["Mistake", "Blunder"]
+                    counted = shallow_assessment in error_classifications
                     if counted:
                         depths_show_error += 1
                         brilliant_depths.append(depth)
@@ -316,7 +315,7 @@ def run_brilliant_move_detection(
                         f"  depth {depth}: best={shallow_best_move_san} (eval={eval_after_best_shallow:.0f}), "
                         f"played={played_move_san} (eval={eval_after_shallow:.0f}), "
                         f"CPL={shallow_cpl:.0f} → {shallow_assessment} "
-                        f"(counted={'yes' if counted else 'no'}, require_blunder_only={require_blunder_only})"
+                        f"(counted={'yes' if counted else 'no'}, error_classifications={error_classifications})"
                     )
                 except Exception as e:
                     logging_service.debug(

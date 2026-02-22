@@ -146,7 +146,7 @@ class GameAnalysisController(QObject):
         self._shallow_depth_min = default_brilliant.get("shallow_depth_min", 3)
         self._shallow_depth_max = default_brilliant.get("shallow_depth_max", 7)
         self._min_depths_show_error = default_brilliant.get("min_depths_show_error", 3)
-        self._require_blunder_only = default_brilliant.get("require_blunder_only", False)
+        self._shallow_error_classifications = default_brilliant.get("shallow_error_classifications", ["Mistake", "Blunder", "Miss"])
         self._candidate_selection = default_brilliant.get("candidate_selection", "best_move_only")
 
         # Override with user settings if available
@@ -161,7 +161,7 @@ class GameAnalysisController(QObject):
                 self._inaccuracy_max_cpl = user_thresholds.get("inaccuracy_max_cpl", self._inaccuracy_max_cpl)
                 self._mistake_max_cpl = user_thresholds.get("mistake_max_cpl", self._mistake_max_cpl)
             
-            # Override brilliant criteria (require_blunder_only is config-only, not overridden)
+            # Override brilliant criteria (shallow_error_classifications is config-only, never from user settings)
             user_brilliant = user_game_analysis.get("brilliant_criteria", {})
             if user_brilliant:
                 self._shallow_depth_min = user_brilliant.get("shallow_depth_min", self._shallow_depth_min)
@@ -225,11 +225,11 @@ class GameAnalysisController(QObject):
         return getattr(self, '_min_depths_show_error', 1)
 
     @property
-    def require_blunder_only(self) -> bool:
-        """Get whether only Blunder (not Mistake) should be counted for brilliancy detection."""
+    def shallow_error_classifications(self):
+        """Get move classifications that count as error at shallow depth for brilliancy detection."""
         if self.classification_model:
-            return self.classification_model.require_blunder_only
-        return getattr(self, '_require_blunder_only', False)
+            return self.classification_model.shallow_error_classifications
+        return getattr(self, '_shallow_error_classifications', ["Mistake", "Blunder", "Miss"])
 
     @property
     def candidate_selection(self) -> str:
@@ -1473,7 +1473,7 @@ class GameAnalysisController(QObject):
             engine_name=engine.name,
             engine_options=engine_options,
             config=self.config,
-            require_blunder_only=self.require_blunder_only,
+            error_classifications=self.shallow_error_classifications,
             candidate_selection=self.candidate_selection,
             on_progress=progress_service.set_status,
             is_cancelled=lambda: False,
