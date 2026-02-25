@@ -2397,7 +2397,7 @@
       },
       "engine_configuration": {
         "width": 600,
-        "height": 700,
+        "height": 680,
         "layout": {
           "spacing": 10,
           "margins": [
@@ -2541,7 +2541,8 @@
             15,
             10,
             10
-          ]
+          ],
+          "engine_params_content_margin_top": 2
         },
         "buttons": {
           "spacing": 10,

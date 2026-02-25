@@ -5,7 +5,12 @@ from typing import Dict, Any, Optional, List, Tuple
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from app.services.engine_parameters_service import EngineParametersService
-from app.services.engine_configuration_service import EngineConfigurationService, TaskType, ValidationResult
+from app.services.engine_configuration_service import (
+    EngineConfigurationService,
+    TaskType,
+    ValidationResult,
+    ValidationSeverity,
+)
 from app.services.progress_service import ProgressService
 
 
@@ -14,7 +19,6 @@ class EngineConfigurationController(QObject):
     
     This controller orchestrates engine parameter operations including:
     - Loading engine options and parameters
-    - Copying parameters between tasks
     - Resetting parameters to defaults
     - Validating parameters
     - Saving parameters
@@ -49,7 +53,9 @@ class EngineConfigurationController(QObject):
         # Load engine options
         self.parameters_service.load()
         self.engine_options = self.parameters_service.get_engine_options(str(self.engine_path))
-    
+        # Clipboard for Copy/Paste of engine-specific parameters (option_name -> value)
+        self._engine_params_clipboard: Optional[Dict[str, Any]] = None
+
     def get_engine_options(self) -> List[Dict[str, Any]]:
         """Get engine options for the configured engine.
         
@@ -85,35 +91,156 @@ class EngineConfigurationController(QObject):
         }
         task_type = task_type_map.get(task, TaskType.EVALUATION)
         return self.config_service.get_recommended_defaults(task_type)
-    
-    def copy_parameters(self, source_task: str, target_task: str, 
-                       source_params: Dict[str, Any]) -> None:
-        """Copy parameters from one task to another.
-        
-        This method updates the ProgressService with status messages.
+
+    def get_engine_param_names(self) -> List[str]:
+        """Return list of engine option names (excluding 'Threads' and button types)."""
+        names = []
+        for option in self.engine_options:
+            if option.get("type") == "button":
+                continue
+            if option.get("name") == "Threads":
+                continue
+            name = option.get("name", "")
+            if name:
+                names.append(name)
+        return names
+
+    def set_engine_params_clipboard(self, params: Dict[str, Any]) -> None:
+        """Store engine-specific parameters for Paste."""
+        self._engine_params_clipboard = dict(params)
+
+    def get_engine_params_clipboard(self) -> Optional[Dict[str, Any]]:
+        """Return copied engine-specific parameters, or None if nothing copied."""
+        if not self._engine_params_clipboard:
+            return None
+        return dict(self._engine_params_clipboard)
+
+    def has_engine_params_clipboard(self) -> bool:
+        """Return True if there are parameters in the clipboard."""
+        return bool(self._engine_params_clipboard)
+
+    def parse_task_parameters_from_ui(self, raw: Dict[str, Any], task: str) -> Dict[str, Any]:
+        """Parse raw widget state into task parameters (types and defaults).
         
         Args:
-            source_task: Task identifier to copy from.
-            target_task: Task identifier to copy to.
-            source_params: Dictionary of parameter values from source task widgets.
+            raw: Raw state from view (strings for edit fields, bool for check, str for combo).
+            task: Task identifier (determines which common params are forced to 0).
+            
+        Returns:
+            Dictionary suitable for validate_parameters and save_parameters.
         """
-        # Format task names for display
-        source_task_name = source_task.replace("_", " ").title()
-        target_task_name = target_task.replace("_", " ").title()
+        params = {}
+        # Threads
+        text = (raw.get("threads") or "").strip()
+        if text:
+            try:
+                params["threads"] = int(round(float(text)))
+            except (ValueError, OverflowError):
+                params["threads"] = 1
+        else:
+            params["threads"] = 1
+        # Depth: forced 0 for Game Analysis and Manual Analysis
+        if task in (self.TASK_GAME_ANALYSIS, self.TASK_MANUAL_ANALYSIS):
+            params["depth"] = 0
+        else:
+            text = (raw.get("depth") or "").strip()
+            if text:
+                try:
+                    params["depth"] = int(round(float(text)))
+                except (ValueError, OverflowError):
+                    params["depth"] = 0
+            else:
+                params["depth"] = 0
+        # Movetime: forced 0 for Evaluation and Manual Analysis
+        if task in (self.TASK_EVALUATION, self.TASK_MANUAL_ANALYSIS):
+            params["movetime"] = 0
+        else:
+            text = (raw.get("movetime") or "").strip()
+            if text:
+                try:
+                    params["movetime"] = int(round(float(text)))
+                except (ValueError, OverflowError):
+                    params["movetime"] = 0
+            else:
+                params["movetime"] = 0
+        # Engine options: raw keys are option names; preserve type (int/str/bool)
+        option_names = self.get_engine_param_names()
+        for name in option_names:
+            if name not in raw:
+                continue
+            value = raw[name]
+            if isinstance(value, bool):
+                params[name] = value
+            elif isinstance(value, str):
+                value = value.strip()
+                if value:
+                    try:
+                        params[name] = int(value)
+                    except ValueError:
+                        params[name] = value
+                else:
+                    params[name] = ""
+            else:
+                params[name] = value
+        return params
+
+    def get_defaults_for_task(self, task: str) -> Dict[str, Any]:
+        """Return full default parameters for a task (common + engine-specific).
         
-        # Show progress and set status
+        Args:
+            task: Task identifier.
+            
+        Returns:
+            Dictionary with keys threads, depth, movetime, and engine option names.
+        """
+        out = self.get_recommended_defaults(task).copy()
+        for option in self.engine_options:
+            name = option.get("name", "")
+            if not name or option.get("type") == "button" or name == "Threads":
+                continue
+            default = option.get("default")
+            if default is not None:
+                out[name] = default
+            else:
+                out[name] = "" if option.get("type") in ("string", "combo") else False
+        return out
+
+    def should_show_validation_dialog(self, validation_results: Dict[str, ValidationResult]) -> bool:
+        """Return True if validation results contain issues the user should see."""
+        for result in validation_results.values():
+            if result.has_errors or result.has_warnings:
+                return True
+            for issue in result.issues:
+                if issue.severity == ValidationSeverity.INFO:
+                    return True
+        return False
+
+    def get_reset_error_dialog(self, success: bool, status_message: str) -> Optional[Tuple[str, str]]:
+        """Return (title, message) for the error dialog to show after reset, or None."""
+        if success:
+            return None
+        if "Failed to refresh" in status_message:
+            return ("Refresh Failed", "Failed to refresh engine options. Using cached options.")
+        return ("Reset Error", status_message)
+
+    def notify_copy_engine_params(self) -> None:
+        """Update progress service and status for copy engine-specific parameters."""
         self.progress_service.show_progress()
-        self.progress_service.set_status(f"Copying parameters from {source_task_name} to {target_task_name}...")
-        self.status_update.emit(f"Copying parameters from {source_task_name} to {target_task_name}...")
-        
-        # Note: The actual widget updates are handled by the dialog
-        # This method is called to manage progress service
-        
-        # Hide progress and set final status
+        self.progress_service.set_status("Copying engine-specific parameters...")
+        self.status_update.emit("Copying engine-specific parameters...")
         self.progress_service.hide_progress()
-        self.progress_service.set_status(f"Parameters copied from {source_task_name} to {target_task_name}")
-        self.status_update.emit(f"Parameters copied from {source_task_name} to {target_task_name}")
-    
+        self.progress_service.set_status("Engine-specific parameters copied.")
+        self.status_update.emit("Engine-specific parameters copied.")
+
+    def notify_paste_engine_params(self) -> None:
+        """Update progress service and status for paste engine-specific parameters."""
+        self.progress_service.show_progress()
+        self.progress_service.set_status("Pasting engine-specific parameters...")
+        self.status_update.emit("Pasting engine-specific parameters...")
+        self.progress_service.hide_progress()
+        self.progress_service.set_status("Engine-specific parameters pasted.")
+        self.status_update.emit("Engine-specific parameters pasted.")
+
     def reset_to_defaults(self, task: str) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
         """Reset parameters to engine defaults for a specific task.
         
@@ -169,7 +296,12 @@ class EngineConfigurationController(QObject):
             self.progress_service.set_status(error_msg)
             self.status_update.emit(error_msg)
             return (False, None, error_msg)
-    
+
+    def set_status(self, message: str) -> None:
+        """Update progress service and status bar with a message."""
+        self.progress_service.set_status(message)
+        self.status_update.emit(message)
+
     def validate_parameters(self, task_params: Dict[str, Dict[str, Any]]) -> Dict[str, ValidationResult]:
         """Validate parameters for all tasks.
         

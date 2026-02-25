@@ -70,8 +70,6 @@ class EngineConfigurationDialog(QDialog):
         # Initialize controller
         self.controller = EngineConfigurationController(config, self.engine_path, engine_controller)
         self.engine_options = self.controller.get_engine_options()
-        self.TaskType = self.controller.get_task_type_enum()
-        
         # Task constants (from controller)
         self.TASK_EVALUATION = EngineConfigurationController.TASK_EVALUATION
         self.TASK_GAME_ANALYSIS = EngineConfigurationController.TASK_GAME_ANALYSIS
@@ -83,6 +81,10 @@ class EngineConfigurationDialog(QDialog):
             self.TASK_GAME_ANALYSIS: {},
             self.TASK_MANUAL_ANALYSIS: {}
         }
+        # Tab index order matches task order
+        self._task_order = [self.TASK_EVALUATION, self.TASK_GAME_ANALYSIS, self.TASK_MANUAL_ANALYSIS]
+        # Paste buttons (one per task tab); enabled only when clipboard has content
+        self._paste_buttons: List[QPushButton] = []
         # Track per-task UI sections for dynamic sizing
         self._task_sections: Dict[str, Dict[str, Any]] = {}
         
@@ -183,7 +185,6 @@ class EngineConfigurationDialog(QDialog):
         for task, info in self._task_sections.items():
             tab = info['tab']
             scroll = info['scroll']
-            copy_group = info['copy_group']
             common_group = info['common_group']
             tab_layout_margins = info['tab_layout_margins']
             tab_layout_spacing = info['tab_layout_spacing']
@@ -198,40 +199,34 @@ class EngineConfigurationDialog(QDialog):
                 continue
 
             # Get the actual height of engine_params_group (including title, margins, padding, border)
-            # We need to account for the group box's full height, not just margin/padding
             engine_params_group = None
             for widget in tab.findChildren(QGroupBox):
                 if widget.title() == "Engine-Specific Parameters":
                     engine_params_group = widget
                     break
-            
-            # Calculate used height more accurately
+
             if engine_params_group:
-                # Use actual group box height instead of just margin/padding/border
                 engine_params_group_height = engine_params_group.sizeHint().height()
                 used_height = (
-                    tab_layout_margins[1]  # top margin
+                    tab_layout_margins[1]
                     + top_spacer
-                    + copy_group.sizeHint().height()
-                    + tab_layout_spacing  # spacing after copy_group
+                    + tab_layout_spacing
                     + common_group.sizeHint().height()
-                    + tab_layout_spacing  # spacing after common_group (before engine_params_group)
-                    + engine_params_group_height  # full height of engine_params_group (includes title, margins, padding, border, content)
-                    + tab_layout_margins[3]  # bottom margin
+                    + tab_layout_spacing
+                    + engine_params_group_height
+                    + tab_layout_margins[3]
                 )
             else:
-                # Fallback if group not found (shouldn't happen, but be safe)
                 used_height = (
-                    tab_layout_margins[1]  # top margin
+                    tab_layout_margins[1]
                     + top_spacer
-                    + copy_group.sizeHint().height()
-                    + tab_layout_spacing  # spacing after copy_group
+                    + tab_layout_spacing
                     + common_group.sizeHint().height()
-                    + tab_layout_spacing  # spacing after common_group (before engine_params_group)
-                    + group_margin_top  # margin_top for engine_params_group
-                    + group_padding_top  # padding_top for engine_params_group
-                    + (group_border_width * 2)  # border top and bottom
-                    + tab_layout_margins[3]  # bottom margin
+                    + tab_layout_spacing
+                    + group_margin_top
+                    + group_padding_top
+                    + (group_border_width * 2)
+                    + tab_layout_margins[3]
                 )
 
             available = tab_height - used_height
@@ -273,8 +268,12 @@ class EngineConfigurationDialog(QDialog):
         
         layout.addWidget(self.tab_widget, stretch=1)
         
-        # Buttons
+        # Buttons: Reset (bottom-left), then stretch, Save and Cancel (bottom-right)
         button_layout = QHBoxLayout()
+        self.reset_button = QPushButton("Reset to Defaults")
+        self.reset_button.setToolTip("Reset all engine settings to defaults")
+        self.reset_button.clicked.connect(self._on_reset_clicked)
+        button_layout.addWidget(self.reset_button)
         button_layout.addStretch()
         
         self.ok_button = QPushButton("Save Changes")
@@ -322,34 +321,6 @@ class EngineConfigurationDialog(QDialog):
         # Add a small spacer at the top to create space between tab bar and first group
         top_spacer = tabs_layout_config.get('top_spacer', 5)
         tab_layout.addSpacing(top_spacer)
-        
-        # Copy parameters section
-        copy_group = QGroupBox("Copy Parameters")
-        copy_layout = QHBoxLayout()
-        copy_layout_spacing = tabs_layout_config.get('copy_layout_spacing', 10)
-        copy_layout.setSpacing(copy_layout_spacing)
-        
-        # Create buttons to copy from other tasks
-        other_tasks = [t for t in [self.TASK_EVALUATION, self.TASK_GAME_ANALYSIS, self.TASK_MANUAL_ANALYSIS] if t != task]
-        for other_task in other_tasks:
-            # Format task name for button label (e.g., "game_analysis" -> "Game Analysis")
-            task_name = other_task.replace("_", " ").title()
-            copy_button = QPushButton(f"Copy {task_name}")
-            # Use a lambda with default arguments to capture the correct values
-            copy_button.clicked.connect(
-                lambda checked, src=other_task, dst=task: self._copy_parameters(src, dst)
-            )
-            copy_layout.addWidget(copy_button)
-        
-        # Add stretch to push reset button to the right
-        copy_layout.addStretch()
-        
-        # Add "Reset to Engine Defaults" button (right-aligned)
-        reset_button = QPushButton("Reset to Engine Defaults")
-        reset_button.clicked.connect(lambda checked, t=task: self._reset_to_defaults(t))
-        copy_layout.addWidget(reset_button)
-        copy_group.setLayout(copy_layout)
-        tab_layout.addWidget(copy_group)
         
         # Add spacing between group boxes (accounting for group box margin_top)
         # The group box has margin_top, so we subtract it from explicit spacing to avoid double spacing
@@ -436,6 +407,25 @@ class EngineConfigurationDialog(QDialog):
         # Engine-specific parameters section
         if self.engine_options:
             engine_params_group = QGroupBox("Engine-Specific Parameters")
+            engine_params_group_layout = QVBoxLayout()
+            engine_params_group_layout.setContentsMargins(0, 0, 0, 0)
+            engine_params_group_layout.setSpacing(0)
+            # Copy / Paste row at top of engine-specific section (no extra spacing)
+            copy_paste_layout = QHBoxLayout()
+            copy_layout_spacing = tabs_layout_config.get('copy_layout_spacing', 10)
+            copy_paste_layout.setSpacing(copy_layout_spacing)
+            copy_btn = QPushButton("Copy")
+            copy_btn.setToolTip("Copy engine-specific parameters from this task to paste into another task")
+            copy_btn.clicked.connect(lambda checked, t=task: self._copy_engine_params(t))
+            copy_paste_layout.addWidget(copy_btn)
+            paste_btn = QPushButton("Paste")
+            paste_btn.setToolTip("Paste engine-specific parameters copied from another task")
+            paste_btn.clicked.connect(lambda checked, t=task: self._paste_engine_params(t))
+            paste_btn.setEnabled(False)
+            self._paste_buttons.append(paste_btn)
+            copy_paste_layout.addWidget(paste_btn)
+            copy_paste_layout.addStretch()
+            engine_params_group_layout.addLayout(copy_paste_layout)
             engine_params_layout = QFormLayout()
             engine_params_layout_spacing = tabs_layout_config.get('engine_params_layout_spacing', 10)
             engine_params_layout.setSpacing(engine_params_layout_spacing)
@@ -516,8 +506,6 @@ class EngineConfigurationDialog(QDialog):
             scroll_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
             scroll.setWidget(scroll_widget)
             
-            engine_params_group_layout = QVBoxLayout()
-            engine_params_group_layout.setContentsMargins(0, 0, 0, 0)
             engine_params_group_layout.addWidget(scroll)
             engine_params_group.setLayout(engine_params_group_layout)
             engine_params_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -527,7 +515,6 @@ class EngineConfigurationDialog(QDialog):
             self._task_sections[task] = {
                 'tab': tab,
                 'scroll': scroll,
-                'copy_group': copy_group,
                 'common_group': common_group,
                 'tab_layout_margins': tab_layout_margins,
                 'tab_layout_spacing': tab_layout_spacing,
@@ -608,171 +595,131 @@ class EngineConfigurationDialog(QDialog):
         
         return None
     
-    def _copy_parameters(self, source_task: str, target_task: str) -> None:
-        """Copy parameters from one task to another.
-        
-        Args:
-            source_task: Task identifier to copy from.
-            target_task: Task identifier to copy to.
-        """
-        # Extract source parameters from widgets
-        source_params = self._get_task_parameters(source_task)
-        
-        # Notify controller (manages ProgressService)
-        self.controller.copy_parameters(source_task, target_task, source_params)
-        QApplication.processEvents()  # Process events to show the status
-        
-        # Copy common parameters in UI
-        if "threads" in self.task_widgets[source_task] and "threads" in self.task_widgets[target_task]:
-            source_text = self.task_widgets[source_task]["threads"].text().strip()
-            self.task_widgets[target_task]["threads"].setText(source_text)
-        
-        if "depth" in self.task_widgets[source_task] and "depth" in self.task_widgets[target_task]:
-            source_text = self.task_widgets[source_task]["depth"].text().strip()
-            self.task_widgets[target_task]["depth"].setText(source_text)
-        
-        if "movetime" in self.task_widgets[source_task] and "movetime" in self.task_widgets[target_task]:
-            source_text = self.task_widgets[source_task]["movetime"].text().strip()
-            self.task_widgets[target_task]["movetime"].setText(source_text)
-        
-        # Copy engine-specific parameters in UI
-        for key, source_widget in self.task_widgets[source_task].items():
-            if key.startswith("engine_option_") and key in self.task_widgets[target_task]:
-                target_widget = self.task_widgets[target_task][key]
-                
-                if isinstance(source_widget, QLineEdit) and isinstance(target_widget, QLineEdit):
-                    target_widget.setText(source_widget.text())
-                elif isinstance(source_widget, QCheckBox) and isinstance(target_widget, QCheckBox):
-                    target_widget.setChecked(source_widget.isChecked())
-                elif isinstance(source_widget, QComboBox) and isinstance(target_widget, QComboBox):
-                    target_widget.setCurrentText(source_widget.currentText())
-        
-        QApplication.processEvents()  # Process events to update status
-    
-    def _reset_to_defaults(self, task: str) -> None:
-        """Reset parameters to engine defaults for a specific task.
-        
-        This method refreshes the engine options from the engine itself,
-        then resets all parameters to their defaults.
-        
-        Args:
-            task: Task identifier to reset.
-        """
-        # Call controller to refresh options and get defaults
-        success, refreshed_options, status_message = self.controller.reset_to_defaults(task)
-        QApplication.processEvents()  # Process events to show the status
-        
-        if not success:
-            # Show error dialog if refresh failed
-            from app.views.message_dialog import MessageDialog
-            if "Failed to refresh" in status_message:
-                MessageDialog.show_warning(
-                    self.config,
-                    "Refresh Failed",
-                    "Failed to refresh engine options. Using cached options.",
-                    self
-                )
-            else:
-                MessageDialog.show_warning(
-                    self.config,
-                    "Refresh Error",
-                    status_message,
-                    self
-                )
-            # Continue with existing options if refresh failed
-            if not refreshed_options:
-                return
-        
-        # Update engine options if refresh succeeded
-        if refreshed_options:
-            self.engine_options = refreshed_options
-        
-        # Get recommended defaults for this task
-        recommended_defaults = self.controller.get_recommended_defaults(task)
-        
-        # Reset common parameters to recommended defaults
+    def _get_raw_widget_state(self, task: str) -> Dict[str, Any]:
+        """Read current widget values for a task (no parsing). Returns raw strings/bools for controller."""
+        raw = {}
         if "threads" in self.task_widgets[task]:
-            self.task_widgets[task]["threads"].setText(str(recommended_defaults.get("threads", 1)))
-        
+            raw["threads"] = self.task_widgets[task]["threads"].text()
         if "depth" in self.task_widgets[task]:
-            self.task_widgets[task]["depth"].setText(str(recommended_defaults.get("depth", 0)))
-        
+            raw["depth"] = self.task_widgets[task]["depth"].text()
         if "movetime" in self.task_widgets[task]:
-            self.task_widgets[task]["movetime"].setText(str(recommended_defaults.get("movetime", 0)))
-        
-        # Reset engine-specific parameters to defaults
-        for option in self.engine_options:
-            option_name = option.get("name", "")
-            option_type = option.get("type", "")
-            option_default = option.get("default")
-            
-            if not option_name or not option_type:
+            raw["movetime"] = self.task_widgets[task]["movetime"].text()
+        for key, widget in self.task_widgets[task].items():
+            if not key.startswith("engine_option_"):
                 continue
-            
-            # Skip button type options
-            if option_type == "button":
+            option_name = key.replace("engine_option_", "", 1)
+            if isinstance(widget, QLineEdit):
+                raw[option_name] = widget.text()
+            elif isinstance(widget, QCheckBox):
+                raw[option_name] = widget.isChecked()
+            elif isinstance(widget, QComboBox):
+                raw[option_name] = widget.currentText()
+        return raw
+
+    def _apply_params_to_task_widgets(self, task: str, params: Dict[str, Any]) -> None:
+        """Apply a parameter dict to the task's widgets (common + engine options)."""
+        if "threads" in self.task_widgets[task] and "threads" in params:
+            self.task_widgets[task]["threads"].setText(str(params["threads"]))
+        if "depth" in self.task_widgets[task] and "depth" in params:
+            self.task_widgets[task]["depth"].setText(str(params["depth"]))
+        if "movetime" in self.task_widgets[task] and "movetime" in params:
+            self.task_widgets[task]["movetime"].setText(str(params["movetime"]))
+        for option_name, value in params.items():
+            if option_name in ("threads", "depth", "movetime"):
                 continue
-            
             key = f"engine_option_{option_name}"
-            if key in self.task_widgets[task]:
-                widget = self.task_widgets[task][key]
-                
-                if isinstance(widget, QLineEdit):
-                    if option_default is not None:
-                        widget.setText(str(option_default))
-                    else:
-                        widget.setText("")
-                elif isinstance(widget, QCheckBox):
-                    if option_default is not None:
-                        widget.setChecked(bool(option_default))
-                    else:
-                        widget.setChecked(False)
-                elif isinstance(widget, QComboBox):
-                    if option_default is not None and str(option_default) in [widget.itemText(i) for i in range(widget.count())]:
-                        widget.setCurrentText(str(option_default))
-                    elif widget.count() > 0:
-                        widget.setCurrentIndex(0)
-        
-        QApplication.processEvents()  # Process events to update status
-    
-    def _on_ok_clicked(self) -> None:
-        """Handle OK button click."""
-        # Extract parameters from all tasks
-        task_params = {}
-        for task in [self.TASK_EVALUATION, self.TASK_GAME_ANALYSIS, self.TASK_MANUAL_ANALYSIS]:
-            task_params[task] = self._get_task_parameters(task)
-        
-        # Validate parameters through controller
-        all_validation_results = self.controller.validate_parameters(task_params)
-        
-        # Check if there are any validation issues
-        has_errors = any(result.has_errors for result in all_validation_results.values())
-        has_warnings = any(result.has_warnings for result in all_validation_results.values())
-        ValidationSeverity = self.controller.get_validation_severity_enum()
-        has_info = any(any(issue.severity == ValidationSeverity.INFO for issue in result.issues) for result in all_validation_results.values())
-        
-        if has_errors or has_warnings or has_info:
-            # Show validation dialog
-            if not self._show_validation_dialog(all_validation_results):
-                # User cancelled, don't save
-                return
-        
-        # Save parameters through controller
-        success, status_message = self.controller.save_parameters(task_params, self.engine.name)
-        QApplication.processEvents()  # Process events to update status
-        
-        if success:
-            # Accept the dialog
-            self.accept()
-        else:
-            # Show error dialog if save failed
+            if key not in self.task_widgets[task]:
+                continue
+            widget = self.task_widgets[task][key]
+            if isinstance(widget, QLineEdit):
+                widget.setText(str(value))
+            elif isinstance(widget, QCheckBox):
+                widget.setChecked(bool(value))
+            elif isinstance(widget, QComboBox):
+                if str(value) in [widget.itemText(i) for i in range(widget.count())]:
+                    widget.setCurrentText(str(value))
+                elif widget.count() > 0:
+                    widget.setCurrentIndex(0)
+
+    def _apply_engine_params_to_task_widgets(self, task: str, params: Dict[str, Any]) -> None:
+        """Apply only engine-specific parameters to the task's widgets."""
+        for option_name, value in params.items():
+            key = f"engine_option_{option_name}"
+            if key not in self.task_widgets[task]:
+                continue
+            widget = self.task_widgets[task][key]
+            if isinstance(widget, QLineEdit):
+                widget.setText(str(value))
+            elif isinstance(widget, QCheckBox):
+                widget.setChecked(bool(value))
+            elif isinstance(widget, QComboBox):
+                if str(value) in [widget.itemText(i) for i in range(widget.count())]:
+                    widget.setCurrentText(str(value))
+
+    def _update_paste_buttons_enabled(self, enabled: bool) -> None:
+        """Enable or disable all Paste buttons."""
+        for btn in self._paste_buttons:
+            btn.setEnabled(enabled)
+
+    def _copy_engine_params(self, task: str) -> None:
+        """Copy engine-specific parameters from the current task into the controller clipboard."""
+        raw = self._get_raw_widget_state(task)
+        engine_names = self.controller.get_engine_param_names()
+        clip = {k: raw[k] for k in engine_names if k in raw}
+        self.controller.set_engine_params_clipboard(clip)
+        self.controller.notify_copy_engine_params()
+        self._update_paste_buttons_enabled(True)
+
+    def _paste_engine_params(self, task: str) -> None:
+        """Paste engine-specific parameters from the controller clipboard into the current task."""
+        clipboard = self.controller.get_engine_params_clipboard()
+        if not clipboard:
             from app.views.message_dialog import MessageDialog
-            MessageDialog.show_warning(
+            MessageDialog.show_info(
                 self.config,
-                "Save Error",
-                status_message,
+                "Nothing to Paste",
+                "Copy engine-specific parameters from another task first.",
                 self
             )
+            return
+        self._apply_engine_params_to_task_widgets(task, clipboard)
+        self.controller.notify_paste_engine_params()
+
+    def _on_reset_clicked(self) -> None:
+        """Reset all parameters to defaults for all three tasks (controller handles logic)."""
+        success, refreshed_options, status_message = self.controller.reset_to_defaults(self.TASK_EVALUATION)
+        QApplication.processEvents()
+        err_dialog = self.controller.get_reset_error_dialog(success, status_message)
+        if err_dialog:
+            from app.views.message_dialog import MessageDialog
+            MessageDialog.show_warning(self.config, err_dialog[0], err_dialog[1], self)
+            if not refreshed_options:
+                return
+        if refreshed_options:
+            self.engine_options = refreshed_options
+        for task in self._task_order:
+            params = self.controller.get_defaults_for_task(task)
+            self._apply_params_to_task_widgets(task, params)
+        QApplication.processEvents()
+        self.controller.set_status("All parameters reset to defaults.")
+
+    def _on_ok_clicked(self) -> None:
+        """Handle OK button click: collect raw state, parse via controller, validate, save."""
+        task_params = {}
+        for task in self._task_order:
+            raw = self._get_raw_widget_state(task)
+            task_params[task] = self.controller.parse_task_parameters_from_ui(raw, task)
+        all_validation_results = self.controller.validate_parameters(task_params)
+        if self.controller.should_show_validation_dialog(all_validation_results):
+            if not self._show_validation_dialog(all_validation_results):
+                return
+        success, status_message = self.controller.save_parameters(task_params, self.engine.name)
+        QApplication.processEvents()
+        if success:
+            self.accept()
+        else:
+            from app.views.message_dialog import MessageDialog
+            MessageDialog.show_warning(self.config, "Save Error", status_message, self)
     
     def _show_validation_dialog(self, validation_results: Dict[str, Any]) -> bool:
         """Show validation dialog with issues and get user confirmation.
@@ -1041,84 +988,7 @@ class EngineConfigurationDialog(QDialog):
         layout.addWidget(message_label, stretch=1)
         
         return widget
-    
-    def _get_task_parameters(self, task: str) -> Dict[str, Any]:
-        """Get parameter values for a specific task.
-        
-        Args:
-            task: Task identifier.
-            
-        Returns:
-            Dictionary with parameter values.
-        """
-        params = {}
-        
-        # Get common parameters
-        if "threads" in self.task_widgets[task]:
-            text = self.task_widgets[task]["threads"].text().strip()
-            if text:
-                try:
-                    # Handle decimal values by rounding to nearest integer
-                    params["threads"] = int(round(float(text)))
-                except (ValueError, OverflowError):
-                    params["threads"] = 1  # Default fallback
-            else:
-                params["threads"] = 1
-        if "depth" in self.task_widgets[task]:
-            depth_edit = self.task_widgets[task]["depth"]
-            # If depth field is disabled, force it to 0 (not used for this task)
-            # For Evaluation task, depth is enabled and can be 0 (infinite) or >0 (max depth)
-            if not depth_edit.isEnabled():
-                params["depth"] = 0
-            else:
-                text = depth_edit.text().strip()
-                if text:
-                    try:
-                        # Handle decimal values by rounding to nearest integer
-                        params["depth"] = int(round(float(text)))
-                    except (ValueError, OverflowError):
-                        params["depth"] = 0  # Default fallback (0 = unlimited)
-                else:
-                    params["depth"] = 0
-        if "movetime" in self.task_widgets[task]:
-            movetime_edit = self.task_widgets[task]["movetime"]
-            # If movetime field is disabled, force it to 0 (not used for this task)
-            if not movetime_edit.isEnabled():
-                params["movetime"] = 0
-            else:
-                text = movetime_edit.text().strip()
-                if text:
-                    try:
-                        # Handle decimal values by rounding to nearest millisecond
-                        params["movetime"] = int(round(float(text)))
-                    except (ValueError, OverflowError):
-                        params["movetime"] = 0  # Default fallback
-                else:
-                    params["movetime"] = 0
-        
-        # Get engine-specific parameters
-        for key, widget in self.task_widgets[task].items():
-            if key.startswith("engine_option_"):
-                option_name = key.replace("engine_option_", "")
-                
-                if isinstance(widget, QLineEdit):
-                    # Check if this was originally a spin type (integer)
-                    # We'll need to check the option type, but for now, try to parse as int
-                    text = widget.text().strip()
-                    if text:
-                        try:
-                            params[option_name] = int(text)
-                        except ValueError:
-                            params[option_name] = text
-                    else:
-                        params[option_name] = ""
-                elif isinstance(widget, QCheckBox):
-                    params[option_name] = widget.isChecked()
-                elif isinstance(widget, QComboBox):
-                    params[option_name] = widget.currentText()
-        
-        return params
-    
+
     def _apply_styling(self) -> None:
         """Apply styling to UI elements based on configuration."""
         ui_config = self.config.get('ui', {})
@@ -1309,7 +1179,14 @@ class EngineConfigurationDialog(QDialog):
                 title_padding=group_title_padding,
                 content_margins=group_content_margins
             )
-            
+            # Reduce top spacing for Engine-Specific Parameters so Copy/Paste sit close to the title (all tabs)
+            left, right, bottom = group_content_margins[0], group_content_margins[2], group_content_margins[3]
+            engine_params_content_top = groups_config.get('engine_params_content_margin_top', 2)
+            for group_box in group_boxes:
+                if group_box.title() == "Engine-Specific Parameters":
+                    layout = group_box.layout()
+                    if layout:
+                        layout.setContentsMargins(left, engine_params_content_top, right, bottom)
             # Force layout recalculation by accessing layout properties
             # This ensures margins are properly applied and spacing is consistent across tabs
             for group_box in group_boxes:
