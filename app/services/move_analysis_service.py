@@ -272,63 +272,6 @@ class MoveAnalysisService:
             return "Blunder"
     
     @staticmethod
-    def is_brilliant_move(
-        eval_before: float,
-        eval_after: float,
-        move_info: Dict[str, Any],
-        best_move_san: str,
-        cpl: float,
-        classification_thresholds: Dict[str, Any],
-        material_sacrifice: int
-    ) -> bool:
-        """Check if a move is brilliant (Chess.com criteria).
-        
-        Args:
-            eval_before: Evaluation before move (centipawns).
-            eval_after: Evaluation after move (centipawns).
-            move_info: Move information dictionary.
-            best_move_san: Best move suggestion.
-            cpl: Centipawn loss (difference from best move).
-            classification_thresholds: Dictionary with thresholds (see assess_move_quality).
-            material_sacrifice: Material sacrifice in centipawns.
-            
-        Returns:
-            True if move is brilliant, False otherwise.
-        """
-        # Calculate eval swing
-        eval_swing = eval_after - eval_before
-        is_white_move = move_info["is_white_move"]
-        
-        min_material_sacrifice = classification_thresholds.get("min_material_sacrifice", 100)
-        min_eval_swing = classification_thresholds.get("min_eval_swing", 200)
-        max_eval_before = classification_thresholds.get("max_eval_before", 500)
-        exclude_already_winning = classification_thresholds.get("exclude_already_winning", True)
-        
-        # Check 1: Material sacrifice (must be piece level)
-        if material_sacrifice < min_material_sacrifice:
-            return False
-        
-        # Check 2: Eval swing threshold
-        if is_white_move:
-            if eval_swing < min_eval_swing:
-                return False
-        else:
-            if eval_swing > -min_eval_swing:
-                return False
-        
-        # Check 3: Exclude if already completely winning (configurable)
-        if exclude_already_winning:
-            if is_white_move:
-                if eval_before > max_eval_before:
-                    return False
-            else:
-                if eval_before < -max_eval_before:
-                    return False
-        
-        # All checks passed
-        return True
-    
-    @staticmethod
     def is_miss(
         move_info: Dict[str, Any],
         best_move_san: str,
