@@ -36,7 +36,7 @@ class MoveAnalysisService:
     def calculate_cpl(
         eval_before: float,
         eval_after: float,
-        eval_after_best_move: Optional[float],
+        eval_after_best_move: float,
         is_white_move: bool,
         is_mate: bool,
         is_mate_before: bool,
@@ -47,11 +47,16 @@ class MoveAnalysisService:
         moves_match: bool
     ) -> float:
         """Calculate Centipawn Loss (CPL) for a move.
-        
+
+        CPL is the loss vs the engine's best move: (eval after best move) vs
+        (eval after played move). Callers must have analyzed the position before
+        the move and pass the evaluation after the best move. (Game analysis
+        does not call this for book moves; it assigns CPL 0 for those.)
+
         Args:
             eval_before: Evaluation before the move (centipawns).
             eval_after: Evaluation after the played move (centipawns).
-            eval_after_best_move: Evaluation after best move (centipawns), if available.
+            eval_after_best_move: Evaluation after best move (centipawns).
             is_white_move: True if white just moved, False if black.
             is_mate: True if position after move is mate.
             is_mate_before: True if position before move was mate.
@@ -60,7 +65,7 @@ class MoveAnalysisService:
             mate_moves_before: Number of moves to mate before move.
             mate_moves_after_best: Number of moves to mate after best move.
             moves_match: True if played move matches best move.
-            
+
         Returns:
             CPL value in centipawns.
         """
@@ -69,37 +74,19 @@ class MoveAnalysisService:
             return 0.0
         
         # Handle mate positions specially
-        if is_mate or is_mate_before or (eval_after_best_move is not None and is_mate_after_best):
-            # Use best move evaluation if available for more accurate comparison
-            if eval_after_best_move is not None:
-                return MoveAnalysisService.calculate_cpl_for_mate(
-                    is_white_move, eval_after_best_move, eval_after,
-                    is_mate_after_best, mate_moves_after_best,
-                    is_mate, mate_moves
-                )
-            else:
-                # Fallback to old method if best move eval not available
-                return MoveAnalysisService.calculate_cpl_for_mate(
-                    is_white_move, eval_before, eval_after,
-                    is_mate_before, mate_moves_before,
-                    is_mate, mate_moves
-                )
+        if is_mate or is_mate_before or is_mate_after_best:
+            return MoveAnalysisService.calculate_cpl_for_mate(
+                is_white_move, eval_after_best_move, eval_after,
+                is_mate_after_best, mate_moves_after_best,
+                is_mate, mate_moves
+            )
+        # Normal centipawn evaluation: loss from the mover's perspective (eval is from White's view).
+        # Only positive loss counts as CPL; if played move is better than "best", CPL = 0.
+        if is_white_move:
+            signed_cpl = eval_after_best_move - eval_after  # White lost if eval dropped
         else:
-            # Normal centipawn evaluation
-            # Use best move evaluation if available for more accurate comparison
-            if eval_after_best_move is not None:
-                # Signed comparison: loss from the mover's perspective (eval is from White's view).
-                # Only positive loss counts as CPL; if played move is better than "best", CPL = 0.
-                # Required when "best" is from a separate shallow run (e.g. brilliancy check).
-                if is_white_move:
-                    signed_cpl = eval_after_best_move - eval_after  # White lost if eval dropped
-                else:
-                    signed_cpl = eval_after - eval_after_best_move  # Black lost if White's eval rose
-                return max(0.0, signed_cpl)
-            else:
-                # No best-move eval: compare position before move vs after (played) move.
-                # CPL = loss relative to previous position (different from branch above, which uses best-move result as reference).
-                return MoveAnalysisService._cpl_signed_eval(eval_before, eval_after, is_white_move)
+            signed_cpl = eval_after - eval_after_best_move  # Black lost if White's eval rose
+        return max(0.0, signed_cpl)
     
     @staticmethod
     def _cpl_signed_eval(eval_before: float, eval_after: float, is_white_move: bool) -> float:

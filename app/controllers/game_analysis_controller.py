@@ -831,23 +831,26 @@ class GameAnalysisController(QObject):
         # Check if the played move matches the best move
         moves_match = bool(best_move_normalized and played_move_normalized == best_move_normalized)
         
-        # Calculate CPL using service
-        cpl = MoveAnalysisService.calculate_cpl(
-            eval_before=eval_before,
-            eval_after=eval_after,
-            eval_after_best_move=eval_after_best_move,
-            is_white_move=is_white_move,
-            is_mate=is_mate,
-            is_mate_before=is_mate_before,
-            is_mate_after_best=is_mate_after_best,
-            mate_moves=mate_moves,
-            mate_moves_before=mate_moves_before,
-            mate_moves_after_best=mate_moves_after_best,
-            moves_match=moves_match
-        )
-        
-        # Check if move is a book move
+        # Check if move is a book move (before CPL so we can skip calculation)
         is_book_move = self._is_book_move(move_info)
+        
+        # Calculate CPL: book moves are always 0 (we don't judge them by engine); otherwise use service
+        if is_book_move:
+            cpl = 0.0
+        else:
+            cpl = MoveAnalysisService.calculate_cpl(
+                eval_before=eval_before,
+                eval_after=eval_after,
+                eval_after_best_move=eval_after_best_move,
+                is_white_move=is_white_move,
+                is_mate=is_mate,
+                is_mate_before=is_mate_before,
+                is_mate_after_best=is_mate_after_best,
+                mate_moves=mate_moves,
+                mate_moves_before=mate_moves_before,
+                mate_moves_after_best=mate_moves_after_best,
+                moves_match=moves_match
+            )
         
         # Get the best alternative move from the position before analysis
         best_alternative_move = self._best_alternative_move
@@ -856,7 +859,7 @@ class GameAnalysisController(QObject):
         move_info["eval_before"] = eval_before
         move_info["eval_after"] = eval_after
         move_info["best_move_san"] = best_alternative_move
-        move_info["cpl"] = cpl
+        move_info["cpl"] = cpl  # 0.0 for book moves, else computed CPL
         move_info["is_mate_before"] = is_mate_before
         move_info["mate_moves_before"] = mate_moves_before
         
