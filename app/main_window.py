@@ -2570,10 +2570,13 @@ class MainWindow(QMainWindow):
         # Connect double-click handler to set active game
         # Connect "+" tab click handler to open PGN database
         self.database_panel = DatabasePanel(
-            self.config, 
+            self.config,
             panel_model,
             on_row_double_click=self._on_database_row_double_click,
-            on_add_tab_clicked=self._open_pgn_database
+            on_add_tab_clicked=self._open_pgn_database,
+            on_close_database=database_controller.close_database_by_identifier,
+            on_close_all_but_database=database_controller.close_all_pgn_databases_except,
+            on_close_search_results=self._close_search_results_tab,
         )
         
         

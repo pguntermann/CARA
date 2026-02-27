@@ -536,7 +536,53 @@ class DatabaseController:
             self.panel_model.set_active_database(clipboard_model)
         
         return closed_count
-    
+
+    def close_database_by_identifier(self, identifier: str) -> bool:
+        """Close a database tab by identifier (e.g. from tab context menu).
+
+        Uses the same logic as close_active_pgn_database but for an arbitrary tab.
+        The right-clicked tab need not be the active one.
+
+        Args:
+            identifier: Database identifier (e.g. file path) to close.
+
+        Returns:
+            True if the database was closed, False if not found or not closeable.
+        """
+        if not identifier or identifier == "clipboard" or identifier == "search_results":
+            return False
+        info = self.panel_model.get_database(identifier)
+        game_count = len(info.model.get_all_games()) if info and info.model else 0
+        result = self._close_database_by_identifier(identifier)
+        if result:
+            logging_service = LoggingService.get_instance()
+            logging_service.info(f"Closed PGN database: {identifier}, {game_count} game(s)")
+        return result
+
+    def close_all_pgn_databases_except(self, identifier: str) -> int:
+        """Close all PGN database tabs except the one with the given identifier.
+
+        Used for "Close all but this" on the tab context menu. Preserves clipboard
+        and search results; closes every other file-based database.
+
+        Args:
+            identifier: Identifier of the tab to keep open.
+
+        Returns:
+            Number of databases closed.
+        """
+        all_databases = self.panel_model.get_all_databases()
+        to_close = [
+            id_ for id_ in all_databases
+            if id_ not in ("clipboard", "search_results") and id_ != identifier
+        ]
+        closed_count = 0
+        for id_ in to_close:
+            if self._close_database_by_identifier(id_):
+                closed_count += 1
+        # Active database is already correct: each close updated it via _determine_new_active_database
+        return closed_count
+
     def _determine_new_active_database(self, removed_identifier: str) -> Optional[DatabaseModel]:
         """Determine which database should become active when a database is removed.
         

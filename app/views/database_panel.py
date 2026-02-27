@@ -1,14 +1,15 @@
 """Database-Panel below Main-Panel and Detail-Panel."""
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QTabWidget, QTableView
+    QWidget, QVBoxLayout, QTabWidget, QTableView, QMenu
 )
-from PyQt6.QtCore import QItemSelectionModel
+from PyQt6.QtCore import QItemSelectionModel, QPoint
 from PyQt6.QtGui import QPalette, QColor, QPixmap, QPainter, QIcon, QBrush
 from PyQt6.QtCore import Qt, QModelIndex, QTimer, QSize, QRect
 from typing import Dict, Any, Optional, Callable, List
 from pathlib import Path
 import math
+import time
 
 from app.models.database_model import DatabaseModel
 from app.models.database_panel_model import DatabasePanelModel
@@ -18,11 +19,14 @@ from app.utils.font_utils import resolve_font_family, scale_font_size
 class DatabasePanel(QWidget):
     """Database panel - can be collapsed if not needed."""
     
-    def __init__(self, config: Dict[str, Any], panel_model: Optional[DatabasePanelModel] = None, 
+    def __init__(self, config: Dict[str, Any], panel_model: Optional[DatabasePanelModel] = None,
                  on_row_double_click: Optional[Callable[[int], None]] = None,
-                 on_add_tab_clicked: Optional[Callable[[], None]] = None) -> None:
+                 on_add_tab_clicked: Optional[Callable[[], None]] = None,
+                 on_close_database: Optional[Callable[[str], None]] = None,
+                 on_close_all_but_database: Optional[Callable[[str], None]] = None,
+                 on_close_search_results: Optional[Callable[[], None]] = None) -> None:
         """Initialize the database panel.
-        
+
         Args:
             config: Configuration dictionary.
             panel_model: Optional DatabasePanelModel to observe.
@@ -31,12 +35,18 @@ class DatabasePanel(QWidget):
                                Receives the row index as argument.
             on_add_tab_clicked: Optional callback function called when the "+" tab is clicked.
                               Should trigger the open PGN database dialog.
+            on_close_database: Optional callback(identifier) for closing a single database tab (e.g. from context menu).
+            on_close_all_but_database: Optional callback(identifier) for closing all database tabs except the given one.
+            on_close_search_results: Optional callback for closing the Search Results tab (e.g. from context menu).
         """
         super().__init__()
         self.config = config
         self._panel_model: Optional[DatabasePanelModel] = None
         self._on_row_double_click = on_row_double_click
         self._on_add_tab_clicked = on_add_tab_clicked
+        self._on_close_database = on_close_database
+        self._on_close_all_but_database = on_close_all_but_database
+        self._on_close_search_results = on_close_search_results
         # Map DatabaseModel instances to tab indices: {DatabaseModel: tab_index}
         self._model_to_tab: Dict[DatabaseModel, int] = {}
         # Track tabs and their models: {tab_index: {'model': DatabaseModel, 'file_path': str, 'table': QTableView, 'identifier': str}}
@@ -47,6 +57,7 @@ class DatabasePanel(QWidget):
         self._pulse_frame: int = 0  # Current animation frame (0-3)
         self._pulse_interval_ms: int = 120  # Update interval for smooth pulse (~8 FPS)
         self._unsaved_tabs: set = set()  # Set of tab indices with unsaved changes
+        self._tab_context_menu_cooldown_until: float = 0  # Ignore context menu for a short time after Close action
         
         self._setup_ui()
         
@@ -217,7 +228,63 @@ class DatabasePanel(QWidget):
         tab_bar.setElideMode(Qt.TextElideMode.ElideNone)  # Prevent text truncation
         tab_bar.setUsesScrollButtons(True)  # Enable scroll buttons when tabs don't fit
         tab_bar.setDrawBase(False)  # Don't draw base line
-    
+        tab_bar.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        tab_bar.customContextMenuRequested.connect(self._on_tab_bar_context_menu)
+
+    def _on_tab_bar_context_menu(self, pos: QPoint) -> None:
+        """Show context menu for database tab (Close; for file-based tabs also Close all but this)."""
+        if time.monotonic() < self._tab_context_menu_cooldown_until:
+            return
+        tab_bar = self.tab_widget.tabBar()
+        tab_index = tab_bar.tabAt(pos)
+        if tab_index < 0:
+            return
+        if tab_index == self._add_tab_index:
+            return
+        tab_info = self._tab_models.get(tab_index)
+        if not tab_info:
+            return
+        identifier = tab_info.get('identifier')
+        if identifier == 'clipboard':
+            return
+        if identifier == 'search_results':
+            if not self._on_close_search_results:
+                return
+            menu = QMenu(self)
+            close_action = menu.addAction("Close")
+            ui_config = self.config.get('ui', {})
+            panel_config = ui_config.get('panels', {}).get('database', {})
+            bg_color = panel_config.get('background_color', [35, 35, 40])
+            from app.views.style import StyleManager
+            StyleManager.style_context_menu(menu, self.config, bg_color)
+            action = menu.exec(tab_bar.mapToGlobal(pos))
+            menu.close()
+            menu.hide()
+            if action == close_action:
+                self._tab_context_menu_cooldown_until = time.monotonic() + 0.4
+                QTimer.singleShot(10, self._on_close_search_results)
+            return
+        if not self._on_close_database and not self._on_close_all_but_database:
+            return
+        menu = QMenu(self)
+        close_action = menu.addAction("Close")
+        close_all_but_action = menu.addAction("Close all but this")
+        ui_config = self.config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('database', {})
+        bg_color = panel_config.get('background_color', [35, 35, 40])
+        from app.views.style import StyleManager
+        StyleManager.style_context_menu(menu, self.config, bg_color)
+        action = menu.exec(tab_bar.mapToGlobal(pos))
+        # Dismiss menu immediately so it does not stay visible or reopen
+        menu.close()
+        menu.hide()
+        if action == close_action and self._on_close_database:
+            self._tab_context_menu_cooldown_until = time.monotonic() + 0.4
+            QTimer.singleShot(10, lambda: self._on_close_database(identifier))
+        elif action == close_all_but_action and self._on_close_all_but_database:
+            self._tab_context_menu_cooldown_until = time.monotonic() + 0.4
+            QTimer.singleShot(10, lambda: self._on_close_all_but_database(identifier))
+
     def _initialize_tabs(self) -> None:
         """Initialize the database panel tabs."""
         # Get column widths from config
