@@ -116,6 +116,7 @@ class EngineConfigurationDialog(QDialog):
         self.setMinimumSize(self._fixed_size)
         self.setMaximumSize(self._fixed_size)
         QTimer.singleShot(0, self._adjust_layouts)
+        QTimer.singleShot(0, self._update_path_label_truncation)
     
     def sizeHint(self) -> QSize:
         """Return the fixed size as the size hint to prevent layout from expanding."""
@@ -143,6 +144,20 @@ class EngineConfigurationDialog(QDialog):
     def moveEvent(self, event: QMoveEvent) -> None:
         """Override move event."""
         super().moveEvent(event)
+
+    def _update_path_label_truncation(self) -> None:
+        """Re-truncate path using label's actual width and font (DPI-aware)."""
+        label = self.info_label
+        path_prefix = "Path: "
+        path_prefix_width_px = QFontMetrics(label.font()).horizontalAdvance(path_prefix)
+        path_max_width_px = max(80, label.width() - path_prefix_width_px - 8)
+        path_display = truncate_path_for_display(
+            self.engine_path, max_width_px=path_max_width_px, font=label.font()
+        )
+        label.setText(
+            f"<b>Engine:</b> {escape(self.engine.name)}<br><b>Path:</b> {escape(path_display)}"
+        )
+        label.setToolTip(str(self.engine_path))
 
     def _adjust_layouts(self) -> None:
         """Adjust tab widget and scroll area heights after layout is ready."""
@@ -271,7 +286,7 @@ class EngineConfigurationDialog(QDialog):
             f"<b>Engine:</b> {escape(self.engine.name)}<br><b>Path:</b> {escape(path_display)}"
         )
         self.info_label.setToolTip(str(self.engine_path))
-        self.info_label.setWordWrap(True)
+        self.info_label.setWordWrap(False)
         self.info_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.info_label)
         

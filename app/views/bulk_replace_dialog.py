@@ -25,6 +25,7 @@ from typing import Optional, Dict, Any, List
 
 from app.controllers.bulk_replace_controller import BulkReplaceController
 from app.models.database_model import DatabaseModel
+from app.utils.path_display_utils import truncate_path_for_display, truncate_text_middle
 
 
 class BulkReplaceDialog(QDialog):
@@ -181,9 +182,10 @@ class BulkReplaceDialog(QDialog):
         db_header_layout.setContentsMargins(0, 0, 0, 0)
         db_header_layout.setSpacing(8)
         
-        db_label = QLabel("Target Database:")
-        db_label.setFont(QFont(self.label_font_family, self.label_font_size))
-        db_header_layout.addWidget(db_label)
+        self._target_db_label = QLabel("Target Database:")
+        self._target_db_label.setFont(QFont(self.label_font_family, self.label_font_size))
+        db_header_layout.addWidget(self._target_db_label)
+        db_label = self._target_db_label
         
         # Get database name and path
         db_name = "Clipboard"
@@ -201,6 +203,9 @@ class BulkReplaceDialog(QDialog):
         
         self.db_name_label = QLabel(f"<b>{db_name}</b>")
         self.db_name_label.setFont(QFont(self.label_font_family, self.label_font_size))
+        self.db_name_label.setWordWrap(False)
+        if db_path:
+            self.db_name_label.setToolTip(db_name)
         db_header_layout.addWidget(self.db_name_label)
         db_header_layout.addStretch()
         
@@ -232,8 +237,17 @@ class BulkReplaceDialog(QDialog):
         path_label_height = font_metrics.lineSpacing()
         
         if db_path:
-            self.db_path_label = QLabel(db_path)
+            self._db_path_full = db_path
+            self._db_name_full = db_name
+            path_max_width_px = max(
+                80,
+                self.dialog_width - self.layout_margins[0] - self.layout_margins[2] - spacer_width - 8,
+            )
+            path_display = truncate_path_for_display(db_path, path_max_width_px, path_font)
+            self.db_path_label = QLabel(path_display)
+            self.db_path_label.setToolTip(db_path)
             self.db_path_label.setFont(path_font)
+            self.db_path_label.setWordWrap(False)
             # Set fixed height to match empty case exactly
             self.db_path_label.setFixedHeight(path_label_height)
             # Make path text lighter/more subtle
@@ -244,9 +258,12 @@ class BulkReplaceDialog(QDialog):
             )
             path_layout.addWidget(self.db_path_label)
         else:
+            self._db_path_full = None
+            self._db_name_full = None
             # Create empty label to reserve space even when no path
             self.db_path_label = QLabel("")
             self.db_path_label.setFont(path_font)
+            self.db_path_label.setWordWrap(False)
             self.db_path_label.setFixedHeight(path_label_height)
             path_layout.addWidget(self.db_path_label)
         
@@ -783,6 +800,9 @@ class BulkReplaceDialog(QDialog):
         self.setMinimumSize(self._fixed_size)
         self.setMaximumSize(self._fixed_size)
         
+        # Truncate path using label's actual width and font (DPI-aware) after layout
+        QTimer.singleShot(0, self._update_path_label_truncation)
+        
         # Update source tag combo with available tags
         available_tags = self._get_available_tags()
         self.source_tag_combo.clear()
@@ -801,6 +821,26 @@ class BulkReplaceDialog(QDialog):
         if hasattr(self, '_tags_widget') and hasattr(self, '_tags_scroll_area'):
             QTimer.singleShot(0, self._update_tags_widget_size)
     
+    def _update_path_label_truncation(self) -> None:
+        """Re-truncate path and name using actual width and font (DPI-aware)."""
+        if hasattr(self, 'db_name_label') and getattr(self, '_db_name_full', None) and hasattr(self, '_target_db_label'):
+            container = self.db_name_label.parent()
+            if container:
+                name_w = max(40, container.width() - self._target_db_label.width() - 8)
+                self.db_name_label.setMaximumWidth(name_w)
+                self.db_name_label.setWordWrap(False)
+                name_font = QFont(self.db_name_label.font())
+                name_font.setBold(True)
+                name_display = truncate_text_middle(self._db_name_full, name_w, name_font)
+                self.db_name_label.setText(f"<b>{name_display}</b>")
+                self.db_name_label.setToolTip(self._db_name_full)
+        if not getattr(self, '_db_path_full', None) or not getattr(self, 'db_path_label', None):
+            return
+        label = self.db_path_label
+        w = max(80, label.width())
+        path_display = truncate_path_for_display(self._db_path_full, w, label.font())
+        label.setText(path_display)
+
     def _update_tags_widget_size(self) -> None:
         """Update the tags widget size to match viewport width and content height."""
         if not hasattr(self, '_tags_widget') or not hasattr(self, '_tags_scroll_area'):
