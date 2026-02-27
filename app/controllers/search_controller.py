@@ -75,7 +75,14 @@ class SearchController:
         logging_service.debug(f"Search completed: scope={search_scope}, games_found={num_games}, success=true")
         
         return search_results_model, status_message
-    
+
+    def create_search_results_model(self, matching_results: List[Tuple[GameData, str]]) -> DatabaseModel:
+        """Create a DatabaseModel for search results from a list of (game, source_name) tuples.
+
+        Used when opening pattern games in a Search Results tab (e.g. from Player Stats).
+        """
+        return self._create_search_results_model(matching_results)
+
     def _get_databases_to_search(
         self,
         scope: str,

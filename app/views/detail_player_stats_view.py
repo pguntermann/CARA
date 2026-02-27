@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QPoint
 from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QFontMetrics, QContextMenuEvent
 from app.views.detail_summary_view import PieChartWidget
-from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING
+from typing import Callable, Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 from app.models.database_model import DatabaseModel
 
 from app.models.game_model import GameModel
@@ -170,6 +170,7 @@ class DetailPlayerStatsView(QWidget):
         self._game_controller = game_controller
         self._stats_controller: Optional["PlayerStatsController"] = None
         self._database_panel = database_panel  # For highlighting games in database panel
+        self._on_open_pattern_games_in_search_results: Optional[Callable[["ErrorPattern"], None]] = None
         
         self.current_stats: Optional["AggregatedPlayerStats"] = None
         self.current_patterns: List["ErrorPattern"] = []
@@ -1863,17 +1864,19 @@ class DetailPlayerStatsView(QWidget):
     
     def _on_view_pattern_games(self, pattern: "ErrorPattern") -> None:
         """Handle click on 'View games' button for a pattern.
-        
-        Groups games by database, switches to the database with the most games,
-        highlights all games in that database, and sorts them to the top.
+
+        If an open-in-search-results callback is set, opens the pattern's games in a Search Results tab.
+        Otherwise falls back to grouping by database and highlighting in the database with the most games.
         """
-        if not pattern.related_games or not self._database_panel or not self._stats_controller:
+        if not pattern.related_games:
             return
-        
-        # Group games by database: {database: [row_indices]}
-        # Use controller method to find games (avoids direct model access)
+        if self._on_open_pattern_games_in_search_results:
+            self._on_open_pattern_games_in_search_results(pattern)
+            return
+        if not self._database_panel or not self._stats_controller:
+            return
+        # Fallback: group games by database, switch to database with most games, highlight
         games_by_database: Dict[DatabaseModel, List[int]] = {}
-        
         for game in pattern.related_games:
             result = self._stats_controller.find_game_in_databases(game, use_all_databases=True)
             if result:
@@ -1881,17 +1884,11 @@ class DetailPlayerStatsView(QWidget):
                 if database not in games_by_database:
                     games_by_database[database] = []
                 games_by_database[database].append(row_index)
-        
         if not games_by_database:
             return
-        
-        # Find the database with the most games (or first one if tie)
         target_database = max(games_by_database.items(), key=lambda x: len(x[1]))[0]
         target_row_indices = games_by_database[target_database]
-        
-        # Highlight all games in the target database and sort them to the top through controller
-        if self._stats_controller:
-            self._stats_controller.highlight_rows(target_database, target_row_indices)
+        self._stats_controller.highlight_rows(target_database, target_row_indices)
     
     def _add_section_header(self, text: str, font: QFont, color: QColor) -> None:
         """Add a section header label."""

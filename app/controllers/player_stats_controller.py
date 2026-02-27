@@ -1,5 +1,6 @@
 """Controller for orchestrating player statistics calculations."""
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, QMutex, QMutexLocker, QTimer
 
@@ -510,7 +511,33 @@ class PlayerStatsController(QObject):
                 return (database, row_index)
         
         return None
-    
+
+    def get_pattern_games_with_sources(self, pattern: "ErrorPattern") -> List[Tuple["GameData", str]]:
+        """Resolve each pattern game to (game, source_display_name) for opening in a Search Results tab.
+
+        Args:
+            pattern: ErrorPattern whose related_games to resolve.
+
+        Returns:
+            List of (GameData, source_display_name). Skipped if a game is not found in any database.
+        """
+        result: List[Tuple["GameData", str]] = []
+        if not pattern or not pattern.related_games:
+            return result
+        panel_model = self._database_controller.get_panel_model()
+        for game in pattern.related_games:
+            found = self.find_game_in_databases(game, use_all_databases=True)
+            if not found:
+                continue
+            database, _ = found
+            identifier = panel_model.find_database_by_model(database)
+            if identifier == "clipboard":
+                display_name = "Clipboard"
+            else:
+                display_name = Path(identifier).stem
+            result.append((game, display_name))
+        return result
+
     def highlight_rows(self, database: DatabaseModel, row_indices: List[int]) -> None:
         """Highlight rows in the database panel through the database controller.
         
@@ -869,6 +896,12 @@ class PlayerStatsController(QObject):
         if self._source_selection == 0:
             # "None" selected - don't update
             return
+
+        # If "Active Database" is selected and the active database was closed/cleared,
+        # switch to "None" to avoid showing stale stats.
+        if self._source_selection == 1 and database is None:
+            self.set_source_selection(0)
+            return
         
         # Only repopulate if "Active Database" is selected (not "All Open Databases")
         if not self._use_all_databases:
@@ -893,6 +926,12 @@ class PlayerStatsController(QObject):
         # Remove from connected list (will be cleaned up on next connection refresh)
         # The database model may already be destroyed, so we just refresh connections
         self._connect_to_database_changes()
+        # If a source is selected (Active or All), treat removal like a data change and
+        # use the existing debounce timer so multiple closes (e.g. \"Close all but this\")
+        # only trigger a single recalculation.
+        if self._source_selection != 0:
+            self._database_update_timer.stop()
+            self._database_update_timer.start(self._database_update_debounce_ms)
     
     def _on_database_data_changed(self, top_left, bottom_right, roles=None) -> None:
         """Handle database data changed signal - debounce and update."""

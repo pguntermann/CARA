@@ -1772,6 +1772,22 @@ class MainWindow(QMainWindow):
                 self.database_panel.tab_widget.setCurrentIndex(tab_index)
                 # Update menu state (will enable close search results action)
                 self._on_database_tab_changed(tab_index)
+
+    def _open_pattern_games_in_search_results(self, pattern: Any) -> None:
+        """Open the pattern's related games in a Search Results tab (create or replace).
+        """
+        if not hasattr(self, 'database_panel') or not pattern or not getattr(pattern, 'related_games', None):
+            return
+        stats_controller = self.controller.get_player_stats_controller()
+        games_with_sources = stats_controller.get_pattern_games_with_sources(pattern)
+        if not games_with_sources:
+            return
+        search_controller = self.controller.get_search_controller()
+        search_results_model = search_controller.create_search_results_model(games_with_sources)
+        tab_index = self.database_panel.add_search_results_tab(search_results_model)
+        # Match regular search behavior: explicitly activate the tab
+        self.database_panel.tab_widget.setCurrentIndex(tab_index)
+        self._on_database_tab_changed(tab_index)
     
     def _find_search_results_tab(self) -> Optional[int]:
         """Find the index of the Search Results tab.
@@ -2589,6 +2605,7 @@ class MainWindow(QMainWindow):
             if hasattr(self.detail_panel, 'player_stats_view'):
                 self.detail_panel.player_stats_view._database_controller = database_controller
                 self.detail_panel.player_stats_view._database_panel = self.database_panel
+                self.detail_panel.player_stats_view._on_open_pattern_games_in_search_results = self._open_pattern_games_in_search_results
                 # Database connections are now handled by the controller
         
         # Set moves list model in game analysis controller
