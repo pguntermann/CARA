@@ -13,21 +13,12 @@ from app.controllers.game_controller import GameController
 from app.services.logging_service import LoggingService, init_worker_logging
 
 
-def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, game_black: str, 
-                            game_eco: str, player_name: str, config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, game_black: str,
+                            game_eco: str, player_name: str, config: Dict[str, Any],
+                            game_index: int = 0) -> Optional[Dict[str, Any]]:
     """Process a single game for statistics aggregation (must be top-level for pickling).
-    
-    Args:
-        game_pgn: PGN string of the game.
-        game_result: Game result string.
-        game_white: White player name.
-        game_black: Black player name.
-        game_eco: ECO code of the opening.
-        player_name: Name of the player to analyze.
-        config: Configuration dictionary.
-        
-    Returns:
-        Dictionary with game statistics, or None if processing failed.
+
+    game_index is used to preserve order of results when using as_completed().
     """
     try:
         # Extract moves from PGN
@@ -147,6 +138,7 @@ def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, ga
                 all_moves_black.append(move)
         
         return {
+            'index': game_index,
             'is_white': is_white_game,
             'game_result': game_result,
             'game_stats': game_stats,
@@ -158,7 +150,7 @@ def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, ga
             'all_moves_white': all_moves_white,
             'all_moves_black': all_moves_black,
             'moves': moves,
-            'game_summary': game_summary  # Return full summary for error pattern detection
+            'game_summary': game_summary,
         }
     except Exception as e:
         # Log error but don't crash - return None to skip this game
@@ -285,7 +277,7 @@ class PlayerStatsService:
                 initializer=init_worker_logging,
                 initargs=(log_queue,)
             )
-            # Submit all games for processing
+            # Submit all games for processing (pass index so results can be restored to input order)
             future_to_game = {
                 executor.submit(
                     _process_game_for_stats,
@@ -295,9 +287,10 @@ class PlayerStatsService:
                     game.black,
                     game.eco if game.eco else "",
                     player_name,
-                    self.config
+                    self.config,
+                    idx,
                 ): game
-                for game in analyzed_games
+                for idx, game in enumerate(analyzed_games)
             }
             
             # Process results as they complete
@@ -340,6 +333,9 @@ class PlayerStatsService:
         if not game_results:
             logging_service.debug(f"Player stats aggregation completed: player={player_name}, games_processed=0, no_results")
             return (None, [])
+        
+        # Restore input order (as_completed returns in completion order)
+        game_results.sort(key=lambda r: r.get('index', 0))
         
         # Extract game summaries for return
         game_summaries: List[GameSummary] = []

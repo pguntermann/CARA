@@ -2978,6 +2978,21 @@ class DetailPlayerStatsView(QWidget):
         # Show menu
         menu.exec(event.globalPos())
     
+    def _get_top_games_summary_for_copy(self):
+        """Get (best_count, best_min_acc, best_max_acc, worst_count, worst_min_acc, worst_max_acc) for clipboard text."""
+        if not self._stats_controller or not self.current_stats:
+            return None
+        ui_config = self.config.get("ui", {})
+        top_games_config = ui_config.get("panels", {}).get("detail", {}).get("player_stats", {}).get("top_games", {})
+        max_best = int(top_games_config.get("max_best", 3))
+        max_worst = int(top_games_config.get("max_worst", 3))
+        try:
+            best_count, best_min_acc, best_max_acc = self._stats_controller.get_top_best_games_summary(max_best)
+            worst_count, worst_min_acc, worst_max_acc = self._stats_controller.get_top_worst_games_summary(max_worst, max_best)
+            return (best_count, best_min_acc, best_max_acc, worst_count, worst_min_acc, worst_max_acc)
+        except Exception:
+            return None
+
     def _copy_section_to_clipboard(self, section_name: str) -> None:
         """Copy a specific section to clipboard.
         
@@ -2989,15 +3004,19 @@ class DetailPlayerStatsView(QWidget):
         
         from app.utils.player_stats_text_formatter import PlayerStatsTextFormatter
         current_player = self._stats_controller.get_current_player() if self._stats_controller else None
+        top_games_summary = self._get_top_games_summary_for_copy() if section_name == "Top Games" else None
         text = PlayerStatsTextFormatter.format_section(
-            self.current_stats, self.current_patterns, section_name, current_player or "Player"
+            self.current_stats,
+            self.current_patterns,
+            section_name,
+            current_player or "Player",
+            top_games_summary=top_games_summary,
         )
         
         if text:
             clipboard = QApplication.clipboard()
             clipboard.setText(text)
             
-            # Update status bar through controller
             if self._stats_controller:
                 self._stats_controller.set_status(f"Copied '{section_name}' section to clipboard")
     
@@ -3008,15 +3027,18 @@ class DetailPlayerStatsView(QWidget):
         
         from app.utils.player_stats_text_formatter import PlayerStatsTextFormatter
         current_player = self._stats_controller.get_current_player() if self._stats_controller else None
+        top_games_summary = self._get_top_games_summary_for_copy()
         text = PlayerStatsTextFormatter.format_full_stats(
-            self.current_stats, self.current_patterns, current_player or "Player"
+            self.current_stats,
+            self.current_patterns,
+            current_player or "Player",
+            top_games_summary=top_games_summary,
         )
         
         if text:
             clipboard = QApplication.clipboard()
             clipboard.setText(text)
             
-            # Update status bar through controller
             if self._stats_controller:
                 self._stats_controller.set_status("Copied player statistics to clipboard")
 

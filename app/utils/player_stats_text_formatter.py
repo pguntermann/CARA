@@ -1,6 +1,6 @@
 """Text formatter for player statistics view."""
 
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.services.player_stats_service import AggregatedPlayerStats
@@ -9,15 +9,46 @@ if TYPE_CHECKING:
 
 class PlayerStatsTextFormatter:
     """Formatter for converting player statistics to text format."""
+
+    @staticmethod
+    def _format_top_games(
+        best_count: int,
+        best_min_acc: Optional[float],
+        best_max_acc: Optional[float],
+        worst_count: int,
+        worst_min_acc: Optional[float],
+        worst_max_acc: Optional[float],
+    ) -> List[str]:
+        """Format Games by Performance (best/worst) section."""
+        lines = []
+        lines.append("Top Games")
+        lines.append("---------")
+        lines.append("")
+        if best_min_acc is not None and best_max_acc is not None and best_count > 0:
+            lines.append(f"Best Games (lowest CPL, Accuracy {best_min_acc:.1f}–{best_max_acc:.1f}%): {best_count} game(s)")
+        else:
+            lines.append(f"Best Games (lowest CPL): {best_count} game(s)")
+        if worst_min_acc is not None and worst_max_acc is not None and worst_count > 0:
+            lines.append(f"Worst Games (highest CPL, Accuracy {worst_min_acc:.1f}–{worst_max_acc:.1f}%): {worst_count} game(s)")
+        else:
+            lines.append(f"Worst Games (highest CPL): {worst_count} game(s)")
+        return lines
     
     @staticmethod
-    def format_full_stats(stats: "AggregatedPlayerStats", patterns: List["ErrorPattern"], player_name: str) -> str:
+    def format_full_stats(
+        stats: "AggregatedPlayerStats",
+        patterns: List["ErrorPattern"],
+        player_name: str,
+        *,
+        top_games_summary: Optional[Tuple[int, Optional[float], Optional[float], int, Optional[float], Optional[float]]] = None,
+    ) -> str:
         """Format the full player statistics as text.
         
         Args:
             stats: AggregatedPlayerStats instance.
             patterns: List of ErrorPattern instances.
             player_name: Name of the player.
+            top_games_summary: Optional (best_count, best_min_acc, best_max_acc, worst_count, worst_min_acc, worst_max_acc).
             
         Returns:
             Formatted text string for the full stats.
@@ -43,13 +74,24 @@ class PlayerStatsTextFormatter:
             lines.extend(PlayerStatsTextFormatter._format_openings(stats))
             lines.append("")
         
+        if top_games_summary is not None:
+            lines.extend(PlayerStatsTextFormatter._format_top_games(*top_games_summary))
+            lines.append("")
+        
         if patterns:
             lines.extend(PlayerStatsTextFormatter._format_error_patterns(patterns))
         
         return "\n".join(lines)
     
     @staticmethod
-    def format_section(stats: "AggregatedPlayerStats", patterns: List["ErrorPattern"], section_name: str, player_name: str) -> str:
+    def format_section(
+        stats: "AggregatedPlayerStats",
+        patterns: List["ErrorPattern"],
+        section_name: str,
+        player_name: str,
+        *,
+        top_games_summary: Optional[Tuple[int, Optional[float], Optional[float], int, Optional[float], Optional[float]]] = None,
+    ) -> str:
         """Format a specific section as text.
         
         Args:
@@ -57,6 +99,7 @@ class PlayerStatsTextFormatter:
             patterns: List of ErrorPattern instances.
             section_name: Name of the section to format.
             player_name: Name of the player.
+            top_games_summary: Required for "Top Games" section: (best_count, best_min_acc, best_max_acc, worst_count, worst_min_acc, worst_max_acc).
             
         Returns:
             Formatted text string for the section.
@@ -70,21 +113,24 @@ class PlayerStatsTextFormatter:
             lines.extend(section_lines[2:])  # Skip "Overview" and "-------"
         elif section_name == "Accuracy Distribution":
             section_lines = PlayerStatsTextFormatter._format_accuracy_distribution(stats)
-            # If distribution is empty, keep section header but no body
             if section_lines:
-                lines.extend(section_lines[2:])  # Skip "Accuracy Distribution" and dashed line
+                lines.extend(section_lines[2:])
         elif section_name == "Move Accuracy":
             section_lines = PlayerStatsTextFormatter._format_move_accuracy(stats)
-            lines.extend(section_lines[2:])  # Skip "Move Accuracy" and "--------------"
+            lines.extend(section_lines[2:])
         elif section_name == "Performance by Phase":
             section_lines = PlayerStatsTextFormatter._format_phase_performance(stats)
-            lines.extend(section_lines[2:])  # Skip "Performance by Phase" and "----------------------"
+            lines.extend(section_lines[2:])
         elif section_name == "Openings":
             section_lines = PlayerStatsTextFormatter._format_openings(stats)
-            lines.extend(section_lines[2:])  # Skip "Openings" and "--------"
+            lines.extend(section_lines[2:])
+        elif section_name == "Top Games":
+            if top_games_summary is not None:
+                section_lines = PlayerStatsTextFormatter._format_top_games(*top_games_summary)
+                lines.extend(section_lines[2:])  # Skip "Top Games" and "---------"
         elif section_name == "Error Patterns":
             section_lines = PlayerStatsTextFormatter._format_error_patterns(patterns)
-            lines.extend(section_lines[2:])  # Skip "Error Patterns" and "---------------"
+            lines.extend(section_lines[2:])
         
         return "\n".join(lines)
     
