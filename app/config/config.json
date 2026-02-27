@@ -1271,6 +1271,34 @@
               "moderate_coverage_percent": 50
             }
           },
+          "accuracy_distribution": {
+            "enabled": true,
+            "height": 90,
+            "margins": [
+              10,
+              10,
+              10,
+              10
+            ],
+            "border_radius": 5,
+            "section_spacing": 6,
+            "bar_color": [
+              120,
+              190,
+              255
+            ],
+            "grid_line_color": [
+              70,
+              70,
+              75
+            ],
+            "axis_color": [
+              140,
+              140,
+              145
+            ],
+            "label_font_size": 9
+          },
           "error_patterns": {
             "thresholds": {
               "phase_blunder_percentage": 20.0,

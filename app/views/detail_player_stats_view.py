@@ -144,6 +144,219 @@ class PhaseBarChartWidget(QWidget):
             y_pos += self.bar_height + self.bar_spacing
 
 
+class AccuracyDistributionWidget(QWidget):
+    """Widget for displaying a simple histogram of per-game accuracy values."""
+
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        accuracy_values: List[float],
+        text_color: QColor,
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._config = config
+        self._accuracy_values: List[float] = accuracy_values or []
+
+        ui_config = config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        player_stats_config = panel_config.get('player_stats', {})
+        colors_config = player_stats_config.get('colors', {})
+        dist_config = player_stats_config.get('accuracy_distribution', {})
+
+        self._bar_color = QColor(*dist_config.get('bar_color', colors_config.get('phase_opening_color', [100, 150, 255])))
+        self._grid_line_color = QColor(*dist_config.get('grid_line_color', [70, 70, 75]))
+        self._axis_color = QColor(*dist_config.get('axis_color', [140, 140, 145]))
+        self._text_color = text_color
+
+        self._bin_size = float(dist_config.get('bin_size', 5.0))
+        if self._bin_size <= 0:
+            self._bin_size = 5.0
+        self._height = int(dist_config.get('height', 90))
+        self._margins = dist_config.get('margins', [10, 10, 10, 10])
+
+        label_font_size = scale_font_size(dist_config.get('label_font_size', 9))
+        fonts_config = player_stats_config.get('fonts', {})
+        label_font_family = resolve_font_family(fonts_config.get('label_font_family', 'Helvetica Neue'))
+        self._label_font = QFont(label_font_family, int(label_font_size))
+
+        self.setMinimumHeight(self._height)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+        # Hover state: store bin geometry and ranges for tooltips
+        # Each entry: (x_left, x_right, start_acc, end_acc, count)
+        self._bin_info: List[Tuple[float, float, float, float, int]] = []
+        self.setMouseTracking(True)
+
+    def set_accuracy_values(self, values: List[float]) -> None:
+        self._accuracy_values = values or []
+        self.update()
+
+    def sizeHint(self) -> QSize:
+        return QSize(200, self._height)
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(100, self._height)
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = self.rect()
+        left = self._margins[0]
+        top = self._margins[1]
+        right = rect.width() - self._margins[2]
+        bottom = rect.height() - self._margins[3]
+        if right <= left or bottom <= top:
+            return
+
+        # Reserve space for axis labels
+        painter.setFont(self._label_font)
+        fm = QFontMetrics(self._label_font)
+        label_height = fm.height() + 4
+
+        # Reserve horizontal space on the left for y-axis labels
+        # (labels for game counts at 0, mid, max)
+        # Use max label width based on a rough upper bound of counts
+        max_label_text = "999"  # enough for typical game counts
+        y_label_width = fm.horizontalAdvance(max_label_text) + 4
+
+        plot_left = left + y_label_width
+        plot_top = top
+        plot_bottom = bottom - label_height
+        if plot_bottom <= plot_top:
+            plot_bottom = top + 10
+        plot_height = plot_bottom - plot_top
+        plot_width = right - plot_left
+
+        # Draw background grid lines
+        painter.setPen(QPen(self._grid_line_color, 1, Qt.PenStyle.SolidLine))
+        for frac in (0.0, 0.5, 1.0):
+            y = plot_bottom - int(plot_height * frac)
+            painter.drawLine(plot_left, y, right, y)
+
+        # Build histogram bins from accuracy values (dynamic range)
+        values = [max(0.0, min(100.0, v)) for v in self._accuracy_values]
+        if not values:
+            # No data: draw a simple placeholder text
+            painter.setPen(QPen(self._text_color))
+            text = "No analyzed games"
+            text_width = fm.horizontalAdvance(text)
+            x_text = plot_left + (plot_width - text_width) // 2
+            y_text = plot_top + plot_height // 2 + fm.ascent() // 2
+            painter.drawText(x_text, y_text, text)
+            return
+
+        # Dynamic range based on data with a small margin
+        data_min = min(values)
+        data_max = max(values)
+        margin = 2.5
+        low = max(0.0, data_min - margin)
+        high = min(100.0, data_max + margin)
+        if high <= low:
+            high = min(100.0, low + 5.0)
+        bin_count = 10
+        bin_size = (high - low) / float(bin_count)
+        bins = [0] * bin_count
+        for v in values:
+            idx = int((v - low) // bin_size) if bin_size > 0 else 0
+            if idx >= bin_count:
+                idx = bin_count - 1
+            bins[idx] += 1
+
+        max_count = max(bins) if bins else 0
+        if max_count == 0:
+            max_count = 1
+
+        bar_width = plot_width / float(bin_count)
+
+        # Reset bin info for hover handling
+        self._bin_info = []
+
+        # Draw bars
+        painter.setBrush(QBrush(self._bar_color))
+        painter.setPen(Qt.PenStyle.NoPen)
+        for i, count in enumerate(bins):
+            if count <= 0:
+                continue
+            height_frac = count / float(max_count)
+            bar_h = max(2, int(plot_height * height_frac))
+            x = plot_left + int(i * bar_width)
+            y = plot_bottom - bar_h
+            w = max(1, int(bar_width) - 1)
+            painter.drawRect(x, y, w, bar_h)
+
+            # Store bin hover region and metadata
+            start_acc = low + i * bin_size
+            end_acc = low + (i + 1) * bin_size if i < bin_count - 1 else high
+            self._bin_info.append((float(x), float(x + w), float(start_acc), float(end_acc), int(count)))
+
+        # Draw axis line
+        painter.setPen(QPen(self._axis_color, 1))
+        painter.drawLine(plot_left, plot_bottom, right, plot_bottom)
+
+        # Draw y-axis labels. Use 0 and max; add a middle label only when meaningful.
+        painter.setPen(QPen(self._text_color))
+        y_ticks: List[Tuple[float, float]] = []
+        if max_count <= 1:
+            y_ticks = [(0.0, 0.0), (1.0, float(max_count))]
+        else:
+            mid_val = max_count / 2.0
+            y_ticks = [(0.0, 0.0), (0.5, mid_val), (1.0, float(max_count))]
+
+        for frac, value in y_ticks:
+            y = plot_bottom - int(plot_height * frac)
+            label = f"{int(round(value))}"
+            label_width = fm.horizontalAdvance(label)
+            x = plot_left - 4 - label_width
+            painter.drawText(x, y + fm.ascent() // 2, label)
+
+        # Draw x-axis labels; density depends on available width
+        painter.setPen(QPen(self._text_color))
+        if high > low and plot_width > 0:
+            # Decide tick count based on width
+            if plot_width >= 480:
+                tick_count = 7
+            elif plot_width >= 320:
+                tick_count = 5
+            elif plot_width >= 200:
+                tick_count = 3
+            else:
+                tick_count = 2
+
+            for i in range(tick_count):
+                if tick_count == 1:
+                    value = (low + high) / 2.0
+                else:
+                    t = i / float(tick_count - 1)
+                    value = low + t * (high - low)
+                label = f"{value:.0f}%"
+                x_pos = plot_left + int(((value - low) / (high - low)) * plot_width)
+                text_width = fm.horizontalAdvance(label)
+                x = x_pos - text_width // 2
+                y = bottom - self._margins[3] + fm.ascent()
+                painter.drawText(x, y, label)
+
+    def mouseMoveEvent(self, event) -> None:
+        """Update tooltip based on hovered bin."""
+        if not self._bin_info:
+            self.setToolTip("")
+            super().mouseMoveEvent(event)
+            return
+
+        pos_x = float(event.position().x())
+        tooltip_text = ""
+        for x_left, x_right, start_acc, end_acc, count in self._bin_info:
+            if x_left <= pos_x <= x_right and count > 0:
+                label = f"{start_acc:.1f}–{end_acc:.1f}%"
+                game_word = "game" if count == 1 else "games"
+                tooltip_text = f"{label} ({count} {game_word})"
+                break
+
+        self.setToolTip(tooltip_text)
+        super().mouseMoveEvent(event)
+
+
 class DetailPlayerStatsView(QWidget):
     """Player statistics view displaying aggregated player performance."""
     
@@ -564,6 +777,21 @@ class DetailPlayerStatsView(QWidget):
         overview_widget.setProperty("section_name", "Overview")
         self.content_layout.addWidget(overview_widget)
         self.content_layout.addSpacing(section_spacing_val)
+
+        # Accuracy Distribution Section (optional)
+        accuracy_dist_config = player_stats_config.get('accuracy_distribution', {})
+        if accuracy_dist_config.get('enabled', True) and getattr(self.current_stats, "accuracy_values", None):
+            self._add_section_header("Accuracy Distribution", header_font, header_text_color)
+            dist_widget = self._create_accuracy_distribution_widget(
+                self.current_stats,
+                text_color,
+                section_bg_color,
+                border_color,
+                accuracy_dist_config,
+            )
+            dist_widget.setProperty("section_name", "Accuracy Distribution")
+            self.content_layout.addWidget(dist_widget)
+            self.content_layout.addSpacing(section_spacing_val)
         
         # Move Accuracy Section
         self._add_section_header("Move Accuracy", header_font, header_text_color)
@@ -1203,15 +1431,27 @@ class DetailPlayerStatsView(QWidget):
         self._add_stat_row(grid, 1, "Win Rate:", f"{stats.win_rate:.1f}%", label_font, value_font, text_color)
         # Wins/Draws/Losses
         self._add_stat_row(grid, 2, "Record:", f"{stats.wins}-{stats.draws}-{stats.losses}", label_font, value_font, text_color)
-        # Average Accuracy
+        # Average Accuracy (include per-game min/max if available)
         accuracy = stats.player_stats.accuracy if stats.player_stats.accuracy is not None else 0.0
-        self._add_stat_row(grid, 3, "Average Accuracy:", f"{accuracy:.1f}%", label_font, value_font, text_color)
+        min_acc = getattr(stats, "min_accuracy", None)
+        max_acc = getattr(stats, "max_accuracy", None)
+        if min_acc is not None and max_acc is not None and stats.analyzed_games > 1:
+            accuracy_text = f"{accuracy:.1f}% (Min: {min_acc:.1f}%, Max: {max_acc:.1f}%)"
+        else:
+            accuracy_text = f"{accuracy:.1f}%"
+        self._add_stat_row(grid, 3, "Average Accuracy:", accuracy_text, label_font, value_font, text_color)
         # Estimated Elo
         est_elo = stats.player_stats.estimated_elo if stats.player_stats.estimated_elo is not None else 0
         self._add_stat_row(grid, 4, "Estimated Elo:", str(est_elo), label_font, value_font, text_color)
-        # Average CPL
+        # Average CPL (include per-game min/max if available)
         avg_cpl = stats.player_stats.average_cpl if stats.player_stats.average_cpl is not None else 0.0
-        self._add_stat_row(grid, 5, "Average CPL:", f"{avg_cpl:.1f}", label_font, value_font, text_color)
+        min_acpl = getattr(stats, "min_acpl", None)
+        max_acpl = getattr(stats, "max_acpl", None)
+        if min_acpl is not None and max_acpl is not None and stats.analyzed_games > 1:
+            cpl_text = f"{avg_cpl:.1f} (Min: {min_acpl:.1f}, Max: {max_acpl:.1f})"
+        else:
+            cpl_text = f"{avg_cpl:.1f}"
+        self._add_stat_row(grid, 5, "Average CPL:", cpl_text, label_font, value_font, text_color)
         # Top 3 Move %
         top3_move_pct = stats.player_stats.top3_move_percentage if stats.player_stats.top3_move_percentage is not None else 0.0
         self._add_stat_row(grid, 6, "Top 3 Move %:", f"{top3_move_pct:.1f}%", label_font, value_font, text_color)
@@ -1230,6 +1470,37 @@ class DetailPlayerStatsView(QWidget):
         layout.addWidget(grid_widget)  # Grid widget expands to fill available space
         layout.addStretch()
         
+        return widget
+
+    def _create_accuracy_distribution_widget(
+        self,
+        stats: "AggregatedPlayerStats",
+        text_color: QColor,
+        bg_color: QColor,
+        border_color: QColor,
+        dist_config: Dict[str, Any],
+    ) -> QWidget:
+        """Create accuracy distribution section widget."""
+        border_radius = dist_config.get('border_radius', 5)
+        section_margins = dist_config.get('margins', [10, 10, 10, 10])
+        section_spacing = dist_config.get('section_spacing', 6)
+
+        widget = QWidget()
+        widget.setStyleSheet(f"""
+            QWidget {{
+                background-color: rgb({bg_color.red()}, {bg_color.green()}, {bg_color.blue()});
+                border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
+                border-radius: {border_radius}px;
+            }}
+        """)
+
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(section_margins[0], section_margins[1], section_margins[2], section_margins[3])
+        layout.setSpacing(section_spacing)
+
+        dist_widget = AccuracyDistributionWidget(self.config, getattr(stats, "accuracy_values", []), text_color, widget)
+        layout.addWidget(dist_widget)
+
         return widget
     
     def _create_move_accuracy_widget(self, stats: "AggregatedPlayerStats",

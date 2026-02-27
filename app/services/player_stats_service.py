@@ -183,6 +183,13 @@ class AggregatedPlayerStats:
     top_openings: List[Tuple[str, Optional[str], int]]  # List of (ECO, opening_name, count) tuples
     worst_accuracy_openings: List[Tuple[str, Optional[str], float, int]]  # List of (ECO, opening_name, avg_cpl, count) tuples
     best_accuracy_openings: List[Tuple[str, Optional[str], float, int]]  # List of (ECO, opening_name, avg_cpl, count) tuples
+    # Additional aggregate accuracy / CPL information across games
+    min_accuracy: float
+    max_accuracy: float
+    min_acpl: float
+    max_acpl: float
+    # Per-game accuracy samples for distribution visualizations
+    accuracy_values: List[float]
 
 
 class PlayerStatsService:
@@ -351,8 +358,9 @@ class PlayerStatsService:
         white_games_count = 0
         black_games_count = 0
         
-        elo_values = []
-        accuracy_values = []
+        elo_values: List[float] = []
+        accuracy_values: List[float] = []
+        overall_cpl_values: List[float] = []
         opening_accuracy_values = []
         middlegame_accuracy_values = []
         endgame_accuracy_values = []
@@ -426,9 +434,10 @@ class PlayerStatsService:
             all_moves_white.extend(result['all_moves_white'])
             all_moves_black.extend(result['all_moves_black'])
             
-            # Collect per-game values for averaging
+            # Collect per-game values for averaging / distribution
             elo_values.append(game_stats.estimated_elo)
             accuracy_values.append(game_stats.accuracy)
+            overall_cpl_values.append(game_stats.average_cpl)
             opening_accuracy_values.append(game_opening.accuracy)
             middlegame_accuracy_values.append(game_middlegame.accuracy)
             endgame_accuracy_values.append(game_endgame.accuracy)
@@ -502,6 +511,21 @@ class PlayerStatsService:
         else:
             averaged_elo = 0
             averaged_accuracy = 0.0
+
+        # Per-game min/max accuracy and ACPL (for display and distributions)
+        if accuracy_values:
+            min_accuracy = min(accuracy_values)
+            max_accuracy = max(accuracy_values)
+        else:
+            min_accuracy = 0.0
+            max_accuracy = 0.0
+
+        if overall_cpl_values:
+            min_acpl = min(overall_cpl_values)
+            max_acpl = max(overall_cpl_values)
+        else:
+            min_acpl = 0.0
+            max_acpl = 0.0
         
         # Average phase accuracies
         if opening_accuracy_values:
@@ -613,7 +637,12 @@ class PlayerStatsService:
             endgame_stats=endgame_stats,
             top_openings=top_openings_list,
             worst_accuracy_openings=worst_openings_list,
-            best_accuracy_openings=best_openings_list
+            best_accuracy_openings=best_openings_list,
+            min_accuracy=min_accuracy,
+            max_accuracy=max_accuracy,
+            min_acpl=min_acpl,
+            max_acpl=max_acpl,
+            accuracy_values=accuracy_values
         )
         
         logging_service.debug(f"Completed player stats aggregation: player={player_name}, games={total_games}, wins={wins}, draws={draws}, losses={losses}, win_rate={win_rate:.1f}%")

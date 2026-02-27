@@ -30,6 +30,10 @@ class PlayerStatsTextFormatter:
         # Add all sections
         lines.extend(PlayerStatsTextFormatter._format_overview(stats))
         lines.append("")
+        dist_lines = PlayerStatsTextFormatter._format_accuracy_distribution(stats)
+        if dist_lines:
+            lines.extend(dist_lines)
+            lines.append("")
         lines.extend(PlayerStatsTextFormatter._format_move_accuracy(stats))
         lines.append("")
         lines.extend(PlayerStatsTextFormatter._format_phase_performance(stats))
@@ -64,6 +68,11 @@ class PlayerStatsTextFormatter:
         if section_name == "Overview":
             section_lines = PlayerStatsTextFormatter._format_overview(stats)
             lines.extend(section_lines[2:])  # Skip "Overview" and "-------"
+        elif section_name == "Accuracy Distribution":
+            section_lines = PlayerStatsTextFormatter._format_accuracy_distribution(stats)
+            # If distribution is empty, keep section header but no body
+            if section_lines:
+                lines.extend(section_lines[2:])  # Skip "Accuracy Distribution" and dashed line
         elif section_name == "Move Accuracy":
             section_lines = PlayerStatsTextFormatter._format_move_accuracy(stats)
             lines.extend(section_lines[2:])  # Skip "Move Accuracy" and "--------------"
@@ -99,17 +108,85 @@ class PlayerStatsTextFormatter:
         lines.append(f"Record: {stats.wins}-{stats.draws}-{stats.losses}")
         
         accuracy = stats.player_stats.accuracy if stats.player_stats.accuracy is not None else 0.0
-        lines.append(f"Average Accuracy: {accuracy:.1f}%")
+        # Include per-game min/max accuracy if available
+        min_acc = getattr(stats, "min_accuracy", None)
+        max_acc = getattr(stats, "max_accuracy", None)
+        if min_acc is not None and max_acc is not None and stats.analyzed_games > 1:
+            lines.append(f"Average Accuracy: {accuracy:.1f}% (Min: {min_acc:.1f}%, Max: {max_acc:.1f}%)")
+        else:
+            lines.append(f"Average Accuracy: {accuracy:.1f}%")
         
         est_elo = stats.player_stats.estimated_elo if stats.player_stats.estimated_elo is not None else 0
         lines.append(f"Estimated Elo: {est_elo}")
         
         avg_cpl = stats.player_stats.average_cpl if stats.player_stats.average_cpl is not None else 0.0
-        lines.append(f"Average CPL: {avg_cpl:.1f}")
+        # Include per-game min/max ACPL if available
+        min_acpl = getattr(stats, "min_acpl", None)
+        max_acpl = getattr(stats, "max_acpl", None)
+        if min_acpl is not None and max_acpl is not None and stats.analyzed_games > 1:
+            lines.append(f"Average CPL: {avg_cpl:.1f} (Min: {min_acpl:.1f}, Max: {max_acpl:.1f})")
+        else:
+            lines.append(f"Average CPL: {avg_cpl:.1f}")
         
         top3_move_pct = stats.player_stats.top3_move_percentage if stats.player_stats.top3_move_percentage is not None else 0.0
         lines.append(f"Top 3 Move %: {top3_move_pct:.1f}%")
         
+        return lines
+
+    @staticmethod
+    def _format_accuracy_distribution(stats: "AggregatedPlayerStats") -> List[str]:
+        """Format accuracy distribution based on per-game accuracy samples.
+
+        Args:
+            stats: AggregatedPlayerStats instance.
+
+        Returns:
+            List of formatted lines, or empty list if not enough data.
+        """
+        values = getattr(stats, "accuracy_values", None) or []
+        # Require at least 2 games to make a distribution meaningful
+        if len(values) < 2:
+            return []
+
+        lines: List[str] = []
+        lines.append("Accuracy Distribution")
+        lines.append("---------------------")
+        lines.append("")
+
+        # Clamp values to [0, 100] and use a dynamic range based on data
+        clamped = [max(0.0, min(100.0, v)) for v in values]
+        data_min = min(clamped)
+        data_max = max(clamped)
+        margin = 2.5
+        low = max(0.0, data_min - margin)
+        high = min(100.0, data_max + margin)
+        if high <= low:
+            high = min(100.0, low + 5.0)
+
+        bin_count = 10
+        bin_size = (high - low) / float(bin_count)
+        bins = [0] * bin_count
+
+        for v in clamped:
+            idx = int((v - low) // bin_size) if bin_size > 0 else 0
+            if idx >= bin_count:
+                idx = bin_count - 1
+            bins[idx] += 1
+
+        # Emit only non-empty bins, in ascending order
+        for i, count in enumerate(bins):
+            if count <= 0:
+                continue
+            start = low + i * bin_size
+            end = start + bin_size
+            # Use inclusive upper bound 'high' for the last bin
+            if i == bin_count - 1:
+                label = f"{start:.1f}–{high:.1f}%"
+            else:
+                label = f"{start:.1f}–{end:.1f}%"
+            game_word = "game" if count == 1 else "games"
+            lines.append(f"{label}: {count} {game_word}")
+
         return lines
     
     @staticmethod
