@@ -384,6 +384,8 @@ class DetailPlayerStatsView(QWidget):
         self._stats_controller: Optional["PlayerStatsController"] = None
         self._database_panel = database_panel  # For highlighting games in database panel
         self._on_open_pattern_games_in_search_results: Optional[Callable[["ErrorPattern"], None]] = None
+        self._on_open_best_games_in_search_results: Optional[Callable[[], None]] = None
+        self._on_open_worst_games_in_search_results: Optional[Callable[[], None]] = None
         
         self.current_stats: Optional["AggregatedPlayerStats"] = None
         self.current_patterns: List["ErrorPattern"] = []
@@ -435,6 +437,9 @@ class DetailPlayerStatsView(QWidget):
         # Error patterns responsive handling
         self._error_patterns_widget: Optional[QWidget] = None
         self._error_pattern_items: List[Dict[str, Any]] = []  # List of {item, button, desc_label, full_text}
+        # Top games responsive handling (shares behavior with error patterns buttons)
+        self._top_games_widget: Optional[QWidget] = None
+        self._top_games_items: List[Dict[str, Any]] = []  # List of {button}
         
         # Openings responsive handling
         self._openings_widget: Optional[QWidget] = None
@@ -827,6 +832,16 @@ class DetailPlayerStatsView(QWidget):
             openings_widget.setProperty("section_name", "Openings")
             self.content_layout.addWidget(openings_widget)
             self.content_layout.addSpacing(section_spacing_val)
+
+        # Top Games Section (Best/Worst games for this player)
+        self._add_section_header("Games by Performance", header_font, header_text_color)
+        top_games_widget = self._create_top_games_widget(
+            self.current_stats, text_color, label_font, value_font,
+            section_bg_color, border_color, widgets_config
+        )
+        top_games_widget.setProperty("section_name", "Top Games")
+        self.content_layout.addWidget(top_games_widget)
+        self.content_layout.addSpacing(section_spacing_val)
         
         # Error Patterns Section
         if self.current_patterns:
@@ -1144,7 +1159,160 @@ class DetailPlayerStatsView(QWidget):
         )
         # Set max height manually (StyleManager doesn't support max_height)
         button.setMaximumHeight(button_height)
+
+    @staticmethod
+    def _html_escape(s: str) -> str:
+        """Escape for use inside HTML content."""
+        return (
+            s.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+        )
+
+    def _build_two_line_html(
+        self,
+        title: str,
+        detail: str,
+        section_config: Dict[str, Any],
+        label_font: QFont,
+        value_font: QFont,
+        text_color: QColor,
+    ) -> str:
+        """Build rich-text HTML for the two-line block so the inter-line gap is one fixed margin."""
+        fm = QFontMetrics(label_font)
+        gap_factor = float(section_config.get("two_line_gap_factor", 0.15))
+        gap_px = max(0, int(fm.lineSpacing() * gap_factor))
+        r, g, b = text_color.red(), text_color.green(), text_color.blue()
+        color = f"rgb({r},{g},{b})"
+        font_family = label_font.family()
+        size1 = label_font.pointSize() if label_font.pointSize() > 0 else 11
+        size2 = value_font.pointSize() if value_font.pointSize() > 0 else 11
+        p1 = f'<p style="margin:0; padding:0; font-family:\'{font_family}\'; font-size:{size1}pt; color:{color};">{self._html_escape(title)}</p>'
+        if not detail:
+            return p1
+        margin_top = f"margin-top:{gap_px}px;"
+        p2 = f'<p style="margin:0; padding:0; {margin_top} font-family:\'{font_family}\'; font-size:{size2}pt; color:{color};">{self._html_escape(detail)}</p>'
+        return p1 + p2
+
+    def _create_two_line_text_column(
+        self,
+        title_text: str,
+        detail_text: str,
+        label_font: QFont,
+        value_font: QFont,
+        text_color: QColor,
+        section_config: Dict[str, Any],
+        wrap_title: bool = True,
+        wrap_detail: bool = False,
+    ) -> Tuple[QVBoxLayout, QLabel, QLabel]:
+        """Create a single label with two lines (rich text) so the inter-line gap is one fixed CSS margin.
+        Row height is capped at two lines so all cards (Games by Performance and Error Patterns) match.
+        """
+        text_column = QVBoxLayout()
+        text_column.setContentsMargins(0, 0, 0, 0)
+
+        fm_title = QFontMetrics(label_font)
+        fm_detail = QFontMetrics(value_font)
+        gap_factor = float(section_config.get("two_line_gap_factor", 0.15))
+        gap_px = max(0, int(fm_title.lineSpacing() * gap_factor))
+        two_line_height = fm_title.lineSpacing() + gap_px + fm_detail.lineSpacing()
+
+        html = self._build_two_line_html(
+            title_text, detail_text, section_config, label_font, value_font, text_color
+        )
+        block_label = QLabel()
+        block_label.setTextFormat(Qt.TextFormat.RichText)
+        block_label.setWordWrap(wrap_title)
+        block_label.setText(html)
+        block_label.setStyleSheet(
+            "border: none; background: transparent; padding: 0; margin: 0;"
+        )
+        block_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        block_label.setFixedHeight(two_line_height)
+        text_column.addWidget(block_label)
+
+        return text_column, block_label, block_label
     
+    def _create_indicator_item_row(
+        self,
+        title_text: str,
+        detail_text: str,
+        indicator_color: List[int],
+        label_font: QFont,
+        value_font: QFont,
+        text_color: QColor,
+        bg_color: QColor,
+        border_color: QColor,
+        section_config: Dict[str, Any],
+        button_text: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a standardized indicator + two-line-text + button row used by multiple cards."""
+        # Layout config
+        item_margins = section_config.get("item_margins", [8, 6, 8, 6])
+        item_spacing = section_config.get("item_spacing", 8)
+        button_column_spacing = section_config.get("button_column_spacing", 8)
+        severity_indicator_config = section_config.get("severity_indicator", {})
+        indicator_size = severity_indicator_config.get("size", [12, 12])
+        indicator_border_radius = severity_indicator_config.get("border_radius", 6)
+
+        # Root item frame
+        item = QFrame()
+        item.setFrameShape(QFrame.Shape.NoFrame)
+        item.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        item.setMinimumWidth(0)
+        item.setMaximumWidth(16777215)
+
+        row = QHBoxLayout(item)
+        row.setSpacing(button_column_spacing)
+        row.setContentsMargins(item_margins[0], item_margins[1], item_margins[2], item_margins[3])
+        row.setSizeConstraint(QHBoxLayout.SizeConstraint.SetNoConstraint)
+
+        # Left column: indicator + two-line text
+        left_column = QHBoxLayout()
+        left_column.setSpacing(item_spacing)
+        left_column.setContentsMargins(0, 0, 0, 0)
+
+        indicator = QWidget()
+        indicator.setFixedSize(indicator_size[0], indicator_size[1])
+        indicator.setStyleSheet(f"""
+            QWidget {{
+                background-color: rgb({indicator_color[0]}, {indicator_color[1]}, {indicator_color[2]});
+                border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
+                border-radius: {indicator_border_radius}px;
+            }}
+        """)
+        left_column.addWidget(indicator)
+
+        text_column, title_label, detail_label = self._create_two_line_text_column(
+            title_text,
+            detail_text,
+            label_font,
+            value_font,
+            text_color,
+            section_config,
+            wrap_title=True,
+            wrap_detail=False,
+        )
+        text_column.setAlignment(Qt.AlignmentFlag.AlignTop)
+        left_column.addLayout(text_column, 1)
+
+        row.addLayout(left_column, 1)
+
+        # Right column: button (optional)
+        button: Optional[QPushButton] = None
+        if button_text:
+            button = QPushButton(button_text)
+            self._apply_button_styling(button, error_pattern_button=True)
+            button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
+            row.addWidget(button, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        return {
+            "item": item,
+            "button": button,
+            "title_label": title_label,
+            "detail_label": detail_label,
+        }
     
     def _on_refresh_clicked(self) -> None:
         """Handle refresh button click."""
@@ -1470,6 +1638,142 @@ class DetailPlayerStatsView(QWidget):
         layout.addWidget(grid_widget)  # Grid widget expands to fill available space
         layout.addStretch()
         
+        return widget
+
+    def _create_top_games_widget(self, stats: "AggregatedPlayerStats",
+                                 text_color: QColor, label_font: QFont, value_font: QFont,
+                                 bg_color: QColor, border_color: QColor,
+                                 widgets_config: Dict[str, Any]) -> QWidget:
+        """Create 'Games by Performance' widget with Best/Worst sub-cards and View buttons."""
+        widget = QWidget()
+        border_radius = widgets_config.get('border_radius', 5)
+        section_margins = widgets_config.get('section_margins', [10, 10, 10, 10])
+        section_spacing = widgets_config.get('section_spacing', 8)
+
+        widget.setStyleSheet(f"""
+            QWidget {{
+                background-color: rgb({bg_color.red()}, {bg_color.green()}, {bg_color.blue()});
+                border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
+                border-radius: {border_radius}px;
+            }}
+        """)
+
+        layout = QVBoxLayout(widget)
+        # Match error patterns card: ensure bottom padding is at least top padding
+        bottom_margin = max(section_margins[1], section_margins[3])
+        layout.setContentsMargins(section_margins[0], section_margins[1], section_margins[2], bottom_margin)
+        layout.setSpacing(section_spacing)
+
+        # Store reference for responsive handling
+        self._top_games_widget = widget
+        self._top_games_items = []
+
+        # Determine how many best/worst games are available (may be less than configured max)
+        best_count = 0
+        worst_count = 0
+        best_min_acc: Optional[float] = None
+        best_max_acc: Optional[float] = None
+        worst_min_acc: Optional[float] = None
+        worst_max_acc: Optional[float] = None
+
+        ui_config = self.config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        player_stats_config = panel_config.get('player_stats', {})
+        error_patterns_config = player_stats_config.get('error_patterns', {})
+        top_games_config = player_stats_config.get('top_games', {})
+        max_best = int(top_games_config.get('max_best', 3))
+        max_worst = int(top_games_config.get('max_worst', 3))
+
+        if self._stats_controller and stats:
+            try:
+                best_count, best_min_acc, best_max_acc = self._stats_controller.get_top_best_games_summary(max_best)
+                worst_count, worst_min_acc, worst_max_acc = self._stats_controller.get_top_worst_games_summary(max_worst, max_best)
+            except Exception:
+                best_count = 0
+                worst_count = 0
+                best_min_acc = best_max_acc = None
+                worst_min_acc = worst_max_acc = None
+
+        # Reuse the exact layout pattern of error pattern items, including indicator dots.
+        # Best games sub-card
+        severity_indicator_config = error_patterns_config.get('severity_indicator', {})
+        severity_colors_config = severity_indicator_config.get('colors', {})
+        # Use a "low" (typically greenish) severity color for best games
+        best_color = severity_colors_config.get('low', [120, 200, 120])
+        indicator_size = severity_indicator_config.get('size', [12, 12])
+        indicator_border_radius = severity_indicator_config.get('border_radius', 6)
+
+        if best_min_acc is not None and best_max_acc is not None:
+            best_detail_text = (
+                f"(lowest CPL, Accuracy {best_min_acc:.1f}–{best_max_acc:.1f}%, {best_count} game(s))"
+            )
+        else:
+            best_detail_text = f"(lowest CPL, {best_count} game(s))"
+        best_button_text = f"View {best_count} →" if best_count > 0 else "View →"
+
+        best_row_data = self._create_indicator_item_row(
+            title_text="Best Games",
+            detail_text=best_detail_text,
+            indicator_color=best_color,
+            label_font=label_font,
+            value_font=value_font,
+            text_color=text_color,
+            bg_color=bg_color,
+            border_color=border_color,
+            section_config=error_patterns_config,
+            button_text=best_button_text,
+        )
+        best_item = best_row_data["item"]
+        best_button = best_row_data["button"]
+
+        if best_count > 0 and self._on_open_best_games_in_search_results:
+            best_button.clicked.connect(lambda checked=False: self._on_open_best_games_in_search_results())
+        else:
+            best_button.setEnabled(False)
+        layout.addWidget(best_item)
+        # Register for responsive button visibility updates
+        self._top_games_items.append({'button': best_button})
+
+        # Worst games sub-card
+        # Use the "critical" (red) severity color for worst games
+        worst_color = severity_colors_config.get('critical', [255, 100, 100])
+
+        if worst_min_acc is not None and worst_max_acc is not None:
+            worst_detail_text = (
+                f"(highest CPL, Accuracy {worst_min_acc:.1f}–{worst_max_acc:.1f}%, {worst_count} game(s))"
+            )
+        else:
+            worst_detail_text = f"(highest CPL, {worst_count} game(s))"
+        worst_button_text = f"View {worst_count} →" if worst_count > 0 else "View →"
+
+        worst_row_data = self._create_indicator_item_row(
+            title_text="Worst Games",
+            detail_text=worst_detail_text,
+            indicator_color=worst_color,
+            label_font=label_font,
+            value_font=value_font,
+            text_color=text_color,
+            bg_color=bg_color,
+            border_color=border_color,
+            section_config=error_patterns_config,
+            button_text=worst_button_text,
+        )
+        worst_item = worst_row_data["item"]
+        worst_button = worst_row_data["button"]
+
+        if worst_count > 0 and self._on_open_worst_games_in_search_results:
+            worst_button.clicked.connect(lambda checked=False: self._on_open_worst_games_in_search_results())
+        else:
+            worst_button.setEnabled(False)
+        layout.addWidget(worst_item)
+        # Register for responsive button visibility updates
+        self._top_games_items.append({'button': worst_button})
+        # Add a tiny spacer after the last sub-card so buttons don't visually touch the outer border
+        layout.addSpacing(2)
+
+        # Initial responsive update
+        QTimer.singleShot(0, self._update_top_games_visibility)
+
         return widget
 
     def _create_accuracy_distribution_widget(
@@ -2005,10 +2309,13 @@ class DetailPlayerStatsView(QWidget):
         layout.setContentsMargins(section_margins[0], section_margins[1], section_margins[2], bottom_margin)
         layout.setSpacing(section_spacing)
         
-        # Store reference for responsive width handling
+        # Store reference for responsive width handling and HTML rebuild
         self._error_patterns_widget = widget
         self._error_pattern_items = []
-        
+        self._error_patterns_label_font = label_font
+        self._error_patterns_value_font = value_font
+        self._error_patterns_text_color = text_color
+
         # Add each pattern
         for i, pattern in enumerate(patterns):
             pattern_data = self._create_error_pattern_item(
@@ -2032,37 +2339,13 @@ class DetailPlayerStatsView(QWidget):
                                   text_color: QColor, label_font: QFont, value_font: QFont,
                                   bg_color: QColor, border_color: QColor,
                                   widgets_config: Dict[str, Any]) -> QWidget:
-        """Create a single error pattern item."""
+        """Create a single error pattern item using the unified row builder."""
         # Get error patterns config
         ui_config = self.config.get('ui', {})
         panel_config = ui_config.get('panels', {}).get('detail', {})
         player_stats_config = panel_config.get('player_stats', {})
         error_patterns_config = player_stats_config.get('error_patterns', {})
         
-        item = QFrame()
-        item.setFrameShape(QFrame.Shape.NoFrame)
-        item.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        item.setMinimumWidth(0)  # Allow item to shrink
-        # Set maximum width to prevent horizontal scrolling
-        item.setMaximumWidth(16777215)  # QWIDGETSIZE_MAX (will be constrained by parent)
-        
-        # Get spacing and margins from config
-        item_spacing = error_patterns_config.get('item_spacing', 8)
-        item_margins = error_patterns_config.get('item_margins', [8, 6, 8, 6])
-        button_column_spacing = error_patterns_config.get('button_column_spacing', 8)  # Spacing between text column and button column
-        
-        # Use QHBoxLayout with two columns: text content (left) and button (right)
-        layout = QHBoxLayout(item)
-        layout.setSpacing(button_column_spacing)
-        layout.setContentsMargins(item_margins[0], item_margins[1], item_margins[2], item_margins[3])
-        layout.setSizeConstraint(QHBoxLayout.SizeConstraint.SetNoConstraint)
-        
-        # Left column: indicator and text content (description + frequency stacked vertically)
-        left_column = QHBoxLayout()
-        left_column.setSpacing(item_spacing)
-        left_column.setContentsMargins(0, 0, 0, 0)
-        
-        # Severity indicator (colored square)
         severity_indicator_config = error_patterns_config.get('severity_indicator', {})
         severity_colors_config = severity_indicator_config.get('colors', {})
         severity_colors = {
@@ -2072,65 +2355,35 @@ class DetailPlayerStatsView(QWidget):
             "low": severity_colors_config.get('low', [200, 200, 100])
         }
         severity_color = severity_colors.get(pattern.severity, severity_colors_config.get('default', [150, 150, 150]))
-        indicator_size = severity_indicator_config.get('size', [12, 12])
-        indicator_border_radius = severity_indicator_config.get('border_radius', 6)
         
-        indicator = QWidget()
-        indicator.setFixedSize(indicator_size[0], indicator_size[1])
-        indicator.setStyleSheet(f"""
-            QWidget {{
-                background-color: rgb({severity_color[0]}, {severity_color[1]}, {severity_color[2]});
-                border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
-                border-radius: {indicator_border_radius}px;
-            }}
-        """)
-        left_column.addWidget(indicator)
-        
-        # Text column: description and frequency stacked vertically
-        text_column = QVBoxLayout()
-        text_column.setSpacing(0)  # No spacing between description and frequency
-        text_column.setContentsMargins(0, 0, 0, 0)
-        text_column.setAlignment(Qt.AlignmentFlag.AlignTop)
-        
-        # Pattern description - allow wrapping and shrinking
-        desc_label = QLabel(pattern.description)
-        desc_label.setFont(label_font)
-        desc_label.setWordWrap(True)
-        desc_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
-        desc_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        desc_label.setMinimumWidth(0)  # Allow description to shrink
-        text_column.addWidget(desc_label)
-        
-        # Frequency/percentage - compact display
         freq_text = f"({pattern.frequency} occurrences, {pattern.percentage:.1f}%)"
-        freq_label = QLabel(freq_text)
-        freq_label.setFont(value_font)
-        freq_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
-        freq_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
-        text_column.addWidget(freq_label)
+        button_text = f"View {len(pattern.related_games)} →" if pattern.related_games else None
         
-        left_column.addLayout(text_column, 1)  # Give text column stretch factor
+        row_data = self._create_indicator_item_row(
+            title_text=pattern.description,
+            detail_text=freq_text,
+            indicator_color=severity_color,
+            label_font=label_font,
+            value_font=value_font,
+            text_color=text_color,
+            bg_color=bg_color,
+            border_color=border_color,
+            section_config=error_patterns_config,
+            button_text=button_text,
+        )
         
-        layout.addLayout(left_column, 1)  # Left column gets stretch factor
-        
-        # Right column: View button (vertically centered, independent of text alignment)
-        view_button = None
-        if pattern.related_games:
-            view_button = QPushButton(f"View {len(pattern.related_games)} →")
-            # Apply button styling using error_patterns button config
-            self._apply_button_styling(view_button, error_pattern_button=True)
+        view_button = row_data["button"]
+        if view_button and pattern.related_games:
             view_button.clicked.connect(lambda checked, p=pattern: self._on_view_pattern_games(p))
-            view_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
-            # Add button to layout with vertical center alignment
-            layout.addWidget(view_button, 0, Qt.AlignmentFlag.AlignVCenter)  # No stretch, vertically centered
         
-        # Return item data for responsive handling
+        # Return item data for responsive handling (title_label and detail_label are the same block label)
         return {
-            'item': item,
+            'item': row_data["item"],
             'button': view_button,
-            'desc_label': desc_label,
-            'freq_label': freq_label,
-            'full_text': pattern.description
+            'desc_label': row_data["title_label"],
+            'freq_label': row_data["detail_label"],
+            'full_text': pattern.description,
+            'freq_text': freq_text,
         }
     
     def _on_view_pattern_games(self, pattern: "ErrorPattern") -> None:
@@ -2456,90 +2709,122 @@ class DetailPlayerStatsView(QWidget):
         
         # Determine if we should show full content or compact
         should_show_full = available_width >= self.error_patterns_collapse_threshold
-        
+
+        ui_config = self.config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        player_stats_config = panel_config.get('player_stats', {})
+        error_patterns_config = player_stats_config.get('error_patterns', {})
+        label_font = getattr(self, '_error_patterns_label_font', None)
+        value_font = getattr(self, '_error_patterns_value_font', None)
+        text_color = getattr(self, '_error_patterns_text_color', None)
+        if not label_font or not value_font or not text_color:
+            return
+
         # Update each error pattern item
         for pattern_data in self._error_pattern_items:
             button = pattern_data.get('button')
             desc_label = pattern_data.get('desc_label')
-            freq_label = pattern_data.get('freq_label')
             full_text = pattern_data.get('full_text', '')
-            
+            freq_text = pattern_data.get('freq_text', '')
+
             if not desc_label:
                 continue
-            
+
             # Update button visibility with fade
             if button:
                 if should_show_full:
-                    # Show button
                     button.setVisible(True)
-                    button.setMaximumWidth(16777215)  # QWIDGETSIZE_MAX
+                    button.setMaximumWidth(16777215)
                     if hasattr(button, 'graphicsEffect') and button.graphicsEffect():
                         button.graphicsEffect().setOpacity(1.0)
                 else:
-                    # Fade out and hide button
                     if not hasattr(button, 'graphicsEffect') or not button.graphicsEffect():
                         opacity_effect = QGraphicsOpacityEffect(button)
                         button.setGraphicsEffect(opacity_effect)
                     button.graphicsEffect().setOpacity(0.0)
                     button.setMaximumWidth(0)
                     button.setVisible(False)
-            
-            # Hide frequency label when width is reduced (more aggressive shrinking)
-            if freq_label:
-                if should_show_full:
-                    freq_label.setVisible(True)
-                    freq_label.setMaximumWidth(16777215)  # QWIDGETSIZE_MAX
-                else:
-                    freq_label.setVisible(False)
-                    freq_label.setMaximumWidth(0)
-            
-            # Update description text - truncate if needed
+
+            # Update block label content (two-line HTML). Keep title to one line (elide) so row height matches Games cards.
             item = pattern_data.get('item')
+            item_margins_config = error_patterns_config.get('item_margins', [8, 6, 8, 6])
+            item_margins = item_margins_config[0] + item_margins_config[2]
+            severity_indicator_config = error_patterns_config.get('severity_indicator', {})
+            indicator_size = severity_indicator_config.get('size', [12, 12])
+            indicator_width = indicator_size[0]
+            spacing = error_patterns_config.get('item_spacing', 8)
+            truncation_config = error_patterns_config.get('truncation', {})
+            min_text_width = truncation_config.get('min_text_width', 50)
+            # Reserve space for button when full (so title elides to one line and row height stays consistent)
+            button_reserve = 90 if should_show_full else 0
+            estimated_available = max(min_text_width, available_width - item_margins - indicator_width - spacing - button_reserve)
+            font_metrics = QFontMetrics(label_font)
+            title_one_line = font_metrics.elidedText(full_text, Qt.TextElideMode.ElideRight, estimated_available)
+
             if should_show_full:
-                # Show full text
-                desc_label.setText(full_text)
-                desc_label.setWordWrap(True)  # Allow wrapping when there's space
-                desc_label.setMaximumWidth(16777215)  # QWIDGETSIZE_MAX - remove width constraint
-                desc_label.setMinimumWidth(0)  # Allow to shrink
-                desc_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-                # Reset item width constraint and size policy
+                html = self._build_two_line_html(
+                    title_one_line, freq_text, error_patterns_config,
+                    label_font, value_font, text_color,
+                )
+                desc_label.setTextFormat(Qt.TextFormat.RichText)
+                desc_label.setText(html)
+                desc_label.setWordWrap(False)
+                desc_label.setMaximumWidth(16777215)
+                desc_label.setMinimumWidth(0)
+                desc_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
                 if item:
-                    item.setMaximumWidth(16777215)  # QWIDGETSIZE_MAX
+                    item.setMaximumWidth(16777215)
                     item.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
             else:
-                # Truncate text with ellipsis - be more aggressive
-                # Estimate available width: total width - margins - indicator - spacing
-                # Frequency label is hidden, so don't account for it
-                # Button is also hidden
-                # Get config values
-                ui_config = self.config.get('ui', {})
-                panel_config = ui_config.get('panels', {}).get('detail', {})
-                player_stats_config = panel_config.get('player_stats', {})
-                error_patterns_config = player_stats_config.get('error_patterns', {})
-                item_margins_config = error_patterns_config.get('item_margins', [8, 6, 8, 6])
-                item_margins = item_margins_config[0] + item_margins_config[2]  # Left + right margins
-                severity_indicator_config = error_patterns_config.get('severity_indicator', {})
-                indicator_size = severity_indicator_config.get('size', [12, 12])
-                indicator_width = indicator_size[0]
-                spacing = error_patterns_config.get('item_spacing', 8)
-                truncation_config = error_patterns_config.get('truncation', {})
-                min_text_width = truncation_config.get('min_text_width', 50)
-                # More aggressive: use more of the available width for text
-                estimated_available = max(min_text_width, available_width - item_margins - indicator_width - spacing)
-                font_metrics = desc_label.fontMetrics()
-                elided_text = font_metrics.elidedText(full_text, Qt.TextElideMode.ElideRight, estimated_available)
-                desc_label.setText(elided_text)
-                desc_label.setWordWrap(False)  # Disable wrapping when truncated
-                # Force the label to use the calculated width to prevent unused space
+                html = self._build_two_line_html(
+                    title_one_line, "", error_patterns_config,
+                    label_font, value_font, text_color,
+                )
+                desc_label.setTextFormat(Qt.TextFormat.RichText)
+                desc_label.setText(html)
+                desc_label.setWordWrap(False)
                 desc_label.setMaximumWidth(estimated_available)
-                desc_label.setMinimumWidth(0)  # Allow to shrink further if needed
-                # Change size policy to Minimum to prevent expansion
-                desc_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
-                # Also ensure the item itself doesn't expand beyond available width
+                desc_label.setMinimumWidth(0)
+                desc_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
                 if item:
                     item.setMaximumWidth(available_width)
-                    # Change item size policy to prevent expansion
                     item.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
+
+    def _update_top_games_visibility(self) -> None:
+        """Update Games by Performance button visibility based on available width.
+
+        Uses the same collapse threshold and fade-out behavior as error patterns.
+        """
+        if not self._top_games_widget or not hasattr(self, 'scroll_area'):
+            return
+
+        # Get current width of the scroll area viewport
+        available_width = self.scroll_area.viewport().width()
+
+        if available_width == 0:
+            return
+
+        # Reuse the error patterns collapse threshold for consistent behavior
+        should_show_full = available_width >= self.error_patterns_collapse_threshold
+
+        for item_data in self._top_games_items:
+            button = item_data.get('button')
+            if not button:
+                continue
+
+            # Update button visibility with the same fade pattern as error patterns
+            if should_show_full:
+                button.setVisible(True)
+                button.setMaximumWidth(16777215)  # QWIDGETSIZE_MAX
+                if hasattr(button, 'graphicsEffect') and button.graphicsEffect():
+                    button.graphicsEffect().setOpacity(1.0)
+            else:
+                if not hasattr(button, 'graphicsEffect') or not button.graphicsEffect():
+                    opacity_effect = QGraphicsOpacityEffect(button)
+                    button.setGraphicsEffect(opacity_effect)
+                button.graphicsEffect().setOpacity(0.0)
+                button.setMaximumWidth(0)
+                button.setVisible(False)
     
     def _update_openings_visibility(self) -> None:
         """Update openings text based on available width - switch to ECO-only when narrow."""
@@ -2626,6 +2911,7 @@ class DetailPlayerStatsView(QWidget):
         if obj == self.scroll_area and event.type() == QEvent.Type.Resize:
             # Defer update until after layout has been processed
             QTimer.singleShot(0, self._update_move_classification_visibility)
+            QTimer.singleShot(0, self._update_top_games_visibility)
             QTimer.singleShot(0, self._update_error_patterns_visibility)
             QTimer.singleShot(0, self._update_openings_visibility)
         return super().eventFilter(obj, event)

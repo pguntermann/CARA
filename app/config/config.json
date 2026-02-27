@@ -1299,6 +1299,10 @@
             ],
             "label_font_size": 9
           },
+          "top_games": {
+            "max_best": 3,
+            "max_worst": 3
+          },
           "error_patterns": {
             "thresholds": {
               "phase_blunder_percentage": 20.0,
@@ -1319,6 +1323,7 @@
               8,
               6
             ],
+            "two_line_gap_factor": 0.15,
             "button": {
               "height": 28
             },
