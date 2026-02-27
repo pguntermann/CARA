@@ -18,10 +18,12 @@ from PyQt6.QtWidgets import (
     QApplication,
 )
 from PyQt6.QtCore import Qt, QSize, QTimer
-from PyQt6.QtGui import QIntValidator, QResizeEvent, QShowEvent, QMoveEvent, QWheelEvent
+from PyQt6.QtGui import QFont, QFontMetrics, QIntValidator, QResizeEvent, QShowEvent, QMoveEvent, QWheelEvent
 from pathlib import Path
+from html import escape
 from typing import Optional, Dict, Any, List
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.path_display_utils import truncate_path_for_display
 from app.controllers.engine_configuration_controller import EngineConfigurationController
 
 
@@ -247,8 +249,28 @@ class EngineConfigurationDialog(QDialog):
         layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetNoConstraint)
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
-        # Engine info header
-        self.info_label = QLabel(f"<b>Engine:</b> {self.engine.name}<br><b>Path:</b> {self.engine_path}")
+        # Engine info header: path truncated to fit one line (font/DPI-aware); full path in tooltip
+        header_config = dialog_config.get('header', {})
+        header_font_family = resolve_font_family(header_config.get('font_family', 'Helvetica Neue'))
+        header_font_size = scale_font_size(header_config.get('font_size', 11))
+        header_font = QFont(header_font_family, header_font_size)
+        path_label_prefix = "Path: "
+        path_prefix_width_px = QFontMetrics(header_font).horizontalAdvance(path_label_prefix)
+        path_max_width_px = max(
+            80,
+            dialog_config.get('width', 600)
+            - layout_margins[0]
+            - layout_margins[2]
+            - path_prefix_width_px
+            - 8,
+        )
+        path_display = truncate_path_for_display(
+            self.engine_path, max_width_px=path_max_width_px, font=header_font
+        )
+        self.info_label = QLabel(
+            f"<b>Engine:</b> {escape(self.engine.name)}<br><b>Path:</b> {escape(path_display)}"
+        )
+        self.info_label.setToolTip(str(self.engine_path))
         self.info_label.setWordWrap(True)
         self.info_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.info_label)
@@ -363,7 +385,7 @@ class EngineConfigurationDialog(QDialog):
         depth_edit = QLineEdit()
         depth_edit.setText(str(depth_value))
         depth_edit.setValidator(QIntValidator(0, 100))
-        depth_edit.setToolTip("Maximum search depth (0 = unlimited, max 100)")
+        depth_edit.setToolTip("Maximum search depth")
         depth_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         common_layout.addRow("Max Depth:", depth_edit)
         self.task_widgets[task]["depth"] = depth_edit
@@ -372,7 +394,7 @@ class EngineConfigurationDialog(QDialog):
         movetime_edit = QLineEdit()
         movetime_edit.setText(str(movetime_value))
         movetime_edit.setValidator(QIntValidator(0, 3600000))  # 1 hour max
-        movetime_edit.setToolTip("Maximum time per move in milliseconds (0 = unlimited, max 3600000)")
+        movetime_edit.setToolTip("Maximum time per move (ply) in milliseconds")
         movetime_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         common_layout.addRow("Move Time:", movetime_edit)
         self.task_widgets[task]["movetime"] = movetime_edit
@@ -393,7 +415,7 @@ class EngineConfigurationDialog(QDialog):
             depth_edit.setToolTip("Depth is not used for game analysis (only move time is used)")
             # Ensure movetime_edit is enabled for Game Analysis
             movetime_edit.setEnabled(True)
-            movetime_edit.setToolTip("Maximum time per move in milliseconds (0 = unlimited, max 3600000)")
+            movetime_edit.setToolTip("Maximum time per move (ply) in milliseconds")
         
         common_group.setLayout(common_layout)
         tab_layout.addWidget(common_group)
