@@ -1,9 +1,9 @@
 """Manual Analysis view for detail panel."""
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy, QMenu, QApplication
 )
-from PyQt6.QtCore import Qt, QEvent, QPropertyAnimation, QEasingCurve, QTimer
+from PyQt6.QtCore import Qt, QEvent, QPropertyAnimation, QEasingCurve, QTimer, QPoint
 from PyQt6.QtGui import QPalette, QColor, QFont, QFontMetrics
 from typing import Dict, Any, Optional
 
@@ -634,7 +634,9 @@ class DetailManualAnalysisView(QWidget):
         scroll_area.setWidget(container)
         self.analysis_container = container
         self.analysis_container_layout = container_layout
-        
+        container.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        container.customContextMenuRequested.connect(self._on_pv_context_menu)
+
         return scroll_area
     
     def _apply_styling(self) -> None:
@@ -2059,7 +2061,88 @@ class DetailManualAnalysisView(QWidget):
                 }}
             """)
         
+        widget.setProperty("multipv", line.multipv)
         return widget
+
+    def _on_pv_context_menu(self, pos: QPoint) -> None:
+        """Show context menu for copying PV line(s) at the clicked position."""
+        from app.views.style import StyleManager
+
+        child = self.analysis_container.childAt(pos) if self.analysis_container else None
+        # Walk up to find the line frame (click may land on inner label/widget which has no multipv)
+        multipv = None
+        w = child
+        while w:
+            pv = w.property("multipv")
+            if pv is not None:
+                try:
+                    multipv = int(pv)
+                    break
+                except (TypeError, ValueError):
+                    pass
+            w = w.parentWidget() if w != self.analysis_container else None
+
+        lines = self._analysis_model.lines if self._analysis_model else []
+        has_lines = bool(lines)
+        line_at_cursor = next((ln for ln in lines if ln.multipv == multipv), None) if multipv is not None else None
+        can_copy_one = line_at_cursor is not None and bool(line_at_cursor.pv and line_at_cursor.pv.strip())
+
+        menu = QMenu(self)
+        ui_config = self.config.get("ui", {})
+        tabs_config = ui_config.get("panels", {}).get("detail", {}).get("tabs", {})
+        pane_bg = tabs_config.get("pane_background", [40, 40, 45])
+        StyleManager.style_context_menu(menu, self.config, pane_bg)
+
+        copy_line_action = menu.addAction("Copy PV line")
+        copy_line_action.setEnabled(can_copy_one)
+        copy_line_action.triggered.connect(lambda checked=False, m=multipv: self._copy_pv_line(m))
+
+        copy_all_action = menu.addAction("Copy all PV lines")
+        copy_all_action.setEnabled(has_lines)
+        copy_all_action.triggered.connect(self._copy_all_pv_lines)
+
+        menu.exec(self.analysis_container.mapToGlobal(pos))
+
+    def _format_pv_line_for_copy(self, line) -> str:
+        """Format a single analysis line for clipboard: eval, depth, and full PV (plain text)."""
+        if line.is_mate:
+            eval_str = f"M{line.mate_moves}" if line.mate_moves > 0 else f"M{abs(line.mate_moves)}"
+        else:
+            pawns = line.centipawns / 100.0
+            eval_str = f"+{pawns:.2f}" if pawns > 0 else f"{pawns:.2f}"
+        pv_part = line.pv.strip() if line.pv else ""
+        return f"{eval_str} @ depth {line.depth} | {pv_part}"
+
+    def _copy_pv_line(self, multipv: Optional[int]) -> None:
+        """Copy the full PV for the line with the given multipv (with eval and depth) to the clipboard."""
+        if multipv is None or not self._analysis_model:
+            return
+        lines = self._analysis_model.lines
+        line = next((ln for ln in lines if ln.multipv == multipv), None)
+        if not line or not line.pv:
+            return
+        text = self._format_pv_line_for_copy(line)
+        QApplication.clipboard().setText(text)
+        from app.services.progress_service import ProgressService
+        ProgressService.get_instance().set_status("Copied PV line to clipboard")
+
+    def _copy_all_pv_lines(self) -> None:
+        """Copy all current PV lines (eval, depth, full PV) to the clipboard."""
+        if not self._analysis_model:
+            return
+        lines = self._analysis_model.lines
+        if not lines:
+            return
+        parts = []
+        for line in lines:
+            if line.pv and line.pv.strip():
+                parts.append(f"Line {line.multipv}: {self._format_pv_line_for_copy(line)}")
+        text = "\n".join(parts)
+        if not text:
+            return
+        QApplication.clipboard().setText(text)
+        from app.services.progress_service import ProgressService
+        ProgressService.get_instance().set_status("Copied all PV lines to clipboard")
     
     def _update_statistics_bar(self) -> None:
         """Update the statistics bar with current engine statistics."""
