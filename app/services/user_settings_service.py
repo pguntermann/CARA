@@ -226,10 +226,8 @@ class UserSettingsService:
         """
         if cls._instance is None:
             cls._instance = cls(settings_path)
-            # Load settings on first creation
+            # Load settings on first creation (migration is run by MigrationService at startup)
             cls._instance.load()
-            # Run migration once on first access
-            cls._instance.migrate()
         return cls._instance
     
     def get_model(self) -> UserSettingsModel:

@@ -75,6 +75,12 @@ def main() -> None:
         # Test logging service with debug message
         logging_service.debug("CARA application starting")
         
+        # Load user settings and run migrations before UI uses them
+        from app.services.user_settings_service import UserSettingsService
+        from app.services.migration_service import MigrationService
+        UserSettingsService.get_instance()
+        MigrationService.run()
+        
         # Initialize MainWindow with injected configuration
         window = MainWindow(config)
         window.show()
