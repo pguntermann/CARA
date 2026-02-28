@@ -1273,7 +1273,8 @@
           },
           "accuracy_distribution": {
             "enabled": true,
-            "height": 90,
+            "transform_exponent": 4.0,
+            "height": 120,
             "margins": [
               10,
               10,
@@ -1282,6 +1283,32 @@
             ],
             "border_radius": 5,
             "section_spacing": 6,
+            "color_ranges": [
+              {
+                "max_acc": 64,
+                "color": [
+                  200,
+                  90,
+                  90
+                ]
+              },
+              {
+                "max_acc": 85,
+                "color": [
+                  220,
+                  180,
+                  80
+                ]
+              },
+              {
+                "max_acc": 100,
+                "color": [
+                  80,
+                  180,
+                  120
+                ]
+              }
+            ],
             "bar_color": [
               120,
               190,

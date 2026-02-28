@@ -165,13 +165,15 @@ class AccuracyDistributionWidget(QWidget):
         dist_config = player_stats_config.get('accuracy_distribution', {})
 
         self._bar_color = QColor(*dist_config.get('bar_color', colors_config.get('phase_opening_color', [100, 150, 255])))
+        self._color_ranges: List[Tuple[float, QColor]] = self._parse_color_ranges(dist_config)
         self._grid_line_color = QColor(*dist_config.get('grid_line_color', [70, 70, 75]))
         self._axis_color = QColor(*dist_config.get('axis_color', [140, 140, 145]))
         self._text_color = text_color
 
-        self._bin_size = float(dist_config.get('bin_size', 5.0))
-        if self._bin_size <= 0:
-            self._bin_size = 5.0
+        # Non-linear transform: t = (acc/100)^exponent so high accuracy gets narrower bins
+        self._transform_exponent = float(dist_config.get('transform_exponent', 4.0))
+        if self._transform_exponent < 1.0:
+            self._transform_exponent = 4.0
         self._height = int(dist_config.get('height', 90))
         self._margins = dist_config.get('margins', [10, 10, 10, 10])
 
@@ -187,6 +189,49 @@ class AccuracyDistributionWidget(QWidget):
         # Each entry: (x_left, x_right, start_acc, end_acc, count)
         self._bin_info: List[Tuple[float, float, float, float, int]] = []
         self.setMouseTracking(True)
+
+    def _parse_color_ranges(self, dist_config: Dict[str, Any]) -> List[Tuple[float, QColor]]:
+        """Parse color_ranges from config: list of (max_acc, QColor), sorted by max_acc."""
+        raw = dist_config.get("color_ranges")
+        if not isinstance(raw, list) or len(raw) < 2:
+            return []
+        out: List[Tuple[float, QColor]] = []
+        for entry in raw:
+            if not isinstance(entry, dict):
+                continue
+            max_acc = entry.get("max_acc")
+            color = entry.get("color")
+            if max_acc is None or not isinstance(color, (list, tuple)) or len(color) < 3:
+                continue
+            try:
+                max_acc_f = float(max_acc)
+                out.append((max_acc_f, QColor(int(color[0]), int(color[1]), int(color[2]))))
+            except (TypeError, ValueError):
+                continue
+        out.sort(key=lambda x: x[0])
+        return out if len(out) >= 2 else []
+
+    def _color_for_accuracy(self, acc: float) -> QColor:
+        """Interpolate bar color from color_ranges by accuracy (0-100). Uses bar_color if no ranges."""
+        if not self._color_ranges:
+            return self._bar_color
+        acc = max(0.0, min(100.0, acc))
+        first_max, first_color = self._color_ranges[0]
+        if acc <= first_max:
+            return first_color
+        prev_max = first_max
+        prev_color = first_color
+        for max_acc, color in self._color_ranges[1:]:
+            if acc <= max_acc:
+                t = (acc - prev_max) / (max_acc - prev_max) if max_acc > prev_max else 1.0
+                return QColor(
+                    int(prev_color.red() + t * (color.red() - prev_color.red())),
+                    int(prev_color.green() + t * (color.green() - prev_color.green())),
+                    int(prev_color.blue() + t * (color.blue() - prev_color.blue())),
+                )
+            prev_max = max_acc
+            prev_color = color
+        return self._color_ranges[-1][1]
 
     def set_accuracy_values(self, values: List[float]) -> None:
         self._accuracy_values = values or []
@@ -235,10 +280,10 @@ class AccuracyDistributionWidget(QWidget):
             y = plot_bottom - int(plot_height * frac)
             painter.drawLine(plot_left, y, right, y)
 
-        # Build histogram bins from accuracy values (dynamic range)
+        # Non-linear binning over data range: t = (acc/100)^k, bin count scales with range
+        # so high-accuracy bins are narrower; wider player range → more bins
         values = [max(0.0, min(100.0, v)) for v in self._accuracy_values]
         if not values:
-            # No data: draw a simple placeholder text
             painter.setPen(QPen(self._text_color))
             text = "No analyzed games"
             text_width = fm.horizontalAdvance(text)
@@ -247,7 +292,6 @@ class AccuracyDistributionWidget(QWidget):
             painter.drawText(x_text, y_text, text)
             return
 
-        # Dynamic range based on data with a small margin
         data_min = min(values)
         data_max = max(values)
         margin = 2.5
@@ -255,40 +299,58 @@ class AccuracyDistributionWidget(QWidget):
         high = min(100.0, data_max + margin)
         if high <= low:
             high = min(100.0, low + 5.0)
-        bin_count = 10
-        bin_size = (high - low) / float(bin_count)
+        range_size = high - low
+        bin_count = max(5, min(25, int(round(range_size / 5.0))))
+
+        k = self._transform_exponent
+        t_low = (low / 100.0) ** k
+        t_high = (high / 100.0) ** k
+        t_range = t_high - t_low
+        t_edges = [t_low + (i / float(bin_count)) * t_range for i in range(bin_count + 1)]
+        acc_edges = [100.0 * (t ** (1.0 / k)) for t in t_edges]
+
         bins = [0] * bin_count
         for v in values:
-            idx = int((v - low) // bin_size) if bin_size > 0 else 0
-            if idx >= bin_count:
+            t = (v / 100.0) ** k
+            if t <= t_low:
+                idx = 0
+            elif t >= t_high:
                 idx = bin_count - 1
+            else:
+                idx = int((t - t_low) / t_range * bin_count)
+                if idx >= bin_count:
+                    idx = bin_count - 1
             bins[idx] += 1
 
         max_count = max(bins) if bins else 0
         if max_count == 0:
             max_count = 1
 
-        bar_width = plot_width / float(bin_count)
-
         # Reset bin info for hover handling
         self._bin_info = []
 
-        # Draw bars
-        painter.setBrush(QBrush(self._bar_color))
+        # X-axis fixed 0-100%: bar position and width = accuracy range (narrow at high end)
         painter.setPen(Qt.PenStyle.NoPen)
-        for i, count in enumerate(bins):
+        for i in range(bin_count):
+            start_acc = acc_edges[i]
+            end_acc = acc_edges[i + 1]
+            x_start = plot_left + (start_acc / 100.0) * plot_width
+            x_end = plot_left + (end_acc / 100.0) * plot_width
+            x = int(x_start)
+            w = max(1, int(x_end - x_start))
+            count = bins[i]
+
             if count <= 0:
+                self._bin_info.append((float(x), float(x + w), float(start_acc), float(end_acc), 0))
                 continue
+
+            center_acc = (start_acc + end_acc) / 2.0
+            bar_color = self._color_for_accuracy(center_acc)
+            painter.setBrush(QBrush(bar_color))
             height_frac = count / float(max_count)
             bar_h = max(2, int(plot_height * height_frac))
-            x = plot_left + int(i * bar_width)
             y = plot_bottom - bar_h
-            w = max(1, int(bar_width) - 1)
             painter.drawRect(x, y, w, bar_h)
-
-            # Store bin hover region and metadata
-            start_acc = low + i * bin_size
-            end_acc = low + (i + 1) * bin_size if i < bin_count - 1 else high
             self._bin_info.append((float(x), float(x + w), float(start_acc), float(end_acc), int(count)))
 
         # Draw axis line
@@ -311,12 +373,11 @@ class AccuracyDistributionWidget(QWidget):
             x = plot_left - 4 - label_width
             painter.drawText(x, y + fm.ascent() // 2, label)
 
-        # Draw x-axis labels; density depends on available width
+        # Draw x-axis labels: fixed 0-100% scale
         painter.setPen(QPen(self._text_color))
-        if high > low and plot_width > 0:
-            # Decide tick count based on width
+        if plot_width > 0:
             if plot_width >= 480:
-                tick_count = 7
+                tick_count = 6
             elif plot_width >= 320:
                 tick_count = 5
             elif plot_width >= 200:
@@ -326,12 +387,11 @@ class AccuracyDistributionWidget(QWidget):
 
             for i in range(tick_count):
                 if tick_count == 1:
-                    value = (low + high) / 2.0
+                    value = 50.0
                 else:
-                    t = i / float(tick_count - 1)
-                    value = low + t * (high - low)
+                    value = i * (100.0 / (tick_count - 1))
                 label = f"{value:.0f}%"
-                x_pos = plot_left + int(((value - low) / (high - low)) * plot_width)
+                x_pos = plot_left + int((value / 100.0) * plot_width)
                 text_width = fm.horizontalAdvance(label)
                 x = x_pos - text_width // 2
                 y = bottom - self._margins[3] + fm.ascent()

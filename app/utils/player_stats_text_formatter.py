@@ -199,7 +199,7 @@ class PlayerStatsTextFormatter:
         lines.append("---------------------")
         lines.append("")
 
-        # Clamp values to [0, 100] and use a dynamic range based on data
+        # Same non-linear binning as chart: t = (acc/100)^k over data range, bin count scales with range
         clamped = [max(0.0, min(100.0, v)) for v in values]
         data_min = min(clamped)
         data_max = max(clamped)
@@ -208,28 +208,36 @@ class PlayerStatsTextFormatter:
         high = min(100.0, data_max + margin)
         if high <= low:
             high = min(100.0, low + 5.0)
+        range_size = high - low
+        bin_count = max(5, min(25, int(round(range_size / 5.0))))
 
-        bin_count = 10
-        bin_size = (high - low) / float(bin_count)
+        transform_exponent = 4.0
+        t_low = (low / 100.0) ** transform_exponent
+        t_high = (high / 100.0) ** transform_exponent
+        t_range = t_high - t_low
+        t_edges = [t_low + (i / float(bin_count)) * t_range for i in range(bin_count + 1)]
+        acc_edges = [100.0 * (t ** (1.0 / transform_exponent)) for t in t_edges]
+
         bins = [0] * bin_count
-
         for v in clamped:
-            idx = int((v - low) // bin_size) if bin_size > 0 else 0
-            if idx >= bin_count:
+            t = (v / 100.0) ** transform_exponent
+            if t <= t_low:
+                idx = 0
+            elif t >= t_high:
                 idx = bin_count - 1
+            else:
+                idx = int((t - t_low) / t_range * bin_count)
+                if idx >= bin_count:
+                    idx = bin_count - 1
             bins[idx] += 1
 
         # Emit only non-empty bins, in ascending order
         for i, count in enumerate(bins):
             if count <= 0:
                 continue
-            start = low + i * bin_size
-            end = start + bin_size
-            # Use inclusive upper bound 'high' for the last bin
-            if i == bin_count - 1:
-                label = f"{start:.1f}–{high:.1f}%"
-            else:
-                label = f"{start:.1f}–{end:.1f}%"
+            start = acc_edges[i]
+            end = acc_edges[i + 1]
+            label = f"{start:.1f}–{end:.1f}%"
             game_word = "game" if count == 1 else "games"
             lines.append(f"{label}: {count} {game_word}")
 
