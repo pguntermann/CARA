@@ -1680,9 +1680,33 @@ class DetailPlayerStatsView(QWidget):
         else:
             cpl_text = f"{avg_cpl:.1f}"
         self._add_stat_row(grid, 5, "Average CPL:", cpl_text, label_font, value_font, text_color)
-        # Top 3 Move %
+        # Best Move % (include per-game min/max if available)
+        best_move_pct = stats.player_stats.best_move_percentage if stats.player_stats.best_move_percentage is not None else 0.0
+        min_best = getattr(stats, "min_best_move_pct", None)
+        max_best = getattr(stats, "max_best_move_pct", None)
+        if min_best is not None and max_best is not None and stats.analyzed_games > 1:
+            best_text = f"{best_move_pct:.1f}% (Min: {min_best:.1f}%, Max: {max_best:.1f}%)"
+        else:
+            best_text = f"{best_move_pct:.1f}%"
+        self._add_stat_row(grid, 6, "Best Move %:", best_text, label_font, value_font, text_color)
+        # Top 3 Move % (include per-game min/max if available)
         top3_move_pct = stats.player_stats.top3_move_percentage if stats.player_stats.top3_move_percentage is not None else 0.0
-        self._add_stat_row(grid, 6, "Top 3 Move %:", f"{top3_move_pct:.1f}%", label_font, value_font, text_color)
+        min_top3 = getattr(stats, "min_top3_move_pct", None)
+        max_top3 = getattr(stats, "max_top3_move_pct", None)
+        if min_top3 is not None and max_top3 is not None and stats.analyzed_games > 1:
+            top3_text = f"{top3_move_pct:.1f}% (Min: {min_top3:.1f}%, Max: {max_top3:.1f}%)"
+        else:
+            top3_text = f"{top3_move_pct:.1f}%"
+        self._add_stat_row(grid, 7, "Top 3 Move %:", top3_text, label_font, value_font, text_color)
+        # Blunder Rate (include per-game min/max if available)
+        blunder_rate = stats.player_stats.blunder_rate if stats.player_stats.blunder_rate is not None else 0.0
+        min_blunder = getattr(stats, "min_blunder_rate", None)
+        max_blunder = getattr(stats, "max_blunder_rate", None)
+        if min_blunder is not None and max_blunder is not None and stats.analyzed_games > 1:
+            blunder_text = f"{blunder_rate:.1f}% (Min: {min_blunder:.1f}%, Max: {max_blunder:.1f}%)"
+        else:
+            blunder_text = f"{blunder_rate:.1f}%"
+        self._add_stat_row(grid, 8, "Blunder Rate:", blunder_text, label_font, value_font, text_color)
         
         # The grid itself has a stretch column between labels and values for flexible spacing
         # The grid widget will expand to fill available space, and the stretch column will shrink when width is reduced

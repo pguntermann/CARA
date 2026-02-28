@@ -175,11 +175,17 @@ class AggregatedPlayerStats:
     top_openings: List[Tuple[str, Optional[str], int]]  # List of (ECO, opening_name, count) tuples
     worst_accuracy_openings: List[Tuple[str, Optional[str], float, int]]  # List of (ECO, opening_name, avg_cpl, count) tuples
     best_accuracy_openings: List[Tuple[str, Optional[str], float, int]]  # List of (ECO, opening_name, avg_cpl, count) tuples
-    # Additional aggregate accuracy / CPL information across games
+    # Additional aggregate accuracy / CPL / Top3 Move % information across games
     min_accuracy: float
     max_accuracy: float
     min_acpl: float
     max_acpl: float
+    min_top3_move_pct: float
+    max_top3_move_pct: float
+    min_best_move_pct: float
+    max_best_move_pct: float
+    min_blunder_rate: float
+    max_blunder_rate: float
     # Per-game accuracy samples for distribution visualizations
     accuracy_values: List[float]
 
@@ -357,6 +363,9 @@ class PlayerStatsService:
         elo_values: List[float] = []
         accuracy_values: List[float] = []
         overall_cpl_values: List[float] = []
+        overall_top3_pct_values: List[float] = []
+        overall_best_move_pct_values: List[float] = []
+        overall_blunder_rate_values: List[float] = []
         opening_accuracy_values = []
         middlegame_accuracy_values = []
         endgame_accuracy_values = []
@@ -434,6 +443,12 @@ class PlayerStatsService:
             elo_values.append(game_stats.estimated_elo)
             accuracy_values.append(game_stats.accuracy)
             overall_cpl_values.append(game_stats.average_cpl)
+            top3_pct = game_stats.top3_move_percentage if game_stats.top3_move_percentage is not None else 0.0
+            overall_top3_pct_values.append(top3_pct)
+            best_pct = game_stats.best_move_percentage if game_stats.best_move_percentage is not None else 0.0
+            overall_best_move_pct_values.append(best_pct)
+            blunder_rate = game_stats.blunder_rate if game_stats.blunder_rate is not None else 0.0
+            overall_blunder_rate_values.append(blunder_rate)
             opening_accuracy_values.append(game_opening.accuracy)
             middlegame_accuracy_values.append(game_middlegame.accuracy)
             endgame_accuracy_values.append(game_endgame.accuracy)
@@ -522,6 +537,27 @@ class PlayerStatsService:
         else:
             min_acpl = 0.0
             max_acpl = 0.0
+
+        if overall_top3_pct_values:
+            min_top3_move_pct = min(overall_top3_pct_values)
+            max_top3_move_pct = max(overall_top3_pct_values)
+        else:
+            min_top3_move_pct = 0.0
+            max_top3_move_pct = 0.0
+
+        if overall_best_move_pct_values:
+            min_best_move_pct = min(overall_best_move_pct_values)
+            max_best_move_pct = max(overall_best_move_pct_values)
+        else:
+            min_best_move_pct = 0.0
+            max_best_move_pct = 0.0
+
+        if overall_blunder_rate_values:
+            min_blunder_rate = min(overall_blunder_rate_values)
+            max_blunder_rate = max(overall_blunder_rate_values)
+        else:
+            min_blunder_rate = 0.0
+            max_blunder_rate = 0.0
         
         # Average phase accuracies
         if opening_accuracy_values:
@@ -638,6 +674,12 @@ class PlayerStatsService:
             max_accuracy=max_accuracy,
             min_acpl=min_acpl,
             max_acpl=max_acpl,
+            min_top3_move_pct=min_top3_move_pct,
+            max_top3_move_pct=max_top3_move_pct,
+            min_best_move_pct=min_best_move_pct,
+            max_best_move_pct=max_best_move_pct,
+            min_blunder_rate=min_blunder_rate,
+            max_blunder_rate=max_blunder_rate,
             accuracy_values=accuracy_values
         )
         

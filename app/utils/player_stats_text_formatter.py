@@ -174,8 +174,29 @@ class PlayerStatsTextFormatter:
         else:
             lines.append(f"Average CPL: {avg_cpl:.1f}")
         
+        best_move_pct = stats.player_stats.best_move_percentage if stats.player_stats.best_move_percentage is not None else 0.0
+        min_best = getattr(stats, "min_best_move_pct", None)
+        max_best = getattr(stats, "max_best_move_pct", None)
+        if min_best is not None and max_best is not None and stats.analyzed_games > 1:
+            lines.append(f"Best Move %: {best_move_pct:.1f}% (Min: {min_best:.1f}%, Max: {max_best:.1f}%)")
+        else:
+            lines.append(f"Best Move %: {best_move_pct:.1f}%")
+        
         top3_move_pct = stats.player_stats.top3_move_percentage if stats.player_stats.top3_move_percentage is not None else 0.0
-        lines.append(f"Top 3 Move %: {top3_move_pct:.1f}%")
+        min_top3 = getattr(stats, "min_top3_move_pct", None)
+        max_top3 = getattr(stats, "max_top3_move_pct", None)
+        if min_top3 is not None and max_top3 is not None and stats.analyzed_games > 1:
+            lines.append(f"Top 3 Move %: {top3_move_pct:.1f}% (Min: {min_top3:.1f}%, Max: {max_top3:.1f}%)")
+        else:
+            lines.append(f"Top 3 Move %: {top3_move_pct:.1f}%")
+        
+        blunder_rate = stats.player_stats.blunder_rate if stats.player_stats.blunder_rate is not None else 0.0
+        min_blunder = getattr(stats, "min_blunder_rate", None)
+        max_blunder = getattr(stats, "max_blunder_rate", None)
+        if min_blunder is not None and max_blunder is not None and stats.analyzed_games > 1:
+            lines.append(f"Blunder Rate: {blunder_rate:.1f}% (Min: {min_blunder:.1f}%, Max: {max_blunder:.1f}%)")
+        else:
+            lines.append(f"Blunder Rate: {blunder_rate:.1f}%")
         
         return lines
 
