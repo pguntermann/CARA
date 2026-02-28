@@ -4430,6 +4430,13 @@ Visibility Settings:
             
             engine_submenu.addSeparator()
             
+            # Set for all tasks
+            set_all_action = QAction("Set for all tasks", self)
+            set_all_action.setToolTip("Assign this engine to Game Analysis, Evaluation, Manual Analysis, and Brilliancy Detection")
+            set_all_action.triggered.connect(lambda checked, eid=engine.id: self._set_engine_for_all_tasks(eid))
+            engine_submenu.addAction(set_all_action)
+            engine_submenu.addSeparator()
+            
             # Set as Game Analysis Engine
             game_analysis_action = QAction("Set as Game Analysis Engine", self)
             game_analysis_action.setCheckable(True)
@@ -4529,6 +4536,15 @@ Visibility Settings:
             self
         )
         dialog.exec()
+    
+    def _set_engine_for_all_tasks(self, engine_id: str) -> None:
+        """Set this engine for all tasks (Game Analysis, Evaluation, Manual Analysis, Brilliancy Detection)."""
+        success, message = self.controller.get_engine_controller().set_engine_for_all_tasks(engine_id)
+        if success:
+            self.controller.set_status(message)
+            # Menu will update automatically via assignment_changed signal
+        else:
+            MessageDialog.show_warning(self.config, "Set Engine for All Tasks Failed", message, self)
     
     def _set_engine_assignment(self, task: str, engine_id: str) -> None:
         """Set engine assignment for a task.
