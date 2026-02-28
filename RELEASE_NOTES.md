@@ -1,5 +1,41 @@
 # Release Notes
 
+# CARA v2.6.0 - Player Stats, UX Improvement and separate Brilliancy Engine task
+
+**Release Date:** 28.02.2026
+
+This release expands the Player Stats view with additional KPIs and min/max ranges and a new Accuracy Distribution chart, adds a dedicated engine role for Brilliant Move Detection, and adds right-click context menus to the moves list, manual analysis PV lines, and database tabs. The Engine Settings dialog has been refactored for better usability, and path display truncation improves dialogs when working with long file paths.
+
+## New Features
+
+- **Player Stats – KPI section:** Overview metrics now show min and max across the analyzed games. Best Move % and Blunder Rate were added.
+- **Player Stats – Accuracy Distribution:** New chart showing how accuracy varies across games.
+- **Player Stats – Top/Worst Games:** New "Top/Worst Games by performance" section.
+- **Engine submenu:** "Set for all tasks" option to apply the selected engine to all tasks.
+- **Brilliant Move Detection:** Separate engine role/task for Brilliant Move Detection, so a dedicated engine can be used for this task.
+- **Manual analysis PV lines:** Right-click context menu to copy PV lines to the clipboard.
+- **Moves list:** Right-click context menu with options to copy single values or the complete table.
+- **Database tabs:** Right-click menu with "Close" and "Close all but this".
+
+## Enhancements
+
+- **Engine Settings Dialog:** Improved usability and path display truncation for long paths.
+- **Bulk dialogs:** File/path truncation for long filenames in Bulk Clean, Bulk Add/Remove Tags, and Bulk Replace Tags dialogs.
+- **Player Stats – Error patterns:** "Player stats View" now opens matched games in a search tab.
+- **Documentation:** HTML manual updated with latest features and screenshots.
+
+## Bug Fixes
+
+- **Player Stats:** Fixed minor issues in player stats calculation.
+
+## Refactoring and Technical Improvements
+
+- **Engine Settings Dialog:** Refactored for better separation of concerns between controller and view.
+- **Migration Service:** New Migration Service class to orchestrate settings and other migration operations on startup.
+- **Move analysis service:** Simplified CPL calculation logic and removed obsolete legacy code for brilliant move classification.
+
+---
+
 # CARA v2.5.10 - Brilliant Move Detection Fixes
 
 **Release Date:** 22.02.2026

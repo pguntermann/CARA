@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-lightgrey.svg)]()
 
-**Version 2.5.10**
+**Version 2.6.0**
 
 CARA is a full-featured desktop application designed for analyzing and reviewing chess games. Unlike chess playing applications or puzzle solvers, CARA focuses exclusively on post-game analysis and review, helping you understand your games, identify mistakes, recognize patterns, and improve your chess understanding.
 
