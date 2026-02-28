@@ -36,7 +36,7 @@ from app.controllers.app_controller import AppController
 from app.input.shortcut_manager import ShortcutManager
 from app.models.column_profile_model import DEFAULT_PROFILE_NAME
 from app.models.database_model import DatabaseModel, GameData
-from app.controllers.engine_controller import TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS
+from app.controllers.engine_controller import TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS, TASK_BRILLIANCY_DETECTION
 from app.services.pgn_cleaning_service import PgnCleaningService
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.tooltip_utils import wrap_tooltip_text
@@ -4408,6 +4408,7 @@ Visibility Settings:
         game_analysis_id = engine_controller.get_engine_assignment(TASK_GAME_ANALYSIS)
         evaluation_id = engine_controller.get_engine_assignment(TASK_EVALUATION)
         manual_analysis_id = engine_controller.get_engine_assignment(TASK_MANUAL_ANALYSIS)
+        brilliancy_detection_id = engine_controller.get_engine_assignment(TASK_BRILLIANCY_DETECTION)
         
         # Add engine submenus with assignment options
         for engine in engines:
@@ -4449,6 +4450,13 @@ Visibility Settings:
             manual_analysis_action.setChecked(manual_analysis_id == engine.id)
             manual_analysis_action.triggered.connect(lambda checked, eid=engine.id: self._set_engine_assignment(TASK_MANUAL_ANALYSIS, eid))
             engine_submenu.addAction(manual_analysis_action)
+            
+            # Set as Brilliancy Detection Engine
+            brilliancy_detection_action = QAction("Set as Brilliancy Detection Engine", self)
+            brilliancy_detection_action.setCheckable(True)
+            brilliancy_detection_action.setChecked(brilliancy_detection_id == engine.id)
+            brilliancy_detection_action.triggered.connect(lambda checked, eid=engine.id: self._set_engine_assignment(TASK_BRILLIANCY_DETECTION, eid))
+            engine_submenu.addAction(brilliancy_detection_action)
             
             # Add submenu to main menu and store reference
             menu.addMenu(engine_submenu)
@@ -4526,7 +4534,7 @@ Visibility Settings:
         """Set engine assignment for a task.
         
         Args:
-            task: Task constant (TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS).
+            task: Task constant (TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS, TASK_BRILLIANCY_DETECTION).
             engine_id: Engine ID to assign.
         """
         success, message = self.controller.get_engine_controller().set_engine_assignment(task, engine_id)

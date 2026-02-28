@@ -12,6 +12,7 @@ from app.services.engine_validation_service import EngineValidationService
 TASK_GAME_ANALYSIS = EngineModel.TASK_GAME_ANALYSIS
 TASK_EVALUATION = EngineModel.TASK_EVALUATION
 TASK_MANUAL_ANALYSIS = EngineModel.TASK_MANUAL_ANALYSIS
+TASK_BRILLIANCY_DETECTION = EngineModel.TASK_BRILLIANCY_DETECTION
 
 
 class EngineController:
@@ -225,7 +226,8 @@ class EngineController:
         task_names = {
             EngineModel.TASK_GAME_ANALYSIS: "Game Analysis Engine",
             EngineModel.TASK_EVALUATION: "Evaluation Engine",
-            EngineModel.TASK_MANUAL_ANALYSIS: "Manual Analysis Engine"
+            EngineModel.TASK_MANUAL_ANALYSIS: "Manual Analysis Engine",
+            EngineModel.TASK_BRILLIANCY_DETECTION: "Brilliancy Detection Engine",
         }
         return task_names.get(task, task)
 

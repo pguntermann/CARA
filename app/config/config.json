@@ -4881,6 +4881,12 @@
         "normalized_weight_by_phase_importance": "max(0, int(2800 - ((average_cpl_opening * opening_moves + average_cpl_middlegame * middlegame_moves + average_cpl_endgame * endgame_moves) / max(total_moves, 1) * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40))) / 1.931 + 166 if max(0, int(2800 - ((average_cpl_opening * opening_moves + average_cpl_middlegame * middlegame_moves + average_cpl_endgame * endgame_moves) / max(total_moves, 1) * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40))) < 2229 else max(0, int(2800 - ((average_cpl_opening * opening_moves + average_cpl_middlegame * middlegame_moves + average_cpl_endgame * endgame_moves) / max(total_moves, 1) * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40))) / 0.305 - 5988"
       }
     },
+    "brilliancy_detection": {
+      "default_threads_formula": {
+        "formula": "max(1, min(8, cpu_count - reserved_cores))"
+      },
+      "time_limit_per_move_ms": 750
+    },
     "brilliant_criteria": {
       "shallow_depth_min": 3,
       "shallow_depth_max": 7,

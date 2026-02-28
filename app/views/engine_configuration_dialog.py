@@ -76,15 +76,17 @@ class EngineConfigurationDialog(QDialog):
         self.TASK_EVALUATION = EngineConfigurationController.TASK_EVALUATION
         self.TASK_GAME_ANALYSIS = EngineConfigurationController.TASK_GAME_ANALYSIS
         self.TASK_MANUAL_ANALYSIS = EngineConfigurationController.TASK_MANUAL_ANALYSIS
+        self.TASK_BRILLIANCY_DETECTION = EngineConfigurationController.TASK_BRILLIANCY_DETECTION
         
         # Store widgets for each task: {task: {param_name: widget}}
         self.task_widgets: Dict[str, Dict[str, Any]] = {
             self.TASK_EVALUATION: {},
             self.TASK_GAME_ANALYSIS: {},
-            self.TASK_MANUAL_ANALYSIS: {}
+            self.TASK_MANUAL_ANALYSIS: {},
+            self.TASK_BRILLIANCY_DETECTION: {},
         }
         # Tab index order matches task order
-        self._task_order = [self.TASK_EVALUATION, self.TASK_GAME_ANALYSIS, self.TASK_MANUAL_ANALYSIS]
+        self._task_order = [self.TASK_EVALUATION, self.TASK_GAME_ANALYSIS, self.TASK_MANUAL_ANALYSIS, self.TASK_BRILLIANCY_DETECTION]
         # Paste buttons (one per task tab); enabled only when clipboard has content
         self._paste_buttons: List[QPushButton] = []
         # Track per-task UI sections for dynamic sizing
@@ -299,6 +301,7 @@ class EngineConfigurationDialog(QDialog):
         self._create_task_tab(self.TASK_EVALUATION, "Evaluation")
         self._create_task_tab(self.TASK_GAME_ANALYSIS, "Game Analysis")
         self._create_task_tab(self.TASK_MANUAL_ANALYSIS, "Manual Analysis")
+        self._create_task_tab(self.TASK_BRILLIANCY_DETECTION, "Brilliancy Detection")
         
         # Configure QTabBar after tabs are added
         self._configure_tab_bar()
@@ -418,17 +421,17 @@ class EngineConfigurationDialog(QDialog):
         # Evaluation: both depth and movetime are ignored (infinite analysis)
         # Manual Analysis: both depth and movetime are ignored (continuous analysis)
         # Game Analysis: depth is ignored, movetime is used
+        # Brilliancy Detection: depth is ignored (shallow depths from config), movetime is used
         if task == self.TASK_EVALUATION or task == self.TASK_MANUAL_ANALYSIS:
             # Disable both depth and movetime for Evaluation and Manual Analysis
             depth_edit.setEnabled(False)
             depth_edit.setToolTip("Depth is not used for this task type (infinite/continuous analysis)")
             movetime_edit.setEnabled(False)
             movetime_edit.setToolTip("Move time is not used for this task type (infinite/continuous analysis)")
-        elif task == self.TASK_GAME_ANALYSIS:
-            # Disable depth only for Game Analysis (movetime is used)
+        elif task == self.TASK_GAME_ANALYSIS or task == self.TASK_BRILLIANCY_DETECTION:
+            # Disable depth only (movetime is used for Game Analysis and Brilliancy Detection)
             depth_edit.setEnabled(False)
-            depth_edit.setToolTip("Depth is not used for game analysis (only move time is used)")
-            # Ensure movetime_edit is enabled for Game Analysis
+            depth_edit.setToolTip("Depth is not used for this task type (move time / shallow depths from config)")
             movetime_edit.setEnabled(True)
             movetime_edit.setToolTip("Maximum time per move (ply) in milliseconds")
         
@@ -862,7 +865,8 @@ class EngineConfigurationDialog(QDialog):
         task_names = {
             self.TASK_EVALUATION: "Evaluation",
             self.TASK_GAME_ANALYSIS: "Game Analysis",
-            self.TASK_MANUAL_ANALYSIS: "Manual Analysis"
+            self.TASK_MANUAL_ANALYSIS: "Manual Analysis",
+            self.TASK_BRILLIANCY_DETECTION: "Brilliancy Detection",
         }
         
         # Add issues for each task

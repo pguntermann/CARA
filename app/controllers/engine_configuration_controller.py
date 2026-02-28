@@ -31,6 +31,7 @@ class EngineConfigurationController(QObject):
     TASK_EVALUATION = "evaluation"
     TASK_GAME_ANALYSIS = "game_analysis"
     TASK_MANUAL_ANALYSIS = "manual_analysis"
+    TASK_BRILLIANCY_DETECTION = "brilliancy_detection"
     
     def __init__(self, config: Dict[str, Any], engine_path: Path, engine_controller) -> None:
         """Initialize the engine configuration controller.
@@ -87,7 +88,8 @@ class EngineConfigurationController(QObject):
         task_type_map = {
             self.TASK_EVALUATION: TaskType.EVALUATION,
             self.TASK_GAME_ANALYSIS: TaskType.GAME_ANALYSIS,
-            self.TASK_MANUAL_ANALYSIS: TaskType.MANUAL_ANALYSIS
+            self.TASK_MANUAL_ANALYSIS: TaskType.MANUAL_ANALYSIS,
+            self.TASK_BRILLIANCY_DETECTION: TaskType.BRILLIANCY_DETECTION,
         }
         task_type = task_type_map.get(task, TaskType.EVALUATION)
         return self.config_service.get_recommended_defaults(task_type)
@@ -139,8 +141,8 @@ class EngineConfigurationController(QObject):
                 params["threads"] = 1
         else:
             params["threads"] = 1
-        # Depth: forced 0 for Game Analysis and Manual Analysis
-        if task in (self.TASK_GAME_ANALYSIS, self.TASK_MANUAL_ANALYSIS):
+        # Depth: forced 0 for Game Analysis, Manual Analysis, and Brilliancy Detection
+        if task in (self.TASK_GAME_ANALYSIS, self.TASK_MANUAL_ANALYSIS, self.TASK_BRILLIANCY_DETECTION):
             params["depth"] = 0
         else:
             text = (raw.get("depth") or "").strip()
@@ -319,7 +321,8 @@ class EngineConfigurationController(QObject):
         task_type_map = {
             self.TASK_EVALUATION: TaskType.EVALUATION,
             self.TASK_GAME_ANALYSIS: TaskType.GAME_ANALYSIS,
-            self.TASK_MANUAL_ANALYSIS: TaskType.MANUAL_ANALYSIS
+            self.TASK_MANUAL_ANALYSIS: TaskType.MANUAL_ANALYSIS,
+            self.TASK_BRILLIANCY_DETECTION: TaskType.BRILLIANCY_DETECTION,
         }
         
         validation_results = {}

@@ -1412,9 +1412,20 @@ class GameAnalysisController(QObject):
         progress_service = ProgressService.get_instance()
         logging_service = LoggingService.get_instance()
 
-        engine_assignment = self.engine_model.get_assignment(EngineModel.TASK_GAME_ANALYSIS)
+        engine_assignment = self.engine_model.get_assignment(EngineModel.TASK_BRILLIANCY_DETECTION)
         if engine_assignment is None:
-            logging_service.warning("Brilliant move detection: No engine assigned to game analysis task")
+            logging_service.warning("Brilliant move detection: No engine assigned to brilliancy detection task")
+            progress_service.set_status("Brilliant move detection: assign an engine in Engines menu")
+            from PyQt6.QtWidgets import QApplication
+            from app.views.message_dialog import MessageDialog
+            main_window = QApplication.activeWindow()
+            MessageDialog.show_information(
+                self.config,
+                "Brilliant Move Detection",
+                "Please assign an engine to the Brilliancy Detection task before running.<br><br>"
+                "Go to Engines → [Engine Name] → Set as Brilliancy Detection Engine.",
+                main_window
+            )
             return
 
         engine = self.engine_model.get_engine(engine_assignment)
@@ -1443,9 +1454,13 @@ class GameAnalysisController(QObject):
             return
 
         engine_path = engine.path if isinstance(engine.path, Path) else Path(engine.path)
+        from app.services.engine_parameters_service import EngineParametersService
+        task_params = EngineParametersService.get_task_parameters_for_engine(engine_path, EngineModel.TASK_BRILLIANCY_DETECTION, self.config)
+        time_limit_ms = task_params.get("movetime", self.time_limit_ms)
+        max_threads = task_params.get("threads") or self.max_threads
         engine_options = {}
-        if self.max_threads:
-            engine_options["Threads"] = self.max_threads
+        if max_threads:
+            engine_options["Threads"] = max_threads
 
         def get_move_data(row_index: int):
             if 0 <= row_index < self.moves_list_model.rowCount():
@@ -1471,8 +1486,8 @@ class GameAnalysisController(QObject):
             inaccuracy_max_cpl=self.inaccuracy_max_cpl,
             mistake_max_cpl=self.mistake_max_cpl,
             engine_path=engine_path,
-            time_limit_ms=self.time_limit_ms,
-            max_threads=self.max_threads,
+            time_limit_ms=time_limit_ms,
+            max_threads=max_threads,
             engine_name=engine.name,
             engine_options=engine_options,
             config=self.config,

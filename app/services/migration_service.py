@@ -29,6 +29,7 @@ class MigrationService:
         logging_service.info("Running application migrations")
 
         cls._run_user_settings_migration(logging_service)
+        cls._run_engine_assignment_migration(logging_service)
 
         logging_service.info("Application migrations completed")
 
@@ -43,5 +44,27 @@ class MigrationService:
         except Exception as e:
             logging_service.error(
                 f"User settings migration failed: {e}",
+                exc_info=e,
+            )
+
+    @classmethod
+    def _run_engine_assignment_migration(cls, logging_service: LoggingService) -> None:
+        """Migrate engine assignments: if game_analysis is set and brilliancy_detection is not, copy game_analysis to brilliancy_detection."""
+        try:
+            logging_service.debug("Engine assignment migration: starting")
+            user_settings_service = UserSettingsService.get_instance()
+            settings = user_settings_service.get_settings()
+            assignments = settings.get("engine_assignments", {})
+            game_analysis_id = assignments.get("game_analysis")
+            brilliancy_id = assignments.get("brilliancy_detection")
+            if game_analysis_id and not brilliancy_id:
+                user_settings_service.update_engine_assignments({"brilliancy_detection": game_analysis_id})
+                user_settings_service.save()
+                logging_service.debug("Engine assignment migration: set brilliancy_detection to game_analysis engine")
+            else:
+                logging_service.debug("Engine assignment migration: no change needed")
+        except Exception as e:
+            logging_service.error(
+                f"Engine assignment migration failed: {e}",
                 exc_info=e,
             )

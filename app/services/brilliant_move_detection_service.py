@@ -97,10 +97,10 @@ def run_brilliant_move_detection(
     total_depths_in_range = max(0, shallow_depth_max - shallow_depth_min + 1)
     min_depths_required = max(1, min(int(min_depths_show_error), total_depths_in_range)) if total_depths_in_range else 1
 
-    shallow_time_limit_ms = max(500, time_limit_ms // 3)
+    # Use configured time limit per position directly (no divisor)
     service: Optional[BrilliantMoveDetectionAnalysisService] = BrilliantMoveDetectionAnalysisService(
         engine_path,
-        shallow_time_limit_ms,
+        time_limit_ms,
         max_threads,
         engine_name,
         engine_options,
@@ -198,7 +198,7 @@ def run_brilliant_move_detection(
                 
                 previous_depth = depth
                 analysis_result = _analyze_at_shallow_depth(
-                    service, fen_before, move_info.get("move_number", 0), depth, shallow_time_limit_ms
+                    service, fen_before, move_info.get("move_number", 0), depth, time_limit_ms
                 )
                 if analysis_result is None:
                     logging_service.debug(
@@ -242,7 +242,7 @@ def run_brilliant_move_detection(
                         continue
                     
                     best_result = _analyze_at_shallow_depth(
-                        service, fen_after_best, move_info.get("move_number", 0), depth, shallow_time_limit_ms
+                        service, fen_after_best, move_info.get("move_number", 0), depth, time_limit_ms
                     )
                     if best_result is None:
                         logging_service.debug(
@@ -262,7 +262,7 @@ def run_brilliant_move_detection(
                     board_after.push(move_uci)
                     fen_after = board_after.fen()
                     after_result = _analyze_at_shallow_depth(
-                        service, fen_after, move_info.get("move_number", 0), depth, shallow_time_limit_ms
+                        service, fen_after, move_info.get("move_number", 0), depth, time_limit_ms
                     )
                     if after_result is None:
                         logging_service.debug(

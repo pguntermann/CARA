@@ -217,7 +217,8 @@ class EngineParametersService:
         task_type_map = {
             "evaluation": TaskType.EVALUATION,
             "game_analysis": TaskType.GAME_ANALYSIS,
-            "manual_analysis": TaskType.MANUAL_ANALYSIS
+            "manual_analysis": TaskType.MANUAL_ANALYSIS,
+            "brilliancy_detection": TaskType.BRILLIANCY_DETECTION,
         }
         
         task_type = task_type_map.get(task)

@@ -14,6 +14,7 @@ class TaskType(Enum):
     EVALUATION = "evaluation"
     GAME_ANALYSIS = "game_analysis"
     MANUAL_ANALYSIS = "manual_analysis"
+    BRILLIANCY_DETECTION = "brilliancy_detection"
 
 
 class ValidationSeverity(Enum):
@@ -106,6 +107,19 @@ class EngineConfigurationService:
             "depth": 0,  # No depth for manual analysis
             "movetime": 0  # No movetime for manual analysis
         }
+        
+        # Brilliancy Detection defaults (own config under game_analysis.brilliancy_detection)
+        brilliancy_config = game_analysis_config.get("brilliancy_detection", {})
+        brilliancy_threads_formula = brilliancy_config.get("default_threads_formula", {}).get("formula")
+        if brilliancy_threads_formula:
+            brilliancy_threads_value = self._evaluate_thread_formula(brilliancy_threads_formula, cpu_count, reserved_cores, "brilliancy_detection")
+        else:
+            brilliancy_threads_value = self.game_analysis_defaults["threads"]
+        self.brilliancy_detection_defaults = {
+            "threads": brilliancy_threads_value,
+            "depth": 0,  # Shallow depths come from brilliant_criteria config
+            "movetime": brilliancy_config.get("time_limit_per_move_ms", game_analysis_config.get("time_limit_per_move_ms", 1000))
+        }
     
     def _evaluate_thread_formula(self, formula: str, cpu_count: int, reserved_cores: int, task_type: str) -> int:
         """Evaluate thread count formula using asteval.
@@ -159,6 +173,8 @@ class EngineConfigurationService:
             return self.game_analysis_defaults.copy()
         elif task == TaskType.MANUAL_ANALYSIS:
             return self.manual_analysis_defaults.copy()
+        elif task == TaskType.BRILLIANCY_DETECTION:
+            return self.brilliancy_detection_defaults.copy()
         else:
             return {"threads": 1, "depth": 0, "movetime": 0}
     
