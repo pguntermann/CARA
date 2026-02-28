@@ -1,9 +1,11 @@
 """Moves List view for detail panel."""
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTableView, QStyledItemDelegate
-from PyQt6.QtCore import Qt, QModelIndex, QTimer
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTableView, QStyledItemDelegate, QMenu, QApplication
+from PyQt6.QtCore import Qt, QModelIndex, QTimer, QPoint
 from PyQt6.QtGui import QPalette, QColor, QBrush
 from typing import Dict, Any, Optional, List
+
+from app.utils.moveslist_export import table_to_delimited
 
 from app.models.moveslist_model import MovesListModel
 from app.models.game_model import GameModel
@@ -64,6 +66,8 @@ class DetailMovesListView(QWidget):
         
         # Create table view
         self.moves_table = QTableView()
+        self.moves_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.moves_table.customContextMenuRequested.connect(self._on_moves_table_context_menu)
         layout.addWidget(self.moves_table)
         
         # Model will be set via set_model() method
@@ -330,7 +334,143 @@ class DetailMovesListView(QWidget):
                     else:
                         # Fallback: just set active move in model (board won't update)
                         self._game_model.set_active_move_ply(ply_index)
-    
+
+    def _on_moves_table_context_menu(self, pos: QPoint) -> None:
+        """Show context menu for copy actions at the cell under the cursor."""
+        from app.views.style import StyleManager
+
+        index = self.moves_table.indexAt(pos)
+        model = self._moveslist_model
+        if not model:
+            return
+
+        menu = QMenu(self)
+        ui_config = self.config.get("ui", {})
+        tabs_config = ui_config.get("panels", {}).get("detail", {}).get("tabs", {})
+        bg_color = tabs_config.get("pane_background", [40, 40, 45])
+        StyleManager.style_context_menu(menu, self.config, bg_color)
+
+        copy_value_action = menu.addAction("Copy value")
+        copy_value_action.triggered.connect(lambda: self._copy_cell_value(index))
+        copy_value_action.setEnabled(index.isValid())
+
+        menu.addSeparator()
+        menu.addAction("Copy Table as CSV (Visual Columns)").triggered.connect(self._copy_table_csv_visual)
+        menu.addAction("Copy Table as CSV (All Columns)").triggered.connect(self._copy_table_csv_all)
+        menu.addAction("Copy Table as TSV (Visual Columns)").triggered.connect(self._copy_table_tsv_visual)
+        menu.addAction("Copy Table as TSV (All Columns)").triggered.connect(self._copy_table_tsv_all)
+
+        menu.exec(self.moves_table.viewport().mapToGlobal(pos))
+
+    def _copy_cell_value(self, index: QModelIndex) -> None:
+        """Copy the display value of the cell at index to the clipboard."""
+        if not index.isValid() or not self._moveslist_model:
+            return
+        val = self._moveslist_model.data(index, Qt.ItemDataRole.DisplayRole)
+        text = "" if val is None else str(val)
+        clipboard = QApplication.clipboard()
+        clipboard.setText(text)
+        from app.services.progress_service import ProgressService
+        ProgressService.get_instance().set_status("Copied value to clipboard")
+
+    def _get_visual_column_indices(self) -> List[int]:
+        """Return model column indices in current visual order (visible columns only)."""
+        if not self._moveslist_model:
+            return []
+        header = self.moves_table.horizontalHeader()
+        indices: List[int] = []
+        for visual in range(header.count()):
+            logical = header.logicalIndex(visual)
+            if logical >= 0 and not header.isSectionHidden(logical):
+                indices.append(logical)
+        return indices
+
+    def _get_copy_table_config(self) -> Dict[str, Any]:
+        """Return copy_table config (csv/tsv delimiter, use_escaping, always_quote_values) from config with defaults."""
+        ui = self.config.get("ui", {})
+        moveslist = ui.get("panels", {}).get("detail", {}).get("moveslist", {})
+        copy_table = moveslist.get("copy_table", {})
+        csv_cfg = copy_table.get("csv", {})
+        tsv_cfg = copy_table.get("tsv", {})
+        return {
+            "csv": {
+                "delimiter": csv_cfg.get("delimiter", ","),
+                "use_escaping": csv_cfg.get("use_escaping", True),
+                "always_quote_values": csv_cfg.get("always_quote_values", False),
+            },
+            "tsv": {
+                "delimiter": tsv_cfg.get("delimiter", "\t"),
+                "use_escaping": tsv_cfg.get("use_escaping", False),
+                "always_quote_values": tsv_cfg.get("always_quote_values", False),
+            },
+        }
+
+    def _copy_table_csv_visual(self) -> None:
+        cfg = self._get_copy_table_config()["csv"]
+        self._copy_table_delimited(
+            visual_columns=True,
+            delimiter=cfg["delimiter"],
+            use_csv_escaping=cfg["use_escaping"],
+            always_quote_values=cfg["always_quote_values"],
+            status_message="Copied table as CSV (visual columns) to clipboard",
+        )
+
+    def _copy_table_csv_all(self) -> None:
+        cfg = self._get_copy_table_config()["csv"]
+        self._copy_table_delimited(
+            visual_columns=False,
+            delimiter=cfg["delimiter"],
+            use_csv_escaping=cfg["use_escaping"],
+            always_quote_values=cfg["always_quote_values"],
+            status_message="Copied table as CSV (all columns) to clipboard",
+        )
+
+    def _copy_table_tsv_visual(self) -> None:
+        cfg = self._get_copy_table_config()["tsv"]
+        self._copy_table_delimited(
+            visual_columns=True,
+            delimiter=cfg["delimiter"],
+            use_csv_escaping=cfg["use_escaping"],
+            always_quote_values=cfg["always_quote_values"],
+            status_message="Copied table as TSV (visual columns) to clipboard",
+        )
+
+    def _copy_table_tsv_all(self) -> None:
+        cfg = self._get_copy_table_config()["tsv"]
+        self._copy_table_delimited(
+            visual_columns=False,
+            delimiter=cfg["delimiter"],
+            use_csv_escaping=cfg["use_escaping"],
+            always_quote_values=cfg["always_quote_values"],
+            status_message="Copied table as TSV (all columns) to clipboard",
+        )
+
+    def _copy_table_delimited(
+        self,
+        visual_columns: bool,
+        delimiter: str,
+        use_csv_escaping: bool,
+        always_quote_values: bool = False,
+        status_message: str = "Copied table to clipboard",
+    ) -> None:
+        """Copy table to clipboard as delimited text. View only orchestrates; formatting in util."""
+        if not self._moveslist_model:
+            return
+        if visual_columns:
+            column_indices = self._get_visual_column_indices()
+        else:
+            column_indices = list(range(self._moveslist_model.columnCount()))
+        text = table_to_delimited(
+            self._moveslist_model,
+            column_indices,
+            delimiter,
+            use_csv_escaping,
+            always_quote_values=always_quote_values,
+        )
+        QApplication.clipboard().setText(text)
+        from app.services.progress_service import ProgressService
+        ProgressService.get_instance().set_status(status_message)
+
     def set_column_profile_model(self, model: ColumnProfileModel) -> None:
         """Set the column profile model to observe for column visibility and widths.
         

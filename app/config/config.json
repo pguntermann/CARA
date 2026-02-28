@@ -681,6 +681,18 @@
           }
         },
         "moveslist": {
+          "copy_table": {
+            "csv": {
+              "delimiter": ",",
+              "use_escaping": true,
+              "always_quote_values": true
+            },
+            "tsv": {
+              "delimiter": "\t",
+              "use_escaping": false,
+              "always_quote_values": false
+            }
+          },
           "table": {
             "active_move": {
               "background_color": [
