@@ -9,7 +9,7 @@ from app.controllers.board_controller import BoardController
 from app.controllers.database_controller import DatabaseController
 from app.controllers.game_controller import GameController
 from app.controllers.column_profile_controller import ColumnProfileController
-from app.controllers.engine_controller import EngineController, TASK_EVALUATION, TASK_GAME_ANALYSIS, TASK_MANUAL_ANALYSIS
+from app.controllers.engine_controller import EngineController, TASK_EVALUATION, TASK_GAME_ANALYSIS, TASK_MANUAL_ANALYSIS, TASK_BRILLIANCY_DETECTION
 from app.controllers.evaluation_controller import EvaluationController
 from app.controllers.manual_analysis_controller import ManualAnalysisController
 from app.controllers.game_analysis_controller import GameAnalysisController
@@ -681,12 +681,14 @@ class AppController:
         task_key_map = {
             TASK_GAME_ANALYSIS: "game_analysis",
             TASK_MANUAL_ANALYSIS: "manual_analysis",
-            TASK_EVALUATION: "evaluation"
+            TASK_EVALUATION: "evaluation",
+            TASK_BRILLIANCY_DETECTION: "brilliancy_detection",
         }
         action_key_map = {
             TASK_GAME_ANALYSIS: "game_analysis",
             TASK_MANUAL_ANALYSIS: "manual_analysis",
-            TASK_EVALUATION: "evaluation_bar"
+            TASK_EVALUATION: "evaluation_bar",
+            TASK_BRILLIANCY_DETECTION: "brilliancy_detection",
         }
         
         task_key = task_key_map.get(task, task)

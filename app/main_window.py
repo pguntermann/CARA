@@ -36,7 +36,7 @@ from app.controllers.app_controller import AppController
 from app.input.shortcut_manager import ShortcutManager
 from app.models.column_profile_model import DEFAULT_PROFILE_NAME
 from app.models.database_model import DatabaseModel, GameData
-from app.controllers.engine_controller import TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS
+from app.controllers.engine_controller import TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS, TASK_BRILLIANCY_DETECTION
 from app.services.pgn_cleaning_service import PgnCleaningService
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.tooltip_utils import wrap_tooltip_text
@@ -1772,6 +1772,61 @@ class MainWindow(QMainWindow):
                 self.database_panel.tab_widget.setCurrentIndex(tab_index)
                 # Update menu state (will enable close search results action)
                 self._on_database_tab_changed(tab_index)
+
+    def _open_pattern_games_in_search_results(self, pattern: Any) -> None:
+        """Open the pattern's related games in a Search Results tab (create or replace).
+        """
+        if not hasattr(self, 'database_panel') or not pattern or not getattr(pattern, 'related_games', None):
+            return
+        stats_controller = self.controller.get_player_stats_controller()
+        games_with_sources = stats_controller.get_pattern_games_with_sources(pattern)
+        if not games_with_sources:
+            return
+        search_controller = self.controller.get_search_controller()
+        search_results_model = search_controller.create_search_results_model(games_with_sources)
+        tab_index = self.database_panel.add_search_results_tab(search_results_model)
+        # Match regular search behavior: explicitly activate the tab
+        self.database_panel.tab_widget.setCurrentIndex(tab_index)
+        self._on_database_tab_changed(tab_index)
+
+    def _open_best_games_in_search_results(self) -> None:
+        """Open the best-performing games for the current player in a Search Results tab."""
+        if not hasattr(self, 'database_panel'):
+            return
+        ui_config = self.config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        player_stats_config = panel_config.get('player_stats', {})
+        top_games_config = player_stats_config.get('top_games', {})
+        max_best = int(top_games_config.get('max_best', 3))
+        stats_controller = self.controller.get_player_stats_controller()
+        games_with_sources = stats_controller.get_top_best_games_with_sources(max_best)
+        if not games_with_sources:
+            return
+        search_controller = self.controller.get_search_controller()
+        search_results_model = search_controller.create_search_results_model(games_with_sources)
+        tab_index = self.database_panel.add_search_results_tab(search_results_model)
+        self.database_panel.tab_widget.setCurrentIndex(tab_index)
+        self._on_database_tab_changed(tab_index)
+
+    def _open_worst_games_in_search_results(self) -> None:
+        """Open the worst-performing games for the current player in a Search Results tab."""
+        if not hasattr(self, 'database_panel'):
+            return
+        ui_config = self.config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        player_stats_config = panel_config.get('player_stats', {})
+        top_games_config = player_stats_config.get('top_games', {})
+        max_best = int(top_games_config.get('max_best', 3))
+        max_worst = int(top_games_config.get('max_worst', 3))
+        stats_controller = self.controller.get_player_stats_controller()
+        games_with_sources = stats_controller.get_top_worst_games_with_sources(max_worst, max_best)
+        if not games_with_sources:
+            return
+        search_controller = self.controller.get_search_controller()
+        search_results_model = search_controller.create_search_results_model(games_with_sources)
+        tab_index = self.database_panel.add_search_results_tab(search_results_model)
+        self.database_panel.tab_widget.setCurrentIndex(tab_index)
+        self._on_database_tab_changed(tab_index)
     
     def _find_search_results_tab(self) -> Optional[int]:
         """Find the index of the Search Results tab.
@@ -2570,10 +2625,13 @@ class MainWindow(QMainWindow):
         # Connect double-click handler to set active game
         # Connect "+" tab click handler to open PGN database
         self.database_panel = DatabasePanel(
-            self.config, 
+            self.config,
             panel_model,
             on_row_double_click=self._on_database_row_double_click,
-            on_add_tab_clicked=self._open_pgn_database
+            on_add_tab_clicked=self._open_pgn_database,
+            on_close_database=database_controller.close_database_by_identifier,
+            on_close_all_but_database=database_controller.close_all_pgn_databases_except,
+            on_close_search_results=self._close_search_results_tab,
         )
         
         
@@ -2586,6 +2644,9 @@ class MainWindow(QMainWindow):
             if hasattr(self.detail_panel, 'player_stats_view'):
                 self.detail_panel.player_stats_view._database_controller = database_controller
                 self.detail_panel.player_stats_view._database_panel = self.database_panel
+                self.detail_panel.player_stats_view._on_open_pattern_games_in_search_results = self._open_pattern_games_in_search_results
+                self.detail_panel.player_stats_view._on_open_best_games_in_search_results = self._open_best_games_in_search_results
+                self.detail_panel.player_stats_view._on_open_worst_games_in_search_results = self._open_worst_games_in_search_results
                 # Database connections are now handled by the controller
         
         # Set moves list model in game analysis controller
@@ -4347,6 +4408,7 @@ Visibility Settings:
         game_analysis_id = engine_controller.get_engine_assignment(TASK_GAME_ANALYSIS)
         evaluation_id = engine_controller.get_engine_assignment(TASK_EVALUATION)
         manual_analysis_id = engine_controller.get_engine_assignment(TASK_MANUAL_ANALYSIS)
+        brilliancy_detection_id = engine_controller.get_engine_assignment(TASK_BRILLIANCY_DETECTION)
         
         # Add engine submenus with assignment options
         for engine in engines:
@@ -4366,6 +4428,13 @@ Visibility Settings:
             config_action.triggered.connect(lambda checked, eid=engine.id: self._open_engine_configuration(eid))
             engine_submenu.addAction(config_action)
             
+            engine_submenu.addSeparator()
+            
+            # Set for all tasks
+            set_all_action = QAction("Set for all tasks", self)
+            set_all_action.setToolTip("Assign this engine to Game Analysis, Evaluation, Manual Analysis, and Brilliancy Detection")
+            set_all_action.triggered.connect(lambda checked, eid=engine.id: self._set_engine_for_all_tasks(eid))
+            engine_submenu.addAction(set_all_action)
             engine_submenu.addSeparator()
             
             # Set as Game Analysis Engine
@@ -4388,6 +4457,13 @@ Visibility Settings:
             manual_analysis_action.setChecked(manual_analysis_id == engine.id)
             manual_analysis_action.triggered.connect(lambda checked, eid=engine.id: self._set_engine_assignment(TASK_MANUAL_ANALYSIS, eid))
             engine_submenu.addAction(manual_analysis_action)
+            
+            # Set as Brilliancy Detection Engine
+            brilliancy_detection_action = QAction("Set as Brilliancy Detection Engine", self)
+            brilliancy_detection_action.setCheckable(True)
+            brilliancy_detection_action.setChecked(brilliancy_detection_id == engine.id)
+            brilliancy_detection_action.triggered.connect(lambda checked, eid=engine.id: self._set_engine_assignment(TASK_BRILLIANCY_DETECTION, eid))
+            engine_submenu.addAction(brilliancy_detection_action)
             
             # Add submenu to main menu and store reference
             menu.addMenu(engine_submenu)
@@ -4461,11 +4537,20 @@ Visibility Settings:
         )
         dialog.exec()
     
+    def _set_engine_for_all_tasks(self, engine_id: str) -> None:
+        """Set this engine for all tasks (Game Analysis, Evaluation, Manual Analysis, Brilliancy Detection)."""
+        success, message = self.controller.get_engine_controller().set_engine_for_all_tasks(engine_id)
+        if success:
+            self.controller.set_status(message)
+            # Menu will update automatically via assignment_changed signal
+        else:
+            MessageDialog.show_warning(self.config, "Set Engine for All Tasks Failed", message, self)
+    
     def _set_engine_assignment(self, task: str, engine_id: str) -> None:
         """Set engine assignment for a task.
         
         Args:
-            task: Task constant (TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS).
+            task: Task constant (TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS, TASK_BRILLIANCY_DETECTION).
             engine_id: Engine ID to assign.
         """
         success, message = self.controller.get_engine_controller().set_engine_assignment(task, engine_id)

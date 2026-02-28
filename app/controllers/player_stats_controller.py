@@ -1,5 +1,6 @@
 """Controller for orchestrating player statistics calculations."""
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, QMutex, QMutexLocker, QTimer
 
@@ -188,6 +189,9 @@ class PlayerStatsCalculationWorker(QThread):
             # Aggregate statistics (includes parallel game summary calculation)
             self.progress_update.emit(20, f"Aggregating statistics from {len(analyzed_games)} game(s)...")
             
+            # Remember analyzed games so controller can reuse them for per-game features
+            self.stats_controller._last_analyzed_games = analyzed_games
+            
             # Define progress callback for parallel processing
             def progress_callback(completed: int, status: str) -> None:
                 if not self._is_cancelled():
@@ -267,6 +271,9 @@ class PlayerStatsController(QObject):
         self.current_stats: Optional[AggregatedPlayerStats] = None
         self.current_patterns: List[ErrorPattern] = []
         self.current_game_summaries: List[GameSummary] = []
+        # Keep the analyzed games used for the current stats so we can rank individual games.
+        self._current_analyzed_games: List["GameData"] = []
+        self._last_analyzed_games: List["GameData"] = []
         self._last_unavailable_reason: str = "no_player"
         self._current_player: Optional[str] = None
         self._use_all_databases: bool = False
@@ -329,7 +336,7 @@ class PlayerStatsController(QObject):
     def calculate_player_statistics(self, player_name: str, use_all_databases: bool = False) -> None:
         """Calculate statistics for a player.
         
-        Uses progress reporting and processes events to keep UI responsive during long operations.
+        This method now delegates all work to the asynchronous worker path.
         
         Args:
             player_name: Player name to analyze.
@@ -339,100 +346,25 @@ class PlayerStatsController(QObject):
         from app.services.progress_service import ProgressService
         from PyQt6.QtWidgets import QApplication
         
+        self._current_player = player_name
+        self._use_all_databases = use_all_databases
+        
         progress_service = ProgressService.get_instance()
         progress_service.show_progress()
         progress_service.set_indeterminate(False)
         progress_service.set_progress(0)
         progress_service.set_status(f"Calculating statistics for {player_name}...")
         
-        # Process events to show progress immediately
         QApplication.processEvents()
         
-        try:
-            self._current_player = player_name
-            self._use_all_databases = use_all_databases
-            
-            if not player_name or not player_name.strip():
-                self._emit_unavailable("no_player")
-                return
-            
-            # Get databases
-            progress_service.set_progress(5)
-            progress_service.set_status("Loading databases...")
-            QApplication.processEvents()
-            
-            if use_all_databases:
-                panel_model = self._database_controller.get_panel_model()
-                databases = panel_model.get_all_database_models()
-            else:
-                active_db = self._database_controller.get_active_database()
-                databases = [active_db] if active_db else []
-            
-            if not databases:
-                self._emit_unavailable("no_database")
-                return
-            
-            # Get player games
-            progress_service.set_progress(10)
-            progress_service.set_status("Finding player games...")
-            QApplication.processEvents()
-            
-            player_games, total_count = self.player_stats_service.get_player_games(
-                player_name, databases, only_analyzed=False
-            )
-            
-            if not player_games:
-                self._emit_unavailable("player_not_found")
-                return
-            
-            # Separate analyzed and unanalyzed
-            analyzed_games = [g for g in player_games if g.analyzed]
-            if not analyzed_games:
-                self._emit_unavailable("no_analyzed_games")
-                return
-            
-            # Aggregate statistics (includes parallel game summary calculation)
-            progress_service.set_progress(20)
-            progress_service.set_status(f"Aggregating statistics from {len(analyzed_games)} game(s)...")
-            QApplication.processEvents()
-            
-            aggregated_stats, game_summaries = self.player_stats_service.aggregate_player_statistics(
-                player_name, analyzed_games, self._game_controller
-            )
-            
-            if not aggregated_stats:
-                self._emit_unavailable("calculation_error")
-                return
-            
-            # Detect error patterns (using summaries already calculated in parallel)
-            progress_service.set_progress(90)
-            progress_service.set_status("Detecting error patterns...")
-            QApplication.processEvents()
-            
-            error_patterns = self.error_pattern_service.detect_error_patterns(
-                player_name, analyzed_games, aggregated_stats, game_summaries
-            )
-            
-            self.current_stats = aggregated_stats
-            self.current_patterns = error_patterns
-            self.current_game_summaries = game_summaries
-            
-            # Emit signal with results
-            progress_service.set_progress(100)
-            progress_service.set_status(f"Statistics calculated for {player_name}")
-            QApplication.processEvents()
-            
-            self.stats_updated.emit(aggregated_stats, error_patterns, game_summaries)
-            
-        except Exception as e:
-            # Avoid crashing the UI
-            logging_service = LoggingService.get_instance()
-            logging_service.error(f"Error calculating player statistics: {e}", exc_info=e)
-            self._emit_unavailable("error")
-        finally:
-            # Always hide progress, even if there's an error
-            QApplication.processEvents()
+        if not player_name or not player_name.strip():
+            self._emit_unavailable("no_player")
             progress_service.hide_progress()
+            return
+        
+        # Kick off asynchronous recalculation. The worker will handle databases,
+        # game collection, aggregation, error patterns, and status updates.
+        self._schedule_stats_recalculation()
     
     def get_current_stats(self) -> Optional[AggregatedPlayerStats]:
         """Get the most recently calculated statistics."""
@@ -442,6 +374,108 @@ class PlayerStatsController(QObject):
         """Get the most recently detected error patterns."""
         return self.current_patterns
     
+    def _get_ranked_games_by_cpl(self) -> List[Tuple[float, float, "GameData"]]:
+        """Rank analyzed games by the player's average CPL (ascending = best).
+        
+        Returns:
+            List of (average_cpl, accuracy, GameData) tuples sorted ascending by CPL.
+        """
+        if not self._current_analyzed_games or not self.current_game_summaries or not self._current_player:
+            return []
+        
+        ranked: List[Tuple[float, float, "GameData"]] = []
+        for game, summary in zip(self._current_analyzed_games, self.current_game_summaries):
+            # Determine whether the player was White or Black in this game
+            if game.white == self._current_player:
+                player_stats = summary.white_stats
+            elif game.black == self._current_player:
+                player_stats = summary.black_stats
+            else:
+                # Game doesn't match current player (shouldn't happen, but be safe)
+                continue
+        
+            ranked.append((player_stats.average_cpl, player_stats.accuracy, game))
+        
+        ranked.sort(key=lambda x: x[0])  # lower CPL is better
+        return ranked
+
+    def _map_games_to_sources(self, games: List["GameData"]) -> List[Tuple["GameData", str]]:
+        """Map GameData instances to (GameData, source_display_name) using database identifiers."""
+        if not games:
+            return []
+
+        panel_model = self._database_controller.get_panel_model()
+        results: List[Tuple["GameData", str]] = []
+
+        for game in games:
+            found = self.find_game_in_databases(game, use_all_databases=True)
+            if not found:
+                continue
+            database, _ = found
+            identifier = panel_model.find_database_by_model(database)
+            if identifier == "clipboard":
+                display_name = "Clipboard"
+            else:
+                display_name = Path(identifier).stem
+            results.append((game, display_name))
+
+        return results
+
+    def get_top_best_games_with_sources(self, max_best: int) -> List[Tuple["GameData", str]]:
+        """Get top N best-performing games (lowest CPL) for the current player with source names."""
+        ranked = self._get_ranked_games_by_cpl()
+        if not ranked or max_best <= 0:
+            return []
+
+        best_count = min(max_best, len(ranked))
+        best_games = [game for _, _, game in ranked[:best_count]]
+        return self._map_games_to_sources(best_games)
+
+    def get_top_worst_games_with_sources(self, max_worst: int, max_best: int) -> List[Tuple["GameData", str]]:
+        """Get top N worst-performing games (highest CPL) for the current player with source names.
+
+        Ensures that worst games are disjoint from the best games if both are shown.
+        """
+        ranked = self._get_ranked_games_by_cpl()
+        if not ranked or max_worst <= 0:
+            return []
+
+        n = len(ranked)
+        # Reserve up to max_best games for the "best" list so we don't overlap
+        reserved_for_best = min(max_best, n)
+        worst_available = max(0, n - reserved_for_best)
+        worst_count = min(max_worst, worst_available)
+        if worst_count <= 0:
+            return []
+
+        start = n - worst_count
+        worst_games = [game for _, _, game in ranked[start:]]
+        return self._map_games_to_sources(worst_games)
+
+    def get_top_best_games_summary(self, max_best: int) -> Tuple[int, Optional[float], Optional[float]]:
+        """Return count and accuracy range for the best-performing games."""
+        ranked = self._get_ranked_games_by_cpl()
+        if not ranked or max_best <= 0:
+            return 0, None, None
+        best_count = min(max_best, len(ranked))
+        accuracies = [acc for _, acc, _ in ranked[:best_count]]
+        return best_count, min(accuracies), max(accuracies)
+
+    def get_top_worst_games_summary(self, max_worst: int, max_best: int) -> Tuple[int, Optional[float], Optional[float]]:
+        """Return count and accuracy range for the worst-performing games."""
+        ranked = self._get_ranked_games_by_cpl()
+        if not ranked or max_worst <= 0:
+            return 0, None, None
+        n = len(ranked)
+        reserved_for_best = min(max_best, n)
+        worst_available = max(0, n - reserved_for_best)
+        worst_count = min(max_worst, worst_available)
+        if worst_count <= 0:
+            return 0, None, None
+        start = n - worst_count
+        accuracies = [acc for _, acc, _ in ranked[start:]]
+        return worst_count, min(accuracies), max(accuracies)
+
     def get_last_unavailable_reason(self) -> str:
         """Get the most recent reason for unavailability."""
         return self._last_unavailable_reason
@@ -510,7 +544,33 @@ class PlayerStatsController(QObject):
                 return (database, row_index)
         
         return None
-    
+
+    def get_pattern_games_with_sources(self, pattern: "ErrorPattern") -> List[Tuple["GameData", str]]:
+        """Resolve each pattern game to (game, source_display_name) for opening in a Search Results tab.
+
+        Args:
+            pattern: ErrorPattern whose related_games to resolve.
+
+        Returns:
+            List of (GameData, source_display_name). Skipped if a game is not found in any database.
+        """
+        result: List[Tuple["GameData", str]] = []
+        if not pattern or not pattern.related_games:
+            return result
+        panel_model = self._database_controller.get_panel_model()
+        for game in pattern.related_games:
+            found = self.find_game_in_databases(game, use_all_databases=True)
+            if not found:
+                continue
+            database, _ = found
+            identifier = panel_model.find_database_by_model(database)
+            if identifier == "clipboard":
+                display_name = "Clipboard"
+            else:
+                display_name = Path(identifier).stem
+            result.append((game, display_name))
+        return result
+
     def highlight_rows(self, database: DatabaseModel, row_indices: List[int]) -> None:
         """Highlight rows in the database panel through the database controller.
         
@@ -559,6 +619,8 @@ class PlayerStatsController(QObject):
         self.current_stats = None
         self.current_patterns = []
         self.current_game_summaries = []
+        self._current_analyzed_games = []
+        self._last_analyzed_games = []
         self.stats_unavailable.emit(reason)
     
     # Source and player selection management
@@ -700,6 +762,8 @@ class PlayerStatsController(QObject):
         self.current_stats = stats
         self.current_patterns = patterns
         self.current_game_summaries = summaries
+        # Use the same analyzed games that were used for this calculation
+        self._current_analyzed_games = getattr(self, "_last_analyzed_games", [])
         self.stats_updated.emit(stats, patterns, summaries)
     
     def _on_stats_worker_unavailable(self, reason: str) -> None:
@@ -869,6 +933,12 @@ class PlayerStatsController(QObject):
         if self._source_selection == 0:
             # "None" selected - don't update
             return
+
+        # If "Active Database" is selected and the active database was closed/cleared,
+        # switch to "None" to avoid showing stale stats.
+        if self._source_selection == 1 and database is None:
+            self.set_source_selection(0)
+            return
         
         # Only repopulate if "Active Database" is selected (not "All Open Databases")
         if not self._use_all_databases:
@@ -893,6 +963,12 @@ class PlayerStatsController(QObject):
         # Remove from connected list (will be cleaned up on next connection refresh)
         # The database model may already be destroyed, so we just refresh connections
         self._connect_to_database_changes()
+        # If a source is selected (Active or All), treat removal like a data change and
+        # use the existing debounce timer so multiple closes (e.g. \"Close all but this\")
+        # only trigger a single recalculation.
+        if self._source_selection != 0:
+            self._database_update_timer.stop()
+            self._database_update_timer.start(self._database_update_debounce_ms)
     
     def _on_database_data_changed(self, top_left, bottom_right, roles=None) -> None:
         """Handle database data changed signal - debounce and update."""

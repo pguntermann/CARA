@@ -681,6 +681,18 @@
           }
         },
         "moveslist": {
+          "copy_table": {
+            "csv": {
+              "delimiter": ",",
+              "use_escaping": true,
+              "always_quote_values": true
+            },
+            "tsv": {
+              "delimiter": "\t",
+              "use_escaping": false,
+              "always_quote_values": false
+            }
+          },
           "table": {
             "active_move": {
               "background_color": [
@@ -1271,6 +1283,65 @@
               "moderate_coverage_percent": 50
             }
           },
+          "accuracy_distribution": {
+            "enabled": true,
+            "transform_exponent": 4.0,
+            "height": 120,
+            "margins": [
+              10,
+              10,
+              10,
+              10
+            ],
+            "border_radius": 5,
+            "section_spacing": 6,
+            "color_ranges": [
+              {
+                "max_acc": 64,
+                "color": [
+                  200,
+                  90,
+                  90
+                ]
+              },
+              {
+                "max_acc": 85,
+                "color": [
+                  220,
+                  180,
+                  80
+                ]
+              },
+              {
+                "max_acc": 100,
+                "color": [
+                  80,
+                  180,
+                  120
+                ]
+              }
+            ],
+            "bar_color": [
+              120,
+              190,
+              255
+            ],
+            "grid_line_color": [
+              70,
+              70,
+              75
+            ],
+            "axis_color": [
+              140,
+              140,
+              145
+            ],
+            "label_font_size": 9
+          },
+          "top_games": {
+            "max_best": 3,
+            "max_worst": 3
+          },
           "error_patterns": {
             "thresholds": {
               "phase_blunder_percentage": 20.0,
@@ -1291,6 +1362,7 @@
               8,
               6
             ],
+            "two_line_gap_factor": 0.15,
             "button": {
               "height": 28
             },
@@ -2397,7 +2469,7 @@
       },
       "engine_configuration": {
         "width": 600,
-        "height": 700,
+        "height": 680,
         "layout": {
           "spacing": 10,
           "margins": [
@@ -2541,7 +2613,8 @@
             15,
             10,
             10
-          ]
+          ],
+          "engine_params_content_margin_top": 2
         },
         "buttons": {
           "spacing": 10,
@@ -4807,6 +4880,12 @@
         "weight_by_phase_importance": "max(0, int(2800 - ((average_cpl_opening * opening_moves + average_cpl_middlegame * middlegame_moves + average_cpl_endgame * endgame_moves) / max(total_moves, 1) * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40)))",
         "normalized_weight_by_phase_importance": "max(0, int(2800 - ((average_cpl_opening * opening_moves + average_cpl_middlegame * middlegame_moves + average_cpl_endgame * endgame_moves) / max(total_moves, 1) * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40))) / 1.931 + 166 if max(0, int(2800 - ((average_cpl_opening * opening_moves + average_cpl_middlegame * middlegame_moves + average_cpl_endgame * endgame_moves) / max(total_moves, 1) * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40))) < 2229 else max(0, int(2800 - ((average_cpl_opening * opening_moves + average_cpl_middlegame * middlegame_moves + average_cpl_endgame * endgame_moves) / max(total_moves, 1) * 8.5) - ((blunder_rate * 50 + mistake_rate * 20) * 40))) / 0.305 - 5988"
       }
+    },
+    "brilliancy_detection": {
+      "default_threads_formula": {
+        "formula": "max(1, min(8, cpu_count - reserved_cores))"
+      },
+      "time_limit_per_move_ms": 750
     },
     "brilliant_criteria": {
       "shallow_depth_min": 3,

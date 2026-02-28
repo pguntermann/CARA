@@ -12,6 +12,7 @@ from app.services.engine_validation_service import EngineValidationService
 TASK_GAME_ANALYSIS = EngineModel.TASK_GAME_ANALYSIS
 TASK_EVALUATION = EngineModel.TASK_EVALUATION
 TASK_MANUAL_ANALYSIS = EngineModel.TASK_MANUAL_ANALYSIS
+TASK_BRILLIANCY_DETECTION = EngineModel.TASK_BRILLIANCY_DETECTION
 
 
 class EngineController:
@@ -188,6 +189,27 @@ class EngineController:
         """
         return self.engine_model.get_assignments()
     
+    def set_engine_for_all_tasks(self, engine_id: str) -> Tuple[bool, str]:
+        """Set the same engine for all tasks (Game Analysis, Evaluation, Manual Analysis, Brilliancy Detection).
+        
+        Args:
+            engine_id: Engine ID to assign to all tasks.
+            
+        Returns:
+            Tuple of (success: bool, message: str).
+        """
+        engine = self.engine_model.get_engine(engine_id)
+        if not engine:
+            return (False, f"Engine with ID '{engine_id}' not found")
+        for task in (
+            EngineModel.TASK_GAME_ANALYSIS,
+            EngineModel.TASK_EVALUATION,
+            EngineModel.TASK_MANUAL_ANALYSIS,
+            EngineModel.TASK_BRILLIANCY_DETECTION,
+        ):
+            self.engine_model.set_assignment(task, engine_id)
+        return (True, f"'{engine.name}' set for all tasks")
+    
     def is_engine_configured_for_task(self, task: str) -> Tuple[bool, Optional[str]]:
         """Check if an engine is configured and assigned for a task.
         
@@ -225,7 +247,8 @@ class EngineController:
         task_names = {
             EngineModel.TASK_GAME_ANALYSIS: "Game Analysis Engine",
             EngineModel.TASK_EVALUATION: "Evaluation Engine",
-            EngineModel.TASK_MANUAL_ANALYSIS: "Manual Analysis Engine"
+            EngineModel.TASK_MANUAL_ANALYSIS: "Manual Analysis Engine",
+            EngineModel.TASK_BRILLIANCY_DETECTION: "Brilliancy Detection Engine",
         }
         return task_names.get(task, task)
 

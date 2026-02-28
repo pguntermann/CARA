@@ -1,6 +1,6 @@
 """Text formatter for player statistics view."""
 
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.services.player_stats_service import AggregatedPlayerStats
@@ -9,15 +9,46 @@ if TYPE_CHECKING:
 
 class PlayerStatsTextFormatter:
     """Formatter for converting player statistics to text format."""
+
+    @staticmethod
+    def _format_top_games(
+        best_count: int,
+        best_min_acc: Optional[float],
+        best_max_acc: Optional[float],
+        worst_count: int,
+        worst_min_acc: Optional[float],
+        worst_max_acc: Optional[float],
+    ) -> List[str]:
+        """Format Games by Performance (best/worst) section."""
+        lines = []
+        lines.append("Top Games")
+        lines.append("---------")
+        lines.append("")
+        if best_min_acc is not None and best_max_acc is not None and best_count > 0:
+            lines.append(f"Best Games (lowest CPL, Accuracy {best_min_acc:.1f}–{best_max_acc:.1f}%): {best_count} game(s)")
+        else:
+            lines.append(f"Best Games (lowest CPL): {best_count} game(s)")
+        if worst_min_acc is not None and worst_max_acc is not None and worst_count > 0:
+            lines.append(f"Worst Games (highest CPL, Accuracy {worst_min_acc:.1f}–{worst_max_acc:.1f}%): {worst_count} game(s)")
+        else:
+            lines.append(f"Worst Games (highest CPL): {worst_count} game(s)")
+        return lines
     
     @staticmethod
-    def format_full_stats(stats: "AggregatedPlayerStats", patterns: List["ErrorPattern"], player_name: str) -> str:
+    def format_full_stats(
+        stats: "AggregatedPlayerStats",
+        patterns: List["ErrorPattern"],
+        player_name: str,
+        *,
+        top_games_summary: Optional[Tuple[int, Optional[float], Optional[float], int, Optional[float], Optional[float]]] = None,
+    ) -> str:
         """Format the full player statistics as text.
         
         Args:
             stats: AggregatedPlayerStats instance.
             patterns: List of ErrorPattern instances.
             player_name: Name of the player.
+            top_games_summary: Optional (best_count, best_min_acc, best_max_acc, worst_count, worst_min_acc, worst_max_acc).
             
         Returns:
             Formatted text string for the full stats.
@@ -30,6 +61,10 @@ class PlayerStatsTextFormatter:
         # Add all sections
         lines.extend(PlayerStatsTextFormatter._format_overview(stats))
         lines.append("")
+        dist_lines = PlayerStatsTextFormatter._format_accuracy_distribution(stats)
+        if dist_lines:
+            lines.extend(dist_lines)
+            lines.append("")
         lines.extend(PlayerStatsTextFormatter._format_move_accuracy(stats))
         lines.append("")
         lines.extend(PlayerStatsTextFormatter._format_phase_performance(stats))
@@ -39,13 +74,24 @@ class PlayerStatsTextFormatter:
             lines.extend(PlayerStatsTextFormatter._format_openings(stats))
             lines.append("")
         
+        if top_games_summary is not None:
+            lines.extend(PlayerStatsTextFormatter._format_top_games(*top_games_summary))
+            lines.append("")
+        
         if patterns:
             lines.extend(PlayerStatsTextFormatter._format_error_patterns(patterns))
         
         return "\n".join(lines)
     
     @staticmethod
-    def format_section(stats: "AggregatedPlayerStats", patterns: List["ErrorPattern"], section_name: str, player_name: str) -> str:
+    def format_section(
+        stats: "AggregatedPlayerStats",
+        patterns: List["ErrorPattern"],
+        section_name: str,
+        player_name: str,
+        *,
+        top_games_summary: Optional[Tuple[int, Optional[float], Optional[float], int, Optional[float], Optional[float]]] = None,
+    ) -> str:
         """Format a specific section as text.
         
         Args:
@@ -53,6 +99,7 @@ class PlayerStatsTextFormatter:
             patterns: List of ErrorPattern instances.
             section_name: Name of the section to format.
             player_name: Name of the player.
+            top_games_summary: Required for "Top Games" section: (best_count, best_min_acc, best_max_acc, worst_count, worst_min_acc, worst_max_acc).
             
         Returns:
             Formatted text string for the section.
@@ -64,18 +111,26 @@ class PlayerStatsTextFormatter:
         if section_name == "Overview":
             section_lines = PlayerStatsTextFormatter._format_overview(stats)
             lines.extend(section_lines[2:])  # Skip "Overview" and "-------"
+        elif section_name == "Accuracy Distribution":
+            section_lines = PlayerStatsTextFormatter._format_accuracy_distribution(stats)
+            if section_lines:
+                lines.extend(section_lines[2:])
         elif section_name == "Move Accuracy":
             section_lines = PlayerStatsTextFormatter._format_move_accuracy(stats)
-            lines.extend(section_lines[2:])  # Skip "Move Accuracy" and "--------------"
+            lines.extend(section_lines[2:])
         elif section_name == "Performance by Phase":
             section_lines = PlayerStatsTextFormatter._format_phase_performance(stats)
-            lines.extend(section_lines[2:])  # Skip "Performance by Phase" and "----------------------"
+            lines.extend(section_lines[2:])
         elif section_name == "Openings":
             section_lines = PlayerStatsTextFormatter._format_openings(stats)
-            lines.extend(section_lines[2:])  # Skip "Openings" and "--------"
+            lines.extend(section_lines[2:])
+        elif section_name == "Top Games":
+            if top_games_summary is not None:
+                section_lines = PlayerStatsTextFormatter._format_top_games(*top_games_summary)
+                lines.extend(section_lines[2:])  # Skip "Top Games" and "---------"
         elif section_name == "Error Patterns":
             section_lines = PlayerStatsTextFormatter._format_error_patterns(patterns)
-            lines.extend(section_lines[2:])  # Skip "Error Patterns" and "---------------"
+            lines.extend(section_lines[2:])
         
         return "\n".join(lines)
     
@@ -99,17 +154,114 @@ class PlayerStatsTextFormatter:
         lines.append(f"Record: {stats.wins}-{stats.draws}-{stats.losses}")
         
         accuracy = stats.player_stats.accuracy if stats.player_stats.accuracy is not None else 0.0
-        lines.append(f"Average Accuracy: {accuracy:.1f}%")
+        # Include per-game min/max accuracy if available
+        min_acc = getattr(stats, "min_accuracy", None)
+        max_acc = getattr(stats, "max_accuracy", None)
+        if min_acc is not None and max_acc is not None and stats.analyzed_games > 1:
+            lines.append(f"Average Accuracy: {accuracy:.1f}% (Min: {min_acc:.1f}%, Max: {max_acc:.1f}%)")
+        else:
+            lines.append(f"Average Accuracy: {accuracy:.1f}%")
         
         est_elo = stats.player_stats.estimated_elo if stats.player_stats.estimated_elo is not None else 0
         lines.append(f"Estimated Elo: {est_elo}")
         
         avg_cpl = stats.player_stats.average_cpl if stats.player_stats.average_cpl is not None else 0.0
-        lines.append(f"Average CPL: {avg_cpl:.1f}")
+        # Include per-game min/max ACPL if available
+        min_acpl = getattr(stats, "min_acpl", None)
+        max_acpl = getattr(stats, "max_acpl", None)
+        if min_acpl is not None and max_acpl is not None and stats.analyzed_games > 1:
+            lines.append(f"Average CPL: {avg_cpl:.1f} (Min: {min_acpl:.1f}, Max: {max_acpl:.1f})")
+        else:
+            lines.append(f"Average CPL: {avg_cpl:.1f}")
+        
+        best_move_pct = stats.player_stats.best_move_percentage if stats.player_stats.best_move_percentage is not None else 0.0
+        min_best = getattr(stats, "min_best_move_pct", None)
+        max_best = getattr(stats, "max_best_move_pct", None)
+        if min_best is not None and max_best is not None and stats.analyzed_games > 1:
+            lines.append(f"Best Move %: {best_move_pct:.1f}% (Min: {min_best:.1f}%, Max: {max_best:.1f}%)")
+        else:
+            lines.append(f"Best Move %: {best_move_pct:.1f}%")
         
         top3_move_pct = stats.player_stats.top3_move_percentage if stats.player_stats.top3_move_percentage is not None else 0.0
-        lines.append(f"Top 3 Move %: {top3_move_pct:.1f}%")
+        min_top3 = getattr(stats, "min_top3_move_pct", None)
+        max_top3 = getattr(stats, "max_top3_move_pct", None)
+        if min_top3 is not None and max_top3 is not None and stats.analyzed_games > 1:
+            lines.append(f"Top 3 Move %: {top3_move_pct:.1f}% (Min: {min_top3:.1f}%, Max: {max_top3:.1f}%)")
+        else:
+            lines.append(f"Top 3 Move %: {top3_move_pct:.1f}%")
         
+        blunder_rate = stats.player_stats.blunder_rate if stats.player_stats.blunder_rate is not None else 0.0
+        min_blunder = getattr(stats, "min_blunder_rate", None)
+        max_blunder = getattr(stats, "max_blunder_rate", None)
+        if min_blunder is not None and max_blunder is not None and stats.analyzed_games > 1:
+            lines.append(f"Blunder Rate: {blunder_rate:.1f}% (Min: {min_blunder:.1f}%, Max: {max_blunder:.1f}%)")
+        else:
+            lines.append(f"Blunder Rate: {blunder_rate:.1f}%")
+        
+        return lines
+
+    @staticmethod
+    def _format_accuracy_distribution(stats: "AggregatedPlayerStats") -> List[str]:
+        """Format accuracy distribution based on per-game accuracy samples.
+
+        Args:
+            stats: AggregatedPlayerStats instance.
+
+        Returns:
+            List of formatted lines, or empty list if not enough data.
+        """
+        values = getattr(stats, "accuracy_values", None) or []
+        # Require at least 2 games to make a distribution meaningful
+        if len(values) < 2:
+            return []
+
+        lines: List[str] = []
+        lines.append("Accuracy Distribution")
+        lines.append("---------------------")
+        lines.append("")
+
+        # Same non-linear binning as chart: t = (acc/100)^k over data range, bin count scales with range
+        clamped = [max(0.0, min(100.0, v)) for v in values]
+        data_min = min(clamped)
+        data_max = max(clamped)
+        margin = 2.5
+        low = max(0.0, data_min - margin)
+        high = min(100.0, data_max + margin)
+        if high <= low:
+            high = min(100.0, low + 5.0)
+        range_size = high - low
+        bin_count = max(5, min(25, int(round(range_size / 5.0))))
+
+        transform_exponent = 4.0
+        t_low = (low / 100.0) ** transform_exponent
+        t_high = (high / 100.0) ** transform_exponent
+        t_range = t_high - t_low
+        t_edges = [t_low + (i / float(bin_count)) * t_range for i in range(bin_count + 1)]
+        acc_edges = [100.0 * (t ** (1.0 / transform_exponent)) for t in t_edges]
+
+        bins = [0] * bin_count
+        for v in clamped:
+            t = (v / 100.0) ** transform_exponent
+            if t <= t_low:
+                idx = 0
+            elif t >= t_high:
+                idx = bin_count - 1
+            else:
+                idx = int((t - t_low) / t_range * bin_count)
+                if idx >= bin_count:
+                    idx = bin_count - 1
+            bins[idx] += 1
+
+        # Emit only non-empty bins, in ascending order
+        for i, count in enumerate(bins):
+            if count <= 0:
+                continue
+            start = acc_edges[i]
+            end = acc_edges[i + 1]
+            label = f"{start:.1f}–{end:.1f}%"
+            game_word = "game" if count == 1 else "games"
+            lines.append(f"{label}: {count} {game_word}")
+
         return lines
     
     @staticmethod

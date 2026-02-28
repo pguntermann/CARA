@@ -171,8 +171,10 @@ class BulkAnalysisService(QObject):
         """Run brilliancy detection on analyzed moves (bulk analysis) via shared orchestrator."""
         if not move_infos or not analyzed_moves:
             return
-        engine_assignment = self.engine_model.get_assignment(EngineModel.TASK_GAME_ANALYSIS)
+        engine_assignment = self.engine_model.get_assignment(EngineModel.TASK_BRILLIANCY_DETECTION)
         if engine_assignment is None:
+            logging_service = LoggingService.get_instance()
+            logging_service.debug("Brilliant move detection skipped: No engine assigned to brilliancy detection task")
             return
         engine = self.engine_model.get_engine(engine_assignment)
         if engine is None or not engine.is_valid:
@@ -181,15 +183,17 @@ class BulkAnalysisService(QObject):
         # Check if engine is incompatible with brilliancy detection
         from app.services.brilliant_move_detection_service import is_engine_incompatible
         if is_engine_incompatible(engine.name, self.config):
-            from app.services.logging_service import LoggingService
             logging_service = LoggingService.get_instance()
             logging_service.warning(f"Brilliant move detection skipped: Engine '{engine.name}' is incompatible")
             return  # Skip silently, no message dialog
         
         engine_path = Path(engine.path) if not isinstance(engine.path, Path) else engine.path
+        task_params = EngineParametersService.get_task_parameters_for_engine(engine_path, EngineModel.TASK_BRILLIANCY_DETECTION, self.config)
+        time_limit_ms = task_params.get("movetime", self.time_limit_ms)
+        max_threads = task_params.get("threads") or self.max_threads
         engine_options = {}
-        if self.max_threads:
-            engine_options["Threads"] = self.max_threads
+        if max_threads:
+            engine_options["Threads"] = max_threads
 
         def get_move_data(row_index: int):
             if 0 <= row_index < len(analyzed_moves):
@@ -211,8 +215,8 @@ class BulkAnalysisService(QObject):
             inaccuracy_max_cpl=self.inaccuracy_max_cpl,
             mistake_max_cpl=self.mistake_max_cpl,
             engine_path=engine_path,
-            time_limit_ms=self.time_limit_ms,
-            max_threads=self.max_threads,
+            time_limit_ms=time_limit_ms,
+            max_threads=max_threads,
             engine_name=engine.name,
             engine_options=engine_options,
             config=self.config,

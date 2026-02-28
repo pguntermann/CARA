@@ -79,6 +79,7 @@ class EngineModel(QObject):
     TASK_GAME_ANALYSIS = "game_analysis"
     TASK_EVALUATION = "evaluation"
     TASK_MANUAL_ANALYSIS = "manual_analysis"
+    TASK_BRILLIANCY_DETECTION = "brilliancy_detection"
     
     def __init__(self) -> None:
         """Initialize the engine model."""
@@ -88,7 +89,8 @@ class EngineModel(QObject):
         self._assignments: Dict[str, Optional[str]] = {
             self.TASK_GAME_ANALYSIS: None,
             self.TASK_EVALUATION: None,
-            self.TASK_MANUAL_ANALYSIS: None
+            self.TASK_MANUAL_ANALYSIS: None,
+            self.TASK_BRILLIANCY_DETECTION: None,
         }
     
     def get_engines(self) -> List[EngineData]:
@@ -141,7 +143,7 @@ class EngineModel(QObject):
         self._engines[engine.id] = engine
         
         # Auto-assign to tasks that have no assignment
-        for task in [self.TASK_GAME_ANALYSIS, self.TASK_EVALUATION, self.TASK_MANUAL_ANALYSIS]:
+        for task in [self.TASK_GAME_ANALYSIS, self.TASK_EVALUATION, self.TASK_MANUAL_ANALYSIS, self.TASK_BRILLIANCY_DETECTION]:
             if self._assignments[task] is None:
                 self._assignments[task] = engine.id
         
@@ -170,7 +172,7 @@ class EngineModel(QObject):
         first_remaining_id = remaining_engines[0].id if remaining_engines else None
         
         # Reassign tasks that were using the removed engine
-        for task in [self.TASK_GAME_ANALYSIS, self.TASK_EVALUATION, self.TASK_MANUAL_ANALYSIS]:
+        for task in [self.TASK_GAME_ANALYSIS, self.TASK_EVALUATION, self.TASK_MANUAL_ANALYSIS, self.TASK_BRILLIANCY_DETECTION]:
             if self._assignments[task] == engine_id:
                 self._assignments[task] = first_remaining_id
         
@@ -219,7 +221,7 @@ class EngineModel(QObject):
         """Get the engine ID assigned to a task.
         
         Args:
-            task: Task constant (TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS).
+            task: Task constant (TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS, TASK_BRILLIANCY_DETECTION).
             
         Returns:
             Engine ID or None if no engine is assigned.
@@ -230,7 +232,7 @@ class EngineModel(QObject):
         """Set the engine assignment for a task.
         
         Args:
-            task: Task constant (TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS).
+            task: Task constant (TASK_GAME_ANALYSIS, TASK_EVALUATION, TASK_MANUAL_ANALYSIS, TASK_BRILLIANCY_DETECTION).
             engine_id: Engine ID to assign, or None to clear.
             
         Returns:
@@ -270,7 +272,7 @@ class EngineModel(QObject):
         engines = self.get_engines()
         if engines:
             first_engine_id = engines[0].id
-            for task in [self.TASK_GAME_ANALYSIS, self.TASK_EVALUATION, self.TASK_MANUAL_ANALYSIS]:
+            for task in [self.TASK_GAME_ANALYSIS, self.TASK_EVALUATION, self.TASK_MANUAL_ANALYSIS, self.TASK_BRILLIANCY_DETECTION]:
                 if self._assignments[task] is None:
                     self._assignments[task] = first_engine_id
         

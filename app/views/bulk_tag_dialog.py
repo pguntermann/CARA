@@ -16,12 +16,13 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QWidget,
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent
 from typing import Optional, Dict, Any, List
 
 from app.controllers.bulk_tag_controller import BulkTagController
 from app.models.database_model import DatabaseModel
+from app.utils.path_display_utils import truncate_path_for_display, truncate_text_middle
 
 
 class BulkTagDialog(QDialog):
@@ -172,9 +173,10 @@ class BulkTagDialog(QDialog):
         db_header_layout.setContentsMargins(0, 0, 0, 0)
         db_header_layout.setSpacing(8)
         
-        db_label = QLabel("Target Database:")
-        db_label.setFont(QFont(self.label_font_family, self.label_font_size))
-        db_header_layout.addWidget(db_label)
+        self._target_db_label = QLabel("Target Database:")
+        self._target_db_label.setFont(QFont(self.label_font_family, self.label_font_size))
+        db_header_layout.addWidget(self._target_db_label)
+        db_label = self._target_db_label
         
         # Get database name and path
         db_name = "Clipboard"
@@ -192,6 +194,9 @@ class BulkTagDialog(QDialog):
         
         self.db_name_label = QLabel(f"<b>{db_name}</b>")
         self.db_name_label.setFont(QFont(self.label_font_family, self.label_font_size))
+        self.db_name_label.setWordWrap(False)
+        if db_path:
+            self.db_name_label.setToolTip(db_name)
         db_header_layout.addWidget(self.db_name_label)
         db_header_layout.addStretch()
         
@@ -214,10 +219,19 @@ class BulkTagDialog(QDialog):
             spacer.setFixedWidth(spacer_width)
             path_layout.addWidget(spacer)
             
-            self.db_path_label = QLabel(db_path)
-            # Use smaller font size
+            self._db_path_full = db_path
+            self._db_name_full = db_name
             path_font_size = max(8, self.label_font_size - 2)
-            self.db_path_label.setFont(QFont(self.label_font_family, path_font_size))
+            path_font = QFont(self.label_font_family, path_font_size)
+            path_max_width_px = max(
+                80,
+                self.dialog_width - self.layout_margins[0] - self.layout_margins[2] - spacer_width - 8,
+            )
+            path_display = truncate_path_for_display(db_path, path_max_width_px, path_font)
+            self.db_path_label = QLabel(path_display)
+            self.db_path_label.setToolTip(db_path)
+            self.db_path_label.setFont(path_font)
+            self.db_path_label.setWordWrap(False)
             # Make path text lighter/more subtle
             path_text_color = self.text_color
             self.db_path_label.setStyleSheet(
@@ -232,6 +246,8 @@ class BulkTagDialog(QDialog):
             path_widget.setLayout(path_layout)
             db_container_layout.addWidget(path_widget)
         else:
+            self._db_path_full = None
+            self._db_name_full = None
             self.db_path_label = None
         
         main_layout.addWidget(db_container)
@@ -625,10 +641,30 @@ class BulkTagDialog(QDialog):
         """Override showEvent to ensure styling is applied when dialog is shown."""
         super().showEvent(event)
         self._apply_checkbox_styling()
+        QTimer.singleShot(0, self._update_path_label_truncation)
         # Update tag combobox if in remove mode
         if self.remove_tag_radio.isChecked():
             self._update_tag_combo_for_remove()
     
+    def _update_path_label_truncation(self) -> None:
+        """Re-truncate path and name using actual width and font (DPI-aware)."""
+        if hasattr(self, 'db_name_label') and self.db_name_label.parent() and getattr(self, '_db_name_full', None) and hasattr(self, '_target_db_label'):
+            container = self.db_name_label.parent()
+            name_w = max(40, container.width() - self._target_db_label.width() - 8)
+            self.db_name_label.setMaximumWidth(name_w)
+            self.db_name_label.setWordWrap(False)
+            name_font = QFont(self.db_name_label.font())
+            name_font.setBold(True)
+            name_display = truncate_text_middle(self._db_name_full, name_w, name_font)
+            self.db_name_label.setText(f"<b>{name_display}</b>")
+            self.db_name_label.setToolTip(self._db_name_full)
+        if not getattr(self, '_db_path_full', None) or not getattr(self, 'db_path_label', None):
+            return
+        label = self.db_path_label
+        w = max(80, label.width())
+        path_display = truncate_path_for_display(self._db_path_full, w, label.font())
+        label.setText(path_display)
+
     def _on_operation_changed(self) -> None:
         """Handle operation selection change."""
         is_add_mode = self.add_tag_radio.isChecked()
