@@ -338,7 +338,7 @@ class UCICommunicationService:
                     line = line_bytes.decode('utf-8', errors='replace').rstrip('\r').strip()
                     if line:
                         self._debug_console(line, "RECV")
-                        return line
+                    return line
                 except Exception as e:
                     self._debug_lifecycle("ERROR", f"Error decoding line: {str(e)}")
                     return None
@@ -363,7 +363,7 @@ class UCICommunicationService:
                             line = line_bytes.decode('utf-8', errors='replace').rstrip('\r').strip()
                             if line:
                                 self._debug_console(line, "RECV")
-                                return line
+                            return line
                         except Exception as e:
                             self._debug_lifecycle("ERROR", f"Error decoding line: {str(e)}")
                             return None
