@@ -5,6 +5,10 @@ comments, variations, annotations) in different orders produces correct results
 and preserves move parsing.
 """
 
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 import unittest
 import re
 import chess.pgn
@@ -136,7 +140,7 @@ that spans multiple lines
             (PgnFormatterService._remove_non_standard_tags, "non-standard tags"),
             (PgnFormatterService._remove_comments, "comments"),
         ]
-        self._test_removal_order(removals, "non-standard tags → comments")
+        self._test_removal_order(removals, "non-standard tags â†’ comments")
     
     def test_order_2_comments_then_non_standard_tags(self):
         """Test: Remove comments, then non-standard tags."""
@@ -146,7 +150,7 @@ that spans multiple lines
         ]
         # Note: This order might not make sense since non-standard tags are in comments,
         # but we test it to ensure it doesn't break
-        self._test_removal_order(removals, "comments → non-standard tags")
+        self._test_removal_order(removals, "comments â†’ non-standard tags")
     
     def test_order_3_non_standard_tags_then_variations(self):
         """Test: Remove non-standard tags, then variations."""
@@ -154,7 +158,7 @@ that spans multiple lines
             (PgnFormatterService._remove_non_standard_tags, "non-standard tags"),
             (PgnFormatterService._remove_variations, "variations"),
         ]
-        self._test_removal_order(removals, "non-standard tags → variations")
+        self._test_removal_order(removals, "non-standard tags â†’ variations")
     
     def test_order_4_variations_then_non_standard_tags(self):
         """Test: Remove variations, then non-standard tags."""
@@ -162,7 +166,7 @@ that spans multiple lines
             (PgnFormatterService._remove_variations, "variations"),
             (PgnFormatterService._remove_non_standard_tags, "non-standard tags"),
         ]
-        self._test_removal_order(removals, "variations → non-standard tags")
+        self._test_removal_order(removals, "variations â†’ non-standard tags")
     
     def test_order_5_comments_then_variations(self):
         """Test: Remove comments, then variations."""
@@ -170,7 +174,7 @@ that spans multiple lines
             (PgnFormatterService._remove_comments, "comments"),
             (PgnFormatterService._remove_variations, "variations"),
         ]
-        self._test_removal_order(removals, "comments → variations")
+        self._test_removal_order(removals, "comments â†’ variations")
     
     def test_order_6_variations_then_comments(self):
         """Test: Remove variations, then comments."""
@@ -178,7 +182,7 @@ that spans multiple lines
             (PgnFormatterService._remove_variations, "variations"),
             (PgnFormatterService._remove_comments, "comments"),
         ]
-        self._test_removal_order(removals, "variations → comments")
+        self._test_removal_order(removals, "variations â†’ comments")
     
     def test_order_7_non_standard_tags_then_annotations(self):
         """Test: Remove non-standard tags, then annotations."""
@@ -186,7 +190,7 @@ that spans multiple lines
             (PgnFormatterService._remove_non_standard_tags, "non-standard tags"),
             (PgnFormatterService._remove_annotations, "annotations"),
         ]
-        self._test_removal_order(removals, "non-standard tags → annotations")
+        self._test_removal_order(removals, "non-standard tags â†’ annotations")
     
     def test_order_8_annotations_then_non_standard_tags(self):
         """Test: Remove annotations, then non-standard tags."""
@@ -194,7 +198,7 @@ that spans multiple lines
             (PgnFormatterService._remove_annotations, "annotations"),
             (PgnFormatterService._remove_non_standard_tags, "non-standard tags"),
         ]
-        self._test_removal_order(removals, "annotations → non-standard tags")
+        self._test_removal_order(removals, "annotations â†’ non-standard tags")
     
     def test_order_9_all_removals_standard_order(self):
         """Test: Remove all elements in recommended order."""
@@ -243,7 +247,7 @@ that spans multiple lines
             (PgnFormatterService._remove_variations, "variations"),
             (PgnFormatterService._remove_annotations, "annotations"),
         ]
-        self._test_removal_order(removals, "comments → variations → annotations")
+        self._test_removal_order(removals, "comments â†’ variations â†’ annotations")
     
     def test_order_14_non_standard_tags_comments_variations(self):
         """Test: Remove non-standard tags, comments, variations."""
@@ -252,7 +256,7 @@ that spans multiple lines
             (PgnFormatterService._remove_comments, "comments"),
             (PgnFormatterService._remove_variations, "variations"),
         ]
-        self._test_removal_order(removals, "non-standard tags → comments → variations")
+        self._test_removal_order(removals, "non-standard tags â†’ comments â†’ variations")
     
     def test_order_15_variations_comments_annotations(self):
         """Test: Remove variations, comments, annotations."""
@@ -261,7 +265,7 @@ that spans multiple lines
             (PgnFormatterService._remove_comments, "comments"),
             (PgnFormatterService._remove_annotations, "annotations"),
         ]
-        self._test_removal_order(removals, "variations → comments → annotations")
+        self._test_removal_order(removals, "variations â†’ comments â†’ annotations")
     
     def test_edge_case_multi_line_comment_standard_order(self):
         """Test edge case: Multi-line comment with non-standard tags in standard order."""
