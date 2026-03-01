@@ -49,6 +49,15 @@ def _parse_base_seconds(time_control: str) -> Optional[int]:
     return None
 
 
+def get_base_seconds(time_control: str) -> Optional[int]:
+    """Return base time in seconds for a TimeControl string, or None if empty/unparseable.
+
+    Use for numeric comparison (e.g. search by time limit in seconds).
+    Same parsing logic as _parse_base_seconds.
+    """
+    return _parse_base_seconds(time_control)
+
+
 def get_tc_type(time_control: str, tc_type_config: Optional[Dict[str, Any]] = None) -> str:
     """Map a PGN TimeControl value to a TC Type label (e.g. Bullet, Blitz, Rapid, Classical).
 

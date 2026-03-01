@@ -16,6 +16,8 @@ class SearchField(Enum):
     EVENT = "event"
     SITE = "site"
     ECO = "eco"
+    TIMECONTROL = "time_control"
+    TC_TYPE = "tc_type"  # Derived category (Bullet, Blitz, Rapid, Classical, etc.)
     ANALYZED = "analyzed"
     ANNOTATED = "annotated"
     CUSTOM_TAG = "custom_tag"  # For PGN tags not in standard columns

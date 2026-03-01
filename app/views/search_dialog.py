@@ -92,7 +92,7 @@ class CriteriaRowWidget(QWidget):
         self.field_combo = QComboBox()
         self.field_combo.addItems([
             "White", "Black", "WhiteElo", "BlackElo", "Result", "Date", 
-            "Event", "Site", "ECO", "Analyzed", "Annotated", "Custom PGN Tag"
+            "Event", "Site", "ECO", "TimeControl", "TC Type", "Analyzed", "Annotated", "Custom PGN Tag"
         ])
         self.field_combo.setFixedWidth(120)
         self.field_combo.currentTextChanged.connect(self._on_field_changed)
@@ -147,6 +147,16 @@ class CriteriaRowWidget(QWidget):
             self.value_input.setVisible(True)
             self.value_input.setEnabled(True)
             self.value_input.setPlaceholderText("Value...")
+            self.custom_tag_input.setVisible(False)
+        elif field_text == "TimeControl":
+            self.operator_combo.addItems([
+                "equals", "not equals", "greater than", "less than",
+                "greater than or equal", "less than or equal",
+                "is empty", "is not empty"
+            ])
+            self.value_input.setVisible(True)
+            self.value_input.setEnabled(True)
+            self.value_input.setPlaceholderText("Base seconds (e.g. 300, 600)")
             self.custom_tag_input.setVisible(False)
         elif field_text == "Date":
             self.operator_combo.addItems([
@@ -290,6 +300,8 @@ class CriteriaRowWidget(QWidget):
             "Event": SearchField.EVENT,
             "Site": SearchField.SITE,
             "ECO": SearchField.ECO,
+            "TimeControl": SearchField.TIMECONTROL,
+            "TC Type": SearchField.TC_TYPE,
             "Analyzed": SearchField.ANALYZED,
             "Annotated": SearchField.ANNOTATED,
             "Custom PGN Tag": SearchField.CUSTOM_TAG,
@@ -322,14 +334,14 @@ class CriteriaRowWidget(QWidget):
         
         # Map text "equals" to appropriate enum based on field type
         if operator == SearchOperator.EQUALS:
-            if field in [SearchField.WHITE_ELO, SearchField.BLACK_ELO]:
+            if field in [SearchField.WHITE_ELO, SearchField.BLACK_ELO, SearchField.TIMECONTROL]:
                 operator = SearchOperator.EQUALS_NUM
             elif field == SearchField.DATE:
                 operator = SearchOperator.DATE_EQUALS
         
         # Map text "not equals" to appropriate enum based on field type
         if operator == SearchOperator.NOT_EQUALS:
-            if field in [SearchField.WHITE_ELO, SearchField.BLACK_ELO]:
+            if field in [SearchField.WHITE_ELO, SearchField.BLACK_ELO, SearchField.TIMECONTROL]:
                 operator = SearchOperator.NOT_EQUALS_NUM
             elif field == SearchField.DATE:
                 operator = SearchOperator.DATE_NOT_EQUALS
@@ -339,6 +351,12 @@ class CriteriaRowWidget(QWidget):
             value = True  # Value doesn't matter for boolean
         elif operator in [SearchOperator.IS_EMPTY, SearchOperator.IS_NOT_EMPTY]:
             value = None
+        elif field == SearchField.TIMECONTROL and operator not in [SearchOperator.IS_EMPTY, SearchOperator.IS_NOT_EMPTY]:
+            # Parse TimeControl value as integer (base seconds)
+            try:
+                value = int(value_text.strip()) if value_text.strip() else None
+            except ValueError:
+                value = None
         else:
             value = value_text
         
@@ -380,6 +398,8 @@ class CriteriaRowWidget(QWidget):
             SearchField.EVENT: "Event",
             SearchField.SITE: "Site",
             SearchField.ECO: "ECO",
+            SearchField.TIMECONTROL: "TimeControl",
+            SearchField.TC_TYPE: "TC Type",
             SearchField.ANALYZED: "Analyzed",
             SearchField.ANNOTATED: "Annotated",
             SearchField.CUSTOM_TAG: "Custom PGN Tag",
