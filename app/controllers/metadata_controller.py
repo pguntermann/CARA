@@ -285,6 +285,7 @@ class MetadataController:
             "Site": "site",
             "WhiteElo": "white_elo",
             "BlackElo": "black_elo",
+            "TimeControl": "time_control",
         }
         
         if tag_name == "CARAAnalysisData":
@@ -313,6 +314,7 @@ class MetadataController:
             "Result": DatabaseModel.COL_RESULT,
             "Date": DatabaseModel.COL_DATE,
             "ECO": DatabaseModel.COL_ECO,
+            "TimeControl": DatabaseModel.COL_TIMECONTROL,
             "Event": DatabaseModel.COL_EVENT,
             "Site": DatabaseModel.COL_SITE,
             "WhiteElo": DatabaseModel.COL_WHITE_ELO,

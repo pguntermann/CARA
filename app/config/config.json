@@ -2052,6 +2052,8 @@
             "col_site": "Site",
             "col_moves": "Moves",
             "col_eco": "ECO",
+            "col_time_control": "TimeControl",
+            "col_tc_type": "TC Type",
             "col_analyzed": "Analyzed",
             "col_annotated": "Annotated",
             "col_source_db": "Source DB",
@@ -2070,6 +2072,8 @@
             "col_site": 150,
             "col_moves": 65,
             "col_eco": 65,
+            "col_time_control": 85,
+            "col_tc_type": 80,
             "col_analyzed": 70,
             "col_annotated": 70,
             "col_source_db": 120
@@ -2104,6 +2108,12 @@
             240,
             240
           ]
+        },
+        "tc_type": {
+          "bullet_max_seconds": 180,
+          "blitz_max_seconds": 600,
+          "rapid_max_seconds": 3600,
+          "string_map": {}
         }
       },
       "status": {

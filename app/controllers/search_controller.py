@@ -160,7 +160,7 @@ class SearchController:
         Returns:
             DatabaseModel populated with search results.
         """
-        search_results_model = DatabaseModel()
+        search_results_model = DatabaseModel(config=self.config)
         
         for game, db_name in matching_results:
             # Create a copy of the game with source database info
@@ -177,6 +177,7 @@ class SearchController:
                 site=game.site,
                 white_elo=game.white_elo,
                 black_elo=game.black_elo,
+                time_control=getattr(game, "time_control", ""),
                 analyzed=game.analyzed,
                 annotated=getattr(game, "annotated", False),
                 source_database=db_name,

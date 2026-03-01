@@ -41,6 +41,7 @@ def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, ga
             site="",
             white_elo="",
             black_elo="",
+            time_control="",
             analyzed=True,
             annotated=False,
             file_position=0

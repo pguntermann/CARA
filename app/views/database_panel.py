@@ -305,6 +305,8 @@ class DatabasePanel(QWidget):
             widths_config.get('col_site', 150),
             widths_config.get('col_moves', 65),
             widths_config.get('col_eco', 65),
+            widths_config.get('col_time_control', 80),
+            widths_config.get('col_tc_type', 70),
             widths_config.get('col_analyzed', 70),
             widths_config.get('col_annotated', 70),
             widths_config.get('col_source_db', 120),

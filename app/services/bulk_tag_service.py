@@ -81,6 +81,7 @@ def _process_game_for_add_tag(
             "Site": "site",
             "WhiteElo": "white_elo",
             "BlackElo": "black_elo",
+            "TimeControl": "time_control",
         }
         
         field_value = new_value if tag_name in tag_to_field_mapping else None
@@ -223,6 +224,7 @@ class BulkTagService:
                 "Site": "site",
                 "WhiteElo": "white_elo",
                 "BlackElo": "black_elo",
+                "TimeControl": "time_control",
             }
             
             for future in as_completed(future_to_game):
@@ -355,6 +357,7 @@ class BulkTagService:
                 "Site": "site",
                 "WhiteElo": "white_elo",
                 "BlackElo": "black_elo",
+                "TimeControl": "time_control",
             }
             
             for future in as_completed(future_to_game):

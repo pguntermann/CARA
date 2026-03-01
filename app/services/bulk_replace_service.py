@@ -73,6 +73,7 @@ def _process_game_for_replace_multiple_tags(
             "Site": "site",
             "WhiteElo": "white_elo",
             "BlackElo": "black_elo",
+            "TimeControl": "time_control",
         }
         
         # Process each tag
@@ -222,6 +223,7 @@ def _process_game_for_replace_tag(
                     "Site": "site",
                     "WhiteElo": "white_elo",
                     "BlackElo": "black_elo",
+                    "TimeControl": "time_control",
                 }
                 
                 field_value = new_value if tag_name in tag_to_field_mapping else None
@@ -278,6 +280,7 @@ def _process_game_for_copy_multiple_tags(
             "Site": "site",
             "WhiteElo": "white_elo",
             "BlackElo": "black_elo",
+            "TimeControl": "time_control",
         }
         
         # Process each target tag
@@ -350,6 +353,11 @@ def _process_game_for_copy_tag(
                 "Result": "result",
                 "Date": "date",
                 "ECO": "eco",
+                "Event": "event",
+                "Site": "site",
+                "WhiteElo": "white_elo",
+                "BlackElo": "black_elo",
+                "TimeControl": "time_control",
             }
             
             field_value = source_value if target_tag in tag_to_field_mapping else None
@@ -478,6 +486,7 @@ class BulkReplaceService:
                 "Site": "site",
                 "WhiteElo": "white_elo",
                 "BlackElo": "black_elo",
+                "TimeControl": "time_control",
             }
             
             for future in as_completed(future_to_game):
@@ -523,9 +532,9 @@ class BulkReplaceService:
         if updated_games:
             database.batch_update_games(updated_games)
         
-        # Log bulk replace operation (replace_metadata_tags)
+        # Log bulk replace operation (replace_metadata_tag)
         logging_service = LoggingService.get_instance()
-        tags_str = ", ".join(tag_names) if tag_names else "none"
+        tags_str = tag_name
         logging_service.info(f"Bulk replace operation completed: tags=[{tags_str}], pattern={find_text[:50] if find_text else 'overwrite_all'}, games_processed={total_games}, games_updated={games_updated}, games_failed={games_failed}")
         
         return BulkReplaceResult(
@@ -654,6 +663,7 @@ class BulkReplaceService:
                 "Site": "site",
                 "WhiteElo": "white_elo",
                 "BlackElo": "black_elo",
+                "TimeControl": "time_control",
             }
             
             for future in as_completed(future_to_game):
@@ -788,6 +798,11 @@ class BulkReplaceService:
                 "Result": "result",
                 "Date": "date",
                 "ECO": "eco",
+                "Event": "event",
+                "Site": "site",
+                "WhiteElo": "white_elo",
+                "BlackElo": "black_elo",
+                "TimeControl": "time_control",
             }
             
             for future in as_completed(future_to_game):
@@ -937,6 +952,7 @@ class BulkReplaceService:
                 "Site": "site",
                 "WhiteElo": "white_elo",
                 "BlackElo": "black_elo",
+                "TimeControl": "time_control",
             }
             
             for future in as_completed(future_to_game):

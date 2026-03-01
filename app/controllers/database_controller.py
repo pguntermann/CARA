@@ -126,7 +126,7 @@ class DatabaseController:
         self.config = config
         
         # Initialize database model (clipboard database)
-        self.database_model = DatabaseModel()
+        self.database_model = DatabaseModel(config=self.config)
         
         # Initialize database panel model
         self.panel_model = DatabasePanelModel()
@@ -240,6 +240,7 @@ class DatabaseController:
                 site=game_dict.get("site", ""),
                 white_elo=game_dict.get("white_elo", ""),
                 black_elo=game_dict.get("black_elo", ""),
+                time_control=game_dict.get("time_control", ""),
                 analyzed=game_dict.get("analyzed", False),
                 annotated=game_dict.get("annotated", False),
                 file_position=0,  # Pasted games don't have file position
@@ -410,7 +411,7 @@ class DatabaseController:
             The new DatabaseModel instance.
         """
         # Create new model with file path
-        model = DatabaseModel(file_path=file_path)
+        model = DatabaseModel(file_path=file_path, config=self.config)
         # Use batch addition for better performance
         # Don't mark as unsaved when loading from file (games are already saved)
         model.add_games_batch(games, mark_unsaved=False, tags_list=tags_list)
@@ -744,6 +745,7 @@ class DatabaseController:
                     site=game_dict.get("site", ""),
                     white_elo=game_dict.get("white_elo", ""),
                     black_elo=game_dict.get("black_elo", ""),
+                    time_control=game_dict.get("time_control", ""),
                     analyzed=game_dict.get("analyzed", False),
                     annotated=game_dict.get("annotated", False),
                     file_position=file_pos,  # Store original file position (1-based)
@@ -984,6 +986,7 @@ class DatabaseController:
                         site=game_dict.get("site", ""),
                         white_elo=game_dict.get("white_elo", ""),
                         black_elo=game_dict.get("black_elo", ""),
+                        time_control=game_dict.get("time_control", ""),
                         analyzed=game_dict.get("analyzed", False),
                         annotated=game_dict.get("annotated", False),
                         file_position=file_pos,
@@ -1121,6 +1124,7 @@ class DatabaseController:
                     site=game_dict.get("site", ""),
                     white_elo=game_dict.get("white_elo", ""),
                     black_elo=game_dict.get("black_elo", ""),
+                    time_control=game_dict.get("time_control", ""),
                     analyzed=game_dict.get("analyzed", False),
                     annotated=game_dict.get("annotated", False),
                     file_position=file_pos,  # Store original file position (1-based)
@@ -1230,7 +1234,7 @@ class DatabaseController:
             self.panel_model.mark_database_saved(model)
             
             # Create a new database model with copied data
-            new_model = DatabaseModel(file_path=file_path)
+            new_model = DatabaseModel(file_path=file_path, config=self.config)
             
             # Copy all games from the original model to the new model
             # Set file_position based on their order in the newly saved file (1-based)
@@ -1249,6 +1253,7 @@ class DatabaseController:
                     site=game.site,
                     white_elo=game.white_elo,
                     black_elo=game.black_elo,
+                    time_control=getattr(game, "time_control", ""),
                     analyzed=game.analyzed,
                     annotated=getattr(game, "annotated", False),
                     file_position=file_pos,  # Set file position based on order in new file

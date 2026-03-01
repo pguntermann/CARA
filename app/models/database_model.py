@@ -6,6 +6,8 @@ from typing import Optional, List, Dict, Any, Set, Tuple
 from datetime import datetime
 from collections import Counter
 
+from app.utils.time_control_utils import get_tc_type
+
 
 class GameData:
     """Represents a single game's data."""
@@ -23,6 +25,7 @@ class GameData:
                  site: str = "",
                  white_elo: str = "",
                  black_elo: str = "",
+                 time_control: str = "",
                  analyzed: bool = False,
                  annotated: bool = False,
                  source_database: str = "",
@@ -42,7 +45,8 @@ class GameData:
             site: Site name (PGN tag [Site]).
             white_elo: White player Elo rating (PGN tag [WhiteElo]).
             black_elo: Black player Elo rating (PGN tag [BlackElo]).
-                analyzed: Whether the game has been analyzed (has CARAAnalysisData tag).
+            time_control: Time control (PGN tag [TimeControl]).
+            analyzed: Whether the game has been analyzed (has CARAAnalysisData tag).
                 annotated: Whether the game has saved annotations (has CARAAnnotations tag).
             source_database: Name of the database this game came from (for search results).
             file_position: Original position of game in file (1-based, 0 if not from file).
@@ -59,6 +63,7 @@ class GameData:
         self.site = site
         self.white_elo = white_elo
         self.black_elo = black_elo
+        self.time_control = time_control
         self.analyzed = analyzed
         self.annotated = annotated
         self.source_database = source_database
@@ -87,16 +92,19 @@ class DatabaseModel(QAbstractTableModel):
     COL_SITE = 10
     COL_MOVES = 11
     COL_ECO = 12
-    COL_ANALYZED = 13
-    COL_ANNOTATED = 14
-    COL_SOURCE_DB = 15
-    COL_PGN = 16
+    COL_TIMECONTROL = 13
+    COL_TC_TYPE = 14
+    COL_ANALYZED = 15
+    COL_ANNOTATED = 16
+    COL_SOURCE_DB = 17
+    COL_PGN = 18
     
-    def __init__(self, file_path: Optional[str] = None) -> None:
+    def __init__(self, file_path: Optional[str] = None, config: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the database model.
         
         Args:
             file_path: Optional file path for file-based databases. None for clipboard database.
+            config: Optional config dict for TC Type mapping thresholds (e.g. tc_type under ui.panels.database).
         """
         super().__init__()
         self._games: List[GameData] = []
@@ -104,6 +112,7 @@ class DatabaseModel(QAbstractTableModel):
         self._unsaved_icon: Optional[QIcon] = None  # Cached icon for unsaved indicator
         self._unique_tags: Set[str] = set()  # Cache of unique tag names found in games
         self.file_path: Optional[str] = file_path  # File path for file-based databases, None for clipboard
+        self._config: Dict[str, Any] = config or {}
     
     def rowCount(self, parent=None) -> int:
         """Get number of rows in the model.
@@ -123,9 +132,9 @@ class DatabaseModel(QAbstractTableModel):
             parent: Parent index (unused for table models).
             
         Returns:
-            Number of columns (17: #, # in File, ●, White, Black, WhiteElo, BlackElo, Result, Date, Event, Site, Moves, ECO, Analyzed, Annotated, Source DB, PGN).
+            Number of columns (19: includes TimeControl, TC Type).
         """
-        return 17
+        return 19
     
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         """Get item flags for the given index.
@@ -207,6 +216,11 @@ class DatabaseModel(QAbstractTableModel):
             return game.moves
         elif col == self.COL_ECO:
             return game.eco
+        elif col == self.COL_TIMECONTROL:
+            return getattr(game, "time_control", "") or ""
+        elif col == self.COL_TC_TYPE:
+            tc = getattr(game, "time_control", "") or ""
+            return get_tc_type(tc, (self._config.get("ui") or {}).get("panels", {}).get("database", {}).get("tc_type"))
         elif col == self.COL_ANALYZED:
             return "✓" if game.analyzed else ""
         elif col == self.COL_ANNOTATED:
@@ -234,7 +248,7 @@ class DatabaseModel(QAbstractTableModel):
             return None
         
         if orientation == Qt.Orientation.Horizontal:
-            headers = ["#", "# in File", "●", "White", "Black", "WhiteElo", "BlackElo", "Result", "Date", "Event", "Site", "Moves", "ECO", "Analyzed", "Annotated", "Source DB", "PGN"]
+            headers = ["#", "# in File", "●", "White", "Black", "WhiteElo", "BlackElo", "Result", "Date", "Event", "Site", "Moves", "ECO", "TimeControl", "TC Type", "Analyzed", "Annotated", "Source DB", "PGN"]
             if 0 <= section < len(headers):
                 return headers[section]
         
@@ -789,9 +803,11 @@ class DatabaseModel(QAbstractTableModel):
                 return game.moves
             elif column == self.COL_ECO:
                 return game.eco or ""
-            elif column == self.COL_ANALYZED:
-                # Sort by boolean: False (not analyzed) comes before True (analyzed)
-                return game.analyzed
+            elif column == self.COL_TIMECONTROL:
+                return getattr(game, "time_control", "") or ""
+            elif column == self.COL_TC_TYPE:
+                tc = getattr(game, "time_control", "") or ""
+                return get_tc_type(tc, (self._config.get("ui") or {}).get("panels", {}).get("database", {}).get("tc_type"))
             elif column == self.COL_ANALYZED:
                 return game.analyzed
             elif column == self.COL_ANNOTATED:
