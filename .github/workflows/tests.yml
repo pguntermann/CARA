@@ -24,7 +24,7 @@ jobs:
       - name: Install Qt/EGL system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libegl1 libxkbcommon0 libxcb-xinerama0 libxcb-cursor0 libgl1-mesa-glx
+          sudo apt-get install -y libegl1 libxkbcommon0 libxcb-xinerama0 libxcb-cursor0 libgl1
 
       - name: Install dependencies
         run: |
