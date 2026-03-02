@@ -509,12 +509,16 @@ class DatabasePanel(QWidget):
         if file_num_col < column_count:
             tab_table.setColumnHidden(file_num_col, True)
         
-        # Hide Source DB column for non-search-results tabs
+        # Hide Source DB and Ref Ply columns for non-search-results tabs (only search results need them)
         if identifier != 'search_results':
             source_db_col = model.COL_SOURCE_DB
             if source_db_col < column_count:
                 tab_table.setColumnHidden(source_db_col, True)
-        
+            if hasattr(model, "COL_REF_PLY"):
+                ref_ply_col = model.COL_REF_PLY
+                if ref_ply_col < column_count:
+                    tab_table.setColumnHidden(ref_ply_col, True)
+
         # Apply styling
         self._configure_table_styling_for_table(tab_table)
         
@@ -929,6 +933,16 @@ class DatabasePanel(QWidget):
             kind = "TSV"
         # Omit "# in File" column (hidden in UI, duplicates "#" column)
         column_indices = [c for c in range(model.columnCount()) if c != model.COL_FILE_NUM]
+        # For non-search-results tabs, omit Source DB and Ref Ply (only relevant for search results)
+        tab_identifier = None
+        for _idx, tab_data in self._tab_models.items():
+            if tab_data.get("model") is model:
+                tab_identifier = tab_data.get("identifier")
+                break
+        if tab_identifier != "search_results":
+            column_indices = [c for c in column_indices if c != model.COL_SOURCE_DB]
+            if hasattr(model, "COL_REF_PLY"):
+                column_indices = [c for c in column_indices if c != model.COL_REF_PLY]
         if not column_indices:
             progress_service.set_status("No columns to copy")
             return

@@ -1931,7 +1931,7 @@ class DetailPlayerStatsView(QWidget):
             callback: Optional[Callable[[], None]],
         ) -> None:
             pct = (stats_count / total_moves * 100.0) if total_moves > 0 else 0.0
-            detail_text = f"{list_count} listed ({pct:.1f}% of your moves)"
+            detail_text = f"{list_count} listed ({pct:.1f}% of moves)"
             color = summary_colors.get(color_key, color_fallback)
             row_data = self._create_indicator_item_row(
                 title_text=title,
