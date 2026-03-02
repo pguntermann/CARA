@@ -43,7 +43,7 @@ Components identified as candidates for additional unit tests. Items 1–3 in th
 | 12 | **Database search (query building)** | `app/services/database_search_service.py` | | Building of search/filter criteria from UI state (date range, player, result, etc.) if done in service. Test criteria dict/object shape. |
 | 13 | **Bulk replace (pattern / replacement)** | `app/services/bulk_replace_service.py` | | Pattern matching and replacement logic for tag/value (e.g. regex, literal). Isolate from DB; test with sample game dicts or PGN snippets. |
 | 14 | **Deduplication service** | `app/services/deduplication_service.py` | | Duplicate detection (e.g. by position, moves, headers). Test with small game sets; no DB. |
-| 15 | **Moveslist/CSV export** | `app/utils/moveslist_export.py` | | `table_to_delimited`, `_quote_field` (delimiter, quoting). String/table-in, string-out. |
+| 15 | **Table CSV/TSV export** | `app/utils/table_export.py` | | `table_to_delimited`, `_quote_field` (delimiter, quoting). String/table-in, string-out. |
 | 16 | **Rule explanation / summary formatters** | `app/utils/rule_explanation_formatter.py`, `app/utils/summary_text_formatter.py` | | Formatting of rule explanations or summary text from structured data. Test with fixed inputs and expected strings. |
 | 17 | **Opening service (ECO/name lookup)** | `app/services/opening_service.py` | | Mapping position or move list to opening code/name if done in-process. Test with known positions or move sequences. |
 | 18 | **Error pattern service** | `app/services/error_pattern_service.py` | | Matching or classifying error messages/patterns. Test with sample messages and expected categories. |

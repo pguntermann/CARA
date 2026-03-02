@@ -1,12 +1,12 @@
 """Database-Panel below Main-Panel and Detail-Panel."""
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QTabWidget, QTableView, QMenu
+    QWidget, QVBoxLayout, QTabWidget, QTableView, QMenu, QApplication
 )
 from PyQt6.QtCore import QItemSelectionModel, QPoint
 from PyQt6.QtGui import QPalette, QColor, QPixmap, QPainter, QIcon, QBrush
 from PyQt6.QtCore import Qt, QModelIndex, QTimer, QSize, QRect
-from typing import Dict, Any, Optional, Callable, List
+from typing import Any, Callable, Dict, List, Optional
 from pathlib import Path
 import math
 import time
@@ -14,6 +14,7 @@ import time
 from app.models.database_model import DatabaseModel
 from app.models.database_panel_model import DatabasePanelModel
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.table_export import table_to_delimited, get_copy_table_config
 
 
 class DatabasePanel(QWidget):
@@ -24,7 +25,11 @@ class DatabasePanel(QWidget):
                  on_add_tab_clicked: Optional[Callable[[], None]] = None,
                  on_close_database: Optional[Callable[[str], None]] = None,
                  on_close_all_but_database: Optional[Callable[[str], None]] = None,
-                 on_close_search_results: Optional[Callable[[], None]] = None) -> None:
+                 on_close_search_results: Optional[Callable[[], None]] = None,
+                 on_copy_game: Optional[Callable[[Any], None]] = None,
+                 on_copy_selected_games: Optional[Callable[[DatabaseModel, List[int]], None]] = None,
+                 on_cut_selected_games: Optional[Callable[[DatabaseModel, List[int]], None]] = None,
+                 on_paste_games: Optional[Callable[[DatabaseModel], None]] = None) -> None:
         """Initialize the database panel.
 
         Args:
@@ -38,6 +43,10 @@ class DatabasePanel(QWidget):
             on_close_database: Optional callback(identifier) for closing a single database tab (e.g. from context menu).
             on_close_all_but_database: Optional callback(identifier) for closing all database tabs except the given one.
             on_close_search_results: Optional callback for closing the Search Results tab (e.g. from context menu).
+            on_copy_game: Optional callback(game) for Copy Game (game at right-clicked row).
+            on_copy_selected_games: Optional callback(model, selected_indices) for Copy selected Games.
+            on_cut_selected_games: Optional callback(model, selected_indices) for Cut selected Games.
+            on_paste_games: Optional callback(model) for Paste Game(s) into this database.
         """
         super().__init__()
         self.config = config
@@ -47,6 +56,10 @@ class DatabasePanel(QWidget):
         self._on_close_database = on_close_database
         self._on_close_all_but_database = on_close_all_but_database
         self._on_close_search_results = on_close_search_results
+        self._on_copy_game = on_copy_game
+        self._on_copy_selected_games = on_copy_selected_games
+        self._on_cut_selected_games = on_cut_selected_games
+        self._on_paste_games = on_paste_games
         # Map DatabaseModel instances to tab indices: {DatabaseModel: tab_index}
         self._model_to_tab: Dict[DatabaseModel, int] = {}
         # Track tabs and their models: {tab_index: {'model': DatabaseModel, 'file_path': str, 'table': QTableView, 'identifier': str}}
@@ -528,6 +541,12 @@ class DatabasePanel(QWidget):
         # Connect double-click signal
         tab_table.doubleClicked.connect(self._on_table_double_click)
         
+        # Context menu for "Select rows" actions
+        tab_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        tab_table.customContextMenuRequested.connect(
+            lambda pos, t=tab_table: self._on_table_context_menu(pos, t)
+        )
+        
         # Force table to update and show all columns
         tab_table.update()
         tab_table.viewport().update()
@@ -750,6 +769,185 @@ class DatabasePanel(QWidget):
         
         return row_indices
     
+    def _set_table_selection_to_rows(
+        self,
+        table: QTableView,
+        model: DatabaseModel,
+        row_indices: List[int],
+    ) -> None:
+        """Set the table selection to exactly the given row indices (model space). Replaces current selection."""
+        table.clearSelection()
+        if not row_indices:
+            return
+        selection_model = table.selectionModel()
+        if not selection_model:
+            return
+        for row_idx in row_indices:
+            if 0 <= row_idx < model.rowCount():
+                for col in range(model.columnCount()):
+                    index = model.index(row_idx, col)
+                    selection_model.select(
+                        index,
+                        QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows,
+                    )
+        first_col_index = model.index(row_indices[0], 0)
+        table.scrollTo(first_col_index, QTableView.ScrollHint.EnsureVisible)
+
+    def _on_table_context_menu(self, pos: QPoint, table: QTableView) -> None:
+        """Show context menu for the database table: Select rows (all, none, by value, empty, not empty)."""
+        tab_info = None
+        for _tab_index, info in self._tab_models.items():
+            if info.get("table") is table:
+                tab_info = info
+                break
+        if not tab_info:
+            return
+        model = tab_info.get("model")
+        if not model:
+            return
+
+        index = table.indexAt(pos)
+        has_cell = index.isValid() and 0 <= index.row() < model.rowCount() and 0 <= index.column() < model.columnCount()
+        cell_value = None
+        col_index = index.column() if has_cell else 0
+        if has_cell:
+            cell_value = model.data(index, Qt.ItemDataRole.DisplayRole)
+
+        select_rows_menu = QMenu("Select rows", self)
+        act_select_all = select_rows_menu.addAction("Select all rows")
+        act_unselect_all = select_rows_menu.addAction("Unselect all rows")
+        if has_cell:
+            select_rows_menu.addSeparator()
+            act_with_this = select_rows_menu.addAction("With this value")
+            act_with_not_this = select_rows_menu.addAction("With not this value")
+            act_with_empty = select_rows_menu.addAction("With empty value")
+            act_with_not_empty = select_rows_menu.addAction("With not empty value")
+
+        menu = QMenu(self)
+        menu.addMenu(select_rows_menu)
+        menu.addSeparator()
+        act_copy_csv = menu.addAction("Copy table as CSV")
+        act_copy_tsv = menu.addAction("Copy table as TSV")
+        act_copy_selected_csv = menu.addAction("Copy selected rows as CSV")
+        act_copy_selected_tsv = menu.addAction("Copy selected rows as TSV")
+        menu.addSeparator()
+        act_copy_game = menu.addAction("Copy Game") if self._on_copy_game and has_cell else None
+        act_copy_selected_games = menu.addAction("Copy selected Games") if self._on_copy_selected_games else None
+        act_cut_selected_games = menu.addAction("Cut selected Games") if self._on_cut_selected_games else None
+        act_paste_games = menu.addAction("Paste Game(s)") if self._on_paste_games else None
+
+        ui_config = self.config.get("ui", {})
+        panel_config = ui_config.get("panels", {}).get("database", {})
+        bg_color = panel_config.get("background_color", [35, 35, 40])
+        from app.views.style import StyleManager
+        StyleManager.style_context_menu(menu, self.config, bg_color)
+        StyleManager.style_context_menu(select_rows_menu, self.config, bg_color)
+
+        action = menu.exec(table.viewport().mapToGlobal(pos))
+        menu.close()
+        menu.hide()
+
+        if action is None:
+            return
+
+        from app.services.progress_service import ProgressService
+        progress_service = ProgressService.get_instance()
+
+        if action == act_select_all:
+            row_indices = model.get_row_indices_matching_column_value(col_index, "all")
+            self._set_table_selection_to_rows(table, model, row_indices)
+            n = len(row_indices)
+            progress_service.set_status(f"Selected all {n} row{'s' if n != 1 else ''}" if n else "No rows in database")
+        elif action == act_unselect_all:
+            self._set_table_selection_to_rows(table, model, [])
+            progress_service.set_status("Unselected all rows")
+        elif has_cell and action == act_with_this:
+            row_indices = model.get_row_indices_matching_column_value(col_index, "equals", cell_value)
+            self._set_table_selection_to_rows(table, model, row_indices)
+            n = len(row_indices)
+            progress_service.set_status(f"Selected {n} row{'s' if n != 1 else ''} with this value")
+        elif has_cell and action == act_with_not_this:
+            row_indices = model.get_row_indices_matching_column_value(col_index, "not_equals", cell_value)
+            self._set_table_selection_to_rows(table, model, row_indices)
+            n = len(row_indices)
+            progress_service.set_status(f"Selected {n} row{'s' if n != 1 else ''} with other values")
+        elif has_cell and action == act_with_empty:
+            row_indices = model.get_row_indices_matching_column_value(col_index, "empty")
+            self._set_table_selection_to_rows(table, model, row_indices)
+            n = len(row_indices)
+            progress_service.set_status(f"Selected {n} row{'s' if n != 1 else ''} with empty value")
+        elif has_cell and action == act_with_not_empty:
+            row_indices = model.get_row_indices_matching_column_value(col_index, "not_empty")
+            self._set_table_selection_to_rows(table, model, row_indices)
+            n = len(row_indices)
+            progress_service.set_status(f"Selected {n} row{'s' if n != 1 else ''} with non-empty value")
+        elif action in (act_copy_csv, act_copy_tsv):
+            self._copy_database_table_as_delimited(table, model, action, act_copy_csv, act_copy_tsv, progress_service)
+        elif action in (act_copy_selected_csv, act_copy_selected_tsv):
+            selected = sorted(set(idx.row() for idx in table.selectionModel().selectedRows()))
+            if not selected:
+                progress_service.set_status("No rows selected")
+                return
+            self._copy_database_table_as_delimited(
+                table, model, action, act_copy_selected_csv, act_copy_selected_tsv, progress_service, row_indices=selected
+            )
+        elif act_copy_game and action == act_copy_game and self._on_copy_game:
+            game = model.get_game(index.row()) if has_cell else None
+            self._on_copy_game(game)
+        elif act_copy_selected_games and action == act_copy_selected_games and self._on_copy_selected_games:
+            selected = sorted(set(idx.row() for idx in table.selectionModel().selectedRows()))
+            self._on_copy_selected_games(model, selected)
+        elif act_cut_selected_games and action == act_cut_selected_games and self._on_cut_selected_games:
+            selected = sorted(set(idx.row() for idx in table.selectionModel().selectedRows()))
+            self._on_cut_selected_games(model, selected)
+        elif act_paste_games and action == act_paste_games and self._on_paste_games:
+            self._on_paste_games(model)
+
+    def _copy_database_table_as_delimited(
+        self,
+        table: QTableView,
+        model: DatabaseModel,
+        action: Any,
+        act_copy_csv: Any,
+        act_copy_tsv: Any,
+        progress_service: Any,
+        row_indices: Optional[List[int]] = None,
+    ) -> None:
+        """Copy database table (or selected rows) to clipboard as CSV or TSV. Uses all columns (no visual/all distinction)."""
+        copy_cfg = get_copy_table_config(self.config)
+        if action == act_copy_csv:
+            cfg = copy_cfg["csv"]
+            kind = "CSV"
+        else:
+            cfg = copy_cfg["tsv"]
+            kind = "TSV"
+        # Omit "# in File" column (hidden in UI, duplicates "#" column)
+        column_indices = [c for c in range(model.columnCount()) if c != model.COL_FILE_NUM]
+        if not column_indices:
+            progress_service.set_status("No columns to copy")
+            return
+        # Export "●" column as "●" or "" by row unsaved state; cell DisplayRole stays "" so UI shows only icon
+        def cell_value_override(row: int, col: int, m: DatabaseModel) -> Optional[str]:
+            if col == m.COL_UNSAVED:
+                return "●" if m.is_row_unsaved(row) else ""
+            return None
+
+        text = table_to_delimited(
+            model,
+            column_indices,
+            cfg["delimiter"],
+            cfg["use_escaping"],
+            always_quote_values=cfg["always_quote_values"],
+            cell_value_override=cell_value_override,
+            row_indices=row_indices,
+        )
+        QApplication.clipboard().setText(text)
+        if row_indices is not None:
+            n = len(row_indices)
+            progress_service.set_status(f"Copied {n} row{'s' if n != 1 else ''} as {kind} to clipboard")
+        else:
+            progress_service.set_status(f"Copied table as {kind} to clipboard")
+
     def highlight_row(self, database: DatabaseModel, row_index: int) -> None:
         """Highlight a specific row in a specific database's table.
         
@@ -805,22 +1003,7 @@ class DatabasePanel(QWidget):
         if not updated_indices:
             return
         
-        # Clear existing selection
-        table.clearSelection()
-        
-        # Select all highlighted rows
-        selection_model = table.selectionModel()
-        if selection_model:
-            for row_idx in updated_indices:
-                # Select entire row
-                for col in range(model.columnCount()):
-                    index = model.index(row_idx, col)
-                    selection_model.select(index, QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows)
-        
-        # Scroll to the first highlighted row
-        if updated_indices:
-            first_col_index = model.index(updated_indices[0], 0)
-            table.scrollTo(first_col_index, QTableView.ScrollHint.EnsureVisible)
+        self._set_table_selection_to_rows(table, model, updated_indices)
     
     def update_tab_file_path(self, tab_index: int, file_path: str) -> None:
         """Update the file path for a specific tab.

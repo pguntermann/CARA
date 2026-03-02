@@ -2632,6 +2632,10 @@ class MainWindow(QMainWindow):
             on_close_database=database_controller.close_database_by_identifier,
             on_close_all_but_database=database_controller.close_all_pgn_databases_except,
             on_close_search_results=self._close_search_results_tab,
+            on_copy_game=self._on_context_copy_game,
+            on_copy_selected_games=self._on_context_copy_selected_games,
+            on_cut_selected_games=self._on_context_cut_selected_games,
+            on_paste_games=self._on_context_paste_games,
         )
         
         
@@ -2953,6 +2957,41 @@ class MainWindow(QMainWindow):
                     self.database_panel.highlight_rows(active_database, pasted_indices)
         
         # Display status message
+        self.controller.set_status(message)
+
+    def _on_context_copy_game(self, game: Any) -> None:
+        """Context menu: copy PGN of the game at the right-clicked row."""
+        success, message = self.controller.copy_game_pgn_to_clipboard(game)
+        self.controller.set_status(message)
+
+    def _on_context_copy_selected_games(self, database_model: Any, selected_indices: List[int]) -> None:
+        """Context menu: copy selected games from the table that was right-clicked."""
+        if not hasattr(self, "database_panel"):
+            self.controller.set_status("No database panel available")
+            return
+        success, message = self.controller.copy_selected_games_to_clipboard(
+            self.database_panel, database_model=database_model, selected_indices=selected_indices
+        )
+        self.controller.set_status(message)
+
+    def _on_context_cut_selected_games(self, database_model: Any, selected_indices: List[int]) -> None:
+        """Context menu: cut selected games from the table that was right-clicked."""
+        if not hasattr(self, "database_panel"):
+            self.controller.set_status("No database panel available")
+            return
+        success, message = self.controller.cut_selected_games_to_clipboard(
+            self.database_panel, database_model=database_model, selected_indices=selected_indices
+        )
+        self.controller.set_status(message)
+
+    def _on_context_paste_games(self, database_model: Any) -> None:
+        """Context menu: paste PGN into the database tab that was right-clicked."""
+        success, message, first_game_index, games_added = self.controller.paste_pgn_to_database(database_model)
+        if success and first_game_index is not None and games_added > 0:
+            database_controller = self.controller.get_database_controller()
+            database_controller.set_active_database(database_model)
+            pasted_indices = list(range(first_game_index, first_game_index + games_added))
+            self.database_panel.highlight_rows(database_model, pasted_indices)
         self.controller.set_status(message)
     
     def _paste_fen_to_board(self) -> None:

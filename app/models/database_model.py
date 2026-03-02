@@ -170,7 +170,7 @@ class DatabaseModel(QAbstractTableModel):
         
         game = self._games[row]
         
-        # Handle unsaved column with DecorationRole for icon (second column)
+        # Handle unsaved column: icon in UI (DecorationRole), text for export/copy (DisplayRole)
         if col == self.COL_UNSAVED:
             if role == Qt.ItemDataRole.DecorationRole:
                 # Return icon if game has unsaved changes, None otherwise
@@ -180,7 +180,7 @@ class DatabaseModel(QAbstractTableModel):
                     return self._unsaved_icon
                 return None
             elif role == Qt.ItemDataRole.DisplayRole:
-                # Return empty string for text display
+                # Empty so the cell shows only the icon (DecorationRole); export uses is_row_unsaved() instead
                 return ""
             elif role == Qt.ItemDataRole.TextAlignmentRole:
                 # Center align the icon
@@ -460,16 +460,94 @@ class DatabaseModel(QAbstractTableModel):
     
     def get_game(self, row: int) -> Optional[GameData]:
         """Get game data at a specific row.
-        
+
         Args:
             row: Row index.
-            
+
         Returns:
             GameData instance or None if row is invalid.
         """
         if 0 <= row < len(self._games):
             return self._games[row]
         return None
+
+    def is_row_unsaved(self, row: int) -> bool:
+        """Return whether the game at the given row has unsaved changes.
+
+        Used by export so the "●" column can be exported as "●" or "" without
+        putting text in the cell (which would show next to the icon in the UI).
+
+        Args:
+            row: Row index.
+
+        Returns:
+            True if the game has unsaved changes, False otherwise.
+        """
+        if 0 <= row < len(self._games):
+            return self._games[row] in self._unsaved_games
+        return False
+
+    def get_row_indices_matching_column_value(
+        self,
+        column_index: int,
+        criterion: str,
+        reference_value: Any = None,
+    ) -> List[int]:
+        """Get row indices where the column value matches the given criterion.
+
+        Uses the same value and empty semantics as data(DisplayRole). No Qt or view dependency.
+
+        Args:
+            column_index: Model column index.
+            criterion: One of "all", "none", "equals", "not_equals", "empty", "not_empty".
+            reference_value: For "equals" and "not_equals", the value to compare against.
+                Normalized for comparison (e.g. str for display consistency).
+
+        Returns:
+            List of row indices (model space) matching the criterion.
+        """
+        n = len(self._games)
+        if n == 0:
+            return []
+
+        if criterion == "all":
+            return list(range(n))
+        if criterion == "none":
+            return []
+
+        def cell_value(r: int) -> Any:
+            idx = self.index(r, column_index)
+            return self.data(idx, Qt.ItemDataRole.DisplayRole)
+
+        def is_empty(val: Any) -> bool:
+            if val is None:
+                return True
+            if isinstance(val, str):
+                return val.strip() == ""
+            return False
+
+        ref_normalized = reference_value
+        if ref_normalized is not None and not isinstance(ref_normalized, str):
+            ref_normalized = str(ref_normalized)
+
+        result: List[int] = []
+        for row in range(n):
+            val = cell_value(row)
+            if criterion == "equals":
+                v_str = str(val).strip() if val is not None else ""
+                if ref_normalized is not None and v_str == ref_normalized.strip():
+                    result.append(row)
+            elif criterion == "not_equals":
+                v_str = str(val).strip() if val is not None else ""
+                if ref_normalized is not None and v_str != ref_normalized.strip():
+                    result.append(row)
+            elif criterion == "empty":
+                if is_empty(val):
+                    result.append(row)
+            elif criterion == "not_empty":
+                if not is_empty(val):
+                    result.append(row)
+        return result
     
     def get_all_games(self) -> List[GameData]:
         """Get all games in the model.

@@ -5,7 +5,7 @@ from PyQt6.QtCore import Qt, QModelIndex, QTimer, QPoint
 from PyQt6.QtGui import QPalette, QColor, QBrush
 from typing import Dict, Any, Optional, List
 
-from app.utils.moveslist_export import table_to_delimited
+from app.utils.table_export import table_to_delimited, get_visual_column_indices, get_copy_table_config
 
 from app.models.moveslist_model import MovesListModel
 from app.models.game_model import GameModel
@@ -377,33 +377,11 @@ class DetailMovesListView(QWidget):
         """Return model column indices in current visual order (visible columns only)."""
         if not self._moveslist_model:
             return []
-        header = self.moves_table.horizontalHeader()
-        indices: List[int] = []
-        for visual in range(header.count()):
-            logical = header.logicalIndex(visual)
-            if logical >= 0 and not header.isSectionHidden(logical):
-                indices.append(logical)
-        return indices
+        return get_visual_column_indices(self.moves_table.horizontalHeader())
 
     def _get_copy_table_config(self) -> Dict[str, Any]:
         """Return copy_table config (csv/tsv delimiter, use_escaping, always_quote_values) from config with defaults."""
-        ui = self.config.get("ui", {})
-        moveslist = ui.get("panels", {}).get("detail", {}).get("moveslist", {})
-        copy_table = moveslist.get("copy_table", {})
-        csv_cfg = copy_table.get("csv", {})
-        tsv_cfg = copy_table.get("tsv", {})
-        return {
-            "csv": {
-                "delimiter": csv_cfg.get("delimiter", ","),
-                "use_escaping": csv_cfg.get("use_escaping", True),
-                "always_quote_values": csv_cfg.get("always_quote_values", False),
-            },
-            "tsv": {
-                "delimiter": tsv_cfg.get("delimiter", "\t"),
-                "use_escaping": tsv_cfg.get("use_escaping", False),
-                "always_quote_values": tsv_cfg.get("always_quote_values", False),
-            },
-        }
+        return get_copy_table_config(self.config)
 
     def _copy_table_csv_visual(self) -> None:
         cfg = self._get_copy_table_config()["csv"]
