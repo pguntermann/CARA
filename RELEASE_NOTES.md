@@ -1,5 +1,32 @@
 # Release Notes
 
+# CARA v2.6.1 - Significant Moves, Database Context Menu and Fixes
+
+**Release Date:** 02.03.2026
+
+This release adds a **new Significant Moves** section to the Player Stats view (Brilliant, Misses, Blunders). The section opens a Search Results tab listing those moves; opening a game from the list then navigates to the corresponding move. It adds a **right-click context menu on the database table** with row selection, CSV/TSV export, and copy/cut/paste games, and introduces a **TimeControl column and derived TC Type column** in the database view, as well as TimeControl/TC Type filters in the search dialog. It also includes aggregation and display fixes for player stats, a **UCI and logging fix**, and **CI/test improvements**.
+
+## New Features
+
+- **Player Stats – Significant Moves:** New section with three rows: **Brilliant Moves**, **Misses**, and **Blunders**. Each shows count and percentage of moves and a "View N →" button that opens a Search Results tab listing those games with a reference to the specific move. When you open a game from that list, the game opens at the corresponding move so the brilliant move, miss, or blunder is shown directly. Configurable via `significant_moves.brilliant_moves.max_moves`, `misses.max_moves`, and `blunders.max_moves` in config.
+- **Database view – context menu (row selection):** Right-click on the database table: **Select rows** submenu (With this value, With not this value, With empty value, With not empty value), **Select all rows**, **Unselect all rows**.
+- **Database view – context menu (export):** **Copy table as CSV/TSV** and **Copy selected rows as CSV/TSV**. Line breaks are normalized so each game becomes a single line, and CSV/TSV export behavior (delimiter, escaping, and quoting) is configurable via the existing `ui.panels.detail.moveslist.copy_table` settings in `config.json` (shared between the moves list and database table).
+- **Database view – context menu (games):** **Copy Game** (PGN of the row under the cursor), **Copy selected Games**, **Cut selected Games**, **Paste Game(s)** (into the table where the menu was opened).
+- **TimeControl in database and search:** TimeControl column and derived TC Type category in the database view. The mapping from raw time control strings (e.g. `5+3`, `15+10`, `90+30`) to higher-level TC Types (blitz/rapid/classical, etc.) is configurable via `time_control_categories` in `config.json`. TimeControl and TC Type are also available as search options in the search dialog.
+
+## Bug Fixes
+
+- **Player Stats – calculations:** Fixed several aggregation and percentage calculation issues in the Player Stats view.
+- **UCI Communication Layer:** Fix for engines that send empty lines between UCI responses.
+- **Logging service:** Fixed issue with closing handlers.
+- **Player Stats view:** Fixed crash during bulk analysis when a deferred layout update ran after the stats content had been rebuilt.
+
+## Refactoring and Technical Improvements
+
+- **Tests and CI:** Unit test suite refactored to `unittest`; additional test cases (time control utils, date matcher, material tracker) and planned test cases document. GitHub Actions run tests on the development branch.
+
+---
+
 # CARA v2.6.0 - Player Stats, UX Improvement and separate Brilliancy Engine task
 
 **Release Date:** 28.02.2026
