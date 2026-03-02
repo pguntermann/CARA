@@ -4,6 +4,10 @@ This test suite validates that combining filter_pgn_for_display (show/hide)
 with permanent removal operations works correctly and preserves move parsing.
 """
 
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 import unittest
 import re
 import chess.pgn

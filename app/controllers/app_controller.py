@@ -1,7 +1,7 @@
 """Central application controller for orchestrating business logic."""
 
 from io import StringIO
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple
 
 from app.models.progress_model import ProgressModel
 from app.services.progress_service import ProgressService
@@ -404,11 +404,50 @@ class AppController:
         status_message = f"PGN copied to clipboard ({active_game.white} vs {active_game.black})"
         return (True, status_message)
     
-    def copy_selected_games_to_clipboard(self, database_panel) -> tuple[bool, str]:
-        """Copy PGN of selected games in active database to clipboard.
+    def copy_game_pgn_to_clipboard(self, game: Any) -> Tuple[bool, str]:
+        """Copy a single game's PGN to clipboard (e.g. game at right-clicked row).
         
         Args:
-            database_panel: DatabasePanel instance to get selected games from.
+            game: GameData instance with .pgn, .white, .black.
+            
+        Returns:
+            Tuple of (success: bool, status_message: str).
+        """
+        from PyQt6.QtWidgets import QApplication
+        from pathlib import Path
+        from app.services.logging_service import LoggingService
+        
+        if game is None:
+            return (False, "No game to copy")
+        pgn = getattr(game, "pgn", None)
+        if not pgn:
+            return (False, "No PGN data in game")
+        clipboard = QApplication.clipboard()
+        clipboard.setText(pgn)
+        white = getattr(game, "white", "?")
+        black = getattr(game, "black", "?")
+        panel_model = self.database_controller.get_panel_model()
+        source_db_name = "unknown"
+        for identifier, db_info in panel_model.get_all_databases().items():
+            if hasattr(db_info.model, "_games") and game in db_info.model._games:
+                source_db_name = "Clipboard" if identifier == "clipboard" else Path(identifier).stem
+                break
+        logging_service = LoggingService.get_instance()
+        logging_service.debug(f"PGN copied: source_db={source_db_name}, games_count=1")
+        return (True, f"PGN copied to clipboard ({white} vs {black})")
+    
+    def copy_selected_games_to_clipboard(
+        self,
+        database_panel: Any,
+        database_model: Optional[Any] = None,
+        selected_indices: Optional[List[int]] = None,
+    ) -> Tuple[bool, str]:
+        """Copy PGN of selected games to clipboard.
+        
+        Args:
+            database_panel: DatabasePanel instance (used when database_model/selected_indices not provided).
+            database_model: Optional; when provided with selected_indices, use this DB and selection (e.g. from context menu).
+            selected_indices: Optional; when provided with database_model, use these row indices.
             
         Returns:
             Tuple of (success: bool, status_message: str).
@@ -419,31 +458,35 @@ class AppController:
         from pathlib import Path
         from app.services.logging_service import LoggingService
         
-        # Get active database info
-        active_info = database_panel.get_active_database_info()
-        if not active_info:
-            return (False, "No active database")
+        if database_model is not None and selected_indices is not None:
+            # Context menu: use provided database and selection
+            model = database_model
+            indices = selected_indices
+            panel_model = self.database_controller.get_panel_model()
+            identifier = panel_model.find_database_by_model(model) if panel_model else "unknown"
+        else:
+            # Edit menu: use active database and its selection
+            active_info = database_panel.get_active_database_info()
+            if not active_info:
+                return (False, "No active database")
+            model = active_info.get('model')
+            if not model:
+                return (False, "No active database")
+            identifier = active_info.get('identifier', 'unknown')
+            indices = database_panel.get_selected_game_indices()
         
-        database_model = active_info.get('model')
-        if not database_model:
-            return (False, "No active database")
-        
-        # Get database name for debug logging
-        identifier = active_info.get('identifier', 'unknown')
         if identifier == "clipboard":
             source_db_name = "Clipboard"
         else:
             source_db_name = Path(identifier).stem if identifier != 'unknown' else "unknown"
         
-        # Get selected game indices
-        selected_indices = database_panel.get_selected_game_indices()
-        if not selected_indices:
+        if not indices:
             return (False, "No games selected")
         
         # Get GameData objects for selected games
         games = []
-        for idx in selected_indices:
-            game = database_model.get_game(idx)
+        for idx in indices:
+            game = model.get_game(idx)
             if game:
                 games.append(game)
         
@@ -477,46 +520,53 @@ class AppController:
         status_message = f"Copied {game_count} game(s) to clipboard"
         return (True, status_message)
     
-    def cut_selected_games_to_clipboard(self, database_panel) -> tuple[bool, str]:
-        """Cut PGN of selected games in active database to clipboard (copy and remove).
+    def cut_selected_games_to_clipboard(
+        self,
+        database_panel: Any,
+        database_model: Optional[Any] = None,
+        selected_indices: Optional[List[int]] = None,
+    ) -> Tuple[bool, str]:
+        """Cut PGN of selected games to clipboard (copy and remove).
         
         Args:
-            database_panel: DatabasePanel instance to get selected games from.
+            database_panel: DatabasePanel instance (used when database_model/selected_indices not provided).
+            database_model: Optional; when provided with selected_indices, use this DB and selection (e.g. from context menu).
+            selected_indices: Optional; when provided with database_model, use these row indices.
             
         Returns:
             Tuple of (success: bool, status_message: str).
-            If success is True, status_message indicates successful cut.
-            If success is False, status_message indicates error (no database, no selection, etc.).
         """
         from PyQt6.QtWidgets import QApplication
         from pathlib import Path
         from app.services.logging_service import LoggingService
         
-        # Get active database info
-        active_info = database_panel.get_active_database_info()
-        if not active_info:
-            return (False, "No active database")
+        if database_model is not None and selected_indices is not None:
+            model = database_model
+            indices = selected_indices
+            panel_model = self.database_controller.get_panel_model()
+            identifier = panel_model.find_database_by_model(model) if panel_model else "unknown"
+        else:
+            active_info = database_panel.get_active_database_info()
+            if not active_info:
+                return (False, "No active database")
+            model = active_info.get('model')
+            if not model:
+                return (False, "No active database")
+            identifier = active_info.get('identifier', 'unknown')
+            indices = database_panel.get_selected_game_indices()
         
-        database_model = active_info.get('model')
-        if not database_model:
-            return (False, "No active database")
-        
-        # Get database name for debug logging
-        identifier = active_info.get('identifier', 'unknown')
         if identifier == "clipboard":
             source_db_name = "Clipboard"
         else:
             source_db_name = Path(identifier).stem if identifier != 'unknown' else "unknown"
         
-        # Get selected game indices
-        selected_indices = database_panel.get_selected_game_indices()
-        if not selected_indices:
+        if not indices:
             return (False, "No games selected")
         
         # Get GameData objects for selected games
         games = []
-        for idx in selected_indices:
-            game = database_model.get_game(idx)
+        for idx in indices:
+            game = model.get_game(idx)
             if game:
                 games.append(game)
         
@@ -546,10 +596,10 @@ class AppController:
         active_game = game_model.active_game
         
         # Remove games from database
-        database_model.remove_games(games)
+        model.remove_games(games)
         
         # Mark database as unsaved
-        self.database_controller.mark_database_unsaved(database_model)
+        self.database_controller.mark_database_unsaved(model)
         
         # If active game was cut, clear it from game model
         if active_game and active_game in games:
@@ -1074,32 +1124,23 @@ class AppController:
         
         return (success, status_message, first_game_index, games_added)
     
-    def paste_pgn_to_active_database(self) -> tuple[bool, str, Optional[int], int]:
-        """Parse PGN from clipboard and add to the currently active database.
+    def paste_pgn_to_database(self, database_model: Any) -> Tuple[bool, str, Optional[int], int]:
+        """Parse PGN from clipboard and add to the given database.
         
-        This method reads PGN text from the clipboard, parses it, and
-        adds the games to the active database model. Returns the first
-        game index and count for highlighting.
+        Used by both Edit → Paste to active DB and context menu Paste (target = right-clicked DB).
         
+        Args:
+            database_model: DatabaseModel to paste into.
+            
         Returns:
             Tuple of (success: bool, status_message: str, first_game_index: Optional[int], games_added: int).
-            If success is True, status_message contains formatted success message,
-            first_game_index is the row index of the first game added, and games_added is the count.
-            If success is False, status_message contains formatted error message,
-            first_game_index is None, and games_added is 0.
         """
         from PyQt6.QtWidgets import QApplication
         from pathlib import Path
         from app.services.logging_service import LoggingService
         
-        # Get the currently active database
-        active_database = self.database_controller.get_active_database()
-        if active_database is None:
-            return (False, "No active database selected", None)
-        
-        # Get database name for debug logging
         panel_model = self.database_controller.get_panel_model()
-        identifier = panel_model.find_database_by_model(active_database)
+        identifier = panel_model.find_database_by_model(database_model) if panel_model else None
         if identifier == "clipboard":
             target_db_name = "Clipboard"
         elif identifier:
@@ -1107,32 +1148,34 @@ class AppController:
         else:
             target_db_name = "unknown"
         
-        # Get PGN text from clipboard
         clipboard = QApplication.clipboard()
         pgn_text = clipboard.text().strip()
-        
         if not pgn_text:
-            return (False, "Clipboard is empty", None)
+            return (False, "Clipboard is empty", None, 0)
         
-        # Parse and add games to the active database model
-        success, message, first_game_index, games_added = self.database_controller.parse_pgn_to_model(pgn_text, active_database)
-        
+        success, message, first_game_index, games_added = self.database_controller.parse_pgn_to_model(pgn_text, database_model)
         if success:
-            # Debug log: paste operation (only on success)
             logging_service = LoggingService.get_instance()
             logging_service.debug(f"PGN pasted: target_db={target_db_name}, games_count={games_added}")
-            # If successful, set the first game as active
             if first_game_index is not None:
-                first_game = active_database.get_game(first_game_index)
+                first_game = database_model.get_game(first_game_index)
                 if first_game:
                     self.game_controller.set_active_game(first_game)
-            # Return success message as-is (already formatted by database controller)
             status_message = message
         else:
-            # Format error message
             status_message = self.database_controller.format_pgn_error_message(message)
-        
         return (success, status_message, first_game_index, games_added)
+
+    def paste_pgn_to_active_database(self) -> Tuple[bool, str, Optional[int], int]:
+        """Parse PGN from clipboard and add to the currently active database.
+        
+        Returns:
+            Tuple of (success: bool, status_message: str, first_game_index: Optional[int], games_added: int).
+        """
+        active_database = self.database_controller.get_active_database()
+        if active_database is None:
+            return (False, "No active database selected", None, 0)
+        return self.paste_pgn_to_database(active_database)
     
     def set_active_game_by_row(self, row: int) -> tuple[bool, Optional[str]]:
         """Set the active game by database table row index.

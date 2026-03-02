@@ -1,0 +1,1 @@
+# Positional heatmap rules tests

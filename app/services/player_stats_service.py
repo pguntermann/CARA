@@ -41,6 +41,7 @@ def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, ga
             site="",
             white_elo="",
             black_elo="",
+            time_control="",
             analyzed=True,
             annotated=False,
             file_position=0
@@ -504,24 +505,30 @@ class PlayerStatsService:
                     opening_cpl_data[opening_key] = []
                 opening_cpl_data[opening_key].append(opening_avg_cpl)
         
-        # Determine which color to use for aggregation (majority)
-        use_white = white_games_count >= black_games_count
-        
-        if use_white:
-            all_moves = all_moves_white
-        else:
-            all_moves = all_moves_black
-        
-        if not all_moves:
+        # Aggregate stats over all of the player's moves (both colors), color-agnostic
+        player_moves_white = self.summary_service._extract_player_moves(all_moves_white, is_white=True)
+        player_moves_black = self.summary_service._extract_player_moves(all_moves_black, is_white=False)
+        all_player_moves = player_moves_white + player_moves_black
+        if not all_player_moves:
             return (None, [])
-        
-        # Average the results
+
+        aggregated_stats = self.summary_service._calculate_player_statistics(
+            all_player_moves,
+            has_won=0,
+            has_drawn=0,
+        )
+
+        # Average the results (per-game metrics unchanged)
         if elo_values:
             averaged_elo = sum(elo_values) / len(elo_values)
             averaged_accuracy = sum(accuracy_values) / len(accuracy_values)
         else:
             averaged_elo = 0
             averaged_accuracy = 0.0
+
+        # Override ELO and accuracy with per-game averaged values (same as before)
+        aggregated_stats.estimated_elo = int(averaged_elo)
+        aggregated_stats.accuracy = averaged_accuracy
 
         # Per-game min/max accuracy and ACPL (for display and distributions)
         if accuracy_values:
@@ -579,14 +586,6 @@ class PlayerStatsService:
         average_cpl_opening = (opening_cpl_sum / opening_cpl_count) if opening_cpl_count > 0 else 0.0
         average_cpl_middlegame = (middlegame_cpl_sum / middlegame_cpl_count) if middlegame_cpl_count > 0 else 0.0
         average_cpl_endgame = (endgame_cpl_sum / endgame_cpl_count) if endgame_cpl_count > 0 else 0.0
-        
-        # Calculate aggregated stats for other metrics (CPL, move counts, etc.)
-        # But we'll replace ELO and accuracy with averaged values
-        aggregated_stats = self.summary_service._calculate_player_statistics(all_moves, use_white, game_result=None)
-        
-        # Override with averaged values
-        aggregated_stats.estimated_elo = int(averaged_elo)
-        aggregated_stats.accuracy = averaged_accuracy
         
         # Create phase statistics with averaged accuracy values
         opening_stats = PhaseStatistics(

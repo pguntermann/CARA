@@ -6,6 +6,8 @@ from typing import Optional, List, Dict, Any, Set, Tuple
 from datetime import datetime
 from collections import Counter
 
+from app.utils.time_control_utils import get_tc_type
+
 
 class GameData:
     """Represents a single game's data."""
@@ -23,10 +25,12 @@ class GameData:
                  site: str = "",
                  white_elo: str = "",
                  black_elo: str = "",
+                 time_control: str = "",
                  analyzed: bool = False,
                  annotated: bool = False,
                  source_database: str = "",
-                 file_position: int = 0) -> None:
+                 file_position: int = 0,
+                 ref_ply: int = 0) -> None:
         """Initialize game data.
         
         Args:
@@ -42,10 +46,13 @@ class GameData:
             site: Site name (PGN tag [Site]).
             white_elo: White player Elo rating (PGN tag [WhiteElo]).
             black_elo: Black player Elo rating (PGN tag [BlackElo]).
-                analyzed: Whether the game has been analyzed (has CARAAnalysisData tag).
+            time_control: Time control (PGN tag [TimeControl]).
+            analyzed: Whether the game has been analyzed (has CARAAnalysisData tag).
                 annotated: Whether the game has saved annotations (has CARAAnnotations tag).
             source_database: Name of the database this game came from (for search results).
             file_position: Original position of game in file (1-based, 0 if not from file).
+            ref_ply: Optional reference ply index used by search results to open a game
+                at a specific move (e.g. a brilliant move). 0 means "no specific ply".
         """
         self.game_number = game_number
         self.white = white
@@ -59,10 +66,12 @@ class GameData:
         self.site = site
         self.white_elo = white_elo
         self.black_elo = black_elo
+        self.time_control = time_control
         self.analyzed = analyzed
         self.annotated = annotated
         self.source_database = source_database
         self.file_position = file_position
+        self.ref_ply = ref_ply
 
 
 class DatabaseModel(QAbstractTableModel):
@@ -87,16 +96,20 @@ class DatabaseModel(QAbstractTableModel):
     COL_SITE = 10
     COL_MOVES = 11
     COL_ECO = 12
-    COL_ANALYZED = 13
-    COL_ANNOTATED = 14
-    COL_SOURCE_DB = 15
-    COL_PGN = 16
+    COL_TIMECONTROL = 13
+    COL_TC_TYPE = 14
+    COL_ANALYZED = 15
+    COL_ANNOTATED = 16
+    COL_SOURCE_DB = 17
+    COL_REF_PLY = 18
+    COL_PGN = 19
     
-    def __init__(self, file_path: Optional[str] = None) -> None:
+    def __init__(self, file_path: Optional[str] = None, config: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the database model.
         
         Args:
             file_path: Optional file path for file-based databases. None for clipboard database.
+            config: Optional config dict for TC Type mapping thresholds (e.g. tc_type under ui.panels.database).
         """
         super().__init__()
         self._games: List[GameData] = []
@@ -104,6 +117,7 @@ class DatabaseModel(QAbstractTableModel):
         self._unsaved_icon: Optional[QIcon] = None  # Cached icon for unsaved indicator
         self._unique_tags: Set[str] = set()  # Cache of unique tag names found in games
         self.file_path: Optional[str] = file_path  # File path for file-based databases, None for clipboard
+        self._config: Dict[str, Any] = config or {}
     
     def rowCount(self, parent=None) -> int:
         """Get number of rows in the model.
@@ -123,9 +137,9 @@ class DatabaseModel(QAbstractTableModel):
             parent: Parent index (unused for table models).
             
         Returns:
-            Number of columns (17: #, # in File, ●, White, Black, WhiteElo, BlackElo, Result, Date, Event, Site, Moves, ECO, Analyzed, Annotated, Source DB, PGN).
+            Number of columns (20: includes TimeControl, TC Type, Ref Ply).
         """
-        return 17
+        return 20
     
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         """Get item flags for the given index.
@@ -161,7 +175,7 @@ class DatabaseModel(QAbstractTableModel):
         
         game = self._games[row]
         
-        # Handle unsaved column with DecorationRole for icon (second column)
+        # Handle unsaved column: icon in UI (DecorationRole), text for export/copy (DisplayRole)
         if col == self.COL_UNSAVED:
             if role == Qt.ItemDataRole.DecorationRole:
                 # Return icon if game has unsaved changes, None otherwise
@@ -171,7 +185,7 @@ class DatabaseModel(QAbstractTableModel):
                     return self._unsaved_icon
                 return None
             elif role == Qt.ItemDataRole.DisplayRole:
-                # Return empty string for text display
+                # Empty so the cell shows only the icon (DecorationRole); export uses is_row_unsaved() instead
                 return ""
             elif role == Qt.ItemDataRole.TextAlignmentRole:
                 # Center align the icon
@@ -207,12 +221,20 @@ class DatabaseModel(QAbstractTableModel):
             return game.moves
         elif col == self.COL_ECO:
             return game.eco
+        elif col == self.COL_TIMECONTROL:
+            return getattr(game, "time_control", "") or ""
+        elif col == self.COL_TC_TYPE:
+            tc = getattr(game, "time_control", "") or ""
+            return get_tc_type(tc, (self._config.get("ui") or {}).get("panels", {}).get("database", {}).get("tc_type"))
         elif col == self.COL_ANALYZED:
             return "✓" if game.analyzed else ""
         elif col == self.COL_ANNOTATED:
             return "✓" if getattr(game, "annotated", False) else ""
         elif col == self.COL_SOURCE_DB:
             return game.source_database
+        elif col == self.COL_REF_PLY:
+            # 0 means "no specific reference ply" so display empty string
+            return game.ref_ply if getattr(game, "ref_ply", 0) > 0 else ""
         elif col == self.COL_PGN:
             # Return raw PGN text (presentation formatting handled by view/delegate)
             return game.pgn
@@ -234,7 +256,28 @@ class DatabaseModel(QAbstractTableModel):
             return None
         
         if orientation == Qt.Orientation.Horizontal:
-            headers = ["#", "# in File", "●", "White", "Black", "WhiteElo", "BlackElo", "Result", "Date", "Event", "Site", "Moves", "ECO", "Analyzed", "Annotated", "Source DB", "PGN"]
+            headers = [
+                "#",
+                "# in File",
+                "●",
+                "White",
+                "Black",
+                "WhiteElo",
+                "BlackElo",
+                "Result",
+                "Date",
+                "Event",
+                "Site",
+                "Moves",
+                "ECO",
+                "TimeControl",
+                "TC Type",
+                "Analyzed",
+                "Annotated",
+                "Source DB",
+                "Ref Ply",
+                "PGN",
+            ]
             if 0 <= section < len(headers):
                 return headers[section]
         
@@ -446,16 +489,94 @@ class DatabaseModel(QAbstractTableModel):
     
     def get_game(self, row: int) -> Optional[GameData]:
         """Get game data at a specific row.
-        
+
         Args:
             row: Row index.
-            
+
         Returns:
             GameData instance or None if row is invalid.
         """
         if 0 <= row < len(self._games):
             return self._games[row]
         return None
+
+    def is_row_unsaved(self, row: int) -> bool:
+        """Return whether the game at the given row has unsaved changes.
+
+        Used by export so the "●" column can be exported as "●" or "" without
+        putting text in the cell (which would show next to the icon in the UI).
+
+        Args:
+            row: Row index.
+
+        Returns:
+            True if the game has unsaved changes, False otherwise.
+        """
+        if 0 <= row < len(self._games):
+            return self._games[row] in self._unsaved_games
+        return False
+
+    def get_row_indices_matching_column_value(
+        self,
+        column_index: int,
+        criterion: str,
+        reference_value: Any = None,
+    ) -> List[int]:
+        """Get row indices where the column value matches the given criterion.
+
+        Uses the same value and empty semantics as data(DisplayRole). No Qt or view dependency.
+
+        Args:
+            column_index: Model column index.
+            criterion: One of "all", "none", "equals", "not_equals", "empty", "not_empty".
+            reference_value: For "equals" and "not_equals", the value to compare against.
+                Normalized for comparison (e.g. str for display consistency).
+
+        Returns:
+            List of row indices (model space) matching the criterion.
+        """
+        n = len(self._games)
+        if n == 0:
+            return []
+
+        if criterion == "all":
+            return list(range(n))
+        if criterion == "none":
+            return []
+
+        def cell_value(r: int) -> Any:
+            idx = self.index(r, column_index)
+            return self.data(idx, Qt.ItemDataRole.DisplayRole)
+
+        def is_empty(val: Any) -> bool:
+            if val is None:
+                return True
+            if isinstance(val, str):
+                return val.strip() == ""
+            return False
+
+        ref_normalized = reference_value
+        if ref_normalized is not None and not isinstance(ref_normalized, str):
+            ref_normalized = str(ref_normalized)
+
+        result: List[int] = []
+        for row in range(n):
+            val = cell_value(row)
+            if criterion == "equals":
+                v_str = str(val).strip() if val is not None else ""
+                if ref_normalized is not None and v_str == ref_normalized.strip():
+                    result.append(row)
+            elif criterion == "not_equals":
+                v_str = str(val).strip() if val is not None else ""
+                if ref_normalized is not None and v_str != ref_normalized.strip():
+                    result.append(row)
+            elif criterion == "empty":
+                if is_empty(val):
+                    result.append(row)
+            elif criterion == "not_empty":
+                if not is_empty(val):
+                    result.append(row)
+        return result
     
     def get_all_games(self) -> List[GameData]:
         """Get all games in the model.
@@ -789,15 +910,19 @@ class DatabaseModel(QAbstractTableModel):
                 return game.moves
             elif column == self.COL_ECO:
                 return game.eco or ""
-            elif column == self.COL_ANALYZED:
-                # Sort by boolean: False (not analyzed) comes before True (analyzed)
-                return game.analyzed
+            elif column == self.COL_TIMECONTROL:
+                return getattr(game, "time_control", "") or ""
+            elif column == self.COL_TC_TYPE:
+                tc = getattr(game, "time_control", "") or ""
+                return get_tc_type(tc, (self._config.get("ui") or {}).get("panels", {}).get("database", {}).get("tc_type"))
             elif column == self.COL_ANALYZED:
                 return game.analyzed
             elif column == self.COL_ANNOTATED:
                 return getattr(game, "annotated", False)
             elif column == self.COL_SOURCE_DB:
                 return game.source_database or ""
+            elif column == self.COL_REF_PLY:
+                return getattr(game, "ref_ply", 0)
             elif column == self.COL_PGN:
                 return game.pgn or ""
             else:

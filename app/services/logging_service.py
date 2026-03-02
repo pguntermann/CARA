@@ -1,5 +1,6 @@
 """Logging service for centralized application logging."""
 
+import atexit
 import sys
 import multiprocessing
 import threading
@@ -16,6 +17,61 @@ from app.utils.path_resolver import resolve_data_file_path
 # Set by initializer in worker processes, created in main process
 _log_queue: Optional[multiprocessing.Queue] = None
 _queue_listener: Optional[logging.handlers.QueueListener] = None
+_atexit_registered = False
+
+
+def _stop_listener_and_close_handlers(listener: logging.handlers.QueueListener) -> None:
+    """Stop the queue listener and close all its handlers.
+
+    QueueListener.stop() does not close handlers (e.g. RotatingFileHandler);
+    leaving them open causes ResourceWarning for unclosed files.
+
+    Thread- and process-safe: handlers are closed only after listener.stop() has
+    joined the listener thread, so no other thread uses the handlers. Only the
+    main process ever owns the listener; workers never call this.
+    """
+    try:
+        listener.stop()
+        if hasattr(listener, '_thread') and listener._thread:
+            listener._thread.join(timeout=1.0)
+    except Exception:
+        pass
+    for handler in getattr(listener, 'handlers', ()):
+        try:
+            handler.close()
+        except Exception:
+            pass
+
+
+def _shutdown_on_exit() -> None:
+    """Stop queue listener and close queue on process exit to avoid _monitor thread errors.
+
+    Uses only module-level globals; does not call shutdown() or take any locks,
+    so it is safe when other threads may still be in _log() or holding _instance_lock.
+    Only the main process registers this (when the listener is started); workers never do.
+    """
+    global _queue_listener, _log_queue
+    try:
+        if _queue_listener is not None:
+            _stop_listener_and_close_handlers(_queue_listener)
+            _queue_listener = None
+        if _log_queue is not None:
+            try:
+                _log_queue.close()
+                _log_queue.join_thread()
+            except Exception:
+                pass
+            _log_queue = None
+    except Exception:
+        pass
+
+
+def _register_atexit() -> None:
+    """Register atexit handler once so logging shuts down cleanly when the process exits."""
+    global _atexit_registered
+    if not _atexit_registered:
+        atexit.register(_shutdown_on_exit)
+        _atexit_registered = True
 
 
 def init_worker_logging(queue: multiprocessing.Queue) -> None:
@@ -143,7 +199,7 @@ class LoggingService:
         
         if self._initialized:
             if is_main_process and _queue_listener:
-                _queue_listener.stop()
+                _stop_listener_and_close_handlers(_queue_listener)
                 _queue_listener = None
             
             if _log_queue is None:
@@ -207,6 +263,7 @@ class LoggingService:
                 if handlers:
                     _queue_listener = logging.handlers.QueueListener(_log_queue, *handlers, respect_handler_level=True)
                     _queue_listener.start()
+                    _register_atexit()
             self._initialized = True
             return
         
@@ -280,7 +337,8 @@ class LoggingService:
         if is_main_process and _queue_listener is None and handlers:
             _queue_listener = logging.handlers.QueueListener(_log_queue, *handlers, respect_handler_level=True)
             _queue_listener.start()
-        
+            _register_atexit()
+
         self._initialized = True
         
         # Only log file path in main process
@@ -400,12 +458,7 @@ class LoggingService:
             
             if _queue_listener:
                 try:
-                    _queue_listener.stop()
-                    if hasattr(_queue_listener, '_thread') and _queue_listener._thread:
-                        _queue_listener._thread.join(timeout=1.0)
-                    else:
-                        import time
-                        time.sleep(0.2)
+                    _stop_listener_and_close_handlers(_queue_listener)
                 except Exception:
                     pass
                 _queue_listener = None

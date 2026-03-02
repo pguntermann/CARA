@@ -452,6 +452,117 @@ class PlayerStatsController(QObject):
         worst_games = [game for _, _, game in ranked[start:]]
         return self._map_games_to_sources(worst_games)
 
+    def get_top_brilliant_moves_with_sources_and_ply(
+        self, max_moves: int
+    ) -> List[Tuple["GameData", str, int]]:
+        """Get top N brilliant moves for the current player with source names and ply index.
+
+        Returns a list of (GameData, source_display_name, ref_ply) tuples. Each entry
+        corresponds to a single brilliant move in a game; games may appear multiple times
+        if they contain multiple brilliant moves.
+        """
+        return self._get_top_moves_by_assessment_with_sources_and_ply(
+            "Brilliant", match_startswith=True, max_moves=max_moves, sort_cpl_ascending=True
+        )
+
+    def _get_top_moves_by_assessment_with_sources_and_ply(
+        self,
+        assessment_match: str,
+        match_startswith: bool,
+        max_moves: int,
+        sort_cpl_ascending: bool,
+    ) -> List[Tuple["GameData", str, int]]:
+        """Get top N moves for the current player by assessment type, with source names and ply.
+
+        assessment_match: "Brilliant", "Miss", or "Blunder".
+        match_startswith: If True, match assessment.startswith(assessment_match); else exact match.
+        sort_cpl_ascending: True for brilliant (best first), False for miss/blunder (worst first).
+        """
+        from app.services.analysis_data_storage_service import AnalysisDataStorageService
+
+        if not self._current_player or max_moves <= 0:
+            return []
+
+        analyzed_games = getattr(self, "_current_analyzed_games", []) or []
+        if not analyzed_games:
+            return []
+
+        records: List[Tuple[float, "GameData", int]] = []
+
+        for game in analyzed_games:
+            if not getattr(game, "analyzed", False):
+                continue
+            is_white_game = (game.white == self._current_player)
+            try:
+                moves = AnalysisDataStorageService.load_analysis_data(game)
+            except Exception:
+                moves = None
+            if not moves:
+                continue
+
+            if is_white_game:
+                cpl_field, assess_field, move_field = "cpl_white", "assess_white", "white_move"
+            else:
+                cpl_field, assess_field, move_field = "cpl_black", "assess_black", "black_move"
+
+            for move in moves:
+                move_str = getattr(move, move_field, "")
+                if not move_str:
+                    continue
+                assessment = getattr(move, assess_field, "") or ""
+                if match_startswith:
+                    if not assessment.startswith(assessment_match):
+                        continue
+                else:
+                    if assessment != assessment_match:
+                        continue
+                cpl_str = getattr(move, cpl_field, "")
+                if not cpl_str:
+                    continue
+                try:
+                    cpl = float(cpl_str)
+                except (ValueError, TypeError):
+                    continue
+                if is_white_game:
+                    ply_index = move.move_number * 2 - 1
+                else:
+                    ply_index = move.move_number * 2
+                records.append((cpl, game, ply_index))
+
+        if not records:
+            return []
+        records.sort(key=lambda x: x[0], reverse=not sort_cpl_ascending)
+        top_records = records[:max_moves]
+
+        unique_games = list({rec[1] for rec in top_records})
+        game_to_source: Dict["GameData", str] = {}
+        for game, source_name in self._map_games_to_sources(unique_games):
+            game_to_source[game] = source_name
+
+        results: List[Tuple["GameData", str, int]] = []
+        for _, game, ply_index in top_records:
+            source_name = game_to_source.get(game)
+            if not source_name:
+                continue
+            results.append((game, source_name, ply_index))
+        return results
+
+    def get_top_misses_with_sources_and_ply(
+        self, max_moves: int
+    ) -> List[Tuple["GameData", str, int]]:
+        """Get top N misses (worst CPL first) for the current player with source names and ply."""
+        return self._get_top_moves_by_assessment_with_sources_and_ply(
+            "Miss", match_startswith=False, max_moves=max_moves, sort_cpl_ascending=False
+        )
+
+    def get_top_blunders_with_sources_and_ply(
+        self, max_moves: int
+    ) -> List[Tuple["GameData", str, int]]:
+        """Get top N blunders (worst CPL first) for the current player with source names and ply."""
+        return self._get_top_moves_by_assessment_with_sources_and_ply(
+            "Blunder", match_startswith=False, max_moves=max_moves, sort_cpl_ascending=False
+        )
+
     def get_top_best_games_summary(self, max_best: int) -> Tuple[int, Optional[float], Optional[float]]:
         """Return count and accuracy range for the best-performing games."""
         ranked = self._get_ranked_games_by_cpl()

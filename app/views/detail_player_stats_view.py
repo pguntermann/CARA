@@ -446,7 +446,10 @@ class DetailPlayerStatsView(QWidget):
         self._on_open_pattern_games_in_search_results: Optional[Callable[["ErrorPattern"], None]] = None
         self._on_open_best_games_in_search_results: Optional[Callable[[], None]] = None
         self._on_open_worst_games_in_search_results: Optional[Callable[[], None]] = None
-        
+        self._on_open_brilliant_moves_in_search_results: Optional[Callable[[], None]] = None
+        self._on_open_misses_in_search_results: Optional[Callable[[], None]] = None
+        self._on_open_blunders_in_search_results: Optional[Callable[[], None]] = None
+
         self.current_stats: Optional["AggregatedPlayerStats"] = None
         self.current_patterns: List["ErrorPattern"] = []
         
@@ -901,6 +904,16 @@ class DetailPlayerStatsView(QWidget):
         )
         top_games_widget.setProperty("section_name", "Top Games")
         self.content_layout.addWidget(top_games_widget)
+        self.content_layout.addSpacing(section_spacing_val)
+        
+        # Significant Moves Section (Brilliant, Misses, Blunders)
+        self._add_section_header("Significant Moves", header_font, header_text_color)
+        significant_widget = self._create_significant_moves_widget(
+            self.current_stats, text_color, label_font, value_font,
+            section_bg_color, border_color, widgets_config
+        )
+        significant_widget.setProperty("section_name", "Significant Moves")
+        self.content_layout.addWidget(significant_widget)
         self.content_layout.addSpacing(section_spacing_val)
         
         # Error Patterns Section
@@ -1857,6 +1870,123 @@ class DetailPlayerStatsView(QWidget):
 
         # Initial responsive update
         QTimer.singleShot(0, self._update_top_games_visibility)
+
+        return widget
+
+    def _create_significant_moves_widget(
+        self,
+        stats: "AggregatedPlayerStats",
+        text_color: QColor,
+        label_font: QFont,
+        value_font: QFont,
+        bg_color: QColor,
+        border_color: QColor,
+        widgets_config: Dict[str, Any],
+    ) -> QWidget:
+        """Create 'Significant Moves' widget with Brilliant, Misses, and Blunders rows and View buttons."""
+        widget = QWidget()
+        border_radius = widgets_config.get("border_radius", 5)
+        section_margins = widgets_config.get("section_margins", [10, 10, 10, 10])
+        section_spacing = widgets_config.get("section_spacing", 8)
+
+        widget.setStyleSheet(
+            f"""
+            QWidget {{
+                background-color: rgb({bg_color.red()}, {bg_color.green()}, {bg_color.blue()});
+                border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
+                border-radius: {border_radius}px;
+            }}
+        """
+        )
+
+        layout = QVBoxLayout(widget)
+        bottom_margin = max(section_margins[1], section_margins[3])
+        layout.setContentsMargins(
+            section_margins[0], section_margins[1], section_margins[2], bottom_margin
+        )
+        layout.setSpacing(section_spacing)
+
+        ui_config = self.config.get("ui", {})
+        panel_config = ui_config.get("panels", {}).get("detail", {})
+        player_stats_config = panel_config.get("player_stats", {})
+        significant_config = player_stats_config.get("significant_moves", {})
+        brilliant_config = significant_config.get("brilliant_moves") or player_stats_config.get("brilliant_moves", {})
+        misses_config = significant_config.get("misses", {})
+        blunders_config = significant_config.get("blunders", {})
+
+        total_moves = 0
+        if stats and getattr(stats, "player_stats", None):
+            total_moves = (stats.player_stats.total_moves or 0)
+
+        error_patterns_config = player_stats_config.get("error_patterns", {})
+        summary_config = panel_config.get("summary", {})
+        summary_colors = summary_config.get("colors", {})
+
+        def add_row(
+            title: str,
+            stats_count: int,
+            list_count: int,
+            color_key: str,
+            color_fallback: List[int],
+            callback: Optional[Callable[[], None]],
+        ) -> None:
+            pct = (stats_count / total_moves * 100.0) if total_moves > 0 else 0.0
+            detail_text = f"{list_count} listed ({pct:.1f}% of moves)"
+            color = summary_colors.get(color_key, color_fallback)
+            row_data = self._create_indicator_item_row(
+                title_text=title,
+                detail_text=detail_text,
+                indicator_color=color,
+                label_font=label_font,
+                value_font=value_font,
+                text_color=text_color,
+                bg_color=bg_color,
+                border_color=border_color,
+                section_config=error_patterns_config,
+                button_text="View →",
+            )
+            item = row_data["item"]
+            button = row_data["button"]
+            if list_count > 0 and callback:
+                button.setText(f"View {list_count} →")
+                button.clicked.connect(lambda checked=False, c=callback: c())
+            else:
+                button.setEnabled(False)
+            layout.addWidget(item)
+            layout.addSpacing(2)
+
+        # Brilliant
+        stats_brilliant = (stats.player_stats.brilliant_moves or 0) if stats and getattr(stats, "player_stats", None) else 0
+        max_brilliant = int(brilliant_config.get("max_moves", 999))
+        list_brilliant = 0
+        if self._stats_controller:
+            try:
+                list_brilliant = len(self._stats_controller.get_top_brilliant_moves_with_sources_and_ply(max_brilliant))
+            except Exception:
+                pass
+        add_row("Brilliant Moves", stats_brilliant, list_brilliant, "brilliant", [255, 215, 0], self._on_open_brilliant_moves_in_search_results)
+
+        # Misses
+        stats_misses = (stats.player_stats.misses or 0) if stats and getattr(stats, "player_stats", None) else 0
+        max_misses = int(misses_config.get("max_moves", 999))
+        list_misses = 0
+        if self._stats_controller:
+            try:
+                list_misses = len(self._stats_controller.get_top_misses_with_sources_and_ply(max_misses))
+            except Exception:
+                pass
+        add_row("Misses", stats_misses, list_misses, "miss", [200, 100, 255], self._on_open_misses_in_search_results)
+
+        # Blunders
+        stats_blunders = (stats.player_stats.blunders or 0) if stats and getattr(stats, "player_stats", None) else 0
+        max_blunders = int(blunders_config.get("max_moves", 999))
+        list_blunders = 0
+        if self._stats_controller:
+            try:
+                list_blunders = len(self._stats_controller.get_top_blunders_with_sources_and_ply(max_blunders))
+            except Exception:
+                pass
+        add_row("Blunders", stats_blunders, list_blunders, "blunder", [255, 100, 100], self._on_open_blunders_in_search_results)
 
         return widget
 
@@ -2882,6 +3012,16 @@ class DetailPlayerStatsView(QWidget):
         if not self._top_games_widget or not hasattr(self, 'scroll_area'):
             return
 
+        # Check if widget is still valid (not deleted) - can happen after content rebuild during bulk analysis
+        try:
+            if not hasattr(self._top_games_widget, 'parent'):
+                self._top_games_widget = None
+                return
+        except RuntimeError:
+            self._top_games_widget = None
+            self._top_games_items = []
+            return
+
         # Get current width of the scroll area viewport
         available_width = self.scroll_area.viewport().width()
 
@@ -2895,20 +3035,23 @@ class DetailPlayerStatsView(QWidget):
             button = item_data.get('button')
             if not button:
                 continue
-
-            # Update button visibility with the same fade pattern as error patterns
-            if should_show_full:
-                button.setVisible(True)
-                button.setMaximumWidth(16777215)  # QWIDGETSIZE_MAX
-                if hasattr(button, 'graphicsEffect') and button.graphicsEffect():
-                    button.graphicsEffect().setOpacity(1.0)
-            else:
-                if not hasattr(button, 'graphicsEffect') or not button.graphicsEffect():
-                    opacity_effect = QGraphicsOpacityEffect(button)
-                    button.setGraphicsEffect(opacity_effect)
-                button.graphicsEffect().setOpacity(0.0)
-                button.setMaximumWidth(0)
-                button.setVisible(False)
+            try:
+                # Update button visibility with the same fade pattern as error patterns
+                if should_show_full:
+                    button.setVisible(True)
+                    button.setMaximumWidth(16777215)  # QWIDGETSIZE_MAX
+                    if hasattr(button, 'graphicsEffect') and button.graphicsEffect():
+                        button.graphicsEffect().setOpacity(1.0)
+                else:
+                    if not hasattr(button, 'graphicsEffect') or not button.graphicsEffect():
+                        opacity_effect = QGraphicsOpacityEffect(button)
+                        button.setGraphicsEffect(opacity_effect)
+                    button.graphicsEffect().setOpacity(0.0)
+                    button.setMaximumWidth(0)
+                    button.setVisible(False)
+            except RuntimeError:
+                # Button was deleted (e.g. content rebuilt before this timer ran)
+                continue
     
     def _update_openings_visibility(self) -> None:
         """Update openings text based on available width - switch to ECO-only when narrow."""

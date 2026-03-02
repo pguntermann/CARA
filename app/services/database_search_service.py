@@ -471,6 +471,14 @@ class DatabaseSearchService:
             return game.site
         elif field == SearchField.ECO:
             return game.eco
+        elif field == SearchField.TIMECONTROL:
+            from app.utils.time_control_utils import get_base_seconds
+            tc = getattr(game, "time_control", "") or ""
+            return get_base_seconds(tc)  # int (base seconds) or None
+        elif field == SearchField.TC_TYPE:
+            from app.utils.time_control_utils import get_tc_type
+            tc = getattr(game, "time_control", "") or ""
+            return get_tc_type(tc, None)  # Use default thresholds
         elif field == SearchField.ANALYZED:
             return game.analyzed
         elif field == SearchField.ANNOTATED:
@@ -514,6 +522,8 @@ class DatabaseSearchService:
             SearchField.EVENT: "Event",
             SearchField.SITE: "Site",
             SearchField.ECO: "ECO",
+            SearchField.TIMECONTROL: "TimeControl",
+            SearchField.TC_TYPE: "TC Type",
             SearchField.ANALYZED: "Analyzed",
             SearchField.ANNOTATED: "Annotated",
             SearchField.CUSTOM_TAG: "Custom Tag",

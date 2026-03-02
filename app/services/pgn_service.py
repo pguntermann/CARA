@@ -920,6 +920,7 @@ class PgnService:
             site = headers.get("Site", "")
             white_elo = headers.get("WhiteElo", "")
             black_elo = headers.get("BlackElo", "")
+            time_control = headers.get("TimeControl", "")
             
             # Count moves (main line only)
             # Count half-moves (plies) in the main line
@@ -1005,6 +1006,7 @@ class PgnService:
                 "site": site,
                 "white_elo": white_elo,
                 "black_elo": black_elo,
+                "time_control": time_control,
                 "analyzed": analyzed,
                 "annotated": annotated,
                 "tags": tag_names  # Tag names extracted during parsing

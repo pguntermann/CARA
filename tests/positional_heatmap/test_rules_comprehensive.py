@@ -5,11 +5,12 @@ and edge cases to expose potential issues. Each test uses carefully constructed
 FEN positions that make sense for the specific rule being tested.
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+import unittest
 import chess
 from app.services.positional_heatmap.rules.passed_pawn_rule import PassedPawnRule
 from app.services.positional_heatmap.rules.backward_pawn_rule import BackwardPawnRule
@@ -22,19 +23,16 @@ from app.services.positional_heatmap.rules.undeveloped_piece_rule import Undevel
 from app.config.config_loader import ConfigLoader
 
 
-class TestPositionalHeatmapRules:
+class TestPositionalHeatmapRules(unittest.TestCase):
     """Comprehensive test suite for all positional heatmap rules."""
-    
-    def __init__(self):
-        """Initialize test suite."""
-        # Load config
+
+    def setUp(self):
+        """Load config and create rule instances."""
         config_path = Path('app/config/config.json')
         config_loader = ConfigLoader(config_path)
         config = config_loader.load()
         heatmap_config = config.get('ui', {}).get('positional_heatmap', {})
         rules_config = heatmap_config.get('rules', {})
-        
-        # Create rule instances
         self.passed_pawn_rule = PassedPawnRule(rules_config.get('passed_pawn', {}))
         self.backward_pawn_rule = BackwardPawnRule(rules_config.get('backward_pawn', {}))
         self.isolated_pawn_rule = IsolatedPawnRule(rules_config.get('isolated_pawn', {}))
@@ -43,135 +41,6 @@ class TestPositionalHeatmapRules:
         self.weak_square_rule = WeakSquareRule(rules_config.get('weak_square', {}))
         self.piece_activity_rule = PieceActivityRule(rules_config.get('piece_activity', {}))
         self.undeveloped_piece_rule = UndevelopedPieceRule(rules_config.get('undeveloped_piece', {}))
-        
-        self.test_count = 0
-        self.pass_count = 0
-        self.fail_count = 0
-    
-    def run_all_tests(self):
-        """Run all test cases."""
-        print(f"\n{'='*80}")
-        print("COMPREHENSIVE POSITIONAL HEATMAP RULES TEST SUITE")
-        print(f"{'='*80}\n")
-        
-        # Passed Pawn Rule Tests
-        print("\n" + "="*80)
-        print("PASSED PAWN RULE TESTS")
-        print("="*80)
-        self.test_passed_pawn_basic_white()
-        self.test_passed_pawn_basic_black()
-        self.test_passed_pawn_starting_rank_not_evaluated()
-        self.test_passed_pawn_blocked_not_passed()
-        self.test_passed_pawn_adjacent_file_blocked()
-        self.test_passed_pawn_rank_scaling()
-        self.test_passed_pawn_attacked_undefended()
-        self.test_passed_pawn_non_passed_no_score()
-        self.test_passed_pawn_blocked_by_same_file_pawn()
-        
-        # Backward Pawn Rule Tests
-        print("\n" + "="*80)
-        print("BACKWARD PAWN RULE TESTS")
-        print("="*80)
-        self.test_backward_pawn_basic()
-        self.test_backward_pawn_not_backward()
-        self.test_backward_pawn_can_advance_safely()
-        self.test_backward_pawn_d3()
-        self.test_backward_pawn_f2_with_protection()
-        self.test_backward_pawn_defended_by_adjacent()
-        
-        # Isolated Pawn Rule Tests
-        print("\n" + "="*80)
-        print("ISOLATED PAWN RULE TESTS")
-        print("="*80)
-        self.test_isolated_pawn_basic()
-        self.test_isolated_pawn_not_isolated()
-        self.test_isolated_pawn_edge_file()
-        
-        # Doubled Pawn Rule Tests
-        print("\n" + "="*80)
-        print("DOUBLED PAWN RULE TESTS")
-        print("="*80)
-        self.test_doubled_pawn_basic()
-        self.test_doubled_pawn_central_vs_edge()
-        self.test_doubled_pawn_open_file_reduction()
-        self.test_doubled_pawn_tripled()
-        
-        # King Safety Rule Tests
-        print("\n" + "="*80)
-        print("KING SAFETY RULE TESTS")
-        print("="*80)
-        self.test_king_safety_in_check()
-        self.test_king_safety_open_file()
-        self.test_king_safety_semi_open_file()
-        self.test_king_safety_pawn_shield()
-        self.test_king_safety_exposed_king()
-        
-        # Weak Square Rule Tests
-        print("\n" + "="*80)
-        print("WEAK SQUARE RULE TESTS")
-        print("="*80)
-        self.test_weak_square_attacked_undefended()
-        self.test_weak_square_attacked_defended()
-        self.test_weak_square_piece_value_scaling()
-        
-        # Piece Activity Rule Tests
-        print("\n" + "="*80)
-        print("PIECE ACTIVITY RULE TESTS")
-        print("="*80)
-        self.test_piece_activity_mobility()
-        self.test_piece_activity_central_control()
-        self.test_piece_activity_blocked_piece()
-        self.test_piece_activity_perspective_independence()
-        self.test_piece_activity_doubled_rooks_on_open_file()
-        
-        # Undeveloped Piece Rule Tests
-        print("\n" + "="*80)
-        print("UNDEVELOPED PIECE RULE TESTS")
-        print("="*80)
-        self.test_undeveloped_piece_blocked_rook()
-        
-        # Print summary
-        print(f"\n{'='*80}")
-        print("TEST SUMMARY")
-        print(f"{'='*80}")
-        print(f"Total tests: {self.test_count}")
-        print(f"Passed: {self.pass_count}")
-        print(f"Failed: {self.fail_count}")
-        print(f"{'='*80}\n")
-    
-    def assert_true(self, condition: bool, message: str):
-        """Assert that condition is True."""
-        self.test_count += 1
-        if condition:
-            self.pass_count += 1
-            print(f"[PASS] {message}")
-        else:
-            self.fail_count += 1
-            print(f"[FAIL] {message}")
-    
-    def assert_false(self, condition: bool, message: str):
-        """Assert that condition is False."""
-        self.assert_true(not condition, message)
-    
-    def assert_equals(self, actual, expected, message: str):
-        """Assert that actual equals expected."""
-        self.assert_true(actual == expected, f"{message} (expected {expected}, got {actual})")
-    
-    def assert_in(self, item, container, message: str):
-        """Assert that item is in container."""
-        self.assert_true(item in container, message)
-    
-    def assert_not_in(self, item, container, message: str):
-        """Assert that item is not in container."""
-        self.assert_false(item in container, message)
-    
-    def assert_greater(self, actual, expected, message: str):
-        """Assert that actual > expected."""
-        self.assert_true(actual > expected, f"{message} (expected > {expected}, got {actual})")
-    
-    def assert_less(self, actual, expected, message: str):
-        """Assert that actual < expected."""
-        self.assert_true(actual < expected, f"{message} (expected < {expected}, got {actual})")
     
     # ============================================================================
     # PASSED PAWN RULE TESTS
@@ -192,10 +61,10 @@ class TestPositionalHeatmapRules:
         scores = self.passed_pawn_rule.evaluate(board, chess.WHITE)
         is_passed = self.passed_pawn_rule._is_passed_pawn(board, 3, 5, chess.WHITE)
         
-        self.assert_true(is_passed, "d6 should be a passed pawn (no black pawns ahead)")
-        self.assert_in(d6, scores, "d6 should have a score")
+        self.assertTrue(is_passed, "d6 should be a passed pawn (no black pawns ahead)")
+        self.assertIn(d6, scores, "d6 should have a score")
         if d6 in scores:
-            self.assert_greater(scores[d6], 0, f"d6 should have positive score (got {scores[d6]})")
+            self.assertGreater(scores[d6], 0, f"d6 should have positive score (got {scores[d6]})")
     
     def test_passed_pawn_basic_black(self):
         """Test basic passed pawn detection for black."""
@@ -220,16 +89,16 @@ class TestPositionalHeatmapRules:
         is_attacked = board.is_attacked_by(chess.WHITE, d3)
         is_defended = board.is_attacked_by(chess.BLACK, d3)
         
-        self.assert_true(is_passed, "d3 should be a passed pawn (no white pawns ahead)")
-        self.assert_in(d3, scores, "d3 should have a score")
+        self.assertTrue(is_passed, "d3 should be a passed pawn (no white pawns ahead)")
+        self.assertIn(d3, scores, "d3 should have a score")
         if d3 in scores:
             # If attacked and undefended, it might have negative score (early rank)
             # Otherwise, it should have positive score
             if is_attacked and not is_defended:
                 # Early rank attacked/undefended passed pawn gets negative score
-                self.assert_less(scores[d3], 0, f"d3 should have negative score if attacked/undefended (got {scores[d3]})")
+                self.assertLess(scores[d3], 0, f"d3 should have negative score if attacked/undefended (got {scores[d3]})")
             else:
-                self.assert_greater(scores[d3], 0, f"d3 should have positive score (got {scores[d3]})")
+                self.assertGreater(scores[d3], 0, f"d3 should have positive score (got {scores[d3]})")
     
     def test_passed_pawn_starting_rank_not_evaluated(self):
         """Test that starting rank pawns are not evaluated."""
@@ -242,7 +111,7 @@ class TestPositionalHeatmapRules:
         # All white pawns are on starting rank (rank 1), should not be evaluated
         white_pawns = board.pieces(chess.PAWN, chess.WHITE)
         for pawn_sq in white_pawns:
-            self.assert_not_in(pawn_sq, scores, f"White pawn on {chess.square_name(pawn_sq)} should not have score (on starting rank)")
+            self.assertNotIn(pawn_sq, scores, f"White pawn on {chess.square_name(pawn_sq)} should not have score (on starting rank)")
     
     def test_passed_pawn_blocked_not_passed(self):
         """Test that blocked pawns are not passed."""
@@ -254,8 +123,8 @@ class TestPositionalHeatmapRules:
         is_blocked = self.passed_pawn_rule._is_blocked_pawn(board, 3, 3, chess.WHITE)
         is_passed = self.passed_pawn_rule._is_passed_pawn(board, 3, 3, chess.WHITE)
         
-        self.assert_true(is_blocked, "d4 should be blocked")
-        self.assert_false(is_passed, "d4 should not be passed (blocked)")
+        self.assertTrue(is_blocked, "d4 should be blocked")
+        self.assertFalse(is_passed, "d4 should not be passed (blocked)")
     
     def test_passed_pawn_adjacent_file_blocked(self):
         """Test that pawns blocked by adjacent file pawns are not passed."""
@@ -267,8 +136,8 @@ class TestPositionalHeatmapRules:
         is_passed = self.passed_pawn_rule._is_passed_pawn(board, 5, 4, chess.WHITE)
         scores = self.passed_pawn_rule.evaluate(board, chess.WHITE)
         
-        self.assert_false(is_passed, "f5 should not be passed (blocked by e3)")
-        self.assert_not_in(f5, scores, "f5 should not have score (not passed)")
+        self.assertFalse(is_passed, "f5 should not be passed (blocked by e3)")
+        self.assertNotIn(f5, scores, "f5 should not have score (not passed)")
     
     def test_passed_pawn_rank_scaling(self):
         """Test that passed pawn bonus scales with rank."""
@@ -316,18 +185,18 @@ class TestPositionalHeatmapRules:
             if d4 in scores and e5 in scores:
                 # e5 should have higher bonus than d4 (higher rank)
                 if not (is_e5_attacked and is_e5_defended):  # Not attacked/defended
-                    self.assert_greater(scores[e5], scores[d4], f"e5 (rank 4) should have higher bonus than d4 (rank 3)")
+                    self.assertGreater(scores[e5], scores[d4], f"e5 (rank 4) should have higher bonus than d4 (rank 3)")
             if e5 in scores and f6 in scores:
                 # f6 should have higher bonus than e5 (higher rank) if not attacked/defended
                 if not (is_f6_attacked and is_f6_defended):  # Not attacked/defended
-                    self.assert_greater(scores[f6], scores[e5], f"f6 (rank 5) should have higher bonus than e5 (rank 4)")
+                    self.assertGreater(scores[f6], scores[e5], f"f6 (rank 5) should have higher bonus than e5 (rank 4)")
                 else:
                     # If f6 is attacked/defended, its bonus is reduced, so it might be lower
                     # This is expected behavior - document it
-                    self.assert_true(True, f"f6 is attacked/defended, so bonus is reduced (expected behavior)")
+                    self.assertTrue(True, f"f6 is attacked/defended, so bonus is reduced (expected behavior)")
         else:
             # If not all passed/not blocked, document it
-            self.assert_true(False, f"Not all pawns are passed and not blocked: d4={is_d4_passed}/{is_d4_blocked}, e5={is_e5_passed}/{is_e5_blocked}, f6={is_f6_passed}/{is_f6_blocked}")
+            self.assertTrue(False, f"Not all pawns are passed and not blocked: d4={is_d4_passed}/{is_d4_blocked}, e5={is_e5_passed}/{is_e5_blocked}, f6={is_f6_passed}/{is_f6_blocked}")
     
     def test_passed_pawn_attacked_undefended(self):
         """Test attacked and undefended passed pawn gets reduced/negative score."""
@@ -343,7 +212,7 @@ class TestPositionalHeatmapRules:
         if d5 in scores and is_attacked and not is_defended:
             rank = chess.square_rank(d5)
             if rank < 4:  # Early rank
-                self.assert_less(scores[d5], 0, f"Early rank attacked/undefended should be negative (got {scores[d5]})")
+                self.assertLess(scores[d5], 0, f"Early rank attacked/undefended should be negative (got {scores[d5]})")
     
     def test_passed_pawn_non_passed_no_score(self):
         """Test that non-passed pawns don't get scores (after our fix)."""
@@ -355,8 +224,8 @@ class TestPositionalHeatmapRules:
         is_passed = self.passed_pawn_rule._is_passed_pawn(board, 5, 4, chess.BLACK)
         scores = self.passed_pawn_rule.evaluate(board, chess.BLACK)
         
-        self.assert_false(is_passed, "f5 should not be passed (blocked by e3)")
-        self.assert_not_in(f5, scores, "f5 should not have score (not passed)")
+        self.assertFalse(is_passed, "f5 should not be passed (blocked by e3)")
+        self.assertNotIn(f5, scores, "f5 should not have score (not passed)")
     
     def test_passed_pawn_blocked_by_same_file_pawn(self):
         """Test that pawns blocked by enemy pawns on same file are not passed."""
@@ -379,12 +248,12 @@ class TestPositionalHeatmapRules:
         scores = self.passed_pawn_rule.evaluate(board, chess.WHITE)
         
         # Assertions: blocked pawns should not be passed
-        self.assert_true(is_f6_blocked, "f6 should be blocked by f7")
-        self.assert_true(is_h6_blocked, "h6 should be blocked by h7")
-        self.assert_false(is_f6_passed, "f6 should NOT be passed (blocked by f7)")
-        self.assert_false(is_h6_passed, "h6 should NOT be passed (blocked by h7)")
-        self.assert_not_in(f6, scores, "f6 should not have score (blocked, not passed)")
-        self.assert_not_in(h6, scores, "h6 should not have score (blocked, not passed)")
+        self.assertTrue(is_f6_blocked, "f6 should be blocked by f7")
+        self.assertTrue(is_h6_blocked, "h6 should be blocked by h7")
+        self.assertFalse(is_f6_passed, "f6 should NOT be passed (blocked by f7)")
+        self.assertFalse(is_h6_passed, "h6 should NOT be passed (blocked by h7)")
+        self.assertNotIn(f6, scores, "f6 should not have score (blocked, not passed)")
+        self.assertNotIn(h6, scores, "h6 should not have score (blocked, not passed)")
     
     # ============================================================================
     # BACKWARD PAWN RULE TESTS
@@ -404,12 +273,12 @@ class TestPositionalHeatmapRules:
         # Note: This test might pass or fail depending on exact backward pawn logic
         # The logic checks if advancing would be attacked by enemy pawns
         if is_backward:
-            self.assert_in(d2, scores, "d2 should have a score if backward")
+            self.assertIn(d2, scores, "d2 should have a score if backward")
             if d2 in scores:
-                self.assert_less(scores[d2], 0, f"d2 should have negative score (got {scores[d2]})")
+                self.assertLess(scores[d2], 0, f"d2 should have negative score (got {scores[d2]})")
         else:
             # If not backward, that's also valid - just document it
-            self.assert_not_in(d2, scores, "d2 should not have score if not backward")
+            self.assertNotIn(d2, scores, "d2 should not have score if not backward")
     
     def test_backward_pawn_not_backward(self):
         """Test that pawns without friendly pawns ahead are not backward."""
@@ -421,8 +290,8 @@ class TestPositionalHeatmapRules:
         is_backward = self.backward_pawn_rule._is_backward_pawn(board, 3, 3, chess.WHITE)
         scores = self.backward_pawn_rule.evaluate(board, chess.WHITE)
         
-        self.assert_false(is_backward, "d4 should not be backward (no friendly pawns ahead)")
-        self.assert_not_in(d4, scores, "d4 should not have score (not backward)")
+        self.assertFalse(is_backward, "d4 should not be backward (no friendly pawns ahead)")
+        self.assertNotIn(d4, scores, "d4 should not have score (not backward)")
     
     def test_backward_pawn_can_advance_safely(self):
         """Test that pawns that can advance safely are not backward."""
@@ -437,7 +306,7 @@ class TestPositionalHeatmapRules:
         # If d3 is safe (no enemy pawns attacking it), d2 should not be backward
         # This test might pass or fail depending on the exact logic
         if not is_backward:
-            self.assert_not_in(d2, scores, "d2 should not have score if not backward")
+            self.assertNotIn(d2, scores, "d2 should not have score if not backward")
     
     def test_backward_pawn_d3(self):
         """Test backward pawn on d3 with black pawns on c5 and e5 attacking d4."""
@@ -449,10 +318,10 @@ class TestPositionalHeatmapRules:
         is_backward = self.backward_pawn_rule._is_backward_pawn(board, 3, 2, chess.WHITE)
         scores = self.backward_pawn_rule.evaluate(board, chess.WHITE)
         
-        self.assert_true(is_backward, "d3 should be identified as backward pawn")
-        self.assert_in(d3, scores, "d3 should have a score")
+        self.assertTrue(is_backward, "d3 should be identified as backward pawn")
+        self.assertIn(d3, scores, "d3 should have a score")
         if d3 in scores:
-            self.assert_less(scores[d3], 0, f"d3 should have negative score (got {scores[d3]})")
+            self.assertLess(scores[d3], 0, f"d3 should have negative score (got {scores[d3]})")
     
     def test_backward_pawn_f2_with_protection(self):
         """Test that f2 is NOT backward because g2 can defend f3."""
@@ -464,8 +333,8 @@ class TestPositionalHeatmapRules:
         is_backward = self.backward_pawn_rule._is_backward_pawn(board, 5, 1, chess.WHITE)
         scores = self.backward_pawn_rule.evaluate(board, chess.WHITE)
         
-        self.assert_false(is_backward, "f2 should NOT be backward (can be defended by g2)")
-        self.assert_not_in(f2, scores, "f2 should not have a score (not backward)")
+        self.assertFalse(is_backward, "f2 should NOT be backward (can be defended by g2)")
+        self.assertNotIn(f2, scores, "f2 should not have a score (not backward)")
     
     def test_backward_pawn_defended_by_adjacent(self):
         """Test backward pawn that is defended by adjacent pawn (c6 defended by b7)."""
@@ -478,14 +347,14 @@ class TestPositionalHeatmapRules:
         is_backward = self.backward_pawn_rule._is_backward_pawn(board, 2, 5, chess.BLACK)
         scores = self.backward_pawn_rule.evaluate(board, chess.BLACK)
         
-        self.assert_true(is_backward, "c6 should be identified as backward pawn")
-        self.assert_in(c6, scores, "c6 should have a score")
+        self.assertTrue(is_backward, "c6 should be identified as backward pawn")
+        self.assertIn(c6, scores, "c6 should have a score")
         if c6 in scores:
             # Should have reduced penalty because it's defended by b7
-            self.assert_less(scores[c6], 0, f"c6 should have negative score (got {scores[c6]})")
+            self.assertLess(scores[c6], 0, f"c6 should have negative score (got {scores[c6]})")
             # Should be less negative than undefended backward pawn
             # Check that it's the defended penalty (should be -8.0 based on config)
-            self.assert_greater(scores[c6], -15.0, f"c6 should have reduced penalty because defended (got {scores[c6]})")
+            self.assertGreater(scores[c6], -15.0, f"c6 should have reduced penalty because defended (got {scores[c6]})")
     
     # ============================================================================
     # ISOLATED PAWN RULE TESTS
@@ -501,10 +370,10 @@ class TestPositionalHeatmapRules:
         scores = self.isolated_pawn_rule.evaluate(board, chess.WHITE)
         is_isolated = self.isolated_pawn_rule._is_isolated_pawn(board, 3, chess.WHITE)
         
-        self.assert_true(is_isolated, "d4 should be isolated (no friendly pawns on adjacent files)")
-        self.assert_in(d4, scores, "d4 should have a score")
+        self.assertTrue(is_isolated, "d4 should be isolated (no friendly pawns on adjacent files)")
+        self.assertIn(d4, scores, "d4 should have a score")
         if d4 in scores:
-            self.assert_less(scores[d4], 0, f"d4 should have negative score (got {scores[d4]})")
+            self.assertLess(scores[d4], 0, f"d4 should have negative score (got {scores[d4]})")
     
     def test_isolated_pawn_not_isolated(self):
         """Test that pawns with friendly pawns on adjacent files are not isolated."""
@@ -516,8 +385,8 @@ class TestPositionalHeatmapRules:
         is_isolated = self.isolated_pawn_rule._is_isolated_pawn(board, 3, chess.WHITE)
         scores = self.isolated_pawn_rule.evaluate(board, chess.WHITE)
         
-        self.assert_false(is_isolated, "d4 should not be isolated (has friendly pawns on adjacent files)")
-        self.assert_not_in(d4, scores, "d4 should not have score (not isolated)")
+        self.assertFalse(is_isolated, "d4 should not be isolated (has friendly pawns on adjacent files)")
+        self.assertNotIn(d4, scores, "d4 should not have score (not isolated)")
     
     def test_isolated_pawn_edge_file(self):
         """Test isolated pawn on edge file."""
@@ -534,9 +403,9 @@ class TestPositionalHeatmapRules:
         
         # Edge file pawns are isolated if no pawn on adjacent file (b file)
         # For edge file (a), only check right file (b)
-        self.assert_true(is_isolated, "a4 should be isolated (edge file, no pawn on b)")
+        self.assertTrue(is_isolated, "a4 should be isolated (edge file, no pawn on b)")
         if is_isolated:
-            self.assert_in(a4, scores, "a4 should have a score if isolated")
+            self.assertIn(a4, scores, "a4 should have a score if isolated")
     
     # ============================================================================
     # DOUBLED PAWN RULE TESTS
@@ -553,11 +422,11 @@ class TestPositionalHeatmapRules:
         d2 = chess.parse_square('d2')
         d3 = chess.parse_square('d3')
         
-        self.assert_in(d2, scores, "d2 should have score (doubled pawn)")
-        self.assert_in(d3, scores, "d3 should have score (doubled pawn)")
+        self.assertIn(d2, scores, "d2 should have score (doubled pawn)")
+        self.assertIn(d3, scores, "d3 should have score (doubled pawn)")
         if d2 in scores and d3 in scores:
-            self.assert_less(scores[d2], 0, f"d2 should have negative score (got {scores[d2]})")
-            self.assert_less(scores[d3], 0, f"d3 should have negative score (got {scores[d3]})")
+            self.assertLess(scores[d2], 0, f"d2 should have negative score (got {scores[d2]})")
+            self.assertLess(scores[d3], 0, f"d3 should have negative score (got {scores[d3]})")
     
     def test_doubled_pawn_central_vs_edge(self):
         """Test that central doubled pawns get reduced penalty."""
@@ -575,7 +444,7 @@ class TestPositionalHeatmapRules:
         
         if d2 in scores and a2 in scores:
             # Central doubled pawns should have less negative score than edge
-            self.assert_greater(scores[d2], scores[a2], f"Central doubled pawn should have less penalty than edge")
+            self.assertGreater(scores[d2], scores[a2], f"Central doubled pawn should have less penalty than edge")
     
     def test_doubled_pawn_open_file_reduction(self):
         """Test that doubled pawns on open files get reduced penalty."""
@@ -589,7 +458,7 @@ class TestPositionalHeatmapRules:
         if d2 in scores:
             # Open file doubled pawns should have reduced penalty (50% of normal)
             # Central file: -6.0, open file: -3.0
-            self.assert_greater(scores[d2], -6.0, f"Open file doubled pawn should have reduced penalty (got {scores[d2]})")
+            self.assertGreater(scores[d2], -6.0, f"Open file doubled pawn should have reduced penalty (got {scores[d2]})")
     
     def test_doubled_pawn_tripled(self):
         """Test tripled pawns (all should get penalty)."""
@@ -604,9 +473,9 @@ class TestPositionalHeatmapRules:
         d6 = chess.parse_square('d6')
         
         # All tripled pawns should have scores
-        self.assert_in(d4, scores, "d4 should have score (tripled pawn)")
-        self.assert_in(d5, scores, "d5 should have score (tripled pawn)")
-        self.assert_in(d6, scores, "d6 should have score (tripled pawn)")
+        self.assertIn(d4, scores, "d4 should have score (tripled pawn)")
+        self.assertIn(d5, scores, "d5 should have score (tripled pawn)")
+        self.assertIn(d6, scores, "d6 should have score (tripled pawn)")
     
     # ============================================================================
     # KING SAFETY RULE TESTS
@@ -627,9 +496,9 @@ class TestPositionalHeatmapRules:
             is_in_check = board.is_attacked_by(chess.BLACK, g1)
             
             if is_in_check:
-                self.assert_in(g1, scores, "King in check should have score")
+                self.assertIn(g1, scores, "King in check should have score")
                 if g1 in scores:
-                    self.assert_less(scores[g1], -20.0, f"King in check should have strong negative score (got {scores[g1]})")
+                    self.assertLess(scores[g1], -20.0, f"King in check should have strong negative score (got {scores[g1]})")
     
     def test_king_safety_open_file(self):
         """Test that king near open file gets penalty."""
@@ -642,7 +511,7 @@ class TestPositionalHeatmapRules:
         
         if g1 in scores:
             # Open file near king should give negative score
-            self.assert_less(scores[g1], 0, f"King near open file should have negative score (got {scores[g1]})")
+            self.assertLess(scores[g1], 0, f"King near open file should have negative score (got {scores[g1]})")
     
     def test_king_safety_semi_open_file(self):
         """Test that king on semi-open file gets penalty."""
@@ -655,7 +524,7 @@ class TestPositionalHeatmapRules:
         
         if g1 in scores:
             # Semi-open file near king should give negative score
-            self.assert_less(scores[g1], 0, f"King on semi-open file should have negative score (got {scores[g1]})")
+            self.assertLess(scores[g1], 0, f"King on semi-open file should have negative score (got {scores[g1]})")
     
     def test_king_safety_pawn_shield(self):
         """Test that king with pawn shield gets bonus."""
@@ -668,7 +537,7 @@ class TestPositionalHeatmapRules:
         
         if g1 in scores:
             # Pawn shield should give positive score
-            self.assert_greater(scores[g1], 0, f"King with pawn shield should have positive score (got {scores[g1]})")
+            self.assertGreater(scores[g1], 0, f"King with pawn shield should have positive score (got {scores[g1]})")
     
     def test_king_safety_exposed_king(self):
         """Test that exposed king gets penalty."""
@@ -685,7 +554,7 @@ class TestPositionalHeatmapRules:
         
         if g1 in scores:
             # Exposed king should give negative score
-            self.assert_less(scores[g1], 0, f"Exposed king should have negative score (got {scores[g1]})")
+            self.assertLess(scores[g1], 0, f"Exposed king should have negative score (got {scores[g1]})")
     
     # ============================================================================
     # WEAK SQUARE RULE TESTS
@@ -703,9 +572,9 @@ class TestPositionalHeatmapRules:
         scores = self.weak_square_rule.evaluate(board, chess.WHITE)
         
         if is_attacked and not is_defended:
-            self.assert_in(d4, scores, "d4 should have score (attacked and undefended)")
+            self.assertIn(d4, scores, "d4 should have score (attacked and undefended)")
             if d4 in scores:
-                self.assert_less(scores[d4], 0, f"d4 should have negative score (got {scores[d4]})")
+                self.assertLess(scores[d4], 0, f"d4 should have negative score (got {scores[d4]})")
     
     def test_weak_square_attacked_defended(self):
         """Test that attacked but defended pieces don't get penalty."""
@@ -721,7 +590,7 @@ class TestPositionalHeatmapRules:
         scores = self.weak_square_rule.evaluate(board, chess.WHITE)
         
         if is_attacked and is_defended:
-            self.assert_not_in(d4, scores, "d4 should not have score (attacked but defended)")
+            self.assertNotIn(d4, scores, "d4 should not have score (attacked but defended)")
     
     def test_weak_square_piece_value_scaling(self):
         """Test that weak square penalty scales with piece value."""
@@ -744,7 +613,7 @@ class TestPositionalHeatmapRules:
             scores = self.weak_square_rule.evaluate(test_board, chess.WHITE)
             if square in scores:
                 # Check that penalty is approximately correct (within reasonable range)
-                self.assert_less(scores[square], 0, f"{piece_type} on weak square should have negative score")
+                self.assertLess(scores[square], 0, f"{piece_type} on weak square should have negative score")
     
     # ============================================================================
     # PIECE ACTIVITY RULE TESTS
@@ -763,7 +632,7 @@ class TestPositionalHeatmapRules:
         
         if d4 in scores and a1 in scores:
             # Knight on d4 should have more moves and higher score
-            self.assert_greater(scores[d4], scores[a1], f"Knight on d4 should have higher score than on a1")
+            self.assertGreater(scores[d4], scores[a1], f"Knight on d4 should have higher score than on a1")
     
     def test_piece_activity_central_control(self):
         """Test that pieces controlling central squares get bonus."""
@@ -776,7 +645,7 @@ class TestPositionalHeatmapRules:
         d4 = chess.parse_square('d4')
         if d4 in scores:
             # Knight on d4 should have positive score (controls central squares)
-            self.assert_greater(scores[d4], 0, f"Knight on d4 should have positive score (got {scores[d4]})")
+            self.assertGreater(scores[d4], 0, f"Knight on d4 should have positive score (got {scores[d4]})")
     
     def test_piece_activity_blocked_piece(self):
         """Test that blocked pieces (no moves) get reduced/zero score."""
@@ -789,7 +658,7 @@ class TestPositionalHeatmapRules:
         a1 = chess.parse_square('a1')
         if a1 in scores:
             # Blocked rook should have low or zero score
-            self.assert_less(scores[a1], 5.0, f"Blocked rook should have low score (got {scores[a1]})")
+            self.assertLess(scores[a1], 5.0, f"Blocked rook should have low score (got {scores[a1]})")
     
     def test_piece_activity_perspective_independence(self):
         """Test that piece activity works correctly regardless of board.turn."""
@@ -813,14 +682,14 @@ class TestPositionalHeatmapRules:
         
         # Both rooks should have bonus for doubled rooks on open file
         if e1 in scores:
-            self.assert_greater(scores[e1], 0, f"e1 should have positive score with doubled rooks bonus (got {scores[e1]})")
+            self.assertGreater(scores[e1], 0, f"e1 should have positive score with doubled rooks bonus (got {scores[e1]})")
             # Should have at least the doubled rooks bonus (20.0) plus mobility
-            self.assert_greater(scores[e1], 19.0, f"e1 should have at least doubled rooks bonus (got {scores[e1]})")
+            self.assertGreater(scores[e1], 19.0, f"e1 should have at least doubled rooks bonus (got {scores[e1]})")
         
         if e3 in scores:
-            self.assert_greater(scores[e3], 0, f"e3 should have positive score with doubled rooks bonus (got {scores[e3]})")
+            self.assertGreater(scores[e3], 0, f"e3 should have positive score with doubled rooks bonus (got {scores[e3]})")
             # Should have at least the doubled rooks bonus (20.0) plus mobility
-            self.assert_greater(scores[e3], 19.0, f"e3 should have at least doubled rooks bonus (got {scores[e3]})")
+            self.assertGreater(scores[e3], 19.0, f"e3 should have at least doubled rooks bonus (got {scores[e3]})")
     
     # ============================================================================
     # UNDEVELOPED PIECE RULE TESTS
@@ -848,14 +717,13 @@ class TestPositionalHeatmapRules:
         scores = self.undeveloped_piece_rule.evaluate(board, chess.BLACK)
         
         # Assertions: undeveloped rook should be penalized
-        self.assert_true(is_on_starting_square, "h8 should be a starting square for black rook")
-        self.assert_equals(num_moves, 0, f"h8 rook should have no legal moves (blocked by h7 pawn), got {num_moves}")
-        self.assert_in(h8, scores, "h8 should have a score (undeveloped)")
+        self.assertTrue(is_on_starting_square, "h8 should be a starting square for black rook")
+        self.assertEqual(num_moves, 0, f"h8 rook should have no legal moves (blocked by h7 pawn), got {num_moves}")
+        self.assertIn(h8, scores, "h8 should have a score (undeveloped)")
         if h8 in scores:
-            self.assert_less(scores[h8], 0, f"h8 should have negative score (got {scores[h8]})")
+            self.assertLess(scores[h8], 0, f"h8 should have negative score (got {scores[h8]})")
 
 
 if __name__ == "__main__":
-    test_suite = TestPositionalHeatmapRules()
-    test_suite.run_all_tests()
+    unittest.main()
 
