@@ -1828,6 +1828,50 @@ class MainWindow(QMainWindow):
         self.database_panel.tab_widget.setCurrentIndex(tab_index)
         self._on_database_tab_changed(tab_index)
     
+    def _open_brilliant_moves_in_search_results(self) -> None:
+        """Open brilliant moves for the current player in a Search Results tab."""
+        self._open_significant_moves_in_search_results("brilliant")
+
+    def _open_misses_in_search_results(self) -> None:
+        """Open misses for the current player in a Search Results tab."""
+        self._open_significant_moves_in_search_results("misses")
+
+    def _open_blunders_in_search_results(self) -> None:
+        """Open blunders for the current player in a Search Results tab."""
+        self._open_significant_moves_in_search_results("blunders")
+
+    def _open_significant_moves_in_search_results(self, move_type: str) -> None:
+        """Open brilliant moves, misses, or blunders in a Search Results tab."""
+        if not hasattr(self, "database_panel"):
+            return
+        ui_config = self.config.get("ui", {})
+        panel_config = ui_config.get("panels", {}).get("detail", {})
+        player_stats_config = panel_config.get("player_stats", {})
+        significant_config = player_stats_config.get("significant_moves", {})
+        if move_type == "brilliant":
+            cfg = significant_config.get("brilliant_moves") or player_stats_config.get("brilliant_moves", {})
+        elif move_type == "misses":
+            cfg = significant_config.get("misses", {})
+        else:
+            cfg = significant_config.get("blunders", {})
+        max_moves = int(cfg.get("max_moves", 999))
+
+        stats_controller = self.controller.get_player_stats_controller()
+        if move_type == "brilliant":
+            items = stats_controller.get_top_brilliant_moves_with_sources_and_ply(max_moves)
+        elif move_type == "misses":
+            items = stats_controller.get_top_misses_with_sources_and_ply(max_moves)
+        else:
+            items = stats_controller.get_top_blunders_with_sources_and_ply(max_moves)
+        if not items:
+            return
+
+        search_controller = self.controller.get_search_controller()
+        search_results_model = search_controller.create_search_results_model(items)
+        tab_index = self.database_panel.add_search_results_tab(search_results_model)
+        self.database_panel.tab_widget.setCurrentIndex(tab_index)
+        self._on_database_tab_changed(tab_index)
+    
     def _find_search_results_tab(self) -> Optional[int]:
         """Find the index of the Search Results tab.
         
@@ -2651,6 +2695,9 @@ class MainWindow(QMainWindow):
                 self.detail_panel.player_stats_view._on_open_pattern_games_in_search_results = self._open_pattern_games_in_search_results
                 self.detail_panel.player_stats_view._on_open_best_games_in_search_results = self._open_best_games_in_search_results
                 self.detail_panel.player_stats_view._on_open_worst_games_in_search_results = self._open_worst_games_in_search_results
+                self.detail_panel.player_stats_view._on_open_brilliant_moves_in_search_results = self._open_brilliant_moves_in_search_results
+                self.detail_panel.player_stats_view._on_open_misses_in_search_results = self._open_misses_in_search_results
+                self.detail_panel.player_stats_view._on_open_blunders_in_search_results = self._open_blunders_in_search_results
                 # Database connections are now handled by the controller
         
         # Set moves list model in game analysis controller
@@ -4404,11 +4451,16 @@ Visibility Settings:
         if game is None:
             return
         
+        game_controller = self.controller.get_game_controller()
         # Set the game as active
-        self.controller.get_game_controller().set_active_game(game)
-        status_message = self.controller.get_game_controller().format_active_game_status_message(game)
+        game_controller.set_active_game(game)
+        status_message = game_controller.format_active_game_status_message(game)
         if status_message:
             self.controller.set_status(status_message)
+        # If this row has a reference ply (e.g. from a brilliant-move search), navigate to it
+        ref_ply = getattr(game, "ref_ply", 0)
+        if isinstance(ref_ply, int) and ref_ply > 0:
+            game_controller.navigate_to_ply(ref_ply)
     
     def _add_engine(self) -> None:
         """Open dialog to add a new engine."""

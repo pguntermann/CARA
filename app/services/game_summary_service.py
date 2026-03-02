@@ -36,6 +36,15 @@ class PlayerStatistics:
 
 
 @dataclass
+class PlayerMoveInfo:
+    """Color-agnostic move data for one player move (SAN, assessment, CPL, top3)."""
+    move_san: str
+    assessment: str
+    cpl: Optional[str]
+    is_top3: bool
+
+
+@dataclass
 class PhaseStatistics:
     """Statistics for a game phase (Opening, Middlegame, Endgame)."""
     moves: int
@@ -343,23 +352,33 @@ class GameSummaryService:
         black_average_cpl_endgame = self._calculate_phase_average_cpl(black_endgame_moves, black_cpl_field, black_assess_field)
         
         # Calculate player statistics with all phase information (phase move counts and phase CPLs)
+        white_moves = self._extract_player_moves(moves, is_white=True)
+        black_moves = self._extract_player_moves(moves, is_white=False)
+        white_has_won = 1 if game_result == "1-0" else 0
+        white_has_drawn = 1 if (game_result in ("1/2-1/2", "", "*") or not game_result) else 0
+        black_has_won = 1 if game_result == "0-1" else 0
+        black_has_drawn = 1 if (game_result in ("1/2-1/2", "", "*") or not game_result) else 0
         white_stats = self._calculate_player_statistics(
-            moves, is_white=True, game_result=game_result,
+            white_moves,
+            has_won=white_has_won,
+            has_drawn=white_has_drawn,
             opening_moves=opening_moves_count,
             middlegame_moves=middlegame_moves_count,
             endgame_moves=endgame_moves_count,
             average_cpl_opening=white_average_cpl_opening,
             average_cpl_middlegame=white_average_cpl_middlegame,
-            average_cpl_endgame=white_average_cpl_endgame
+            average_cpl_endgame=white_average_cpl_endgame,
         )
         black_stats = self._calculate_player_statistics(
-            moves, is_white=False, game_result=game_result,
+            black_moves,
+            has_won=black_has_won,
+            has_drawn=black_has_drawn,
             opening_moves=opening_moves_count,
             middlegame_moves=middlegame_moves_count,
             endgame_moves=endgame_moves_count,
             average_cpl_opening=black_average_cpl_opening,
             average_cpl_middlegame=black_average_cpl_middlegame,
-            average_cpl_endgame=black_average_cpl_endgame
+            average_cpl_endgame=black_average_cpl_endgame,
         )
         
         # Classify endgame type - check all moves in the endgame phase to find the most specific type
@@ -446,16 +465,47 @@ class GameSummaryService:
         
         return summary
     
-    def _calculate_player_statistics(self, moves: List[MoveData], is_white: bool, game_result: Optional[str] = None,
-                                     opening_moves: int = 0, middlegame_moves: int = 0, endgame_moves: int = 0,
-                                     average_cpl_opening: float = 0.0, average_cpl_middlegame: float = 0.0,
-                                     average_cpl_endgame: float = 0.0) -> PlayerStatistics:
-        """Calculate statistics for a single player.
+    def _extract_player_moves(self, moves: List[MoveData], is_white: bool) -> List[PlayerMoveInfo]:
+        """Extract color-agnostic player move info from MoveData list for one side."""
+        if is_white:
+            move_field, assess_field, cpl_field, top3_field = (
+                "white_move", "assess_white", "cpl_white", "white_is_top3"
+            )
+        else:
+            move_field, assess_field, cpl_field, top3_field = (
+                "black_move", "assess_black", "cpl_black", "black_is_top3"
+            )
+        out: List[PlayerMoveInfo] = []
+        for move in moves:
+            move_san = getattr(move, move_field, "") or ""
+            if not move_san:
+                continue
+            out.append(PlayerMoveInfo(
+                move_san=move_san,
+                assessment=getattr(move, assess_field, "") or "",
+                cpl=getattr(move, cpl_field, None) or None,
+                is_top3=bool(getattr(move, top3_field, False)),
+            ))
+        return out
+
+    def _calculate_player_statistics(
+        self,
+        player_moves: List[PlayerMoveInfo],
+        has_won: int = 0,
+        has_drawn: int = 0,
+        opening_moves: int = 0,
+        middlegame_moves: int = 0,
+        endgame_moves: int = 0,
+        average_cpl_opening: float = 0.0,
+        average_cpl_middlegame: float = 0.0,
+        average_cpl_endgame: float = 0.0,
+    ) -> PlayerStatistics:
+        """Calculate statistics from a color-agnostic list of player moves.
         
         Args:
-            moves: List of MoveData instances.
-            is_white: True for White, False for Black.
-            game_result: Optional game result string ("1-0", "0-1", "1/2-1/2", "", "*", or None).
+            player_moves: List of PlayerMoveInfo (one entry per player move, any color).
+            has_won: 1 if the player won (for formula), 0 otherwise.
+            has_drawn: 1 if the player drew (for formula), 0 otherwise.
             opening_moves: Total number of moves in opening phase.
             middlegame_moves: Total number of moves in middlegame phase.
             endgame_moves: Total number of moves in endgame phase.
@@ -466,21 +516,8 @@ class GameSummaryService:
         Returns:
             PlayerStatistics instance.
         """
-        # Get relevant fields based on player
-        if is_white:
-            cpl_field = 'cpl_white'
-            assess_field = 'assess_white'
-            move_field = 'white_move'
-            is_top3_field = 'white_is_top3'
-        else:
-            cpl_field = 'cpl_black'
-            assess_field = 'assess_black'
-            move_field = 'black_move'
-            is_top3_field = 'black_is_top3'
-        
-        # Count moves and classifications
         total_moves = 0
-        non_book_moves = 0  # All moves except book moves (renamed from analyzed_moves)
+        non_book_moves = 0
         book_moves = 0
         brilliant_moves = 0
         best_moves = 0
@@ -490,24 +527,18 @@ class GameSummaryService:
         mistakes = 0
         misses = 0
         blunders = 0
-        
         cpl_values: List[float] = []
-        
-        for move in moves:
-            move_str = getattr(move, move_field)
-            if not move_str:  # Skip empty moves
+
+        for move in player_moves:
+            if not move.move_san:
                 continue
-            
             total_moves += 1
-            assessment = getattr(move, assess_field)
-            cpl_str = getattr(move, cpl_field)
-            is_top3 = getattr(move, is_top3_field, False)
-            
-            # Count top3 moves (excluding book moves)
+            assessment = move.assessment
+            cpl_str = move.cpl
+            is_top3 = move.is_top3
+
             if is_top3 and assessment != "Book Move":
                 top3_moves += 1
-            
-            # Count classifications
             if assessment == "Book Move":
                 book_moves += 1
             elif assessment.startswith("Brilliant"):
@@ -531,25 +562,18 @@ class GameSummaryService:
             elif assessment == "Blunder":
                 blunders += 1
                 non_book_moves += 1
-            
-            # Parse CPL (exclude book moves)
+
             if cpl_str and assessment != "Book Move":
                 try:
-                    cpl = float(cpl_str)
-                    cpl_values.append(cpl)
+                    cpl_values.append(float(cpl_str))
                 except (ValueError, TypeError):
                     pass
-        
-        # Calculate CPL statistics
-        # Cap very high CPL values (e.g., from blunders leading to mate) to prevent skewing the average
-        # A reasonable cap is 500 centipawns - represents a catastrophic blunder but not infinite loss
-        CPL_CAP_FOR_AVERAGE = 500.0  # Cap CPL at 500 centipawns for average calculation
+
+        CPL_CAP_FOR_AVERAGE = 500.0
         if cpl_values:
             cpl_values_sorted = sorted(cpl_values)
-            # Cap CPL values when calculating average to prevent extreme outliers from skewing results
             capped_cpl_values = [min(cpl, CPL_CAP_FOR_AVERAGE) for cpl in cpl_values]
             average_cpl = sum(capped_cpl_values) / len(capped_cpl_values)
-            # Calculate median correctly
             n = len(cpl_values_sorted)
             if n % 2 == 0:
                 median_cpl = (cpl_values_sorted[n // 2 - 1] + cpl_values_sorted[n // 2]) / 2.0
@@ -562,24 +586,14 @@ class GameSummaryService:
             median_cpl = 0.0
             min_cpl = 0.0
             max_cpl = 0.0
-        
-        # Calculate game result variables
-        if is_white:
-            has_won = 1 if game_result == "1-0" else 0
-            has_drawn = 1 if (game_result == "1/2-1/2" or not game_result or game_result == "*") else 0
-        else:
-            has_won = 1 if game_result == "0-1" else 0
-            has_drawn = 1 if (game_result == "1/2-1/2" or not game_result or game_result == "*") else 0
-        
-        # Calculate rates
+
         if total_moves > 0:
             blunder_rate = blunders / total_moves
             mistake_rate = mistakes / total_moves
         else:
             blunder_rate = 0.0
             mistake_rate = 0.0
-        
-        # Calculate accuracy using customizable formula (with phase variables)
+
         accuracy = self._evaluate_accuracy_formula(
             average_cpl=average_cpl,
             average_cpl_opening=average_cpl_opening,
@@ -606,8 +620,7 @@ class GameSummaryService:
             has_won=has_won,
             has_drawn=has_drawn
         )
-        
-        # Calculate estimated ELO using customizable formula (with phase variables)
+
         estimated_elo = self._evaluate_elo_formula(
             average_cpl=average_cpl,
             average_cpl_opening=average_cpl_opening,

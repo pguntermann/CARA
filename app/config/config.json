@@ -1085,6 +1085,11 @@
           "placeholder_text_no_source": "Select a data source above to view player statistics.",
           "placeholder_text_no_analyzed_players": "No players with at least 2 analyzed games found in selected database(s).",
           "placeholder_text_loading": "Loading players...",
+          "significant_moves": {
+            "brilliant_moves": { "max_moves": 999 },
+            "misses": { "max_moves": 999 },
+            "blunders": { "max_moves": 999 }
+          },
           "colors": {
             "text_color": [
               220,

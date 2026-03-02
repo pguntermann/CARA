@@ -162,7 +162,13 @@ class SearchController:
         """
         search_results_model = DatabaseModel(config=self.config)
         
-        for game, db_name in matching_results:
+        for item in matching_results:
+            # Support tuples of (game, db_name) and (game, db_name, ref_ply)
+            if len(item) == 3:
+                game, db_name, ref_ply = item  # type: ignore[misc]
+            else:
+                game, db_name = item  # type: ignore[misc]
+                ref_ply = getattr(game, "ref_ply", 0)
             # Create a copy of the game with source database info
             game_copy = GameData(
                 game_number=0,  # Will be set by model
@@ -181,7 +187,8 @@ class SearchController:
                 analyzed=game.analyzed,
                 annotated=getattr(game, "annotated", False),
                 source_database=db_name,
-                file_position=0  # Search results don't have file position
+                file_position=0,  # Search results don't have file position
+                ref_ply=ref_ply,
             )
             
             # Extract tags from existing game's PGN (game is being copied for search results)

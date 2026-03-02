@@ -29,7 +29,8 @@ class GameData:
                  analyzed: bool = False,
                  annotated: bool = False,
                  source_database: str = "",
-                 file_position: int = 0) -> None:
+                 file_position: int = 0,
+                 ref_ply: int = 0) -> None:
         """Initialize game data.
         
         Args:
@@ -50,6 +51,8 @@ class GameData:
                 annotated: Whether the game has saved annotations (has CARAAnnotations tag).
             source_database: Name of the database this game came from (for search results).
             file_position: Original position of game in file (1-based, 0 if not from file).
+            ref_ply: Optional reference ply index used by search results to open a game
+                at a specific move (e.g. a brilliant move). 0 means "no specific ply".
         """
         self.game_number = game_number
         self.white = white
@@ -68,6 +71,7 @@ class GameData:
         self.annotated = annotated
         self.source_database = source_database
         self.file_position = file_position
+        self.ref_ply = ref_ply
 
 
 class DatabaseModel(QAbstractTableModel):
@@ -97,7 +101,8 @@ class DatabaseModel(QAbstractTableModel):
     COL_ANALYZED = 15
     COL_ANNOTATED = 16
     COL_SOURCE_DB = 17
-    COL_PGN = 18
+    COL_REF_PLY = 18
+    COL_PGN = 19
     
     def __init__(self, file_path: Optional[str] = None, config: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the database model.
@@ -132,9 +137,9 @@ class DatabaseModel(QAbstractTableModel):
             parent: Parent index (unused for table models).
             
         Returns:
-            Number of columns (19: includes TimeControl, TC Type).
+            Number of columns (20: includes TimeControl, TC Type, Ref Ply).
         """
-        return 19
+        return 20
     
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         """Get item flags for the given index.
@@ -227,6 +232,9 @@ class DatabaseModel(QAbstractTableModel):
             return "✓" if getattr(game, "annotated", False) else ""
         elif col == self.COL_SOURCE_DB:
             return game.source_database
+        elif col == self.COL_REF_PLY:
+            # 0 means "no specific reference ply" so display empty string
+            return game.ref_ply if getattr(game, "ref_ply", 0) > 0 else ""
         elif col == self.COL_PGN:
             # Return raw PGN text (presentation formatting handled by view/delegate)
             return game.pgn
@@ -248,7 +256,28 @@ class DatabaseModel(QAbstractTableModel):
             return None
         
         if orientation == Qt.Orientation.Horizontal:
-            headers = ["#", "# in File", "●", "White", "Black", "WhiteElo", "BlackElo", "Result", "Date", "Event", "Site", "Moves", "ECO", "TimeControl", "TC Type", "Analyzed", "Annotated", "Source DB", "PGN"]
+            headers = [
+                "#",
+                "# in File",
+                "●",
+                "White",
+                "Black",
+                "WhiteElo",
+                "BlackElo",
+                "Result",
+                "Date",
+                "Event",
+                "Site",
+                "Moves",
+                "ECO",
+                "TimeControl",
+                "TC Type",
+                "Analyzed",
+                "Annotated",
+                "Source DB",
+                "Ref Ply",
+                "PGN",
+            ]
             if 0 <= section < len(headers):
                 return headers[section]
         
@@ -892,6 +921,8 @@ class DatabaseModel(QAbstractTableModel):
                 return getattr(game, "annotated", False)
             elif column == self.COL_SOURCE_DB:
                 return game.source_database or ""
+            elif column == self.COL_REF_PLY:
+                return getattr(game, "ref_ply", 0)
             elif column == self.COL_PGN:
                 return game.pgn or ""
             else:

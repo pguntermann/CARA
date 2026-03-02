@@ -600,9 +600,12 @@ class DatabasePanel(QWidget):
                 tab_data['model'] = model
                 tab_table = tab_data['table']
                 tab_table.setModel(model)
-                # Ensure Source DB column is visible for search results
+                # Ensure Source DB (and Ref Ply) columns are visible for search results
                 source_db_col = model.COL_SOURCE_DB
                 tab_table.setColumnHidden(source_db_col, False)
+                if hasattr(model, "COL_REF_PLY"):
+                    ref_ply_col = model.COL_REF_PLY
+                    tab_table.setColumnHidden(ref_ply_col, False)
                 # Refresh the view
                 tab_table.update()
                 tab_table.viewport().update()
@@ -617,13 +620,16 @@ class DatabasePanel(QWidget):
         # Update tab label to "Search Results"
         self.tab_widget.setTabText(tab_index, "Search Results")
         
-        # Ensure Source DB column is visible for search results
+        # Ensure Source DB (and Ref Ply) columns are visible for search results
         tab_data = self._tab_models.get(tab_index)
         if tab_data:
             tab_table = tab_data.get('table')
             if tab_table:
                 source_db_col = model.COL_SOURCE_DB
                 tab_table.setColumnHidden(source_db_col, False)
+                if hasattr(model, "COL_REF_PLY"):
+                    ref_ply_col = model.COL_REF_PLY
+                    tab_table.setColumnHidden(ref_ply_col, False)
         
         return tab_index
     
