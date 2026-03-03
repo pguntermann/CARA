@@ -58,26 +58,16 @@ jobs:
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Create Windows ZIP
+      - name: Upload Windows artifact
         if: matrix.platform == 'windows'
-        shell: pwsh
-        run: |
-          $version = "${{ steps.version.outputs.version }}"
-          $zipName = "CARA.$version.windows.AppBundle.zip"
-          Compress-Archive -Path "dist\CARA\*" -DestinationPath $zipName
-          echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
-
-      - name: Create macOS ZIP
-        if: matrix.platform == 'macos'
-        shell: bash
-        run: |
-          version="${{ steps.version.outputs.version }}"
-          zipName="CARA.${version}.macOS.AppBundle.zip"
-          (cd dist && zip -r "../$zipName" CARA.app)
-          echo "ZIP_NAME=$zipName" >> $GITHUB_ENV
-
-      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: CARA.${{ steps.version.outputs.version }}.${{ matrix.platform_display }}.AppBundle
-          path: ${{ env.ZIP_NAME }}
+          path: dist/CARA
+
+      - name: Upload macOS artifact
+        if: matrix.platform == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: CARA.${{ steps.version.outputs.version }}.${{ matrix.platform_display }}.AppBundle
+          path: dist/CARA.app
