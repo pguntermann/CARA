@@ -1,0 +1,81 @@
+# Build Windows and macOS app bundles (manual trigger only).
+# Outputs are uploaded as workflow artifacts only; no public release.
+
+name: Build AppBundles
+
+on:
+  workflow_dispatch:
+    inputs:
+      use_config_version:
+        description: 'Use version from config.json (if false, use timestamp)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            spec: CARA_windows.spec
+            platform: windows
+          - os: macos-latest
+            spec: CARA_macos.spec
+            platform: macos
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller ${{ matrix.spec }}
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event.inputs.use_config_version }}" = "true" ]; then
+            VERSION=$(python -c "import json; print(json.load(open('app/config/config.json'))['version'])")
+          else
+            VERSION=$(date +%Y%m%d_%H%M%S)
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Windows ZIP
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $zipName = "CARA.$version.windows.AppBundle.zip"
+          Compress-Archive -Path "dist\CARA\*" -DestinationPath $zipName
+          echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
+
+      - name: Create macOS ZIP
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          zipName="CARA.${version}.macOS.AppBundle.zip"
+          (cd dist && zip -r "../$zipName" CARA.app)
+          echo "ZIP_NAME=$zipName" >> $GITHUB_ENV
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CARA-${{ matrix.platform }}-AppBundle
+          path: ${{ env.ZIP_NAME }}
