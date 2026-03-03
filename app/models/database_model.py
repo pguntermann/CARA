@@ -118,6 +118,11 @@ class DatabaseModel(QAbstractTableModel):
         self._unique_tags: Set[str] = set()  # Cache of unique tag names found in games
         self.file_path: Optional[str] = file_path  # File path for file-based databases, None for clipboard
         self._config: Dict[str, Any] = config or {}
+        # Maximum number of characters to show in the PGN column (preview only).
+        # Full PGN remains available via game.pgn for exports and detail views.
+        ui_cfg = (self._config.get("ui") or {})
+        db_panel_cfg = ui_cfg.get("panels", {}).get("database", {})
+        self._pgn_preview_max_len: int = db_panel_cfg.get("pgn_col_max_chars", 250)
     
     def rowCount(self, parent=None) -> int:
         """Get number of rows in the model.
@@ -236,8 +241,18 @@ class DatabaseModel(QAbstractTableModel):
             # 0 means "no specific reference ply" so display empty string
             return game.ref_ply if getattr(game, "ref_ply", 0) > 0 else ""
         elif col == self.COL_PGN:
-            # Return raw PGN text (presentation formatting handled by view/delegate)
-            return game.pgn
+            # Return a cached, single-line preview of the PGN for display.
+            # The full PGN is still available on game.pgn and is used for exports.
+            preview = getattr(game, "_pgn_preview", None)
+            if preview is None:
+                text = (game.pgn or "").replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+                max_len = self._pgn_preview_max_len
+                if len(text) > max_len:
+                    preview = text[: max_len - 1] + "…"
+                else:
+                    preview = text
+                setattr(game, "_pgn_preview", preview)
+            return preview
         
         return None
     

@@ -521,26 +521,9 @@ class DatabasePanel(QWidget):
 
         # Apply styling
         self._configure_table_styling_for_table(tab_table)
-        
-        # Set delegate for PGN column
-        from PyQt6.QtWidgets import QStyledItemDelegate
-        from PyQt6.QtCore import Qt
-        
-        class PgnColumnDelegate(QStyledItemDelegate):
-            """Delegate for PGN column that formats text for display."""
-            def paint(self, painter, option, index):
-                option.textElideMode = Qt.TextElideMode.ElideNone
-                super().paint(painter, option, index)
-            
-            def displayText(self, value, locale):
-                if value is None:
-                    return ""
-                text = str(value)
-                return text.replace('\n', ' ').replace('\r', ' ')
-        
-        pgn_column = model.COL_PGN
-        tab_table.setItemDelegateForColumn(pgn_column, PgnColumnDelegate())
-        tab_table.setWordWrap(True)
+
+        # Use single-line rows with truncation; no word wrap needed for PGN preview
+        tab_table.setWordWrap(False)
         
         # Connect double-click signal
         tab_table.doubleClicked.connect(self._on_table_double_click)
@@ -946,10 +929,14 @@ class DatabasePanel(QWidget):
         if not column_indices:
             progress_service.set_status("No columns to copy")
             return
-        # Export "●" column as "●" or "" by row unsaved state; cell DisplayRole stays "" so UI shows only icon
+        # Export "●" column as "●" or "" by row unsaved state; cell DisplayRole stays "" so UI shows only icon.
+        # Also export full PGN text for the PGN column (model DisplayRole uses a shortened preview for performance).
         def cell_value_override(row: int, col: int, m: DatabaseModel) -> Optional[str]:
             if col == m.COL_UNSAVED:
                 return "●" if m.is_row_unsaved(row) else ""
+            if col == m.COL_PGN:
+                game = m.get_game(row)
+                return "" if game is None else (game.pgn or "")
             return None
 
         text = table_to_delimited(
