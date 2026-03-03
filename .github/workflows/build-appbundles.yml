@@ -38,6 +38,10 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install UPX (macOS)
+        if: matrix.platform == 'macos'
+        run: brew install upx
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
