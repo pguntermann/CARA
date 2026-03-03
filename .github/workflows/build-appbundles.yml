@@ -48,9 +48,6 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller==6.18.0
 
-      - name: Build with PyInstaller
-        run: pyinstaller ${{ matrix.spec }}
-
       - name: Get version
         id: version
         shell: bash
@@ -61,6 +58,26 @@ jobs:
             VERSION=$(date +%Y%m%d_%H%M%S)
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update config.json version for timestamp builds
+        if: github.event.inputs.use_config_version == 'false'
+        shell: bash
+        env:
+          BUILD_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python - << 'EOF'
+          import json
+          import os
+          from pathlib import Path
+
+          cfg_path = Path("app/config/config.json")
+          data = json.loads(cfg_path.read_text(encoding="utf-8"))
+          data["version"] = os.environ["BUILD_VERSION"]
+          cfg_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+          EOF
+
+      - name: Build with PyInstaller
+        run: pyinstaller ${{ matrix.spec }}
 
       - name: Upload Windows artifact
         if: matrix.platform == 'windows'
