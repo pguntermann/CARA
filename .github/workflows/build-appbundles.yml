@@ -46,7 +46,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller==6.18.0
 
       - name: Build with PyInstaller
         run: pyinstaller ${{ matrix.spec }}
@@ -75,7 +75,10 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
           zipName="CARA.${version}.macOS.AppBundle.zip"
-          (cd dist && zip -r "../$zipName" CARA.app)
+          # Use -y to store symlinks instead of following them; this keeps the ZIP
+          # size aligned with the local PyInstaller bundle, which relies on symlinks
+          # between Resources and Frameworks.
+          (cd dist && zip -ry "../$zipName" CARA.app)
           echo "ZIP_NAME=$zipName" >> $GITHUB_ENV
 
       - name: Upload macOS artifact
