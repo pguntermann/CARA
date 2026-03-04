@@ -4948,6 +4948,12 @@
       "strip_pua_characters": true
     }
   },
+  "parallel_processing": {
+    "process_pool": {
+      "max_workers_cap": 60,
+      "reserved_cores": 2
+    }
+  },
   "logging": {
     "console": {
       "enabled": true,

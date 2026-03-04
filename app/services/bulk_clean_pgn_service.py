@@ -8,6 +8,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from app.models.database_model import DatabaseModel, GameData
 from app.services.pgn_cleaning_service import PgnCleaningService
 from app.services.logging_service import LoggingService, init_worker_logging
+from app.utils.concurrency_utils import get_process_pool_max_workers
 
 
 @dataclass
@@ -147,8 +148,8 @@ class BulkCleanPgnService:
                 games_skipped=total_games
             )
         
-        # Determine worker count (reserve 1-2 cores for UI)
-        max_workers = max(1, os.cpu_count() - 2)
+        # Worker count from config (reserved_cores + max_workers_cap)
+        max_workers = get_process_pool_max_workers(os.cpu_count(), self.config)
         
         # Collect all updated games for batch update
         updated_games = []

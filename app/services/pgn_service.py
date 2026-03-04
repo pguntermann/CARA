@@ -12,6 +12,7 @@ from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from app.services.logging_service import LoggingService, init_worker_logging
+from app.utils.concurrency_utils import get_process_pool_max_workers
 
 
 class PgnParseResult:
@@ -507,7 +508,11 @@ class PgnService:
         return chunks
     
     @staticmethod
-    def parse_pgn_text(pgn_text: str, progress_callback: Optional[Callable[[int, str], None]] = None) -> PgnParseResult:
+    def parse_pgn_text(
+        pgn_text: str,
+        progress_callback: Optional[Callable[[int, str], None]] = None,
+        config: Optional[dict] = None
+    ) -> PgnParseResult:
         """Parse PGN text and extract game data using parallel processing.
         
         This method normalizes the PGN text sequentially, then splits it into game chunks
@@ -521,6 +526,7 @@ class PgnService:
                              - Boundary Detection: 20-40%
                              - Splitting: 40-42%
                              - Parsing: 42-100%
+            config: Optional app config for parallel_processing.process_pool.max_workers_cap.
             
         Returns:
             PgnParseResult with parsed game data or error message.
@@ -566,9 +572,8 @@ class PgnService:
             # Phase 4: Parse chunks in parallel
             total_games = len(chunks)
             
-            # Calculate number of worker processes (reserve 1-2 cores for UI)
-            cpu_count = os.cpu_count() or 4
-            max_workers = max(1, cpu_count - 2)
+            # Worker count from config (reserved_cores + max_workers_cap)
+            max_workers = get_process_pool_max_workers(os.cpu_count(), config)
             
             games: List[Optional[Dict[str, Any]]] = [None] * total_games
             completed_count = 0
