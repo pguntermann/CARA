@@ -829,7 +829,8 @@
   "engine_assignments": {
     "game_analysis": null,
     "evaluation": null,
-    "manual_analysis": null
+    "manual_analysis": null,
+    "brilliancy_detection": null
   },
   "profile_order": [
     "Moves and Opening Info",
