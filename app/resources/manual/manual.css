@@ -141,10 +141,46 @@
             border: 1px solid rgb(60, 60, 65);
         }
         
+        .toc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+        
         nav h3 {
             margin-top: 0;
-            margin-bottom: 10px;
+            margin-bottom: 0;
             font-size: 1.2em;
+        }
+        
+        .toc-toggle-btn {
+            flex-shrink: 0;
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            border: 1px solid rgb(80, 80, 90);
+            border-radius: 4px;
+            background-color: rgb(55, 55, 60);
+            color: rgb(220, 220, 220);
+            font-size: 1.1em;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+        }
+        
+        .toc-toggle-btn:hover {
+            background-color: rgb(65, 65, 70);
+            border-color: rgb(100, 100, 110);
+            color: rgb(240, 240, 240);
+        }
+        
+        nav.sub-subsections-hidden ul ul ul {
+            display: none;
         }
         
         nav ul {
@@ -172,7 +208,9 @@
         }
         
         nav ul ul ul {
-            display: none; /* Hide sub-sub sections */
+            margin-left: 20px;
+            margin-top: 2px;
+            margin-bottom: 2px;
         }
         
         nav ul li {
