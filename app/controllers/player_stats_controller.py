@@ -282,6 +282,7 @@ class PlayerStatsController(QObject):
         # Worker threads
         self._dropdown_worker: Optional[PlayerDropdownWorker] = None
         self._stats_worker: Optional[PlayerStatsCalculationWorker] = None
+        self._recalc_pending: bool = False  # Coalesce recalc requests while worker is running
         
         # Database change tracking
         self._connected_databases: List[DatabaseModel] = []
@@ -802,7 +803,7 @@ class PlayerStatsController(QObject):
     # Worker management
     
     def _cancel_stats_worker(self) -> None:
-        """Cancel any running stats worker and clean up."""
+        """Cancel any running stats worker and clean up. Never deletes a running QThread."""
         if self._stats_worker:
             try:
                 is_running = self._stats_worker.isRunning()
@@ -812,51 +813,34 @@ class PlayerStatsController(QObject):
                 is_running = False
             
             if is_running:
+                # Request cooperative shutdown; do NOT wait or deleteLater here.
+                # _on_stats_worker_finished will perform cleanup when the thread actually stops.
                 self._stats_worker.cancel()
-                # Wait for worker to finish (with longer timeout for ProcessPoolExecutor shutdown)
-                if not self._stats_worker.wait(10000):  # Wait up to 10 seconds
-                    # If it didn't finish, disconnect signals and delete later
-                    try:
-                        self._stats_worker.stats_ready.disconnect()
-                        self._stats_worker.stats_unavailable.disconnect()
-                        self._stats_worker.progress_update.disconnect()
-                        self._stats_worker.finished.disconnect()
-                    except (RuntimeError, TypeError):
-                        pass
-                    self._stats_worker.deleteLater()
-                    self._stats_worker = None
-                else:
-                    # Worker finished, disconnect and clean up
-                    try:
-                        self._stats_worker.stats_ready.disconnect()
-                        self._stats_worker.stats_unavailable.disconnect()
-                        self._stats_worker.progress_update.disconnect()
-                        self._stats_worker.finished.disconnect()
-                    except (RuntimeError, TypeError):
-                        pass
-                    self._stats_worker.deleteLater()
-                    self._stats_worker = None
-            else:
-                # Worker not running, just clean up
-                try:
-                    self._stats_worker.stats_ready.disconnect()
-                    self._stats_worker.stats_unavailable.disconnect()
-                    self._stats_worker.progress_update.disconnect()
-                    self._stats_worker.finished.disconnect()
-                except (RuntimeError, TypeError):
-                    pass
-                self._stats_worker.deleteLater()
-                self._stats_worker = None
+                return
+            # Worker not running: safe to disconnect and delete
+            try:
+                self._stats_worker.stats_ready.disconnect()
+                self._stats_worker.stats_unavailable.disconnect()
+                self._stats_worker.progress_update.disconnect()
+                self._stats_worker.finished.disconnect()
+            except (RuntimeError, TypeError):
+                pass
+            self._stats_worker.deleteLater()
+            self._stats_worker = None
     
     def _schedule_stats_recalculation(self) -> None:
-        """Schedule an asynchronous statistics recalculation."""
+        """Schedule an asynchronous statistics recalculation. Coalesces requests while a worker is running."""
         if not self._current_player:
             return
         
-        # Cancel any running worker
-        self._cancel_stats_worker()
+        # If a worker is already running, mark that we need one more run when it finishes
+        if self._stats_worker and self._stats_worker.isRunning():
+            self._recalc_pending = True
+            return
         
-        # Create and start new worker
+        self._recalc_pending = False
+        self._cancel_stats_worker()  # Clean up any finished worker
+        
         self._stats_worker = PlayerStatsCalculationWorker(
             self,
             self._current_player,
@@ -887,7 +871,7 @@ class PlayerStatsController(QObject):
         self._progress_service.set_status(status)
     
     def _on_stats_worker_finished(self) -> None:
-        """Handle stats worker finished signal."""
+        """Handle stats worker finished signal. Schedules one recalc if requested while worker was running."""
         worker = self.sender()
         if worker and worker == self._stats_worker:
             try:
@@ -899,6 +883,9 @@ class PlayerStatsController(QObject):
                 pass
             self._stats_worker = None
             worker.deleteLater()
+            if self._recalc_pending and self._current_player:
+                self._recalc_pending = False
+                QTimer.singleShot(0, self._schedule_stats_recalculation)
     
     def _schedule_dropdown_update(self) -> None:
         """Schedule an asynchronous dropdown update."""
