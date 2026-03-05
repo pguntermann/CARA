@@ -621,27 +621,43 @@ class MovesListModel(QAbstractTableModel):
         
         This method clears the following fields for all moves:
         - eval_white, eval_black
-        - cpl_white, cpl_black
+        - cpl_white, cpl_black, cpl_white_2, cpl_white_3, cpl_black_2, cpl_black_3
         - assess_white, assess_black
-        - best_white, best_black
+        - best_white, best_black, best_white_2, best_white_3, best_black_2, best_black_3
+        - white_depth, black_depth, white_seldepth, black_seldepth
+        - white_is_top3, black_is_top3
         """
         changed = False
         for move in self._moves:
             if (move.eval_white or move.eval_black or move.cpl_white or move.cpl_black or
-                move.assess_white or move.assess_black or move.best_white or move.best_black or
-                move.white_depth or move.black_depth or move.white_seldepth or move.black_seldepth):
+                move.cpl_white_2 or move.cpl_white_3 or move.cpl_black_2 or move.cpl_black_3 or
+                move.assess_white or move.assess_black or
+                move.best_white or move.best_black or
+                move.best_white_2 or move.best_white_3 or move.best_black_2 or move.best_black_3 or
+                move.white_depth or move.black_depth or move.white_seldepth or move.black_seldepth or
+                move.white_is_top3 or move.black_is_top3):
                 move.eval_white = ""
                 move.eval_black = ""
                 move.cpl_white = ""
                 move.cpl_black = ""
+                move.cpl_white_2 = ""
+                move.cpl_white_3 = ""
+                move.cpl_black_2 = ""
+                move.cpl_black_3 = ""
                 move.assess_white = ""
                 move.assess_black = ""
                 move.best_white = ""
                 move.best_black = ""
+                move.best_white_2 = ""
+                move.best_white_3 = ""
+                move.best_black_2 = ""
+                move.best_black_3 = ""
                 move.white_depth = 0
                 move.black_depth = 0
                 move.white_seldepth = 0
                 move.black_seldepth = 0
+                move.white_is_top3 = False
+                move.black_is_top3 = False
                 changed = True
         
         if changed:
