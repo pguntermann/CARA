@@ -2699,7 +2699,13 @@ class MainWindow(QMainWindow):
                 self.detail_panel.player_stats_view._on_open_misses_in_search_results = self._open_misses_in_search_results
                 self.detail_panel.player_stats_view._on_open_blunders_in_search_results = self._open_blunders_in_search_results
                 # Database connections are now handled by the controller
-        
+            # Inject selected-games callback for Player Stats "Selected games (Active/All)" source
+            player_stats_controller = self.controller.get_player_stats_controller()
+            player_stats_controller.set_get_selected_games_callback(
+                lambda active_only: self.database_panel.get_selected_games(active_only)
+            )
+            self.database_panel.selection_changed.connect(player_stats_controller.notify_selection_changed)
+
         # Set moves list model in game analysis controller
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
             self.controller.set_moves_list_model(self.detail_panel.moveslist_model)

@@ -1,7 +1,7 @@
 """Controller for orchestrating player statistics calculations."""
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, QMutex, QMutexLocker, QTimer
 
 from app.models.database_model import DatabaseModel
@@ -20,20 +20,27 @@ from app.services.logging_service import LoggingService
 
 class PlayerDropdownWorker(QThread):
     """Worker thread for populating player dropdown asynchronously."""
-    
+
     players_ready = pyqtSignal(list)  # List of (player_name, game_count, analyzed_count) tuples
     progress_update = pyqtSignal(int, str)  # progress_percent, status_message
-    
-    def __init__(self, stats_controller: "PlayerStatsController", use_all_databases: bool) -> None:
+
+    def __init__(
+        self,
+        stats_controller: "PlayerStatsController",
+        use_all_databases: bool,
+        selected_games: Optional[List["GameData"]] = None,
+    ) -> None:
         """Initialize the dropdown worker.
-        
+
         Args:
             stats_controller: PlayerStatsController instance.
-            use_all_databases: Whether to use all databases or just active.
+            use_all_databases: Whether to use all databases or just active (ignored if selected_games is set).
+            selected_games: If set, derive players from this list instead of querying databases.
         """
         super().__init__()
         self.stats_controller = stats_controller
         self.use_all_databases = use_all_databases
+        self.selected_games = selected_games  # Optional; when set, use this list for dropdown
         self._cancelled = False
         self._mutex = QMutex()
     
@@ -52,20 +59,24 @@ class PlayerDropdownWorker(QThread):
         try:
             if self._is_cancelled():
                 return
-            
+
+            if self.selected_games is not None:
+                self._run_from_selected_games()
+                return
+
             self.progress_update.emit(10, "Collecting player names...")
-            
+
             # Get unique players
             players = self.stats_controller.get_unique_players(self.use_all_databases)
-            
+
             if self._is_cancelled() or not players:
                 self.players_ready.emit([])
                 return
-            
+
             # Filter to only include players with at least 2 analyzed games
             players_with_analyzed = []
             total_players = len(players)
-            
+
             # Cache databases once at the start to avoid repeated get_active_database() calls
             if self.use_all_databases:
                 panel_model = self.stats_controller._database_controller.get_panel_model()
@@ -73,25 +84,25 @@ class PlayerDropdownWorker(QThread):
             else:
                 active_db = self.stats_controller._database_controller.get_active_database()
                 cached_databases = [active_db] if active_db else []
-            
+
             for idx, (player_name, game_count) in enumerate(players):
                 if self._is_cancelled():
                     return
-                
+
                 # Update progress
                 progress_percent = 10 + int((idx / total_players) * 80)
                 self.progress_update.emit(progress_percent, f"Checking players: {idx + 1}/{total_players}...")
-                
+
                 # Check if this player has at least 2 analyzed games
                 # Use cached databases to avoid repeated get_active_database() calls
                 analyzed_count, _ = self.stats_controller.get_analyzed_game_count_with_databases(
                     player_name,
                     cached_databases
                 )
-                
+
                 if analyzed_count >= 2:
                     players_with_analyzed.append((player_name, game_count, analyzed_count))
-            
+
             if not self._is_cancelled():
                 try:
                     self.progress_update.emit(100, f"Found {len(players_with_analyzed)} player(s)")
@@ -99,12 +110,36 @@ class PlayerDropdownWorker(QThread):
                 except RuntimeError:
                     # Receiver might be deleted, ignore
                     pass
-        
+
         except Exception as e:
             # Emit empty list on error
             logging_service = LoggingService.get_instance()
             logging_service.error(f"Error in PlayerDropdownWorker: {e}", exc_info=e)
             self.players_ready.emit([])
+
+    def _run_from_selected_games(self) -> None:
+        """Build player list from selected_games (same format as run() for DB path)."""
+        from collections import Counter
+        total_count_per_player: Dict[str, int] = Counter()
+        analyzed_count_per_player: Dict[str, int] = Counter()
+        for game in self.selected_games:
+            for name in (game.white, game.black):
+                if name and name.strip():
+                    total_count_per_player[name] += 1
+                    if getattr(game, "analyzed", False):
+                        analyzed_count_per_player[name] += 1
+        players_with_analyzed = [
+            (name, total_count_per_player[name], analyzed_count_per_player[name])
+            for name in total_count_per_player
+            if analyzed_count_per_player.get(name, 0) >= 2
+        ]
+        players_with_analyzed.sort(key=lambda x: (-x[2], x[0]))
+        if not self._is_cancelled():
+            try:
+                self.progress_update.emit(100, f"Found {len(players_with_analyzed)} player(s)")
+                self.players_ready.emit(players_with_analyzed)
+            except RuntimeError:
+                pass
 
 
 class PlayerStatsCalculationWorker(QThread):
@@ -114,18 +149,26 @@ class PlayerStatsCalculationWorker(QThread):
     stats_unavailable = pyqtSignal(str)  # Reason key
     progress_update = pyqtSignal(int, str)  # progress_percent, status_message
     
-    def __init__(self, stats_controller: "PlayerStatsController", player_name: str, use_all_databases: bool) -> None:
+    def __init__(
+        self,
+        stats_controller: "PlayerStatsController",
+        player_name: str,
+        use_all_databases: bool,
+        player_games: Optional[List["GameData"]] = None,
+    ) -> None:
         """Initialize the stats calculation worker.
-        
+
         Args:
             stats_controller: PlayerStatsController instance.
             player_name: Player name to analyze.
-            use_all_databases: Whether to use all databases or just active.
+            use_all_databases: Whether to use all databases or just active (ignored if player_games is set).
+            player_games: If set, use this list for the player's games instead of querying databases.
         """
         super().__init__()
         self.stats_controller = stats_controller
         self.player_name = player_name
         self.use_all_databases = use_all_databases
+        self.player_games = player_games  # Optional; when set, already filtered to this player
         self._cancelled = False
         self._mutex = QMutex()
     
@@ -148,34 +191,38 @@ class PlayerStatsCalculationWorker(QThread):
             if not self.player_name or not self.player_name.strip():
                 self.stats_unavailable.emit("no_player")
                 return
-            
-            # Get databases
-            self.progress_update.emit(5, "Loading databases...")
-            
-            if self.use_all_databases:
-                panel_model = self.stats_controller._database_controller.get_panel_model()
-                databases = panel_model.get_all_database_models()
+
+            if self.player_games is not None:
+                player_games = self.player_games
+                total_count = len(player_games)
             else:
-                active_db = self.stats_controller._database_controller.get_active_database()
-                databases = [active_db] if active_db else []
-            
-            if self._is_cancelled():
-                return
-            
-            if not databases:
-                self.stats_unavailable.emit("no_database")
-                return
-            
-            # Get player games
-            self.progress_update.emit(10, "Finding player games...")
-            
-            player_games, total_count = self.stats_controller.player_stats_service.get_player_games(
-                self.player_name, databases, only_analyzed=False
-            )
-            
-            if self._is_cancelled():
-                return
-            
+                # Get databases
+                self.progress_update.emit(5, "Loading databases...")
+
+                if self.use_all_databases:
+                    panel_model = self.stats_controller._database_controller.get_panel_model()
+                    databases = panel_model.get_all_database_models()
+                else:
+                    active_db = self.stats_controller._database_controller.get_active_database()
+                    databases = [active_db] if active_db else []
+
+                if self._is_cancelled():
+                    return
+
+                if not databases:
+                    self.stats_unavailable.emit("no_database")
+                    return
+
+                # Get player games
+                self.progress_update.emit(10, "Finding player games...")
+
+                player_games, total_count = self.stats_controller.player_stats_service.get_player_games(
+                    self.player_name, databases, only_analyzed=False
+                )
+
+                if self._is_cancelled():
+                    return
+
             if not player_games:
                 self.stats_unavailable.emit("player_not_found")
                 return
@@ -277,7 +324,8 @@ class PlayerStatsController(QObject):
         self._last_unavailable_reason: str = "no_player"
         self._current_player: Optional[str] = None
         self._use_all_databases: bool = False
-        self._source_selection: int = 0  # 0=None, 1=Active Database, 2=All Open Databases
+        self._source_selection: int = 0  # 0=None, 1=Active, 2=All DBs, 3=Selected (Active), 4=Selected (All)
+        self._get_selected_games_callback: Optional[Callable[[bool], List["GameData"]]] = None
         
         # Worker threads
         self._dropdown_worker: Optional[PlayerDropdownWorker] = None
@@ -739,15 +787,15 @@ class PlayerStatsController(QObject):
     
     def set_source_selection(self, index: int) -> None:
         """Set the data source selection.
-        
+
         Args:
-            index: 0=None, 1=Active Database, 2=All Open Databases
+            index: 0=None, 1=Active Database, 2=All Open Databases, 3=Selected (Active), 4=Selected (All)
         """
         if self._source_selection == index:
             return
-        
+
         self._source_selection = index
-        
+
         if index == 0:
             # "None" selected - disable updates
             self._use_all_databases = False
@@ -755,22 +803,22 @@ class PlayerStatsController(QObject):
             self._current_player = None
             self.player_selection_cleared.emit()
         else:
-            # "Active Database" (index 1) or "All Open Databases" (index 2) selected
-            self._use_all_databases = (index == 2)
+            # 1=Active, 2=All DBs, 3=Selected (Active), 4=Selected (All)
+            self._use_all_databases = (index == 2 or index == 4)
             self._connect_to_database_changes()
             self._schedule_dropdown_update()
-            
+
             # If a player is selected, recalculate stats with new source
             if self._current_player:
                 QTimer.singleShot(200, self._schedule_stats_recalculation)
-        
+
         self.source_selection_changed.emit(index)
-    
+
     def get_source_selection(self) -> int:
         """Get the current source selection.
-        
+
         Returns:
-            0=None, 1=Active Database, 2=All Open Databases
+            0=None, 1=Active Database, 2=All Open Databases, 3=Selected (Active), 4=Selected (All)
         """
         return self._source_selection
     
@@ -799,7 +847,20 @@ class PlayerStatsController(QObject):
     def get_use_all_databases(self) -> bool:
         """Get whether using all databases."""
         return self._use_all_databases
-    
+
+    def set_get_selected_games_callback(self, callback: Optional[Callable[[bool], List["GameData"]]]) -> None:
+        """Set the callback used to obtain selected games when source is 'Selected games (Active)' or 'Selected games (All)'.
+        Callback receives active_only: bool and returns List[GameData]. Injected by app layer (e.g. MainWindow)."""
+        self._get_selected_games_callback = callback
+
+    def notify_selection_changed(self) -> None:
+        """Called when database table selection changes. Refreshes dropdown and stats if source is Selected games."""
+        if self._source_selection not in (3, 4):
+            return
+        self._schedule_dropdown_update()
+        if self._current_player:
+            self._schedule_stats_recalculation()
+
     # Worker management
     
     def _cancel_stats_worker(self) -> None:
@@ -840,11 +901,25 @@ class PlayerStatsController(QObject):
         
         self._recalc_pending = False
         self._cancel_stats_worker()  # Clean up any finished worker
-        
+
+        player_games_arg: Optional[List["GameData"]] = None
+        if self._source_selection in (3, 4) and self._get_selected_games_callback:
+            try:
+                selected = self._get_selected_games_callback(active_only=(self._source_selection == 3))
+                if selected:
+                    player_games_arg = [
+                        g for g in selected
+                        if (g.white == self._current_player or g.black == self._current_player)
+                    ]
+            except Exception as e:
+                logging_service = LoggingService.get_instance()
+                logging_service.error(f"Error getting selected games for stats: {e}", exc_info=e)
+
         self._stats_worker = PlayerStatsCalculationWorker(
             self,
             self._current_player,
-            self._use_all_databases
+            self._use_all_databases,
+            player_games=player_games_arg,
         )
         self._stats_worker.stats_ready.connect(self._on_stats_worker_ready)
         self._stats_worker.stats_unavailable.connect(self._on_stats_worker_unavailable)
@@ -936,9 +1011,23 @@ class PlayerStatsController(QObject):
                 self._dropdown_worker.deleteLater()
                 self._dropdown_worker = None
         
+        # For "Selected games" source, get games on main thread then run worker with that list
+        selected_games: Optional[List["GameData"]] = None
+        if self._source_selection in (3, 4):
+            if self._get_selected_games_callback:
+                try:
+                    selected_games = self._get_selected_games_callback(active_only=(self._source_selection == 3))
+                except Exception as e:
+                    logging_service = LoggingService.get_instance()
+                    logging_service.error(f"Error getting selected games: {e}", exc_info=e)
+            if selected_games is None:
+                selected_games = []
+
         # Create and start new worker
         try:
-            self._dropdown_worker = PlayerDropdownWorker(self, self._use_all_databases)
+            self._dropdown_worker = PlayerDropdownWorker(
+                self, self._use_all_databases, selected_games=selected_games
+            )
             self._dropdown_worker.players_ready.connect(self._on_dropdown_players_ready)
             self._dropdown_worker.progress_update.connect(self._on_dropdown_progress)
             self._dropdown_worker.finished.connect(self._on_dropdown_worker_finished)

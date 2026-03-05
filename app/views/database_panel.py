@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTabWidget, QTableView, QMenu, QApplication
 )
-from PyQt6.QtCore import QItemSelectionModel, QPoint, QEvent
+from PyQt6.QtCore import QItemSelectionModel, QPoint, QEvent, pyqtSignal
 from PyQt6.QtGui import QPalette, QColor, QPixmap, QPainter, QIcon, QBrush
 from PyQt6.QtCore import Qt, QModelIndex, QTimer, QSize, QRect
 from typing import Any, Callable, Dict, List, Optional
@@ -19,7 +19,9 @@ from app.utils.table_export import table_to_delimited, get_copy_table_config
 
 class DatabasePanel(QWidget):
     """Database panel - can be collapsed if not needed."""
-    
+
+    selection_changed = pyqtSignal()  # Emitted when selection changes in any database table
+
     def __init__(self, config: Dict[str, Any], panel_model: Optional[DatabasePanelModel] = None,
                  on_row_double_click: Optional[Callable[[int], None]] = None,
                  on_add_tab_clicked: Optional[Callable[[], None]] = None,
@@ -538,7 +540,10 @@ class DatabasePanel(QWidget):
         tab_table.customContextMenuRequested.connect(
             lambda pos, t=tab_table: self._on_table_context_menu(pos, t)
         )
-        
+        sm = tab_table.selectionModel()
+        if sm:
+            sm.selectionChanged.connect(self.selection_changed.emit)
+
         # Force table to update and show all columns
         tab_table.update()
         tab_table.viewport().update()
@@ -769,6 +774,50 @@ class DatabasePanel(QWidget):
         row_indices = sorted(set(index.row() for index in selected_indexes))
         
         return row_indices
+
+    def get_selected_games(self, active_only: bool) -> List[Any]:
+        """Get GameData for currently selected rows.
+
+        Args:
+            active_only: If True, only the active tab's selection. If False, selection from every tab.
+
+        Returns:
+            List of GameData (order not guaranteed when active_only is False).
+        """
+        result: List[Any] = []
+        if active_only:
+            active_info = self.get_active_database_info()
+            if not active_info:
+                return []
+            model = active_info.get("model")
+            table = active_info.get("table")
+            if not model or not table:
+                return []
+            sel = table.selectionModel()
+            if not sel:
+                return []
+            for idx in sel.selectedRows():
+                r = idx.row()
+                if 0 <= r < model.rowCount():
+                    game = model.get_game(r)
+                    if game:
+                        result.append(game)
+            return result
+        for _tab_index, info in self._tab_models.items():
+            model = info.get("model")
+            table = info.get("table")
+            if not model or not table:
+                continue
+            sel = table.selectionModel()
+            if not sel:
+                continue
+            for idx in sel.selectedRows():
+                r = idx.row()
+                if 0 <= r < model.rowCount():
+                    game = model.get_game(r)
+                    if game:
+                        result.append(game)
+        return result
 
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
         """Intercept right-click on database table viewport so selection is not changed before the context menu."""
