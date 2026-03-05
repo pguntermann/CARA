@@ -53,8 +53,7 @@ def main() -> None:
         app = QApplication(sys.argv)
         app.setApplicationName("CARA")
         app.setOrganizationName("CARA")
-        if sys.platform == "win32":
-            app.setStyle("Windows11")  # Consistent Windows look; avoids build-to-build style DLL variance on CI
+        
         # Set application icon
         icon_path = get_app_resource_path("appicon.svg")
         if icon_path.exists():
