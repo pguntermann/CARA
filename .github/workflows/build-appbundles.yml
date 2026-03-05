@@ -1,5 +1,6 @@
 # Build Windows and macOS app bundles (manual trigger only).
 # Outputs are uploaded as workflow artifacts only; no public release.
+# Restored to default branch so workflow_dispatch is available in Actions.
 
 name: Build AppBundles
 
