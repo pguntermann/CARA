@@ -9,6 +9,7 @@ from PyQt6.QtCore import Qt, QModelIndex, QTimer, QSize, QRect
 from typing import Any, Callable, Dict, List, Optional
 from pathlib import Path
 import math
+import sys
 import time
 
 from app.models.database_model import DatabaseModel
@@ -923,8 +924,30 @@ class DatabasePanel(QWidget):
         StyleManager.style_context_menu(select_mode_menu, self.config, bg_color)
 
         action = menu.exec(table.viewport().mapToGlobal(pos))
-        menu.close()
-        menu.hide()
+
+        def dismiss_menus() -> None:
+            # Close our menu hierarchy (root first so native layer tears down on macOS).
+            menu.close()
+            menu.hide()
+            select_rows_menu.close()
+            select_rows_menu.hide()
+            select_mode_menu.close()
+            select_mode_menu.hide()
+            # On macOS the root menu can remain as the active popup after a submenu action;
+            # process events so close() takes effect, then force-close any remaining active popup.
+            if sys.platform == "darwin":
+                QApplication.processEvents()
+                popup = QApplication.activePopupWidget()
+                while popup is not None:
+                    popup.close()
+                    popup.hide()
+                    QApplication.processEvents()
+                    popup = QApplication.activePopupWidget()
+
+        if sys.platform == "darwin":
+            QTimer.singleShot(20, dismiss_menus)
+        else:
+            dismiss_menus()
 
         if action is None:
             return
