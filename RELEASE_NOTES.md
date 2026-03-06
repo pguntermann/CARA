@@ -1,5 +1,31 @@
 # Release Notes
 
+# CARA v2.6.2 - Maintenance Release
+
+**Release Date:** 06.03.2026
+
+This release adds **selection mode and selection inversion** to the database view context menu and a **Selected Games** source option in the Player Stats view. It fixes several bugs, improves database view scrolling "performance" and updates the HTML user manual.
+
+## New Features
+
+- **Player Stats – Selected Games source:** Two new options in the Source dropdown in the Player Stats view: **Selected games (All Open Databases)** and **Selected games (Active Database)**. Statistics are then computed for the respective selection and update when the selection changes.
+- **Database view – context menu (selection):** **Select mode** submenu with two options: **Replace** (default) replaces the current selection when using "With this value", "With not this value", etc.; **Append** adds the matching rows to the current selection instead of replacing it. **Invert Selection** flips the current selection, e.g. currently selected rows become unselected and unselected rows become selected.
+
+## Enhancements
+
+- **Database view:** Improved scrolling performance by truncating displayed PGN information. The full PGN is still available for exporting, only the display value is truncated. Can be configured through `config.json` with `ui.panels.database.pgn_col_max_chars`.
+- **Documentation:** Updated the HTML user manual.
+
+## Bug Fixes
+
+- **Parallel processing:** Fixed ProcessPool issue on systems with more than 61 cores (like AMD Threadripper PRO 5995WX)
+- **Game analysis – CPL2/CPL3:** Fixed CPL2 and CPL3 calculation when lower/upper bound info lines are present.
+- **Game analysis – moves list:** Fixed CPL2/CPL3 and Best2/3 columns not being cleared when starting a new game analysis.
+- **Search results – copy games:** Fixed crash when copying selected games from the Search Results tab.
+- **Player Stats – bulk analysis:** Fixed a rare crash predominantly happening on slow Windows computers when player stats update during bulk analysis.
+
+---
+
 # CARA v2.6.1 - Significant Moves, Database Context Menu and Fixes
 
 **Release Date:** 02.03.2026
