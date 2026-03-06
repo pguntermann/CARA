@@ -475,10 +475,14 @@ class AppController:
             identifier = active_info.get('identifier', 'unknown')
             indices = database_panel.get_selected_game_indices()
         
-        if identifier == "clipboard":
+        if identifier is None:
+            source_db_name = "Search Results"
+        elif identifier == "clipboard":
             source_db_name = "Clipboard"
+        elif identifier == "unknown":
+            source_db_name = "unknown"
         else:
-            source_db_name = Path(identifier).stem if identifier != 'unknown' else "unknown"
+            source_db_name = Path(identifier).stem
         
         if not indices:
             return (False, "No games selected")
@@ -555,10 +559,14 @@ class AppController:
             identifier = active_info.get('identifier', 'unknown')
             indices = database_panel.get_selected_game_indices()
         
-        if identifier == "clipboard":
+        if identifier is None:
+            source_db_name = "Search Results"
+        elif identifier == "clipboard":
             source_db_name = "Clipboard"
+        elif identifier == "unknown":
+            source_db_name = "unknown"
         else:
-            source_db_name = Path(identifier).stem if identifier != 'unknown' else "unknown"
+            source_db_name = Path(identifier).stem
         
         if not indices:
             return (False, "No games selected")

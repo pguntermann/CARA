@@ -1962,7 +1962,7 @@
         "minimum_height": 40,
         "default_height": 240,
         "collapsed_height": 30,
-        "pgn_col_max_chars": 250,
+        "pgn_col_max_chars": 300,
         "background_color": [
           35,
           35,
@@ -4946,6 +4946,12 @@
     },
     "import": {
       "strip_pua_characters": true
+    }
+  },
+  "parallel_processing": {
+    "process_pool": {
+      "max_workers_cap": 60,
+      "reserved_cores": 2
     }
   },
   "logging": {

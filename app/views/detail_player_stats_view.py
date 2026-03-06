@@ -1024,6 +1024,8 @@ class DetailPlayerStatsView(QWidget):
         self.source_combo.addItem("None")
         self.source_combo.addItem("Active Database")
         self.source_combo.addItem("All Open Databases")
+        self.source_combo.addItem("Selected games (Active Database)")
+        self.source_combo.addItem("Selected games (All Open Databases)")
         self.source_combo.setCurrentIndex(0)  # Default to "None"
         
         self.source_combo.currentIndexChanged.connect(self._on_source_changed)

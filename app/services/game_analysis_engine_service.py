@@ -343,6 +343,11 @@ class GameAnalysisEngineThread(QThread):
                             final_is_mate = False
                             final_mate_moves = 0
                     
+                    # DEBUG: one line per completion; with UCI RECV shows which run (side=position's turn) and which pv2/pv3 we emit
+                    side = "black" if self._is_black_to_move else "white"
+                    LoggingService.get_instance().debug(
+                        f"[Game analysis complete] move_number={request.move_number} side_to_move={side} eval={final_score:.1f} pv2={pv2_score:.1f} pv3={pv3_score:.1f}"
+                    )
                     self.analysis_complete.emit(
                         final_score,
                         final_is_mate,
@@ -467,8 +472,10 @@ class GameAnalysisEngineThread(QThread):
                     except ValueError:
                         pass
                 
-                # Store score for this multipv number
-                if score_value is not None:
+                # Store score for this multipv number only if it is a final score, not a bound.
+                # UCI "upperbound"/"lowerbound" mean the search has not finished for this line; using them
+                # would overwrite good scores with incomplete data and can make PV2/PV3 appear out of order.
+                if score_value is not None and "upperbound" not in parts and "lowerbound" not in parts:
                     # Update the multipv_moves tuple with score information
                     current_move_uci, current_pv_string, _, _, _ = self._multipv_moves[multipv_num]
                     self._multipv_moves[multipv_num] = (current_move_uci, current_pv_string, score_value, is_mate_score, mate_moves_value)

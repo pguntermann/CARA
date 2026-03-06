@@ -106,6 +106,10 @@ class GameAnalysisController(QObject):
         self._best_move_pv3 = ""  # Store PV3 move from position before
         self._best_move_depth = 0  # Store depth from position before analysis
         self._best_move_seldepth = 0  # Store seldepth from position before analysis (0 if engine does not report)
+        self._best_move_pv2_score = 0.0  # PV2/PV3 scores from position-before (for CPL2/CPL3)
+        self._best_move_pv3_score = 0.0
+        self._best_move_pv2_score_black = 0.0
+        self._best_move_pv3_score_black = 0.0
         self._move_depth = 0  # Store depth from position after analysis
         self._move_seldepth = 0  # Store seldepth from position after analysis (0 if engine does not report)
         self._consecutive_errors = 0  # Track consecutive errors to detect engine failure
@@ -311,6 +315,10 @@ class GameAnalysisController(QObject):
         self._best_move_is_mate = False
         self._best_move_depth = 0
         self._best_move_seldepth = 0
+        self._best_move_pv2_score = 0.0
+        self._best_move_pv3_score = 0.0
+        self._best_move_pv2_score_black = 0.0
+        self._best_move_pv3_score_black = 0.0
         self._move_depth = 0
         self._move_seldepth = 0
         self._best_move_mate_moves = 0
@@ -637,7 +645,7 @@ class GameAnalysisController(QObject):
             best_move_eval, best_move_is_mate, best_mate_moves, best_move_san, pv2_move_san, pv3_move_san, \
                 pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth, seldepth = self._cached_best_move_info
             
-            # Store best move info for current move
+            # Store best move info for current move (from cache = position before this move)
             self._best_alternative_move = best_move_san
             self._best_move_pv2 = pv2_move_san
             self._best_move_pv3 = pv3_move_san
@@ -646,6 +654,10 @@ class GameAnalysisController(QObject):
             self._best_move_mate_moves = best_mate_moves
             self._best_move_depth = depth
             self._best_move_seldepth = seldepth
+            self._best_move_pv2_score = pv2_score
+            self._best_move_pv3_score = pv3_score
+            self._best_move_pv2_score_black = pv2_score_black
+            self._best_move_pv3_score_black = pv3_score_black
             
             # Check if this is a book move - if so, don't store best moves
             if self._is_book_move(move_info):
@@ -655,6 +667,10 @@ class GameAnalysisController(QObject):
                 self._best_move_evaluation = None
                 self._best_move_depth = 0
                 self._best_move_seldepth = 0
+                self._best_move_pv2_score = 0.0
+                self._best_move_pv3_score = 0.0
+                self._best_move_pv2_score_black = 0.0
+                self._best_move_pv3_score_black = 0.0
             
             # Proceed directly to analyzing position after move
             self._analyze_position_after_move(move_info)
@@ -686,10 +702,10 @@ class GameAnalysisController(QObject):
             except TypeError:
                 pass
             
-            # Connect with lambda that captures move_info
+            # Connect with lambda (pv2/3 scores = mover's alternatives from position-before)
             thread.analysis_complete.connect(
                 lambda eval_cp, is_mate, mate_moves, best_move, pv1, pv2, pv3, pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth, seldepth, nps, engine_name: 
-                self._on_best_move_analysis_complete(move_info, best_move, pv2, pv3, eval_cp, is_mate, mate_moves, depth, seldepth)
+                self._on_best_move_analysis_complete(move_info, best_move, pv2, pv3, eval_cp, is_mate, mate_moves, depth, seldepth, pv2_score, pv3_score, pv2_score_black, pv3_score_black)
             )
         
         # Setup progress timer for periodic updates
@@ -728,27 +744,16 @@ class GameAnalysisController(QObject):
     
     def _on_best_move_analysis_complete(self, move_info: Dict[str, Any], best_move_san: str, 
                                        pv2_move_san: str, pv3_move_san: str,
-                                       best_move_eval: float, best_move_is_mate: bool, best_move_mate_moves: int, depth: int, seldepth: int = 0) -> None:
-        """Handle completion of best move analysis (position before the move).
-        
-        Args:
-            move_info: Move information dictionary.
-            best_move_san: Best alternative move (PV1) in SAN notation.
-            pv2_move_san: Second best move (PV2) in SAN notation.
-            pv3_move_san: Third best move (PV3) in SAN notation.
-            best_move_eval: Evaluation after playing the best move (from position before analysis).
-            best_move_is_mate: True if best move leads to mate.
-            best_move_mate_moves: Mate moves for best move.
-            depth: Engine depth for this analysis.
-            seldepth: Engine selective depth (0 if engine does not report).
-        """
+                                       best_move_eval: float, best_move_is_mate: bool, best_move_mate_moves: int, depth: int, seldepth: int = 0,
+                                       pv2_score: float = 0.0, pv3_score: float = 0.0, pv2_score_black: float = 0.0, pv3_score_black: float = 0.0) -> None:
+        """Handle completion of best move analysis (position before the move). Stores mover's PV2/PV3 scores for CPL2/CPL3."""
         if self._cancelled:
             return
         
         # Reset consecutive errors on successful analysis
         self._consecutive_errors = 0
         
-        # Store the best alternative moves and their evaluation
+        # Store the best alternative moves and their evaluation (mover's top 3 from position-before)
         self._best_alternative_move = best_move_san
         self._best_move_pv2 = pv2_move_san
         self._best_move_pv3 = pv3_move_san
@@ -757,6 +762,10 @@ class GameAnalysisController(QObject):
         self._best_move_mate_moves = best_move_mate_moves
         self._best_move_depth = depth
         self._best_move_seldepth = seldepth
+        self._best_move_pv2_score = pv2_score
+        self._best_move_pv3_score = pv3_score
+        self._best_move_pv2_score_black = pv2_score_black
+        self._best_move_pv3_score_black = pv3_score_black
         
         # Check if this is a book move - if so, don't store best moves
         if self._is_book_move(move_info):
@@ -766,6 +775,10 @@ class GameAnalysisController(QObject):
             self._best_move_evaluation = None
             self._best_move_depth = 0
             self._best_move_seldepth = 0
+            self._best_move_pv2_score = 0.0
+            self._best_move_pv3_score = 0.0
+            self._best_move_pv2_score_black = 0.0
+            self._best_move_pv3_score_black = 0.0
         
         # Now analyze position AFTER the move to get evaluation
         self._analyze_position_after_move(move_info)
@@ -880,9 +893,9 @@ class GameAnalysisController(QObject):
                 classification_thresholds, material_sacrifice=0
             )
         
-        # Calculate CPL for PV2 and PV3
-        # CPL for PV2 = difference between PV2 score and played move evaluation
-        # CPL for PV3 = difference between PV3 score and played move evaluation
+        # Calculate CPL for PV2 and PV3 (use mover's PV2/PV3 scores from position-before; same convention as _best_move_evaluation)
+        pv2_ref = self._best_move_pv2_score if is_white_move else self._best_move_pv2_score_black
+        pv3_ref = self._best_move_pv3_score if is_white_move else self._best_move_pv3_score_black
         cpl_white_2_str = ""
         cpl_white_3_str = ""
         cpl_black_2_str = ""
@@ -890,20 +903,18 @@ class GameAnalysisController(QObject):
         
         if not is_book_move:
             if is_white_move:
-                # For white moves, use pv2_score and pv3_score (from white's perspective)
-                if pv2_score != 0.0:  # Only calculate if PV2 score is available
-                    cpl_2 = MoveAnalysisService.calculate_pv_cpl(pv2_score, eval_after, is_white_move)
+                if pv2_ref != 0.0:
+                    cpl_2 = MoveAnalysisService.calculate_pv_cpl(pv2_ref, eval_after, is_white_move)
                     cpl_white_2_str = MoveAnalysisService.format_cpl(cpl_2)
-                if pv3_score != 0.0:  # Only calculate if PV3 score is available
-                    cpl_3 = MoveAnalysisService.calculate_pv_cpl(pv3_score, eval_after, is_white_move)
+                if pv3_ref != 0.0:
+                    cpl_3 = MoveAnalysisService.calculate_pv_cpl(pv3_ref, eval_after, is_white_move)
                     cpl_white_3_str = MoveAnalysisService.format_cpl(cpl_3)
             else:
-                # For black moves, use pv2_score_black and pv3_score_black (White's perspective)
-                if pv2_score_black != 0.0:  # Only calculate if PV2 score is available
-                    cpl_2 = MoveAnalysisService.calculate_pv_cpl(pv2_score_black, eval_after, is_white_move)
+                if pv2_ref != 0.0:
+                    cpl_2 = MoveAnalysisService.calculate_pv_cpl(pv2_ref, eval_after, is_white_move)
                     cpl_black_2_str = MoveAnalysisService.format_cpl(cpl_2)
-                if pv3_score_black != 0.0:  # Only calculate if PV3 score is available
-                    cpl_3 = MoveAnalysisService.calculate_pv_cpl(pv3_score_black, eval_after, is_white_move)
+                if pv3_ref != 0.0:
+                    cpl_3 = MoveAnalysisService.calculate_pv_cpl(pv3_ref, eval_after, is_white_move)
                     cpl_black_3_str = MoveAnalysisService.format_cpl(cpl_3)
         
         # Format evaluation

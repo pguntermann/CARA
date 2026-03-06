@@ -15,6 +15,7 @@ from app.services.uci_communication_service import UCICommunicationService
 from app.services.opening_service import OpeningService
 from app.services.pgn_service import PgnService
 from app.services.logging_service import LoggingService
+from app.utils.concurrency_utils import get_process_pool_max_workers
 
 
 @dataclass
@@ -447,8 +448,8 @@ class BulkReplaceService:
                     error_message=f"Invalid regex pattern: {str(e)}"
                 )
         
-        # Determine worker count (reserve 1-2 cores for UI)
-        max_workers = max(1, os.cpu_count() - 2)
+        # Worker count from config (reserved_cores + max_workers_cap)
+        max_workers = get_process_pool_max_workers(os.cpu_count(), self.config)
         
         # Collect all updated games for batch update
         updated_games = []
@@ -624,8 +625,8 @@ class BulkReplaceService:
                     error_message=f"Invalid regex pattern: {str(e)}"
                 )
         
-        # Determine worker count (reserve 1-2 cores for UI)
-        max_workers = max(1, os.cpu_count() - 2)
+        # Worker count from config (reserved_cores + max_workers_cap)
+        max_workers = get_process_pool_max_workers(os.cpu_count(), self.config)
         
         # Collect all updated games for batch update
         updated_games = []
@@ -767,8 +768,8 @@ class BulkReplaceService:
                 games_skipped=0
             )
         
-        # Determine worker count (reserve 1-2 cores for UI)
-        max_workers = max(1, os.cpu_count() - 2)
+        # Worker count from config (reserved_cores + max_workers_cap)
+        max_workers = get_process_pool_max_workers(os.cpu_count(), self.config)
         
         # Collect all updated games for batch update
         updated_games = []
@@ -917,8 +918,8 @@ class BulkReplaceService:
                 games_skipped=0
             )
         
-        # Determine worker count (reserve 1-2 cores for UI)
-        max_workers = max(1, os.cpu_count() - 2)
+        # Worker count from config (reserved_cores + max_workers_cap)
+        max_workers = get_process_pool_max_workers(os.cpu_count(), self.config)
         
         # Collect all updated games for batch update
         updated_games = []

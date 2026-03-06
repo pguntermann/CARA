@@ -11,6 +11,7 @@ from app.models.moveslist_model import MoveData
 from app.services.game_summary_service import GameSummary, PlayerStatistics, PhaseStatistics, GameSummaryService
 from app.controllers.game_controller import GameController
 from app.services.logging_service import LoggingService, init_worker_logging
+from app.utils.concurrency_utils import get_process_pool_max_workers
 
 
 def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, game_black: str,
@@ -268,9 +269,8 @@ class PlayerStatsService:
         total_games = len(analyzed_games)
         logging_service.debug(f"Starting player stats aggregation: player={player_name}, games={total_games}")
         
-        # Calculate number of worker processes (reserve 1-2 cores for UI)
-        cpu_count = os.cpu_count() or 4
-        max_workers = max(1, cpu_count - 2)
+        # Worker count from config (reserved_cores + max_workers_cap)
+        max_workers = get_process_pool_max_workers(os.cpu_count(), self.config)
         
         # Process games in parallel
         game_results: List[Dict[str, Any]] = []

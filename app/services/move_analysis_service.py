@@ -161,20 +161,12 @@ class MoveAnalysisService:
     
     @staticmethod
     def calculate_pv_cpl(pv_score: float, eval_after: float, is_white_move: bool) -> float:
-        """Calculate CPL for PV2/PV3 moves.
-        
-        Args:
-            pv_score: Evaluation score for the PV move (centipawns, White's perspective).
-            eval_after: Evaluation after the played move (centipawns, White's perspective).
-            is_white_move: True if white just moved, False if black.
-            
-        Returns:
-            CPL value in centipawns (0 if played move is better than or equal to PV).
-        """
+        """Calculate CPL for PV2/PV3. Both scores in same convention as main CPL (white: positive=white; black: stored positive=good for black).
+        Loss = pv_score - eval_after for white; loss = eval_after - pv_score for black."""
         if is_white_move:
-            signed_cpl = pv_score - eval_after  # White lost if eval dropped vs PV
+            signed_cpl = pv_score - eval_after
         else:
-            signed_cpl = eval_after - pv_score  # Black lost if White's eval rose vs PV
+            signed_cpl = eval_after - pv_score
         return max(0.0, signed_cpl)
     
     @staticmethod

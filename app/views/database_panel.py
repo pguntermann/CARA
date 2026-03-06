@@ -3,12 +3,13 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTabWidget, QTableView, QMenu, QApplication
 )
-from PyQt6.QtCore import QItemSelectionModel, QPoint
+from PyQt6.QtCore import QItemSelectionModel, QPoint, QEvent, pyqtSignal
 from PyQt6.QtGui import QPalette, QColor, QPixmap, QPainter, QIcon, QBrush
 from PyQt6.QtCore import Qt, QModelIndex, QTimer, QSize, QRect
 from typing import Any, Callable, Dict, List, Optional
 from pathlib import Path
 import math
+import sys
 import time
 
 from app.models.database_model import DatabaseModel
@@ -19,7 +20,9 @@ from app.utils.table_export import table_to_delimited, get_copy_table_config
 
 class DatabasePanel(QWidget):
     """Database panel - can be collapsed if not needed."""
-    
+
+    selection_changed = pyqtSignal()  # Emitted when selection changes in any database table
+
     def __init__(self, config: Dict[str, Any], panel_model: Optional[DatabasePanelModel] = None,
                  on_row_double_click: Optional[Callable[[int], None]] = None,
                  on_add_tab_clicked: Optional[Callable[[], None]] = None,
@@ -71,7 +74,9 @@ class DatabasePanel(QWidget):
         self._pulse_interval_ms: int = 120  # Update interval for smooth pulse (~8 FPS)
         self._unsaved_tabs: set = set()  # Set of tab indices with unsaved changes
         self._tab_context_menu_cooldown_until: float = 0  # Ignore context menu for a short time after Close action
-        
+        self._selection_mode: str = "replace"  # "replace" or "append" for Select rows actions (not persisted)
+        self._database_table_viewports: set = set()  # viewports we install event filter on (to avoid right-click changing selection)
+
         self._setup_ui()
         
         # Connect to panel model if provided
@@ -528,12 +533,18 @@ class DatabasePanel(QWidget):
         # Connect double-click signal
         tab_table.doubleClicked.connect(self._on_table_double_click)
         
-        # Context menu for "Select rows" actions
+        # Context menu: intercept right-click so it does not change the selection, then show menu
         tab_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        viewport = tab_table.viewport()
+        viewport.installEventFilter(self)
+        self._database_table_viewports.add(viewport)
         tab_table.customContextMenuRequested.connect(
             lambda pos, t=tab_table: self._on_table_context_menu(pos, t)
         )
-        
+        sm = tab_table.selectionModel()
+        if sm:
+            sm.selectionChanged.connect(self.selection_changed.emit)
+
         # Force table to update and show all columns
         tab_table.update()
         tab_table.viewport().update()
@@ -631,6 +642,9 @@ class DatabasePanel(QWidget):
         
         tab_info = self._tab_models[tab_index]
         model = tab_info['model']
+        table = tab_info.get('table')
+        if table and table.viewport() in self._database_table_viewports:
+            self._database_table_viewports.discard(table.viewport())
         
         # Remove from unsaved tabs tracking if present
         self._unsaved_tabs.discard(tab_index)
@@ -761,14 +775,76 @@ class DatabasePanel(QWidget):
         row_indices = sorted(set(index.row() for index in selected_indexes))
         
         return row_indices
-    
+
+    def get_selected_games(self, active_only: bool) -> List[Any]:
+        """Get GameData for currently selected rows.
+
+        Args:
+            active_only: If True, only the active tab's selection. If False, selection from every tab.
+
+        Returns:
+            List of GameData (order not guaranteed when active_only is False).
+        """
+        result: List[Any] = []
+        if active_only:
+            active_info = self.get_active_database_info()
+            if not active_info:
+                return []
+            model = active_info.get("model")
+            table = active_info.get("table")
+            if not model or not table:
+                return []
+            sel = table.selectionModel()
+            if not sel:
+                return []
+            for idx in sel.selectedRows():
+                r = idx.row()
+                if 0 <= r < model.rowCount():
+                    game = model.get_game(r)
+                    if game:
+                        result.append(game)
+            return result
+        for _tab_index, info in self._tab_models.items():
+            model = info.get("model")
+            table = info.get("table")
+            if not model or not table:
+                continue
+            sel = table.selectionModel()
+            if not sel:
+                continue
+            for idx in sel.selectedRows():
+                r = idx.row()
+                if 0 <= r < model.rowCount():
+                    game = model.get_game(r)
+                    if game:
+                        result.append(game)
+        return result
+
+    def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
+        """Intercept right-click on database table viewport so selection is not changed before the context menu."""
+        if (
+            event.type() == QEvent.Type.MouseButtonPress
+            and obj in self._database_table_viewports
+        ):
+            if hasattr(event, "button") and event.button() == Qt.MouseButton.RightButton:
+                table = obj.parent()
+                if isinstance(table, QTableView):
+                    self._on_table_context_menu(event.pos(), table)
+                    return True  # consume event so view does not change selection
+        return super().eventFilter(obj, event)
+
     def _set_table_selection_to_rows(
         self,
         table: QTableView,
         model: DatabaseModel,
         row_indices: List[int],
+        append: bool = False,
     ) -> None:
-        """Set the table selection to exactly the given row indices (model space). Replaces current selection."""
+        """Set the table selection to the given row indices (model space).
+        If append is True, add these rows to the current selection (right-click is intercepted so selection is unchanged)."""
+        if append:
+            current = set(idx.row() for idx in table.selectionModel().selectedRows())
+            row_indices = sorted(set(current) | set(row_indices))
         table.clearSelection()
         if not row_indices:
             return
@@ -787,7 +863,7 @@ class DatabasePanel(QWidget):
         table.scrollTo(first_col_index, QTableView.ScrollHint.EnsureVisible)
 
     def _on_table_context_menu(self, pos: QPoint, table: QTableView) -> None:
-        """Show context menu for the database table: Select rows (all, none, by value, empty, not empty)."""
+        """Show context menu for the database table: Select mode (Replace/Append), Select rows (all, none, by value, empty, not empty), copy, paste."""
         tab_info = None
         for _tab_index, info in self._tab_models.items():
             if info.get("table") is table:
@@ -807,8 +883,18 @@ class DatabasePanel(QWidget):
             cell_value = model.data(index, Qt.ItemDataRole.DisplayRole)
 
         select_rows_menu = QMenu("Select rows", self)
+        select_mode_menu = QMenu("Select mode", self)
+        act_replace = select_mode_menu.addAction("Replace")
+        act_replace.setCheckable(True)
+        act_replace.setChecked(self._selection_mode == "replace")
+        act_append = select_mode_menu.addAction("Append")
+        act_append.setCheckable(True)
+        act_append.setChecked(self._selection_mode == "append")
+        select_rows_menu.addMenu(select_mode_menu)
+        select_rows_menu.addSeparator()
         act_select_all = select_rows_menu.addAction("Select all rows")
         act_unselect_all = select_rows_menu.addAction("Unselect all rows")
+        act_invert_selection = select_rows_menu.addAction("Invert Selection")
         if has_cell:
             select_rows_menu.addSeparator()
             act_with_this = select_rows_menu.addAction("With this value")
@@ -835,10 +921,33 @@ class DatabasePanel(QWidget):
         from app.views.style import StyleManager
         StyleManager.style_context_menu(menu, self.config, bg_color)
         StyleManager.style_context_menu(select_rows_menu, self.config, bg_color)
+        StyleManager.style_context_menu(select_mode_menu, self.config, bg_color)
 
         action = menu.exec(table.viewport().mapToGlobal(pos))
-        menu.close()
-        menu.hide()
+
+        def dismiss_menus() -> None:
+            # Close our menu hierarchy (root first so native layer tears down on macOS).
+            menu.close()
+            menu.hide()
+            select_rows_menu.close()
+            select_rows_menu.hide()
+            select_mode_menu.close()
+            select_mode_menu.hide()
+            # On macOS the root menu can remain as the active popup after a submenu action;
+            # process events so close() takes effect, then force-close any remaining active popup.
+            if sys.platform == "darwin":
+                QApplication.processEvents()
+                popup = QApplication.activePopupWidget()
+                while popup is not None:
+                    popup.close()
+                    popup.hide()
+                    QApplication.processEvents()
+                    popup = QApplication.activePopupWidget()
+
+        if sys.platform == "darwin":
+            QTimer.singleShot(20, dismiss_menus)
+        else:
+            dismiss_menus()
 
         if action is None:
             return
@@ -846,32 +955,46 @@ class DatabasePanel(QWidget):
         from app.services.progress_service import ProgressService
         progress_service = ProgressService.get_instance()
 
+        append = self._selection_mode == "append"
+        if action == act_replace:
+            self._selection_mode = "replace"
+            return
+        if action == act_append:
+            self._selection_mode = "append"
+            return
         if action == act_select_all:
             row_indices = model.get_row_indices_matching_column_value(col_index, "all")
-            self._set_table_selection_to_rows(table, model, row_indices)
+            self._set_table_selection_to_rows(table, model, row_indices, append=append)
             n = len(row_indices)
             progress_service.set_status(f"Selected all {n} row{'s' if n != 1 else ''}" if n else "No rows in database")
         elif action == act_unselect_all:
             self._set_table_selection_to_rows(table, model, [])
             progress_service.set_status("Unselected all rows")
+        elif action == act_invert_selection:
+            selected = set(idx.row() for idx in table.selectionModel().selectedRows())
+            all_rows = set(range(model.rowCount()))
+            inverted = sorted(all_rows - selected)
+            self._set_table_selection_to_rows(table, model, inverted)
+            n = len(inverted)
+            progress_service.set_status(f"Inverted selection: {n} row{'s' if n != 1 else ''} now selected")
         elif has_cell and action == act_with_this:
             row_indices = model.get_row_indices_matching_column_value(col_index, "equals", cell_value)
-            self._set_table_selection_to_rows(table, model, row_indices)
+            self._set_table_selection_to_rows(table, model, row_indices, append=append)
             n = len(row_indices)
             progress_service.set_status(f"Selected {n} row{'s' if n != 1 else ''} with this value")
         elif has_cell and action == act_with_not_this:
             row_indices = model.get_row_indices_matching_column_value(col_index, "not_equals", cell_value)
-            self._set_table_selection_to_rows(table, model, row_indices)
+            self._set_table_selection_to_rows(table, model, row_indices, append=append)
             n = len(row_indices)
             progress_service.set_status(f"Selected {n} row{'s' if n != 1 else ''} with other values")
         elif has_cell and action == act_with_empty:
             row_indices = model.get_row_indices_matching_column_value(col_index, "empty")
-            self._set_table_selection_to_rows(table, model, row_indices)
+            self._set_table_selection_to_rows(table, model, row_indices, append=append)
             n = len(row_indices)
             progress_service.set_status(f"Selected {n} row{'s' if n != 1 else ''} with empty value")
         elif has_cell and action == act_with_not_empty:
             row_indices = model.get_row_indices_matching_column_value(col_index, "not_empty")
-            self._set_table_selection_to_rows(table, model, row_indices)
+            self._set_table_selection_to_rows(table, model, row_indices, append=append)
             n = len(row_indices)
             progress_service.set_status(f"Selected {n} row{'s' if n != 1 else ''} with non-empty value")
         elif action in (act_copy_csv, act_copy_tsv):

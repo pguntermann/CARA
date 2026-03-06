@@ -8,6 +8,8 @@ import chess.pgn
 from io import StringIO
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
+from app.utils.concurrency_utils import get_process_pool_max_workers
+
 from app.models.database_model import DatabaseModel, GameData
 from app.models.database_panel_model import DatabasePanelModel
 from app.services.pgn_service import PgnService
@@ -216,7 +218,7 @@ class DatabaseController:
             and games_added is 0.
         """
         # Parse PGN text using service
-        result = PgnService.parse_pgn_text(pgn_text)
+        result = PgnService.parse_pgn_text(pgn_text, config=self.config)
         
         if not result.success:
             return (False, result.error_message, None, 0)
@@ -708,7 +710,7 @@ class DatabaseController:
                     QApplication.processEvents()  # Process events to update status
             
             # Parse PGN with progress callback
-            parse_result = PgnService.parse_pgn_text(pgn_text, progress_callback=parsing_progress)
+            parse_result = PgnService.parse_pgn_text(pgn_text, progress_callback=parsing_progress, config=self.config)
             
             if not parse_result.success:
                 progress_service.hide_progress()
@@ -877,9 +879,8 @@ class DatabaseController:
         # Multiple files - use parallel processing
         progress_service = ProgressService.get_instance()
         
-        # Calculate number of worker processes (reserve 1-2 cores for UI)
-        cpu_count = os.cpu_count() or 4
-        max_workers = max(1, cpu_count - 2)
+        # Worker count from config (reserved_cores + max_workers_cap)
+        max_workers = get_process_pool_max_workers(os.cpu_count(), self.config)
         
         # Show progress
         progress_service.show_progress()
@@ -1084,7 +1085,7 @@ class DatabaseController:
                     QApplication.processEvents()  # Process events to update status
             
             # Parse PGN with progress callback
-            parse_result = PgnService.parse_pgn_text(pgn_text, progress_callback=parsing_progress)
+            parse_result = PgnService.parse_pgn_text(pgn_text, progress_callback=parsing_progress, config=self.config)
             
             if not parse_result.success:
                 progress_service.hide_progress()
