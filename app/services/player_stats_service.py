@@ -140,6 +140,28 @@ def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, ga
             elif not is_white_game and move.black_move:
                 all_moves_black.append(move)
         
+        # Running accuracy by game progress (0%, 5%, ..., 100%) for chart
+        player_moves_list = summary_service._extract_player_moves(moves, is_white_game)
+        num_bins = 21  # 0, 5, 10, ..., 100
+        accuracy_by_progress: List[Tuple[float, Optional[float]]] = []
+        for i in range(num_bins):
+            pct = (i * 100.0) / (num_bins - 1) if num_bins > 1 else 100.0
+            k = round((pct / 100.0) * len(player_moves_list)) if player_moves_list else 0
+            prefix = player_moves_list[:k]
+            if not prefix:
+                accuracy_by_progress.append((pct, None))
+                continue
+            prefix_stats = summary_service._calculate_player_statistics(
+                prefix,
+                opening_moves=len(prefix),
+                middlegame_moves=0,
+                endgame_moves=0,
+                average_cpl_opening=0.0,
+                average_cpl_middlegame=0.0,
+                average_cpl_endgame=0.0,
+            )
+            accuracy_by_progress.append((pct, prefix_stats.accuracy))
+        
         return {
             'index': game_index,
             'is_white': is_white_game,
@@ -154,6 +176,7 @@ def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, ga
             'all_moves_black': all_moves_black,
             'moves': moves,
             'game_summary': game_summary,
+            'accuracy_by_progress': accuracy_by_progress,
         }
     except Exception as e:
         # Log error but don't crash - return None to skip this game
@@ -191,13 +214,8 @@ class AggregatedPlayerStats:
     max_blunder_rate: float
     # Per-game accuracy samples for distribution visualizations
     accuracy_values: List[float]
-    # Opening repertoire information (for repertoire width visualizations)
-    white_opening_counts: Dict[Tuple[str, Optional[str]], int]
-    black_opening_counts: Dict[Tuple[str, Optional[str]], int]
-    white_distinct_openings: int
-    black_distinct_openings: int
-    white_repertoire_breadth: float
-    black_repertoire_breadth: float
+    # Running accuracy by game progress (0–100%): list of (progress_pct, avg_accuracy) for chart
+    accuracy_by_progress: List[Tuple[float, float]]
 
 
 class PlayerStatsService:
@@ -371,6 +389,7 @@ class PlayerStatsService:
         
         elo_values: List[float] = []
         accuracy_values: List[float] = []
+        accuracy_by_progress_bins: Dict[float, List[float]] = {}  # progress_pct -> list of accuracies
         overall_cpl_values: List[float] = []
         overall_top3_pct_values: List[float] = []
         overall_best_move_pct_values: List[float] = []
@@ -417,8 +436,6 @@ class PlayerStatsService:
         endgame_blunders = 0
         
         opening_counter = Counter()
-        white_opening_counter = Counter()
-        black_opening_counter = Counter()
         opening_cpl_data: Dict[Tuple[str, Optional[str]], List[float]] = {}
         
         for result in game_results:
@@ -463,6 +480,11 @@ class PlayerStatsService:
             opening_accuracy_values.append(game_opening.accuracy)
             middlegame_accuracy_values.append(game_middlegame.accuracy)
             endgame_accuracy_values.append(game_endgame.accuracy)
+            
+            # Collect running accuracy by progress for chart
+            for pct, acc in result.get('accuracy_by_progress', []):
+                if acc is not None:
+                    accuracy_by_progress_bins.setdefault(pct, []).append(acc)
             
             # Collect phase statistics for aggregation
             opening_moves_total += game_opening.moves
@@ -510,10 +532,6 @@ class PlayerStatsService:
             
             # Track opening usage and CPL
             opening_counter[opening_key] += 1
-            if is_white_game:
-                white_opening_counter[opening_key] += 1
-            else:
-                black_opening_counter[opening_key] += 1
             if opening_avg_cpl is not None:
                 if opening_key not in opening_cpl_data:
                     opening_cpl_data[opening_key] = []
@@ -669,31 +687,13 @@ class PlayerStatsService:
         best_openings = opening_avg_cpl[:3]  # Top 3 best
         best_openings_list = [(eco, opening_name, avg_cpl, count) for (eco, opening_name), avg_cpl, count in best_openings]
 
-        # Repertoire breadth metrics (per color)
-        def _compute_repertoire_breadth(counter: Counter) -> Tuple[int, float]:
-            """Return (distinct_openings, breadth_index in [0,1])."""
-            if not counter:
-                return 0, 0.0
-            total = sum(counter.values())
-            if total <= 0:
-                return 0, 0.0
-            distinct = len([k for k, v in counter.items() if v > 0])
-            if distinct <= 1:
-                return distinct, 0.0
-            # Entropy-based breadth index (0 = narrow, 1 = wide / uniform)
-            entropy = 0.0
-            for count in counter.values():
-                if count <= 0:
-                    continue
-                p = count / total
-                entropy -= p * math.log(p)
-            max_entropy = math.log(distinct)
-            breadth = entropy / max_entropy if max_entropy > 0 else 0.0
-            return distinct, breadth
+        # Average running accuracy by progress for chart
+        accuracy_by_progress_list: List[Tuple[float, float]] = []
+        for pct in sorted(accuracy_by_progress_bins.keys()):
+            values = accuracy_by_progress_bins[pct]
+            if values:
+                accuracy_by_progress_list.append((pct, sum(values) / len(values)))
 
-        white_distinct_openings, white_repertoire_breadth = _compute_repertoire_breadth(white_opening_counter)
-        black_distinct_openings, black_repertoire_breadth = _compute_repertoire_breadth(black_opening_counter)
-        
         aggregated_stats = AggregatedPlayerStats(
             total_games=total_games,
             analyzed_games=len(analyzed_games),
@@ -719,12 +719,7 @@ class PlayerStatsService:
             min_blunder_rate=min_blunder_rate,
             max_blunder_rate=max_blunder_rate,
             accuracy_values=accuracy_values,
-            white_opening_counts=dict(white_opening_counter),
-            black_opening_counts=dict(black_opening_counter),
-            white_distinct_openings=white_distinct_openings,
-            black_distinct_openings=black_distinct_openings,
-            white_repertoire_breadth=white_repertoire_breadth,
-            black_repertoire_breadth=black_repertoire_breadth,
+            accuracy_by_progress=accuracy_by_progress_list,
         )
         
         logging_service.debug(f"Completed player stats aggregation: player={player_name}, games={total_games}, wins={wins}, draws={draws}, losses={losses}, win_rate={win_rate:.1f}%")

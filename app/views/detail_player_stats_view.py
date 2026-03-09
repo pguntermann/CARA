@@ -3,10 +3,10 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
     QGridLayout, QSizePolicy, QComboBox, QPushButton, QApplication,
-    QGraphicsOpacityEffect, QMenu, QTreeWidget, QTreeWidgetItem
+    QGraphicsOpacityEffect, QMenu, QTreeWidget, QTreeWidgetItem, QToolButton, QToolTip
 )
-from PyQt6.QtCore import Qt, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QPoint
-from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QFontMetrics, QContextMenuEvent
+from PyQt6.QtCore import Qt, QRect, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QPoint, QPointF
+from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QFontMetrics, QContextMenuEvent, QMouseEvent
 from app.views.detail_summary_view import PieChartWidget
 from typing import Callable, Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 from app.models.database_model import DatabaseModel
@@ -142,6 +142,255 @@ class PhaseBarChartWidget(QWidget):
             painter.drawText(value_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{accuracy:.1f}%")
             
             y_pos += self.bar_height + self.bar_spacing
+
+
+class AccuracyVsProgressChartWidget(QWidget):
+    """Line chart: X = game progress 0-100%, Y = running accuracy (0-100%), averaged across games. Styled like evaluation graph; no phase shading."""
+
+    def __init__(self, config: Dict[str, Any], parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.config = config
+        ui_config = config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        player_stats_config = panel_config.get('player_stats', {})
+        chart_config = player_stats_config.get('accuracy_vs_progress_chart', {})
+
+        self._height = int(chart_config.get('height', 200))
+        self.background_color = QColor(*chart_config.get('background_color', [30, 30, 35]))
+        self.grid_color = QColor(*chart_config.get('grid_color', [60, 60, 65]))
+        self.line_color = QColor(*chart_config.get('line_color', [120, 190, 255]))
+        self.line_width = chart_config.get('line_width', 2)
+        self.text_color = QColor(*chart_config.get('text_color', [200, 200, 200]))
+        self.axis_color = QColor(*chart_config.get('axis_color', [150, 150, 150]))
+        self.padding = chart_config.get('padding', [40, 20, 20, 40])
+        self.font_family = resolve_font_family(chart_config.get('font_family', 'Helvetica Neue'))
+        self.font_size = int(scale_font_size(chart_config.get('font_size', 10)))
+        self.min_font_size = int(scale_font_size(chart_config.get('min_font_size', 8)))
+        self.font_size_calculation_divisor = chart_config.get('font_size_calculation_divisor', 20)
+        self.min_grid_spacing = chart_config.get('min_grid_spacing', 30)
+        self.min_grid_lines = chart_config.get('min_grid_lines', 3)
+        self.y_axis_label_spacing = chart_config.get('y_axis_label_spacing', 5)
+        self.x_axis_label_spacing = chart_config.get('x_axis_label_spacing', 5)
+
+        self._data: List[Tuple[float, float]] = []  # (progress_pct, accuracy)
+        self._hover_data: Optional[Tuple[float, float]] = None  # (progress_pct, accuracy) when hovering
+        self._hover_pixel: Optional[QPointF] = None  # pixel position for circle
+        self._hover_hit_threshold_px = 25
+        self._hover_circle_radius = 6
+        self._y_padding_pct = 0.05  # padding as fraction of range (5%)
+        self._y_min_range = 5.0  # minimum Y range when min_acc == max_acc
+
+        # Use the configured height as a fixed height for this chart
+        self.setFixedHeight(self._height)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setMouseTracking(True)
+
+    def set_data(self, data: List[Tuple[float, float]]) -> None:
+        """Set chart data: list of (progress_pct, accuracy) sorted by progress_pct."""
+        self._data = list(data) if data else []
+        self.update()
+
+    def _accuracy_range(self) -> Tuple[float, float]:
+        """Return (min_acc, max_acc) for the Y scale from data, with padding, clamped to 0-100%. Empty data -> (0, 100)."""
+        if not self._data:
+            return 0.0, 100.0
+        accs = [acc for _, acc in self._data]
+        lo, hi = min(accs), max(accs)
+        r = hi - lo
+        if r < self._y_min_range:
+            mid = (lo + hi) / 2.0
+            half = self._y_min_range / 2.0
+            lo, hi = mid - half, mid + half
+            r = self._y_min_range
+        pad = max(2.0, r * self._y_padding_pct)
+        # Clamp to 0-100% so Y labels never go beyond that
+        return (max(0.0, lo - pad), min(100.0, hi + pad))
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        width = self.width()
+        height = self.height()
+        painter.fillRect(0, 0, width, height, self.background_color)
+
+        if not self._data:
+            painter.setPen(self.text_color)
+            font = QFont(self.font_family, self.font_size)
+            painter.setFont(font)
+            painter.drawText(QRect(0, 0, width, height), Qt.AlignmentFlag.AlignCenter, "No data")
+            return
+
+        left = self.padding[0]
+        top = self.padding[1]
+        right = width - self.padding[2]
+        bottom = height - self.padding[3]
+        graph_width = right - left
+        graph_height = bottom - top
+
+        # Y: dynamic scale from data (lowest to highest accuracy + padding)
+        min_acc, max_acc = self._accuracy_range()
+        acc_range = max_acc - min_acc
+
+        # Grid: horizontal lines at accuracy steps across the dynamic range
+        max_grid_lines = max(self.min_grid_lines, int(graph_height / self.min_grid_spacing))
+        step = acc_range / max(1, max_grid_lines - 1) if acc_range > 0 else 1.0
+        painter.setPen(QPen(self.grid_color, 1))
+        for i in range(max_grid_lines + 1):
+            acc = min_acc + i * step
+            y = bottom - ((acc - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
+            painter.drawLine(int(left), int(y), int(right), int(y))
+
+        # Grid: vertical lines at key progress points (0%, 25%, 50%, 75%, 100%)
+        for pct in [0, 25, 50, 75, 100]:
+            x = left + (pct / 100.0 * graph_width)
+            painter.drawLine(int(x), int(top), int(x), int(bottom))
+
+        # Axis labels
+        painter.setPen(self.text_color)
+        adaptive_font_size = max(self.min_font_size, min(self.font_size, int(graph_height / self.font_size_calculation_divisor)))
+        font = QFont(self.font_family, adaptive_font_size)
+        painter.setFont(font)
+        fm = QFontMetrics(font)
+
+        for i in range(max_grid_lines + 1):
+            acc = min_acc + i * step
+            y = bottom - ((acc - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
+            label = f"{acc:.1f}%" if acc != int(acc) or acc_range < 20 else f"{acc:.0f}%"
+            label_width = fm.horizontalAdvance(label)
+            painter.drawText(int(left - label_width - self.y_axis_label_spacing), int(y + fm.height() / 2), label)
+
+        # X-axis labels (progress 0%, 25%, 50%, 75%, 100%)
+        for pct in [0, 25, 50, 75, 100]:
+            x = left + (pct / 100.0 * graph_width)
+            label = f"{pct}%"
+            label_width = fm.horizontalAdvance(label)
+            painter.drawText(int(x - label_width / 2), int(bottom + fm.height() + self.x_axis_label_spacing), label)
+
+        # Line
+        sorted_data = sorted(self._data, key=lambda x: x[0])
+        points: List[QPointF] = []
+        for pct, acc in sorted_data:
+            x = left + (pct / 100.0 * graph_width)
+            y = bottom - ((acc - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
+            y = max(top, min(bottom, y))
+            points.append(QPointF(x, y))
+
+        if len(points) > 1:
+            painter.setPen(QPen(self.line_color, self.line_width))
+            for i in range(len(points) - 1):
+                painter.drawLine(points[i], points[i + 1])
+
+        # Hover indicator: circle and tooltip text are driven by mouseMoveEvent/leaveEvent
+        if self._hover_pixel is not None and self._hover_data is not None:
+            painter.setPen(QPen(self.line_color, 2))
+            painter.setBrush(QBrush(self.background_color))
+            painter.drawEllipse(self._hover_pixel, self._hover_circle_radius, self._hover_circle_radius)
+
+    def _graph_bounds(self) -> Tuple[float, float, float, float, float, float]:
+        """Return (left, top, right, bottom, graph_width, graph_height) in widget coordinates."""
+        width = self.width()
+        height = self.height()
+        left = self.padding[0]
+        top = self.padding[1]
+        right = width - self.padding[2]
+        bottom = height - self.padding[3]
+        return left, top, right, bottom, right - left, bottom - top
+
+    def _data_to_pixel(self, progress: float, accuracy: float,
+                       left: float, bottom: float, graph_width: float, graph_height: float,
+                       min_acc: Optional[float] = None, max_acc: Optional[float] = None) -> QPointF:
+        if min_acc is None or max_acc is None:
+            min_acc, max_acc = self._accuracy_range()
+        acc_range = max_acc - min_acc
+        x = left + (progress / 100.0 * graph_width)
+        y = bottom - ((accuracy - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
+        return QPointF(x, y)
+
+    def _pixel_to_data(self, x: float, y: float,
+                       left: float, bottom: float, graph_width: float, graph_height: float,
+                       min_acc: Optional[float] = None, max_acc: Optional[float] = None) -> Tuple[float, float]:
+        if min_acc is None or max_acc is None:
+            min_acc, max_acc = self._accuracy_range()
+        acc_range = max_acc - min_acc
+        progress = (x - left) / graph_width * 100.0 if graph_width > 0 else 0.0
+        accuracy = (bottom - y) / graph_height * acc_range + min_acc if graph_height > 0 else min_acc
+        progress = max(0.0, min(100.0, progress))
+        return progress, accuracy
+
+    def _closest_point_on_segment(self, p: QPointF, a: QPointF, b: QPointF) -> Tuple[QPointF, float]:
+        """Return (closest_point, distance_squared) on segment a-b to point p."""
+        vx = b.x() - a.x()
+        vy = b.y() - a.y()
+        wx = p.x() - a.x()
+        wy = p.y() - a.y()
+        c1 = wx * vx + wy * vy
+        c2 = vx * vx + vy * vy
+        if c2 <= 0:
+            cx, cy = a.x(), a.y()
+        elif c1 <= 0:
+            cx, cy = a.x(), a.y()
+        elif c1 >= c2:
+            cx, cy = b.x(), b.y()
+        else:
+            t = c1 / c2
+            cx = a.x() + t * vx
+            cy = a.y() + t * vy
+        dx = p.x() - cx
+        dy = p.y() - cy
+        return QPointF(cx, cy), dx * dx + dy * dy
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        if not self._data:
+            return
+        left, top, right, bottom, graph_width, graph_height = self._graph_bounds()
+        if graph_width <= 0 or graph_height <= 0:
+            self._hover_data = None
+            self._hover_pixel = None
+            self.update()
+            return
+        sorted_data = sorted(self._data, key=lambda x: x[0])
+        points: List[QPointF] = []
+        for pct, acc in sorted_data:
+            pt = self._data_to_pixel(pct, acc, left, bottom, graph_width, graph_height)
+            pt.setY(max(top, min(bottom, pt.y())))
+            points.append(pt)
+        if len(points) < 2:
+            self._hover_data = None
+            self._hover_pixel = None
+            QToolTip.hideText()
+            self.update()
+            return
+        mp = event.position()
+        best_dist_sq = float('inf')
+        best_pixel: Optional[QPointF] = None
+        for i in range(len(points) - 1):
+            closest, dist_sq = self._closest_point_on_segment(mp, points[i], points[i + 1])
+            if dist_sq < best_dist_sq:
+                best_dist_sq = dist_sq
+                best_pixel = closest
+        threshold_sq = self._hover_hit_threshold_px * self._hover_hit_threshold_px
+        if best_dist_sq <= threshold_sq and best_pixel is not None:
+            progress, accuracy = self._pixel_to_data(
+                best_pixel.x(), best_pixel.y(), left, bottom, graph_width, graph_height
+            )
+            self._hover_data = (progress, accuracy)
+            self._hover_pixel = best_pixel
+            tip = f"{accuracy:.1f}% accuracy at {progress:.1f}% game progress"
+            QToolTip.showText(event.globalPosition().toPoint(), tip, self, QRect(), 3000)
+        else:
+            self._hover_data = None
+            self._hover_pixel = None
+            QToolTip.hideText()
+        self.update()
+
+    def leaveEvent(self, event) -> None:
+        super().leaveEvent(event)
+        self._hover_data = None
+        self._hover_pixel = None
+        QToolTip.hideText()
+        self.update()
 
 
 class AccuracyDistributionWidget(QWidget):
@@ -456,308 +705,6 @@ class OpeningTreeItem(QTreeWidgetItem):
         return super().__lt__(other)
 
 
-class RepertoireMapWidget(QWidget):
-    """Widget for visualizing opening repertoire breadth for White and Black."""
-
-    def __init__(
-        self,
-        config: Dict[str, Any],
-        text_color: QColor,
-        label_font: QFont,
-        value_font: QFont,
-        parent: Optional[QWidget] = None,
-    ) -> None:
-        super().__init__(parent)
-        self._config = config
-        self._text_color = text_color
-        self._label_font = label_font
-        self._value_font = value_font
-
-        ui_config = config.get('ui', {})
-        panel_config = ui_config.get('panels', {}).get('detail', {})
-        player_stats_config = panel_config.get('player_stats', {})
-        colors_config = player_stats_config.get('colors', {})
-        rep_config = player_stats_config.get('repertoire_map', {})
-
-        self._bar_height = int(rep_config.get('bar_height', 22))
-        self._bar_spacing = int(rep_config.get('bar_spacing', 8))
-        self._margins = rep_config.get('margins', [10, 10, 10, 10])
-        self._label_width = int(rep_config.get('label_width', 80))
-        self._value_width = int(rep_config.get('value_width', 140))
-        self._min_segment_width = int(rep_config.get('min_segment_width', 3))
-        self._max_segments_per_side = int(rep_config.get('max_segments_per_side', 8))
-
-        # Segment colors (cycle)
-        default_segment_colors = [
-            colors_config.get('phase_opening_color', [100, 150, 255]),
-            colors_config.get('phase_middlegame_color', [150, 255, 100]),
-            colors_config.get('phase_endgame_color', [255, 200, 100]),
-            [180, 140, 255],
-            [255, 170, 140],
-            [140, 210, 255],
-        ]
-        raw_segment_colors = rep_config.get('segment_colors', default_segment_colors)
-        self._segment_colors: List[QColor] = []
-        for rgb in raw_segment_colors:
-            if isinstance(rgb, (list, tuple)) and len(rgb) >= 3:
-                self._segment_colors.append(QColor(int(rgb[0]), int(rgb[1]), int(rgb[2])))
-        if not self._segment_colors:
-            self._segment_colors = [QColor(120, 190, 255)]
-
-        self._white_segments: List[Tuple[str, float, int]] = []
-        self._black_segments: List[Tuple[str, float, int]] = []
-        self._white_breadth: float = 0.0
-        self._black_breadth: float = 0.0
-        # Hover hitboxes: (rect, side_label, segment_label, count, fraction)
-        self._segment_hitboxes: List[Tuple[QRectF, str, str, int, float]] = []
-
-        total_height = (
-            self._margins[1]
-            + self._bar_height * 2
-            + self._bar_spacing
-            + self._margins[3]
-        )
-        self.setMinimumHeight(total_height)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-
-    def set_stats(self, stats: "AggregatedPlayerStats") -> None:
-        """Populate internal data from AggregatedPlayerStats."""
-        self._segment_hitboxes = []
-        # Helper to build segments for a given color side
-        def build_segments(counts: Dict[Tuple[str, Optional[str]], int]) -> List[Tuple[str, float, int]]:
-            items = [(key, count) for key, count in counts.items() if count > 0]
-            if not items:
-                return []
-            total = sum(count for _, count in items)
-            if total <= 0:
-                return []
-            # Sort by frequency (descending)
-            items.sort(key=lambda kv: kv[1], reverse=True)
-            head = items[: self._max_segments_per_side]
-            tail = items[self._max_segments_per_side :]
-            segments: List[Tuple[str, float, int]] = []
-            for (eco, name), count in head:
-                if name and eco != "Unknown":
-                    label = f"{eco} ({name})"
-                elif eco != "Unknown":
-                    label = eco
-                else:
-                    label = "Unknown"
-                fraction = count / float(total)
-                segments.append((label, fraction, count))
-            # Group remaining openings into "Other"
-            if tail:
-                other_count = sum(count for _, count in tail)
-                if other_count > 0:
-                    fraction = other_count / float(total)
-                    segments.append(("Other", fraction, other_count))
-            return segments
-
-        self._white_segments = build_segments(getattr(stats, "white_opening_counts", {}) or {})
-        self._black_segments = build_segments(getattr(stats, "black_opening_counts", {}) or {})
-        self._white_breadth = float(getattr(stats, "white_repertoire_breadth", 0.0) or 0.0)
-        self._black_breadth = float(getattr(stats, "black_repertoire_breadth", 0.0) or 0.0)
-        self.update()
-
-    def sizeHint(self) -> QSize:
-        total_height = (
-            self._margins[1]
-            + self._bar_height * 2
-            + self._bar_spacing
-            + self._margins[3]
-        )
-        return QSize(200, total_height)
-
-    def minimumSizeHint(self) -> QSize:
-        return self.sizeHint()
-
-    def _draw_side_bar(
-        self,
-        painter: QPainter,
-        y_top: int,
-        side_label: str,
-        segments: List[Tuple[str, float, int]],
-        breadth: float,
-        rect: QRectF,
-    ) -> None:
-        left = int(rect.left())
-        right = int(rect.right())
-        bar_top = y_top
-        bar_bottom = y_top + self._bar_height
-        bar_height = self._bar_height
-
-        # Side label
-        painter.setFont(self._label_font)
-        painter.setPen(self._text_color)
-        label_rect = QRectF(
-            left + self._margins[0],
-            bar_top,
-            self._label_width,
-            bar_height,
-        )
-        painter.drawText(
-            label_rect,
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-            side_label,
-        )
-
-        # Bar area
-        bar_left = left + self._margins[0] + self._label_width
-        bar_right = right - self._margins[2] - self._value_width
-        if bar_right <= bar_left or bar_height <= 0:
-            return
-        bar_width = bar_right - bar_left
-
-        # Draw segments
-        painter.setPen(Qt.PenStyle.NoPen)
-        x_cursor = bar_left
-        num_segments = len(segments)
-        for idx, (seg_label, fraction, _count) in enumerate(segments):
-            if fraction <= 0.0:
-                continue
-            if idx == num_segments - 1:
-                # Last segment: fill remaining width
-                seg_width = bar_left + bar_width - x_cursor
-            else:
-                seg_width = int(bar_width * fraction)
-            if seg_width < self._min_segment_width:
-                seg_width = self._min_segment_width
-            if x_cursor + seg_width > bar_left + bar_width:
-                seg_width = (bar_left + bar_width) - x_cursor
-            if seg_width <= 0:
-                continue
-            color = self._segment_colors[idx % len(self._segment_colors)]
-            painter.setBrush(QBrush(color))
-            seg_rect = QRectF(float(x_cursor), float(bar_top), float(seg_width), float(bar_height))
-            painter.drawRect(x_cursor, bar_top, seg_width, bar_height)
-            # Store for hover tooltips
-            self._segment_hitboxes.append((seg_rect, side_label, seg_label, int(_count), float(fraction)))
-
-            # Draw segment label inside if there is enough space
-            if seg_width >= 40:
-                painter.save()
-                painter.setFont(self._value_font)
-                # Choose text color with simple contrast heuristic
-                text_color = QColor(255, 255, 255)
-                painter.setPen(text_color)
-                fm = QFontMetrics(self._value_font)
-                max_text_width = seg_width - 6
-                text = seg_label
-                if fm.horizontalAdvance(text) > max_text_width:
-                    # Try ECO only (first token) if label is long like "C11 (French ...)"
-                    if "(" in text:
-                        text = text.split("(", 1)[0].strip()
-                    # Truncate with ellipsis if still too long
-                    while text and fm.horizontalAdvance(text + "…") > max_text_width:
-                        text = text[:-1]
-                    if text:
-                        text = text + "…"
-                if text:
-                    text_rect = QRectF(
-                        float(x_cursor + 3),
-                        float(bar_top),
-                        float(seg_width - 6),
-                        float(bar_height),
-                    )
-                    painter.drawText(
-                        text_rect,
-                        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                        text,
-                    )
-                painter.restore()
-
-            x_cursor += seg_width
-            if x_cursor >= bar_left + bar_width:
-                break
-
-        # Summary text on the right
-        painter.setFont(self._value_font)
-        painter.setPen(self._text_color)
-        breadth_pct = breadth * 100.0
-        summary_parts: List[str] = []
-        summary_parts.append(f"Breadth {breadth_pct:.0f}%")
-        # Distinct openings can be inferred from segment count (excluding 'Other')
-        distinct_estimate = len([s for s in segments if s[0] != "Other"])
-        if distinct_estimate > 0:
-            summary_parts.insert(0, f"{distinct_estimate} opening(s)")
-        summary_text = " · ".join(summary_parts)
-        value_rect = QRectF(
-            bar_right + 8,
-            bar_top,
-            self._value_width - 8,
-            bar_height,
-        )
-        painter.drawText(
-            value_rect,
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-            summary_text,
-        )
-
-    def paintEvent(self, event) -> None:
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        rect = self.rect()
-        content_rect = QRectF(
-            rect.left(),
-            rect.top(),
-            rect.width(),
-            rect.height(),
-        )
-
-        # Early exit if no data
-        if not self._white_segments and not self._black_segments:
-            painter.setFont(self._value_font)
-            painter.setPen(self._text_color)
-            text = "No opening data"
-            fm = QFontMetrics(self._value_font)
-            text_width = fm.horizontalAdvance(text)
-            x = content_rect.left() + (content_rect.width() - text_width) / 2.0
-            y = content_rect.top() + content_rect.height() / 2.0 + fm.ascent() / 2.0
-            painter.drawText(QPoint(int(x), int(y)), text)
-            return
-
-        top_y = int(rect.top() + self._margins[1])
-        # White bar
-        self._draw_side_bar(
-            painter,
-            top_y,
-            "White",
-            self._white_segments,
-            self._white_breadth,
-            content_rect,
-        )
-        # Black bar
-        black_y = top_y + self._bar_height + self._bar_spacing
-        self._draw_side_bar(
-            painter,
-            black_y,
-            "Black",
-            self._black_segments,
-            self._black_breadth,
-            content_rect,
-        )
-
-    def mouseMoveEvent(self, event) -> None:
-        """Show tooltip when hovering over a repertoire segment."""
-        if not self._segment_hitboxes:
-            self.setToolTip("")
-            super().mouseMoveEvent(event)
-            return
-
-        pos = event.position()
-        tooltip = ""
-        for rect, side_label, seg_label, count, fraction in self._segment_hitboxes:
-            if rect.contains(pos):
-                pct = fraction * 100.0
-                game_word = "game" if count == 1 else "games"
-                tooltip = f"{side_label}: {seg_label} \u2013 {pct:.1f}% ({count} {game_word})"
-                break
-
-        self.setToolTip(tooltip)
-        super().mouseMoveEvent(event)
-
-
 class DetailPlayerStatsView(QWidget):
     """Player statistics view displaying aggregated player performance."""
     
@@ -851,6 +798,12 @@ class DetailPlayerStatsView(QWidget):
         self._opening_tree_widget: Optional[QTreeWidget] = None
         self._opening_tree_header_compact: str = "Move / Opening"
         self._opening_tree_header_with_hint: str = "Move / Opening (double-click row to open games)"
+        self._opening_tree_current_height: int = 0
+        self._opening_tree_min_height: int = 0
+        self._opening_tree_max_height: int = 0
+        self._opening_tree_height_step: int = 0
+        self._opening_tree_decrease_button: Optional[QToolButton] = None
+        self._opening_tree_increase_button: Optional[QToolButton] = None
         
         # Get responsive config
         responsive_config = self.player_stats_config.get('responsive', {})
@@ -1226,6 +1179,16 @@ class DetailPlayerStatsView(QWidget):
         phase_widget.setProperty("section_name", "Performance by Phase")
         self.content_layout.addWidget(phase_widget)
         self.content_layout.addSpacing(section_spacing_val)
+        
+        # Accuracy over game duration Section (line chart)
+        progress_chart_config = player_stats_config.get('accuracy_vs_progress_chart', {})
+        if progress_chart_config.get('enabled', True) and getattr(self.current_stats, 'accuracy_by_progress', None):
+            self._add_section_header("Accuracy over game duration", header_font, header_text_color)
+            progress_chart = AccuracyVsProgressChartWidget(self.config)
+            progress_chart.set_data(self.current_stats.accuracy_by_progress)
+            progress_chart.setProperty("section_name", "Accuracy over game duration")
+            self.content_layout.addWidget(progress_chart)
+            self.content_layout.addSpacing(section_spacing_val)
         
         # Openings Section
         if self.current_stats and (self.current_stats.top_openings or 
@@ -2953,9 +2916,14 @@ class DetailPlayerStatsView(QWidget):
 
                 add_children(None, opening_tree, [])
                 tree_widget.expandToDepth(int(tree_config.get('initial_expand_depth', 2)))
-                # Optional fixed height
-                preferred_height = int(tree_config.get('height', 200))
-                tree_widget.setMinimumHeight(preferred_height)
+
+                # Initial and dynamic height settings
+                default_height = int(tree_config.get('height', 280))
+                self._opening_tree_min_height = int(tree_config.get('min_height', max(80, default_height // 2)))
+                self._opening_tree_max_height = int(tree_config.get('max_height', max(default_height, default_height * 2)))
+                self._opening_tree_height_step = int(tree_config.get('height_step', 40))
+                self._opening_tree_current_height = default_height
+                tree_widget.setFixedHeight(self._opening_tree_current_height)
 
                 # Connect double-click to open games for this opening line
                 tree_widget.itemDoubleClicked.connect(self._on_opening_tree_item_double_clicked)
@@ -2967,7 +2935,46 @@ class DetailPlayerStatsView(QWidget):
                 # Keep reference for responsive header hint updates
                 self._opening_tree_widget = tree_widget
 
+                # Add tree widget and height controls
                 layout.addWidget(tree_widget)
+
+                controls_layout = QHBoxLayout()
+                controls_layout.setContentsMargins(0, 0, 0, 0)
+                controls_layout.addStretch()
+
+                # Height adjust buttons (use small tool buttons with symbols)
+                height_step = self._opening_tree_height_step or 40
+
+                decrease_btn = QToolButton(widget)
+                decrease_btn.setText("−")
+                decrease_btn.setToolTip("Decrease opening tree height")
+
+                increase_btn = QToolButton(widget)
+                increase_btn.setText("+")
+                increase_btn.setToolTip("Increase opening tree height")
+
+                # Match button height from config where possible
+                button_config = player_stats_config.get('button', {})
+                btn_height = int(button_config.get('height', 24))
+                decrease_btn.setFixedHeight(btn_height)
+                increase_btn.setFixedHeight(btn_height)
+
+                decrease_btn.clicked.connect(
+                    lambda checked=False, step=height_step: self._adjust_opening_tree_height(-step)
+                )
+                increase_btn.clicked.connect(
+                    lambda checked=False, step=height_step: self._adjust_opening_tree_height(step)
+                )
+
+                controls_layout.addWidget(decrease_btn)
+                controls_layout.addWidget(increase_btn)
+
+                layout.addLayout(controls_layout)
+
+                # Keep references for enabling/disabling at bounds and initialize state
+                self._opening_tree_decrease_button = decrease_btn
+                self._opening_tree_increase_button = increase_btn
+                self._update_opening_tree_height_buttons()
 
         layout.addStretch()
 
@@ -3166,6 +3173,41 @@ class DetailPlayerStatsView(QWidget):
         tab_widget = getattr(self._database_panel, "tab_widget", None)
         if tab_widget is not None and hasattr(tab_widget, "setCurrentIndex"):
             tab_widget.setCurrentIndex(tab_index)
+
+    def _adjust_opening_tree_height(self, delta: int) -> None:
+        """Adjust the opening tree height by delta, clamped to configured min/max."""
+        if not self._opening_tree_widget:
+            return
+        if self._opening_tree_height_step <= 0:
+            return
+        new_height = self._opening_tree_current_height + int(delta)
+        # Clamp to min/max
+        if self._opening_tree_min_height > 0:
+            new_height = max(self._opening_tree_min_height, new_height)
+        if self._opening_tree_max_height > 0:
+            new_height = min(self._opening_tree_max_height, new_height)
+        if new_height == self._opening_tree_current_height:
+            return
+        self._opening_tree_current_height = new_height
+        self._opening_tree_widget.setFixedHeight(new_height)
+        self._update_opening_tree_height_buttons()
+
+    def _update_opening_tree_height_buttons(self) -> None:
+        """Enable/disable opening tree height buttons when min/max are reached."""
+        if not self._opening_tree_widget:
+            return
+        can_decrease = (
+            self._opening_tree_min_height > 0
+            and self._opening_tree_current_height > self._opening_tree_min_height
+        )
+        can_increase = (
+            self._opening_tree_max_height > 0
+            and self._opening_tree_current_height < self._opening_tree_max_height
+        )
+        if self._opening_tree_decrease_button is not None:
+            self._opening_tree_decrease_button.setEnabled(can_decrease)
+        if self._opening_tree_increase_button is not None:
+            self._opening_tree_increase_button.setEnabled(can_increase)
     
     def _add_stat_row(self, grid: QGridLayout, row: int, label_text: str, value_text: str,
                      label_font: QFont, value_font: QFont, text_color: QColor) -> None:

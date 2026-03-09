@@ -1440,11 +1440,59 @@
             "bar_pen_width": 1,
             "bar_value_spacing": 5
           },
+          "accuracy_vs_progress_chart": {
+            "enabled": true,
+            "height": 220,
+            "background_color": [
+              30,
+              30,
+              35
+            ],
+            "grid_color": [
+              60,
+              60,
+              65
+            ],
+            "line_color": [
+              120,
+              190,
+              255
+            ],
+            "line_width": 2,
+            "font_family": "Helvetica Neue",
+            "font_size": 10,
+            "text_color": [
+              200,
+              200,
+              200
+            ],
+            "axis_color": [
+              150,
+              150,
+              150
+            ],
+            "padding": [
+              40,
+              20,
+              20,
+              40
+            ],
+            "min_grid_spacing": 30,
+            "min_grid_lines": 3,
+            "min_font_size": 8,
+            "font_size_calculation_divisor": 20,
+            "y_axis_label_spacing": 5,
+            "x_axis_label_spacing": 5,
+            "progress_bins": 21
+          },
           "opening_tree": {
             "max_depth": 12,
             "min_games": 1,
             "initial_expand_depth": 2,
             "height": 280,
+            "min_height": 160,
+            "max_height": 480,
+            "height_step": 80,
             "show_root_decorations": true,
             "alternating_row_colors": true,
             "column_resize_modes": {
