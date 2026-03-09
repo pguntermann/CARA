@@ -858,6 +858,33 @@ class PlayerStatsController(QObject):
         # Map games to source display names (database file names)
         return self._map_games_to_sources(results)
 
+    def get_games_for_endgame_filter(
+        self,
+        raw_type: Optional[str] = None,
+        group_key: Optional[str] = None,
+    ) -> List[Tuple["GameData", str]]:
+        """Return games (with source names) that match the given endgame type or group.
+
+        Exactly one of raw_type or group_key must be set.
+        - raw_type: filter by specific endgame type (e.g. "Rook + Minor Piece").
+        - group_key: filter by endgame group (e.g. "Rook" includes all rook endgame types).
+        """
+        results: List["GameData"] = []
+        analyzed_games = getattr(self, "_current_analyzed_games", []) or []
+        summaries = getattr(self, "current_game_summaries", []) or []
+        if not analyzed_games or not summaries or len(analyzed_games) != len(summaries):
+            return []
+        if (raw_type is None) == (group_key is None):
+            return []
+        for game, summary in zip(analyzed_games, summaries):
+            if raw_type is not None:
+                if getattr(summary, "endgame_type", None) == raw_type:
+                    results.append(game)
+            else:
+                if getattr(summary, "endgame_type_group", None) == group_key:
+                    results.append(game)
+        return self._map_games_to_sources(results)
+
     def get_top_best_games_summary(self, max_best: int) -> Tuple[int, Optional[float], Optional[float]]:
         """Return count and accuracy range for the best-performing games."""
         ranked = self._get_ranked_games_by_cpl()

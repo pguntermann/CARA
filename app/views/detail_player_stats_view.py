@@ -705,6 +705,25 @@ class OpeningTreeItem(QTreeWidgetItem):
         return super().__lt__(other)
 
 
+class EndgameTreeItem(QTreeWidgetItem):
+    """Tree item with numeric-aware sorting for endgame tree: 1=Total, 2=White, 3=Black, 4=Accuracy."""
+
+    def __lt__(self, other: "QTreeWidgetItem") -> bool:  # type: ignore[override]
+        tree = self.treeWidget()
+        if not tree:
+            return super().__lt__(other)
+        column = tree.sortColumn()
+        if column in (1, 2, 3, 4):
+            try:
+                left_val = self.data(column, Qt.ItemDataRole.UserRole)
+                right_val = other.data(column, Qt.ItemDataRole.UserRole)
+                if left_val is not None and right_val is not None:
+                    return float(left_val) < float(right_val)
+            except Exception:
+                pass
+        return super().__lt__(other)
+
+
 class DetailPlayerStatsView(QWidget):
     """Player statistics view displaying aggregated player performance."""
     
@@ -798,12 +817,21 @@ class DetailPlayerStatsView(QWidget):
         self._opening_tree_widget: Optional[QTreeWidget] = None
         self._opening_tree_header_compact: str = "Move / Opening"
         self._opening_tree_header_with_hint: str = "Move / Opening (double-click row to open games)"
+        self._endgame_tree_header_compact: str = "Endgame type"
+        self._endgame_tree_header_with_hint: str = "Endgame type (double-click row to open games)"
         self._opening_tree_current_height: int = 0
         self._opening_tree_min_height: int = 0
         self._opening_tree_max_height: int = 0
         self._opening_tree_height_step: int = 0
         self._opening_tree_decrease_button: Optional[QToolButton] = None
         self._opening_tree_increase_button: Optional[QToolButton] = None
+        self._endgame_tree_widget: Optional[QTreeWidget] = None
+        self._endgame_tree_current_height: int = 0
+        self._endgame_tree_min_height: int = 0
+        self._endgame_tree_max_height: int = 0
+        self._endgame_tree_height_step: int = 0
+        self._endgame_tree_decrease_button: Optional[QToolButton] = None
+        self._endgame_tree_increase_button: Optional[QToolButton] = None
         
         # Get responsive config
         responsive_config = self.player_stats_config.get('responsive', {})
@@ -1055,6 +1083,9 @@ class DetailPlayerStatsView(QWidget):
         self._move_classification_legend_widget = None
         self._openings_widget = None
         self._error_patterns_widget = None
+        self._endgame_tree_widget = None
+        self._endgame_tree_decrease_button = None
+        self._endgame_tree_increase_button = None
         
         # Find player selection widget index
         player_selection_index = -1
@@ -1209,7 +1240,7 @@ class DetailPlayerStatsView(QWidget):
             self.content_layout.addWidget(progress_chart)
             self.content_layout.addSpacing(section_spacing_val)
         
-        # Openings Section
+        # Openings Section (Most Played, Worst/Best accuracy grids only)
         if self.current_stats and (self.current_stats.top_openings or 
                                     self.current_stats.worst_accuracy_openings or 
                                     self.current_stats.best_accuracy_openings):
@@ -1220,6 +1251,35 @@ class DetailPlayerStatsView(QWidget):
             )
             openings_widget.setProperty("section_name", "Openings")
             self.content_layout.addWidget(openings_widget)
+            self.content_layout.addSpacing(section_spacing_val)
+
+        # Opening tree Section (separate section, same style as endgame tree)
+        if self._stats_controller:
+            tree_config = player_stats_config.get('opening_tree', {})
+            max_depth = int(tree_config.get('max_depth', 12))
+            min_games = int(tree_config.get('min_games', 1))
+            opening_tree = self._stats_controller.get_opening_tree(max_depth=max_depth, min_games=min_games)
+            if opening_tree.get("children"):
+                self._add_section_header("Opening tree", header_font, header_text_color)
+                opening_tree_widget = self._create_opening_tree_section_widget(
+                    text_color, label_font, value_font,
+                    section_bg_color, border_color, widgets_config
+                )
+                if opening_tree_widget:
+                    opening_tree_widget.setProperty("section_name", "Opening tree")
+                    self.content_layout.addWidget(opening_tree_widget)
+                    self.content_layout.addSpacing(section_spacing_val)
+
+        # Endgame tree Section (below opening tree; grouped, expand to see types)
+        accuracy_by_endgame_grouped = getattr(self.current_stats, 'accuracy_by_endgame_type_grouped', None)
+        if accuracy_by_endgame_grouped:
+            self._add_section_header("Endgame tree", header_font, header_text_color)
+            endgame_type_widget = self._create_endgame_type_performance_widget(
+                self.current_stats, text_color, label_font, value_font,
+                section_bg_color, border_color, widgets_config
+            )
+            endgame_type_widget.setProperty("section_name", "Endgame tree")
+            self.content_layout.addWidget(endgame_type_widget)
             self.content_layout.addSpacing(section_spacing_val)
 
         # Top Games Section (Best/Worst games for this player)
@@ -2578,6 +2638,284 @@ class DetailPlayerStatsView(QWidget):
         
         return widget
     
+    def _create_endgame_type_performance_widget(self, stats: "AggregatedPlayerStats",
+                                                text_color: QColor, label_font: QFont, value_font: QFont,
+                                                bg_color: QColor, border_color: QColor,
+                                                widgets_config: Dict[str, Any]) -> QWidget:
+        """Create widget showing accuracy by endgame type: groups (expand to see types), tree view."""
+        from PyQt6.QtWidgets import QHeaderView
+        border_radius = widgets_config.get('border_radius', 5)
+        section_margins = widgets_config.get('section_margins', [10, 10, 10, 10])
+        section_spacing = widgets_config.get('section_spacing', 8)
+        widget = QWidget()
+        widget.setStyleSheet(f"""
+            QWidget {{
+                background-color: rgb({bg_color.red()}, {bg_color.green()}, {bg_color.blue()});
+                border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
+                border-radius: {border_radius}px;
+            }}
+        """)
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(section_margins[0], section_margins[1], section_margins[2], section_margins[3])
+        layout.setSpacing(section_spacing)
+        widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        widget.setMinimumWidth(0)
+        grouped = getattr(stats, 'accuracy_by_endgame_type_grouped', []) or []
+        tree_widget = NoWheelTreeWidget(widget)
+        tree_widget.setColumnCount(5)
+        tree_widget.setHeaderLabels([self._endgame_tree_header_compact, "Total", "White", "Black", "Accuracy"])
+        tree_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        header = tree_widget.header()
+        header.setStretchLastSection(False)
+        tree_widget.setFont(value_font)
+        header.setFont(label_font)
+        palette = tree_widget.palette()
+        palette.setColor(tree_widget.foregroundRole(), text_color)
+        tree_widget.setPalette(palette)
+        ui_config = self.config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        player_stats_config = panel_config.get('player_stats', {})
+        tree_config = player_stats_config.get('endgame_tree', {}) or player_stats_config.get('endgame_type_tree', {})
+        show_root_decorations = bool(tree_config.get('show_root_decorations', True))
+        alternating_rows = bool(tree_config.get('alternating_row_colors', True))
+        tree_widget.setRootIsDecorated(show_root_decorations)
+        tree_widget.setAlternatingRowColors(alternating_rows)
+        resize_config = tree_config.get('column_resize_modes', {}) or {}
+        def _mode_for(key: str, default_mode: QHeaderView.ResizeMode) -> QHeaderView.ResizeMode:
+            raw = resize_config.get(key, None)
+            if isinstance(raw, str):
+                try:
+                    mode = getattr(QHeaderView.ResizeMode, raw.strip())
+                    if isinstance(mode, QHeaderView.ResizeMode):
+                        return mode
+                except AttributeError:
+                    pass
+            return default_mode
+        header.setSectionResizeMode(0, _mode_for("endgame_type", QHeaderView.ResizeMode.Stretch))
+        header.setSectionResizeMode(1, _mode_for("total", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(2, _mode_for("white", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(3, _mode_for("black", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(4, _mode_for("accuracy", QHeaderView.ResizeMode.ResizeToContents))
+        for group_key, group_label, group_accuracy, group_count, group_white, group_black, types_list in grouped:
+            group_item = EndgameTreeItem([
+                group_label,
+                str(group_count),
+                str(group_white),
+                str(group_black),
+                f"{group_accuracy:.1f}%" if group_count else "",
+            ])
+            group_item.setData(0, Qt.ItemDataRole.UserRole, ("group", group_key))
+            group_item.setData(1, Qt.ItemDataRole.UserRole, int(group_count))
+            group_item.setData(2, Qt.ItemDataRole.UserRole, int(group_white))
+            group_item.setData(3, Qt.ItemDataRole.UserRole, int(group_black))
+            group_item.setData(4, Qt.ItemDataRole.UserRole, float(group_accuracy))
+            for raw_type, type_label, type_accuracy, type_count, type_white, type_black in types_list:
+                child_item = EndgameTreeItem([
+                    type_label,
+                    str(type_count),
+                    str(type_white),
+                    str(type_black),
+                    f"{type_accuracy:.1f}%" if type_count else "",
+                ])
+                child_item.setData(0, Qt.ItemDataRole.UserRole, ("type", raw_type))
+                child_item.setData(1, Qt.ItemDataRole.UserRole, int(type_count))
+                child_item.setData(2, Qt.ItemDataRole.UserRole, int(type_white))
+                child_item.setData(3, Qt.ItemDataRole.UserRole, int(type_black))
+                child_item.setData(4, Qt.ItemDataRole.UserRole, float(type_accuracy))
+                group_item.addChild(child_item)
+            tree_widget.addTopLevelItem(group_item)
+        tree_widget.setSortingEnabled(True)
+        tree_widget.sortByColumn(1, Qt.SortOrder.DescendingOrder)
+        initial_depth = int(tree_config.get('initial_expand_depth', 0))
+        tree_widget.expandToDepth(initial_depth)
+        default_height = int(tree_config.get('height', 180))
+        self._endgame_tree_min_height = int(tree_config.get('min_height', max(80, default_height // 2)))
+        self._endgame_tree_max_height = int(tree_config.get('max_height', max(default_height, default_height * 2)))
+        self._endgame_tree_height_step = int(tree_config.get('height_step', 40))
+        self._endgame_tree_current_height = default_height
+        tree_widget.setFixedHeight(self._endgame_tree_current_height)
+        tree_widget.itemDoubleClicked.connect(self._on_endgame_tree_item_double_clicked)
+        self._endgame_tree_widget = tree_widget
+        layout.addWidget(tree_widget)
+        controls_layout = QHBoxLayout()
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.addStretch()
+        height_step = self._endgame_tree_height_step or 40
+        decrease_btn = QToolButton(widget)
+        decrease_btn.setText("−")
+        decrease_btn.setToolTip("Decrease endgame tree height")
+        increase_btn = QToolButton(widget)
+        increase_btn.setText("+")
+        increase_btn.setToolTip("Increase endgame tree height")
+        button_config = player_stats_config.get('button', {})
+        btn_height = int(button_config.get('height', 24))
+        decrease_btn.setFixedHeight(btn_height)
+        increase_btn.setFixedHeight(btn_height)
+        decrease_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_endgame_tree_height(-step))
+        increase_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_endgame_tree_height(step))
+        controls_layout.addWidget(decrease_btn)
+        controls_layout.addWidget(increase_btn)
+        layout.addLayout(controls_layout)
+        self._endgame_tree_decrease_button = decrease_btn
+        self._endgame_tree_increase_button = increase_btn
+        self._update_endgame_tree_height_buttons()
+        return widget
+
+    def _create_opening_tree_section_widget(self, text_color: QColor, label_font: QFont, value_font: QFont,
+                                            bg_color: QColor, border_color: QColor,
+                                            widgets_config: Dict[str, Any]) -> Optional[QWidget]:
+        """Create standalone Opening tree section (tree + height controls), same style as endgame tree section."""
+        if not self._stats_controller:
+            return None
+        from PyQt6.QtWidgets import QHeaderView
+        ui_config = self.config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        player_stats_config = panel_config.get('player_stats', {})
+        tree_config = player_stats_config.get('opening_tree', {})
+        max_depth = int(tree_config.get('max_depth', 12))
+        min_games = int(tree_config.get('min_games', 1))
+        opening_tree = self._stats_controller.get_opening_tree(max_depth=max_depth, min_games=min_games)
+        if not opening_tree.get("children"):
+            return None
+        border_radius = widgets_config.get('border_radius', 5)
+        section_margins = widgets_config.get('section_margins', [10, 10, 10, 10])
+        section_spacing = widgets_config.get('section_spacing', 8)
+        widget = QWidget()
+        widget.setStyleSheet(f"""
+            QWidget {{
+                background-color: rgb({bg_color.red()}, {bg_color.green()}, {bg_color.blue()});
+                border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
+                border-radius: {border_radius}px;
+            }}
+        """)
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(section_margins[0], section_margins[1], section_margins[2], section_margins[3])
+        layout.setSpacing(section_spacing)
+        widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        widget.setMinimumWidth(0)
+        tree_widget = NoWheelTreeWidget(widget)
+        tree_widget.setColumnCount(5)
+        tree_widget.setHeaderLabels([
+            self._opening_tree_header_compact,
+            "Total",
+            "White",
+            "Black",
+            "Accuracy",
+        ])
+        show_root_decorations = bool(tree_config.get('show_root_decorations', True))
+        alternating_rows = bool(tree_config.get('alternating_row_colors', True))
+        tree_widget.setRootIsDecorated(show_root_decorations)
+        tree_widget.setAlternatingRowColors(alternating_rows)
+        tree_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
+        header = tree_widget.header()
+        header.setStretchLastSection(False)
+        resize_config = tree_config.get('column_resize_modes', {}) or {}
+
+        def _mode_for(key: str, default_mode: QHeaderView.ResizeMode) -> QHeaderView.ResizeMode:
+            raw = resize_config.get(key, None)
+            if isinstance(raw, str):
+                try:
+                    mode = getattr(QHeaderView.ResizeMode, raw.strip())
+                    if isinstance(mode, QHeaderView.ResizeMode):
+                        return mode
+                except AttributeError:
+                    pass
+            return default_mode
+
+        header.setSectionResizeMode(0, _mode_for("move_opening", QHeaderView.ResizeMode.Stretch))
+        header.setSectionResizeMode(1, _mode_for("total", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(2, _mode_for("white", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(3, _mode_for("black", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(4, _mode_for("accuracy", QHeaderView.ResizeMode.ResizeToContents))
+        tree_widget.setFont(value_font)
+        header.setFont(label_font)
+        palette = tree_widget.palette()
+        palette.setColor(tree_widget.foregroundRole(), text_color)
+        tree_widget.setPalette(palette)
+
+        def format_label(san: str, node_data: Dict[str, Any]) -> str:
+            eco = node_data.get("eco")
+            opening_name = node_data.get("opening_name")
+            if opening_name and eco:
+                return f"{san} – {eco} ({opening_name})"
+            if opening_name:
+                return f"{san} – {opening_name}"
+            if eco:
+                return f"{san} – {eco}"
+            return san
+
+        def add_children(parent_item: Optional[QTreeWidgetItem], node: Dict[str, Any], path: List[str]) -> None:
+            node_children = node.get("children", {})
+            sorted_items = sorted(
+                node_children.items(),
+                key=lambda kv: kv[1].get("games", 0),
+                reverse=True,
+            )
+            for san, child in sorted_items:
+                total_games = child.get("games", 0)
+                white_games = child.get("white_games", 0)
+                black_games = child.get("black_games", 0)
+                acc_sum = float(child.get("accuracy_sum", 0.0) or 0.0)
+                acc_count = int(child.get("accuracy_count", 0) or 0)
+                acc_text = f"{acc_sum / float(acc_count):.1f}%" if acc_count > 0 else ""
+                label_text = format_label(san, child)
+                item = OpeningTreeItem([
+                    label_text,
+                    str(total_games),
+                    str(white_games),
+                    str(black_games),
+                    acc_text,
+                ])
+                item.setData(1, Qt.ItemDataRole.UserRole, int(total_games))
+                item.setData(2, Qt.ItemDataRole.UserRole, int(white_games))
+                item.setData(3, Qt.ItemDataRole.UserRole, int(black_games))
+                if acc_count > 0:
+                    item.setData(4, Qt.ItemDataRole.UserRole, float(acc_sum / float(acc_count)))
+                new_path = path + [san]
+                item.setData(0, Qt.ItemDataRole.UserRole, new_path)
+                if parent_item is None:
+                    tree_widget.addTopLevelItem(item)
+                else:
+                    parent_item.addChild(item)
+                add_children(item, child, new_path)
+
+        add_children(None, opening_tree, [])
+        tree_widget.expandToDepth(int(tree_config.get('initial_expand_depth', 2)))
+        default_height = int(tree_config.get('height', 280))
+        self._opening_tree_min_height = int(tree_config.get('min_height', max(80, default_height // 2)))
+        self._opening_tree_max_height = int(tree_config.get('max_height', max(default_height, default_height * 2)))
+        self._opening_tree_height_step = int(tree_config.get('height_step', 40))
+        self._opening_tree_current_height = default_height
+        tree_widget.setFixedHeight(self._opening_tree_current_height)
+        tree_widget.itemDoubleClicked.connect(self._on_opening_tree_item_double_clicked)
+        tree_widget.setSortingEnabled(True)
+        tree_widget.sortByColumn(1, Qt.SortOrder.DescendingOrder)
+        self._opening_tree_widget = tree_widget
+        layout.addWidget(tree_widget)
+        controls_layout = QHBoxLayout()
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.addStretch()
+        height_step = self._opening_tree_height_step or 40
+        decrease_btn = QToolButton(widget)
+        decrease_btn.setText("−")
+        decrease_btn.setToolTip("Decrease opening tree height")
+        increase_btn = QToolButton(widget)
+        increase_btn.setText("+")
+        increase_btn.setToolTip("Increase opening tree height")
+        button_config = player_stats_config.get('button', {})
+        btn_height = int(button_config.get('height', 24))
+        decrease_btn.setFixedHeight(btn_height)
+        increase_btn.setFixedHeight(btn_height)
+        decrease_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_opening_tree_height(-step))
+        increase_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_opening_tree_height(step))
+        controls_layout.addWidget(decrease_btn)
+        controls_layout.addWidget(increase_btn)
+        layout.addLayout(controls_layout)
+        self._opening_tree_decrease_button = decrease_btn
+        self._opening_tree_increase_button = increase_btn
+        self._update_opening_tree_height_buttons()
+        return widget
+
     def _create_openings_widget(self, stats: "AggregatedPlayerStats",
                                text_color: QColor, label_font: QFont, value_font: QFont,
                                bg_color: QColor, border_color: QColor,
@@ -2616,7 +2954,6 @@ class DetailPlayerStatsView(QWidget):
         grid_config = player_stats_config.get('grid', {})
         label_col_min_width = grid_config.get('label_column_minimum_width', 150)
         value_col_min_width = grid_config.get('value_column_minimum_width', 100)
-        tree_config = player_stats_config.get('opening_tree', {})
         
         # Most Played Openings
         if stats.top_openings:
@@ -2816,185 +3153,6 @@ class DetailPlayerStatsView(QWidget):
             layout.addWidget(grid_widget_best)
             layout.addSpacing(section_spacing)
 
-        # Opening tree (expandable move tree)
-        if self._stats_controller:
-            max_depth = int(tree_config.get('max_depth', 12))
-            min_games = int(tree_config.get('min_games', 1))
-            opening_tree = self._stats_controller.get_opening_tree(
-                max_depth=max_depth,
-                min_games=min_games,
-            )
-            children = opening_tree.get("children", {})
-            if children:
-                from PyQt6.QtWidgets import QHeaderView
-
-                tree_widget = NoWheelTreeWidget(widget)
-                tree_widget.setColumnCount(5)
-                tree_widget.setHeaderLabels([
-                    self._opening_tree_header_compact,
-                    "Total",
-                    "White",
-                    "Black",
-                    "Accuracy",
-                ])
-
-                # Behavior flags from config
-                show_root_decorations = bool(tree_config.get('show_root_decorations', True))
-                alternating_rows = bool(tree_config.get('alternating_row_colors', True))
-                tree_widget.setRootIsDecorated(show_root_decorations)
-                tree_widget.setAlternatingRowColors(alternating_rows)
-                tree_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
-
-                # Column sizing from config
-                header = tree_widget.header()
-                header.setStretchLastSection(False)
-
-                resize_config = tree_config.get('column_resize_modes', {}) or {}
-
-                def _mode_for(key: str, default_mode: QHeaderView.ResizeMode) -> QHeaderView.ResizeMode:
-                    raw = resize_config.get(key, None)
-                    if isinstance(raw, str):
-                        name = raw.strip()
-                        try:
-                            mode = getattr(QHeaderView.ResizeMode, name)
-                            if isinstance(mode, QHeaderView.ResizeMode):
-                                return mode
-                        except AttributeError:
-                            pass
-                    return default_mode
-
-                header.setSectionResizeMode(0, _mode_for("move_opening", QHeaderView.ResizeMode.Stretch))
-                header.setSectionResizeMode(1, _mode_for("total", QHeaderView.ResizeMode.ResizeToContents))
-                header.setSectionResizeMode(2, _mode_for("white", QHeaderView.ResizeMode.ResizeToContents))
-                header.setSectionResizeMode(3, _mode_for("black", QHeaderView.ResizeMode.ResizeToContents))
-                header.setSectionResizeMode(4, _mode_for("accuracy", QHeaderView.ResizeMode.ResizeToContents))
-
-                # Fonts and colors (align with other value fonts in the view)
-                tree_widget.setFont(value_font)
-                header.setFont(label_font)
-                palette = tree_widget.palette()
-                palette.setColor(tree_widget.foregroundRole(), text_color)
-                tree_widget.setPalette(palette)
-
-                def format_label(san: str, node_data: Dict[str, Any]) -> str:
-                    eco = node_data.get("eco")
-                    opening_name = node_data.get("opening_name")
-                    # Focus on opening families: show ECO and name when available
-                    if opening_name and eco:
-                        return f"{san} – {eco} ({opening_name})"
-                    if opening_name:
-                        return f"{san} – {opening_name}"
-                    if eco:
-                        return f"{san} – {eco}"
-                    return san
-
-                def add_children(parent_item: Optional[QTreeWidgetItem], node: Dict[str, Any], path: List[str]) -> None:
-                    node_children = node.get("children", {})
-                    # Sort children by games descending
-                    sorted_items = sorted(
-                        node_children.items(),
-                        key=lambda kv: kv[1].get("games", 0),
-                        reverse=True,
-                    )
-                    for san, child in sorted_items:
-                        total_games = child.get("games", 0)
-                        white_games = child.get("white_games", 0)
-                        black_games = child.get("black_games", 0)
-                        acc_sum = float(child.get("accuracy_sum", 0.0) or 0.0)
-                        acc_count = int(child.get("accuracy_count", 0) or 0)
-                        if acc_count > 0:
-                            avg_acc = acc_sum / float(acc_count)
-                            acc_text = f"{avg_acc:.1f}%"
-                        else:
-                            acc_text = ""
-                        label_text = format_label(san, child)
-                        item = OpeningTreeItem(
-                            [
-                                label_text,
-                                str(total_games),
-                                str(white_games),
-                                str(black_games),
-                                acc_text,
-                            ]
-                        )
-                        # Store raw numeric values for sorting
-                        item.setData(1, Qt.ItemDataRole.UserRole, int(total_games))
-                        item.setData(2, Qt.ItemDataRole.UserRole, int(white_games))
-                        item.setData(3, Qt.ItemDataRole.UserRole, int(black_games))
-                        if acc_count > 0:
-                            item.setData(4, Qt.ItemDataRole.UserRole, float(avg_acc))
-                        # Store SAN path for this node so double-click handlers
-                        # can resolve games for the corresponding line.
-                        new_path = path + [san]
-                        item.setData(0, Qt.ItemDataRole.UserRole, new_path)
-                        if parent_item is None:
-                            tree_widget.addTopLevelItem(item)
-                        else:
-                            parent_item.addChild(item)
-                        add_children(item, child, new_path)
-
-                add_children(None, opening_tree, [])
-                tree_widget.expandToDepth(int(tree_config.get('initial_expand_depth', 2)))
-
-                # Initial and dynamic height settings
-                default_height = int(tree_config.get('height', 280))
-                self._opening_tree_min_height = int(tree_config.get('min_height', max(80, default_height // 2)))
-                self._opening_tree_max_height = int(tree_config.get('max_height', max(default_height, default_height * 2)))
-                self._opening_tree_height_step = int(tree_config.get('height_step', 40))
-                self._opening_tree_current_height = default_height
-                tree_widget.setFixedHeight(self._opening_tree_current_height)
-
-                # Connect double-click to open games for this opening line
-                tree_widget.itemDoubleClicked.connect(self._on_opening_tree_item_double_clicked)
-
-                # Enable sorting (default by Total descending)
-                tree_widget.setSortingEnabled(True)
-                tree_widget.sortByColumn(1, Qt.SortOrder.DescendingOrder)
-
-                # Keep reference for responsive header hint updates
-                self._opening_tree_widget = tree_widget
-
-                # Add tree widget and height controls
-                layout.addWidget(tree_widget)
-
-                controls_layout = QHBoxLayout()
-                controls_layout.setContentsMargins(0, 0, 0, 0)
-                controls_layout.addStretch()
-
-                # Height adjust buttons (use small tool buttons with symbols)
-                height_step = self._opening_tree_height_step or 40
-
-                decrease_btn = QToolButton(widget)
-                decrease_btn.setText("−")
-                decrease_btn.setToolTip("Decrease opening tree height")
-
-                increase_btn = QToolButton(widget)
-                increase_btn.setText("+")
-                increase_btn.setToolTip("Increase opening tree height")
-
-                # Match button height from config where possible
-                button_config = player_stats_config.get('button', {})
-                btn_height = int(button_config.get('height', 24))
-                decrease_btn.setFixedHeight(btn_height)
-                increase_btn.setFixedHeight(btn_height)
-
-                decrease_btn.clicked.connect(
-                    lambda checked=False, step=height_step: self._adjust_opening_tree_height(-step)
-                )
-                increase_btn.clicked.connect(
-                    lambda checked=False, step=height_step: self._adjust_opening_tree_height(step)
-                )
-
-                controls_layout.addWidget(decrease_btn)
-                controls_layout.addWidget(increase_btn)
-
-                layout.addLayout(controls_layout)
-
-                # Keep references for enabling/disabling at bounds and initialize state
-                self._opening_tree_decrease_button = decrease_btn
-                self._opening_tree_increase_button = increase_btn
-                self._update_opening_tree_height_buttons()
-
         layout.addStretch()
 
         # Update visibility based on initial width (for text blocks)
@@ -3144,6 +3302,47 @@ class DetailPlayerStatsView(QWidget):
         header.setStyleSheet(f"color: rgb({color.red()}, {color.green()}, {color.blue()}); border: none;")
         self.content_layout.addWidget(header)
 
+    def _on_endgame_tree_item_double_clicked(self, item) -> None:
+        """Open games for the double-clicked endgame type/group row in a Search Results tab."""
+        if not item or not self._stats_controller:
+            return
+        filter_data = item.data(0, Qt.ItemDataRole.UserRole)
+        if not filter_data or not isinstance(filter_data, (list, tuple)) or len(filter_data) != 2:
+            return
+        kind, key = filter_data[0], filter_data[1]
+        if kind == "group":
+            games_with_sources = self._stats_controller.get_games_for_endgame_filter(group_key=key)
+        elif kind == "type":
+            games_with_sources = self._stats_controller.get_games_for_endgame_filter(raw_type=key)
+        else:
+            return
+        if not games_with_sources:
+            return
+        self._open_games_in_search_results_tab(games_with_sources)
+
+    def _open_games_in_search_results_tab(self, games_with_sources: List[Tuple[Any, str]]) -> None:
+        """Open a Search Results tab with the given (GameData, source_name) list. Used by opening tree and endgame tree."""
+        if not games_with_sources or not self._database_panel:
+            return
+        main_window = self._database_panel.parent()
+        while main_window is not None and not hasattr(main_window, "controller"):
+            main_window = main_window.parent()
+        if not main_window or not hasattr(main_window, "controller"):
+            return
+        app_controller = main_window.controller
+        if not hasattr(app_controller, "get_search_controller"):
+            return
+        search_controller = app_controller.get_search_controller()
+        if not search_controller:
+            return
+        search_results_model = search_controller.create_search_results_model(games_with_sources)
+        if not hasattr(self._database_panel, "add_search_results_tab"):
+            return
+        tab_index = self._database_panel.add_search_results_tab(search_results_model)
+        tab_widget = getattr(self._database_panel, "tab_widget", None)
+        if tab_widget is not None and hasattr(tab_widget, "setCurrentIndex"):
+            tab_widget.setCurrentIndex(tab_index)
+
     def _on_opening_tree_item_double_clicked(self, item) -> None:
         """Open games corresponding to the double-clicked opening tree node in a Search Results tab."""
         if not item or not self._stats_controller:
@@ -3158,40 +3357,7 @@ class DetailPlayerStatsView(QWidget):
             return
         if not games_with_sources:
             return
-
-        # Reuse the same search-results opening flow as error patterns:
-        # create a search results model and add a Search Results tab.
-        # Delegate to MainWindow's existing helper if available (same behavior as error patterns)
-        if self._on_open_pattern_games_in_search_results:
-            # We don't have an ErrorPattern instance here, but the helper only cares
-            # about games; emulate its behavior by using SearchController directly.
-            pass
-
-        # Fallback: mimic MainWindow._open_pattern_games_in_search_results behavior
-        if not self._database_panel:
-            return
-        # MainWindow holds the shared controller; database_panel is attached to it
-        main_window = self._database_panel.parent()
-        # Walk up parents until we find something with a 'controller' attribute
-        while main_window is not None and not hasattr(main_window, "controller"):
-            main_window = main_window.parent()
-        if not main_window or not hasattr(main_window, "controller"):
-            return
-        app_controller = main_window.controller
-        if not hasattr(app_controller, "get_search_controller"):
-            return
-        search_controller = app_controller.get_search_controller()
-        if not search_controller:
-            return
-
-        search_results_model = search_controller.create_search_results_model(games_with_sources)
-        if not hasattr(self._database_panel, "add_search_results_tab"):
-            return
-
-        tab_index = self._database_panel.add_search_results_tab(search_results_model)
-        tab_widget = getattr(self._database_panel, "tab_widget", None)
-        if tab_widget is not None and hasattr(tab_widget, "setCurrentIndex"):
-            tab_widget.setCurrentIndex(tab_index)
+        self._open_games_in_search_results_tab(games_with_sources)
 
     def _adjust_opening_tree_height(self, delta: int) -> None:
         """Adjust the opening tree height by delta, clamped to configured min/max."""
@@ -3227,6 +3393,40 @@ class DetailPlayerStatsView(QWidget):
             self._opening_tree_decrease_button.setEnabled(can_decrease)
         if self._opening_tree_increase_button is not None:
             self._opening_tree_increase_button.setEnabled(can_increase)
+
+    def _adjust_endgame_tree_height(self, delta: int) -> None:
+        """Adjust the endgame type tree height by delta, clamped to configured min/max."""
+        if not self._endgame_tree_widget:
+            return
+        if self._endgame_tree_height_step <= 0:
+            return
+        new_height = self._endgame_tree_current_height + int(delta)
+        if self._endgame_tree_min_height > 0:
+            new_height = max(self._endgame_tree_min_height, new_height)
+        if self._endgame_tree_max_height > 0:
+            new_height = min(self._endgame_tree_max_height, new_height)
+        if new_height == self._endgame_tree_current_height:
+            return
+        self._endgame_tree_current_height = new_height
+        self._endgame_tree_widget.setFixedHeight(new_height)
+        self._update_endgame_tree_height_buttons()
+
+    def _update_endgame_tree_height_buttons(self) -> None:
+        """Enable/disable endgame tree height buttons when min/max are reached."""
+        if not self._endgame_tree_widget:
+            return
+        can_decrease = (
+            self._endgame_tree_min_height > 0
+            and self._endgame_tree_current_height > self._endgame_tree_min_height
+        )
+        can_increase = (
+            self._endgame_tree_max_height > 0
+            and self._endgame_tree_current_height < self._endgame_tree_max_height
+        )
+        if self._endgame_tree_decrease_button is not None:
+            self._endgame_tree_decrease_button.setEnabled(can_decrease)
+        if self._endgame_tree_increase_button is not None:
+            self._endgame_tree_increase_button.setEnabled(can_increase)
     
     def _add_stat_row(self, grid: QGridLayout, row: int, label_text: str, value_text: str,
                      label_font: QFont, value_font: QFont, text_color: QColor) -> None:
@@ -3684,6 +3884,17 @@ class DetailPlayerStatsView(QWidget):
             except RuntimeError:
                 # Tree widget may have been deleted during rebuild
                 self._opening_tree_widget = None
+        # Update endgame tree header hint based on width (when tree is present)
+        if self._endgame_tree_widget is not None:
+            try:
+                header_item = self._endgame_tree_widget.headerItem()
+                if header_item is not None:
+                    if should_show_full:
+                        header_item.setText(0, self._endgame_tree_header_with_hint)
+                    else:
+                        header_item.setText(0, self._endgame_tree_header_compact)
+            except RuntimeError:
+                self._endgame_tree_widget = None
         
         # Update each openings item
         for item_data in self._openings_items:
@@ -3775,6 +3986,7 @@ class DetailPlayerStatsView(QWidget):
         # Find which section was clicked by checking widget geometries
         section_name = None
         click_in_opening_tree = False
+        click_in_endgame_tree = False
         
         try:
             if hasattr(self, 'content_widget') and self.content_widget:
@@ -3797,15 +4009,18 @@ class DetailPlayerStatsView(QWidget):
                             if widget_global_rect.contains(global_pos):
                                 section_name = section
                                 # Additionally track if click is inside the opening tree widget
-                                if section == "Openings" and self._opening_tree_widget is not None:
+                                if section == "Opening tree" and self._opening_tree_widget is not None:
+                                    click_in_opening_tree = True
+                                # Track if click is inside the endgame type tree widget
+                                if section == "Endgame tree" and self._endgame_tree_widget is not None:
                                     try:
-                                        tree_global_pos = self._opening_tree_widget.mapToGlobal(QPoint(0, 0))
-                                        tree_global_rect = self._opening_tree_widget.geometry()
+                                        tree_global_pos = self._endgame_tree_widget.mapToGlobal(QPoint(0, 0))
+                                        tree_global_rect = self._endgame_tree_widget.geometry()
                                         tree_global_rect.moveTopLeft(tree_global_pos)
                                         if tree_global_rect.contains(global_pos):
-                                            click_in_opening_tree = True
+                                            click_in_endgame_tree = True
                                     except (RuntimeError, AttributeError, TypeError):
-                                        click_in_opening_tree = False
+                                        click_in_endgame_tree = False
                                 break
         except (RuntimeError, AttributeError, TypeError):
             # If detection fails, just show full stats option
@@ -3840,6 +4055,13 @@ class DetailPlayerStatsView(QWidget):
             collapse_all_action = menu.addAction("Collapse all")
             expand_all_action.triggered.connect(lambda checked=False: self._opening_tree_widget.expandAll())
             collapse_all_action.triggered.connect(lambda checked=False: self._opening_tree_widget.collapseAll())
+        # When right-clicking inside the endgame type tree, offer expand/collapse actions
+        if click_in_endgame_tree and self._endgame_tree_widget is not None:
+            menu.addSeparator()
+            expand_all_action = menu.addAction("Expand all")
+            collapse_all_action = menu.addAction("Collapse all")
+            expand_all_action.triggered.connect(lambda checked=False: self._endgame_tree_widget.expandAll())
+            collapse_all_action.triggered.connect(lambda checked=False: self._endgame_tree_widget.collapseAll())
         
         # Show menu
         menu.exec(event.globalPos())

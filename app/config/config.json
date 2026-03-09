@@ -1443,6 +1443,40 @@
             "bar_pen_width": 1,
             "bar_value_spacing": 5
           },
+          "opening_tree": {
+            "max_depth": 12,
+            "min_games": 1,
+            "initial_expand_depth": 2,
+            "height": 280,
+            "min_height": 120,
+            "max_height": 600,
+            "height_step": 80,
+            "show_root_decorations": true,
+            "alternating_row_colors": true,
+            "column_resize_modes": {
+              "move_opening": "Stretch",
+              "total": "ResizeToContents",
+              "white": "ResizeToContents",
+              "black": "ResizeToContents",
+              "accuracy": "ResizeToContents"
+            }
+          },
+          "endgame_tree": {
+            "initial_expand_depth": 0,
+            "height": 240,
+            "min_height": 120,
+            "max_height": 600,
+            "height_step": 80,
+            "show_root_decorations": true,
+            "alternating_row_colors": true,
+            "column_resize_modes": {
+              "endgame_type": "Stretch",
+              "total": "ResizeToContents",
+              "white": "ResizeToContents",
+              "black": "ResizeToContents",
+              "accuracy": "ResizeToContents"
+            }
+          },
           "accuracy_vs_progress_chart": {
             "enabled": true,
             "height": 220,
@@ -1487,24 +1521,6 @@
             "y_axis_label_spacing": 5,
             "x_axis_label_spacing": 5,
             "progress_bins": 21
-          },
-          "opening_tree": {
-            "max_depth": 12,
-            "min_games": 1,
-            "initial_expand_depth": 2,
-            "height": 280,
-            "min_height": 160,
-            "max_height": 480,
-            "height_step": 80,
-            "show_root_decorations": true,
-            "alternating_row_colors": true,
-            "column_resize_modes": {
-              "move_opening": "Stretch",
-              "total": "ResizeToContents",
-              "white": "ResizeToContents",
-              "black": "ResizeToContents",
-              "accuracy": "ResizeToContents"
-            }
           },
           "responsive": {
             "move_classification_collapse_threshold": 500,
