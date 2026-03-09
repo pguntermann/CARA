@@ -811,6 +811,14 @@ class DetailPlayerStatsView(QWidget):
         self.error_patterns_collapse_threshold = responsive_config.get('error_patterns_collapse_threshold', 300)
         self.openings_collapse_threshold = responsive_config.get('openings_collapse_threshold', 350)
         self.animation_duration = responsive_config.get('animation_duration_ms', 200)
+        # Debounce resize-driven visibility updates to avoid stack overflow (0xc00000fd) when
+        # many resizes occur (e.g. during bulk analysis + stats refresh)
+        self._resize_debounce_timer = QTimer(self)
+        self._resize_debounce_timer.setSingleShot(True)
+        self._resize_debounce_timer.timeout.connect(self._on_resize_debounce_timeout)
+        self._resize_debounce_ms = 80
+        self._updating_visibility = False  # Re-entrancy guard for visibility updates
+        self._building_content = False  # True while building stats content (skip resize-driven updates)
         
         # Event filter will be installed on scroll_area in _setup_ui
     
@@ -974,8 +982,19 @@ class DetailPlayerStatsView(QWidget):
         
         self._set_disabled_placeholder_visible(False)
         
-        self._clear_content()
-        self._build_stats_content()
+        # Defer heavy build to next event-loop tick to avoid deep call stack and stack overflow
+        # (0xc00000fd) when updating live during bulk analysis. Signal handler returns immediately.
+        QTimer.singleShot(0, self._deferred_build_stats_content)
+    
+    def _deferred_build_stats_content(self) -> None:
+        """Run build on a fresh stack; avoids stack overflow during live updates."""
+        if getattr(self, '_building_content', False):
+            return
+        self._building_content = True
+        try:
+            self._build_stats_content()
+        finally:
+            self._building_content = False
     
     def _handle_stats_unavailable(self, reason: str) -> None:
         """Show appropriate placeholder when stats data is unavailable."""
@@ -3720,14 +3739,28 @@ class DetailPlayerStatsView(QWidget):
                     opacity_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
                     opacity_anim.start()
     
+    def _on_resize_debounce_timeout(self) -> None:
+        """Run all visibility updates once after resize has settled (avoids stack overflow from rapid resizes)."""
+        if self._updating_visibility:
+            return
+        self._updating_visibility = True
+        try:
+            self._update_move_classification_visibility()
+            self._update_top_games_visibility()
+            self._update_error_patterns_visibility()
+            self._update_openings_visibility()
+        finally:
+            self._updating_visibility = False
+
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
         """Event filter to monitor width changes for responsive layout."""
         if obj == self.scroll_area and event.type() == QEvent.Type.Resize:
-            # Defer update until after layout has been processed
-            QTimer.singleShot(0, self._update_move_classification_visibility)
-            QTimer.singleShot(0, self._update_top_games_visibility)
-            QTimer.singleShot(0, self._update_error_patterns_visibility)
-            QTimer.singleShot(0, self._update_openings_visibility)
+            # Skip scheduling while building content to avoid deep stack during live updates
+            if getattr(self, '_building_content', False):
+                return super().eventFilter(obj, event)
+            # Debounce: one coalesced update after resizes settle (avoids 0xc00000fd during bulk analysis)
+            self._resize_debounce_timer.stop()
+            self._resize_debounce_timer.start(self._resize_debounce_ms)
         return super().eventFilter(obj, event)
     
     def contextMenuEvent(self, event: QContextMenuEvent) -> None:

@@ -951,17 +951,38 @@ class PlayerStatsController(QObject):
         
         return None
 
-    def get_pattern_games_with_sources(self, pattern: "ErrorPattern") -> List[Tuple["GameData", str]]:
-        """Resolve each pattern game to (game, source_display_name) for opening in a Search Results tab.
+    def get_pattern_games_with_sources(self, pattern: "ErrorPattern") -> List[Tuple["GameData", str, int]]:
+        """Resolve each pattern game to (game, source_display_name, ref_ply) for opening in a Search Results tab.
+
+        When pattern.related_ref_plies is set (e.g. repeated position patterns, brilliant/miss/blunder),
+        returns one entry per (game, ply) so the user can jump directly to that move. ref_ply 0 means no jump.
 
         Args:
-            pattern: ErrorPattern whose related_games to resolve.
+            pattern: ErrorPattern whose related_games (and optionally related_ref_plies) to resolve.
 
         Returns:
-            List of (GameData, source_display_name). Skipped if a game is not found in any database.
+            List of (GameData, source_display_name, ref_ply). Skipped if a game is not found in any database.
         """
-        result: List[Tuple["GameData", str]] = []
-        if not pattern or not pattern.related_games:
+        result: List[Tuple["GameData", str, int]] = []
+        if not pattern:
+            return result
+        # Use (game, ref_ply) pairs when available so search results can open at the specific move
+        if getattr(pattern, "related_ref_plies", None):
+            pairs: List[Tuple["GameData", int]] = pattern.related_ref_plies
+            if not pairs:
+                return result
+            panel_model = self._database_controller.get_panel_model()
+            for game, ref_ply in pairs:
+                found = self.find_game_in_databases(game, use_all_databases=True)
+                if not found:
+                    continue
+                database, _ = found
+                identifier = panel_model.find_database_by_model(database)
+                display_name = "Clipboard" if identifier == "clipboard" else Path(identifier).stem
+                result.append((game, display_name, ref_ply))
+            return result
+        # Fallback: no ref_ply, one row per game
+        if not pattern.related_games:
             return result
         panel_model = self._database_controller.get_panel_model()
         for game in pattern.related_games:
@@ -970,11 +991,8 @@ class PlayerStatsController(QObject):
                 continue
             database, _ = found
             identifier = panel_model.find_database_by_model(database)
-            if identifier == "clipboard":
-                display_name = "Clipboard"
-            else:
-                display_name = Path(identifier).stem
-            result.append((game, display_name))
+            display_name = "Clipboard" if identifier == "clipboard" else Path(identifier).stem
+            result.append((game, display_name, 0))
         return result
 
     def highlight_rows(self, database: DatabaseModel, row_indices: List[int]) -> None:

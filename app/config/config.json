@@ -1364,7 +1364,10 @@
               "winning_eval_threshold": 200.0,
               "losing_eval_threshold": -200.0,
               "defensive_weakness_threshold": 20.0,
-              "inaccuracy_rate_threshold": 25.0
+              "inaccuracy_rate_threshold": 25.0,
+              "repeated_position_min_games_blunder": 2,
+              "repeated_position_min_games_miss": 2,
+              "repeated_position_min_games_inaccuracy": 2
             },
             "item_spacing": 8,
             "item_margins": [

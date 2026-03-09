@@ -1,6 +1,6 @@
 """Service for detecting error patterns in player performance."""
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 
 from app.models.database_model import GameData
@@ -21,6 +21,8 @@ class ErrorPattern:
     percentage: float  # Percentage (0-100)
     severity: str  # "low", "moderate", "high", "critical"
     related_games: List[GameData]  # Games where this pattern occurs
+    # Optional: (game, ref_ply) per occurrence for jump-to-move (e.g. repeated position, brilliant/miss/blunder)
+    related_ref_plies: Optional[List[Tuple[GameData, int]]] = None  # (game, ply) for each occurrence
 
 
 class ErrorPatternService:
@@ -110,6 +112,12 @@ class ErrorPatternService:
             player_name, aggregated_stats
         )
         patterns.extend(inaccuracy_patterns)
+        
+        # Pattern 9: Repeated errors in the same position (blunders, misses, inaccuracies)
+        repeated_position_patterns = self._detect_repeated_position_errors(
+            player_name, games
+        )
+        patterns.extend(repeated_position_patterns)
         
         # Sort patterns: those without related_games first, then by severity/percentage
         patterns.sort(key=lambda p: (
@@ -528,6 +536,99 @@ class ErrorPatternService:
                 percentage=inaccuracy_rate,
                 severity=severity,
                 related_games=[]  # Would need individual game analysis for specific instances
+            ))
+        
+        return patterns
+    
+    @staticmethod
+    def _normalize_fen(fen: str) -> str:
+        """Normalize FEN to board + side to move so same position matches across games."""
+        if not (fen or "").strip():
+            return ""
+        parts = fen.strip().split()
+        return " ".join(parts[:2]) if len(parts) >= 2 else fen.strip()
+    
+    def _detect_repeated_position_errors(self, player_name: str, games: List[GameData]) -> List[ErrorPattern]:
+        """Detect repeated blunders, misses, or inaccuracies in the same position across games."""
+        patterns: List[ErrorPattern] = []
+        if not self.game_controller or not games:
+            return patterns
+        
+        start_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        # (normalized_fen, assessment_type) -> list of (game, ref_ply) where player made that error in that position
+        collector: Dict[tuple, List[Tuple[GameData, int]]] = {}
+        
+        for game in games:
+            moves = self.game_controller.extract_moves_from_game(game)
+            if not moves:
+                continue
+            is_white = (game.white == player_name)
+            prev = None
+            for i, move in enumerate(moves):
+                if is_white and (move.white_move or getattr(move, "white_move", None)):
+                    fen_before = (prev.fen_black if prev and getattr(prev, "fen_black", None) else None) or start_fen
+                    assessment = (move.assess_white or "").strip()
+                    if assessment in ("Blunder", "Miss", "Inaccuracy"):
+                        key = (self._normalize_fen(fen_before), assessment)
+                        ply = move.move_number * 2 - 1  # after white's move
+                        if key not in collector:
+                            collector[key] = []
+                        # Allow same game multiple times if same position repeated in one game (one entry per occurrence)
+                        collector[key].append((game, ply))
+                if not is_white and (move.black_move or getattr(move, "black_move", None)):
+                    fen_before = (move.fen_white or "").strip()
+                    if fen_before:
+                        assessment = (move.assess_black or "").strip()
+                        if assessment in ("Blunder", "Miss", "Inaccuracy"):
+                            key = (self._normalize_fen(fen_before), assessment)
+                            ply = move.move_number * 2  # after black's move
+                            if key not in collector:
+                                collector[key] = []
+                            collector[key].append((game, ply))
+                prev = move
+        
+        min_blunder = self.thresholds.get("repeated_position_min_games_blunder", 2)
+        min_miss = self.thresholds.get("repeated_position_min_games_miss", 2)
+        min_inaccuracy = self.thresholds.get("repeated_position_min_games_inaccuracy", 2)
+        
+        for assessment_type, min_games, pattern_type, description_label in [
+            ("Blunder", min_blunder, "repeated_blunders_same_position", "Repeated blunders in the same position"),
+            ("Miss", min_miss, "repeated_misses_same_position", "Repeated misses in the same position"),
+            ("Inaccuracy", min_inaccuracy, "repeated_inaccuracies_same_position", "Repeated inaccuracies in the same position"),
+        ]:
+            positions_with_repeats = [
+                (key, pairs) for key, pairs in collector.items()
+                if key[1] == assessment_type and len(pairs) >= min_games
+            ]
+            # Require at least min_games distinct games (same position in same game counts as one game)
+            positions_with_repeats = [
+                (key, pairs) for key, pairs in positions_with_repeats
+                if len(set(id(g) for g, _ in pairs)) >= min_games
+            ]
+            if not positions_with_repeats:
+                continue
+            all_games: List[GameData] = []
+            seen = set()
+            related_ref_plies: List[Tuple[GameData, int]] = []
+            for _, pairs in positions_with_repeats:
+                for g, ply in pairs:
+                    related_ref_plies.append((g, ply))
+                    if id(g) not in seen:
+                        seen.add(id(g))
+                        all_games.append(g)
+            num_positions = len(positions_with_repeats)
+            num_games = len(all_games)
+            percentage = (num_games / len(games) * 100) if games else 0.0
+            severity = self._determine_severity(num_games, [3, 5, 8])
+            desc = f"{description_label} ({num_positions} position{'s' if num_positions != 1 else ''} in {num_games} game{'s' if num_games != 1 else ''})"
+            patterns.append(ErrorPattern(
+                pattern_type=pattern_type,
+                description=desc,
+                frequency=num_positions,
+                percentage=percentage,
+                severity=severity,
+                related_games=all_games,
+                related_ref_plies=related_ref_plies,
             ))
         
         return patterns
