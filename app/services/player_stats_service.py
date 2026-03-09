@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional, Tuple, Callable
 from dataclasses import dataclass
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor, as_completed
+import math
 
 from app.models.database_model import GameData, DatabaseModel
 from app.models.moveslist_model import MoveData
@@ -190,6 +191,13 @@ class AggregatedPlayerStats:
     max_blunder_rate: float
     # Per-game accuracy samples for distribution visualizations
     accuracy_values: List[float]
+    # Opening repertoire information (for repertoire width visualizations)
+    white_opening_counts: Dict[Tuple[str, Optional[str]], int]
+    black_opening_counts: Dict[Tuple[str, Optional[str]], int]
+    white_distinct_openings: int
+    black_distinct_openings: int
+    white_repertoire_breadth: float
+    black_repertoire_breadth: float
 
 
 class PlayerStatsService:
@@ -409,6 +417,8 @@ class PlayerStatsService:
         endgame_blunders = 0
         
         opening_counter = Counter()
+        white_opening_counter = Counter()
+        black_opening_counter = Counter()
         opening_cpl_data: Dict[Tuple[str, Optional[str]], List[float]] = {}
         
         for result in game_results:
@@ -500,6 +510,10 @@ class PlayerStatsService:
             
             # Track opening usage and CPL
             opening_counter[opening_key] += 1
+            if is_white_game:
+                white_opening_counter[opening_key] += 1
+            else:
+                black_opening_counter[opening_key] += 1
             if opening_avg_cpl is not None:
                 if opening_key not in opening_cpl_data:
                     opening_cpl_data[opening_key] = []
@@ -654,6 +668,31 @@ class PlayerStatsService:
         opening_avg_cpl.sort(key=lambda x: x[1])  # Lowest CPL first (best)
         best_openings = opening_avg_cpl[:3]  # Top 3 best
         best_openings_list = [(eco, opening_name, avg_cpl, count) for (eco, opening_name), avg_cpl, count in best_openings]
+
+        # Repertoire breadth metrics (per color)
+        def _compute_repertoire_breadth(counter: Counter) -> Tuple[int, float]:
+            """Return (distinct_openings, breadth_index in [0,1])."""
+            if not counter:
+                return 0, 0.0
+            total = sum(counter.values())
+            if total <= 0:
+                return 0, 0.0
+            distinct = len([k for k, v in counter.items() if v > 0])
+            if distinct <= 1:
+                return distinct, 0.0
+            # Entropy-based breadth index (0 = narrow, 1 = wide / uniform)
+            entropy = 0.0
+            for count in counter.values():
+                if count <= 0:
+                    continue
+                p = count / total
+                entropy -= p * math.log(p)
+            max_entropy = math.log(distinct)
+            breadth = entropy / max_entropy if max_entropy > 0 else 0.0
+            return distinct, breadth
+
+        white_distinct_openings, white_repertoire_breadth = _compute_repertoire_breadth(white_opening_counter)
+        black_distinct_openings, black_repertoire_breadth = _compute_repertoire_breadth(black_opening_counter)
         
         aggregated_stats = AggregatedPlayerStats(
             total_games=total_games,
@@ -679,7 +718,13 @@ class PlayerStatsService:
             max_best_move_pct=max_best_move_pct,
             min_blunder_rate=min_blunder_rate,
             max_blunder_rate=max_blunder_rate,
-            accuracy_values=accuracy_values
+            accuracy_values=accuracy_values,
+            white_opening_counts=dict(white_opening_counter),
+            black_opening_counts=dict(black_opening_counter),
+            white_distinct_openings=white_distinct_openings,
+            black_distinct_openings=black_distinct_openings,
+            white_repertoire_breadth=white_repertoire_breadth,
+            black_repertoire_breadth=black_repertoire_breadth,
         )
         
         logging_service.debug(f"Completed player stats aggregation: player={player_name}, games={total_games}, wins={wins}, draws={draws}, losses={losses}, win_rate={win_rate:.1f}%")

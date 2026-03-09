@@ -16,6 +16,7 @@ from app.services.game_summary_service import GameSummaryService, GameSummary
 from app.services.progress_service import ProgressService
 from app.controllers.game_controller import GameController
 from app.services.logging_service import LoggingService
+from app.services.opening_service import OpeningService
 
 
 class PlayerDropdownWorker(QThread):
@@ -314,6 +315,7 @@ class PlayerStatsController(QObject):
         self.player_stats_service = PlayerStatsService(config, game_controller)
         self.error_pattern_service = ErrorPatternService(config, game_controller)
         self.summary_service = GameSummaryService(config)
+        self._opening_service = OpeningService(config)
         
         self.current_stats: Optional[AggregatedPlayerStats] = None
         self.current_patterns: List[ErrorPattern] = []
@@ -611,6 +613,250 @@ class PlayerStatsController(QObject):
         return self._get_top_moves_by_assessment_with_sources_and_ply(
             "Blunder", match_startswith=False, max_moves=max_moves, sort_cpl_ascending=False
         )
+
+    def get_opening_tree(
+        self,
+        max_depth: int = 12,
+        min_games: int = 1,
+    ) -> Dict[str, Any]:
+        """Build an opening move tree from analyzed games for the current player.
+
+        The tree differentiates White vs Black games and attaches ECO / opening
+        family information when available.
+
+        Structure:
+            {
+              "games": total_games_used,
+              "white_games": count,
+              "black_games": count,
+              "children": {
+                  "e4": {
+                      "games": n_total,
+                      "white_games": n_white,
+                      "black_games": n_black,
+                      "eco": "C20",
+                      "opening_name": "King's Pawn Game",
+                      "children": { ... }
+                  },
+                  ...
+              }
+            }
+
+        Only sequences that appear in at least min_games games are kept.
+        """
+        from app.services.analysis_data_storage_service import AnalysisDataStorageService
+
+        tree: Dict[str, Any] = {
+            "games": 0,
+            "white_games": 0,
+            "black_games": 0,
+            "children": {},
+        }
+
+        if not self._current_player:
+            return tree
+
+        analyzed_games = getattr(self, "_current_analyzed_games", []) or []
+        summaries = getattr(self, "current_game_summaries", []) or []
+        if not analyzed_games or not summaries or len(analyzed_games) != len(summaries):
+            return tree
+
+        total_games_used = 0
+
+        for game, summary in zip(analyzed_games, summaries):
+            if not getattr(game, "analyzed", False):
+                continue
+            try:
+                moves = AnalysisDataStorageService.load_analysis_data(game)
+            except Exception:
+                moves = None
+            if not moves:
+                continue
+
+            is_white_game = (game.white == self._current_player)
+
+            # Per-game accuracy for this player (overall game accuracy)
+            if is_white_game:
+                player_stats = summary.white_stats
+            else:
+                player_stats = summary.black_stats
+            game_accuracy = player_stats.accuracy if player_stats and player_stats.accuracy is not None else 0.0
+
+            node = tree
+            ply_count = 0
+            for move in moves:
+                if ply_count >= max_depth:
+                    break
+
+                # White move
+                if move.white_move:
+                    ply_count += 1
+                    if ply_count > max_depth:
+                        break
+                    san = move.white_move
+                    children = node.setdefault("children", {})
+                    child = children.setdefault(
+                        san,
+                        {
+                            "games": 0,
+                            "white_games": 0,
+                            "black_games": 0,
+                            "accuracy_sum": 0.0,
+                            "accuracy_count": 0,
+                            "children": {},
+                        },
+                    )
+                    child["games"] += 1
+                    if is_white_game:
+                        child["white_games"] += 1
+                    else:
+                        child["black_games"] += 1
+                    child["accuracy_sum"] += float(game_accuracy)
+                    child["accuracy_count"] += 1
+
+                    # Attach ECO info (opening family) if available and not already set
+                    fen_after = getattr(move, "fen_white", "") or ""
+                    if fen_after and "eco" not in child:
+                        eco, name = self._opening_service.get_opening_info(fen_after)
+                        if eco or name:
+                            if eco:
+                                child["eco"] = eco
+                            if name:
+                                child["opening_name"] = name
+
+                    node = child
+
+                # Black move
+                if move.black_move and ply_count < max_depth:
+                    ply_count += 1
+                    if ply_count > max_depth:
+                        break
+                    san = move.black_move
+                    children = node.setdefault("children", {})
+                    child = children.setdefault(
+                        san,
+                        {
+                            "games": 0,
+                            "white_games": 0,
+                            "black_games": 0,
+                            "accuracy_sum": 0.0,
+                            "accuracy_count": 0,
+                            "children": {},
+                        },
+                    )
+                    child["games"] += 1
+                    if is_white_game:
+                        child["white_games"] += 1
+                    else:
+                        child["black_games"] += 1
+                    child["accuracy_sum"] += float(game_accuracy)
+                    child["accuracy_count"] += 1
+
+                    fen_after = getattr(move, "fen_black", "") or ""
+                    if fen_after and "eco" not in child:
+                        eco, name = self._opening_service.get_opening_info(fen_after)
+                        if eco or name:
+                            if eco:
+                                child["eco"] = eco
+                            if name:
+                                child["opening_name"] = name
+
+                    node = child
+
+            total_games_used += 1
+            tree["games"] += 1
+            if is_white_game:
+                tree["white_games"] += 1
+            else:
+                tree["black_games"] += 1
+
+        # Prune nodes that are rarely played
+        def prune(node: Dict[str, Any]) -> None:
+            children = node.get("children", {})
+            to_delete = []
+            for san, child in children.items():
+                if child.get("games", 0) < min_games:
+                    to_delete.append(san)
+                else:
+                    prune(child)
+            for san in to_delete:
+                del children[san]
+
+        if min_games > 1:
+            prune(tree)
+
+        return tree
+
+    def get_games_for_opening_path(
+        self,
+        san_path: List[str],
+        max_depth: int = 12,
+    ) -> List[Tuple["GameData", str]]:
+        """Return games (with source names) that follow the given SAN path from the start.
+
+        san_path is a sequence of SAN moves like ["e4", "c5", "Nf3"] corresponding to
+        the path of a node in the opening tree.
+        """
+        from app.services.analysis_data_storage_service import AnalysisDataStorageService
+
+        results: List[Tuple["GameData", str]] = []
+        if not san_path or not self._current_player:
+            return results
+
+        analyzed_games = getattr(self, "_current_analyzed_games", []) or []
+        if not analyzed_games:
+            return results
+
+        max_plies = min(max_depth, len(san_path))
+
+        for game in analyzed_games:
+            if not getattr(game, "analyzed", False):
+                continue
+            try:
+                moves = AnalysisDataStorageService.load_analysis_data(game)
+            except Exception:
+                moves = None
+            if not moves:
+                continue
+
+            path_idx = 0
+            ply_count = 0
+            matched = True
+
+            for move in moves:
+                if ply_count >= max_plies:
+                    break
+                # White move
+                if move.white_move:
+                    if path_idx >= len(san_path):
+                        break
+                    ply_count += 1
+                    if ply_count > max_plies:
+                        break
+                    if move.white_move != san_path[path_idx]:
+                        matched = False
+                        break
+                    path_idx += 1
+                # Black move
+                if move.black_move and ply_count < max_plies:
+                    if path_idx >= len(san_path):
+                        break
+                    ply_count += 1
+                    if ply_count > max_plies:
+                        break
+                    if move.black_move != san_path[path_idx]:
+                        matched = False
+                        break
+                    path_idx += 1
+
+            if matched and path_idx == len(san_path):
+                results.append(game)
+
+        if not results:
+            return []
+
+        # Map games to source display names (database file names)
+        return self._map_games_to_sources(results)
 
     def get_top_best_games_summary(self, max_best: int) -> Tuple[int, Optional[float], Optional[float]]:
         """Return count and accuracy range for the best-performing games."""

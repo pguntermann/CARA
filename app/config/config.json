@@ -1440,6 +1440,21 @@
             "bar_pen_width": 1,
             "bar_value_spacing": 5
           },
+          "opening_tree": {
+            "max_depth": 12,
+            "min_games": 1,
+            "initial_expand_depth": 2,
+            "height": 280,
+            "show_root_decorations": true,
+            "alternating_row_colors": true,
+            "column_resize_modes": {
+              "move_opening": "Stretch",
+              "total": "ResizeToContents",
+              "white": "ResizeToContents",
+              "black": "ResizeToContents",
+              "accuracy": "ResizeToContents"
+            }
+          },
           "responsive": {
             "move_classification_collapse_threshold": 500,
             "error_patterns_collapse_threshold": 500,

@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
     QGridLayout, QSizePolicy, QComboBox, QPushButton, QApplication,
-    QGraphicsOpacityEffect, QMenu
+    QGraphicsOpacityEffect, QMenu, QTreeWidget, QTreeWidgetItem
 )
 from PyQt6.QtCore import Qt, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QPoint
 from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QFontMetrics, QContextMenuEvent
@@ -417,6 +417,347 @@ class AccuracyDistributionWidget(QWidget):
         super().mouseMoveEvent(event)
 
 
+class NoWheelTreeWidget(QTreeWidget):
+    """Tree widget that ignores mouse wheel events so the outer scroll area handles scrolling,
+    and uses double-click only for custom handlers (no auto expand/collapse)."""
+
+    def wheelEvent(self, event) -> None:
+        event.ignore()
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        # Emit itemDoubleClicked without the default expand/collapse behavior.
+        item = self.itemAt(event.position().toPoint())
+        if item is not None:
+            # Use column 0 by default; handlers can ignore the column if not needed.
+            self.itemDoubleClicked.emit(item, 0)
+        event.accept()
+
+
+class OpeningTreeItem(QTreeWidgetItem):
+    """Tree item with numeric-aware sorting for opening tree columns."""
+
+    def __lt__(self, other: "QTreeWidgetItem") -> bool:  # type: ignore[override]
+        tree = self.treeWidget()
+        if not tree:
+            return super().__lt__(other)
+        column = tree.sortColumn()
+
+        # Numeric columns: 1=Total, 2=White, 3=Black, 4=Accuracy (percentage)
+        if column in (1, 2, 3, 4):
+            try:
+                left_val = self.data(column, Qt.ItemDataRole.UserRole)
+                right_val = other.data(column, Qt.ItemDataRole.UserRole)
+                if left_val is not None and right_val is not None:
+                    return float(left_val) < float(right_val)
+            except Exception:
+                pass
+
+        # Fallback to default string-based comparison
+        return super().__lt__(other)
+
+
+class RepertoireMapWidget(QWidget):
+    """Widget for visualizing opening repertoire breadth for White and Black."""
+
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        text_color: QColor,
+        label_font: QFont,
+        value_font: QFont,
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._config = config
+        self._text_color = text_color
+        self._label_font = label_font
+        self._value_font = value_font
+
+        ui_config = config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        player_stats_config = panel_config.get('player_stats', {})
+        colors_config = player_stats_config.get('colors', {})
+        rep_config = player_stats_config.get('repertoire_map', {})
+
+        self._bar_height = int(rep_config.get('bar_height', 22))
+        self._bar_spacing = int(rep_config.get('bar_spacing', 8))
+        self._margins = rep_config.get('margins', [10, 10, 10, 10])
+        self._label_width = int(rep_config.get('label_width', 80))
+        self._value_width = int(rep_config.get('value_width', 140))
+        self._min_segment_width = int(rep_config.get('min_segment_width', 3))
+        self._max_segments_per_side = int(rep_config.get('max_segments_per_side', 8))
+
+        # Segment colors (cycle)
+        default_segment_colors = [
+            colors_config.get('phase_opening_color', [100, 150, 255]),
+            colors_config.get('phase_middlegame_color', [150, 255, 100]),
+            colors_config.get('phase_endgame_color', [255, 200, 100]),
+            [180, 140, 255],
+            [255, 170, 140],
+            [140, 210, 255],
+        ]
+        raw_segment_colors = rep_config.get('segment_colors', default_segment_colors)
+        self._segment_colors: List[QColor] = []
+        for rgb in raw_segment_colors:
+            if isinstance(rgb, (list, tuple)) and len(rgb) >= 3:
+                self._segment_colors.append(QColor(int(rgb[0]), int(rgb[1]), int(rgb[2])))
+        if not self._segment_colors:
+            self._segment_colors = [QColor(120, 190, 255)]
+
+        self._white_segments: List[Tuple[str, float, int]] = []
+        self._black_segments: List[Tuple[str, float, int]] = []
+        self._white_breadth: float = 0.0
+        self._black_breadth: float = 0.0
+        # Hover hitboxes: (rect, side_label, segment_label, count, fraction)
+        self._segment_hitboxes: List[Tuple[QRectF, str, str, int, float]] = []
+
+        total_height = (
+            self._margins[1]
+            + self._bar_height * 2
+            + self._bar_spacing
+            + self._margins[3]
+        )
+        self.setMinimumHeight(total_height)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+
+    def set_stats(self, stats: "AggregatedPlayerStats") -> None:
+        """Populate internal data from AggregatedPlayerStats."""
+        self._segment_hitboxes = []
+        # Helper to build segments for a given color side
+        def build_segments(counts: Dict[Tuple[str, Optional[str]], int]) -> List[Tuple[str, float, int]]:
+            items = [(key, count) for key, count in counts.items() if count > 0]
+            if not items:
+                return []
+            total = sum(count for _, count in items)
+            if total <= 0:
+                return []
+            # Sort by frequency (descending)
+            items.sort(key=lambda kv: kv[1], reverse=True)
+            head = items[: self._max_segments_per_side]
+            tail = items[self._max_segments_per_side :]
+            segments: List[Tuple[str, float, int]] = []
+            for (eco, name), count in head:
+                if name and eco != "Unknown":
+                    label = f"{eco} ({name})"
+                elif eco != "Unknown":
+                    label = eco
+                else:
+                    label = "Unknown"
+                fraction = count / float(total)
+                segments.append((label, fraction, count))
+            # Group remaining openings into "Other"
+            if tail:
+                other_count = sum(count for _, count in tail)
+                if other_count > 0:
+                    fraction = other_count / float(total)
+                    segments.append(("Other", fraction, other_count))
+            return segments
+
+        self._white_segments = build_segments(getattr(stats, "white_opening_counts", {}) or {})
+        self._black_segments = build_segments(getattr(stats, "black_opening_counts", {}) or {})
+        self._white_breadth = float(getattr(stats, "white_repertoire_breadth", 0.0) or 0.0)
+        self._black_breadth = float(getattr(stats, "black_repertoire_breadth", 0.0) or 0.0)
+        self.update()
+
+    def sizeHint(self) -> QSize:
+        total_height = (
+            self._margins[1]
+            + self._bar_height * 2
+            + self._bar_spacing
+            + self._margins[3]
+        )
+        return QSize(200, total_height)
+
+    def minimumSizeHint(self) -> QSize:
+        return self.sizeHint()
+
+    def _draw_side_bar(
+        self,
+        painter: QPainter,
+        y_top: int,
+        side_label: str,
+        segments: List[Tuple[str, float, int]],
+        breadth: float,
+        rect: QRectF,
+    ) -> None:
+        left = int(rect.left())
+        right = int(rect.right())
+        bar_top = y_top
+        bar_bottom = y_top + self._bar_height
+        bar_height = self._bar_height
+
+        # Side label
+        painter.setFont(self._label_font)
+        painter.setPen(self._text_color)
+        label_rect = QRectF(
+            left + self._margins[0],
+            bar_top,
+            self._label_width,
+            bar_height,
+        )
+        painter.drawText(
+            label_rect,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            side_label,
+        )
+
+        # Bar area
+        bar_left = left + self._margins[0] + self._label_width
+        bar_right = right - self._margins[2] - self._value_width
+        if bar_right <= bar_left or bar_height <= 0:
+            return
+        bar_width = bar_right - bar_left
+
+        # Draw segments
+        painter.setPen(Qt.PenStyle.NoPen)
+        x_cursor = bar_left
+        num_segments = len(segments)
+        for idx, (seg_label, fraction, _count) in enumerate(segments):
+            if fraction <= 0.0:
+                continue
+            if idx == num_segments - 1:
+                # Last segment: fill remaining width
+                seg_width = bar_left + bar_width - x_cursor
+            else:
+                seg_width = int(bar_width * fraction)
+            if seg_width < self._min_segment_width:
+                seg_width = self._min_segment_width
+            if x_cursor + seg_width > bar_left + bar_width:
+                seg_width = (bar_left + bar_width) - x_cursor
+            if seg_width <= 0:
+                continue
+            color = self._segment_colors[idx % len(self._segment_colors)]
+            painter.setBrush(QBrush(color))
+            seg_rect = QRectF(float(x_cursor), float(bar_top), float(seg_width), float(bar_height))
+            painter.drawRect(x_cursor, bar_top, seg_width, bar_height)
+            # Store for hover tooltips
+            self._segment_hitboxes.append((seg_rect, side_label, seg_label, int(_count), float(fraction)))
+
+            # Draw segment label inside if there is enough space
+            if seg_width >= 40:
+                painter.save()
+                painter.setFont(self._value_font)
+                # Choose text color with simple contrast heuristic
+                text_color = QColor(255, 255, 255)
+                painter.setPen(text_color)
+                fm = QFontMetrics(self._value_font)
+                max_text_width = seg_width - 6
+                text = seg_label
+                if fm.horizontalAdvance(text) > max_text_width:
+                    # Try ECO only (first token) if label is long like "C11 (French ...)"
+                    if "(" in text:
+                        text = text.split("(", 1)[0].strip()
+                    # Truncate with ellipsis if still too long
+                    while text and fm.horizontalAdvance(text + "…") > max_text_width:
+                        text = text[:-1]
+                    if text:
+                        text = text + "…"
+                if text:
+                    text_rect = QRectF(
+                        float(x_cursor + 3),
+                        float(bar_top),
+                        float(seg_width - 6),
+                        float(bar_height),
+                    )
+                    painter.drawText(
+                        text_rect,
+                        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                        text,
+                    )
+                painter.restore()
+
+            x_cursor += seg_width
+            if x_cursor >= bar_left + bar_width:
+                break
+
+        # Summary text on the right
+        painter.setFont(self._value_font)
+        painter.setPen(self._text_color)
+        breadth_pct = breadth * 100.0
+        summary_parts: List[str] = []
+        summary_parts.append(f"Breadth {breadth_pct:.0f}%")
+        # Distinct openings can be inferred from segment count (excluding 'Other')
+        distinct_estimate = len([s for s in segments if s[0] != "Other"])
+        if distinct_estimate > 0:
+            summary_parts.insert(0, f"{distinct_estimate} opening(s)")
+        summary_text = " · ".join(summary_parts)
+        value_rect = QRectF(
+            bar_right + 8,
+            bar_top,
+            self._value_width - 8,
+            bar_height,
+        )
+        painter.drawText(
+            value_rect,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            summary_text,
+        )
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = self.rect()
+        content_rect = QRectF(
+            rect.left(),
+            rect.top(),
+            rect.width(),
+            rect.height(),
+        )
+
+        # Early exit if no data
+        if not self._white_segments and not self._black_segments:
+            painter.setFont(self._value_font)
+            painter.setPen(self._text_color)
+            text = "No opening data"
+            fm = QFontMetrics(self._value_font)
+            text_width = fm.horizontalAdvance(text)
+            x = content_rect.left() + (content_rect.width() - text_width) / 2.0
+            y = content_rect.top() + content_rect.height() / 2.0 + fm.ascent() / 2.0
+            painter.drawText(QPoint(int(x), int(y)), text)
+            return
+
+        top_y = int(rect.top() + self._margins[1])
+        # White bar
+        self._draw_side_bar(
+            painter,
+            top_y,
+            "White",
+            self._white_segments,
+            self._white_breadth,
+            content_rect,
+        )
+        # Black bar
+        black_y = top_y + self._bar_height + self._bar_spacing
+        self._draw_side_bar(
+            painter,
+            black_y,
+            "Black",
+            self._black_segments,
+            self._black_breadth,
+            content_rect,
+        )
+
+    def mouseMoveEvent(self, event) -> None:
+        """Show tooltip when hovering over a repertoire segment."""
+        if not self._segment_hitboxes:
+            self.setToolTip("")
+            super().mouseMoveEvent(event)
+            return
+
+        pos = event.position()
+        tooltip = ""
+        for rect, side_label, seg_label, count, fraction in self._segment_hitboxes:
+            if rect.contains(pos):
+                pct = fraction * 100.0
+                game_word = "game" if count == 1 else "games"
+                tooltip = f"{side_label}: {seg_label} \u2013 {pct:.1f}% ({count} {game_word})"
+                break
+
+        self.setToolTip(tooltip)
+        super().mouseMoveEvent(event)
+
+
 class DetailPlayerStatsView(QWidget):
     """Player statistics view displaying aggregated player performance."""
     
@@ -507,6 +848,9 @@ class DetailPlayerStatsView(QWidget):
         # Openings responsive handling
         self._openings_widget: Optional[QWidget] = None
         self._openings_items: List[Dict[str, Any]] = []  # List of {label, value, full_text, compact_text}
+        self._opening_tree_widget: Optional[QTreeWidget] = None
+        self._opening_tree_header_compact: str = "Move / Opening"
+        self._opening_tree_header_with_hint: str = "Move / Opening (double-click row to open games)"
         
         # Get responsive config
         responsive_config = self.player_stats_config.get('responsive', {})
@@ -2290,6 +2634,7 @@ class DetailPlayerStatsView(QWidget):
         grid_config = player_stats_config.get('grid', {})
         label_col_min_width = grid_config.get('label_column_minimum_width', 150)
         value_col_min_width = grid_config.get('value_column_minimum_width', 100)
+        tree_config = player_stats_config.get('opening_tree', {})
         
         # Most Played Openings
         if stats.top_openings:
@@ -2487,12 +2832,148 @@ class DetailPlayerStatsView(QWidget):
             grid_widget_best.setLayout(grid_best)
             grid_widget_best.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
             layout.addWidget(grid_widget_best)
-        
+            layout.addSpacing(section_spacing)
+
+        # Opening tree (expandable move tree)
+        if self._stats_controller:
+            max_depth = int(tree_config.get('max_depth', 12))
+            min_games = int(tree_config.get('min_games', 1))
+            opening_tree = self._stats_controller.get_opening_tree(
+                max_depth=max_depth,
+                min_games=min_games,
+            )
+            children = opening_tree.get("children", {})
+            if children:
+                from PyQt6.QtWidgets import QHeaderView
+
+                tree_widget = NoWheelTreeWidget(widget)
+                tree_widget.setColumnCount(5)
+                tree_widget.setHeaderLabels([
+                    self._opening_tree_header_compact,
+                    "Total",
+                    "White",
+                    "Black",
+                    "Accuracy",
+                ])
+
+                # Behavior flags from config
+                show_root_decorations = bool(tree_config.get('show_root_decorations', True))
+                alternating_rows = bool(tree_config.get('alternating_row_colors', True))
+                tree_widget.setRootIsDecorated(show_root_decorations)
+                tree_widget.setAlternatingRowColors(alternating_rows)
+                tree_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
+
+                # Column sizing from config
+                header = tree_widget.header()
+                header.setStretchLastSection(False)
+
+                resize_config = tree_config.get('column_resize_modes', {}) or {}
+
+                def _mode_for(key: str, default_mode: QHeaderView.ResizeMode) -> QHeaderView.ResizeMode:
+                    raw = resize_config.get(key, None)
+                    if isinstance(raw, str):
+                        name = raw.strip()
+                        try:
+                            mode = getattr(QHeaderView.ResizeMode, name)
+                            if isinstance(mode, QHeaderView.ResizeMode):
+                                return mode
+                        except AttributeError:
+                            pass
+                    return default_mode
+
+                header.setSectionResizeMode(0, _mode_for("move_opening", QHeaderView.ResizeMode.Stretch))
+                header.setSectionResizeMode(1, _mode_for("total", QHeaderView.ResizeMode.ResizeToContents))
+                header.setSectionResizeMode(2, _mode_for("white", QHeaderView.ResizeMode.ResizeToContents))
+                header.setSectionResizeMode(3, _mode_for("black", QHeaderView.ResizeMode.ResizeToContents))
+                header.setSectionResizeMode(4, _mode_for("accuracy", QHeaderView.ResizeMode.ResizeToContents))
+
+                # Fonts and colors (align with other value fonts in the view)
+                tree_widget.setFont(value_font)
+                header.setFont(label_font)
+                palette = tree_widget.palette()
+                palette.setColor(tree_widget.foregroundRole(), text_color)
+                tree_widget.setPalette(palette)
+
+                def format_label(san: str, node_data: Dict[str, Any]) -> str:
+                    eco = node_data.get("eco")
+                    opening_name = node_data.get("opening_name")
+                    # Focus on opening families: show ECO and name when available
+                    if opening_name and eco:
+                        return f"{san} – {eco} ({opening_name})"
+                    if opening_name:
+                        return f"{san} – {opening_name}"
+                    if eco:
+                        return f"{san} – {eco}"
+                    return san
+
+                def add_children(parent_item: Optional[QTreeWidgetItem], node: Dict[str, Any], path: List[str]) -> None:
+                    node_children = node.get("children", {})
+                    # Sort children by games descending
+                    sorted_items = sorted(
+                        node_children.items(),
+                        key=lambda kv: kv[1].get("games", 0),
+                        reverse=True,
+                    )
+                    for san, child in sorted_items:
+                        total_games = child.get("games", 0)
+                        white_games = child.get("white_games", 0)
+                        black_games = child.get("black_games", 0)
+                        acc_sum = float(child.get("accuracy_sum", 0.0) or 0.0)
+                        acc_count = int(child.get("accuracy_count", 0) or 0)
+                        if acc_count > 0:
+                            avg_acc = acc_sum / float(acc_count)
+                            acc_text = f"{avg_acc:.1f}%"
+                        else:
+                            acc_text = ""
+                        label_text = format_label(san, child)
+                        item = OpeningTreeItem(
+                            [
+                                label_text,
+                                str(total_games),
+                                str(white_games),
+                                str(black_games),
+                                acc_text,
+                            ]
+                        )
+                        # Store raw numeric values for sorting
+                        item.setData(1, Qt.ItemDataRole.UserRole, int(total_games))
+                        item.setData(2, Qt.ItemDataRole.UserRole, int(white_games))
+                        item.setData(3, Qt.ItemDataRole.UserRole, int(black_games))
+                        if acc_count > 0:
+                            item.setData(4, Qt.ItemDataRole.UserRole, float(avg_acc))
+                        # Store SAN path for this node so double-click handlers
+                        # can resolve games for the corresponding line.
+                        new_path = path + [san]
+                        item.setData(0, Qt.ItemDataRole.UserRole, new_path)
+                        if parent_item is None:
+                            tree_widget.addTopLevelItem(item)
+                        else:
+                            parent_item.addChild(item)
+                        add_children(item, child, new_path)
+
+                add_children(None, opening_tree, [])
+                tree_widget.expandToDepth(int(tree_config.get('initial_expand_depth', 2)))
+                # Optional fixed height
+                preferred_height = int(tree_config.get('height', 200))
+                tree_widget.setMinimumHeight(preferred_height)
+
+                # Connect double-click to open games for this opening line
+                tree_widget.itemDoubleClicked.connect(self._on_opening_tree_item_double_clicked)
+
+                # Enable sorting (default by Total descending)
+                tree_widget.setSortingEnabled(True)
+                tree_widget.sortByColumn(1, Qt.SortOrder.DescendingOrder)
+
+                # Keep reference for responsive header hint updates
+                self._opening_tree_widget = tree_widget
+
+                layout.addWidget(tree_widget)
+
         layout.addStretch()
-        
-        # Update visibility based on initial width
+
+        # Update visibility based on initial width (for text blocks)
         QTimer.singleShot(0, self._update_openings_visibility)
-        
+
         return widget
     
     def _create_error_patterns_widget(self, patterns: List["ErrorPattern"],
@@ -2636,6 +3117,55 @@ class DetailPlayerStatsView(QWidget):
         header.setFont(font)
         header.setStyleSheet(f"color: rgb({color.red()}, {color.green()}, {color.blue()}); border: none;")
         self.content_layout.addWidget(header)
+
+    def _on_opening_tree_item_double_clicked(self, item) -> None:
+        """Open games corresponding to the double-clicked opening tree node in a Search Results tab."""
+        if not item or not self._stats_controller:
+            return
+        san_path = item.data(0, Qt.ItemDataRole.UserRole)
+        if not san_path:
+            return
+        # Resolve games for this opening path
+        try:
+            games_with_sources = self._stats_controller.get_games_for_opening_path(san_path)
+        except Exception:
+            return
+        if not games_with_sources:
+            return
+
+        # Reuse the same search-results opening flow as error patterns:
+        # create a search results model and add a Search Results tab.
+        # Delegate to MainWindow's existing helper if available (same behavior as error patterns)
+        if self._on_open_pattern_games_in_search_results:
+            # We don't have an ErrorPattern instance here, but the helper only cares
+            # about games; emulate its behavior by using SearchController directly.
+            pass
+
+        # Fallback: mimic MainWindow._open_pattern_games_in_search_results behavior
+        if not self._database_panel:
+            return
+        # MainWindow holds the shared controller; database_panel is attached to it
+        main_window = self._database_panel.parent()
+        # Walk up parents until we find something with a 'controller' attribute
+        while main_window is not None and not hasattr(main_window, "controller"):
+            main_window = main_window.parent()
+        if not main_window or not hasattr(main_window, "controller"):
+            return
+        app_controller = main_window.controller
+        if not hasattr(app_controller, "get_search_controller"):
+            return
+        search_controller = app_controller.get_search_controller()
+        if not search_controller:
+            return
+
+        search_results_model = search_controller.create_search_results_model(games_with_sources)
+        if not hasattr(self._database_panel, "add_search_results_tab"):
+            return
+
+        tab_index = self._database_panel.add_search_results_tab(search_results_model)
+        tab_widget = getattr(self._database_panel, "tab_widget", None)
+        if tab_widget is not None and hasattr(tab_widget, "setCurrentIndex"):
+            tab_widget.setCurrentIndex(tab_index)
     
     def _add_stat_row(self, grid: QGridLayout, row: int, label_text: str, value_text: str,
                      label_font: QFont, value_font: QFont, text_color: QColor) -> None:
@@ -3080,6 +3610,19 @@ class DetailPlayerStatsView(QWidget):
         # Determine if we should show full content or compact
         # With line breaks in full text, we can use a slightly lower threshold
         should_show_full = available_width >= self.openings_collapse_threshold
+
+        # Update opening tree header hint based on width (when tree is present)
+        if self._opening_tree_widget is not None:
+            try:
+                header_item = self._opening_tree_widget.headerItem()
+                if header_item is not None:
+                    if should_show_full:
+                        header_item.setText(0, self._opening_tree_header_with_hint)
+                    else:
+                        header_item.setText(0, self._opening_tree_header_compact)
+            except RuntimeError:
+                # Tree widget may have been deleted during rebuild
+                self._opening_tree_widget = None
         
         # Update each openings item
         for item_data in self._openings_items:
@@ -3156,6 +3699,7 @@ class DetailPlayerStatsView(QWidget):
         
         # Find which section was clicked by checking widget geometries
         section_name = None
+        click_in_opening_tree = False
         
         try:
             if hasattr(self, 'content_widget') and self.content_widget:
@@ -3177,6 +3721,16 @@ class DetailPlayerStatsView(QWidget):
                             # Check if click is within this widget's bounds
                             if widget_global_rect.contains(global_pos):
                                 section_name = section
+                                # Additionally track if click is inside the opening tree widget
+                                if section == "Openings" and self._opening_tree_widget is not None:
+                                    try:
+                                        tree_global_pos = self._opening_tree_widget.mapToGlobal(QPoint(0, 0))
+                                        tree_global_rect = self._opening_tree_widget.geometry()
+                                        tree_global_rect.moveTopLeft(tree_global_pos)
+                                        if tree_global_rect.contains(global_pos):
+                                            click_in_opening_tree = True
+                                    except (RuntimeError, AttributeError, TypeError):
+                                        click_in_opening_tree = False
                                 break
         except (RuntimeError, AttributeError, TypeError):
             # If detection fails, just show full stats option
@@ -3203,6 +3757,14 @@ class DetailPlayerStatsView(QWidget):
         
         copy_full_action = menu.addAction("Copy stats to clipboard")
         copy_full_action.triggered.connect(self._copy_full_stats_to_clipboard)
+
+        # When right-clicking inside the opening tree, offer expand/collapse actions
+        if click_in_opening_tree and self._opening_tree_widget is not None:
+            menu.addSeparator()
+            expand_all_action = menu.addAction("Expand all")
+            collapse_all_action = menu.addAction("Collapse all")
+            expand_all_action.triggered.connect(lambda checked=False: self._opening_tree_widget.expandAll())
+            collapse_all_action.triggered.connect(lambda checked=False: self._opening_tree_widget.collapseAll())
         
         # Show menu
         menu.exec(event.globalPos())
