@@ -140,7 +140,7 @@ class PlayerStatsTextFormatter:
             section_lines = PlayerStatsTextFormatter._format_accuracy_distribution(stats)
             if section_lines:
                 lines.extend(section_lines[3:])
-        elif section_name == "Accuracy over game duration":
+        elif section_name == "Avg. Accuracy over game duration":
             section_lines = PlayerStatsTextFormatter._format_accuracy_over_progress(stats)
             if section_lines:
                 lines.extend(section_lines[3:])
@@ -317,7 +317,7 @@ class PlayerStatsTextFormatter:
             return []
 
         lines: List[str] = []
-        PlayerStatsTextFormatter._add_section_header(lines, "Accuracy over game duration")
+        PlayerStatsTextFormatter._add_section_header(lines, "Avg. Accuracy over game duration")
         # Compact table: fixed-width label column then tab-separated buckets so columns align.
         label_width = 17  # matches "Opponents (avg):"
         header_cells = [f"{int(t):02d}%" for t in targets]

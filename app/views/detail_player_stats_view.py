@@ -1324,14 +1324,14 @@ class DetailPlayerStatsView(QWidget):
         self.content_layout.addWidget(phase_widget)
         self.content_layout.addSpacing(section_spacing_val)
         
-        # Accuracy over game duration Section (line chart)
+        # Avg. Accuracy over game duration Section (line chart)
         progress_chart_config = player_stats_config.get('accuracy_vs_progress_chart', {})
         if progress_chart_config.get('enabled', True) and getattr(self.current_stats, 'accuracy_by_progress', None):
-            self._add_section_header("Accuracy over game duration", header_font, header_text_color)
+            self._add_section_header("Avg. Accuracy over game duration", header_font, header_text_color)
             progress_chart = AccuracyVsProgressChartWidget(self.config)
             opponent_progress = getattr(self.current_stats, 'opponent_accuracy_by_progress', None) or []
             progress_chart.set_data(self.current_stats.accuracy_by_progress, opponent_data=opponent_progress)
-            progress_chart.setProperty("section_name", "Accuracy over game duration")
+            progress_chart.setProperty("section_name", "Avg. Accuracy over game duration")
             self.content_layout.addWidget(progress_chart)
             self.content_layout.addSpacing(section_spacing_val)
         
