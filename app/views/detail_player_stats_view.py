@@ -2739,6 +2739,7 @@ class DetailPlayerStatsView(QWidget):
                                                 widgets_config: Dict[str, Any]) -> QWidget:
         """Create widget showing accuracy by endgame type: groups (expand to see types), tree view."""
         from PyQt6.QtWidgets import QHeaderView
+        from app.views.style import StyleManager
         border_radius = widgets_config.get('border_radius', 5)
         section_margins = widgets_config.get('section_margins', [10, 10, 10, 10])
         section_spacing = widgets_config.get('section_spacing', 8)
@@ -2776,11 +2777,9 @@ class DetailPlayerStatsView(QWidget):
         tree_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         header = tree_widget.header()
         header.setStretchLastSection(False)
-        tree_widget.setFont(value_font)
-        header.setFont(label_font)
-        palette = tree_widget.palette()
-        palette.setColor(tree_widget.foregroundRole(), text_color)
-        tree_widget.setPalette(palette)
+
+        # Apply unified tree view styling (overrides default platform look)
+        StyleManager.style_tree_views([tree_widget], self.config, style_key="tree_view")
         ui_config = self.config.get('ui', {})
         panel_config = ui_config.get('panels', {}).get('detail', {})
         player_stats_config = panel_config.get('player_stats', {})
@@ -2882,6 +2881,10 @@ class DetailPlayerStatsView(QWidget):
         btn_height = int(button_config.get('height', 24))
         decrease_btn.setFixedHeight(btn_height)
         increase_btn.setFixedHeight(btn_height)
+        # Match button text color to tree text for dark theme consistency
+        btn_text = f"rgb({text_color.red()}, {text_color.green()}, {text_color.blue()})"
+        decrease_btn.setStyleSheet(f"QToolButton {{ color: {btn_text}; }}")
+        increase_btn.setStyleSheet(f"QToolButton {{ color: {btn_text}; }}")
         decrease_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_endgame_tree_height(-step))
         increase_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_endgame_tree_height(step))
         controls_layout.addWidget(decrease_btn)
@@ -2899,6 +2902,7 @@ class DetailPlayerStatsView(QWidget):
         if not self._stats_controller:
             return None
         from PyQt6.QtWidgets import QHeaderView
+        from app.views.style import StyleManager
         ui_config = self.config.get('ui', {})
         panel_config = ui_config.get('panels', {}).get('detail', {})
         player_stats_config = panel_config.get('player_stats', {})
@@ -2967,11 +2971,9 @@ class DetailPlayerStatsView(QWidget):
         header.setSectionResizeMode(3, _mode_for("black", QHeaderView.ResizeMode.ResizeToContents))
         header.setSectionResizeMode(4, _mode_for("game_accuracy", QHeaderView.ResizeMode.ResizeToContents))
         header.setSectionResizeMode(5, _mode_for("opening_accuracy", QHeaderView.ResizeMode.ResizeToContents))
-        tree_widget.setFont(value_font)
-        header.setFont(label_font)
-        palette = tree_widget.palette()
-        palette.setColor(tree_widget.foregroundRole(), text_color)
-        tree_widget.setPalette(palette)
+
+        # Apply unified tree view styling (overrides default platform look)
+        StyleManager.style_tree_views([tree_widget], self.config, style_key="tree_view")
 
         def format_label(san: str, node_data: Dict[str, Any]) -> str:
             eco = node_data.get("eco")
@@ -3052,6 +3054,10 @@ class DetailPlayerStatsView(QWidget):
         btn_height = int(button_config.get('height', 24))
         decrease_btn.setFixedHeight(btn_height)
         increase_btn.setFixedHeight(btn_height)
+        # Match button text color to tree text for dark theme consistency
+        btn_text = f"rgb({text_color.red()}, {text_color.green()}, {text_color.blue()})"
+        decrease_btn.setStyleSheet(f"QToolButton {{ color: {btn_text}; }}")
+        increase_btn.setStyleSheet(f"QToolButton {{ color: {btn_text}; }}")
         decrease_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_opening_tree_height(-step))
         increase_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_opening_tree_height(step))
         controls_layout.addWidget(decrease_btn)

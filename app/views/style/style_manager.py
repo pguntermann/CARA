@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from typing import Dict, Any, List
-from PyQt6.QtWidgets import QScrollArea, QCheckBox, QComboBox, QRadioButton, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox, QDateEdit, QTimeEdit, QDateTimeEdit, QGroupBox, QTextEdit, QMenu
+from PyQt6.QtWidgets import QScrollArea, QCheckBox, QComboBox, QRadioButton, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox, QDateEdit, QTimeEdit, QDateTimeEdit, QGroupBox, QTextEdit, QMenu, QTreeWidget
 
 from app.views.style.scrollbar import (
     apply_scrollbar_styling,
@@ -19,6 +19,7 @@ from app.views.style.spinbox import apply_spinbox_styling
 from app.views.style.date_edit import apply_date_edit_styling
 from app.views.style.group_box import apply_group_box_styling
 from app.views.style.context_menu import apply_context_menu_styling
+from app.views.style.tree_view import apply_tree_view_styling
 
 
 class StyleManager:
@@ -566,6 +567,15 @@ class StyleManager:
             title_font_weight, title_color, title_left, title_padding,
             content_margins, use_transparent_palette
         )
+    
+    @staticmethod
+    def style_tree_views(
+        tree_views: List[QTreeWidget],
+        config: Dict[str, Any],
+        style_key: str = "tree_view",
+    ) -> None:
+        """Apply styling to one or more tree views using centralized config."""
+        apply_tree_view_styling(tree_views, config, tree_style_key=style_key)
     
     @staticmethod
     def style_context_menu(

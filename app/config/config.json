@@ -223,6 +223,51 @@
           4
         ]
       },
+      "tree_view": {
+        "text_color": [
+          220,
+          220,
+          220
+        ],
+        "header_text_color": [
+          230,
+          230,
+          230
+        ],
+        "font_family": "Helvetica Neue",
+        "font_size": 11,
+        "header_font_family": "Helvetica Neue",
+        "header_font_size": 11,
+        "background_color": [
+          35,
+          35,
+          40
+        ],
+        "alternate_background_color": [
+          40,
+          40,
+          45
+        ],
+        "grid_color": [
+          60,
+          60,
+          65
+        ],
+        "selection_background_color": [
+          70,
+          90,
+          130
+        ],
+        "selection_text_color": [
+          240,
+          240,
+          240
+        ],
+        "row_height": 20,
+        "header_min_height": 20,
+        "show_grid": false,
+        "show_focus_rect": true
+      },
       "tooltip": {
         "background_color": [
           45,
