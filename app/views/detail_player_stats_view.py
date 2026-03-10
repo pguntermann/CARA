@@ -3,10 +3,10 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
     QGridLayout, QSizePolicy, QComboBox, QPushButton, QApplication,
-    QGraphicsOpacityEffect, QMenu
+    QGraphicsOpacityEffect, QMenu, QTreeWidget, QTreeWidgetItem, QToolButton, QToolTip
 )
-from PyQt6.QtCore import Qt, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QPoint
-from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QFontMetrics, QContextMenuEvent
+from PyQt6.QtCore import Qt, QRect, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QPoint, QPointF
+from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QFontMetrics, QContextMenuEvent, QMouseEvent
 from app.views.detail_summary_view import PieChartWidget
 from typing import Callable, Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 from app.models.database_model import DatabaseModel
@@ -142,6 +142,337 @@ class PhaseBarChartWidget(QWidget):
             painter.drawText(value_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{accuracy:.1f}%")
             
             y_pos += self.bar_height + self.bar_spacing
+
+
+class AccuracyVsProgressChartWidget(QWidget):
+    """Line chart: X = game progress 0-100%, Y = running accuracy (0-100%), averaged across games. Styled like evaluation graph; no phase shading."""
+
+    def __init__(self, config: Dict[str, Any], parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.config = config
+        ui_config = config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        player_stats_config = panel_config.get('player_stats', {})
+        chart_config = player_stats_config.get('accuracy_vs_progress_chart', {})
+
+        self._height = int(chart_config.get('height', 200))
+        self.background_color = QColor(*chart_config.get('background_color', [30, 30, 35]))
+        self.grid_color = QColor(*chart_config.get('grid_color', [60, 60, 65]))
+        self.line_color = QColor(*chart_config.get('line_color', [120, 190, 255]))
+        self.opponent_line_color = QColor(*chart_config.get('opponent_line_color', [200, 130, 130]))
+        self._line_style = self._pen_style_from_config(chart_config.get('line_style', 'solid'))
+        self._opponent_line_style = self._pen_style_from_config(chart_config.get('opponent_line_style', 'dashed'))
+        self.line_width = chart_config.get('line_width', 2)
+        self.text_color = QColor(*chart_config.get('text_color', [200, 200, 200]))
+        self.axis_color = QColor(*chart_config.get('axis_color', [150, 150, 150]))
+        self.padding = chart_config.get('padding', [40, 20, 20, 40])
+        self.font_family = resolve_font_family(chart_config.get('font_family', 'Helvetica Neue'))
+        self.font_size = int(scale_font_size(chart_config.get('font_size', 10)))
+        self.min_font_size = int(scale_font_size(chart_config.get('min_font_size', 8)))
+        self.font_size_calculation_divisor = chart_config.get('font_size_calculation_divisor', 20)
+        self.min_grid_spacing = chart_config.get('min_grid_spacing', 30)
+        self.min_grid_lines = chart_config.get('min_grid_lines', 3)
+        self.y_axis_label_spacing = chart_config.get('y_axis_label_spacing', 5)
+        self.x_axis_label_spacing = chart_config.get('x_axis_label_spacing', 5)
+
+        self._data: List[Tuple[float, float]] = []  # (progress_pct, accuracy)
+        self._data_opponent: List[Tuple[float, float]] = []  # (progress_pct, accuracy) for opponents' average
+        self._hover_data: Optional[Tuple[float, float]] = None  # (progress_pct, accuracy) when hovering
+        self._hover_data_opponent: Optional[float] = None  # opponent accuracy at hover progress (if available)
+        self._hover_pixel: Optional[QPointF] = None  # pixel position for circle
+        self._hover_hit_threshold_px = 25
+        self._hover_circle_radius = 6
+        self._y_padding_pct = 0.05  # padding as fraction of range (5%)
+        self._y_min_range = 5.0  # minimum Y range when min_acc == max_acc
+
+        # Use the configured height as a fixed height for this chart
+        self.setFixedHeight(self._height)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setMouseTracking(True)
+
+    @staticmethod
+    def _pen_style_from_config(style: str) -> Qt.PenStyle:
+        """Map config string to Qt.PenStyle. 'dashed' -> DashLine, else SolidLine."""
+        if (style or "").strip().lower() == "dashed":
+            return Qt.PenStyle.DashLine
+        return Qt.PenStyle.SolidLine
+
+    def set_data(
+        self,
+        data: List[Tuple[float, float]],
+        opponent_data: Optional[List[Tuple[float, float]]] = None,
+    ) -> None:
+        """Set chart data: list of (progress_pct, accuracy) sorted by progress_pct.
+        opponent_data: optional second series (average opponents' accuracy) for reference line.
+        """
+        self._data = list(data) if data else []
+        self._data_opponent = list(opponent_data) if opponent_data else []
+        self.update()
+
+    def _opponent_accuracy_at_progress(self, progress: float) -> Optional[float]:
+        """Interpolate opponent accuracy at given progress (0-100). Returns None if no opponent data."""
+        if not self._data_opponent:
+            return None
+        sorted_opp = sorted(self._data_opponent, key=lambda x: x[0])
+        if progress <= sorted_opp[0][0]:
+            return sorted_opp[0][1]
+        if progress >= sorted_opp[-1][0]:
+            return sorted_opp[-1][1]
+        for i in range(len(sorted_opp) - 1):
+            p0, a0 = sorted_opp[i]
+            p1, a1 = sorted_opp[i + 1]
+            if p0 <= progress <= p1:
+                if p1 == p0:
+                    return a0
+                t = (progress - p0) / (p1 - p0)
+                return a0 + t * (a1 - a0)
+        return None
+
+    def _accuracy_range(self) -> Tuple[float, float]:
+        """Return (min_acc, max_acc) for the Y scale from both series, with padding, clamped to 0-100%. Empty -> (0, 100)."""
+        accs: List[float] = [acc for _, acc in self._data]
+        accs.extend(acc for _, acc in self._data_opponent)
+        if not accs:
+            return 0.0, 100.0
+        lo, hi = min(accs), max(accs)
+        r = hi - lo
+        if r < self._y_min_range:
+            mid = (lo + hi) / 2.0
+            half = self._y_min_range / 2.0
+            lo, hi = mid - half, mid + half
+            r = self._y_min_range
+        pad = max(2.0, r * self._y_padding_pct)
+        return (max(0.0, lo - pad), min(100.0, hi + pad))
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        width = self.width()
+        height = self.height()
+        painter.fillRect(0, 0, width, height, self.background_color)
+
+        if not self._data:
+            painter.setPen(self.text_color)
+            font = QFont(self.font_family, self.font_size)
+            painter.setFont(font)
+            painter.drawText(QRect(0, 0, width, height), Qt.AlignmentFlag.AlignCenter, "No data")
+            return
+
+        left = self.padding[0]
+        top = self.padding[1]
+        right = width - self.padding[2]
+        bottom = height - self.padding[3]
+        graph_width = right - left
+        graph_height = bottom - top
+
+        # Y: dynamic scale from data (lowest to highest accuracy + padding)
+        min_acc, max_acc = self._accuracy_range()
+        acc_range = max_acc - min_acc
+
+        # Grid: horizontal lines at accuracy steps across the dynamic range
+        max_grid_lines = max(self.min_grid_lines, int(graph_height / self.min_grid_spacing))
+        step = acc_range / max(1, max_grid_lines - 1) if acc_range > 0 else 1.0
+        painter.setPen(QPen(self.grid_color, 1))
+        for i in range(max_grid_lines + 1):
+            acc = min_acc + i * step
+            y = bottom - ((acc - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
+            painter.drawLine(int(left), int(y), int(right), int(y))
+
+        # Grid: vertical lines at key progress points (0%, 25%, 50%, 75%, 100%)
+        for pct in [0, 25, 50, 75, 100]:
+            x = left + (pct / 100.0 * graph_width)
+            painter.drawLine(int(x), int(top), int(x), int(bottom))
+
+        # Axis labels
+        painter.setPen(self.text_color)
+        adaptive_font_size = max(self.min_font_size, min(self.font_size, int(graph_height / self.font_size_calculation_divisor)))
+        font = QFont(self.font_family, adaptive_font_size)
+        painter.setFont(font)
+        fm = QFontMetrics(font)
+
+        for i in range(max_grid_lines + 1):
+            acc = min_acc + i * step
+            y = bottom - ((acc - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
+            label = f"{acc:.1f}%" if acc != int(acc) or acc_range < 20 else f"{acc:.0f}%"
+            label_width = fm.horizontalAdvance(label)
+            painter.drawText(int(left - label_width - self.y_axis_label_spacing), int(y + fm.height() / 2), label)
+
+        # X-axis labels (progress 0%, 25%, 50%, 75%, 100%)
+        for pct in [0, 25, 50, 75, 100]:
+            x = left + (pct / 100.0 * graph_width)
+            label = f"{pct}%"
+            label_width = fm.horizontalAdvance(label)
+            painter.drawText(int(x - label_width / 2), int(bottom + fm.height() + self.x_axis_label_spacing), label)
+
+        # Opponent line (drawn first so player line is on top)
+        if self._data_opponent and acc_range > 0:
+            sorted_opp = sorted(self._data_opponent, key=lambda x: x[0])
+            points_opp: List[QPointF] = []
+            for pct, acc in sorted_opp:
+                x = left + (pct / 100.0 * graph_width)
+                y = bottom - ((acc - min_acc) / acc_range * graph_height)
+                y = max(top, min(bottom, y))
+                points_opp.append(QPointF(x, y))
+            if len(points_opp) > 1:
+                pen_opp = QPen(self.opponent_line_color, self.line_width)
+                pen_opp.setStyle(self._opponent_line_style)
+                painter.setPen(pen_opp)
+                for i in range(len(points_opp) - 1):
+                    painter.drawLine(points_opp[i], points_opp[i + 1])
+
+        # Player line
+        sorted_data = sorted(self._data, key=lambda x: x[0])
+        points: List[QPointF] = []
+        for pct, acc in sorted_data:
+            x = left + (pct / 100.0 * graph_width)
+            y = bottom - ((acc - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
+            y = max(top, min(bottom, y))
+            points.append(QPointF(x, y))
+
+        if len(points) > 1:
+            pen_player = QPen(self.line_color, self.line_width)
+            pen_player.setStyle(self._line_style)
+            painter.setPen(pen_player)
+            for i in range(len(points) - 1):
+                painter.drawLine(points[i], points[i + 1])
+
+        # Legend when both series present
+        if self._data and self._data_opponent:
+            legend_x = right - 100
+            legend_y = top + 6
+            pen_leg = QPen(self.line_color, 2)
+            pen_leg.setStyle(self._line_style)
+            painter.setPen(pen_leg)
+            painter.drawLine(int(legend_x), int(legend_y + 4), int(legend_x + 20), int(legend_y + 4))
+            painter.setPen(self.text_color)
+            painter.drawText(int(legend_x + 24), int(legend_y + fm.height()), "Player")
+            legend_y += fm.height() + 2
+            pen_opp_leg = QPen(self.opponent_line_color, 2)
+            pen_opp_leg.setStyle(self._opponent_line_style)
+            painter.setPen(pen_opp_leg)
+            painter.drawLine(int(legend_x), int(legend_y + 4), int(legend_x + 20), int(legend_y + 4))
+            painter.setPen(self.text_color)
+            painter.drawText(int(legend_x + 24), int(legend_y + fm.height()), "Opponents")
+
+        # Hover indicator: circle and tooltip text are driven by mouseMoveEvent/leaveEvent
+        if self._hover_pixel is not None and self._hover_data is not None:
+            hover_pen = QPen(self.line_color, 2)
+            hover_pen.setStyle(self._line_style)
+            painter.setPen(hover_pen)
+            painter.setBrush(QBrush(self.background_color))
+            painter.drawEllipse(self._hover_pixel, self._hover_circle_radius, self._hover_circle_radius)
+
+    def _graph_bounds(self) -> Tuple[float, float, float, float, float, float]:
+        """Return (left, top, right, bottom, graph_width, graph_height) in widget coordinates."""
+        width = self.width()
+        height = self.height()
+        left = self.padding[0]
+        top = self.padding[1]
+        right = width - self.padding[2]
+        bottom = height - self.padding[3]
+        return left, top, right, bottom, right - left, bottom - top
+
+    def _data_to_pixel(self, progress: float, accuracy: float,
+                       left: float, bottom: float, graph_width: float, graph_height: float,
+                       min_acc: Optional[float] = None, max_acc: Optional[float] = None) -> QPointF:
+        if min_acc is None or max_acc is None:
+            min_acc, max_acc = self._accuracy_range()
+        acc_range = max_acc - min_acc
+        x = left + (progress / 100.0 * graph_width)
+        y = bottom - ((accuracy - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
+        return QPointF(x, y)
+
+    def _pixel_to_data(self, x: float, y: float,
+                       left: float, bottom: float, graph_width: float, graph_height: float,
+                       min_acc: Optional[float] = None, max_acc: Optional[float] = None) -> Tuple[float, float]:
+        if min_acc is None or max_acc is None:
+            min_acc, max_acc = self._accuracy_range()
+        acc_range = max_acc - min_acc
+        progress = (x - left) / graph_width * 100.0 if graph_width > 0 else 0.0
+        accuracy = (bottom - y) / graph_height * acc_range + min_acc if graph_height > 0 else min_acc
+        progress = max(0.0, min(100.0, progress))
+        return progress, accuracy
+
+    def _closest_point_on_segment(self, p: QPointF, a: QPointF, b: QPointF) -> Tuple[QPointF, float]:
+        """Return (closest_point, distance_squared) on segment a-b to point p."""
+        vx = b.x() - a.x()
+        vy = b.y() - a.y()
+        wx = p.x() - a.x()
+        wy = p.y() - a.y()
+        c1 = wx * vx + wy * vy
+        c2 = vx * vx + vy * vy
+        if c2 <= 0:
+            cx, cy = a.x(), a.y()
+        elif c1 <= 0:
+            cx, cy = a.x(), a.y()
+        elif c1 >= c2:
+            cx, cy = b.x(), b.y()
+        else:
+            t = c1 / c2
+            cx = a.x() + t * vx
+            cy = a.y() + t * vy
+        dx = p.x() - cx
+        dy = p.y() - cy
+        return QPointF(cx, cy), dx * dx + dy * dy
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        if not self._data:
+            return
+        left, top, right, bottom, graph_width, graph_height = self._graph_bounds()
+        if graph_width <= 0 or graph_height <= 0:
+            self._hover_data = None
+            self._hover_pixel = None
+            self.update()
+            return
+        sorted_data = sorted(self._data, key=lambda x: x[0])
+        points: List[QPointF] = []
+        for pct, acc in sorted_data:
+            pt = self._data_to_pixel(pct, acc, left, bottom, graph_width, graph_height)
+            pt.setY(max(top, min(bottom, pt.y())))
+            points.append(pt)
+        if len(points) < 2:
+            self._hover_data = None
+            self._hover_pixel = None
+            QToolTip.hideText()
+            self.update()
+            return
+        mp = event.position()
+        best_dist_sq = float('inf')
+        best_pixel: Optional[QPointF] = None
+        for i in range(len(points) - 1):
+            closest, dist_sq = self._closest_point_on_segment(mp, points[i], points[i + 1])
+            if dist_sq < best_dist_sq:
+                best_dist_sq = dist_sq
+                best_pixel = closest
+        threshold_sq = self._hover_hit_threshold_px * self._hover_hit_threshold_px
+        if best_dist_sq <= threshold_sq and best_pixel is not None:
+            progress, accuracy = self._pixel_to_data(
+                best_pixel.x(), best_pixel.y(), left, bottom, graph_width, graph_height
+            )
+            self._hover_data = (progress, accuracy)
+            self._hover_data_opponent = self._opponent_accuracy_at_progress(progress)
+            self._hover_pixel = best_pixel
+            if self._hover_data_opponent is not None:
+                tip = f"Player: {accuracy:.1f}% at {progress:.1f}% game progress\nOpponents: {self._hover_data_opponent:.1f}%"
+            else:
+                tip = f"{accuracy:.1f}% accuracy at {progress:.1f}% game progress"
+            QToolTip.showText(event.globalPosition().toPoint(), tip, self, QRect(), 3000)
+        else:
+            self._hover_data = None
+            self._hover_data_opponent = None
+            self._hover_pixel = None
+            QToolTip.hideText()
+        self.update()
+
+    def leaveEvent(self, event) -> None:
+        super().leaveEvent(event)
+        self._hover_data = None
+        self._hover_data_opponent = None
+        self._hover_pixel = None
+        QToolTip.hideText()
+        self.update()
 
 
 class AccuracyDistributionWidget(QWidget):
@@ -417,6 +748,74 @@ class AccuracyDistributionWidget(QWidget):
         super().mouseMoveEvent(event)
 
 
+class NoWheelTreeWidget(QTreeWidget):
+    """Tree widget that ignores mouse wheel events so the outer scroll area handles scrolling,
+    and uses double-click only for custom handlers (no auto expand/collapse)."""
+
+    def wheelEvent(self, event) -> None:
+        event.ignore()
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        # Emit itemDoubleClicked without the default expand/collapse behavior.
+        item = self.itemAt(event.position().toPoint())
+        if item is not None:
+            # Use column 0 by default; handlers can ignore the column if not needed.
+            self.itemDoubleClicked.emit(item, 0)
+        event.accept()
+
+
+class OpeningTreeItem(QTreeWidgetItem):
+    """Tree item with numeric-aware sorting for opening tree columns."""
+
+    def __lt__(self, other: "QTreeWidgetItem") -> bool:  # type: ignore[override]
+        tree = self.treeWidget()
+        if not tree:
+            return super().__lt__(other)
+        column = tree.sortColumn()
+
+        # Numeric columns:
+        # 1 = Total, 2 = White, 3 = Black,
+        # 4 = Game accuracy (%), 5 = Opening-phase accuracy (%)
+        if column in (1, 2, 3, 4, 5):
+            try:
+                left_val = self.data(column, Qt.ItemDataRole.UserRole)
+                right_val = other.data(column, Qt.ItemDataRole.UserRole)
+                if left_val is not None and right_val is not None:
+                    return float(left_val) < float(right_val)
+            except Exception:
+                pass
+
+        # Fallback to default string-based comparison
+        return super().__lt__(other)
+
+
+class EndgameTreeItem(QTreeWidgetItem):
+    """Tree item with numeric-aware sorting for endgame tree.
+
+    Numeric columns:
+      1 = Total
+      2 = White
+      3 = Black
+      4 = Game accuracy (%)
+      5 = Endgame-phase accuracy (%)
+    """
+
+    def __lt__(self, other: "QTreeWidgetItem") -> bool:  # type: ignore[override]
+        tree = self.treeWidget()
+        if not tree:
+            return super().__lt__(other)
+        column = tree.sortColumn()
+        if column in (1, 2, 3, 4, 5):
+            try:
+                left_val = self.data(column, Qt.ItemDataRole.UserRole)
+                right_val = other.data(column, Qt.ItemDataRole.UserRole)
+                if left_val is not None and right_val is not None:
+                    return float(left_val) < float(right_val)
+            except Exception:
+                pass
+        return super().__lt__(other)
+
+
 class DetailPlayerStatsView(QWidget):
     """Player statistics view displaying aggregated player performance."""
     
@@ -506,7 +905,27 @@ class DetailPlayerStatsView(QWidget):
         
         # Openings responsive handling
         self._openings_widget: Optional[QWidget] = None
-        self._openings_items: List[Dict[str, Any]] = []  # List of {label, value, full_text, compact_text}
+        # List of per-opening row dicts:
+        # {eco_label, name_label, games_label, cpl_label (optional), full_name}
+        self._openings_items: List[Dict[str, Any]] = []
+        self._opening_tree_widget: Optional[QTreeWidget] = None
+        self._opening_tree_header_compact: str = "Move / Opening"
+        self._opening_tree_header_with_hint: str = "Move / Opening (double-click row to open games)"
+        self._endgame_tree_header_compact: str = "Endgame type"
+        self._endgame_tree_header_with_hint: str = "Endgame type (double-click row to open games)"
+        self._opening_tree_current_height: int = 0
+        self._opening_tree_min_height: int = 0
+        self._opening_tree_max_height: int = 0
+        self._opening_tree_height_step: int = 0
+        self._opening_tree_decrease_button: Optional[QToolButton] = None
+        self._opening_tree_increase_button: Optional[QToolButton] = None
+        self._endgame_tree_widget: Optional[QTreeWidget] = None
+        self._endgame_tree_current_height: int = 0
+        self._endgame_tree_min_height: int = 0
+        self._endgame_tree_max_height: int = 0
+        self._endgame_tree_height_step: int = 0
+        self._endgame_tree_decrease_button: Optional[QToolButton] = None
+        self._endgame_tree_increase_button: Optional[QToolButton] = None
         
         # Get responsive config
         responsive_config = self.player_stats_config.get('responsive', {})
@@ -514,6 +933,14 @@ class DetailPlayerStatsView(QWidget):
         self.error_patterns_collapse_threshold = responsive_config.get('error_patterns_collapse_threshold', 300)
         self.openings_collapse_threshold = responsive_config.get('openings_collapse_threshold', 350)
         self.animation_duration = responsive_config.get('animation_duration_ms', 200)
+        # Debounce resize-driven visibility updates to avoid stack overflow (0xc00000fd) when
+        # many resizes occur (e.g. during bulk analysis + stats refresh)
+        self._resize_debounce_timer = QTimer(self)
+        self._resize_debounce_timer.setSingleShot(True)
+        self._resize_debounce_timer.timeout.connect(self._on_resize_debounce_timeout)
+        self._resize_debounce_ms = 80
+        self._updating_visibility = False  # Re-entrancy guard for visibility updates
+        self._building_content = False  # True while building stats content (skip resize-driven updates)
         
         # Event filter will be installed on scroll_area in _setup_ui
     
@@ -677,8 +1104,19 @@ class DetailPlayerStatsView(QWidget):
         
         self._set_disabled_placeholder_visible(False)
         
-        self._clear_content()
-        self._build_stats_content()
+        # Defer heavy build to next event-loop tick to avoid deep call stack and stack overflow
+        # (0xc00000fd) when updating live during bulk analysis. Signal handler returns immediately.
+        QTimer.singleShot(0, self._deferred_build_stats_content)
+    
+    def _deferred_build_stats_content(self) -> None:
+        """Run build on a fresh stack; avoids stack overflow during live updates."""
+        if getattr(self, '_building_content', False):
+            return
+        self._building_content = True
+        try:
+            self._build_stats_content()
+        finally:
+            self._building_content = False
     
     def _handle_stats_unavailable(self, reason: str) -> None:
         """Show appropriate placeholder when stats data is unavailable."""
@@ -739,6 +1177,9 @@ class DetailPlayerStatsView(QWidget):
         self._move_classification_legend_widget = None
         self._openings_widget = None
         self._error_patterns_widget = None
+        self._endgame_tree_widget = None
+        self._endgame_tree_decrease_button = None
+        self._endgame_tree_increase_button = None
         
         # Find player selection widget index
         player_selection_index = -1
@@ -883,7 +1324,18 @@ class DetailPlayerStatsView(QWidget):
         self.content_layout.addWidget(phase_widget)
         self.content_layout.addSpacing(section_spacing_val)
         
-        # Openings Section
+        # Avg. Accuracy over game duration Section (line chart)
+        progress_chart_config = player_stats_config.get('accuracy_vs_progress_chart', {})
+        if progress_chart_config.get('enabled', True) and getattr(self.current_stats, 'accuracy_by_progress', None):
+            self._add_section_header("Avg. Accuracy over game duration", header_font, header_text_color)
+            progress_chart = AccuracyVsProgressChartWidget(self.config)
+            opponent_progress = getattr(self.current_stats, 'opponent_accuracy_by_progress', None) or []
+            progress_chart.set_data(self.current_stats.accuracy_by_progress, opponent_data=opponent_progress)
+            progress_chart.setProperty("section_name", "Avg. Accuracy over game duration")
+            self.content_layout.addWidget(progress_chart)
+            self.content_layout.addSpacing(section_spacing_val)
+        
+        # Openings Section (Most Played, Worst/Best accuracy grids only)
         if self.current_stats and (self.current_stats.top_openings or 
                                     self.current_stats.worst_accuracy_openings or 
                                     self.current_stats.best_accuracy_openings):
@@ -894,6 +1346,35 @@ class DetailPlayerStatsView(QWidget):
             )
             openings_widget.setProperty("section_name", "Openings")
             self.content_layout.addWidget(openings_widget)
+            self.content_layout.addSpacing(section_spacing_val)
+
+        # Opening tree Section (separate section, same style as endgame tree)
+        if self._stats_controller:
+            tree_config = player_stats_config.get('opening_tree', {})
+            max_depth = int(tree_config.get('max_depth', 12))
+            min_games = int(tree_config.get('min_games', 1))
+            opening_tree = self._stats_controller.get_opening_tree(max_depth=max_depth, min_games=min_games)
+            if opening_tree.get("children"):
+                self._add_section_header("Opening tree", header_font, header_text_color)
+                opening_tree_widget = self._create_opening_tree_section_widget(
+                    text_color, label_font, value_font,
+                    section_bg_color, border_color, widgets_config
+                )
+                if opening_tree_widget:
+                    opening_tree_widget.setProperty("section_name", "Opening tree")
+                    self.content_layout.addWidget(opening_tree_widget)
+                    self.content_layout.addSpacing(section_spacing_val)
+
+        # Endgame tree Section (below opening tree; grouped, expand to see types)
+        accuracy_by_endgame_grouped = getattr(self.current_stats, 'accuracy_by_endgame_type_grouped', None)
+        if accuracy_by_endgame_grouped:
+            self._add_section_header("Endgame tree", header_font, header_text_color)
+            endgame_type_widget = self._create_endgame_type_performance_widget(
+                self.current_stats, text_color, label_font, value_font,
+                section_bg_color, border_color, widgets_config
+            )
+            endgame_type_widget.setProperty("section_name", "Endgame tree")
+            self.content_layout.addWidget(endgame_type_widget)
             self.content_layout.addSpacing(section_spacing_val)
 
         # Top Games Section (Best/Worst games for this player)
@@ -2252,11 +2733,356 @@ class DetailPlayerStatsView(QWidget):
         
         return widget
     
+    def _create_endgame_type_performance_widget(self, stats: "AggregatedPlayerStats",
+                                                text_color: QColor, label_font: QFont, value_font: QFont,
+                                                bg_color: QColor, border_color: QColor,
+                                                widgets_config: Dict[str, Any]) -> QWidget:
+        """Create widget showing accuracy by endgame type: groups (expand to see types), tree view."""
+        from PyQt6.QtWidgets import QHeaderView
+        from app.views.style import StyleManager
+        border_radius = widgets_config.get('border_radius', 5)
+        section_margins = widgets_config.get('section_margins', [10, 10, 10, 10])
+        section_spacing = widgets_config.get('section_spacing', 8)
+        widget = QWidget()
+        widget.setStyleSheet(f"""
+            QWidget {{
+                background-color: rgb({bg_color.red()}, {bg_color.green()}, {bg_color.blue()});
+                border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
+                border-radius: {border_radius}px;
+            }}
+        """)
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(section_margins[0], section_margins[1], section_margins[2], section_margins[3])
+        layout.setSpacing(section_spacing)
+        widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        widget.setMinimumWidth(0)
+        grouped = getattr(stats, 'accuracy_by_endgame_type_grouped', []) or []
+        tree_widget = NoWheelTreeWidget(widget)
+        # Columns:
+        # 0 = Type / Group label
+        # 1 = Total games
+        # 2 = White games
+        # 3 = Black games
+        # 4 = Game accuracy (%)
+        # 5 = Phase accuracy (%)
+        tree_widget.setColumnCount(6)
+        tree_widget.setHeaderLabels([
+            self._endgame_tree_header_compact,
+            "Total",
+            "White",
+            "Black",
+            "Game Acc",
+            "Phase Acc",
+        ])
+        tree_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        header = tree_widget.header()
+        header.setStretchLastSection(False)
+
+        # Apply unified tree view styling (overrides default platform look)
+        StyleManager.style_tree_views([tree_widget], self.config, style_key="tree_view")
+        ui_config = self.config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        player_stats_config = panel_config.get('player_stats', {})
+        tree_config = player_stats_config.get('endgame_tree', {}) or player_stats_config.get('endgame_type_tree', {})
+        show_root_decorations = bool(tree_config.get('show_root_decorations', True))
+        alternating_rows = bool(tree_config.get('alternating_row_colors', True))
+        tree_widget.setRootIsDecorated(show_root_decorations)
+        tree_widget.setAlternatingRowColors(alternating_rows)
+        resize_config = tree_config.get('column_resize_modes', {}) or {}
+        def _mode_for(key: str, default_mode: QHeaderView.ResizeMode) -> QHeaderView.ResizeMode:
+            raw = resize_config.get(key, None)
+            if isinstance(raw, str):
+                try:
+                    mode = getattr(QHeaderView.ResizeMode, raw.strip())
+                    if isinstance(mode, QHeaderView.ResizeMode):
+                        return mode
+                except AttributeError:
+                    pass
+            return default_mode
+        header.setSectionResizeMode(0, _mode_for("endgame_type", QHeaderView.ResizeMode.Stretch))
+        header.setSectionResizeMode(1, _mode_for("total", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(2, _mode_for("white", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(3, _mode_for("black", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(4, _mode_for("game_accuracy", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(5, _mode_for("endgame_accuracy", QHeaderView.ResizeMode.ResizeToContents))
+        for (
+            group_key,
+            group_label,
+            group_endgame_accuracy,
+            group_game_accuracy,
+            group_count,
+            group_white,
+            group_black,
+            types_list,
+        ) in grouped:
+            group_item = EndgameTreeItem([
+                group_label,
+                str(group_count),
+                str(group_white),
+                str(group_black),
+                f"{group_game_accuracy:.1f}%" if group_count else "",
+                f"{group_endgame_accuracy:.1f}%" if group_count else "",
+            ])
+            group_item.setData(0, Qt.ItemDataRole.UserRole, ("group", group_key))
+            group_item.setData(1, Qt.ItemDataRole.UserRole, int(group_count))
+            group_item.setData(2, Qt.ItemDataRole.UserRole, int(group_white))
+            group_item.setData(3, Qt.ItemDataRole.UserRole, int(group_black))
+            group_item.setData(4, Qt.ItemDataRole.UserRole, float(group_game_accuracy))
+            group_item.setData(5, Qt.ItemDataRole.UserRole, float(group_endgame_accuracy))
+            for (
+                raw_type,
+                type_label,
+                type_endgame_accuracy,
+                type_game_accuracy,
+                type_count,
+                type_white,
+                type_black,
+            ) in types_list:
+                child_item = EndgameTreeItem([
+                    type_label,
+                    str(type_count),
+                    str(type_white),
+                    str(type_black),
+                    f"{type_game_accuracy:.1f}%" if type_count else "",
+                    f"{type_endgame_accuracy:.1f}%" if type_count else "",
+                ])
+                child_item.setData(0, Qt.ItemDataRole.UserRole, ("type", raw_type))
+                child_item.setData(1, Qt.ItemDataRole.UserRole, int(type_count))
+                child_item.setData(2, Qt.ItemDataRole.UserRole, int(type_white))
+                child_item.setData(3, Qt.ItemDataRole.UserRole, int(type_black))
+                child_item.setData(4, Qt.ItemDataRole.UserRole, float(type_game_accuracy))
+                child_item.setData(5, Qt.ItemDataRole.UserRole, float(type_endgame_accuracy))
+                group_item.addChild(child_item)
+            tree_widget.addTopLevelItem(group_item)
+        tree_widget.setSortingEnabled(True)
+        tree_widget.sortByColumn(1, Qt.SortOrder.DescendingOrder)
+        initial_depth = int(tree_config.get('initial_expand_depth', 0))
+        tree_widget.expandToDepth(initial_depth)
+        default_height = int(tree_config.get('height', 180))
+        self._endgame_tree_min_height = int(tree_config.get('min_height', max(80, default_height // 2)))
+        self._endgame_tree_max_height = int(tree_config.get('max_height', max(default_height, default_height * 2)))
+        self._endgame_tree_height_step = int(tree_config.get('height_step', 40))
+        self._endgame_tree_current_height = default_height
+        tree_widget.setFixedHeight(self._endgame_tree_current_height)
+        tree_widget.itemDoubleClicked.connect(self._on_endgame_tree_item_double_clicked)
+        self._endgame_tree_widget = tree_widget
+        layout.addWidget(tree_widget)
+        controls_layout = QHBoxLayout()
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.addStretch()
+        height_step = self._endgame_tree_height_step or 40
+        decrease_btn = QToolButton(widget)
+        decrease_btn.setText("−")
+        decrease_btn.setToolTip("Decrease endgame tree height")
+        increase_btn = QToolButton(widget)
+        increase_btn.setText("+")
+        increase_btn.setToolTip("Increase endgame tree height")
+        button_config = player_stats_config.get('button', {})
+        btn_height = int(button_config.get('height', 24))
+        decrease_btn.setFixedHeight(btn_height)
+        increase_btn.setFixedHeight(btn_height)
+        # Match button text color to tree text for dark theme consistency
+        btn_text = f"rgb({text_color.red()}, {text_color.green()}, {text_color.blue()})"
+        decrease_btn.setStyleSheet(f"QToolButton {{ color: {btn_text}; }}")
+        increase_btn.setStyleSheet(f"QToolButton {{ color: {btn_text}; }}")
+        decrease_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_endgame_tree_height(-step))
+        increase_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_endgame_tree_height(step))
+        controls_layout.addWidget(decrease_btn)
+        controls_layout.addWidget(increase_btn)
+        layout.addLayout(controls_layout)
+        self._endgame_tree_decrease_button = decrease_btn
+        self._endgame_tree_increase_button = increase_btn
+        self._update_endgame_tree_height_buttons()
+        return widget
+
+    def _create_opening_tree_section_widget(self, text_color: QColor, label_font: QFont, value_font: QFont,
+                                            bg_color: QColor, border_color: QColor,
+                                            widgets_config: Dict[str, Any]) -> Optional[QWidget]:
+        """Create standalone Opening tree section (tree + height controls), same style as endgame tree section."""
+        if not self._stats_controller:
+            return None
+        from PyQt6.QtWidgets import QHeaderView
+        from app.views.style import StyleManager
+        ui_config = self.config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        player_stats_config = panel_config.get('player_stats', {})
+        tree_config = player_stats_config.get('opening_tree', {})
+        max_depth = int(tree_config.get('max_depth', 12))
+        min_games = int(tree_config.get('min_games', 1))
+        opening_tree = self._stats_controller.get_opening_tree(max_depth=max_depth, min_games=min_games)
+        if not opening_tree.get("children"):
+            return None
+        border_radius = widgets_config.get('border_radius', 5)
+        section_margins = widgets_config.get('section_margins', [10, 10, 10, 10])
+        section_spacing = widgets_config.get('section_spacing', 8)
+        widget = QWidget()
+        widget.setStyleSheet(f"""
+            QWidget {{
+                background-color: rgb({bg_color.red()}, {bg_color.green()}, {bg_color.blue()});
+                border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
+                border-radius: {border_radius}px;
+            }}
+        """)
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(section_margins[0], section_margins[1], section_margins[2], section_margins[3])
+        layout.setSpacing(section_spacing)
+        widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        widget.setMinimumWidth(0)
+        tree_widget = NoWheelTreeWidget(widget)
+        # Columns:
+        # 0 = Move / opening label
+        # 1 = Total games
+        # 2 = White games
+        # 3 = Black games
+        # 4 = Game accuracy (%)
+        # 5 = Phase accuracy (%)
+        tree_widget.setColumnCount(6)
+        tree_widget.setHeaderLabels([
+            self._opening_tree_header_compact,
+            "Total",
+            "White",
+            "Black",
+            "Game Acc",
+            "Phase Acc",
+        ])
+        show_root_decorations = bool(tree_config.get('show_root_decorations', True))
+        alternating_rows = bool(tree_config.get('alternating_row_colors', True))
+        tree_widget.setRootIsDecorated(show_root_decorations)
+        tree_widget.setAlternatingRowColors(alternating_rows)
+        tree_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
+        header = tree_widget.header()
+        header.setStretchLastSection(False)
+        resize_config = tree_config.get('column_resize_modes', {}) or {}
+
+        def _mode_for(key: str, default_mode: QHeaderView.ResizeMode) -> QHeaderView.ResizeMode:
+            raw = resize_config.get(key, None)
+            if isinstance(raw, str):
+                try:
+                    mode = getattr(QHeaderView.ResizeMode, raw.strip())
+                    if isinstance(mode, QHeaderView.ResizeMode):
+                        return mode
+                except AttributeError:
+                    pass
+            return default_mode
+
+        header.setSectionResizeMode(0, _mode_for("move_opening", QHeaderView.ResizeMode.Stretch))
+        header.setSectionResizeMode(1, _mode_for("total", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(2, _mode_for("white", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(3, _mode_for("black", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(4, _mode_for("game_accuracy", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(5, _mode_for("opening_accuracy", QHeaderView.ResizeMode.ResizeToContents))
+
+        # Apply unified tree view styling (overrides default platform look)
+        StyleManager.style_tree_views([tree_widget], self.config, style_key="tree_view")
+
+        def format_label(san: str, node_data: Dict[str, Any]) -> str:
+            eco = node_data.get("eco")
+            opening_name = node_data.get("opening_name")
+            if opening_name and eco:
+                return f"{san} – {eco} ({opening_name})"
+            if opening_name:
+                return f"{san} – {opening_name}"
+            if eco:
+                return f"{san} – {eco}"
+            return san
+
+        def add_children(parent_item: Optional[QTreeWidgetItem], node: Dict[str, Any], path: List[str]) -> None:
+            node_children = node.get("children", {})
+            sorted_items = sorted(
+                node_children.items(),
+                key=lambda kv: kv[1].get("games", 0),
+                reverse=True,
+            )
+            for san, child in sorted_items:
+                total_games = child.get("games", 0)
+                white_games = child.get("white_games", 0)
+                black_games = child.get("black_games", 0)
+                game_acc_sum = float(child.get("game_accuracy_sum", 0.0) or 0.0)
+                game_acc_count = int(child.get("game_accuracy_count", 0) or 0)
+                opening_acc_sum = float(child.get("opening_accuracy_sum", 0.0) or 0.0)
+                opening_acc_count = int(child.get("opening_accuracy_count", 0) or 0)
+                game_acc_text = f"{game_acc_sum / float(game_acc_count):.1f}%" if game_acc_count > 0 else ""
+                opening_acc_text = f"{opening_acc_sum / float(opening_acc_count):.1f}%" if opening_acc_count > 0 else ""
+                label_text = format_label(san, child)
+                item = OpeningTreeItem([
+                    label_text,
+                    str(total_games),
+                    str(white_games),
+                    str(black_games),
+                    game_acc_text,
+                    opening_acc_text,
+                ])
+                item.setData(1, Qt.ItemDataRole.UserRole, int(total_games))
+                item.setData(2, Qt.ItemDataRole.UserRole, int(white_games))
+                item.setData(3, Qt.ItemDataRole.UserRole, int(black_games))
+                if game_acc_count > 0:
+                    item.setData(4, Qt.ItemDataRole.UserRole, float(game_acc_sum / float(game_acc_count)))
+                if opening_acc_count > 0:
+                    item.setData(5, Qt.ItemDataRole.UserRole, float(opening_acc_sum / float(opening_acc_count)))
+                new_path = path + [san]
+                item.setData(0, Qt.ItemDataRole.UserRole, new_path)
+                if parent_item is None:
+                    tree_widget.addTopLevelItem(item)
+                else:
+                    parent_item.addChild(item)
+                add_children(item, child, new_path)
+
+        add_children(None, opening_tree, [])
+        tree_widget.expandToDepth(int(tree_config.get('initial_expand_depth', 2)))
+        default_height = int(tree_config.get('height', 280))
+        self._opening_tree_min_height = int(tree_config.get('min_height', max(80, default_height // 2)))
+        self._opening_tree_max_height = int(tree_config.get('max_height', max(default_height, default_height * 2)))
+        self._opening_tree_height_step = int(tree_config.get('height_step', 40))
+        self._opening_tree_current_height = default_height
+        tree_widget.setFixedHeight(self._opening_tree_current_height)
+        tree_widget.itemDoubleClicked.connect(self._on_opening_tree_item_double_clicked)
+        tree_widget.setSortingEnabled(True)
+        tree_widget.sortByColumn(1, Qt.SortOrder.DescendingOrder)
+        self._opening_tree_widget = tree_widget
+        layout.addWidget(tree_widget)
+        controls_layout = QHBoxLayout()
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.addStretch()
+        height_step = self._opening_tree_height_step or 40
+        decrease_btn = QToolButton(widget)
+        decrease_btn.setText("−")
+        decrease_btn.setToolTip("Decrease opening tree height")
+        increase_btn = QToolButton(widget)
+        increase_btn.setText("+")
+        increase_btn.setToolTip("Increase opening tree height")
+        button_config = player_stats_config.get('button', {})
+        btn_height = int(button_config.get('height', 24))
+        decrease_btn.setFixedHeight(btn_height)
+        increase_btn.setFixedHeight(btn_height)
+        # Match button text color to tree text for dark theme consistency
+        btn_text = f"rgb({text_color.red()}, {text_color.green()}, {text_color.blue()})"
+        decrease_btn.setStyleSheet(f"QToolButton {{ color: {btn_text}; }}")
+        increase_btn.setStyleSheet(f"QToolButton {{ color: {btn_text}; }}")
+        decrease_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_opening_tree_height(-step))
+        increase_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_opening_tree_height(step))
+        controls_layout.addWidget(decrease_btn)
+        controls_layout.addWidget(increase_btn)
+        layout.addLayout(controls_layout)
+        self._opening_tree_decrease_button = decrease_btn
+        self._opening_tree_increase_button = increase_btn
+        self._update_opening_tree_height_buttons()
+        return widget
+
     def _create_openings_widget(self, stats: "AggregatedPlayerStats",
                                text_color: QColor, label_font: QFont, value_font: QFont,
                                bg_color: QColor, border_color: QColor,
                                widgets_config: Dict[str, Any]) -> QWidget:
-        """Create openings widget showing most played, worst, and best accuracy openings."""
+        """Create openings widget showing most played, worst, and best accuracy openings.
+
+        Layout:
+            - One section for each of: Most Played, Worst Accuracy, Best Accuracy.
+            - Each section has a label and a compact grid of rows:
+                ECO | Name | Games | CPL (for worst/best).
+
+        Responsiveness:
+            - When the view becomes narrow, opening names are hidden via
+              _update_openings_visibility(), keeping ECO and numeric data visible.
+        """
         border_radius = widgets_config.get('border_radius', 5)
         section_margins = widgets_config.get('section_margins', [10, 10, 10, 10])
         section_spacing = widgets_config.get('section_spacing', 8)
@@ -2288,211 +3114,135 @@ class DetailPlayerStatsView(QWidget):
         panel_config = ui_config.get('panels', {}).get('detail', {})
         player_stats_config = panel_config.get('player_stats', {})
         grid_config = player_stats_config.get('grid', {})
-        label_col_min_width = grid_config.get('label_column_minimum_width', 150)
-        value_col_min_width = grid_config.get('value_column_minimum_width', 100)
-        
-        # Most Played Openings
+        eco_col_min_width = grid_config.get('label_column_minimum_width', 150)
+        name_col_min_width = grid_config.get('value_column_minimum_width', 100)
+
+        def _add_openings_section(
+            title: str,
+            rows: List[Tuple[str, Optional[str], Optional[float], int]],
+            show_cpl: bool,
+        ) -> None:
+            """Add a compact openings section with one row per opening."""
+            if not rows:
+                return
+
+            section_label = QLabel(title)
+            section_label.setFont(label_font)
+            section_label.setStyleSheet(
+                f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+                "border: none; background: transparent;"
+            )
+            section_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            layout.addWidget(section_label)
+
+            grid = QGridLayout()
+            grid.setSpacing(grid_spacing)
+            # Column layout: 0=ECO, 1=Name, 2=Games, 3=CPL (optional)
+            grid.setColumnStretch(0, 0)
+            grid.setColumnStretch(1, 1)
+            grid.setColumnStretch(2, 0)
+            grid.setColumnStretch(3, 0)
+            grid.setColumnMinimumWidth(0, eco_col_min_width)
+            grid.setColumnMinimumWidth(1, name_col_min_width)
+
+            row_idx = 0
+            for eco, opening_name, avg_cpl, count in rows:
+                eco_text = eco if eco and eco != "Unknown" else "?"
+                # Show name when available; keep empty to allow compact mode to hide it.
+                full_name = opening_name or ""
+                if not full_name and not (eco and eco != "Unknown"):
+                    full_name = "Unknown"
+                name_text = full_name
+                games_text = f"{count} game" if count == 1 else f"{count} games"
+                cpl_text = f"{avg_cpl:.1f} CPL" if (show_cpl and avg_cpl is not None) else ""
+
+                eco_label = QLabel(eco_text)
+                eco_label.setFont(value_font)
+                eco_label.setStyleSheet(
+                    f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+                    "border: none; background: transparent;"
+                )
+                eco_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
+                name_label = QLabel(name_text)
+                name_label.setFont(value_font)
+                name_label.setStyleSheet(
+                    f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+                    "border: none; background: transparent;"
+                )
+                name_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+                name_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+                name_label.setMinimumWidth(0)
+
+                games_label = QLabel(games_text)
+                games_label.setFont(value_font)
+                games_label.setStyleSheet(
+                    f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+                    "border: none; background: transparent;"
+                )
+                games_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
+                cpl_label: Optional[QLabel] = None
+                if show_cpl:
+                    cpl_label = QLabel(cpl_text)
+                    cpl_label.setFont(value_font)
+                    cpl_label.setStyleSheet(
+                        f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+                        "border: none; background: transparent;"
+                    )
+                    cpl_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
+                grid.addWidget(eco_label, row_idx, 0)
+                grid.addWidget(name_label, row_idx, 1)
+                grid.addWidget(games_label, row_idx, 2)
+                if cpl_label is not None:
+                    grid.addWidget(cpl_label, row_idx, 3)
+
+                # Track row for responsive updates
+                self._openings_items.append(
+                    {
+                        "eco_label": eco_label,
+                        "name_label": name_label,
+                        "games_label": games_label,
+                        "cpl_label": cpl_label,
+                        "full_name": full_name,
+                    }
+                )
+
+                row_idx += 1
+
+            grid_widget = QWidget()
+            grid_widget.setLayout(grid)
+            grid_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+            layout.addWidget(grid_widget)
+            layout.addSpacing(section_spacing)
+
+        # Build sections from AggregatedPlayerStats
         if stats.top_openings:
-            grid_most = QGridLayout()
-            grid_most.setSpacing(grid_spacing * 2)  # Increase spacing between label and value
-            # 2-column layout: labels (left), values (right, expanding)
-            grid_most.setColumnStretch(0, 0)  # Label column - no stretch
-            grid_most.setColumnStretch(1, 1)  # Value column - expanding to fill space
-            grid_most.setColumnMinimumWidth(0, label_col_min_width)  # Set minimum width for label column
-            grid_most.setColumnMinimumWidth(1, 0)  # Allow value column to shrink
-            
-            openings_lines = []
-            openings_lines_eco_only = []
-            for eco, opening_name, count in stats.top_openings:
-                if opening_name and eco != "Unknown":
-                    openings_lines.append(f"{eco} ({opening_name}):\n({count} games)")
-                    openings_lines_eco_only.append(f"{eco}: ({count} games)")
-                elif eco != "Unknown":
-                    openings_lines.append(f"{eco}:\n({count} games)")
-                    openings_lines_eco_only.append(f"{eco}: ({count} games)")
-                else:
-                    openings_lines.append(f"Unknown:\n({count} games)")
-                    openings_lines_eco_only.append(f"?: ({count} games)")
-            
-            if openings_lines:
-                # Add spacing between items for better readability
-                openings_text = "\n\n".join(openings_lines)
-                openings_text_eco_only = "\n\n".join(openings_lines_eco_only)
-                label = QLabel("Most Played:")
-                label.setFont(label_font)
-                label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
-                label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-                label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
-                label.setMinimumWidth(0)  # Allow label to shrink
-                grid_most.addWidget(label, 0, 0)
-                
-                value = QLabel(openings_text)
-                value.setFont(value_font)
-                value.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
-                value.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)  # Left-aligned for better readability
-                value.setWordWrap(True)  # Allow wrapping for graceful width reduction
-                value.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-                value.setMinimumWidth(0)  # Allow value to shrink
-                
-                # Setup opacity effect for fading opening names
-                opening_name_opacity = QGraphicsOpacityEffect(value)
-                value.setGraphicsEffect(opening_name_opacity)
-                opening_name_opacity.setOpacity(1.0)
-                
-                grid_most.addWidget(value, 0, 1)  # Column 1 for expanding values
-                
-                # Store for responsive handling
-                self._openings_items.append({
-                    'label': label,
-                    'value': value,
-                    'opacity_effect': opening_name_opacity,
-                    'full_text': openings_text,
-                    'eco_only_text': openings_text_eco_only
-                })
-            
-            # Wrap grid in a widget to ensure it expands properly
-            grid_widget_most = QWidget()
-            grid_widget_most.setLayout(grid_most)
-            grid_widget_most.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-            layout.addWidget(grid_widget_most)
-            layout.addSpacing(section_spacing)
-        
-        # Worst Accuracy Openings
+            top_rows: List[Tuple[str, Optional[str], Optional[float], int]] = [
+                (eco, opening_name, None, count) for eco, opening_name, count in stats.top_openings
+            ]
+            _add_openings_section("Most Played:", top_rows, show_cpl=False)
+
         if stats.worst_accuracy_openings:
-            grid_worst = QGridLayout()
-            grid_worst.setSpacing(grid_spacing * 2)  # Increase spacing between label and value
-            # 2-column layout: labels (left), values (right, expanding)
-            grid_worst.setColumnStretch(0, 0)  # Label column - no stretch
-            grid_worst.setColumnStretch(1, 1)  # Value column - expanding to fill space
-            grid_worst.setColumnMinimumWidth(0, label_col_min_width)  # Set minimum width for label column
-            grid_worst.setColumnMinimumWidth(1, 0)  # Allow value column to shrink
-            
-            worst_lines = []
-            worst_lines_eco_only = []
-            for eco, opening_name, avg_cpl, count in stats.worst_accuracy_openings:
-                if opening_name and eco != "Unknown":
-                    worst_lines.append(f"{eco} ({opening_name}):\n{avg_cpl:.1f} CPL ({count} games)")
-                    worst_lines_eco_only.append(f"{eco}: {avg_cpl:.1f} CPL ({count} games)")
-                elif eco != "Unknown":
-                    worst_lines.append(f"{eco}: {avg_cpl:.1f} CPL ({count} games)")
-                    worst_lines_eco_only.append(f"{eco}: {avg_cpl:.1f} CPL ({count} games)")
-                else:
-                    worst_lines.append(f"Unknown: {avg_cpl:.1f} CPL ({count} games)")
-                    worst_lines_eco_only.append(f"?: {avg_cpl:.1f} CPL ({count} games)")
-            
-            if worst_lines:
-                # Add spacing between items for better readability
-                worst_text = "\n\n".join(worst_lines)
-                worst_text_eco_only = "\n\n".join(worst_lines_eco_only)
-                label = QLabel("Worst Accuracy:")
-                label.setFont(label_font)
-                label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
-                label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-                label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
-                label.setMinimumWidth(0)  # Allow label to shrink
-                grid_worst.addWidget(label, 0, 0)
-                
-                value = QLabel(worst_text)
-                value.setFont(value_font)
-                value.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
-                value.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)  # Left-aligned for better readability
-                value.setWordWrap(True)  # Allow wrapping for graceful width reduction
-                value.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-                value.setMinimumWidth(0)  # Allow value to shrink
-                
-                # Setup opacity effect for fading opening names
-                opening_name_opacity = QGraphicsOpacityEffect(value)
-                value.setGraphicsEffect(opening_name_opacity)
-                opening_name_opacity.setOpacity(1.0)
-                
-                grid_worst.addWidget(value, 0, 1)  # Column 1 for expanding values
-                
-                # Store for responsive handling
-                self._openings_items.append({
-                    'label': label,
-                    'value': value,
-                    'opacity_effect': opening_name_opacity,
-                    'full_text': worst_text,
-                    'eco_only_text': worst_text_eco_only
-                })
-            
-            # Wrap grid in a widget to ensure it expands properly
-            grid_widget_worst = QWidget()
-            grid_widget_worst.setLayout(grid_worst)
-            grid_widget_worst.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-            layout.addWidget(grid_widget_worst)
-            layout.addSpacing(section_spacing)
-        
-        # Best Accuracy Openings
+            worst_rows: List[Tuple[str, Optional[str], Optional[float], int]] = [
+                (eco, opening_name, avg_cpl, count)
+                for eco, opening_name, avg_cpl, count in stats.worst_accuracy_openings
+            ]
+            _add_openings_section("Worst Accuracy:", worst_rows, show_cpl=True)
+
         if stats.best_accuracy_openings:
-            grid_best = QGridLayout()
-            grid_best.setSpacing(grid_spacing * 2)  # Increase spacing between label and value
-            # 2-column layout: labels (left), values (right, expanding)
-            grid_best.setColumnStretch(0, 0)  # Label column - no stretch
-            grid_best.setColumnStretch(1, 1)  # Value column - expanding to fill space
-            grid_best.setColumnMinimumWidth(0, label_col_min_width)  # Set minimum width for label column
-            grid_best.setColumnMinimumWidth(1, 0)  # Allow value column to shrink
-            
-            best_lines = []
-            best_lines_eco_only = []
-            for eco, opening_name, avg_cpl, count in stats.best_accuracy_openings:
-                if opening_name and eco != "Unknown":
-                    best_lines.append(f"{eco} ({opening_name}):\n{avg_cpl:.1f} CPL ({count} games)")
-                    best_lines_eco_only.append(f"{eco}: {avg_cpl:.1f} CPL ({count} games)")
-                elif eco != "Unknown":
-                    best_lines.append(f"{eco}: {avg_cpl:.1f} CPL ({count} games)")
-                    best_lines_eco_only.append(f"{eco}: {avg_cpl:.1f} CPL ({count} games)")
-                else:
-                    best_lines.append(f"Unknown: {avg_cpl:.1f} CPL ({count} games)")
-                    best_lines_eco_only.append(f"?: {avg_cpl:.1f} CPL ({count} games)")
-            
-            if best_lines:
-                # Add spacing between items for better readability
-                best_text = "\n\n".join(best_lines)
-                best_text_eco_only = "\n\n".join(best_lines_eco_only)
-                label = QLabel("Best Accuracy:")
-                label.setFont(label_font)
-                label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
-                label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-                label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
-                label.setMinimumWidth(0)  # Allow label to shrink
-                grid_best.addWidget(label, 0, 0)
-                
-                value = QLabel(best_text)
-                value.setFont(value_font)
-                value.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
-                value.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)  # Left-aligned for better readability
-                value.setWordWrap(True)  # Allow wrapping for graceful width reduction
-                value.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-                value.setMinimumWidth(0)  # Allow value to shrink
-                
-                # Setup opacity effect for fading opening names
-                opening_name_opacity = QGraphicsOpacityEffect(value)
-                value.setGraphicsEffect(opening_name_opacity)
-                opening_name_opacity.setOpacity(1.0)
-                
-                grid_best.addWidget(value, 0, 1)  # Column 1 for expanding values
-                
-                # Store for responsive handling
-                self._openings_items.append({
-                    'label': label,
-                    'value': value,
-                    'opacity_effect': opening_name_opacity,
-                    'full_text': best_text,
-                    'eco_only_text': best_text_eco_only
-                })
-            
-            # Wrap grid in a widget to ensure it expands properly
-            grid_widget_best = QWidget()
-            grid_widget_best.setLayout(grid_best)
-            grid_widget_best.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-            layout.addWidget(grid_widget_best)
-        
+            best_rows: List[Tuple[str, Optional[str], Optional[float], int]] = [
+                (eco, opening_name, avg_cpl, count)
+                for eco, opening_name, avg_cpl, count in stats.best_accuracy_openings
+            ]
+            _add_openings_section("Best Accuracy:", best_rows, show_cpl=True)
+
         layout.addStretch()
-        
-        # Update visibility based on initial width
+
+        # Update visibility based on initial width (for text blocks)
         QTimer.singleShot(0, self._update_openings_visibility)
-        
+
         return widget
     
     def _create_error_patterns_widget(self, patterns: List["ErrorPattern"],
@@ -2572,8 +3322,15 @@ class DetailPlayerStatsView(QWidget):
         }
         severity_color = severity_colors.get(pattern.severity, severity_colors_config.get('default', [150, 150, 150]))
         
-        freq_text = f"({pattern.frequency} occurrences, {pattern.percentage:.1f}%)"
-        button_text = f"View {len(pattern.related_games)} →" if pattern.related_games else None
+        ref_plies = getattr(pattern, "related_ref_plies", None)
+        if ref_plies:
+            num_occurrences = len(ref_plies)
+            num_games = len(pattern.related_games)
+            freq_text = f"({num_occurrences} occurrence{'s' if num_occurrences != 1 else ''} in {num_games} game{'s' if num_games != 1 else ''}, {pattern.percentage:.1f}%)"
+            button_text = f"View {num_occurrences} →" if pattern.related_games else None
+        else:
+            freq_text = f"({pattern.frequency} occurrences, {pattern.percentage:.1f}%)"
+            button_text = f"View {len(pattern.related_games)} →" if pattern.related_games else None
         
         row_data = self._create_indicator_item_row(
             title_text=pattern.description,
@@ -2636,6 +3393,132 @@ class DetailPlayerStatsView(QWidget):
         header.setFont(font)
         header.setStyleSheet(f"color: rgb({color.red()}, {color.green()}, {color.blue()}); border: none;")
         self.content_layout.addWidget(header)
+
+    def _on_endgame_tree_item_double_clicked(self, item) -> None:
+        """Open games for the double-clicked endgame type/group row in a Search Results tab."""
+        if not item or not self._stats_controller:
+            return
+        filter_data = item.data(0, Qt.ItemDataRole.UserRole)
+        if not filter_data or not isinstance(filter_data, (list, tuple)) or len(filter_data) != 2:
+            return
+        kind, key = filter_data[0], filter_data[1]
+        if kind == "group":
+            games_with_sources = self._stats_controller.get_games_for_endgame_filter(group_key=key)
+        elif kind == "type":
+            games_with_sources = self._stats_controller.get_games_for_endgame_filter(raw_type=key)
+        else:
+            return
+        if not games_with_sources:
+            return
+        self._open_games_in_search_results_tab(games_with_sources)
+
+    def _open_games_in_search_results_tab(self, games_with_sources: List[Tuple[Any, str]]) -> None:
+        """Open a Search Results tab with the given (GameData, source_name) list. Used by opening tree and endgame tree."""
+        if not games_with_sources or not self._database_panel:
+            return
+        main_window = self._database_panel.parent()
+        while main_window is not None and not hasattr(main_window, "controller"):
+            main_window = main_window.parent()
+        if not main_window or not hasattr(main_window, "controller"):
+            return
+        app_controller = main_window.controller
+        if not hasattr(app_controller, "get_search_controller"):
+            return
+        search_controller = app_controller.get_search_controller()
+        if not search_controller:
+            return
+        search_results_model = search_controller.create_search_results_model(games_with_sources)
+        if not hasattr(self._database_panel, "add_search_results_tab"):
+            return
+        tab_index = self._database_panel.add_search_results_tab(search_results_model)
+        tab_widget = getattr(self._database_panel, "tab_widget", None)
+        if tab_widget is not None and hasattr(tab_widget, "setCurrentIndex"):
+            tab_widget.setCurrentIndex(tab_index)
+
+    def _on_opening_tree_item_double_clicked(self, item) -> None:
+        """Open games corresponding to the double-clicked opening tree node in a Search Results tab."""
+        if not item or not self._stats_controller:
+            return
+        san_path = item.data(0, Qt.ItemDataRole.UserRole)
+        if not san_path:
+            return
+        # Resolve games for this opening path
+        try:
+            games_with_sources = self._stats_controller.get_games_for_opening_path(san_path)
+        except Exception:
+            return
+        if not games_with_sources:
+            return
+        self._open_games_in_search_results_tab(games_with_sources)
+
+    def _adjust_opening_tree_height(self, delta: int) -> None:
+        """Adjust the opening tree height by delta, clamped to configured min/max."""
+        if not self._opening_tree_widget:
+            return
+        if self._opening_tree_height_step <= 0:
+            return
+        new_height = self._opening_tree_current_height + int(delta)
+        # Clamp to min/max
+        if self._opening_tree_min_height > 0:
+            new_height = max(self._opening_tree_min_height, new_height)
+        if self._opening_tree_max_height > 0:
+            new_height = min(self._opening_tree_max_height, new_height)
+        if new_height == self._opening_tree_current_height:
+            return
+        self._opening_tree_current_height = new_height
+        self._opening_tree_widget.setFixedHeight(new_height)
+        self._update_opening_tree_height_buttons()
+
+    def _update_opening_tree_height_buttons(self) -> None:
+        """Enable/disable opening tree height buttons when min/max are reached."""
+        if not self._opening_tree_widget:
+            return
+        can_decrease = (
+            self._opening_tree_min_height > 0
+            and self._opening_tree_current_height > self._opening_tree_min_height
+        )
+        can_increase = (
+            self._opening_tree_max_height > 0
+            and self._opening_tree_current_height < self._opening_tree_max_height
+        )
+        if self._opening_tree_decrease_button is not None:
+            self._opening_tree_decrease_button.setEnabled(can_decrease)
+        if self._opening_tree_increase_button is not None:
+            self._opening_tree_increase_button.setEnabled(can_increase)
+
+    def _adjust_endgame_tree_height(self, delta: int) -> None:
+        """Adjust the endgame type tree height by delta, clamped to configured min/max."""
+        if not self._endgame_tree_widget:
+            return
+        if self._endgame_tree_height_step <= 0:
+            return
+        new_height = self._endgame_tree_current_height + int(delta)
+        if self._endgame_tree_min_height > 0:
+            new_height = max(self._endgame_tree_min_height, new_height)
+        if self._endgame_tree_max_height > 0:
+            new_height = min(self._endgame_tree_max_height, new_height)
+        if new_height == self._endgame_tree_current_height:
+            return
+        self._endgame_tree_current_height = new_height
+        self._endgame_tree_widget.setFixedHeight(new_height)
+        self._update_endgame_tree_height_buttons()
+
+    def _update_endgame_tree_height_buttons(self) -> None:
+        """Enable/disable endgame tree height buttons when min/max are reached."""
+        if not self._endgame_tree_widget:
+            return
+        can_decrease = (
+            self._endgame_tree_min_height > 0
+            and self._endgame_tree_current_height > self._endgame_tree_min_height
+        )
+        can_increase = (
+            self._endgame_tree_max_height > 0
+            and self._endgame_tree_current_height < self._endgame_tree_max_height
+        )
+        if self._endgame_tree_decrease_button is not None:
+            self._endgame_tree_decrease_button.setEnabled(can_decrease)
+        if self._endgame_tree_increase_button is not None:
+            self._endgame_tree_increase_button.setEnabled(can_increase)
     
     def _add_stat_row(self, grid: QGridLayout, row: int, label_text: str, value_text: str,
                      label_font: QFont, value_font: QFont, text_color: QColor) -> None:
@@ -3056,7 +3939,7 @@ class DetailPlayerStatsView(QWidget):
                 continue
     
     def _update_openings_visibility(self) -> None:
-        """Update openings text based on available width - switch to ECO-only when narrow."""
+        """Update openings rows based on available width (show/hide opening names)."""
         if not self._openings_widget or not hasattr(self, 'scroll_area'):
             return
         
@@ -3077,72 +3960,114 @@ class DetailPlayerStatsView(QWidget):
         if available_width == 0:
             return
         
-        # Determine if we should show full content or compact
-        # With line breaks in full text, we can use a slightly lower threshold
-        should_show_full = available_width >= self.openings_collapse_threshold
+        # Determine whether to show full names or elided (shortened) names
+        show_full_names = available_width >= self.openings_collapse_threshold
+
+        # Update opening tree header hint and columns based on width (when tree is present)
+        if self._opening_tree_widget is not None:
+            try:
+                header_item = self._opening_tree_widget.headerItem()
+                if header_item is not None:
+                    if show_full_names:
+                        header_item.setText(0, self._opening_tree_header_with_hint)
+                    else:
+                        header_item.setText(0, self._opening_tree_header_compact)
+
+                # Simple, threshold-driven column visibility:
+                # When narrow, keep: 0=Move/Opening, 1=Total, 5=Phase Acc.
+                # Hide: 2=White, 3=Black, 4=Game Acc.
+                col_count = self._opening_tree_widget.columnCount()
+                if show_full_names:
+                    # Show all columns when there is enough width.
+                    for col in range(col_count):
+                        self._opening_tree_widget.setColumnHidden(col, False)
+                else:
+                    # Narrow view: hide less important numeric columns.
+                    for col in range(col_count):
+                        if col in (2, 3, 4):
+                            self._opening_tree_widget.setColumnHidden(col, True)
+                        else:
+                            self._opening_tree_widget.setColumnHidden(col, False)
+            except RuntimeError:
+                # Tree widget may have been deleted
+                self._opening_tree_widget = None
+
+        # Update endgame tree header hint and columns based on width (when tree is present)
+        if self._endgame_tree_widget is not None:
+            try:
+                header_item = self._endgame_tree_widget.headerItem()
+                if header_item is not None:
+                    if show_full_names:
+                        header_item.setText(0, self._endgame_tree_header_with_hint)
+                    else:
+                        header_item.setText(0, self._endgame_tree_header_compact)
+
+                # Same behavior as opening tree:
+                # Keep: 0=Endgame type, 1=Total, 5=Phase Acc.
+                # Hide: 2=White, 3=Black, 4=Game Acc.
+                col_count = self._endgame_tree_widget.columnCount()
+                if show_full_names:
+                    for col in range(col_count):
+                        self._endgame_tree_widget.setColumnHidden(col, False)
+                else:
+                    for col in range(col_count):
+                        if col in (2, 3, 4):
+                            self._endgame_tree_widget.setColumnHidden(col, True)
+                        else:
+                            self._endgame_tree_widget.setColumnHidden(col, False)
+            except RuntimeError:
+                self._endgame_tree_widget = None
         
-        # Update each openings item
+        # Update each openings row: truncate or restore the middle (name) column
         for item_data in self._openings_items:
-            value_label = item_data.get('value')
-            opacity_effect = item_data.get('opacity_effect')
-            full_text = item_data.get('full_text', '')
-            eco_only_text = item_data.get('eco_only_text', '')
-            
-            if not value_label:
+            name_label: Optional[QLabel] = item_data.get("name_label")
+            full_name: str = item_data.get("full_name", "")
+            if not name_label:
                 continue
-            
-            # Update text and width constraints
-            if should_show_full:
-                # Show full text with opening names (now with line breaks for better wrapping)
-                value_label.setText(full_text)
-                # Calculate reasonable max width based on available space
-                # Get width calculation values from config
-                panel_config = self.config.get('ui', {}).get('panels', {}).get('detail', {})
-                player_stats_config = panel_config.get('player_stats', {})
-                openings_config = player_stats_config.get('openings', {})
-                label_column_width = openings_config.get('label_column_width', 120)
-                margins_width = openings_config.get('margins_width', 40)
-                min_value_width = openings_config.get('min_value_width', 150)
-                max_value_width = max(min_value_width, available_width - label_column_width - margins_width)
-                value_label.setMaximumWidth(max_value_width)
-                if opacity_effect:
-                    # Animate opacity to 1.0 (fully visible)
-                    opacity_anim = QPropertyAnimation(opacity_effect, b"opacity")
-                    opacity_anim.setDuration(self.animation_duration)
-                    opacity_anim.setStartValue(opacity_effect.opacity())
-                    opacity_anim.setEndValue(1.0)
-                    opacity_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-                    opacity_anim.start()
+            if not full_name:
+                continue
+
+            if show_full_names:
+                # Restore full name
+                name_label.setText(full_name)
             else:
-                # Show ECO-only text (single line, more compact)
-                value_label.setText(eco_only_text if eco_only_text else full_text)
-                # Set maximum width to prevent overflow
-                # Get width calculation values from config
+                # Elide name text based on available width so ECO and metrics stay visible
                 panel_config = self.config.get('ui', {}).get('panels', {}).get('detail', {})
                 player_stats_config = panel_config.get('player_stats', {})
                 openings_config = player_stats_config.get('openings', {})
                 label_column_width = openings_config.get('label_column_width', 120)
                 margins_width = openings_config.get('margins_width', 40)
-                min_eco_width = openings_config.get('min_eco_width', 100)
-                estimated_available = max(min_eco_width, available_width - label_column_width - margins_width)
-                value_label.setMaximumWidth(estimated_available)
-                if opacity_effect:
-                    # Keep opacity at 1.0 for ECO-only text
-                    opacity_anim = QPropertyAnimation(opacity_effect, b"opacity")
-                    opacity_anim.setDuration(self.animation_duration)
-                    opacity_anim.setStartValue(opacity_effect.opacity())
-                    opacity_anim.setEndValue(1.0)
-                    opacity_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-                    opacity_anim.start()
+                min_name_width = openings_config.get('min_value_width', 150)
+                # Reserve some space for ECO and numeric columns (~140px as heuristic)
+                reserved_for_other = label_column_width + margins_width + 140
+                max_name_width = max(min_name_width, available_width - reserved_for_other)
+
+                metrics = QFontMetrics(name_label.font())
+                elided = metrics.elidedText(full_name, Qt.TextElideMode.ElideRight, max_name_width)
+                name_label.setText(elided)
     
+    def _on_resize_debounce_timeout(self) -> None:
+        """Run all visibility updates once after resize has settled (avoids stack overflow from rapid resizes)."""
+        if self._updating_visibility:
+            return
+        self._updating_visibility = True
+        try:
+            self._update_move_classification_visibility()
+            self._update_top_games_visibility()
+            self._update_error_patterns_visibility()
+            self._update_openings_visibility()
+        finally:
+            self._updating_visibility = False
+
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
         """Event filter to monitor width changes for responsive layout."""
         if obj == self.scroll_area and event.type() == QEvent.Type.Resize:
-            # Defer update until after layout has been processed
-            QTimer.singleShot(0, self._update_move_classification_visibility)
-            QTimer.singleShot(0, self._update_top_games_visibility)
-            QTimer.singleShot(0, self._update_error_patterns_visibility)
-            QTimer.singleShot(0, self._update_openings_visibility)
+            # Skip scheduling while building content to avoid deep stack during live updates
+            if getattr(self, '_building_content', False):
+                return super().eventFilter(obj, event)
+            # Debounce: one coalesced update after resizes settle (avoids 0xc00000fd during bulk analysis)
+            self._resize_debounce_timer.stop()
+            self._resize_debounce_timer.start(self._resize_debounce_ms)
         return super().eventFilter(obj, event)
     
     def contextMenuEvent(self, event: QContextMenuEvent) -> None:
@@ -3156,6 +4081,8 @@ class DetailPlayerStatsView(QWidget):
         
         # Find which section was clicked by checking widget geometries
         section_name = None
+        click_in_opening_tree = False
+        click_in_endgame_tree = False
         
         try:
             if hasattr(self, 'content_widget') and self.content_widget:
@@ -3177,6 +4104,19 @@ class DetailPlayerStatsView(QWidget):
                             # Check if click is within this widget's bounds
                             if widget_global_rect.contains(global_pos):
                                 section_name = section
+                                # Additionally track if click is inside the opening tree widget
+                                if section == "Opening tree" and self._opening_tree_widget is not None:
+                                    click_in_opening_tree = True
+                                # Track if click is inside the endgame type tree widget
+                                if section == "Endgame tree" and self._endgame_tree_widget is not None:
+                                    try:
+                                        tree_global_pos = self._endgame_tree_widget.mapToGlobal(QPoint(0, 0))
+                                        tree_global_rect = self._endgame_tree_widget.geometry()
+                                        tree_global_rect.moveTopLeft(tree_global_pos)
+                                        if tree_global_rect.contains(global_pos):
+                                            click_in_endgame_tree = True
+                                    except (RuntimeError, AttributeError, TypeError):
+                                        click_in_endgame_tree = False
                                 break
         except (RuntimeError, AttributeError, TypeError):
             # If detection fails, just show full stats option
@@ -3203,6 +4143,21 @@ class DetailPlayerStatsView(QWidget):
         
         copy_full_action = menu.addAction("Copy stats to clipboard")
         copy_full_action.triggered.connect(self._copy_full_stats_to_clipboard)
+
+        # When right-clicking inside the opening tree, offer expand/collapse actions
+        if click_in_opening_tree and self._opening_tree_widget is not None:
+            menu.addSeparator()
+            expand_all_action = menu.addAction("Expand all")
+            collapse_all_action = menu.addAction("Collapse all")
+            expand_all_action.triggered.connect(lambda checked=False: self._opening_tree_widget.expandAll())
+            collapse_all_action.triggered.connect(lambda checked=False: self._opening_tree_widget.collapseAll())
+        # When right-clicking inside the endgame type tree, offer expand/collapse actions
+        if click_in_endgame_tree and self._endgame_tree_widget is not None:
+            menu.addSeparator()
+            expand_all_action = menu.addAction("Expand all")
+            collapse_all_action = menu.addAction("Collapse all")
+            expand_all_action.triggered.connect(lambda checked=False: self._endgame_tree_widget.expandAll())
+            collapse_all_action.triggered.connect(lambda checked=False: self._endgame_tree_widget.collapseAll())
         
         # Show menu
         menu.exec(event.globalPos())
@@ -3234,13 +4189,24 @@ class DetailPlayerStatsView(QWidget):
         from app.utils.player_stats_text_formatter import PlayerStatsTextFormatter
         current_player = self._stats_controller.get_current_player() if self._stats_controller else None
         top_games_summary = self._get_top_games_summary_for_copy() if section_name == "Top Games" else None
-        text = PlayerStatsTextFormatter.format_section(
-            self.current_stats,
-            self.current_patterns,
-            section_name,
-            current_player or "Player",
-            top_games_summary=top_games_summary,
-        )
+
+        # Special handling for Opening tree: build summary from controller tree data
+        if section_name == "Opening tree":
+            opening_tree_summary_lines = self._build_opening_tree_summary_lines()
+            if opening_tree_summary_lines:
+                title = "Opening tree (first 2 moves)"
+                header = [title, "=" * len(title), ""]
+                text = "\n".join(header + opening_tree_summary_lines)
+            else:
+                text = "\n".join([section_name, "=" * len(section_name), ""])
+        else:
+            text = PlayerStatsTextFormatter.format_section(
+                self.current_stats,
+                self.current_patterns,
+                section_name,
+                current_player or "Player",
+                top_games_summary=top_games_summary,
+            )
         
         if text:
             clipboard = QApplication.clipboard()
@@ -3248,6 +4214,126 @@ class DetailPlayerStatsView(QWidget):
             
             if self._stats_controller:
                 self._stats_controller.set_status(f"Copied '{section_name}' section to clipboard")
+    
+    def _build_opening_tree_summary_lines(self) -> List[str]:
+        """Build compact text summary lines for the opening tree (first two plies)."""
+        lines: List[str] = []
+        if not self._stats_controller:
+            return lines
+        try:
+            # Reuse the same config-driven depth and min_games as the UI tree
+            ui_config = self.config.get("ui", {})
+            panel_config = ui_config.get("panels", {}).get("detail", {})
+            player_stats_config = panel_config.get("player_stats", {})
+            tree_config = player_stats_config.get("opening_tree", {})
+            max_depth = int(tree_config.get("max_depth", 12))
+            min_games = int(tree_config.get("min_games", 1))
+            opening_tree = self._stats_controller.get_opening_tree(
+                max_depth=max_depth, min_games=min_games
+            )
+            # We only care about the first 2 plies (root moves + replies)
+            root_children = opening_tree.get("children", {}) or {}
+            if not root_children:
+                return lines
+            # Sort root moves by total games descending
+            sorted_roots = sorted(
+                root_children.items(),
+                key=lambda kv: kv[1].get("games", 0),
+                reverse=True,
+            )
+            for san_root, root_node in sorted_roots:
+                total_games = int(root_node.get("games", 0) or 0)
+                if total_games <= 0:
+                    continue
+                white_games = int(root_node.get("white_games", 0) or 0)
+                black_games = int(root_node.get("black_games", 0) or 0)
+                game_acc_sum = float(root_node.get("game_accuracy_sum", 0.0) or 0.0)
+                game_acc_count = int(root_node.get("game_accuracy_count", 0) or 0)
+                phase_acc_sum = float(root_node.get("opening_accuracy_sum", 0.0) or 0.0)
+                phase_acc_count = int(root_node.get("opening_accuracy_count", 0) or 0)
+                game_acc = game_acc_sum / float(game_acc_count) if game_acc_count > 0 else None
+                phase_acc = phase_acc_sum / float(phase_acc_count) if phase_acc_count > 0 else None
+
+                # Build label with optional ECO / opening name
+                eco = root_node.get("eco")
+                opening_name = root_node.get("opening_name")
+                games_suffix = "" if total_games == 1 else "s"
+                base_label = (
+                    f"1. {san_root} — {total_games} game{games_suffix} "
+                    f"({white_games} as White, {black_games} as Black)"
+                )
+                if opening_name and eco:
+                    root_label = f"{base_label}, {opening_name} ({eco})"
+                elif opening_name:
+                    root_label = f"{base_label}, {opening_name}"
+                else:
+                    root_label = base_label
+
+                if game_acc is not None and phase_acc is not None:
+                    root_label += f", Game Acc {game_acc:.1f}%, Phase Acc {phase_acc:.1f}%"
+                lines.append(root_label)
+
+                # Child replies (second ply)
+                child_nodes = root_node.get("children", {}) or {}
+                if not child_nodes:
+                    continue
+                # Sort replies by games descending and limit to a few
+                sorted_replies = sorted(
+                    child_nodes.items(),
+                    key=lambda kv: kv[1].get("games", 0),
+                    reverse=True,
+                )
+                max_replies = 3
+                for idx, (san_reply, reply_node) in enumerate(sorted_replies):
+                    if idx >= max_replies:
+                        break
+                    reply_games = int(reply_node.get("games", 0) or 0)
+                    if reply_games <= 0:
+                        continue
+                    reply_game_acc_sum = float(reply_node.get("game_accuracy_sum", 0.0) or 0.0)
+                    reply_game_acc_count = int(reply_node.get("game_accuracy_count", 0) or 0)
+                    reply_phase_acc_sum = float(reply_node.get("opening_accuracy_sum", 0.0) or 0.0)
+                    reply_phase_acc_count = int(reply_node.get("opening_accuracy_count", 0) or 0)
+                    reply_game_acc = (
+                        reply_game_acc_sum / float(reply_game_acc_count)
+                        if reply_game_acc_count > 0
+                        else None
+                    )
+                    reply_phase_acc = (
+                        reply_phase_acc_sum / float(reply_phase_acc_count)
+                        if reply_phase_acc_count > 0
+                        else None
+                    )
+                    reply_eco = reply_node.get("eco")
+                    reply_name = reply_node.get("opening_name")
+                    games_suffix_reply = "" if reply_games == 1 else "s"
+                    if reply_name and reply_eco:
+                        reply_label = (
+                            f"  ... {san_reply} — {reply_games} game{games_suffix_reply} — "
+                            f"{reply_name} ({reply_eco})"
+                        )
+                    elif reply_name:
+                        reply_label = (
+                            f"  ... {san_reply} — {reply_games} game{games_suffix_reply} — "
+                            f"{reply_name}"
+                        )
+                    elif reply_eco:
+                        reply_label = (
+                            f"  ... {san_reply} — {reply_games} game{games_suffix_reply} — "
+                            f"{reply_eco}"
+                        )
+                    else:
+                        reply_label = (
+                            f"  ... {san_reply} — {reply_games} game{games_suffix_reply}"
+                        )
+                    if reply_game_acc is not None and reply_phase_acc is not None:
+                        reply_label += (
+                            f", Game Acc {reply_game_acc:.1f}%, Phase Acc {reply_phase_acc:.1f}%"
+                        )
+                    lines.append(reply_label)
+        except Exception:
+            lines = []
+        return lines
     
     def _copy_full_stats_to_clipboard(self) -> None:
         """Copy the full stats to clipboard."""
@@ -3257,11 +4343,15 @@ class DetailPlayerStatsView(QWidget):
         from app.utils.player_stats_text_formatter import PlayerStatsTextFormatter
         current_player = self._stats_controller.get_current_player() if self._stats_controller else None
         top_games_summary = self._get_top_games_summary_for_copy()
+        # Build a compact opening tree summary (first two plies) for text export
+        opening_tree_summary_lines: List[str] = self._build_opening_tree_summary_lines()
+
         text = PlayerStatsTextFormatter.format_full_stats(
             self.current_stats,
             self.current_patterns,
             current_player or "Player",
             top_games_summary=top_games_summary,
+            opening_tree_summary_lines=opening_tree_summary_lines if opening_tree_summary_lines else None,
         )
         
         if text:

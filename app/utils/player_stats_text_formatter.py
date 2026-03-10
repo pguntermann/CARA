@@ -11,6 +11,13 @@ class PlayerStatsTextFormatter:
     """Formatter for converting player statistics to text format."""
 
     @staticmethod
+    def _add_section_header(lines: List[str], title: str) -> None:
+        """Append a standardized section header (title + '=' underline + blank line)."""
+        lines.append(title)
+        lines.append("=" * len(title))
+        lines.append("")
+
+    @staticmethod
     def _format_top_games(
         best_count: int,
         best_min_acc: Optional[float],
@@ -41,6 +48,7 @@ class PlayerStatsTextFormatter:
         player_name: str,
         *,
         top_games_summary: Optional[Tuple[int, Optional[float], Optional[float], int, Optional[float], Optional[float]]] = None,
+        opening_tree_summary_lines: Optional[List[str]] = None,
     ) -> str:
         """Format the full player statistics as text.
         
@@ -54,9 +62,7 @@ class PlayerStatsTextFormatter:
             Formatted text string for the full stats.
         """
         lines = []
-        lines.append(f"Player Statistics: {player_name}")
-        lines.append("=" * (len(f"Player Statistics: {player_name}")))
-        lines.append("")
+        PlayerStatsTextFormatter._add_section_header(lines, f"Player Statistics: {player_name}")
         
         # Add all sections
         lines.extend(PlayerStatsTextFormatter._format_overview(stats))
@@ -65,6 +71,11 @@ class PlayerStatsTextFormatter:
         if dist_lines:
             lines.extend(dist_lines)
             lines.append("")
+        # Compact summary of accuracy over game duration (line chart)
+        progress_lines = PlayerStatsTextFormatter._format_accuracy_over_progress(stats)
+        if progress_lines:
+            lines.extend(progress_lines)
+            lines.append("")
         lines.extend(PlayerStatsTextFormatter._format_move_accuracy(stats))
         lines.append("")
         lines.extend(PlayerStatsTextFormatter._format_phase_performance(stats))
@@ -72,6 +83,20 @@ class PlayerStatsTextFormatter:
         
         if stats.top_openings or stats.worst_accuracy_openings or stats.best_accuracy_openings:
             lines.extend(PlayerStatsTextFormatter._format_openings(stats))
+            lines.append("")
+        
+        # Optional opening tree summary (passed in from view/controller)
+        if opening_tree_summary_lines:
+            lines.append("Opening tree (first 2 moves)")
+            lines.append("----------------------------")
+            lines.append("")
+            lines.extend(opening_tree_summary_lines)
+            lines.append("")
+        
+        # Endgame tree summary (high-level, non-redundant)
+        endgame_tree_lines = PlayerStatsTextFormatter._format_endgame_tree(stats)
+        if endgame_tree_lines:
+            lines.extend(endgame_tree_lines)
             lines.append("")
         
         if top_games_summary is not None:
@@ -104,33 +129,40 @@ class PlayerStatsTextFormatter:
         Returns:
             Formatted text string for the section.
         """
-        lines = []
-        lines.append(section_name)
-        lines.append("=" * len(section_name))
+        lines: List[str] = []
+        PlayerStatsTextFormatter._add_section_header(lines, section_name)
         
         if section_name == "Overview":
             section_lines = PlayerStatsTextFormatter._format_overview(stats)
-            lines.extend(section_lines[2:])  # Skip "Overview" and "-------"
+            # Skip the duplicated header (title + underline + blank line)
+            lines.extend(section_lines[3:])
         elif section_name == "Accuracy Distribution":
             section_lines = PlayerStatsTextFormatter._format_accuracy_distribution(stats)
             if section_lines:
-                lines.extend(section_lines[2:])
+                lines.extend(section_lines[3:])
+        elif section_name == "Avg. Accuracy over game duration":
+            section_lines = PlayerStatsTextFormatter._format_accuracy_over_progress(stats)
+            if section_lines:
+                lines.extend(section_lines[3:])
         elif section_name == "Move Accuracy":
             section_lines = PlayerStatsTextFormatter._format_move_accuracy(stats)
-            lines.extend(section_lines[2:])
+            lines.extend(section_lines[3:])
         elif section_name == "Performance by Phase":
             section_lines = PlayerStatsTextFormatter._format_phase_performance(stats)
-            lines.extend(section_lines[2:])
+            lines.extend(section_lines[3:])
         elif section_name == "Openings":
             section_lines = PlayerStatsTextFormatter._format_openings(stats)
-            lines.extend(section_lines[2:])
+            lines.extend(section_lines[3:])
+        elif section_name == "Endgame tree":
+            section_lines = PlayerStatsTextFormatter._format_endgame_tree(stats)
+            lines.extend(section_lines[3:])
         elif section_name == "Top Games":
             if top_games_summary is not None:
                 section_lines = PlayerStatsTextFormatter._format_top_games(*top_games_summary)
-                lines.extend(section_lines[2:])  # Skip "Top Games" and "---------"
+                lines.extend(section_lines[3:])
         elif section_name == "Error Patterns":
             section_lines = PlayerStatsTextFormatter._format_error_patterns(patterns)
-            lines.extend(section_lines[2:])
+            lines.extend(section_lines[3:])
         
         return "\n".join(lines)
     
@@ -144,10 +176,8 @@ class PlayerStatsTextFormatter:
         Returns:
             List of formatted lines.
         """
-        lines = []
-        lines.append("Overview")
-        lines.append("-------")
-        lines.append("")
+        lines: List[str] = []
+        PlayerStatsTextFormatter._add_section_header(lines, "Overview")
         
         lines.append(f"Total Games: {stats.total_games}")
         lines.append(f"Win Rate: {stats.win_rate:.1f}%")
@@ -216,9 +246,7 @@ class PlayerStatsTextFormatter:
             return []
 
         lines: List[str] = []
-        lines.append("Accuracy Distribution")
-        lines.append("---------------------")
-        lines.append("")
+        PlayerStatsTextFormatter._add_section_header(lines, "Accuracy Distribution")
 
         # Same non-linear binning as chart: t = (acc/100)^k over data range, bin count scales with range
         clamped = [max(0.0, min(100.0, v)) for v in values]
@@ -265,6 +293,54 @@ class PlayerStatsTextFormatter:
         return lines
     
     @staticmethod
+    def _format_accuracy_over_progress(stats: "AggregatedPlayerStats") -> List[str]:
+        """Format a compact summary of accuracy vs game progress (line chart data).
+
+        Emits a single line of 3–5 representative accuracy values from early to late game.
+        """
+        data = getattr(stats, "accuracy_by_progress", None) or []
+        if not data:
+            return []
+
+        # Target progress buckets (percent); we'll pick closest available samples.
+        targets = [5.0, 25.0, 50.0, 75.0, 100.0]
+        sampled: List[Optional[float]] = []
+
+        for target in targets:
+            # Find closest bucket by progress percentage
+            closest = min(data, key=lambda p: abs(float(p[0]) - target))
+            acc = closest[1]
+            sampled.append(float(acc) if acc is not None else None)
+
+        # If all samples are None, skip
+        if all(v is None for v in sampled):
+            return []
+
+        lines: List[str] = []
+        PlayerStatsTextFormatter._add_section_header(lines, "Avg. Accuracy over game duration")
+        # Compact table: fixed-width label column then tab-separated buckets so columns align.
+        label_width = 17  # matches "Opponents (avg):"
+        header_cells = [f"{int(t):02d}%" for t in targets]
+        value_cells = [
+            (f"{v:.1f}%" if v is not None else "n/a")
+            for v in sampled
+        ]
+        # Header row: extra tab after each progress % so they align above the value columns
+        lines.append("".ljust(label_width) + "\t" + "\t\t".join(header_cells))
+        lines.append("Player:".ljust(label_width) + "\t" + "\t".join(value_cells))
+        opponent_data = getattr(stats, "opponent_accuracy_by_progress", None) or []
+        if opponent_data:
+            opp_sampled: List[Optional[float]] = []
+            for target in targets:
+                closest = min(opponent_data, key=lambda p: abs(float(p[0]) - target))
+                acc = closest[1]
+                opp_sampled.append(float(acc) if acc is not None else None)
+            if not all(v is None for v in opp_sampled):
+                opp_cells = [(f"{v:.1f}%" if v is not None else "n/a") for v in opp_sampled]
+                lines.append("Opponents (avg):".ljust(label_width) + "\t" + "\t".join(opp_cells))
+        return lines
+    
+    @staticmethod
     def _format_move_accuracy(stats: "AggregatedPlayerStats") -> List[str]:
         """Format move accuracy statistics.
         
@@ -274,10 +350,8 @@ class PlayerStatsTextFormatter:
         Returns:
             List of formatted lines.
         """
-        lines = []
-        lines.append("Move Accuracy")
-        lines.append("-------------")
-        lines.append("")
+        lines: List[str] = []
+        PlayerStatsTextFormatter._add_section_header(lines, "Move Accuracy")
         
         player_stats = stats.player_stats
         total_moves = player_stats.total_moves if player_stats.total_moves else 0
@@ -322,10 +396,8 @@ class PlayerStatsTextFormatter:
         Returns:
             List of formatted lines.
         """
-        lines = []
-        lines.append("Performance by Phase")
-        lines.append("-------------------")
-        lines.append("")
+        lines: List[str] = []
+        PlayerStatsTextFormatter._add_section_header(lines, "Performance by Phase")
         
         lines.append("Phase          Avg CPL")
         lines.append("Opening        {:.1f}".format(stats.opening_stats.average_cpl))
@@ -344,10 +416,8 @@ class PlayerStatsTextFormatter:
         Returns:
             List of formatted lines.
         """
-        lines = []
-        lines.append("Openings")
-        lines.append("--------")
-        lines.append("")
+        lines: List[str] = []
+        PlayerStatsTextFormatter._add_section_header(lines, "Openings")
         
         # Most Played Openings
         if stats.top_openings:
@@ -387,6 +457,77 @@ class PlayerStatsTextFormatter:
         return lines
     
     @staticmethod
+    def _format_endgame_tree(stats: "AggregatedPlayerStats") -> List[str]:
+        """Format a high-level summary of endgame performance by type/group.
+
+        Uses AggregatedPlayerStats.accuracy_by_endgame_type_grouped and emits only a few
+        top groups and types to avoid excessive verbosity.
+        """
+        grouped = getattr(stats, "accuracy_by_endgame_type_grouped", None) or []
+        if not grouped:
+            return []
+
+        lines: List[str] = []
+        PlayerStatsTextFormatter._add_section_header(lines, "Endgame tree (by type)")
+
+        # Show at most the top 3 groups by game count (data is already sorted by count).
+        max_groups = 3
+        max_types_per_group = 3
+
+        for idx, group in enumerate(grouped):
+            if idx >= max_groups:
+                break
+            (
+                group_key,
+                group_label,
+                group_endgame_accuracy,
+                group_game_accuracy,
+                group_count,
+                group_white,
+                group_black,
+                types_list,
+            ) = group
+
+            if group_count <= 0:
+                continue
+
+            lines.append(
+                f"{group_label} — {group_count} game"
+                f"{'' if group_count == 1 else 's'} "
+                f"({group_white} as White, {group_black} as Black), "
+                f"Game Acc {group_game_accuracy:.1f}%, Phase Acc {group_endgame_accuracy:.1f}%"
+            )
+
+            # List top types within this group (by count, already sorted)
+            for t_idx, t in enumerate(types_list):
+                if t_idx >= max_types_per_group:
+                    break
+                (
+                    raw_type,
+                    type_label,
+                    type_endgame_accuracy,
+                    type_game_accuracy,
+                    type_count,
+                    type_white,
+                    type_black,
+                ) = t
+                if type_count <= 0:
+                    continue
+                lines.append(
+                    f"  {type_label} — {type_count} game"
+                    f"{'' if type_count == 1 else 's'}, "
+                    f"Game Acc {type_game_accuracy:.1f}%, Phase Acc {type_endgame_accuracy:.1f}%"
+                )
+
+            lines.append("")
+
+        # Remove trailing blank line if present
+        if lines and not lines[-1].strip():
+            lines.pop()
+
+        return lines
+    
+    @staticmethod
     def _format_error_patterns(patterns: List["ErrorPattern"]) -> List[str]:
         """Format error patterns.
         
@@ -396,14 +537,22 @@ class PlayerStatsTextFormatter:
         Returns:
             List of formatted lines.
         """
-        lines = []
-        lines.append("Error Patterns")
-        lines.append("--------------")
-        lines.append("")
+        lines: List[str] = []
+        PlayerStatsTextFormatter._add_section_header(lines, "Error Patterns")
         
         for pattern in patterns:
             lines.append(f"{pattern.description}")
-            lines.append(f"  Frequency: {pattern.frequency} ({pattern.percentage:.1f}%)")
+            ref_plies = getattr(pattern, "related_ref_plies", None)
+            if ref_plies:
+                num_occurrences = len(ref_plies)
+                num_games = len(pattern.related_games)
+                lines.append(
+                    f"  Frequency: {num_occurrences} occurrence"
+                    f"{'s' if num_occurrences != 1 else ''} in {num_games} game"
+                    f"{'s' if num_games != 1 else ''} ({pattern.percentage:.1f}%)"
+                )
+            else:
+                lines.append(f"  Frequency: {pattern.frequency} ({pattern.percentage:.1f}%)")
             lines.append("")
         
         return lines

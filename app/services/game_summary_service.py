@@ -89,7 +89,8 @@ class GameSummary:
     evaluation_data: List[Tuple[int, float]]  # (move_number, evaluation) pairs
     opening_end: int  # Move number where opening phase ends
     middlegame_end: int  # Move number where middlegame phase ends
-    endgame_type: Optional[str]  # Endgame type: "Pawn-Endgame", "Minor Piece-Endgame", "Rook-Endgame", "Queen-Endgame", "Endgame", or None
+    endgame_type: Optional[str]  # Specific endgame type from classifier (e.g. "Pawn", "Rook", "Queen + Two Minor Piece")
+    endgame_type_group: Optional[str]  # Group for UI aggregation: "Pawn", "Rook", "Queen", "Minor Piece", "Heavy Piece", "Other", or None
     highlights: List[GameHighlight]  # Game highlights (key moments and facts)
 
 
@@ -441,6 +442,7 @@ class GameSummaryService:
         )
         highlights = highlight_detector.detect_highlights(moves, total_moves, opening_end, middlegame_end)
         
+        endgame_type_group = self.get_endgame_type_group(endgame_type) if endgame_type else None
         summary = GameSummary(
             white_stats=white_stats,
             black_stats=black_stats,
@@ -458,6 +460,7 @@ class GameSummaryService:
             opening_end=opening_end,
             middlegame_end=middlegame_end,
             endgame_type=endgame_type,
+            endgame_type_group=endgame_type_group,
             highlights=highlights
         )
         
@@ -968,6 +971,57 @@ class GameSummaryService:
         
         # Not an endgame
         return None
+    
+    # Endgame type -> group key for aggregation/UI (group rows, expand to show types).
+    # When adding a new type in _classify_endgame_type, add it here under the right group.
+    _ENDGAME_TYPE_GROUP: Dict[str, str] = {
+        "Pawn": "Pawn",
+        "Minor Piece": "Minor Piece",
+        "Two Minor Piece": "Minor Piece",
+        "Rook": "Rook",
+        "Double Rook": "Rook",
+        "Rook + Minor Piece": "Rook",
+        "Rook + Two Minor Piece": "Rook",
+        "Rook vs Rook (Unequal Minors)": "Rook",
+        "Rook vs Minor Piece": "Rook",
+        "Queen": "Queen",
+        "Queen + Two Minor Piece": "Queen",
+        "Heavy Piece": "Heavy Piece",
+        "Asymmetric Heavy Piece": "Heavy Piece",
+        "Strong Material Imbalance": "Other",
+        "Transitional": "Other",
+        "Endgame": "Other",
+    }
+
+    def get_endgame_type_group(self, raw_type: str) -> str:
+        """Return the group key for an endgame type (for grouped UI: one row per group, expand for types).
+        
+        Args:
+            raw_type: Value returned by _classify_endgame_type.
+            
+        Returns:
+            Group key (e.g. "Pawn", "Rook", "Queen", "Minor Piece", "Heavy Piece", "Other").
+        """
+        return self._ENDGAME_TYPE_GROUP.get(raw_type, "Other")
+
+    def get_endgame_type_group_display_name(self, group_key: str) -> str:
+        """Return the display label for a group key (e.g. for tree parent row)."""
+        return group_key
+
+    def get_endgame_type_display_name(self, raw_type: str) -> str:
+        """Return the display label for an endgame type for use in UI (e.g. player stats).
+        
+        Centralizes type-to-label mapping so new types added in _classify_endgame_type
+        can be given display names in one place. Callers should use this when showing
+        endgame type in the UI.
+        
+        Args:
+            raw_type: Value returned by _classify_endgame_type (e.g. "Pawn", "Rook", "Queen").
+            
+        Returns:
+            Label to display (currently the raw type as-is; override here for shorter labels).
+        """
+        return raw_type
     
     def _calculate_phase_statistics(self, moves: List[MoveData], total_moves: int, 
                                     is_white: bool, opening_end: int, middlegame_end: int,

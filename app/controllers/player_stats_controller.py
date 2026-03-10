@@ -16,6 +16,7 @@ from app.services.game_summary_service import GameSummaryService, GameSummary
 from app.services.progress_service import ProgressService
 from app.controllers.game_controller import GameController
 from app.services.logging_service import LoggingService
+from app.services.opening_service import OpeningService
 
 
 class PlayerDropdownWorker(QThread):
@@ -314,6 +315,7 @@ class PlayerStatsController(QObject):
         self.player_stats_service = PlayerStatsService(config, game_controller)
         self.error_pattern_service = ErrorPatternService(config, game_controller)
         self.summary_service = GameSummaryService(config)
+        self._opening_service = OpeningService(config)
         
         self.current_stats: Optional[AggregatedPlayerStats] = None
         self.current_patterns: List[ErrorPattern] = []
@@ -612,6 +614,340 @@ class PlayerStatsController(QObject):
             "Blunder", match_startswith=False, max_moves=max_moves, sort_cpl_ascending=False
         )
 
+    def get_opening_tree(
+        self,
+        max_depth: int = 12,
+        min_games: int = 1,
+    ) -> Dict[str, Any]:
+        """Build an opening move tree from analyzed games for the current player.
+
+        The tree differentiates White vs Black games and attaches ECO / opening
+        family information when available.
+
+        Structure:
+            {
+              "games": total_games_used,
+              "white_games": count,
+              "black_games": count,
+              "children": {
+                  "e4": {
+                      "games": n_total,
+                      "white_games": n_white,
+                      "black_games": n_black,
+                      "eco": "C20",
+                      "opening_name": "King's Pawn Game",
+                      "children": { ... }
+                  },
+                  ...
+              }
+            }
+
+        Only sequences that appear in at least min_games games are kept.
+        """
+        from app.services.analysis_data_storage_service import AnalysisDataStorageService
+
+        tree: Dict[str, Any] = {
+            "games": 0,
+            "white_games": 0,
+            "black_games": 0,
+            "children": {},
+        }
+
+        if not self._current_player:
+            return tree
+
+        analyzed_games = getattr(self, "_current_analyzed_games", []) or []
+        summaries = getattr(self, "current_game_summaries", []) or []
+        if not analyzed_games or not summaries or len(analyzed_games) != len(summaries):
+            return tree
+
+        total_games_used = 0
+
+        for game, summary in zip(analyzed_games, summaries):
+            if not getattr(game, "analyzed", False):
+                continue
+            try:
+                moves = AnalysisDataStorageService.load_analysis_data(game)
+            except Exception:
+                moves = None
+            if not moves:
+                continue
+
+            is_white_game = (game.white == self._current_player)
+
+            # Per-game accuracy for this player:
+            # - Overall game accuracy (used for "Game Acc" column)
+            # - Opening-phase accuracy (used for "Opening Acc" column)
+            if is_white_game:
+                player_stats = summary.white_stats
+                phase_stats = summary.white_opening
+            else:
+                player_stats = summary.black_stats
+                phase_stats = summary.black_opening
+
+            game_accuracy = player_stats.accuracy if player_stats and player_stats.accuracy is not None else 0.0
+            opening_phase_accuracy = phase_stats.accuracy if phase_stats and phase_stats.accuracy is not None else 0.0
+
+            node = tree
+            ply_count = 0
+            for move in moves:
+                if ply_count >= max_depth:
+                    break
+
+                # White move
+                if move.white_move:
+                    ply_count += 1
+                    if ply_count > max_depth:
+                        break
+                    san = move.white_move
+                    children = node.setdefault("children", {})
+                    child = children.setdefault(
+                        san,
+                        {
+                            "games": 0,
+                            "white_games": 0,
+                            "black_games": 0,
+                            # Aggregated overall game accuracy for this player in games
+                            # that reached this node.
+                            "game_accuracy_sum": 0.0,
+                            "game_accuracy_count": 0,
+                            # Aggregated opening-phase accuracy for this player in games
+                            # that reached this node.
+                            "opening_accuracy_sum": 0.0,
+                            "opening_accuracy_count": 0,
+                            "children": {},
+                        },
+                    )
+                    child["games"] += 1
+                    if is_white_game:
+                        child["white_games"] += 1
+                    else:
+                        child["black_games"] += 1
+                    child["game_accuracy_sum"] += float(game_accuracy)
+                    child["game_accuracy_count"] += 1
+                    child["opening_accuracy_sum"] += float(opening_phase_accuracy)
+                    child["opening_accuracy_count"] += 1
+
+                    # Attach ECO info (opening family) if available and not already set
+                    fen_after = getattr(move, "fen_white", "") or ""
+                    if fen_after and "eco" not in child:
+                        eco, name = self._opening_service.get_opening_info(fen_after)
+                        if eco or name:
+                            if eco:
+                                child["eco"] = eco
+                            if name:
+                                child["opening_name"] = name
+
+                    node = child
+
+                # Black move
+                if move.black_move and ply_count < max_depth:
+                    ply_count += 1
+                    if ply_count > max_depth:
+                        break
+                    san = move.black_move
+                    children = node.setdefault("children", {})
+                    child = children.setdefault(
+                        san,
+                        {
+                            "games": 0,
+                            "white_games": 0,
+                            "black_games": 0,
+                            "game_accuracy_sum": 0.0,
+                            "game_accuracy_count": 0,
+                            "opening_accuracy_sum": 0.0,
+                            "opening_accuracy_count": 0,
+                            "children": {},
+                        },
+                    )
+                    child["games"] += 1
+                    if is_white_game:
+                        child["white_games"] += 1
+                    else:
+                        child["black_games"] += 1
+                    child["game_accuracy_sum"] += float(game_accuracy)
+                    child["game_accuracy_count"] += 1
+                    child["opening_accuracy_sum"] += float(opening_phase_accuracy)
+                    child["opening_accuracy_count"] += 1
+
+                    fen_after = getattr(move, "fen_black", "") or ""
+                    if fen_after and "eco" not in child:
+                        eco, name = self._opening_service.get_opening_info(fen_after)
+                        if eco or name:
+                            if eco:
+                                child["eco"] = eco
+                            if name:
+                                child["opening_name"] = name
+
+                    node = child
+
+            total_games_used += 1
+            tree["games"] += 1
+            if is_white_game:
+                tree["white_games"] += 1
+            else:
+                tree["black_games"] += 1
+
+        # Prune nodes that are rarely played
+        def prune(node: Dict[str, Any]) -> None:
+            children = node.get("children", {})
+            to_delete = []
+            for san, child in children.items():
+                if child.get("games", 0) < min_games:
+                    to_delete.append(san)
+                else:
+                    prune(child)
+            for san in to_delete:
+                del children[san]
+
+        if min_games > 1:
+            prune(tree)
+
+        return tree
+
+    def get_games_for_opening_path(
+        self,
+        san_path: List[str],
+        max_depth: int = 12,
+    ) -> List[Tuple["GameData", str, int]]:
+        """Return games (with source names and ref_ply) that follow the given SAN path from the start.
+        
+        san_path is a sequence of SAN moves like ["e4", "c5", "Nf3"] corresponding to
+        the path of a node in the opening tree.
+        
+        ref_ply is set to the ply index of the last move in the SAN path so the
+        Search Results tab can jump directly to the defining move of that opening.
+        """
+        from app.services.analysis_data_storage_service import AnalysisDataStorageService
+        
+        matches: List[Tuple["GameData", int]] = []
+        if not san_path or not self._current_player:
+            return []
+        
+        analyzed_games = getattr(self, "_current_analyzed_games", []) or []
+        if not analyzed_games:
+            return []
+        
+        max_plies = min(max_depth, len(san_path))
+        
+        for game in analyzed_games:
+            if not getattr(game, "analyzed", False):
+                continue
+            try:
+                moves = AnalysisDataStorageService.load_analysis_data(game)
+            except Exception:
+                moves = None
+            if not moves:
+                continue
+            
+            path_idx = 0
+            ply_count = 0
+            matched = True
+            
+            for move in moves:
+                if ply_count >= max_plies:
+                    break
+                # White move
+                if move.white_move:
+                    if path_idx >= len(san_path):
+                        break
+                    ply_count += 1
+                    if ply_count > max_plies:
+                        break
+                    if move.white_move != san_path[path_idx]:
+                        matched = False
+                        break
+                    path_idx += 1
+                # Black move
+                if move.black_move and ply_count < max_plies:
+                    if path_idx >= len(san_path):
+                        break
+                    ply_count += 1
+                    if ply_count > max_plies:
+                        break
+                    if move.black_move != san_path[path_idx]:
+                        matched = False
+                        break
+                    path_idx += 1
+            
+            if matched and path_idx == len(san_path):
+                # ply_count now points at the last move in san_path
+                ref_ply = int(ply_count) if ply_count > 0 else 0
+                matches.append((game, ref_ply))
+        
+        if not matches:
+            return []
+        
+        # Map games to source display names (database file names)
+        games_only = [g for (g, _) in matches]
+        mapped = self._map_games_to_sources(games_only)  # List[Tuple[GameData, str]]
+        game_to_source: Dict["GameData", str] = {game: source for (game, source) in mapped}
+        
+        results_with_ref: List[Tuple["GameData", str, int]] = []
+        for game, ref_ply in matches:
+            source_name = game_to_source.get(game)
+            if not source_name:
+                continue
+            results_with_ref.append((game, source_name, ref_ply))
+        
+        return results_with_ref
+
+    def get_games_for_endgame_filter(
+        self,
+        raw_type: Optional[str] = None,
+        group_key: Optional[str] = None,
+    ) -> List[Tuple["GameData", str, int]]:
+        """Return games (with source names and ref_ply) that match the given endgame type or group.
+        
+        Exactly one of raw_type or group_key must be set.
+        - raw_type: filter by specific endgame type (e.g. "Rook + Minor Piece").
+        - group_key: filter by endgame group (e.g. "Rook" includes all rook endgame types).
+        
+        ref_ply is set to the ply index corresponding to the middlegame/endgame
+        boundary (`middlegame_end` from GameSummary, converted to ply index) so
+        the Search Results tab can jump directly to the start of the endgame.
+        """
+        matches: List[Tuple["GameData", int]] = []
+        analyzed_games = getattr(self, "_current_analyzed_games", []) or []
+        summaries = getattr(self, "current_game_summaries", []) or []
+        if not analyzed_games or not summaries or len(analyzed_games) != len(summaries):
+            return []
+        if (raw_type is None) == (group_key is None):
+            return []
+        for game, summary in zip(analyzed_games, summaries):
+            if raw_type is not None:
+                if getattr(summary, "endgame_type", None) != raw_type:
+                    continue
+            else:
+                if getattr(summary, "endgame_type_group", None) != group_key:
+                    continue
+            # Convert middlegame_end (full-move number) to a ply index.
+            middlegame_end = getattr(summary, "middlegame_end", 0) or 0
+            if middlegame_end > 0:
+                # Jump to the first full move classified as endgame.
+                # Using ply = middlegame_end * 2 aligns with the endgame
+                # boundary used in GameSummaryService.
+                ref_ply = middlegame_end * 2
+            else:
+                ref_ply = 0
+            matches.append((game, ref_ply))
+        
+        if not matches:
+            return []
+        
+        games_only = [g for (g, _) in matches]
+        mapped = self._map_games_to_sources(games_only)  # List[Tuple[GameData, str]]
+        game_to_source: Dict["GameData", str] = {game: source for (game, source) in mapped}
+        
+        results_with_ref: List[Tuple["GameData", str, int]] = []
+        for game, ref_ply in matches:
+            source_name = game_to_source.get(game)
+            if not source_name:
+                continue
+            results_with_ref.append((game, source_name, ref_ply))
+        
+        return results_with_ref
+
     def get_top_best_games_summary(self, max_best: int) -> Tuple[int, Optional[float], Optional[float]]:
         """Return count and accuracy range for the best-performing games."""
         ranked = self._get_ranked_games_by_cpl()
@@ -705,17 +1041,38 @@ class PlayerStatsController(QObject):
         
         return None
 
-    def get_pattern_games_with_sources(self, pattern: "ErrorPattern") -> List[Tuple["GameData", str]]:
-        """Resolve each pattern game to (game, source_display_name) for opening in a Search Results tab.
+    def get_pattern_games_with_sources(self, pattern: "ErrorPattern") -> List[Tuple["GameData", str, int]]:
+        """Resolve each pattern game to (game, source_display_name, ref_ply) for opening in a Search Results tab.
+
+        When pattern.related_ref_plies is set (e.g. repeated position patterns, brilliant/miss/blunder),
+        returns one entry per (game, ply) so the user can jump directly to that move. ref_ply 0 means no jump.
 
         Args:
-            pattern: ErrorPattern whose related_games to resolve.
+            pattern: ErrorPattern whose related_games (and optionally related_ref_plies) to resolve.
 
         Returns:
-            List of (GameData, source_display_name). Skipped if a game is not found in any database.
+            List of (GameData, source_display_name, ref_ply). Skipped if a game is not found in any database.
         """
-        result: List[Tuple["GameData", str]] = []
-        if not pattern or not pattern.related_games:
+        result: List[Tuple["GameData", str, int]] = []
+        if not pattern:
+            return result
+        # Use (game, ref_ply) pairs when available so search results can open at the specific move
+        if getattr(pattern, "related_ref_plies", None):
+            pairs: List[Tuple["GameData", int]] = pattern.related_ref_plies
+            if not pairs:
+                return result
+            panel_model = self._database_controller.get_panel_model()
+            for game, ref_ply in pairs:
+                found = self.find_game_in_databases(game, use_all_databases=True)
+                if not found:
+                    continue
+                database, _ = found
+                identifier = panel_model.find_database_by_model(database)
+                display_name = "Clipboard" if identifier == "clipboard" else Path(identifier).stem
+                result.append((game, display_name, ref_ply))
+            return result
+        # Fallback: no ref_ply, one row per game
+        if not pattern.related_games:
             return result
         panel_model = self._database_controller.get_panel_model()
         for game in pattern.related_games:
@@ -724,11 +1081,8 @@ class PlayerStatsController(QObject):
                 continue
             database, _ = found
             identifier = panel_model.find_database_by_model(database)
-            if identifier == "clipboard":
-                display_name = "Clipboard"
-            else:
-                display_name = Path(identifier).stem
-            result.append((game, display_name))
+            display_name = "Clipboard" if identifier == "clipboard" else Path(identifier).stem
+            result.append((game, display_name, 0))
         return result
 
     def highlight_rows(self, database: DatabaseModel, row_indices: List[int]) -> None:

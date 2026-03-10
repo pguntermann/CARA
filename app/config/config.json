@@ -223,6 +223,51 @@
           4
         ]
       },
+      "tree_view": {
+        "text_color": [
+          220,
+          220,
+          220
+        ],
+        "header_text_color": [
+          230,
+          230,
+          230
+        ],
+        "font_family": "Helvetica Neue",
+        "font_size": 11,
+        "header_font_family": "Helvetica Neue",
+        "header_font_size": 11,
+        "background_color": [
+          35,
+          35,
+          40
+        ],
+        "alternate_background_color": [
+          40,
+          40,
+          45
+        ],
+        "grid_color": [
+          60,
+          60,
+          65
+        ],
+        "selection_background_color": [
+          70,
+          90,
+          130
+        ],
+        "selection_text_color": [
+          240,
+          240,
+          240
+        ],
+        "row_height": 20,
+        "header_min_height": 20,
+        "show_grid": false,
+        "show_focus_rect": true
+      },
       "tooltip": {
         "background_color": [
           45,
@@ -1364,7 +1409,11 @@
               "winning_eval_threshold": 200.0,
               "losing_eval_threshold": -200.0,
               "defensive_weakness_threshold": 20.0,
-              "inaccuracy_rate_threshold": 25.0
+              "inaccuracy_rate_threshold": 25.0,
+              "repeated_position_min_games_blunder": 2,
+              "repeated_position_min_games_mistake": 2,
+              "repeated_position_min_games_miss": 2,
+              "repeated_position_min_games_inaccuracy": 2
             },
             "item_spacing": 8,
             "item_margins": [
@@ -1439,6 +1488,96 @@
             "bar_border_radius": 3,
             "bar_pen_width": 1,
             "bar_value_spacing": 5
+          },
+          "opening_tree": {
+            "max_depth": 12,
+            "min_games": 1,
+            "initial_expand_depth": 2,
+            "height": 280,
+            "min_height": 120,
+            "max_height": 600,
+            "height_step": 80,
+            "show_root_decorations": true,
+            "alternating_row_colors": true,
+            "column_resize_modes": {
+              "move_opening": "Stretch",
+              "total": "ResizeToContents",
+              "white": "ResizeToContents",
+              "black": "ResizeToContents",
+              "accuracy": "ResizeToContents",
+              "game_accuracy": "ResizeToContents",
+              "opening_accuracy": "ResizeToContents"
+            }
+          },
+          "endgame_tree": {
+            "initial_expand_depth": 0,
+            "height": 240,
+            "min_height": 120,
+            "max_height": 600,
+            "height_step": 80,
+            "show_root_decorations": true,
+            "alternating_row_colors": true,
+            "column_resize_modes": {
+              "endgame_type": "Stretch",
+              "total": "ResizeToContents",
+              "white": "ResizeToContents",
+              "black": "ResizeToContents",
+              "accuracy": "ResizeToContents",
+              "game_accuracy": "ResizeToContents",
+              "endgame_accuracy": "ResizeToContents"
+            }
+          },
+          "accuracy_vs_progress_chart": {
+            "enabled": true,
+            "height": 220,
+            "background_color": [
+              30,
+              30,
+              35
+            ],
+            "grid_color": [
+              60,
+              60,
+              65
+            ],
+            "line_color": [
+              120,
+              190,
+              255
+            ],
+            "opponent_line_color": [
+              200,
+              130,
+              130
+            ],
+            "line_style": "solid",
+            "opponent_line_style": "dashed",
+            "line_width": 2,
+            "font_family": "Helvetica Neue",
+            "font_size": 10,
+            "text_color": [
+              200,
+              200,
+              200
+            ],
+            "axis_color": [
+              150,
+              150,
+              150
+            ],
+            "padding": [
+              40,
+              20,
+              20,
+              40
+            ],
+            "min_grid_spacing": 30,
+            "min_grid_lines": 3,
+            "min_font_size": 8,
+            "font_size_calculation_divisor": 20,
+            "y_axis_label_spacing": 5,
+            "x_axis_label_spacing": 5,
+            "progress_bins": 21
           },
           "responsive": {
             "move_classification_collapse_threshold": 500,
