@@ -4093,13 +4093,24 @@ class DetailPlayerStatsView(QWidget):
         from app.utils.player_stats_text_formatter import PlayerStatsTextFormatter
         current_player = self._stats_controller.get_current_player() if self._stats_controller else None
         top_games_summary = self._get_top_games_summary_for_copy() if section_name == "Top Games" else None
-        text = PlayerStatsTextFormatter.format_section(
-            self.current_stats,
-            self.current_patterns,
-            section_name,
-            current_player or "Player",
-            top_games_summary=top_games_summary,
-        )
+
+        # Special handling for Opening tree: build summary from controller tree data
+        if section_name == "Opening tree":
+            opening_tree_summary_lines = self._build_opening_tree_summary_lines()
+            if opening_tree_summary_lines:
+                title = "Opening tree (first 2 moves)"
+                header = [title, "=" * len(title), ""]
+                text = "\n".join(header + opening_tree_summary_lines)
+            else:
+                text = "\n".join([section_name, "=" * len(section_name), ""])
+        else:
+            text = PlayerStatsTextFormatter.format_section(
+                self.current_stats,
+                self.current_patterns,
+                section_name,
+                current_player or "Player",
+                top_games_summary=top_games_summary,
+            )
         
         if text:
             clipboard = QApplication.clipboard()
@@ -4107,6 +4118,126 @@ class DetailPlayerStatsView(QWidget):
             
             if self._stats_controller:
                 self._stats_controller.set_status(f"Copied '{section_name}' section to clipboard")
+    
+    def _build_opening_tree_summary_lines(self) -> List[str]:
+        """Build compact text summary lines for the opening tree (first two plies)."""
+        lines: List[str] = []
+        if not self._stats_controller:
+            return lines
+        try:
+            # Reuse the same config-driven depth and min_games as the UI tree
+            ui_config = self.config.get("ui", {})
+            panel_config = ui_config.get("panels", {}).get("detail", {})
+            player_stats_config = panel_config.get("player_stats", {})
+            tree_config = player_stats_config.get("opening_tree", {})
+            max_depth = int(tree_config.get("max_depth", 12))
+            min_games = int(tree_config.get("min_games", 1))
+            opening_tree = self._stats_controller.get_opening_tree(
+                max_depth=max_depth, min_games=min_games
+            )
+            # We only care about the first 2 plies (root moves + replies)
+            root_children = opening_tree.get("children", {}) or {}
+            if not root_children:
+                return lines
+            # Sort root moves by total games descending
+            sorted_roots = sorted(
+                root_children.items(),
+                key=lambda kv: kv[1].get("games", 0),
+                reverse=True,
+            )
+            for san_root, root_node in sorted_roots:
+                total_games = int(root_node.get("games", 0) or 0)
+                if total_games <= 0:
+                    continue
+                white_games = int(root_node.get("white_games", 0) or 0)
+                black_games = int(root_node.get("black_games", 0) or 0)
+                game_acc_sum = float(root_node.get("game_accuracy_sum", 0.0) or 0.0)
+                game_acc_count = int(root_node.get("game_accuracy_count", 0) or 0)
+                phase_acc_sum = float(root_node.get("opening_accuracy_sum", 0.0) or 0.0)
+                phase_acc_count = int(root_node.get("opening_accuracy_count", 0) or 0)
+                game_acc = game_acc_sum / float(game_acc_count) if game_acc_count > 0 else None
+                phase_acc = phase_acc_sum / float(phase_acc_count) if phase_acc_count > 0 else None
+
+                # Build label with optional ECO / opening name
+                eco = root_node.get("eco")
+                opening_name = root_node.get("opening_name")
+                games_suffix = "" if total_games == 1 else "s"
+                base_label = (
+                    f"1. {san_root} — {total_games} game{games_suffix} "
+                    f"({white_games} as White, {black_games} as Black)"
+                )
+                if opening_name and eco:
+                    root_label = f"{base_label}, {opening_name} ({eco})"
+                elif opening_name:
+                    root_label = f"{base_label}, {opening_name}"
+                else:
+                    root_label = base_label
+
+                if game_acc is not None and phase_acc is not None:
+                    root_label += f", Game Acc {game_acc:.1f}%, Phase Acc {phase_acc:.1f}%"
+                lines.append(root_label)
+
+                # Child replies (second ply)
+                child_nodes = root_node.get("children", {}) or {}
+                if not child_nodes:
+                    continue
+                # Sort replies by games descending and limit to a few
+                sorted_replies = sorted(
+                    child_nodes.items(),
+                    key=lambda kv: kv[1].get("games", 0),
+                    reverse=True,
+                )
+                max_replies = 3
+                for idx, (san_reply, reply_node) in enumerate(sorted_replies):
+                    if idx >= max_replies:
+                        break
+                    reply_games = int(reply_node.get("games", 0) or 0)
+                    if reply_games <= 0:
+                        continue
+                    reply_game_acc_sum = float(reply_node.get("game_accuracy_sum", 0.0) or 0.0)
+                    reply_game_acc_count = int(reply_node.get("game_accuracy_count", 0) or 0)
+                    reply_phase_acc_sum = float(reply_node.get("opening_accuracy_sum", 0.0) or 0.0)
+                    reply_phase_acc_count = int(reply_node.get("opening_accuracy_count", 0) or 0)
+                    reply_game_acc = (
+                        reply_game_acc_sum / float(reply_game_acc_count)
+                        if reply_game_acc_count > 0
+                        else None
+                    )
+                    reply_phase_acc = (
+                        reply_phase_acc_sum / float(reply_phase_acc_count)
+                        if reply_phase_acc_count > 0
+                        else None
+                    )
+                    reply_eco = reply_node.get("eco")
+                    reply_name = reply_node.get("opening_name")
+                    games_suffix_reply = "" if reply_games == 1 else "s"
+                    if reply_name and reply_eco:
+                        reply_label = (
+                            f"  ... {san_reply} — {reply_games} game{games_suffix_reply} — "
+                            f"{reply_name} ({reply_eco})"
+                        )
+                    elif reply_name:
+                        reply_label = (
+                            f"  ... {san_reply} — {reply_games} game{games_suffix_reply} — "
+                            f"{reply_name}"
+                        )
+                    elif reply_eco:
+                        reply_label = (
+                            f"  ... {san_reply} — {reply_games} game{games_suffix_reply} — "
+                            f"{reply_eco}"
+                        )
+                    else:
+                        reply_label = (
+                            f"  ... {san_reply} — {reply_games} game{games_suffix_reply}"
+                        )
+                    if reply_game_acc is not None and reply_phase_acc is not None:
+                        reply_label += (
+                            f", Game Acc {reply_game_acc:.1f}%, Phase Acc {reply_phase_acc:.1f}%"
+                        )
+                    lines.append(reply_label)
+        except Exception:
+            lines = []
+        return lines
     
     def _copy_full_stats_to_clipboard(self) -> None:
         """Copy the full stats to clipboard."""
@@ -4116,11 +4247,15 @@ class DetailPlayerStatsView(QWidget):
         from app.utils.player_stats_text_formatter import PlayerStatsTextFormatter
         current_player = self._stats_controller.get_current_player() if self._stats_controller else None
         top_games_summary = self._get_top_games_summary_for_copy()
+        # Build a compact opening tree summary (first two plies) for text export
+        opening_tree_summary_lines: List[str] = self._build_opening_tree_summary_lines()
+
         text = PlayerStatsTextFormatter.format_full_stats(
             self.current_stats,
             self.current_patterns,
             current_player or "Player",
             top_games_summary=top_games_summary,
+            opening_tree_summary_lines=opening_tree_summary_lines if opening_tree_summary_lines else None,
         )
         
         if text:
