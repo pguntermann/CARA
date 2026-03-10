@@ -159,6 +159,9 @@ class AccuracyVsProgressChartWidget(QWidget):
         self.background_color = QColor(*chart_config.get('background_color', [30, 30, 35]))
         self.grid_color = QColor(*chart_config.get('grid_color', [60, 60, 65]))
         self.line_color = QColor(*chart_config.get('line_color', [120, 190, 255]))
+        self.opponent_line_color = QColor(*chart_config.get('opponent_line_color', [200, 130, 130]))
+        self._line_style = self._pen_style_from_config(chart_config.get('line_style', 'solid'))
+        self._opponent_line_style = self._pen_style_from_config(chart_config.get('opponent_line_style', 'dashed'))
         self.line_width = chart_config.get('line_width', 2)
         self.text_color = QColor(*chart_config.get('text_color', [200, 200, 200]))
         self.axis_color = QColor(*chart_config.get('axis_color', [150, 150, 150]))
@@ -173,7 +176,9 @@ class AccuracyVsProgressChartWidget(QWidget):
         self.x_axis_label_spacing = chart_config.get('x_axis_label_spacing', 5)
 
         self._data: List[Tuple[float, float]] = []  # (progress_pct, accuracy)
+        self._data_opponent: List[Tuple[float, float]] = []  # (progress_pct, accuracy) for opponents' average
         self._hover_data: Optional[Tuple[float, float]] = None  # (progress_pct, accuracy) when hovering
+        self._hover_data_opponent: Optional[float] = None  # opponent accuracy at hover progress (if available)
         self._hover_pixel: Optional[QPointF] = None  # pixel position for circle
         self._hover_hit_threshold_px = 25
         self._hover_circle_radius = 6
@@ -185,16 +190,50 @@ class AccuracyVsProgressChartWidget(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setMouseTracking(True)
 
-    def set_data(self, data: List[Tuple[float, float]]) -> None:
-        """Set chart data: list of (progress_pct, accuracy) sorted by progress_pct."""
+    @staticmethod
+    def _pen_style_from_config(style: str) -> Qt.PenStyle:
+        """Map config string to Qt.PenStyle. 'dashed' -> DashLine, else SolidLine."""
+        if (style or "").strip().lower() == "dashed":
+            return Qt.PenStyle.DashLine
+        return Qt.PenStyle.SolidLine
+
+    def set_data(
+        self,
+        data: List[Tuple[float, float]],
+        opponent_data: Optional[List[Tuple[float, float]]] = None,
+    ) -> None:
+        """Set chart data: list of (progress_pct, accuracy) sorted by progress_pct.
+        opponent_data: optional second series (average opponents' accuracy) for reference line.
+        """
         self._data = list(data) if data else []
+        self._data_opponent = list(opponent_data) if opponent_data else []
         self.update()
 
+    def _opponent_accuracy_at_progress(self, progress: float) -> Optional[float]:
+        """Interpolate opponent accuracy at given progress (0-100). Returns None if no opponent data."""
+        if not self._data_opponent:
+            return None
+        sorted_opp = sorted(self._data_opponent, key=lambda x: x[0])
+        if progress <= sorted_opp[0][0]:
+            return sorted_opp[0][1]
+        if progress >= sorted_opp[-1][0]:
+            return sorted_opp[-1][1]
+        for i in range(len(sorted_opp) - 1):
+            p0, a0 = sorted_opp[i]
+            p1, a1 = sorted_opp[i + 1]
+            if p0 <= progress <= p1:
+                if p1 == p0:
+                    return a0
+                t = (progress - p0) / (p1 - p0)
+                return a0 + t * (a1 - a0)
+        return None
+
     def _accuracy_range(self) -> Tuple[float, float]:
-        """Return (min_acc, max_acc) for the Y scale from data, with padding, clamped to 0-100%. Empty data -> (0, 100)."""
-        if not self._data:
+        """Return (min_acc, max_acc) for the Y scale from both series, with padding, clamped to 0-100%. Empty -> (0, 100)."""
+        accs: List[float] = [acc for _, acc in self._data]
+        accs.extend(acc for _, acc in self._data_opponent)
+        if not accs:
             return 0.0, 100.0
-        accs = [acc for _, acc in self._data]
         lo, hi = min(accs), max(accs)
         r = hi - lo
         if r < self._y_min_range:
@@ -203,7 +242,6 @@ class AccuracyVsProgressChartWidget(QWidget):
             lo, hi = mid - half, mid + half
             r = self._y_min_range
         pad = max(2.0, r * self._y_padding_pct)
-        # Clamp to 0-100% so Y labels never go beyond that
         return (max(0.0, lo - pad), min(100.0, hi + pad))
 
     def paintEvent(self, event) -> None:
@@ -267,7 +305,23 @@ class AccuracyVsProgressChartWidget(QWidget):
             label_width = fm.horizontalAdvance(label)
             painter.drawText(int(x - label_width / 2), int(bottom + fm.height() + self.x_axis_label_spacing), label)
 
-        # Line
+        # Opponent line (drawn first so player line is on top)
+        if self._data_opponent and acc_range > 0:
+            sorted_opp = sorted(self._data_opponent, key=lambda x: x[0])
+            points_opp: List[QPointF] = []
+            for pct, acc in sorted_opp:
+                x = left + (pct / 100.0 * graph_width)
+                y = bottom - ((acc - min_acc) / acc_range * graph_height)
+                y = max(top, min(bottom, y))
+                points_opp.append(QPointF(x, y))
+            if len(points_opp) > 1:
+                pen_opp = QPen(self.opponent_line_color, self.line_width)
+                pen_opp.setStyle(self._opponent_line_style)
+                painter.setPen(pen_opp)
+                for i in range(len(points_opp) - 1):
+                    painter.drawLine(points_opp[i], points_opp[i + 1])
+
+        # Player line
         sorted_data = sorted(self._data, key=lambda x: x[0])
         points: List[QPointF] = []
         for pct, acc in sorted_data:
@@ -277,13 +331,35 @@ class AccuracyVsProgressChartWidget(QWidget):
             points.append(QPointF(x, y))
 
         if len(points) > 1:
-            painter.setPen(QPen(self.line_color, self.line_width))
+            pen_player = QPen(self.line_color, self.line_width)
+            pen_player.setStyle(self._line_style)
+            painter.setPen(pen_player)
             for i in range(len(points) - 1):
                 painter.drawLine(points[i], points[i + 1])
 
+        # Legend when both series present
+        if self._data and self._data_opponent:
+            legend_x = right - 100
+            legend_y = top + 6
+            pen_leg = QPen(self.line_color, 2)
+            pen_leg.setStyle(self._line_style)
+            painter.setPen(pen_leg)
+            painter.drawLine(int(legend_x), int(legend_y + 4), int(legend_x + 20), int(legend_y + 4))
+            painter.setPen(self.text_color)
+            painter.drawText(int(legend_x + 24), int(legend_y + fm.height()), "Player")
+            legend_y += fm.height() + 2
+            pen_opp_leg = QPen(self.opponent_line_color, 2)
+            pen_opp_leg.setStyle(self._opponent_line_style)
+            painter.setPen(pen_opp_leg)
+            painter.drawLine(int(legend_x), int(legend_y + 4), int(legend_x + 20), int(legend_y + 4))
+            painter.setPen(self.text_color)
+            painter.drawText(int(legend_x + 24), int(legend_y + fm.height()), "Opponents")
+
         # Hover indicator: circle and tooltip text are driven by mouseMoveEvent/leaveEvent
         if self._hover_pixel is not None and self._hover_data is not None:
-            painter.setPen(QPen(self.line_color, 2))
+            hover_pen = QPen(self.line_color, 2)
+            hover_pen.setStyle(self._line_style)
+            painter.setPen(hover_pen)
             painter.setBrush(QBrush(self.background_color))
             painter.drawEllipse(self._hover_pixel, self._hover_circle_radius, self._hover_circle_radius)
 
@@ -376,11 +452,16 @@ class AccuracyVsProgressChartWidget(QWidget):
                 best_pixel.x(), best_pixel.y(), left, bottom, graph_width, graph_height
             )
             self._hover_data = (progress, accuracy)
+            self._hover_data_opponent = self._opponent_accuracy_at_progress(progress)
             self._hover_pixel = best_pixel
-            tip = f"{accuracy:.1f}% accuracy at {progress:.1f}% game progress"
+            if self._hover_data_opponent is not None:
+                tip = f"Player: {accuracy:.1f}% at {progress:.1f}% game progress\nOpponents: {self._hover_data_opponent:.1f}%"
+            else:
+                tip = f"{accuracy:.1f}% accuracy at {progress:.1f}% game progress"
             QToolTip.showText(event.globalPosition().toPoint(), tip, self, QRect(), 3000)
         else:
             self._hover_data = None
+            self._hover_data_opponent = None
             self._hover_pixel = None
             QToolTip.hideText()
         self.update()
@@ -388,6 +469,7 @@ class AccuracyVsProgressChartWidget(QWidget):
     def leaveEvent(self, event) -> None:
         super().leaveEvent(event)
         self._hover_data = None
+        self._hover_data_opponent = None
         self._hover_pixel = None
         QToolTip.hideText()
         self.update()
@@ -1247,7 +1329,8 @@ class DetailPlayerStatsView(QWidget):
         if progress_chart_config.get('enabled', True) and getattr(self.current_stats, 'accuracy_by_progress', None):
             self._add_section_header("Accuracy over game duration", header_font, header_text_color)
             progress_chart = AccuracyVsProgressChartWidget(self.config)
-            progress_chart.set_data(self.current_stats.accuracy_by_progress)
+            opponent_progress = getattr(self.current_stats, 'opponent_accuracy_by_progress', None) or []
+            progress_chart.set_data(self.current_stats.accuracy_by_progress, opponent_data=opponent_progress)
             progress_chart.setProperty("section_name", "Accuracy over game duration")
             self.content_layout.addWidget(progress_chart)
             self.content_layout.addSpacing(section_spacing_val)

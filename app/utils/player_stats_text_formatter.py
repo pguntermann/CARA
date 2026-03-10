@@ -318,17 +318,26 @@ class PlayerStatsTextFormatter:
 
         lines: List[str] = []
         PlayerStatsTextFormatter._add_section_header(lines, "Accuracy over game duration")
-        # Two-line compact table: header row with buckets, second row with accuracies.
-        # Use two-digit percentages (05%, 25%, ...) for slightly better visual alignment.
+        # Compact table: fixed-width label column then tab-separated buckets so columns align.
+        label_width = 17  # matches "Opponents (avg):"
         header_cells = [f"{int(t):02d}%" for t in targets]
         value_cells = [
             (f"{v:.1f}%" if v is not None else "n/a")
             for v in sampled
         ]
-        # Use tabs around pipes to encourage alignment in monospace environments.
-        separator = " \t|\t "
-        lines.append(separator.join(header_cells))
-        lines.append(separator.join(value_cells))
+        # Header row: extra tab after each progress % so they align above the value columns
+        lines.append("".ljust(label_width) + "\t" + "\t\t".join(header_cells))
+        lines.append("Player:".ljust(label_width) + "\t" + "\t".join(value_cells))
+        opponent_data = getattr(stats, "opponent_accuracy_by_progress", None) or []
+        if opponent_data:
+            opp_sampled: List[Optional[float]] = []
+            for target in targets:
+                closest = min(opponent_data, key=lambda p: abs(float(p[0]) - target))
+                acc = closest[1]
+                opp_sampled.append(float(acc) if acc is not None else None)
+            if not all(v is None for v in opp_sampled):
+                opp_cells = [(f"{v:.1f}%" if v is not None else "n/a") for v in opp_sampled]
+                lines.append("Opponents (avg):".ljust(label_width) + "\t" + "\t".join(opp_cells))
         return lines
     
     @staticmethod

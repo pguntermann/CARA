@@ -1500,6 +1500,13 @@
               190,
               255
             ],
+            "opponent_line_color": [
+              200,
+              130,
+              130
+            ],
+            "line_style": "solid",
+            "opponent_line_style": "dashed",
             "line_width": 2,
             "font_family": "Helvetica Neue",
             "font_size": 10,

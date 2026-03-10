@@ -142,25 +142,42 @@ def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, ga
         
         # Running accuracy by game progress (0%, 5%, ..., 100%) for chart
         player_moves_list = summary_service._extract_player_moves(moves, is_white_game)
+        opponent_moves_list = summary_service._extract_player_moves(moves, not is_white_game)
         num_bins = 21  # 0, 5, 10, ..., 100
         accuracy_by_progress: List[Tuple[float, Optional[float]]] = []
+        opponent_accuracy_by_progress: List[Tuple[float, Optional[float]]] = []
         for i in range(num_bins):
             pct = (i * 100.0) / (num_bins - 1) if num_bins > 1 else 100.0
             k = round((pct / 100.0) * len(player_moves_list)) if player_moves_list else 0
             prefix = player_moves_list[:k]
             if not prefix:
                 accuracy_by_progress.append((pct, None))
-                continue
-            prefix_stats = summary_service._calculate_player_statistics(
-                prefix,
-                opening_moves=len(prefix),
-                middlegame_moves=0,
-                endgame_moves=0,
-                average_cpl_opening=0.0,
-                average_cpl_middlegame=0.0,
-                average_cpl_endgame=0.0,
-            )
-            accuracy_by_progress.append((pct, prefix_stats.accuracy))
+            else:
+                prefix_stats = summary_service._calculate_player_statistics(
+                    prefix,
+                    opening_moves=len(prefix),
+                    middlegame_moves=0,
+                    endgame_moves=0,
+                    average_cpl_opening=0.0,
+                    average_cpl_middlegame=0.0,
+                    average_cpl_endgame=0.0,
+                )
+                accuracy_by_progress.append((pct, prefix_stats.accuracy))
+            k_opp = round((pct / 100.0) * len(opponent_moves_list)) if opponent_moves_list else 0
+            prefix_opp = opponent_moves_list[:k_opp]
+            if not prefix_opp:
+                opponent_accuracy_by_progress.append((pct, None))
+            else:
+                prefix_opp_stats = summary_service._calculate_player_statistics(
+                    prefix_opp,
+                    opening_moves=len(prefix_opp),
+                    middlegame_moves=0,
+                    endgame_moves=0,
+                    average_cpl_opening=0.0,
+                    average_cpl_middlegame=0.0,
+                    average_cpl_endgame=0.0,
+                )
+                opponent_accuracy_by_progress.append((pct, prefix_opp_stats.accuracy))
         
         return {
             'index': game_index,
@@ -177,6 +194,7 @@ def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, ga
             'moves': moves,
             'game_summary': game_summary,
             'accuracy_by_progress': accuracy_by_progress,
+            'opponent_accuracy_by_progress': opponent_accuracy_by_progress,
         }
     except Exception as e:
         # Log error but don't crash - return None to skip this game
@@ -216,6 +234,8 @@ class AggregatedPlayerStats:
     accuracy_values: List[float]
     # Running accuracy by game progress (0–100%): list of (progress_pct, avg_accuracy) for chart
     accuracy_by_progress: List[Tuple[float, float]]
+    # Opponents' average running accuracy by game progress (same bins) for chart reference line
+    opponent_accuracy_by_progress: List[Tuple[float, float]]
     # Performance by endgame type:
     # (display_label, endgame_accuracy_pct, game_count, game_accuracy_pct), sorted by game_count descending.
     accuracy_by_endgame_type: List[Tuple[str, float, int, float]]
@@ -401,6 +421,7 @@ class PlayerStatsService:
         elo_values: List[float] = []
         accuracy_values: List[float] = []
         accuracy_by_progress_bins: Dict[float, List[float]] = {}  # progress_pct -> list of accuracies
+        opponent_accuracy_by_progress_bins: Dict[float, List[float]] = {}  # progress_pct -> list of opponent accuracies
         overall_cpl_values: List[float] = []
         overall_top3_pct_values: List[float] = []
         overall_best_move_pct_values: List[float] = []
@@ -498,6 +519,9 @@ class PlayerStatsService:
             for pct, acc in result.get('accuracy_by_progress', []):
                 if acc is not None:
                     accuracy_by_progress_bins.setdefault(pct, []).append(acc)
+            for pct, acc in result.get('opponent_accuracy_by_progress', []):
+                if acc is not None:
+                    opponent_accuracy_by_progress_bins.setdefault(pct, []).append(acc)
             
             # Collect phase statistics for aggregation
             opening_moves_total += game_opening.moves
@@ -714,6 +738,11 @@ class PlayerStatsService:
             values = accuracy_by_progress_bins[pct]
             if values:
                 accuracy_by_progress_list.append((pct, sum(values) / len(values)))
+        opponent_accuracy_by_progress_list: List[Tuple[float, float]] = []
+        for pct in sorted(opponent_accuracy_by_progress_bins.keys()):
+            values = opponent_accuracy_by_progress_bins[pct]
+            if values:
+                opponent_accuracy_by_progress_list.append((pct, sum(values) / len(values)))
 
         # Performance by endgame type (flat):
         # (display_label, endgame_accuracy_pct, game_count, game_accuracy_pct),
@@ -805,6 +834,7 @@ class PlayerStatsService:
             max_blunder_rate=max_blunder_rate,
             accuracy_values=accuracy_values,
             accuracy_by_progress=accuracy_by_progress_list,
+            opponent_accuracy_by_progress=opponent_accuracy_by_progress_list,
             accuracy_by_endgame_type=accuracy_by_endgame_type_list,
             accuracy_by_endgame_type_grouped=accuracy_by_endgame_type_grouped_list,
         )
