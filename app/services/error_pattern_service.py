@@ -10,6 +10,7 @@ from app.services.game_highlights.highlight_detector import HighlightDetector
 from app.services.game_highlights.rule_registry import RuleRegistry
 from app.controllers.game_controller import GameController
 from app.services.opening_service import OpeningService
+from app.services.analysis_data_storage_service import AnalysisDataStorageService
 
 
 @dataclass
@@ -162,6 +163,9 @@ class ErrorPatternService:
                 related_games = self._find_games_with_phase_blunders(
                     player_name, games, game_summaries, phase_name
                 )
+                related_ref_plies = self._collect_phase_blunder_ref_plies(
+                    player_name, games, game_summaries, phase_name
+                )
                 severity = self._determine_severity(phase_percentage, [30, 50, 70])
                 patterns.append(ErrorPattern(
                     pattern_type="phase_blunders",
@@ -169,7 +173,8 @@ class ErrorPatternService:
                     frequency=phase_blunder_count,
                     percentage=phase_percentage,
                     severity=severity,
-                    related_games=related_games
+                    related_games=related_games,
+                    related_ref_plies=related_ref_plies or None,
                 ))
         
         return patterns
@@ -246,7 +251,9 @@ class ErrorPatternService:
                     'errors': 0,
                     'blunders': 0,
                     'mistakes': 0,
-                    'opening_name': opening_name  # Store opening name from first game with this ECO
+                    'opening_name': opening_name,  # Store opening name from first game with this ECO
+                    # Concrete (game, ref_ply) locations of opening-phase errors for this ECO.
+                    'ref_plies': [],
                 }
             
             opening_stats[eco]['games'].append(game)
@@ -258,13 +265,34 @@ class ErrorPatternService:
             # Get player stats for this game
             if is_white:
                 stats = summary.white_opening
+                opening_moves = summary.white_opening.moves
             else:
                 stats = summary.black_opening
+                opening_moves = summary.black_opening.moves
             
             opening_stats[eco]['total_moves'] += stats.moves
             opening_stats[eco]['errors'] += stats.inaccuracies + stats.mistakes + stats.blunders
             opening_stats[eco]['blunders'] += stats.blunders
             opening_stats[eco]['mistakes'] += stats.mistakes
+
+            # Collect specific opening-phase errors for jump-to-move support.
+            if opening_moves > 0:
+                player_move_index = 0
+                for mv in moves:
+                    if is_white and getattr(mv, "white_move", None):
+                        player_move_index += 1
+                        if player_move_index <= opening_moves:
+                            assess = (getattr(mv, "assess_white", "") or "").strip()
+                            if assess in ("Inaccuracy", "Mistake", "Miss", "Blunder"):
+                                ref_ply = mv.move_number * 2 - 1
+                                opening_stats[eco]['ref_plies'].append((game, ref_ply))
+                    elif (not is_white) and getattr(mv, "black_move", None):
+                        player_move_index += 1
+                        if player_move_index <= opening_moves:
+                            assess = (getattr(mv, "assess_black", "") or "").strip()
+                            if assess in ("Inaccuracy", "Mistake", "Miss", "Blunder"):
+                                ref_ply = mv.move_number * 2
+                                opening_stats[eco]['ref_plies'].append((game, ref_ply))
         
         # Check for openings with high error rates
         for eco, stats in opening_stats.items():
@@ -289,7 +317,8 @@ class ErrorPatternService:
                     frequency=stats['errors'],
                     percentage=error_rate,
                     severity=severity,
-                    related_games=stats['games']
+                    related_games=stats['games'],
+                    related_ref_plies=stats.get('ref_plies') or None,
                 ))
         
         return patterns
@@ -318,6 +347,82 @@ class ErrorPatternService:
                 related_games.append(game)
         
         return related_games
+
+    def _collect_phase_blunder_ref_plies(
+        self,
+        player_name: str,
+        games: List[GameData],
+        game_summaries: List[GameSummary],
+        phase: str,
+    ) -> List[Tuple[GameData, int]]:
+        """Collect (game, ref_ply) pairs for blunders in the specified phase.
+
+        Uses per-phase move counts from GameSummary to map a player's moves to
+        opening/middlegame/endgame and records blunders in the dominant phase.
+        """
+        if not self.game_controller:
+            return []
+
+        results: List[Tuple[GameData, int]] = []
+
+        for i, game in enumerate(games):
+            if i >= len(game_summaries):
+                continue
+
+            is_white = (game.white == player_name)
+            summary = game_summaries[i]
+
+            if is_white:
+                opening_moves = summary.white_opening.moves
+                middlegame_moves = summary.white_middlegame.moves
+                endgame_moves = summary.white_endgame.moves
+            else:
+                opening_moves = summary.black_opening.moves
+                middlegame_moves = summary.black_middlegame.moves
+                endgame_moves = summary.black_endgame.moves
+
+            try:
+                moves = self.game_controller.extract_moves_from_game(game)
+            except Exception:
+                moves = None
+            if not moves:
+                continue
+
+            player_move_index = 0
+
+            for mv in moves:
+                if is_white and getattr(mv, "white_move", None):
+                    player_move_index += 1
+                    assess = (getattr(mv, "assess_white", "") or "").strip()
+                    if assess != "Blunder":
+                        continue
+                    if player_move_index <= opening_moves:
+                        move_phase = "opening"
+                    elif player_move_index <= opening_moves + middlegame_moves:
+                        move_phase = "middlegame"
+                    else:
+                        move_phase = "endgame"
+                    if move_phase != phase:
+                        continue
+                    ref_ply = mv.move_number * 2 - 1
+                    results.append((game, ref_ply))
+                elif (not is_white) and getattr(mv, "black_move", None):
+                    player_move_index += 1
+                    assess = (getattr(mv, "assess_black", "") or "").strip()
+                    if assess != "Blunder":
+                        continue
+                    if player_move_index <= opening_moves:
+                        move_phase = "opening"
+                    elif player_move_index <= opening_moves + middlegame_moves:
+                        move_phase = "middlegame"
+                    else:
+                        move_phase = "endgame"
+                    if move_phase != phase:
+                        continue
+                    ref_ply = mv.move_number * 2
+                    results.append((game, ref_ply))
+
+        return results
     
     def _detect_high_cpl_patterns(self, player_name: str, games: List[GameData],
                                   game_summaries: List[GameSummary],
@@ -331,6 +436,7 @@ class ErrorPatternService:
         if avg_cpl >= high_cpl_threshold:
             # Find games with high CPL
             related_games: List[GameData] = []
+            related_ref_plies: List[Tuple[GameData, int]] = []
             for i, game in enumerate(games):
                 if i >= len(game_summaries):
                     continue
@@ -339,6 +445,35 @@ class ErrorPatternService:
                 player_stats = summary.white_stats if is_white else summary.black_stats
                 if player_stats.average_cpl >= high_cpl_threshold:
                     related_games.append(game)
+                    # Collect a few of the worst moves by CPL for jump-to-move
+                    try:
+                        moves = AnalysisDataStorageService.load_analysis_data(game)
+                    except Exception:
+                        moves = None
+                    if not moves:
+                        continue
+                    cpl_field = "cpl_white" if is_white else "cpl_black"
+                    move_field = "white_move" if is_white else "black_move"
+                    worst: List[Tuple[float, int]] = []
+                    for mv in moves:
+                        if not getattr(mv, move_field, None):
+                            continue
+                        cpl_str = getattr(mv, cpl_field, "") or ""
+                        if not cpl_str:
+                            continue
+                        try:
+                            cpl_val = float(cpl_str)
+                        except (ValueError, TypeError):
+                            continue
+                        if is_white:
+                            ref_ply = mv.move_number * 2 - 1
+                        else:
+                            ref_ply = mv.move_number * 2
+                        worst.append((cpl_val, ref_ply))
+                    if worst:
+                        worst.sort(key=lambda x: x[0], reverse=True)
+                        for _, ref_ply in worst[:3]:
+                            related_ref_plies.append((game, ref_ply))
             
             severity = self._determine_severity(avg_cpl, [60, 80, 100])
             patterns.append(ErrorPattern(
@@ -347,7 +482,8 @@ class ErrorPatternService:
                 frequency=len(related_games),
                 percentage=(len(related_games) / len(games) * 100) if games else 0.0,
                 severity=severity,
-                related_games=related_games
+                related_games=related_games,
+                related_ref_plies=related_ref_plies or None,
             ))
         
         return patterns
@@ -386,6 +522,7 @@ class ErrorPatternService:
         
         conversion_issues = 0
         related_games: List[GameData] = []
+        related_ref_plies: List[Tuple[GameData, int]] = []
         winning_threshold = self.thresholds.get('winning_eval_threshold', 200.0)  # +2.0 pawns
         
         for i, game in enumerate(games):
@@ -398,8 +535,9 @@ class ErrorPatternService:
             # Check if player had a winning position but lost or drew
             had_winning_position = False
             max_winning_eval = 0.0
+            winning_ply_indices: List[int] = []
             
-            for move_num, eval_value in summary.evaluation_data:
+            for ply_index, eval_value in summary.evaluation_data:
                 # Determine if this evaluation is for the player
                 # Evaluation is after the move, so we need to check whose turn it was
                 # For simplicity, check if eval was favorable for the player
@@ -408,20 +546,26 @@ class ErrorPatternService:
                     if eval_value >= winning_threshold:
                         had_winning_position = True
                         max_winning_eval = max(max_winning_eval, eval_value)
+                        winning_ply_indices.append(ply_index)
                 else:
                     # Negative eval is good for black (more negative = better)
                     if eval_value <= -winning_threshold:
                         had_winning_position = True
                         max_winning_eval = max(max_winning_eval, abs(eval_value))
+                        winning_ply_indices.append(ply_index)
             
             # Check if player lost or drew despite having winning position
             if had_winning_position:
                 if is_white and game.result in ["0-1", "1/2-1/2"]:
                     conversion_issues += 1
                     related_games.append(game)
+                    if winning_ply_indices:
+                        related_ref_plies.append((game, int(winning_ply_indices[-1])))
                 elif not is_white and game.result in ["1-0", "1/2-1/2"]:
                     conversion_issues += 1
                     related_games.append(game)
+                    if winning_ply_indices:
+                        related_ref_plies.append((game, int(winning_ply_indices[-1])))
         
         if conversion_issues > 0:
             conversion_rate = (conversion_issues / len(games) * 100) if games else 0.0
@@ -433,7 +577,8 @@ class ErrorPatternService:
                     frequency=conversion_issues,
                     percentage=conversion_rate,
                     severity=severity,
-                    related_games=related_games
+                    related_games=related_games,
+                    related_ref_plies=related_ref_plies or None,
                 ))
         
         return patterns
@@ -448,6 +593,7 @@ class ErrorPatternService:
         
         defensive_errors = 0
         related_games: List[GameData] = []
+        related_ref_plies: List[Tuple[GameData, int]] = []
         losing_threshold = self.thresholds.get('losing_eval_threshold', -200.0)  # -2.0 pawns
         
         for i, game in enumerate(games):
@@ -460,6 +606,7 @@ class ErrorPatternService:
             # Check if player was in a losing position
             had_losing_position = False
             defensive_blunders = 0
+            game_ref_plies: List[Tuple[GameData, int]] = []
             
             # Get moves for this game
             moves = self.game_controller.extract_moves_from_game(game)
@@ -485,6 +632,8 @@ class ErrorPatternService:
                         had_losing_position = True
                         if move.assess_white == "Blunder":
                             defensive_blunders += 1
+                            ref_ply = ply_before + 1
+                            game_ref_plies.append((game, ref_ply))
                 else:
                     # Black's move: ply_index before = (move_num - 1) * 2 + 1
                     ply_before = (move_num - 1) * 2 + 1
@@ -493,10 +642,14 @@ class ErrorPatternService:
                         had_losing_position = True
                         if move.assess_black == "Blunder":
                             defensive_blunders += 1
+                            ref_ply = ply_before + 1
+                            game_ref_plies.append((game, ref_ply))
             
             if had_losing_position and defensive_blunders >= 2:
                 defensive_errors += 1
                 related_games.append(game)
+                if game_ref_plies:
+                    related_ref_plies.extend(game_ref_plies)
         
         if defensive_errors > 0:
             defensive_rate = (defensive_errors / len(games) * 100) if games else 0.0
@@ -508,7 +661,8 @@ class ErrorPatternService:
                     frequency=defensive_errors,
                     percentage=defensive_rate,
                     severity=severity,
-                    related_games=related_games
+                    related_games=related_games,
+                    related_ref_plies=related_ref_plies or None,
                 ))
         
         return patterns

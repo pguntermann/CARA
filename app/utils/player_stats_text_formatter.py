@@ -533,7 +533,17 @@ class PlayerStatsTextFormatter:
         
         for pattern in patterns:
             lines.append(f"{pattern.description}")
-            lines.append(f"  Frequency: {pattern.frequency} ({pattern.percentage:.1f}%)")
+            ref_plies = getattr(pattern, "related_ref_plies", None)
+            if ref_plies:
+                num_occurrences = len(ref_plies)
+                num_games = len(pattern.related_games)
+                lines.append(
+                    f"  Frequency: {num_occurrences} occurrence"
+                    f"{'s' if num_occurrences != 1 else ''} in {num_games} game"
+                    f"{'s' if num_games != 1 else ''} ({pattern.percentage:.1f}%)"
+                )
+            else:
+                lines.append(f"  Frequency: {pattern.frequency} ({pattern.percentage:.1f}%)")
             lines.append("")
         
         return lines

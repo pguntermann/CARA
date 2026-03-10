@@ -3233,8 +3233,15 @@ class DetailPlayerStatsView(QWidget):
         }
         severity_color = severity_colors.get(pattern.severity, severity_colors_config.get('default', [150, 150, 150]))
         
-        freq_text = f"({pattern.frequency} occurrences, {pattern.percentage:.1f}%)"
-        button_text = f"View {len(pattern.related_games)} →" if pattern.related_games else None
+        ref_plies = getattr(pattern, "related_ref_plies", None)
+        if ref_plies:
+            num_occurrences = len(ref_plies)
+            num_games = len(pattern.related_games)
+            freq_text = f"({num_occurrences} occurrence{'s' if num_occurrences != 1 else ''} in {num_games} game{'s' if num_games != 1 else ''}, {pattern.percentage:.1f}%)"
+            button_text = f"View {num_occurrences} →" if pattern.related_games else None
+        else:
+            freq_text = f"({pattern.frequency} occurrences, {pattern.percentage:.1f}%)"
+            button_text = f"View {len(pattern.related_games)} →" if pattern.related_games else None
         
         row_data = self._create_indicator_item_row(
             title_text=pattern.description,
