@@ -691,8 +691,10 @@ class OpeningTreeItem(QTreeWidgetItem):
             return super().__lt__(other)
         column = tree.sortColumn()
 
-        # Numeric columns: 1=Total, 2=White, 3=Black, 4=Accuracy (percentage)
-        if column in (1, 2, 3, 4):
+        # Numeric columns:
+        # 1 = Total, 2 = White, 3 = Black,
+        # 4 = Game accuracy (%), 5 = Opening-phase accuracy (%)
+        if column in (1, 2, 3, 4, 5):
             try:
                 left_val = self.data(column, Qt.ItemDataRole.UserRole)
                 right_val = other.data(column, Qt.ItemDataRole.UserRole)
@@ -706,14 +708,22 @@ class OpeningTreeItem(QTreeWidgetItem):
 
 
 class EndgameTreeItem(QTreeWidgetItem):
-    """Tree item with numeric-aware sorting for endgame tree: 1=Total, 2=White, 3=Black, 4=Accuracy."""
+    """Tree item with numeric-aware sorting for endgame tree.
+
+    Numeric columns:
+      1 = Total
+      2 = White
+      3 = Black
+      4 = Game accuracy (%)
+      5 = Endgame-phase accuracy (%)
+    """
 
     def __lt__(self, other: "QTreeWidgetItem") -> bool:  # type: ignore[override]
         tree = self.treeWidget()
         if not tree:
             return super().__lt__(other)
         column = tree.sortColumn()
-        if column in (1, 2, 3, 4):
+        if column in (1, 2, 3, 4, 5):
             try:
                 left_val = self.data(column, Qt.ItemDataRole.UserRole)
                 right_val = other.data(column, Qt.ItemDataRole.UserRole)
@@ -813,7 +823,9 @@ class DetailPlayerStatsView(QWidget):
         
         # Openings responsive handling
         self._openings_widget: Optional[QWidget] = None
-        self._openings_items: List[Dict[str, Any]] = []  # List of {label, value, full_text, compact_text}
+        # List of per-opening row dicts:
+        # {eco_label, name_label, games_label, cpl_label (optional), full_name}
+        self._openings_items: List[Dict[str, Any]] = []
         self._opening_tree_widget: Optional[QTreeWidget] = None
         self._opening_tree_header_compact: str = "Move / Opening"
         self._opening_tree_header_with_hint: str = "Move / Opening (double-click row to open games)"
@@ -2662,8 +2674,22 @@ class DetailPlayerStatsView(QWidget):
         widget.setMinimumWidth(0)
         grouped = getattr(stats, 'accuracy_by_endgame_type_grouped', []) or []
         tree_widget = NoWheelTreeWidget(widget)
-        tree_widget.setColumnCount(5)
-        tree_widget.setHeaderLabels([self._endgame_tree_header_compact, "Total", "White", "Black", "Accuracy"])
+        # Columns:
+        # 0 = Type / Group label
+        # 1 = Total games
+        # 2 = White games
+        # 3 = Black games
+        # 4 = Game accuracy (%)
+        # 5 = Phase accuracy (%)
+        tree_widget.setColumnCount(6)
+        tree_widget.setHeaderLabels([
+            self._endgame_tree_header_compact,
+            "Total",
+            "White",
+            "Black",
+            "Game Acc",
+            "Phase Acc",
+        ])
         tree_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         header = tree_widget.header()
         header.setStretchLastSection(False)
@@ -2695,33 +2721,55 @@ class DetailPlayerStatsView(QWidget):
         header.setSectionResizeMode(1, _mode_for("total", QHeaderView.ResizeMode.ResizeToContents))
         header.setSectionResizeMode(2, _mode_for("white", QHeaderView.ResizeMode.ResizeToContents))
         header.setSectionResizeMode(3, _mode_for("black", QHeaderView.ResizeMode.ResizeToContents))
-        header.setSectionResizeMode(4, _mode_for("accuracy", QHeaderView.ResizeMode.ResizeToContents))
-        for group_key, group_label, group_accuracy, group_count, group_white, group_black, types_list in grouped:
+        header.setSectionResizeMode(4, _mode_for("game_accuracy", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(5, _mode_for("endgame_accuracy", QHeaderView.ResizeMode.ResizeToContents))
+        for (
+            group_key,
+            group_label,
+            group_endgame_accuracy,
+            group_game_accuracy,
+            group_count,
+            group_white,
+            group_black,
+            types_list,
+        ) in grouped:
             group_item = EndgameTreeItem([
                 group_label,
                 str(group_count),
                 str(group_white),
                 str(group_black),
-                f"{group_accuracy:.1f}%" if group_count else "",
+                f"{group_game_accuracy:.1f}%" if group_count else "",
+                f"{group_endgame_accuracy:.1f}%" if group_count else "",
             ])
             group_item.setData(0, Qt.ItemDataRole.UserRole, ("group", group_key))
             group_item.setData(1, Qt.ItemDataRole.UserRole, int(group_count))
             group_item.setData(2, Qt.ItemDataRole.UserRole, int(group_white))
             group_item.setData(3, Qt.ItemDataRole.UserRole, int(group_black))
-            group_item.setData(4, Qt.ItemDataRole.UserRole, float(group_accuracy))
-            for raw_type, type_label, type_accuracy, type_count, type_white, type_black in types_list:
+            group_item.setData(4, Qt.ItemDataRole.UserRole, float(group_game_accuracy))
+            group_item.setData(5, Qt.ItemDataRole.UserRole, float(group_endgame_accuracy))
+            for (
+                raw_type,
+                type_label,
+                type_endgame_accuracy,
+                type_game_accuracy,
+                type_count,
+                type_white,
+                type_black,
+            ) in types_list:
                 child_item = EndgameTreeItem([
                     type_label,
                     str(type_count),
                     str(type_white),
                     str(type_black),
-                    f"{type_accuracy:.1f}%" if type_count else "",
+                    f"{type_game_accuracy:.1f}%" if type_count else "",
+                    f"{type_endgame_accuracy:.1f}%" if type_count else "",
                 ])
                 child_item.setData(0, Qt.ItemDataRole.UserRole, ("type", raw_type))
                 child_item.setData(1, Qt.ItemDataRole.UserRole, int(type_count))
                 child_item.setData(2, Qt.ItemDataRole.UserRole, int(type_white))
                 child_item.setData(3, Qt.ItemDataRole.UserRole, int(type_black))
-                child_item.setData(4, Qt.ItemDataRole.UserRole, float(type_accuracy))
+                child_item.setData(4, Qt.ItemDataRole.UserRole, float(type_game_accuracy))
+                child_item.setData(5, Qt.ItemDataRole.UserRole, float(type_endgame_accuracy))
                 group_item.addChild(child_item)
             tree_widget.addTopLevelItem(group_item)
         tree_widget.setSortingEnabled(True)
@@ -2794,13 +2842,21 @@ class DetailPlayerStatsView(QWidget):
         widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         widget.setMinimumWidth(0)
         tree_widget = NoWheelTreeWidget(widget)
-        tree_widget.setColumnCount(5)
+        # Columns:
+        # 0 = Move / opening label
+        # 1 = Total games
+        # 2 = White games
+        # 3 = Black games
+        # 4 = Game accuracy (%)
+        # 5 = Phase accuracy (%)
+        tree_widget.setColumnCount(6)
         tree_widget.setHeaderLabels([
             self._opening_tree_header_compact,
             "Total",
             "White",
             "Black",
-            "Accuracy",
+            "Game Acc",
+            "Phase Acc",
         ])
         show_root_decorations = bool(tree_config.get('show_root_decorations', True))
         alternating_rows = bool(tree_config.get('alternating_row_colors', True))
@@ -2826,7 +2882,8 @@ class DetailPlayerStatsView(QWidget):
         header.setSectionResizeMode(1, _mode_for("total", QHeaderView.ResizeMode.ResizeToContents))
         header.setSectionResizeMode(2, _mode_for("white", QHeaderView.ResizeMode.ResizeToContents))
         header.setSectionResizeMode(3, _mode_for("black", QHeaderView.ResizeMode.ResizeToContents))
-        header.setSectionResizeMode(4, _mode_for("accuracy", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(4, _mode_for("game_accuracy", QHeaderView.ResizeMode.ResizeToContents))
+        header.setSectionResizeMode(5, _mode_for("opening_accuracy", QHeaderView.ResizeMode.ResizeToContents))
         tree_widget.setFont(value_font)
         header.setFont(label_font)
         palette = tree_widget.palette()
@@ -2855,22 +2912,28 @@ class DetailPlayerStatsView(QWidget):
                 total_games = child.get("games", 0)
                 white_games = child.get("white_games", 0)
                 black_games = child.get("black_games", 0)
-                acc_sum = float(child.get("accuracy_sum", 0.0) or 0.0)
-                acc_count = int(child.get("accuracy_count", 0) or 0)
-                acc_text = f"{acc_sum / float(acc_count):.1f}%" if acc_count > 0 else ""
+                game_acc_sum = float(child.get("game_accuracy_sum", 0.0) or 0.0)
+                game_acc_count = int(child.get("game_accuracy_count", 0) or 0)
+                opening_acc_sum = float(child.get("opening_accuracy_sum", 0.0) or 0.0)
+                opening_acc_count = int(child.get("opening_accuracy_count", 0) or 0)
+                game_acc_text = f"{game_acc_sum / float(game_acc_count):.1f}%" if game_acc_count > 0 else ""
+                opening_acc_text = f"{opening_acc_sum / float(opening_acc_count):.1f}%" if opening_acc_count > 0 else ""
                 label_text = format_label(san, child)
                 item = OpeningTreeItem([
                     label_text,
                     str(total_games),
                     str(white_games),
                     str(black_games),
-                    acc_text,
+                    game_acc_text,
+                    opening_acc_text,
                 ])
                 item.setData(1, Qt.ItemDataRole.UserRole, int(total_games))
                 item.setData(2, Qt.ItemDataRole.UserRole, int(white_games))
                 item.setData(3, Qt.ItemDataRole.UserRole, int(black_games))
-                if acc_count > 0:
-                    item.setData(4, Qt.ItemDataRole.UserRole, float(acc_sum / float(acc_count)))
+                if game_acc_count > 0:
+                    item.setData(4, Qt.ItemDataRole.UserRole, float(game_acc_sum / float(game_acc_count)))
+                if opening_acc_count > 0:
+                    item.setData(5, Qt.ItemDataRole.UserRole, float(opening_acc_sum / float(opening_acc_count)))
                 new_path = path + [san]
                 item.setData(0, Qt.ItemDataRole.UserRole, new_path)
                 if parent_item is None:
@@ -2920,7 +2983,17 @@ class DetailPlayerStatsView(QWidget):
                                text_color: QColor, label_font: QFont, value_font: QFont,
                                bg_color: QColor, border_color: QColor,
                                widgets_config: Dict[str, Any]) -> QWidget:
-        """Create openings widget showing most played, worst, and best accuracy openings."""
+        """Create openings widget showing most played, worst, and best accuracy openings.
+
+        Layout:
+            - One section for each of: Most Played, Worst Accuracy, Best Accuracy.
+            - Each section has a label and a compact grid of rows:
+                ECO | Name | Games | CPL (for worst/best).
+
+        Responsiveness:
+            - When the view becomes narrow, opening names are hidden via
+              _update_openings_visibility(), keeping ECO and numeric data visible.
+        """
         border_radius = widgets_config.get('border_radius', 5)
         section_margins = widgets_config.get('section_margins', [10, 10, 10, 10])
         section_spacing = widgets_config.get('section_spacing', 8)
@@ -2952,206 +3025,129 @@ class DetailPlayerStatsView(QWidget):
         panel_config = ui_config.get('panels', {}).get('detail', {})
         player_stats_config = panel_config.get('player_stats', {})
         grid_config = player_stats_config.get('grid', {})
-        label_col_min_width = grid_config.get('label_column_minimum_width', 150)
-        value_col_min_width = grid_config.get('value_column_minimum_width', 100)
-        
-        # Most Played Openings
+        eco_col_min_width = grid_config.get('label_column_minimum_width', 150)
+        name_col_min_width = grid_config.get('value_column_minimum_width', 100)
+
+        def _add_openings_section(
+            title: str,
+            rows: List[Tuple[str, Optional[str], Optional[float], int]],
+            show_cpl: bool,
+        ) -> None:
+            """Add a compact openings section with one row per opening."""
+            if not rows:
+                return
+
+            section_label = QLabel(title)
+            section_label.setFont(label_font)
+            section_label.setStyleSheet(
+                f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+                "border: none; background: transparent;"
+            )
+            section_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            layout.addWidget(section_label)
+
+            grid = QGridLayout()
+            grid.setSpacing(grid_spacing)
+            # Column layout: 0=ECO, 1=Name, 2=Games, 3=CPL (optional)
+            grid.setColumnStretch(0, 0)
+            grid.setColumnStretch(1, 1)
+            grid.setColumnStretch(2, 0)
+            grid.setColumnStretch(3, 0)
+            grid.setColumnMinimumWidth(0, eco_col_min_width)
+            grid.setColumnMinimumWidth(1, name_col_min_width)
+
+            row_idx = 0
+            for eco, opening_name, avg_cpl, count in rows:
+                eco_text = eco if eco and eco != "Unknown" else "?"
+                # Show name when available; keep empty to allow compact mode to hide it.
+                full_name = opening_name or ""
+                if not full_name and not (eco and eco != "Unknown"):
+                    full_name = "Unknown"
+                name_text = full_name
+                games_text = f"{count} game" if count == 1 else f"{count} games"
+                cpl_text = f"{avg_cpl:.1f} CPL" if (show_cpl and avg_cpl is not None) else ""
+
+                eco_label = QLabel(eco_text)
+                eco_label.setFont(value_font)
+                eco_label.setStyleSheet(
+                    f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+                    "border: none; background: transparent;"
+                )
+                eco_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
+                name_label = QLabel(name_text)
+                name_label.setFont(value_font)
+                name_label.setStyleSheet(
+                    f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+                    "border: none; background: transparent;"
+                )
+                name_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+                name_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+                name_label.setMinimumWidth(0)
+
+                games_label = QLabel(games_text)
+                games_label.setFont(value_font)
+                games_label.setStyleSheet(
+                    f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+                    "border: none; background: transparent;"
+                )
+                games_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
+                cpl_label: Optional[QLabel] = None
+                if show_cpl:
+                    cpl_label = QLabel(cpl_text)
+                    cpl_label.setFont(value_font)
+                    cpl_label.setStyleSheet(
+                        f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+                        "border: none; background: transparent;"
+                    )
+                    cpl_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
+                grid.addWidget(eco_label, row_idx, 0)
+                grid.addWidget(name_label, row_idx, 1)
+                grid.addWidget(games_label, row_idx, 2)
+                if cpl_label is not None:
+                    grid.addWidget(cpl_label, row_idx, 3)
+
+                # Track row for responsive updates
+                self._openings_items.append(
+                    {
+                        "eco_label": eco_label,
+                        "name_label": name_label,
+                        "games_label": games_label,
+                        "cpl_label": cpl_label,
+                        "full_name": full_name,
+                    }
+                )
+
+                row_idx += 1
+
+            grid_widget = QWidget()
+            grid_widget.setLayout(grid)
+            grid_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+            layout.addWidget(grid_widget)
+            layout.addSpacing(section_spacing)
+
+        # Build sections from AggregatedPlayerStats
         if stats.top_openings:
-            grid_most = QGridLayout()
-            grid_most.setSpacing(grid_spacing * 2)  # Increase spacing between label and value
-            # 2-column layout: labels (left), values (right, expanding)
-            grid_most.setColumnStretch(0, 0)  # Label column - no stretch
-            grid_most.setColumnStretch(1, 1)  # Value column - expanding to fill space
-            grid_most.setColumnMinimumWidth(0, label_col_min_width)  # Set minimum width for label column
-            grid_most.setColumnMinimumWidth(1, 0)  # Allow value column to shrink
-            
-            openings_lines = []
-            openings_lines_eco_only = []
-            for eco, opening_name, count in stats.top_openings:
-                if opening_name and eco != "Unknown":
-                    openings_lines.append(f"{eco} ({opening_name}):\n({count} games)")
-                    openings_lines_eco_only.append(f"{eco}: ({count} games)")
-                elif eco != "Unknown":
-                    openings_lines.append(f"{eco}:\n({count} games)")
-                    openings_lines_eco_only.append(f"{eco}: ({count} games)")
-                else:
-                    openings_lines.append(f"Unknown:\n({count} games)")
-                    openings_lines_eco_only.append(f"?: ({count} games)")
-            
-            if openings_lines:
-                # Add spacing between items for better readability
-                openings_text = "\n\n".join(openings_lines)
-                openings_text_eco_only = "\n\n".join(openings_lines_eco_only)
-                label = QLabel("Most Played:")
-                label.setFont(label_font)
-                label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
-                label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-                label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
-                label.setMinimumWidth(0)  # Allow label to shrink
-                grid_most.addWidget(label, 0, 0)
-                
-                value = QLabel(openings_text)
-                value.setFont(value_font)
-                value.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
-                value.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)  # Left-aligned for better readability
-                value.setWordWrap(True)  # Allow wrapping for graceful width reduction
-                value.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-                value.setMinimumWidth(0)  # Allow value to shrink
-                
-                # Setup opacity effect for fading opening names
-                opening_name_opacity = QGraphicsOpacityEffect(value)
-                value.setGraphicsEffect(opening_name_opacity)
-                opening_name_opacity.setOpacity(1.0)
-                
-                grid_most.addWidget(value, 0, 1)  # Column 1 for expanding values
-                
-                # Store for responsive handling
-                self._openings_items.append({
-                    'label': label,
-                    'value': value,
-                    'opacity_effect': opening_name_opacity,
-                    'full_text': openings_text,
-                    'eco_only_text': openings_text_eco_only
-                })
-            
-            # Wrap grid in a widget to ensure it expands properly
-            grid_widget_most = QWidget()
-            grid_widget_most.setLayout(grid_most)
-            grid_widget_most.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-            layout.addWidget(grid_widget_most)
-            layout.addSpacing(section_spacing)
-        
-        # Worst Accuracy Openings
+            top_rows: List[Tuple[str, Optional[str], Optional[float], int]] = [
+                (eco, opening_name, None, count) for eco, opening_name, count in stats.top_openings
+            ]
+            _add_openings_section("Most Played:", top_rows, show_cpl=False)
+
         if stats.worst_accuracy_openings:
-            grid_worst = QGridLayout()
-            grid_worst.setSpacing(grid_spacing * 2)  # Increase spacing between label and value
-            # 2-column layout: labels (left), values (right, expanding)
-            grid_worst.setColumnStretch(0, 0)  # Label column - no stretch
-            grid_worst.setColumnStretch(1, 1)  # Value column - expanding to fill space
-            grid_worst.setColumnMinimumWidth(0, label_col_min_width)  # Set minimum width for label column
-            grid_worst.setColumnMinimumWidth(1, 0)  # Allow value column to shrink
-            
-            worst_lines = []
-            worst_lines_eco_only = []
-            for eco, opening_name, avg_cpl, count in stats.worst_accuracy_openings:
-                if opening_name and eco != "Unknown":
-                    worst_lines.append(f"{eco} ({opening_name}):\n{avg_cpl:.1f} CPL ({count} games)")
-                    worst_lines_eco_only.append(f"{eco}: {avg_cpl:.1f} CPL ({count} games)")
-                elif eco != "Unknown":
-                    worst_lines.append(f"{eco}: {avg_cpl:.1f} CPL ({count} games)")
-                    worst_lines_eco_only.append(f"{eco}: {avg_cpl:.1f} CPL ({count} games)")
-                else:
-                    worst_lines.append(f"Unknown: {avg_cpl:.1f} CPL ({count} games)")
-                    worst_lines_eco_only.append(f"?: {avg_cpl:.1f} CPL ({count} games)")
-            
-            if worst_lines:
-                # Add spacing between items for better readability
-                worst_text = "\n\n".join(worst_lines)
-                worst_text_eco_only = "\n\n".join(worst_lines_eco_only)
-                label = QLabel("Worst Accuracy:")
-                label.setFont(label_font)
-                label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
-                label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-                label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
-                label.setMinimumWidth(0)  # Allow label to shrink
-                grid_worst.addWidget(label, 0, 0)
-                
-                value = QLabel(worst_text)
-                value.setFont(value_font)
-                value.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
-                value.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)  # Left-aligned for better readability
-                value.setWordWrap(True)  # Allow wrapping for graceful width reduction
-                value.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-                value.setMinimumWidth(0)  # Allow value to shrink
-                
-                # Setup opacity effect for fading opening names
-                opening_name_opacity = QGraphicsOpacityEffect(value)
-                value.setGraphicsEffect(opening_name_opacity)
-                opening_name_opacity.setOpacity(1.0)
-                
-                grid_worst.addWidget(value, 0, 1)  # Column 1 for expanding values
-                
-                # Store for responsive handling
-                self._openings_items.append({
-                    'label': label,
-                    'value': value,
-                    'opacity_effect': opening_name_opacity,
-                    'full_text': worst_text,
-                    'eco_only_text': worst_text_eco_only
-                })
-            
-            # Wrap grid in a widget to ensure it expands properly
-            grid_widget_worst = QWidget()
-            grid_widget_worst.setLayout(grid_worst)
-            grid_widget_worst.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-            layout.addWidget(grid_widget_worst)
-            layout.addSpacing(section_spacing)
-        
-        # Best Accuracy Openings
+            worst_rows: List[Tuple[str, Optional[str], Optional[float], int]] = [
+                (eco, opening_name, avg_cpl, count)
+                for eco, opening_name, avg_cpl, count in stats.worst_accuracy_openings
+            ]
+            _add_openings_section("Worst Accuracy:", worst_rows, show_cpl=True)
+
         if stats.best_accuracy_openings:
-            grid_best = QGridLayout()
-            grid_best.setSpacing(grid_spacing * 2)  # Increase spacing between label and value
-            # 2-column layout: labels (left), values (right, expanding)
-            grid_best.setColumnStretch(0, 0)  # Label column - no stretch
-            grid_best.setColumnStretch(1, 1)  # Value column - expanding to fill space
-            grid_best.setColumnMinimumWidth(0, label_col_min_width)  # Set minimum width for label column
-            grid_best.setColumnMinimumWidth(1, 0)  # Allow value column to shrink
-            
-            best_lines = []
-            best_lines_eco_only = []
-            for eco, opening_name, avg_cpl, count in stats.best_accuracy_openings:
-                if opening_name and eco != "Unknown":
-                    best_lines.append(f"{eco} ({opening_name}):\n{avg_cpl:.1f} CPL ({count} games)")
-                    best_lines_eco_only.append(f"{eco}: {avg_cpl:.1f} CPL ({count} games)")
-                elif eco != "Unknown":
-                    best_lines.append(f"{eco}: {avg_cpl:.1f} CPL ({count} games)")
-                    best_lines_eco_only.append(f"{eco}: {avg_cpl:.1f} CPL ({count} games)")
-                else:
-                    best_lines.append(f"Unknown: {avg_cpl:.1f} CPL ({count} games)")
-                    best_lines_eco_only.append(f"?: {avg_cpl:.1f} CPL ({count} games)")
-            
-            if best_lines:
-                # Add spacing between items for better readability
-                best_text = "\n\n".join(best_lines)
-                best_text_eco_only = "\n\n".join(best_lines_eco_only)
-                label = QLabel("Best Accuracy:")
-                label.setFont(label_font)
-                label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
-                label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-                label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
-                label.setMinimumWidth(0)  # Allow label to shrink
-                grid_best.addWidget(label, 0, 0)
-                
-                value = QLabel(best_text)
-                value.setFont(value_font)
-                value.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
-                value.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)  # Left-aligned for better readability
-                value.setWordWrap(True)  # Allow wrapping for graceful width reduction
-                value.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-                value.setMinimumWidth(0)  # Allow value to shrink
-                
-                # Setup opacity effect for fading opening names
-                opening_name_opacity = QGraphicsOpacityEffect(value)
-                value.setGraphicsEffect(opening_name_opacity)
-                opening_name_opacity.setOpacity(1.0)
-                
-                grid_best.addWidget(value, 0, 1)  # Column 1 for expanding values
-                
-                # Store for responsive handling
-                self._openings_items.append({
-                    'label': label,
-                    'value': value,
-                    'opacity_effect': opening_name_opacity,
-                    'full_text': best_text,
-                    'eco_only_text': best_text_eco_only
-                })
-            
-            # Wrap grid in a widget to ensure it expands properly
-            grid_widget_best = QWidget()
-            grid_widget_best.setLayout(grid_best)
-            grid_widget_best.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-            layout.addWidget(grid_widget_best)
-            layout.addSpacing(section_spacing)
+            best_rows: List[Tuple[str, Optional[str], Optional[float], int]] = [
+                (eco, opening_name, avg_cpl, count)
+                for eco, opening_name, avg_cpl, count in stats.best_accuracy_openings
+            ]
+            _add_openings_section("Best Accuracy:", best_rows, show_cpl=True)
 
         layout.addStretch()
 
@@ -3847,7 +3843,7 @@ class DetailPlayerStatsView(QWidget):
                 continue
     
     def _update_openings_visibility(self) -> None:
-        """Update openings text based on available width - switch to ECO-only when narrow."""
+        """Update openings rows based on available width (show/hide opening names)."""
         if not self._openings_widget or not hasattr(self, 'scroll_area'):
             return
         
@@ -3868,87 +3864,91 @@ class DetailPlayerStatsView(QWidget):
         if available_width == 0:
             return
         
-        # Determine if we should show full content or compact
-        # With line breaks in full text, we can use a slightly lower threshold
-        should_show_full = available_width >= self.openings_collapse_threshold
+        # Determine whether to show full names or elided (shortened) names
+        show_full_names = available_width >= self.openings_collapse_threshold
 
-        # Update opening tree header hint based on width (when tree is present)
+        # Update opening tree header hint and columns based on width (when tree is present)
         if self._opening_tree_widget is not None:
             try:
                 header_item = self._opening_tree_widget.headerItem()
                 if header_item is not None:
-                    if should_show_full:
+                    if show_full_names:
                         header_item.setText(0, self._opening_tree_header_with_hint)
                     else:
                         header_item.setText(0, self._opening_tree_header_compact)
+
+                # Simple, threshold-driven column visibility:
+                # When narrow, keep: 0=Move/Opening, 1=Total, 5=Phase Acc.
+                # Hide: 2=White, 3=Black, 4=Game Acc.
+                col_count = self._opening_tree_widget.columnCount()
+                if show_full_names:
+                    # Show all columns when there is enough width.
+                    for col in range(col_count):
+                        self._opening_tree_widget.setColumnHidden(col, False)
+                else:
+                    # Narrow view: hide less important numeric columns.
+                    for col in range(col_count):
+                        if col in (2, 3, 4):
+                            self._opening_tree_widget.setColumnHidden(col, True)
+                        else:
+                            self._opening_tree_widget.setColumnHidden(col, False)
             except RuntimeError:
-                # Tree widget may have been deleted during rebuild
+                # Tree widget may have been deleted
                 self._opening_tree_widget = None
-        # Update endgame tree header hint based on width (when tree is present)
+
+        # Update endgame tree header hint and columns based on width (when tree is present)
         if self._endgame_tree_widget is not None:
             try:
                 header_item = self._endgame_tree_widget.headerItem()
                 if header_item is not None:
-                    if should_show_full:
+                    if show_full_names:
                         header_item.setText(0, self._endgame_tree_header_with_hint)
                     else:
                         header_item.setText(0, self._endgame_tree_header_compact)
+
+                # Same behavior as opening tree:
+                # Keep: 0=Endgame type, 1=Total, 5=Phase Acc.
+                # Hide: 2=White, 3=Black, 4=Game Acc.
+                col_count = self._endgame_tree_widget.columnCount()
+                if show_full_names:
+                    for col in range(col_count):
+                        self._endgame_tree_widget.setColumnHidden(col, False)
+                else:
+                    for col in range(col_count):
+                        if col in (2, 3, 4):
+                            self._endgame_tree_widget.setColumnHidden(col, True)
+                        else:
+                            self._endgame_tree_widget.setColumnHidden(col, False)
             except RuntimeError:
                 self._endgame_tree_widget = None
         
-        # Update each openings item
+        # Update each openings row: truncate or restore the middle (name) column
         for item_data in self._openings_items:
-            value_label = item_data.get('value')
-            opacity_effect = item_data.get('opacity_effect')
-            full_text = item_data.get('full_text', '')
-            eco_only_text = item_data.get('eco_only_text', '')
-            
-            if not value_label:
+            name_label: Optional[QLabel] = item_data.get("name_label")
+            full_name: str = item_data.get("full_name", "")
+            if not name_label:
                 continue
-            
-            # Update text and width constraints
-            if should_show_full:
-                # Show full text with opening names (now with line breaks for better wrapping)
-                value_label.setText(full_text)
-                # Calculate reasonable max width based on available space
-                # Get width calculation values from config
-                panel_config = self.config.get('ui', {}).get('panels', {}).get('detail', {})
-                player_stats_config = panel_config.get('player_stats', {})
-                openings_config = player_stats_config.get('openings', {})
-                label_column_width = openings_config.get('label_column_width', 120)
-                margins_width = openings_config.get('margins_width', 40)
-                min_value_width = openings_config.get('min_value_width', 150)
-                max_value_width = max(min_value_width, available_width - label_column_width - margins_width)
-                value_label.setMaximumWidth(max_value_width)
-                if opacity_effect:
-                    # Animate opacity to 1.0 (fully visible)
-                    opacity_anim = QPropertyAnimation(opacity_effect, b"opacity")
-                    opacity_anim.setDuration(self.animation_duration)
-                    opacity_anim.setStartValue(opacity_effect.opacity())
-                    opacity_anim.setEndValue(1.0)
-                    opacity_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-                    opacity_anim.start()
+            if not full_name:
+                continue
+
+            if show_full_names:
+                # Restore full name
+                name_label.setText(full_name)
             else:
-                # Show ECO-only text (single line, more compact)
-                value_label.setText(eco_only_text if eco_only_text else full_text)
-                # Set maximum width to prevent overflow
-                # Get width calculation values from config
+                # Elide name text based on available width so ECO and metrics stay visible
                 panel_config = self.config.get('ui', {}).get('panels', {}).get('detail', {})
                 player_stats_config = panel_config.get('player_stats', {})
                 openings_config = player_stats_config.get('openings', {})
                 label_column_width = openings_config.get('label_column_width', 120)
                 margins_width = openings_config.get('margins_width', 40)
-                min_eco_width = openings_config.get('min_eco_width', 100)
-                estimated_available = max(min_eco_width, available_width - label_column_width - margins_width)
-                value_label.setMaximumWidth(estimated_available)
-                if opacity_effect:
-                    # Keep opacity at 1.0 for ECO-only text
-                    opacity_anim = QPropertyAnimation(opacity_effect, b"opacity")
-                    opacity_anim.setDuration(self.animation_duration)
-                    opacity_anim.setStartValue(opacity_effect.opacity())
-                    opacity_anim.setEndValue(1.0)
-                    opacity_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-                    opacity_anim.start()
+                min_name_width = openings_config.get('min_value_width', 150)
+                # Reserve some space for ECO and numeric columns (~140px as heuristic)
+                reserved_for_other = label_column_width + margins_width + 140
+                max_name_width = max(min_name_width, available_width - reserved_for_other)
+
+                metrics = QFontMetrics(name_label.font())
+                elided = metrics.elidedText(full_name, Qt.TextElideMode.ElideRight, max_name_width)
+                name_label.setText(elided)
     
     def _on_resize_debounce_timeout(self) -> None:
         """Run all visibility updates once after resize has settled (avoids stack overflow from rapid resizes)."""

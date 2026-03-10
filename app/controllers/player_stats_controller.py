@@ -675,12 +675,18 @@ class PlayerStatsController(QObject):
 
             is_white_game = (game.white == self._current_player)
 
-            # Per-game accuracy for this player (overall game accuracy)
+            # Per-game accuracy for this player:
+            # - Overall game accuracy (used for "Game Acc" column)
+            # - Opening-phase accuracy (used for "Opening Acc" column)
             if is_white_game:
                 player_stats = summary.white_stats
+                phase_stats = summary.white_opening
             else:
                 player_stats = summary.black_stats
+                phase_stats = summary.black_opening
+
             game_accuracy = player_stats.accuracy if player_stats and player_stats.accuracy is not None else 0.0
+            opening_phase_accuracy = phase_stats.accuracy if phase_stats and phase_stats.accuracy is not None else 0.0
 
             node = tree
             ply_count = 0
@@ -701,8 +707,14 @@ class PlayerStatsController(QObject):
                             "games": 0,
                             "white_games": 0,
                             "black_games": 0,
-                            "accuracy_sum": 0.0,
-                            "accuracy_count": 0,
+                            # Aggregated overall game accuracy for this player in games
+                            # that reached this node.
+                            "game_accuracy_sum": 0.0,
+                            "game_accuracy_count": 0,
+                            # Aggregated opening-phase accuracy for this player in games
+                            # that reached this node.
+                            "opening_accuracy_sum": 0.0,
+                            "opening_accuracy_count": 0,
                             "children": {},
                         },
                     )
@@ -711,8 +723,10 @@ class PlayerStatsController(QObject):
                         child["white_games"] += 1
                     else:
                         child["black_games"] += 1
-                    child["accuracy_sum"] += float(game_accuracy)
-                    child["accuracy_count"] += 1
+                    child["game_accuracy_sum"] += float(game_accuracy)
+                    child["game_accuracy_count"] += 1
+                    child["opening_accuracy_sum"] += float(opening_phase_accuracy)
+                    child["opening_accuracy_count"] += 1
 
                     # Attach ECO info (opening family) if available and not already set
                     fen_after = getattr(move, "fen_white", "") or ""
@@ -739,8 +753,10 @@ class PlayerStatsController(QObject):
                             "games": 0,
                             "white_games": 0,
                             "black_games": 0,
-                            "accuracy_sum": 0.0,
-                            "accuracy_count": 0,
+                            "game_accuracy_sum": 0.0,
+                            "game_accuracy_count": 0,
+                            "opening_accuracy_sum": 0.0,
+                            "opening_accuracy_count": 0,
                             "children": {},
                         },
                     )
@@ -749,8 +765,10 @@ class PlayerStatsController(QObject):
                         child["white_games"] += 1
                     else:
                         child["black_games"] += 1
-                    child["accuracy_sum"] += float(game_accuracy)
-                    child["accuracy_count"] += 1
+                    child["game_accuracy_sum"] += float(game_accuracy)
+                    child["game_accuracy_count"] += 1
+                    child["opening_accuracy_sum"] += float(opening_phase_accuracy)
+                    child["opening_accuracy_count"] += 1
 
                     fen_after = getattr(move, "fen_black", "") or ""
                     if fen_after and "eco" not in child:
@@ -791,24 +809,27 @@ class PlayerStatsController(QObject):
         self,
         san_path: List[str],
         max_depth: int = 12,
-    ) -> List[Tuple["GameData", str]]:
-        """Return games (with source names) that follow the given SAN path from the start.
-
+    ) -> List[Tuple["GameData", str, int]]:
+        """Return games (with source names and ref_ply) that follow the given SAN path from the start.
+        
         san_path is a sequence of SAN moves like ["e4", "c5", "Nf3"] corresponding to
         the path of a node in the opening tree.
+        
+        ref_ply is set to the ply index of the last move in the SAN path so the
+        Search Results tab can jump directly to the defining move of that opening.
         """
         from app.services.analysis_data_storage_service import AnalysisDataStorageService
-
-        results: List[Tuple["GameData", str]] = []
+        
+        matches: List[Tuple["GameData", int]] = []
         if not san_path or not self._current_player:
-            return results
-
+            return []
+        
         analyzed_games = getattr(self, "_current_analyzed_games", []) or []
         if not analyzed_games:
-            return results
-
+            return []
+        
         max_plies = min(max_depth, len(san_path))
-
+        
         for game in analyzed_games:
             if not getattr(game, "analyzed", False):
                 continue
@@ -818,11 +839,11 @@ class PlayerStatsController(QObject):
                 moves = None
             if not moves:
                 continue
-
+            
             path_idx = 0
             ply_count = 0
             matched = True
-
+            
             for move in moves:
                 if ply_count >= max_plies:
                     break
@@ -848,28 +869,45 @@ class PlayerStatsController(QObject):
                         matched = False
                         break
                     path_idx += 1
-
+            
             if matched and path_idx == len(san_path):
-                results.append(game)
-
-        if not results:
+                # ply_count now points at the last move in san_path
+                ref_ply = int(ply_count) if ply_count > 0 else 0
+                matches.append((game, ref_ply))
+        
+        if not matches:
             return []
-
+        
         # Map games to source display names (database file names)
-        return self._map_games_to_sources(results)
+        games_only = [g for (g, _) in matches]
+        mapped = self._map_games_to_sources(games_only)  # List[Tuple[GameData, str]]
+        game_to_source: Dict["GameData", str] = {game: source for (game, source) in mapped}
+        
+        results_with_ref: List[Tuple["GameData", str, int]] = []
+        for game, ref_ply in matches:
+            source_name = game_to_source.get(game)
+            if not source_name:
+                continue
+            results_with_ref.append((game, source_name, ref_ply))
+        
+        return results_with_ref
 
     def get_games_for_endgame_filter(
         self,
         raw_type: Optional[str] = None,
         group_key: Optional[str] = None,
-    ) -> List[Tuple["GameData", str]]:
-        """Return games (with source names) that match the given endgame type or group.
-
+    ) -> List[Tuple["GameData", str, int]]:
+        """Return games (with source names and ref_ply) that match the given endgame type or group.
+        
         Exactly one of raw_type or group_key must be set.
         - raw_type: filter by specific endgame type (e.g. "Rook + Minor Piece").
         - group_key: filter by endgame group (e.g. "Rook" includes all rook endgame types).
+        
+        ref_ply is set to the ply index corresponding to the middlegame/endgame
+        boundary (`middlegame_end` from GameSummary, converted to ply index) so
+        the Search Results tab can jump directly to the start of the endgame.
         """
-        results: List["GameData"] = []
+        matches: List[Tuple["GameData", int]] = []
         analyzed_games = getattr(self, "_current_analyzed_games", []) or []
         summaries = getattr(self, "current_game_summaries", []) or []
         if not analyzed_games or not summaries or len(analyzed_games) != len(summaries):
@@ -878,12 +916,37 @@ class PlayerStatsController(QObject):
             return []
         for game, summary in zip(analyzed_games, summaries):
             if raw_type is not None:
-                if getattr(summary, "endgame_type", None) == raw_type:
-                    results.append(game)
+                if getattr(summary, "endgame_type", None) != raw_type:
+                    continue
             else:
-                if getattr(summary, "endgame_type_group", None) == group_key:
-                    results.append(game)
-        return self._map_games_to_sources(results)
+                if getattr(summary, "endgame_type_group", None) != group_key:
+                    continue
+            # Convert middlegame_end (full-move number) to a ply index.
+            middlegame_end = getattr(summary, "middlegame_end", 0) or 0
+            if middlegame_end > 0:
+                # Jump to the first full move classified as endgame.
+                # Using ply = middlegame_end * 2 aligns with the endgame
+                # boundary used in GameSummaryService.
+                ref_ply = middlegame_end * 2
+            else:
+                ref_ply = 0
+            matches.append((game, ref_ply))
+        
+        if not matches:
+            return []
+        
+        games_only = [g for (g, _) in matches]
+        mapped = self._map_games_to_sources(games_only)  # List[Tuple[GameData, str]]
+        game_to_source: Dict["GameData", str] = {game: source for (game, source) in mapped}
+        
+        results_with_ref: List[Tuple["GameData", str, int]] = []
+        for game, ref_ply in matches:
+            source_name = game_to_source.get(game)
+            if not source_name:
+                continue
+            results_with_ref.append((game, source_name, ref_ply))
+        
+        return results_with_ref
 
     def get_top_best_games_summary(self, max_best: int) -> Tuple[int, Optional[float], Optional[float]]:
         """Return count and accuracy range for the best-performing games."""

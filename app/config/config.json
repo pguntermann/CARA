@@ -1458,7 +1458,9 @@
               "total": "ResizeToContents",
               "white": "ResizeToContents",
               "black": "ResizeToContents",
-              "accuracy": "ResizeToContents"
+              "accuracy": "ResizeToContents",
+              "game_accuracy": "ResizeToContents",
+              "opening_accuracy": "ResizeToContents"
             }
           },
           "endgame_tree": {
@@ -1474,7 +1476,9 @@
               "total": "ResizeToContents",
               "white": "ResizeToContents",
               "black": "ResizeToContents",
-              "accuracy": "ResizeToContents"
+              "accuracy": "ResizeToContents",
+              "game_accuracy": "ResizeToContents",
+              "endgame_accuracy": "ResizeToContents"
             }
           },
           "accuracy_vs_progress_chart": {

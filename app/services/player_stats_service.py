@@ -216,10 +216,17 @@ class AggregatedPlayerStats:
     accuracy_values: List[float]
     # Running accuracy by game progress (0–100%): list of (progress_pct, avg_accuracy) for chart
     accuracy_by_progress: List[Tuple[float, float]]
-    # Performance by endgame type: list of (display_label, accuracy_pct, game_count), sorted by game_count descending
-    accuracy_by_endgame_type: List[Tuple[str, float, int]]
-    # Endgame tree (expandable in UI): (group_key, group_display, group_accuracy, group_count, group_white, group_black, [(raw_type, type_display, type_accuracy, type_count, type_white, type_black), ...]), sorted by group_count descending
-    accuracy_by_endgame_type_grouped: List[Tuple[str, str, float, int, int, int, List[Tuple[str, str, float, int, int, int]]]]
+    # Performance by endgame type:
+    # (display_label, endgame_accuracy_pct, game_count, game_accuracy_pct), sorted by game_count descending.
+    accuracy_by_endgame_type: List[Tuple[str, float, int, float]]
+    # Endgame tree (expandable in UI):
+    # (group_key, group_display, group_endgame_accuracy, group_game_accuracy,
+    #  group_count, group_white, group_black,
+    #  [(raw_type, type_display, type_endgame_accuracy, type_game_accuracy,
+    #    type_count, type_white, type_black), ...]), sorted by group_count descending.
+    accuracy_by_endgame_type_grouped: List[
+        Tuple[str, str, float, float, int, int, int, List[Tuple[str, str, float, float, int, int, int]]]
+    ]
 
 
 class PlayerStatsService:
@@ -441,7 +448,8 @@ class PlayerStatsService:
         
         opening_counter = Counter()
         opening_cpl_data: Dict[Tuple[str, Optional[str]], List[float]] = {}
-        endgame_type_data: Dict[str, List[Tuple[float, bool]]] = {}  # raw_type -> [(accuracy, is_white), ...]
+        # raw_type -> [(endgame_phase_accuracy, is_white, game_accuracy), ...]
+        endgame_type_data: Dict[str, List[Tuple[float, bool, float]]] = {}
         
         for result in game_results:
             is_white_game = result['is_white']
@@ -535,10 +543,13 @@ class PlayerStatsService:
             endgame_misses += game_endgame.misses
             endgame_blunders += game_endgame.blunders
             
-            # Collect accuracy by endgame type (for games that have a classified endgame type), with white/black
+            # Collect accuracy by endgame type (for games that have a classified endgame type),
+            # storing both endgame-phase accuracy and overall game accuracy, plus color.
             game_summary = result.get('game_summary')
             if game_summary and game_summary.endgame_type:
-                endgame_type_data.setdefault(game_summary.endgame_type, []).append((game_endgame.accuracy, is_white_game))
+                endgame_type_data.setdefault(game_summary.endgame_type, []).append(
+                    (game_endgame.accuracy, is_white_game, game_stats.accuracy)
+                )
             
             # Track opening usage and CPL
             opening_counter[opening_key] += 1
@@ -704,40 +715,69 @@ class PlayerStatsService:
             if values:
                 accuracy_by_progress_list.append((pct, sum(values) / len(values)))
 
-        # Performance by endgame type (flat): (display_label, accuracy_pct, game_count), sorted by game_count descending
-        accuracy_by_endgame_type_list: List[Tuple[str, float, int]] = []
+        # Performance by endgame type (flat):
+        # (display_label, endgame_accuracy_pct, game_count, game_accuracy_pct),
+        # sorted by game_count descending.
+        accuracy_by_endgame_type_list: List[Tuple[str, float, int, float]] = []
         for raw_type, data in endgame_type_data.items():
             if data:
-                accuracies = [a for a, _ in data]
+                endgame_accuracies = [a for a, _, _ in data]
+                game_accuracies = [g for _, _, g in data]
                 display_name = self.summary_service.get_endgame_type_display_name(raw_type)
-                avg_accuracy = sum(accuracies) / len(accuracies)
-                accuracy_by_endgame_type_list.append((display_name, avg_accuracy, len(data)))
+                avg_endgame_accuracy = sum(endgame_accuracies) / len(endgame_accuracies)
+                avg_game_accuracy = sum(game_accuracies) / len(game_accuracies)
+                accuracy_by_endgame_type_list.append(
+                    (display_name, avg_endgame_accuracy, len(data), avg_game_accuracy)
+                )
         accuracy_by_endgame_type_list.sort(key=lambda x: x[2], reverse=True)
 
-        # Endgame tree grouped: (group_key, group_display, group_accuracy, group_count, group_white, group_black, [(raw_type, type_display, type_accuracy, type_count, type_white, type_black), ...])
-        group_to_types: Dict[str, List[Tuple[str, str, float, int, int, int]]] = {}
+        # Endgame tree grouped:
+        # (group_key, group_display, group_endgame_accuracy, group_game_accuracy,
+        #  group_count, group_white, group_black,
+        #  [(raw_type, type_display, type_endgame_accuracy, type_game_accuracy,
+        #    type_count, type_white, type_black), ...])
+        group_to_types: Dict[str, List[Tuple[str, str, float, float, int, int, int]]] = {}
         for raw_type, data in endgame_type_data.items():
             if not data:
                 continue
-            accuracies = [a for a, _ in data]
-            white_count = sum(1 for _, w in data if w)
-            black_count = sum(1 for _, w in data if not w)
+            endgame_accuracies = [a for a, _, _ in data]
+            game_accuracies = [g for _, _, g in data]
+            white_count = sum(1 for _, w, _ in data if w)
+            black_count = sum(1 for _, w, _ in data if not w)
             count = len(data)
-            avg_accuracy = sum(accuracies) / count
+            avg_endgame_accuracy = sum(endgame_accuracies) / count
+            avg_game_accuracy = sum(game_accuracies) / count
             group_key = self.summary_service.get_endgame_type_group(raw_type)
             display_name = self.summary_service.get_endgame_type_display_name(raw_type)
-            group_to_types.setdefault(group_key, []).append((raw_type, display_name, avg_accuracy, count, white_count, black_count))
-        accuracy_by_endgame_type_grouped_list: List[Tuple[str, str, float, int, int, int, List[Tuple[str, str, float, int, int, int]]]] = []
+            group_to_types.setdefault(group_key, []).append(
+                (raw_type, display_name, avg_endgame_accuracy, avg_game_accuracy, count, white_count, black_count)
+            )
+        accuracy_by_endgame_type_grouped_list: List[
+            Tuple[str, str, float, float, int, int, int, List[Tuple[str, str, float, float, int, int, int]]]
+        ] = []
         for group_key, types_list in group_to_types.items():
-            group_count = sum(c for _, _, _, c, _, _ in types_list)
-            group_white = sum(w for _, _, _, _, w, _ in types_list)
-            group_black = sum(b for _, _, _, _, _, b in types_list)
-            group_accuracy_sum = sum(acc * c for _, _, acc, c, _, _ in types_list)
-            group_accuracy = group_accuracy_sum / group_count if group_count else 0.0
-            types_list_sorted = sorted(types_list, key=lambda x: x[3], reverse=True)
+            group_count = sum(c for _, _, _, _, c, _, _ in types_list)
+            group_white = sum(w for _, _, _, _, _, w, _ in types_list)
+            group_black = sum(b for _, _, _, _, _, _, b in types_list)
+            group_endgame_accuracy_sum = sum(acc * c for _, _, acc, _, c, _, _ in types_list)
+            group_game_accuracy_sum = sum(acc_g * c for _, _, _, acc_g, c, _, _ in types_list)
+            group_endgame_accuracy = group_endgame_accuracy_sum / group_count if group_count else 0.0
+            group_game_accuracy = group_game_accuracy_sum / group_count if group_count else 0.0
+            types_list_sorted = sorted(types_list, key=lambda x: x[4], reverse=True)
             group_display = self.summary_service.get_endgame_type_group_display_name(group_key)
-            accuracy_by_endgame_type_grouped_list.append((group_key, group_display, group_accuracy, group_count, group_white, group_black, types_list_sorted))
-        accuracy_by_endgame_type_grouped_list.sort(key=lambda x: x[3], reverse=True)
+            accuracy_by_endgame_type_grouped_list.append(
+                (
+                    group_key,
+                    group_display,
+                    group_endgame_accuracy,
+                    group_game_accuracy,
+                    group_count,
+                    group_white,
+                    group_black,
+                    types_list_sorted,
+                )
+            )
+        accuracy_by_endgame_type_grouped_list.sort(key=lambda x: x[4], reverse=True)
 
         aggregated_stats = AggregatedPlayerStats(
             total_games=total_games,
