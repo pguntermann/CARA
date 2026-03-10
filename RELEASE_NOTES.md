@@ -1,5 +1,28 @@
 # Release Notes
 
+# CARA v2.6.3 - Extended and Improved Player Stats
+
+**Release Date:** 10.03.2026
+
+This release expands the Player Stats view with opening and endgame trees, a new accuracy-over-game-duration chart and new error patterns for detecting recurring blunders, misses, mistakes and inaccuracies. 
+
+## New Features
+
+- **Opening tree:** New opening tree view in the Player Stats panel showing the selected player's repertoire/played openings as an expandable tree with performance and accuracy per branch, including opening phase accuracy and overall game accuracy values. The columns are sortable and tree nodes can be expanded and collapsed, right-clicking allows to expand/collapse all nodes.
+- **Endgame tree:** Similar new tree-view that groups reached endgame types.
+- **Accuracy over game duration:** New line chart with two lines: one for the selected player's running average accuracy over the course of their games, and one for the average of all opponents in those games. 
+
+## Enhancements
+
+- **Error patterns:** New error detection patterns to detect recurring blunders, misses, mistakes and inaccuracies made in the same position. Additionally, existing error patterns were updated to include the referenced moves when clicking the "View" buttons, so that users can directly navigate to the respective moves.
+
+
+## Bug Fixes
+
+- Some minor bug fixes and UI/UX improvements.
+
+---
+
 # CARA v2.6.2 - Maintenance Release
 
 **Release Date:** 06.03.2026
