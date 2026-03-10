@@ -549,7 +549,7 @@ class ErrorPatternService:
         return " ".join(parts[:2]) if len(parts) >= 2 else fen.strip()
     
     def _detect_repeated_position_errors(self, player_name: str, games: List[GameData]) -> List[ErrorPattern]:
-        """Detect repeated blunders, misses, or inaccuracies in the same position across games."""
+        """Detect repeated blunders, mistakes, misses, or inaccuracies in the same position across games."""
         patterns: List[ErrorPattern] = []
         if not self.game_controller or not games:
             return patterns
@@ -568,7 +568,7 @@ class ErrorPatternService:
                 if is_white and (move.white_move or getattr(move, "white_move", None)):
                     fen_before = (prev.fen_black if prev and getattr(prev, "fen_black", None) else None) or start_fen
                     assessment = (move.assess_white or "").strip()
-                    if assessment in ("Blunder", "Miss", "Inaccuracy"):
+                    if assessment in ("Blunder", "Mistake", "Miss", "Inaccuracy"):
                         key = (self._normalize_fen(fen_before), assessment)
                         ply = move.move_number * 2 - 1  # after white's move
                         if key not in collector:
@@ -579,7 +579,7 @@ class ErrorPatternService:
                     fen_before = (move.fen_white or "").strip()
                     if fen_before:
                         assessment = (move.assess_black or "").strip()
-                        if assessment in ("Blunder", "Miss", "Inaccuracy"):
+                        if assessment in ("Blunder", "Mistake", "Miss", "Inaccuracy"):
                             key = (self._normalize_fen(fen_before), assessment)
                             ply = move.move_number * 2  # after black's move
                             if key not in collector:
@@ -588,11 +588,13 @@ class ErrorPatternService:
                 prev = move
         
         min_blunder = self.thresholds.get("repeated_position_min_games_blunder", 2)
+        min_mistake = self.thresholds.get("repeated_position_min_games_mistake", 2)
         min_miss = self.thresholds.get("repeated_position_min_games_miss", 2)
         min_inaccuracy = self.thresholds.get("repeated_position_min_games_inaccuracy", 2)
         
         for assessment_type, min_games, pattern_type, description_label in [
             ("Blunder", min_blunder, "repeated_blunders_same_position", "Repeated blunders in the same position"),
+            ("Mistake", min_mistake, "repeated_mistakes_same_position", "Repeated mistakes in the same position"),
             ("Miss", min_miss, "repeated_misses_same_position", "Repeated misses in the same position"),
             ("Inaccuracy", min_inaccuracy, "repeated_inaccuracies_same_position", "Repeated inaccuracies in the same position"),
         ]:
