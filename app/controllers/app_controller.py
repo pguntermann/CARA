@@ -347,6 +347,18 @@ class AppController:
         status = "Best alternative move arrow shown" if show_arrow else "Best alternative move arrow hidden"
         self.set_status(status)
     
+    def toggle_move_classification_icons_visibility(self) -> None:
+        """Toggle the visibility of move classification icons (badges) on the board.
+        
+        This is a convenience method that goes through the board controller.
+        """
+        self.board_controller.toggle_move_classification_icons_visibility()
+        
+        # Show status message
+        show_icons = self.board_controller.get_board_model().show_move_classification_icons
+        status = "Move classification icons shown" if show_icons else "Move classification icons hidden"
+        self.set_status(status)
+    
     def copy_fen_to_clipboard(self) -> tuple[str, str]:
         """Copy current FEN to clipboard and return formatted status message.
         
@@ -1237,6 +1249,7 @@ class AppController:
             "show_pv2_arrow": board_model.show_pv2_arrow,
             "show_pv3_arrow": board_model.show_pv3_arrow,
             "show_bestalternativemove_arrow": board_model.show_bestalternativemove_arrow,
+            "show_move_classification_icons": board_model.show_move_classification_icons,
             "show_annotations_layer": self.annotation_controller.get_annotation_model().show_annotations if self.annotation_controller else True,
             "hide_other_arrows_during_plan_exploration": board_model.hide_other_arrows_during_plan_exploration,
             "show_evaluation_bar": board_model.show_evaluation_bar,

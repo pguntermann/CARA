@@ -586,6 +586,7 @@
                     <li><strong>Best Next Move Arrow (PV1):</strong> Shows the engine's recommended move during manual analysis mode. Toggle with <code>Alt+B</code> / <code>⌥+B</code> or <span class="menu-item">Board → Show Best Next Move</span>.</li>
                     <li><strong>PV2 and PV3 Arrows:</strong> Display alternative candidate moves from MultiPV analysis during manual analysis mode. Toggle with <code>Alt+2</code> / <code>⌥+2</code>, <code>Alt+3</code> / <code>⌥+3</code> or <span class="menu-item">Board → Show Next Best Move (PV2/PV3)</span>.</li>
                     <li><strong>Best Alternative Move Arrow:</strong> Highlights superior moves found after analyzing the game with the Game Analysis function. The arrow appears once analysis has been performed and indicates when the played move was not optimal. Toggle with <code>Alt+A</code> / <code>⌥+A</code> or <span class="menu-item">Board → Show Best Alternative Move</span>.</li>
+                    <li><strong>Move Classification Icons:</strong> Small badges on the played move's destination square showing the move assessment (e.g. book move, best move, good move, brilliant, inaccuracy, mistake, miss, blunder). Available once the game has been analyzed. Toggle with <code>Alt+4</code> / <code>⌥+4</code> or <span class="menu-item">Board → Show Move Classification Icons</span>.</li>
                     <li><strong>Positional Heatmap:</strong> Color-coded overlay showing positional factors (weak squares, passed pawns, outposts, piece activity, king safety). Toggle with <code>Alt+H</code> / <code>⌥+H</code> or <span class="menu-item">Board → Show Positional Heat-map</span>.</li>
                 </ul>
                 
@@ -1773,12 +1774,16 @@
                 <h5>6.3.12 Show Best Alternative Move</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+A</code> / <code>⌥+A</code></p>
                 <p>Toggles the display of an arrow showing the best alternative move found during game analysis (the move that should have been played instead of the actual move).</p>
-                
-                <h5>6.3.13 Show Annotations Layer</h5>
+
+                <h5>6.3.13 Show Move Classification Icons</h5>
+                <p><strong>Shortcut:</strong> <code>Alt+4</code> / <code>⌥+4</code></p>
+                <p>Toggles small badges on the played move's destination square that show the move assessment (e.g. book move, best move, good move, brilliant, inaccuracy, mistake, miss, blunder). Available once the game has been analyzed.</p>
+
+                <h5>6.3.14 Show Annotations Layer</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+L</code> / <code>⌥+L</code></p>
                 <p>Toggles the visibility of the annotations layer on the chessboard, showing or hiding all custom annotations (text, arrows, circles, squares).<br>See <a href="#adding-annotations">section 5.8</a> for more information.</p>
-                
-                <h5>6.3.14 Path trajectory style</h5>
+
+                <h5>6.3.15 Path trajectory style</h5>
                 <p>Selects the visual style for piece trajectory lines displayed during positional plan exploration:</p>
                 <ul>
                     <li><strong>Straight:</strong> Trajectory lines are drawn as straight segments between squares.</li>
@@ -2135,9 +2140,10 @@
                     <li><code>Alt+2</code> / <code>⌥+2</code>: Toggle PV2 arrow</li>
                     <li><code>Alt+3</code> / <code>⌥+3</code>: Toggle PV3 arrow</li>
                     <li><code>Alt+A</code> / <code>⌥+A</code>: Toggle best alternative move arrow</li>
+                    <li><code>Alt+4</code> / <code>⌥+4</code>: Toggle move classification icons</li>
                     <li><code>Alt+L</code> / <code>⌥+L</code>: Toggle annotations layer</li>
                 </ul>
-                
+
                 <h5>6.12.9 Manual Analysis</h5>
                 <p>Shortcuts for manual position analysis:</p>
                 <ul>

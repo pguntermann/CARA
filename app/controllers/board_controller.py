@@ -99,7 +99,11 @@ class BoardController:
     def toggle_bestalternativemove_arrow_visibility(self) -> None:
         """Toggle the visibility of best alternative move arrow."""
         self.board_model.toggle_bestalternativemove_arrow_visibility()
-    
+
+    def toggle_move_classification_icons_visibility(self) -> None:
+        """Toggle the visibility of move classification icons (badges) on the board."""
+        self.board_model.toggle_move_classification_icons_visibility()
+
     def toggle_evaluation_bar_visibility(self) -> None:
         """Toggle the visibility of evaluation bar."""
         self.board_model.toggle_evaluation_bar_visibility()

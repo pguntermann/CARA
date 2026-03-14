@@ -366,7 +366,8 @@
             ]
           },
           "pieces": {
-            "svg_path": "app/resources/chesspieces/default"
+            "svg_path": "app/resources/chesspieces/default",
+            "padding_ratio": 0.05
           },
           "turn_indicator": {
             "size": 16,
@@ -590,6 +591,51 @@
               100,
               105
             ]
+          },
+          "move_classification_badges": {
+            "inset_ratio": 0.04,
+            "colors": {
+              "book_move": [
+                150,
+                150,
+                150
+              ],
+              "brilliant": [
+                255,
+                215,
+                0
+              ],
+              "best_move": [
+                100,
+                255,
+                100
+              ],
+              "good_move": [
+                150,
+                255,
+                150
+              ],
+              "inaccuracy": [
+                255,
+                255,
+                100
+              ],
+              "mistake": [
+                255,
+                200,
+                100
+              ],
+              "miss": [
+                200,
+                100,
+                255
+              ],
+              "blunder": [
+                255,
+                100,
+                100
+              ]
+            }
           },
           "initial_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
         }

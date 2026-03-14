@@ -424,6 +424,13 @@ class MainWindow(QMainWindow):
         self.bestalternativemove_arrow_action.triggered.connect(self.controller.toggle_bestalternativemove_arrow_visibility)
         board_menu.addAction(self.bestalternativemove_arrow_action)
         
+        # Show Move Classification Icons action (checkable to show toggle state)
+        self.move_classification_icons_action = QAction("Show Move Classification Icons", self)
+        self.move_classification_icons_action.setShortcut(QKeySequence("Alt+4"))
+        self.move_classification_icons_action.setCheckable(True)
+        self.move_classification_icons_action.triggered.connect(self.controller.toggle_move_classification_icons_visibility)
+        board_menu.addAction(self.move_classification_icons_action)
+        
         board_menu.addSeparator()
         
         # Show Annotations Layer action (checkable to show toggle state)
@@ -472,6 +479,7 @@ class MainWindow(QMainWindow):
         board_model.playedmove_arrow_visibility_changed.connect(self._on_playedmove_arrow_visibility_changed)
         board_model.bestnextmove_arrow_visibility_changed.connect(self._on_bestnextmove_arrow_visibility_changed)
         board_model.bestalternativemove_arrow_visibility_changed.connect(self._on_bestalternativemove_arrow_visibility_changed)
+        board_model.move_classification_icons_visibility_changed.connect(self._on_move_classification_icons_visibility_changed)
         board_model.evaluation_bar_visibility_changed.connect(self._on_evaluation_bar_visibility_changed)
         board_model.material_widget_visibility_changed.connect(self._on_material_widget_visibility_changed)
         
@@ -485,6 +493,7 @@ class MainWindow(QMainWindow):
         self._update_pv2_arrow_action_state(board_model.show_pv2_arrow)
         self._update_pv3_arrow_action_state(board_model.show_pv3_arrow)
         self._update_bestalternativemove_arrow_action_state(board_model.show_bestalternativemove_arrow)
+        self._update_move_classification_icons_action_state(board_model.show_move_classification_icons)
         self._update_evaluation_bar_action_state(board_model.show_evaluation_bar)
         self._update_material_widget_action_state(board_model.show_material_widget)
         
@@ -2410,13 +2419,22 @@ class MainWindow(QMainWindow):
     
     def _update_bestalternativemove_arrow_action_state(self, visible: bool) -> None:
         """Update best alternative move arrow menu action checked state.
-        
+
         Args:
             visible: True if best alternative move arrow is visible, False otherwise.
         """
         if hasattr(self, 'bestalternativemove_arrow_action'):
             self.bestalternativemove_arrow_action.setChecked(visible)
-    
+
+    def _on_move_classification_icons_visibility_changed(self, visible: bool) -> None:
+        """Handle move classification icons visibility change to update menu toggle."""
+        self._update_move_classification_icons_action_state(visible)
+
+    def _update_move_classification_icons_action_state(self, visible: bool) -> None:
+        """Update move classification icons menu action checked state."""
+        if hasattr(self, 'move_classification_icons_action'):
+            self.move_classification_icons_action.setChecked(visible)
+
     def _on_active_move_changed(self, ply_index: int) -> None:
         """Handle active move change to update best alternative move arrow.
         
@@ -2711,9 +2729,11 @@ class MainWindow(QMainWindow):
             )
             self.database_panel.selection_changed.connect(player_stats_controller.notify_selection_changed)
 
-        # Set moves list model in game analysis controller
+        # Set moves list model in game analysis controller and on chessboard (for move classification badges)
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
             self.controller.set_moves_list_model(self.detail_panel.moveslist_model)
+            if hasattr(self, 'main_panel') and hasattr(self.main_panel, 'chessboard_view') and hasattr(self.main_panel.chessboard_view, 'chessboard'):
+                self.main_panel.chessboard_view.chessboard.set_moveslist_model(self.detail_panel.moveslist_model)
             # Connect bulk analysis finished so active game's Game Summary becomes available after bulk run
             if not getattr(self, '_bulk_analysis_finished_connected', False):
                 self.controller.get_bulk_analysis_controller().finished.connect(
@@ -4774,6 +4794,11 @@ Visibility Settings:
         show_bestalternativemove_arrow = board_visibility.get("show_bestalternativemove_arrow", True)
         board_model.set_show_bestalternativemove_arrow(show_bestalternativemove_arrow)
         self._update_bestalternativemove_arrow_action_state(show_bestalternativemove_arrow)
+        
+        # Show Move Classification Icons
+        show_move_classification_icons = board_visibility.get("show_move_classification_icons", False)
+        board_model.set_show_move_classification_icons(show_move_classification_icons)
+        self._update_move_classification_icons_action_state(show_move_classification_icons)
         
         # Show Annotations Layer (already loaded above, just ensure signal is connected)
         # Signal connection is done above in the annotation layer loading section

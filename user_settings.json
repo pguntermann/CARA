@@ -805,6 +805,7 @@
     "show_playedmove_arrow": true,
     "show_bestnextmove_arrow": true,
     "show_bestalternativemove_arrow": true,
+    "show_move_classification_icons": true,
     "show_evaluation_bar": false,
     "show_material_widget": true,
     "hide_other_arrows_during_plan_exploration": true,
