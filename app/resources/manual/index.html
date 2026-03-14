@@ -3030,9 +3030,11 @@
                 
                 <h5>7.9.3 Troubleshooting</h5>
                 <ul>
-                    <li>Ensure the local server is running and a model is loaded before sending requests from CARA.</li>
-                    <li>Verify the Base URL matches the server (e.g. <code>http://localhost:1234/v1</code> for LM Studio’s default).</li>
-                    <li>If requests fail or time out, increase the request timeout in AI Model Settings and confirm the model is loaded in the server.</li>
+                    <li><strong>Server not responding:</strong> Ensure the local server is running and a model is loaded before sending requests.</li>
+                    <li><strong>Wrong or unreachable URL:</strong> Verify the Base URL matches the server (e.g. <code>http://localhost:1234/v1</code> for LM Studio’s default).</li>
+                    <li><strong>Requests fail or time out:</strong> Increase the request timeout in AI Model Settings and confirm a model is loaded.</li>
+                    <li><strong>API error 400 – context length:</strong> The prompt exceeds the model’s context window. Configure and reload the model with a larger context length in your server (e.g. LM Studio), or reduce the amount of data sent in the prompt by disabling <span class="menu-item">AI Summary → Include Game Analysis Data in Pre-Prompt</span> and <span class="menu-item">AI Summary → Include PGN Metadata tags in Pre-Prompt</span>.</li>
+                    <li><strong>Output used only for reasoning:</strong> The model might use the full output context only for reasoning, leaving no room for the actual answer. Disable reasoning/thinking in your server. In LM Studio you can do this by adding <code>{%- set enable_thinking = false %}</code> to the prompt template (Jinja) in AI Model Settings.</li>
                 </ul>
             </div>
         </section>
