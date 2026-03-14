@@ -932,12 +932,21 @@
       "api_key": "",
       "model": "",
       "models": []
+    },
+    "custom": {
+      "enabled": false,
+      "base_url": "",
+      "api_key": "",
+      "model": "",
+      "models": []
     }
   },
   "ai_summary": {
     "use_openai_models": true,
     "use_anthropic_models": false,
+    "use_custom_models": false,
     "include_analysis_data_in_preprompt": true,
-    "include_metadata_in_preprompt": true
+    "include_metadata_in_preprompt": true,
+    "request_timeout_seconds": 60
   }
 }

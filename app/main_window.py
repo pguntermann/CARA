@@ -954,6 +954,11 @@ class MainWindow(QMainWindow):
         self.ai_summary_use_anthropic_action.triggered.connect(lambda: self._on_ai_summary_provider_selected("anthropic"))
         ai_summary_menu.addAction(self.ai_summary_use_anthropic_action)
         
+        self.ai_summary_use_custom_action = QAction("Use Custom Endpoint", self)
+        self.ai_summary_use_custom_action.setCheckable(True)
+        self.ai_summary_use_custom_action.triggered.connect(lambda: self._on_ai_summary_provider_selected("custom"))
+        ai_summary_menu.addAction(self.ai_summary_use_custom_action)
+        
         ai_summary_menu.addSeparator()
         
         # Include Analysis Data in Pre-Prompt toggle
@@ -4250,17 +4255,20 @@ Visibility Settings:
         """Handle AI Summary provider toggle selection."""
         use_openai = provider == "openai"
         use_anthropic = provider == "anthropic"
+        use_custom = provider == "custom"
         
         # Update menu states to enforce exclusivity
         self.ai_summary_use_openai_action.setChecked(use_openai)
         self.ai_summary_use_anthropic_action.setChecked(use_anthropic)
+        self.ai_summary_use_custom_action.setChecked(use_custom)
         
         # Persist setting
         from app.services.user_settings_service import UserSettingsService
         settings_service = UserSettingsService.get_instance()
         settings_service.update_ai_summary_settings({
             "use_openai_models": use_openai,
-            "use_anthropic_models": use_anthropic
+            "use_anthropic_models": use_anthropic,
+            "use_custom_models": use_custom
         })
         settings_service.save()
         
@@ -4305,16 +4313,20 @@ Visibility Settings:
         ai_summary_settings = settings.get("ai_summary", {})
         use_openai = ai_summary_settings.get("use_openai_models", True)
         use_anthropic = ai_summary_settings.get("use_anthropic_models", False)
+        use_custom = ai_summary_settings.get("use_custom_models", False)
         
-        # Enforce exclusivity: if both or neither are selected, default to OpenAI
-        if use_openai == use_anthropic:
+        # Enforce exactly one provider: default to OpenAI if invalid
+        if sum([use_openai, use_anthropic, use_custom]) != 1:
             use_openai = True
             use_anthropic = False
+            use_custom = False
         
         if hasattr(self, 'ai_summary_use_openai_action'):
             self.ai_summary_use_openai_action.setChecked(use_openai)
         if hasattr(self, 'ai_summary_use_anthropic_action'):
             self.ai_summary_use_anthropic_action.setChecked(use_anthropic)
+        if hasattr(self, 'ai_summary_use_custom_action'):
+            self.ai_summary_use_custom_action.setChecked(use_custom)
     
     def _on_manual_analysis_state_changed(self, is_analyzing: bool) -> None:
         """Handle manual analysis state change to update menu toggle.
@@ -4912,13 +4924,17 @@ Visibility Settings:
         ai_summary_settings = settings.get("ai_summary", {})
         use_openai = ai_summary_settings.get("use_openai_models", True)
         use_anthropic = ai_summary_settings.get("use_anthropic_models", False)
-        if use_openai == use_anthropic:
+        use_custom = ai_summary_settings.get("use_custom_models", False)
+        if sum([use_openai, use_anthropic, use_custom]) != 1:
             use_openai = True
             use_anthropic = False
+            use_custom = False
         if hasattr(self, 'ai_summary_use_openai_action'):
             self.ai_summary_use_openai_action.setChecked(use_openai)
         if hasattr(self, 'ai_summary_use_anthropic_action'):
             self.ai_summary_use_anthropic_action.setChecked(use_anthropic)
+        if hasattr(self, 'ai_summary_use_custom_action'):
+            self.ai_summary_use_custom_action.setChecked(use_custom)
         
         # Include Analysis Data in Pre-Prompt toggle
         include_analysis_data = ai_summary_settings.get("include_analysis_data_in_preprompt", False)
@@ -4985,7 +5001,8 @@ Visibility Settings:
         if hasattr(self, 'ai_summary_use_openai_action'):
             ai_summary_settings = {
                 "use_openai_models": self.ai_summary_use_openai_action.isChecked(),
-                "use_anthropic_models": self.ai_summary_use_anthropic_action.isChecked() if hasattr(self, 'ai_summary_use_anthropic_action') else False
+                "use_anthropic_models": self.ai_summary_use_anthropic_action.isChecked() if hasattr(self, 'ai_summary_use_anthropic_action') else False,
+                "use_custom_models": self.ai_summary_use_custom_action.isChecked() if hasattr(self, 'ai_summary_use_custom_action') else False
             }
             settings_service = getattr(self, '_settings_service', None)
             if settings_service is None:

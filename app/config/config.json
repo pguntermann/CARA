@@ -1982,11 +1982,12 @@
             }
           },
           "tokens": {
+            "spacing_before": 12,
             "minimum": 256,
             "maximum": 16000,
             "default": 2000,
             "step": 100,
-            "width": 100,
+            "width": 92,
             "height": 30,
             "collapse_width_threshold": 520,
             "collapse_animation_duration_ms": 200,
@@ -2018,6 +2019,11 @@
               6,
               8
             ]
+          },
+          "timeout": {
+            "spacing_before": 12,
+            "width": 56,
+            "height": 30
           }
         },
         "splitter": {
@@ -2531,7 +2537,9 @@
       },
       "ai_model_settings": {
         "width": 600,
-        "height": 400,
+        "height": 650,
+        "default_custom_base_url": "http://localhost:1234/v1",
+        "form_label_min_width": 180,
         "background_color": [
           40,
           40,
@@ -2578,7 +2586,7 @@
         },
         "labels": {
           "font_family": "Helvetica Neue",
-          "font_size": 10,
+          "font_size": 11,
           "text_color": [
             200,
             200,

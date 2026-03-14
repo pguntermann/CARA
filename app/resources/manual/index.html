@@ -198,6 +198,7 @@
                         <li><a href="#performance-optimization">7.6 Performance Optimization</a></li>
                         <li><a href="#moves-list-columns-reference">7.7 Moves List Columns Reference</a></li>
                         <li><a href="#customizing-formulas">7.8 Customizing ELO and Accuracy Formulas</a></li>
+                        <li><a href="#custom-ai-endpoint">7.9 Using a Custom AI Endpoint (Local LLM)</a></li>
                     </ul>
                 </li>
             </ul>
@@ -937,11 +938,12 @@
                 
                 <h5 id="ai-summary">4.5.7 AI Summary</h5>
                 <p>The AI Summary tab provides an interactive chat interface for discussing any position in a game with a Large Language Model (LLM). The AI model has access to extensive game data, including detailed engine analysis, move classifications, evaluation metrics, and positional information, enabling it to provide accurate assessments of the game, played moves, and current position. You can ask questions about the game, request explanations of moves, or generate summaries. Access this tab using <span class="menu-item">View → AI Summary</span> or press <code>F7</code>.</p>
+                <p>CARA supports OpenAI, Anthropic, and custom OpenAI-compatible endpoints. Configure your provider and API key through the AI Model Settings dialog; see <a href="#ai-summary-menu">section 6.10</a>. See <a href="#custom-ai-endpoint">section 7.9</a> for more information on setting up a custom endpoint.</p>
                 
                 <img src="screenshots/ai_summary.png" alt="CARA AI Summary View - Interactive chat interface for discussing game positions with an AI model that has access to engine analysis and game data" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
                 <div class="tip-box">
-                    <strong>Quick Tip:</strong> To use the AI Summary feature, you must first set up an OpenAI or Anthropic API key. Configure your API key using <span class="menu-item">AI Summary → AI Model Settings...</span>.
+                    <strong>Quick Tip:</strong> To use the AI Summary feature, configure at least one provider—<strong>OpenAI</strong>, <strong>Anthropic</strong>, or a <strong>custom endpoint</strong> (e.g. local LLM)—in <span class="menu-item">AI Summary → AI Model Settings...</span>.
                 </div>
             </div>
             <div class="outline-item">
@@ -2003,23 +2005,27 @@
                 <h4 id="ai-summary-menu">6.10 AI Summary Menu</h4>
                 
                 <h5>6.10.1 AI Model Settings...</h5>
-                <p>Opens a dialog for configuring AI model settings, including API keys and default model selection for the two supported providers OpenAI and Anthropic. You must configure at least one API key and select a model before using the AI Summary feature.<br>See <a href="#ai-summary">section 4.5.7</a> for more information.</p>
-                <p>To acquire API keys:</p>
+                <p>Opens a dialog for configuring AI model settings. CARA supports three options: <strong>OpenAI</strong>, <strong>Anthropic</strong>, and <strong>Custom endpoint</strong> (e.g. a local LLM). You must configure at least one provider and select a model before using the AI Summary feature. For custom endpoints, set the base URL (and optionally an API key) and choose a model; see <a href="#custom-ai-endpoint">section 7.9</a>.</p>
+                <p>To acquire API keys for cloud providers:</p>
                 <ul>
                     <li><strong>OpenAI:</strong> Sign up at <a href="https://platform.openai.com/signup" target="_blank">platform.openai.com</a> and create an API key in your account settings. Visit <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a> to manage your keys.</li>
                     <li><strong>Anthropic:</strong> Sign up at <a href="https://console.anthropic.com/signup" target="_blank">console.anthropic.com</a> and create an API key in your account settings. Visit <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com/settings/keys</a> to manage your keys.</li>
                 </ul>
+                <p>For a custom endpoint, an API key is optional (e.g. leave empty for local servers).</p>
                 
                 <h5>6.10.2 Use OpenAI Models</h5>
-                <p>Toggles whether to use OpenAI models for AI Summary. When enabled, OpenAI models are available for selection. This option is mutually exclusive with "Use Anthropic Models"—only one provider can be active at a time.</p>
+                <p>Toggles whether to use OpenAI models for AI Summary. When enabled, OpenAI models are available for selection. This option is mutually exclusive with "Use Anthropic Models" and "Use Custom Endpoint"—only one provider can be active at a time.</p>
                 
                 <h5>6.10.3 Use Anthropic Models</h5>
-                <p>Toggles whether to use Anthropic models for AI Summary. When enabled, Anthropic models are available for selection. This option is mutually exclusive with "Use OpenAI Models"—only one provider can be active at a time.</p>
+                <p>Toggles whether to use Anthropic models for AI Summary. When enabled, Anthropic models are available for selection. This option is mutually exclusive with "Use OpenAI Models" and "Use Custom Endpoint"—only one provider can be active at a time.</p>
                 
-                <h5>6.10.4 Include Game Analysis Data in Pre-Prompt</h5>
+                <h5>6.10.4 Use Custom Endpoint</h5>
+                <p>Toggles whether to use the custom endpoint (e.g. local LLM) for AI Summary. When enabled, models from the configured custom base URL are available. This option is mutually exclusive with "Use OpenAI Models" and "Use Anthropic Models"—only one provider can be active at a time.</p>
+                
+                <h5>6.10.5 Include Game Analysis Data in Pre-Prompt</h5>
                 <p>Toggles whether game analysis data (evaluations, move classifications, CPL values, best move alternatives) is included in the pre-prompt sent to the AI model. When enabled, the AI has access to detailed engine analysis, enabling more accurate assessments of moves and positions.</p>
                 
-                <h5>6.10.5 Include PGN Metadata tags in Pre-Prompt</h5>
+                <h5>6.10.6 Include PGN Metadata tags in Pre-Prompt</h5>
                 <p>Toggles whether PGN metadata tags (player names, ELO ratings, event information, etc.) are included in the pre-prompt sent to the AI model. When enabled, the AI has access to game metadata, providing context for more informed responses.</p>
             </div>
 
@@ -2995,6 +3001,33 @@
                 <p>When calculating player statistics across multiple games, CARA calculates ELO and accuracy for each individual game using the configured formulas, then averages these values. This approach ensures that each game contributes equally to the final statistics, regardless of game length or number of moves analyzed.</p>
                 
                 <p>For example, if a player has three games with ELO estimates of 1800, 1900, and 2000, the player's average ELO will be 1900, not a single calculation based on all moves combined.</p>
+            </div>
+            
+            <div class="outline-item">
+                <h4 id="custom-ai-endpoint">7.9 Using a Custom AI Endpoint (Local LLM)</h4>
+                <p>CARA can use any <strong>OpenAI-compatible</strong> API as an AI Summary provider. That includes local servers such as LM Studio or Ollama, so you can run a model on your own machine for privacy, no cloud cost, or offline use.</p>
+                
+                <div class="tip-box">
+                    <strong>Experimental feature:</strong> Custom endpoint support is an experimental implementation. Responses from locally run models may not match the quality of top-tier cloud models (e.g. OpenAI GPT-4, Anthropic Claude). Local models may be less accurate, less consistent, or occasionally produce incorrect or irrelevant answers. Use at your own discretion.
+                </div>
+                
+                <h5>7.9.1 Setup with LM Studio</h5>
+                <ol>
+                    <li><strong>Install and run LM Studio:</strong> Download and install <a href="https://lmstudio.ai/" target="_blank">LM Studio</a>, then load a model of your choice.</li>
+                    <li><strong>Start the local server:</strong> In LM Studio, start the <strong>Local Server</strong> and note the <strong>Server URL</strong> (e.g. <code>http://localhost:1234/v1</code>).</li>
+                    <li><strong>Configure CARA:</strong> Open <span class="menu-item">AI Summary → AI Model Settings...</span>. Enable <strong>Enable custom endpoint</strong>, set <strong>Base URL</strong> to the server URL (or accept the default if it matches), and leave <strong>API Key</strong> empty for LM Studio. Click <strong>Refresh Models</strong>, then select a <strong>Default Model</strong>. Adjust <strong>Request timeout (seconds)</strong> if needed.</li>
+                    <li><strong>Use the custom provider:</strong> Choose <span class="menu-item">AI Summary → Use Custom Endpoint</span> so CARA uses your local model for AI Summary.</li>
+                </ol>
+                
+                <h5>7.9.2 Other OpenAI-Compatible Servers</h5>
+                <p>The same custom endpoint flow works with other servers that expose an OpenAI-compatible API (e.g. Ollama, or your own deployment). Use their base URL in AI Model Settings and, if required, add an API key.</p>
+                
+                <h5>7.9.3 Troubleshooting</h5>
+                <ul>
+                    <li>Ensure the local server is running and a model is loaded before sending requests from CARA.</li>
+                    <li>Verify the Base URL matches the server (e.g. <code>http://localhost:1234/v1</code> for LM Studio’s default).</li>
+                    <li>If requests fail or time out, increase the request timeout in AI Model Settings and confirm the model is loaded in the server.</li>
+                </ul>
             </div>
         </section>
 

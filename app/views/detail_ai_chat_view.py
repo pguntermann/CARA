@@ -85,6 +85,7 @@ class DetailAIChatView(QWidget):
         
         # Control configs
         self.tokens_config = self.chat_config.get('tokens', {})
+        self.timeout_config = self.chat_config.get('timeout', {})
         self.tokens_collapse_threshold = self.tokens_config.get('collapse_width_threshold', 520)
         self.tokens_animation_duration = self.tokens_config.get('collapse_animation_duration_ms', 200)
         
@@ -159,8 +160,34 @@ class DetailAIChatView(QWidget):
         combo_min_width = 200  # View-specific minimum width
         self.model_combo.setFixedHeight(control_height)
         self.model_combo.setMinimumWidth(combo_min_width)
-        self.model_combo.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-        self.model_layout.addWidget(self.model_combo)
+        self.model_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.model_layout.addWidget(self.model_combo, 1)  # Stretch so combo uses available width
+        # Timeout (spacer + control; both hide with reactive layout)
+        self._timeout_spacer_width = self.timeout_config.get('spacing_before', 12)
+        self.timeout_spacer = QWidget()
+        self.timeout_spacer.setFixedWidth(self._timeout_spacer_width)
+        self.timeout_spacer.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.model_layout.addWidget(self.timeout_spacer)
+        self.timeout_container = QWidget()
+        timeout_layout = QHBoxLayout(self.timeout_container)
+        timeout_layout.setContentsMargins(0, 0, 0, 0)
+        timeout_layout.setSpacing(6)
+        self.timeout_label = QLabel("Timeout (s):")
+        timeout_layout.addWidget(self.timeout_label)
+        self.timeout_spin = QSpinBox()
+        self.timeout_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+        self.timeout_spin.setRange(10, 600)
+        self.timeout_spin.setValue(60)
+        self.timeout_spin.setFixedWidth(self.timeout_config.get('width', 56))
+        self.timeout_spin.setFixedHeight(control_height)
+        timeout_layout.addWidget(self.timeout_spin)
+        self.model_layout.addWidget(self.timeout_container)
+        # Tokens (spacer + control; both hide with reactive layout)
+        self._tokens_spacer_width = self.tokens_config.get('spacing_before', 12)
+        self.tokens_spacer = QWidget()
+        self.tokens_spacer.setFixedWidth(self._tokens_spacer_width)
+        self.tokens_spacer.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.model_layout.addWidget(self.tokens_spacer)
         
         # Token limit spinbox
         self.tokens_container = QWidget()
@@ -186,7 +213,6 @@ class DetailAIChatView(QWidget):
         self.tokens_opacity_effect.setOpacity(1.0)
         self.tokens_container.setGraphicsEffect(self.tokens_opacity_effect)
         self.model_layout.addWidget(self.tokens_container)
-        self.model_layout.addStretch()
         
         input_layout.addWidget(self.model_row_frame)
         
@@ -382,9 +408,9 @@ class DetailAIChatView(QWidget):
         else:
             spinbox_padding = [6, 8]
         
-        # Apply unified spinbox styling using StyleManager
+        # Apply unified spinbox styling using StyleManager (tokens and timeout)
         StyleManager.style_spinboxes(
-            [self.tokens_spin],
+            [self.tokens_spin, self.timeout_spin],
             self.config,
             text_color=token_text,
             font_family=resolved_token_font_family,
@@ -407,6 +433,7 @@ class DetailAIChatView(QWidget):
         """
         self.model_label.setStyleSheet(label_style)
         self.tokens_label.setStyleSheet(label_style)
+        self.timeout_label.setStyleSheet(label_style)
     
     def _setup_tokens_animation(self) -> None:
         if not hasattr(self, 'tokens_container'):
@@ -443,9 +470,25 @@ class DetailAIChatView(QWidget):
         should_show = available_width >= self.tokens_collapse_threshold
         self._set_tokens_visible(should_show)
     
+    def _set_collapsible_controls_visible(self, visible: bool) -> None:
+        """Show or hide timeout and tokens spacers and controls (reactive layout)."""
+        if hasattr(self, 'timeout_spacer'):
+            w = self._timeout_spacer_width if visible else 0
+            self.timeout_spacer.setFixedWidth(w)
+            self.timeout_spacer.setVisible(visible)
+        if hasattr(self, 'timeout_container'):
+            self.timeout_container.setVisible(visible)
+        if hasattr(self, 'tokens_spacer'):
+            w = self._tokens_spacer_width if visible else 0
+            self.tokens_spacer.setFixedWidth(w)
+            self.tokens_spacer.setVisible(visible)
+        if hasattr(self, 'tokens_container'):
+            pass  # tokens_container visibility/width handled by animation or below
+    
     def _set_tokens_visible(self, visible: bool) -> None:
         if not self.tokens_animation:
             self.tokens_container.setVisible(visible)
+            self._set_collapsible_controls_visible(visible)
             self._tokens_visible = visible
             self._update_model_combo_expansion(visible)
             return
@@ -456,6 +499,7 @@ class DetailAIChatView(QWidget):
         self._tokens_target_visible = visible
         self._tokens_visibility_pending = True
         
+        self._set_collapsible_controls_visible(visible)
         self.tokens_animation.stop()
         
         if visible:
@@ -488,38 +532,19 @@ class DetailAIChatView(QWidget):
             self.tokens_container.setVisible(False)
             self.tokens_container.setMaximumWidth(0)
             self.tokens_opacity_effect.setOpacity(0.0)
+            self._set_collapsible_controls_visible(False)
         else:
             target_width = self._tokens_full_width or self.tokens_container.sizeHint().width()
             self.tokens_container.setMaximumWidth(max(0, target_width))
             self.tokens_opacity_effect.setOpacity(1.0)
+            self._set_collapsible_controls_visible(True)
         
         # Ensure model combo expansion state is correct after animation
         self._update_model_combo_expansion(self._tokens_visible)
     
     def _update_model_combo_expansion(self, tokens_visible: bool) -> None:
-        """Update model combo to expand when tokens are hidden, or use minimum width when visible."""
-        if not hasattr(self, 'model_combo') or not hasattr(self, 'model_layout'):
-            return
-        
-        # Check if stretch exists by looking at the last item
-        has_stretch = False
-        if self.model_layout.count() > 0:
-            last_item = self.model_layout.itemAt(self.model_layout.count() - 1)
-            if last_item and last_item.spacerItem() is not None:
-                has_stretch = True
-        
-        if tokens_visible:
-            # Restore stretch and use minimum width for combo
-            if not has_stretch:
-                self.model_layout.addStretch()
-            self.model_combo.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-        else:
-            # Remove stretch and make combo expand
-            if has_stretch:
-                stretch_item = self.model_layout.takeAt(self.model_layout.count() - 1)
-                if stretch_item:
-                    del stretch_item
-            self.model_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        """Model combo uses stretch layout and always expands to use available width; no-op for compatibility."""
+        pass
     
     def _show_placeholder(self) -> None:
         """Show placeholder message when no conversation exists."""
@@ -828,6 +853,10 @@ class DetailAIChatView(QWidget):
                 self.tokens_spin.valueChanged.disconnect(self._on_tokens_changed)
             except (TypeError, RuntimeError):
                 pass
+            try:
+                self.timeout_spin.valueChanged.disconnect(self._on_timeout_changed)
+            except (TypeError, RuntimeError):
+                pass
         
         self._ai_chat_controller = controller
         
@@ -839,7 +868,11 @@ class DetailAIChatView(QWidget):
         controller.request_completed.connect(self._on_request_completed)
         self.model_combo.currentTextChanged.connect(self._on_model_changed)
         self.tokens_spin.valueChanged.connect(self._on_tokens_changed)
+        self.timeout_spin.valueChanged.connect(self._on_timeout_changed)
         self._on_tokens_changed(self.tokens_spin.value())
+        self.timeout_spin.blockSignals(True)
+        self.timeout_spin.setValue(controller.get_request_timeout_seconds())
+        self.timeout_spin.blockSignals(False)
         
         # Populate model dropdown
         self._populate_models()
@@ -941,8 +974,12 @@ class DetailAIChatView(QWidget):
                 self._ai_chat_controller.set_selected_model(self.model_combo.currentText())
     
     def refresh_model_list(self) -> None:
-        """Refresh the model dropdown based on current provider settings."""
+        """Refresh the model dropdown and timeout value from current provider settings."""
         self._populate_models()
+        if self._ai_chat_controller and hasattr(self, 'timeout_spin'):
+            self.timeout_spin.blockSignals(True)
+            self.timeout_spin.setValue(self._ai_chat_controller.get_request_timeout_seconds())
+            self.timeout_spin.blockSignals(False)
     
     def _on_model_changed(self, model_string: str) -> None:
         """Handle model selection change.
@@ -957,7 +994,12 @@ class DetailAIChatView(QWidget):
         """Handle token limit changes."""
         if self._ai_chat_controller:
             self._ai_chat_controller.set_token_limit(value)
-    
+
+    def _on_timeout_changed(self, value: int) -> None:
+        """Handle request timeout changes."""
+        if self._ai_chat_controller:
+            self._ai_chat_controller.set_request_timeout_seconds(value)
+
     def eventFilter(self, obj, event: QEvent) -> bool:
         """Event filter to handle scroll area resize events.
         

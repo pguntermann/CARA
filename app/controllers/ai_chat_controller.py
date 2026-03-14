@@ -17,19 +17,23 @@ class AIRequestThread(QThread):
     
     response_received = pyqtSignal(bool, str)  # success, message
     
-    def __init__(self, provider: str, model: str, api_key: str, 
+    def __init__(self, provider: str, model: str, api_key: str,
                  messages: List[Dict[str, str]], system_prompt: Optional[str] = None,
-                 token_limit: Optional[int] = None, config: Optional[Dict[str, Any]] = None) -> None:
+                 token_limit: Optional[int] = None, config: Optional[Dict[str, Any]] = None,
+                 base_url_override: Optional[str] = None,
+                 timeout_seconds: int = 60) -> None:
         """Initialize the AI request thread.
         
         Args:
-            provider: Provider name ("openai" or "anthropic").
+            provider: Provider name ("openai", "anthropic", or "custom").
             model: Model ID.
-            api_key: API key for the provider.
+            api_key: API key for the provider (optional for custom).
             messages: List of message dicts.
             system_prompt: Optional system prompt.
             token_limit: Optional token limit.
             config: Configuration dictionary.
+            base_url_override: For custom provider, the base URL (e.g. http://localhost:1234/v1).
+            timeout_seconds: Request timeout in seconds.
         """
         super().__init__()
         self.provider = provider
@@ -39,6 +43,8 @@ class AIRequestThread(QThread):
         self.system_prompt = system_prompt
         self.token_limit = token_limit
         self.config = config
+        self.base_url_override = base_url_override
+        self.timeout_seconds = timeout_seconds
     
     def run(self) -> None:
         """Execute the AI request in the background thread."""
@@ -49,7 +55,9 @@ class AIRequestThread(QThread):
             self.api_key,
             self.messages,
             self.system_prompt,
-            token_limit=self.token_limit
+            token_limit=self.token_limit,
+            base_url_override=self.base_url_override,
+            timeout_seconds=self.timeout_seconds
         )
         self.response_received.emit(success, response)
 
@@ -273,7 +281,7 @@ Please provide a brief analysis of this position, including:
         """
         models: List[str] = []
         ai_settings = self.user_settings_service.get_settings().get("ai_models", {})
-        use_openai, use_anthropic = self._get_provider_preferences()
+        use_openai, use_anthropic, use_custom = self._get_provider_preferences()
         
         if use_openai:
             openai_settings = ai_settings.get("openai", {})
@@ -291,6 +299,17 @@ Please provide a brief analysis of this position, including:
                 for model in anthropic_models:
                     models.append(f"Anthropic: {model}")
         
+        if use_custom:
+            custom_settings = ai_settings.get("custom", {})
+            if not custom_settings.get("enabled", False):
+                pass
+            else:
+                custom_base_url = (custom_settings.get("base_url") or "").strip()
+                custom_models = custom_settings.get("models", []) or []
+                if custom_base_url and custom_models:
+                    for model in custom_models:
+                        models.append(f"Custom: {model}")
+        
         return models
     
     def get_default_model(self) -> Optional[str]:
@@ -300,7 +319,7 @@ Please provide a brief analysis of this position, including:
             Model string in format "Provider: model" or None if not configured.
         """
         ai_settings = self.user_settings_service.get_settings().get("ai_models", {})
-        use_openai, use_anthropic = self._get_provider_preferences()
+        use_openai, use_anthropic, use_custom = self._get_provider_preferences()
         
         # Check OpenAI first
         if use_openai:
@@ -313,6 +332,12 @@ Please provide a brief analysis of this position, including:
             anthropic_settings = ai_settings.get("anthropic", {})
             if anthropic_settings.get("api_key") and anthropic_settings.get("model"):
                 return f"Anthropic: {anthropic_settings['model']}"
+        
+        # Check Custom (only if enabled)
+        if use_custom:
+            custom_settings = ai_settings.get("custom", {})
+            if custom_settings.get("enabled", False) and custom_settings.get("base_url", "").strip() and custom_settings.get("model"):
+                return f"Custom: {custom_settings['model']}"
         
         return None
     
@@ -329,18 +354,19 @@ Please provide a brief analysis of this position, including:
         clamped = max(self._token_min, min(self._token_max, token_limit))
         self._token_limit = clamped
     
-    def _get_model_config(self) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    def _get_model_config(self) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
         """Get configured AI model settings.
         
         Returns:
-            Tuple of (provider: Optional[str], model: Optional[str], api_key: Optional[str]).
-            Returns (None, None, None) if no model is configured.
+            Tuple of (provider, model, api_key, base_url_override).
+            base_url_override is non-None only for custom provider.
+            Returns (None, None, None, None) if no model is configured.
         """
         # Use selected model if set, otherwise fall back to default
         model_string = self._selected_model or self.get_default_model()
         
         if not model_string:
-            return None, None, None
+            return None, None, None, None
         
         # Parse model string (format: "Provider: model")
         if ":" in model_string:
@@ -352,38 +378,49 @@ Please provide a brief analysis of this position, including:
             provider_name = "OpenAI"
             model = model_string
         
-        # Get API key for the provider
         ai_settings = self.user_settings_service.get_settings().get("ai_models", {})
         
         if provider_name.lower() == "openai":
             openai_settings = ai_settings.get("openai", {})
             api_key = openai_settings.get("api_key", "")
             if api_key and model:
-                return AIProvider.OPENAI, model, api_key
+                return AIProvider.OPENAI, model, api_key, None
         elif provider_name.lower() == "anthropic":
             anthropic_settings = ai_settings.get("anthropic", {})
             api_key = anthropic_settings.get("api_key", "")
             if api_key and model:
-                return AIProvider.ANTHROPIC, model, api_key
+                return AIProvider.ANTHROPIC, model, api_key, None
+        elif provider_name.lower() == "custom":
+            custom_settings = ai_settings.get("custom", {})
+            if not custom_settings.get("enabled", False):
+                return None, None, None, None
+            base_url = (custom_settings.get("base_url") or "").strip()
+            api_key = custom_settings.get("api_key", "") or ""
+            if base_url and model:
+                return AIProvider.CUSTOM, model, api_key, base_url
         
-        return None, None, None
+        return None, None, None, None
     
-    def _get_provider_preferences(self) -> tuple[bool, bool]:
+    def _get_provider_preferences(self) -> tuple[bool, bool, bool]:
         """Get provider toggle states from user settings.
         
         Returns:
-            Tuple of (use_openai_models, use_anthropic_models) with enforced exclusivity.
+            Tuple of (use_openai_models, use_anthropic_models, use_custom_models) with enforced exclusivity.
         """
         settings = self.user_settings_service.get_settings()
         ai_summary = settings.get("ai_summary", {})
         use_openai = ai_summary.get("use_openai_models", True)
         use_anthropic = ai_summary.get("use_anthropic_models", False)
+        use_custom = ai_summary.get("use_custom_models", False)
         
-        if use_openai == use_anthropic:
+        # Enforce exactly one provider: if multiple or none True, default to OpenAI
+        count = sum([use_openai, use_anthropic, use_custom])
+        if count != 1:
             use_openai = True
             use_anthropic = False
+            use_custom = False
         
-        return use_openai, use_anthropic
+        return use_openai, use_anthropic, use_custom
     
     def _build_move_label_cache(self, game) -> None:
         """Build cache mapping ply indices to move labels for the active game."""
@@ -442,9 +479,15 @@ Please provide a brief analysis of this position, including:
             return False
         
         # Get model configuration
-        provider, model, api_key = self._get_model_config()
-        if not provider or not model or not api_key:
+        provider, model, api_key, base_url_override = self._get_model_config()
+        if not provider or not model:
             self.error_occurred.emit("Please configure an AI model in AI Model Settings.")
+            return False
+        if provider != AIProvider.CUSTOM and not api_key:
+            self.error_occurred.emit("Please configure an AI model in AI Model Settings.")
+            return False
+        if provider == AIProvider.CUSTOM and not base_url_override:
+            self.error_occurred.emit("Please configure a custom endpoint base URL in AI Model Settings.")
             return False
         
         # Get position info first (before adding message)
@@ -517,15 +560,20 @@ Please provide a brief analysis of this position, including:
         # Emit request started signal
         self.request_started.emit()
         
+        timeout_seconds = self.user_settings_service.get_settings().get("ai_summary", {}).get("request_timeout_seconds", 60)
+        timeout_seconds = max(10, min(600, int(timeout_seconds)))
+        
         # Make API call in background thread
         self._request_thread = AIRequestThread(
             provider,
             model,
-            api_key,
+            api_key or "",
             self._conversation,
             system_prompt,
             token_limit=self._token_limit,
-            config=self.config
+            config=self.config,
+            base_url_override=base_url_override,
+            timeout_seconds=timeout_seconds
         )
         self._request_thread.response_received.connect(self._on_ai_response)
         self._request_thread.finished.connect(self._on_request_finished)
@@ -563,4 +611,14 @@ Please provide a brief analysis of this position, including:
             True if a request is in progress, False otherwise.
         """
         return self._request_thread is not None and self._request_thread.isRunning()
+
+    def get_request_timeout_seconds(self) -> int:
+        """Return the request timeout in seconds (from user settings, clamped 10–600)."""
+        timeout = self.user_settings_service.get_settings().get("ai_summary", {}).get("request_timeout_seconds", 60)
+        return max(10, min(600, int(timeout)))
+
+    def set_request_timeout_seconds(self, seconds: int) -> None:
+        """Save the request timeout in seconds to user settings (clamped 10–600)."""
+        seconds = max(10, min(600, int(seconds)))
+        self.user_settings_service.update_ai_summary_settings({"request_timeout_seconds": seconds})
 
