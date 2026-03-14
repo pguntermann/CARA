@@ -216,6 +216,8 @@ class AIModelSettingsDialog(QDialog):
         # Request timeout (applies to all providers)
         timeout_layout = QFormLayout()
         timeout_layout.setSpacing(self.fields_config.get('spacing', 8))
+        timeout_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        timeout_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         timeout_label = QLabel("Request timeout (seconds):")
         timeout_label.setMinimumWidth(self.form_label_min_width)
         self.request_timeout_spinbox = QSpinBox()
@@ -225,7 +227,7 @@ class AIModelSettingsDialog(QDialog):
         timeout_layout.addRow(timeout_label, self.request_timeout_spinbox)
         timeout_widget = QWidget()
         timeout_widget.setLayout(timeout_layout)
-        layout.addWidget(timeout_widget)
+        layout.addWidget(timeout_widget, 0, Qt.AlignmentFlag.AlignLeft)
         
         # Store scroll area for styling
         self.scroll_area = scroll

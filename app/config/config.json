@@ -2583,7 +2583,7 @@
       },
       "ai_model_settings": {
         "width": 600,
-        "height": 650,
+        "height": 640,
         "default_custom_base_url": "http://localhost:1234/v1",
         "form_label_min_width": 180,
         "background_color": [
@@ -2657,7 +2657,7 @@
           ],
           "border_width": 1,
           "border_radius": 3,
-          "padding": 5,
+          "padding": 3,
           "font_family": "Cascadia Mono, Menlo",
           "font_size": 11,
           "focus_border_color": [
@@ -3945,11 +3945,11 @@
       "engine_validation_messages": {
         "no_engines": {
           "title": "No Engine Configured",
-          "message_template": "Please add at least one UCI chess engine before {action}.\n\nGo to Engines → Add Engine... to configure an engine."
+          "message_template": "Please add at least one UCI chess engine before {action}.<br><br>Go to Engines → Add Engine... to configure an engine."
         },
         "no_assignment": {
           "title": "No Engine Assigned",
-          "message_template": "Please assign an engine to the {task} task before {action}.\n\nGo to Engines → [Engine Name] → Assign to {task}."
+          "message_template": "Please assign an engine to the {task} task before {action}.<br><br>Go to Engines → [Engine Name] → Assign to {task}."
         },
         "actions": {
           "game_analysis": "starting game analysis",
