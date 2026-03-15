@@ -1,5 +1,29 @@
 # Release Notes
 
+# CARA v2.6.4 - Notes View, Move Classification Badges and Custom LLM Endpoints
+
+**Release Date:** 15.03.2026
+
+This release adds a **Notes view** for entering and persisting game notes, **toggleable move classification icons/badges** on the chessboard, and a **custom OpenAI-compatible API endpoint** option for the AI chat integration. 
+
+## New Features
+
+- **Notes view:** Dedicated panel to write and edit free-form notes per game. Move notation in the text (e.g. <code>1. e4</code>, <code>13... Rb7</code>) is automatically detected and linked—moves that appear in the current game become clickable so you can jump to that position. Use **Notes → Save Notes to current game** (<code>Ctrl+Alt+N</code>) to attach them to the current game; notes are written to the PGN file when you save the database.
+- **Move classification badges on chessboard:** Toggleable move classification icons/badges on the chessboard, similar to chess.com, to show brilliant moves, mistakes, blunders, etc. directly on the board. Badges become available once the game has been analyzed. Can be enabled or disabled through the Board menu (**Board → Show Move Classification Icons**, <code>Alt+4</code>).
+- **AI chat – custom API endpoint:** Option to use a custom OpenAI-compatible API endpoint for the AI chat integration (e.g. local LLMs via LM Studio, Ollama, or your own server). This is an advanced feature: you need to install, run, and configure a compatible server and model yourself; the manual (section 7.9) provides some partial guidance. Responses from local models may not match the quality of top-tier cloud providers (e.g. OpenAI, Anthropic)—they can be less accurate, less consistent, or occasionally wrong or off-topic; use at your own discretion.
+
+## Enhancements
+
+- **AI Model Settings Dialog:** Improved the dialog for better UI/UX.
+- **AI Summary View:** Improved the AI Summary/AI Chat view UI/UX.
+- **User manual:** Updated HTML manual with documentation for the new Notes view and additional guidance on local LLM usage.
+
+## Bug Fixes
+
+- **Copy AI Responses** Fixed an issue where the right-click context menu on the AI Sumamry view would not allow copying AI resposnes to the cliopboard.
+
+---
+
 # CARA v2.6.3 - Extended and Improved Player Stats
 
 **Release Date:** 10.03.2026
