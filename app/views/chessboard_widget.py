@@ -7,6 +7,7 @@ from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtCore import Qt, QRect, QRectF, QPointF, QTimer, QPoint, QByteArray
 from pathlib import Path
 import sys
+from colorsys import rgb_to_hls, hls_to_rgb
 import chess
 from typing import Dict, Any, Optional, List, TYPE_CHECKING
 
@@ -616,24 +617,28 @@ class ChessBoardWidget(QWidget):
     @staticmethod
     def _contrast_color_for_badge(rgb: List[int]) -> List[int]:
         """Return a stroke/fill color that is visible on the badge background.
-        Uses inverse of the badge color; falls back to black or white if contrast would be low.
+        Keeps the badge hue and saturation but uses opposite lightness (e.g. bright yellow -> dark yellow).
+        When badge L is near 0.5 (e.g. saturated yellow), inverting would give the same color, so we
+        force icon to dark (L=0.2) on light badges and light (L=0.8) on dark badges.
         """
         if len(rgb) < 3:
             return [255, 255, 255]
-        r, g, b = rgb[0], rgb[1], rgb[2]
-        inv = [255 - r, 255 - g, 255 - b]
-        # Relative luminance (sRGB approx, 0-255 range -> 0-1)
-        def lum(c):
-            return (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) / 255.0
-        l_bg = lum(rgb)
-        l_stroke = lum(inv)
-        # If background is light and inverse is also light (mid-gray case), use black
-        if l_bg > 0.55 and l_stroke > 0.45:
-            return [0, 0, 0]
-        # If background is dark and inverse is also dark, use white
-        if l_bg < 0.45 and l_stroke < 0.55:
-            return [255, 255, 255]
-        return inv
+        r, g, b = rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0
+        h, l, s = rgb_to_hls(r, g, b)
+        if l > 0.55:
+            l_icon = 0.2   # dark icon on light badge
+        elif l < 0.45:
+            l_icon = 0.8   # light icon on dark badge
+        else:
+            l_icon = 1.0 - l  # mid range: invert (may still be mid; prefer dark for consistency)
+            if 0.4 <= l_icon <= 0.6:
+                l_icon = 0.2
+        r_out, g_out, b_out = hls_to_rgb(h, l_icon, s)
+        return [
+            max(0, min(255, round(r_out * 255))),
+            max(0, min(255, round(g_out * 255))),
+            max(0, min(255, round(b_out * 255))),
+        ]
     
     def _draw_move_classification_badge(self, painter: QPainter, board_start_x: int, board_start_y: int) -> None:
         """Draw the move classification badge (colored circle + icon) on the last move's destination square."""
