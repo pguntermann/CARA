@@ -14,13 +14,13 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QWidget,
     QFrame,
+    QCheckBox,
+    QSpinBox,
 )
 from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal
-from PyQt6.QtGui import QShowEvent, QPalette, QColor
+from PyQt6.QtGui import QShowEvent, QPalette, QColor, QAction, QIcon
 from typing import Dict, Any, Optional, List
 from pathlib import Path
-
-
 
 
 class ModelDiscoveryThread(QThread):
@@ -29,18 +29,21 @@ class ModelDiscoveryThread(QThread):
     models_discovered = pyqtSignal(str, list)  # provider, models
     discovery_failed = pyqtSignal(str, str)  # provider, error_message
     
-    def __init__(self, provider: str, api_key: str, discovery_service) -> None:
+    def __init__(self, provider: str, api_key: str, discovery_service,
+                 base_url: Optional[str] = None) -> None:
         """Initialize the discovery thread.
         
         Args:
-            provider: Provider name ("openai" or "anthropic").
-            api_key: API key for the provider.
+            provider: Provider name ("openai", "anthropic", or "custom").
+            api_key: API key for the provider (optional for custom).
             discovery_service: AIModelDiscoveryService instance.
+            base_url: For custom provider, the base URL (e.g. http://localhost:1234/v1).
         """
         super().__init__()
         self.provider = provider
         self.api_key = api_key
         self.discovery_service = discovery_service
+        self.base_url = base_url
     
     def run(self) -> None:
         """Run the model discovery."""
@@ -49,14 +52,16 @@ class ModelDiscoveryThread(QThread):
                 models = self.discovery_service.get_openai_models(self.api_key)
             elif self.provider == "anthropic":
                 models = self.discovery_service.get_anthropic_models(self.api_key)
+            elif self.provider == "custom" and self.base_url:
+                models = self.discovery_service.get_custom_models(self.base_url, self.api_key or None)
             else:
-                self.discovery_failed.emit(self.provider, f"Unknown provider: {self.provider}")
+                self.discovery_failed.emit(self.provider, f"Unknown or misconfigured provider: {self.provider}")
                 return
             
             if models:
                 self.models_discovered.emit(self.provider, models)
             else:
-                self.discovery_failed.emit(self.provider, "No models found or API key invalid")
+                self.discovery_failed.emit(self.provider, "No models found or endpoint unreachable")
         except Exception as e:
             self.discovery_failed.emit(self.provider, str(e))
 
@@ -81,7 +86,8 @@ class AIModelSettingsDialog(QDialog):
         self.current_settings = settings.get("ai_models", {})
         self._provider_models = {
             "openai": list(self.current_settings.get("openai", {}).get("models", [])),
-            "anthropic": list(self.current_settings.get("anthropic", {}).get("models", []))
+            "anthropic": list(self.current_settings.get("anthropic", {}).get("models", [])),
+            "custom": list(self.current_settings.get("custom", {}).get("models", []))
         }
         
         # Store fixed size - set it BEFORE layout is set up
@@ -103,11 +109,14 @@ class AIModelSettingsDialog(QDialog):
         # Store discovery threads
         self.discovery_threads: Dict[str, Optional[ModelDiscoveryThread]] = {
             "openai": None,
-            "anthropic": None
+            "anthropic": None,
+            "custom": None
         }
         
         # Track refresh state
         self._refresh_results: List[tuple] = []
+        # Password reveal state for API key line edits (id(edit) -> {action, icon_show, icon_hide})
+        self._password_reveal_data: Dict[int, Dict[str, Any]] = {}
         
         # Load config values
         self._load_config()
@@ -123,6 +132,9 @@ class AIModelSettingsDialog(QDialog):
         # Dialog dimensions
         self.dialog_width = dialog_config.get('width', 600)
         self.dialog_height = dialog_config.get('height', 500)
+        self.default_custom_base_url = dialog_config.get('default_custom_base_url', 'http://localhost:1234/v1')
+        # Minimum width for form labels so input fields align across all groups (pixels).
+        self.form_label_min_width = dialog_config.get('form_label_min_width', 220)
         
         # Background color
         self.bg_color = dialog_config.get('background_color', [40, 40, 45])
@@ -192,10 +204,30 @@ class AIModelSettingsDialog(QDialog):
         anthropic_group = self._create_provider_group("Anthropic", "anthropic")
         scroll_layout.addWidget(anthropic_group)
         
+        # Custom endpoint group (OpenAI-compatible, e.g. local LLM)
+        custom_group = self._create_custom_provider_group()
+        scroll_layout.addWidget(custom_group)
+        
         scroll_layout.addStretch()
         
         scroll.setWidget(scroll_widget)
         layout.addWidget(scroll)
+        
+        # Request timeout (applies to all providers)
+        timeout_layout = QFormLayout()
+        timeout_layout.setSpacing(self.fields_config.get('spacing', 8))
+        timeout_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        timeout_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        timeout_label = QLabel("Request timeout (seconds):")
+        timeout_label.setMinimumWidth(self.form_label_min_width)
+        self.request_timeout_spinbox = QSpinBox()
+        self.request_timeout_spinbox.setRange(10, 600)
+        self.request_timeout_spinbox.setValue(60)
+        self.request_timeout_spinbox.setFixedWidth(56)
+        timeout_layout.addRow(timeout_label, self.request_timeout_spinbox)
+        timeout_widget = QWidget()
+        timeout_widget.setLayout(timeout_layout)
+        layout.addWidget(timeout_widget, 0, Qt.AlignmentFlag.AlignLeft)
         
         # Store scroll area for styling
         self.scroll_area = scroll
@@ -245,14 +277,16 @@ class AIModelSettingsDialog(QDialog):
         form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
         form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         
-        # API Key field
+        # API Key field (masked with reveal toggle)
         api_key_label = QLabel("API Key:")
+        api_key_label.setMinimumWidth(self.form_label_min_width)
         api_key_input = QLineEdit()
         api_key_input.setPlaceholderText("Enter your API key")
         # Make input field expand to fill available width in form layout
         api_key_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         # Set minimum width to ensure it's not too narrow
         api_key_input.setMinimumWidth(200)
+        self._add_password_reveal(api_key_input)
         
         # Store reference
         setattr(self, f"{provider_key}_api_key_input", api_key_input)
@@ -261,6 +295,7 @@ class AIModelSettingsDialog(QDialog):
         
         # Model selection field
         model_label = QLabel("Default Model:")
+        model_label.setMinimumWidth(self.form_label_min_width)
         model_combo = QComboBox()
         model_combo.addItem("(Select model)")
         # Make combo box expand to fill available width in form layout, same as API key input
@@ -276,6 +311,93 @@ class AIModelSettingsDialog(QDialog):
         group.setLayout(form_layout)
         
         return group
+    
+    def _create_custom_provider_group(self) -> QGroupBox:
+        """Create the Custom endpoint configuration group (enable checkbox, base URL, optional API key, model)."""
+        group = QGroupBox("Custom endpoint")
+        
+        form_layout = QFormLayout()
+        form_layout.setSpacing(self.fields_config.get('spacing', 8))
+        form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        
+        enable_checkbox = QCheckBox("Enable custom endpoint")
+        enable_checkbox.setChecked(False)
+        enable_checkbox.toggled.connect(self._on_custom_enabled_toggled)
+        self.custom_enabled_checkbox = enable_checkbox
+        form_layout.addRow(enable_checkbox)
+        
+        default_url = getattr(self, 'default_custom_base_url', 'http://localhost:1234/v1')
+        base_url_label = QLabel("Base URL:")
+        base_url_label.setMinimumWidth(self.form_label_min_width)
+        base_url_input = QLineEdit()
+        base_url_input.setPlaceholderText(default_url)
+        base_url_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        base_url_input.setMinimumWidth(200)
+        self.custom_base_url_input = base_url_input
+        form_layout.addRow(base_url_label, base_url_input)
+        
+        api_key_label = QLabel("API Key (optional):")
+        api_key_label.setMinimumWidth(self.form_label_min_width)
+        api_key_input = QLineEdit()
+        api_key_input.setPlaceholderText("Leave empty for local servers")
+        api_key_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        api_key_input.setMinimumWidth(200)
+        self._add_password_reveal(api_key_input)
+        self.custom_api_key_input = api_key_input
+        form_layout.addRow(api_key_label, api_key_input)
+        
+        model_label = QLabel("Default Model:")
+        model_label.setMinimumWidth(self.form_label_min_width)
+        model_combo = QComboBox()
+        model_combo.addItem("(Select model)")
+        model_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        model_combo.setMinimumWidth(200)
+        self.custom_model_combo = model_combo
+        form_layout.addRow(model_label, model_combo)
+        
+        group.setLayout(form_layout)
+        return group
+    
+    def _on_custom_enabled_toggled(self, checked: bool) -> None:
+        """Enable or disable custom endpoint input fields based on checkbox."""
+        self.custom_base_url_input.setEnabled(checked)
+        self.custom_api_key_input.setEnabled(checked)
+        self.custom_model_combo.setEnabled(checked)
+    
+    def _add_password_reveal(self, line_edit: QLineEdit) -> None:
+        """Set password echo mode and add a trailing action to toggle visibility.
+        The line edit remains a plain QLineEdit so StyleManager.style_line_edits still applies.
+        """
+        line_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        icons_dir = Path(__file__).parent.parent.parent / "app" / "resources" / "icons"
+        icon_show = QIcon(str(icons_dir / "eye.svg"))
+        icon_hide = QIcon(str(icons_dir / "eye_off.svg"))
+        action = QAction(self)
+        action.setIcon(icon_show)
+        action.setToolTip("Show password")
+        action.triggered.connect(lambda checked=False, le=line_edit: self._toggle_password_reveal(le))
+        line_edit.addAction(action, QLineEdit.ActionPosition.TrailingPosition)
+        self._password_reveal_data[id(line_edit)] = {
+            "action": action,
+            "icon_show": icon_show,
+            "icon_hide": icon_hide,
+        }
+    
+    def _toggle_password_reveal(self, line_edit: QLineEdit) -> None:
+        """Toggle API key visibility and update the reveal action icon and tooltip."""
+        data = self._password_reveal_data.get(id(line_edit))
+        if not data:
+            return
+        if line_edit.echoMode() == QLineEdit.EchoMode.Password:
+            line_edit.setEchoMode(QLineEdit.EchoMode.Normal)
+            data["action"].setIcon(data["icon_hide"])
+            data["action"].setToolTip("Hide password")
+        else:
+            line_edit.setEchoMode(QLineEdit.EchoMode.Password)
+            data["action"].setIcon(data["icon_show"])
+            data["action"].setToolTip("Show password")
     
     def _populate_model_combo(self, provider_key: str, models: List[str], preferred_model: str = "") -> None:
         """Populate a provider's model combo with the provided list."""
@@ -348,6 +470,29 @@ class AIModelSettingsDialog(QDialog):
             anthropic_models,
             anthropic_settings.get("model", "")
         )
+        
+        # Custom endpoint settings
+        custom_settings = self.current_settings.get("custom", {})
+        custom_enabled = custom_settings.get("enabled", False)
+        self.custom_enabled_checkbox.setChecked(custom_enabled)
+        custom_base_url_saved = (custom_settings.get("base_url") or "").strip()
+        self.custom_base_url_input.setText(
+            custom_base_url_saved or self.default_custom_base_url
+        )
+        self.custom_api_key_input.setText(custom_settings.get("api_key", ""))
+        custom_models = list(custom_settings.get("models", []) or [])
+        self._provider_models["custom"] = custom_models
+        self._populate_model_combo(
+            "custom",
+            custom_models,
+            custom_settings.get("model", "")
+        )
+        self._on_custom_enabled_toggled(custom_enabled)
+        
+        # Request timeout (from ai_summary)
+        ai_summary = settings.get("ai_summary", {})
+        timeout = max(10, min(600, int(ai_summary.get("request_timeout_seconds", 60))))
+        self.request_timeout_spinbox.setValue(timeout)
     
     def _refresh_all_models(self) -> None:
         """Refresh model lists for all providers that have API keys.
@@ -357,25 +502,32 @@ class AIModelSettingsDialog(QDialog):
         # Check OpenAI
         openai_api_key = self.openai_api_key_input.text().strip()
         if openai_api_key:
-            providers_to_refresh.append(("openai", openai_api_key))
+            providers_to_refresh.append(("openai", openai_api_key, None))
         else:
-            # Clear models if no API key
             self._populate_model_combo("openai", [], "")
         
         # Check Anthropic
         anthropic_api_key = self.anthropic_api_key_input.text().strip()
         if anthropic_api_key:
-            providers_to_refresh.append(("anthropic", anthropic_api_key))
+            providers_to_refresh.append(("anthropic", anthropic_api_key, None))
         else:
-            # Clear models if no API key
             self._populate_model_combo("anthropic", [], "")
+        
+        # Check Custom (only if enabled; base URL required; API key optional)
+        custom_enabled = self.custom_enabled_checkbox.isChecked()
+        custom_base_url = self.custom_base_url_input.text().strip()
+        custom_api_key = self.custom_api_key_input.text().strip()
+        if custom_enabled and custom_base_url:
+            providers_to_refresh.append(("custom", custom_api_key, custom_base_url))
+        else:
+            self._populate_model_combo("custom", [], "")
         
         if not providers_to_refresh:
             from app.views.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
-                "API Key Required",
-                "Please enter at least one API key before refreshing models.",
+                "Configuration Required",
+                "Please enter at least one API key (OpenAI/Anthropic) or a custom base URL before refreshing models.",
                 self
             )
             return
@@ -385,7 +537,7 @@ class AIModelSettingsDialog(QDialog):
         self.refresh_models_button.setText("Loading...")
         
         # Cancel any existing discovery threads
-        for provider_key in ["openai", "anthropic"]:
+        for provider_key in ["openai", "anthropic", "custom"]:
             thread = self.discovery_threads.get(provider_key)
             if thread:
                 # Disconnect signals first
@@ -400,7 +552,6 @@ class AIModelSettingsDialog(QDialog):
                     thread.terminate()
                     thread.wait(2000)  # Wait up to 2 seconds for termination
                 
-                # Clean up thread reference
                 self.discovery_threads[provider_key] = None
         
         # Track how many providers we're refreshing
@@ -409,8 +560,11 @@ class AIModelSettingsDialog(QDialog):
         self._refresh_results = []  # Store results for combined status message
         
         # Start discovery threads for each provider
-        for provider_key, api_key in providers_to_refresh:
-            thread = ModelDiscoveryThread(provider_key, api_key, self.discovery_service)
+        for provider_key, api_key, base_url in providers_to_refresh:
+            thread = ModelDiscoveryThread(
+                provider_key, api_key, self.discovery_service,
+                base_url=base_url
+            )
             thread.models_discovered.connect(self._on_models_discovered)
             thread.discovery_failed.connect(self._on_discovery_failed)
             
@@ -421,7 +575,7 @@ class AIModelSettingsDialog(QDialog):
         """Handle successful model discovery.
         
         Args:
-            provider: Provider name.
+            provider: Provider name (openai, anthropic, or custom).
             models: List of discovered model IDs.
         """
         combo = getattr(self, f"{provider}_model_combo")
@@ -432,7 +586,7 @@ class AIModelSettingsDialog(QDialog):
         self.discovery_threads[provider] = None
         
         # Store result for combined status message
-        provider_display = "OpenAI" if provider == "openai" else "Anthropic"
+        provider_display = {"openai": "OpenAI", "anthropic": "Anthropic", "custom": "Custom"}.get(provider, provider)
         self._refresh_results.append((provider_display, len(models)))
         
         # Check if all refreshes are complete
@@ -489,7 +643,7 @@ class AIModelSettingsDialog(QDialog):
     
     def _cleanup_threads(self) -> None:
         """Clean up discovery threads before dialog closes."""
-        for provider_key in ["openai", "anthropic"]:
+        for provider_key in ["openai", "anthropic", "custom"]:
             thread = self.discovery_threads.get(provider_key)
             if thread and thread.isRunning():
                 # Disconnect signals to prevent callbacks after dialog closes
@@ -523,6 +677,14 @@ class AIModelSettingsDialog(QDialog):
         if not anthropic_api_key:
             anthropic_model = ""
         
+        custom_enabled = self.custom_enabled_checkbox.isChecked()
+        custom_base_url = self.custom_base_url_input.text().strip()
+        custom_api_key = self.custom_api_key_input.text().strip()
+        custom_model = self.custom_model_combo.currentText() if self.custom_model_combo.currentIndex() > 0 else ""
+        custom_models = self._get_models_for_provider("custom") if (custom_enabled and custom_base_url) else []
+        if not custom_base_url:
+            custom_model = ""
+        
         settings = {
             "openai": {
                 "api_key": openai_api_key,
@@ -533,27 +695,42 @@ class AIModelSettingsDialog(QDialog):
                 "api_key": anthropic_api_key,
                 "model": anthropic_model,
                 "models": anthropic_models
+            },
+            "custom": {
+                "enabled": custom_enabled,
+                "base_url": custom_base_url,
+                "api_key": custom_api_key,
+                "model": custom_model,
+                "models": custom_models
             }
         }
         
-        ai_summary_updates = {}
+        ai_summary_updates = {"request_timeout_seconds": self.request_timeout_spinbox.value()}
         has_openai_key = bool(openai_api_key)
         has_anthropic_key = bool(anthropic_api_key)
-        if has_openai_key and not has_anthropic_key:
-            ai_summary_updates = {
+        has_custom = bool(custom_enabled and custom_base_url)
+        if has_openai_key and not has_anthropic_key and not has_custom:
+            ai_summary_updates.update({
                 "use_openai_models": True,
-                "use_anthropic_models": False
-            }
-        elif has_anthropic_key and not has_openai_key:
-            ai_summary_updates = {
+                "use_anthropic_models": False,
+                "use_custom_models": False
+            })
+        elif has_anthropic_key and not has_openai_key and not has_custom:
+            ai_summary_updates.update({
                 "use_openai_models": False,
-                "use_anthropic_models": True
-            }
+                "use_anthropic_models": True,
+                "use_custom_models": False
+            })
+        elif has_custom and not has_openai_key and not has_anthropic_key:
+            ai_summary_updates.update({
+                "use_openai_models": False,
+                "use_anthropic_models": False,
+                "use_custom_models": True
+            })
         
         # Update user settings
         self.user_settings_service.update_ai_model_settings(settings)
-        if ai_summary_updates:
-            self.user_settings_service.update_ai_summary_settings(ai_summary_updates)
+        self.user_settings_service.update_ai_summary_settings(ai_summary_updates)
         
         # Save to file
         if self.user_settings_service.save():
@@ -647,13 +824,33 @@ class AIModelSettingsDialog(QDialog):
         
         for label in self.findChildren(QLabel):
             # Skip group box titles
-            if isinstance(label.parent(), QGroupBox) and label.text() in ["OpenAI", "Anthropic"]:
+            if isinstance(label.parent(), QGroupBox) and label.text() in ["OpenAI", "Anthropic", "Custom endpoint"]:
                 continue
             label.setStyleSheet(label_style)
             # Also set palette to ensure transparent background on macOS
             label_palette = label.palette()
             label_palette.setColor(label.backgroundRole(), QColor(0, 0, 0, 0))  # Transparent
             label.setPalette(label_palette)
+        
+        # Checkboxes (e.g. Enable custom endpoint)
+        checkboxes = self.findChildren(QCheckBox)
+        if checkboxes:
+            from pathlib import Path
+            from app.views.style import StyleManager
+            project_root = Path(__file__).parent.parent.parent
+            checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
+            checkbox_bg = self.inputs_config.get('background_color', [45, 45, 50])
+            checkbox_border = self.inputs_config.get('border_color', [60, 60, 65])
+            StyleManager.style_checkboxes(
+                checkboxes,
+                self.config,
+                label_text_color,
+                label_font_family,
+                label_font_size,
+                checkbox_bg,
+                checkbox_border,
+                checkmark_path
+            )
         
         # Input widgets (QLineEdit, QComboBox)
         input_bg_color = self.inputs_config.get('background_color', [45, 45, 50])
@@ -704,6 +901,10 @@ class AIModelSettingsDialog(QDialog):
                 border_radius=input_border_radius,  # Match combobox border radius
                 padding=input_padding  # Preserve existing padding for alignment
             )
+            # Use a lighter mask character for password fields (· U+00B7) instead of default bullet
+            for le in line_edits:
+                if le.echoMode() == QLineEdit.EchoMode.Password:
+                    le.setStyleSheet(le.styleSheet() + " QLineEdit { lineedit-password-character: 183; }")
         
         # Apply combobox styling using StyleManager
         from app.views.style import StyleManager
@@ -724,6 +925,24 @@ class AIModelSettingsDialog(QDialog):
                 border_radius=input_border_radius,
                 padding=[input_padding_h, input_padding_v],
                 editable=False  # Model comboboxes are non-editable
+            )
+        
+        # Apply spinbox styling using StyleManager (e.g. Request timeout)
+        spinboxes = list(self.findChildren(QSpinBox))
+        if spinboxes:
+            spinbox_padding = [input_padding_h, input_padding_v]
+            StyleManager.style_spinboxes(
+                spinboxes,
+                self.config,
+                text_color=input_text_color,
+                font_family=input_font_family,
+                font_size=input_font_size,
+                bg_color=input_bg_color,
+                border_color=input_border_color,
+                focus_border_color=input_focus_border_color,
+                border_width=input_border_width,
+                border_radius=input_border_radius,
+                padding=spinbox_padding
             )
         
         # Apply button styling using StyleManager (uses unified config)

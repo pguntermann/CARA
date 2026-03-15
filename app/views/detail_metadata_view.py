@@ -456,10 +456,11 @@ class DetailMetadataView(QWidget):
         if not tag_name:
             return
         
-        # CARA analysis and annotation tags are read-only and cannot be removed
+        # CARA analysis, annotation, and notes tags are read-only and cannot be removed
         read_only_tags = {
             "CARAAnalysisData", "CARAAnalysisInfo", "CARAAnalysisChecksum",
-            "CARAAnnotations", "CARAAnnotationsInfo", "CARAAnnotationsChecksum"
+            "CARAAnnotations", "CARAAnnotationsInfo", "CARAAnnotationsChecksum",
+            "CARANotes", "CARANotesInfo", "CARANotesChecksum"
         }
         if tag_name in read_only_tags:
             from app.views.message_dialog import MessageDialog

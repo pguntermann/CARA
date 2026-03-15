@@ -186,6 +186,7 @@ class SearchController:
                 time_control=getattr(game, "time_control", ""),
                 analyzed=game.analyzed,
                 annotated=getattr(game, "annotated", False),
+                has_notes=getattr(game, "has_notes", False),
                 source_database=db_name,
                 file_position=0,  # Search results don't have file position
                 ref_ply=ref_ply,

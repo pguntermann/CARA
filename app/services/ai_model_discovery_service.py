@@ -107,6 +107,46 @@ class AIModelDiscoveryService:
         except Exception:
             return []
     
+    def get_custom_models(self, base_url: Optional[str] = None, api_key: Optional[str] = None) -> List[str]:
+        """Get list of models from an OpenAI-compatible endpoint (e.g. local LLM server).
+        
+        Args:
+            base_url: Base URL of the API (e.g. http://localhost:1234/v1). Required.
+            api_key: Optional API key; many local servers do not require one.
+            
+        Returns:
+            List of model IDs.
+        """
+        if not base_url or not base_url.strip():
+            return []
+        
+        base_url = base_url.strip().rstrip("/")
+        models_url = base_url + "/models"
+        
+        try:
+            headers = {"Content-Type": "application/json"}
+            if api_key and api_key.strip():
+                headers["Authorization"] = f"Bearer {api_key.strip()}"
+            
+            response = requests.get(models_url, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            models = []
+            
+            for item in data.get("data", []):
+                model_id = item.get("id", "")
+                if not model_id:
+                    continue
+                if self._should_exclude_model(model_id, "custom"):
+                    continue
+                models.append(model_id)
+            
+            models.sort(reverse=True)
+            return models
+        except Exception:
+            return []
+    
     def _load_filter_config(self) -> Dict[str, Dict[str, List[str]]]:
         """Load provider-specific filter configuration from config.json.
         
@@ -120,7 +160,7 @@ class AIModelDiscoveryService:
         model_filters = ai_config.get("model_filters", {})
         
         # Load filters for each provider from config.json
-        for provider in ["openai", "anthropic"]:
+        for provider in ["openai", "anthropic", "custom"]:
             provider_config = model_filters.get(provider, {})
             filters[provider] = {
                 "exclude_prefixes": list(provider_config.get("exclude_prefixes", [])),

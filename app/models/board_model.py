@@ -37,6 +37,7 @@ class BoardModel(QObject):
     pv2_move_changed = pyqtSignal(object)  # Emitted when PV2 move changes (chess.Move or None)
     pv3_move_changed = pyqtSignal(object)  # Emitted when PV3 move changes (chess.Move or None)
     best_alternative_move_changed = pyqtSignal(object)  # Emitted when best alternative move changes (chess.Move or None)
+    move_classification_icons_visibility_changed = pyqtSignal(bool)  # Emitted when move classification badges visibility changes
     positional_plan_changed = pyqtSignal(object)  # Emitted when positional plan changes (PieceTrajectory or None)
     active_pv_plan_changed = pyqtSignal(int)  # Emitted when active PV plan changes (1, 2, 3, or 0 for none)
     hide_other_arrows_during_plan_exploration_changed = pyqtSignal(bool)  # Emitted when hide other arrows setting changes
@@ -62,6 +63,7 @@ class BoardModel(QObject):
         self._show_pv2_arrow = True  # Track if PV2 arrow is visible
         self._show_pv3_arrow = True  # Track if PV3 arrow is visible
         self._show_bestalternativemove_arrow = True  # Track if best alternative move arrow is visible
+        self._show_move_classification_icons = False  # Track if move classification badges are visible
         self._show_evaluation_bar = False  # Track if evaluation bar is visible
         self._show_material_widget = False  # Track if material widget is visible
         self._last_move: Optional[chess.Move] = None  # Track the last move made
@@ -420,6 +422,21 @@ class BoardModel(QObject):
     def toggle_bestalternativemove_arrow_visibility(self) -> None:
         """Toggle best alternative move arrow visibility."""
         self.set_show_bestalternativemove_arrow(not self._show_bestalternativemove_arrow)
+    
+    @property
+    def show_move_classification_icons(self) -> bool:
+        """Get move classification icons (badges) visibility state."""
+        return self._show_move_classification_icons
+    
+    def set_show_move_classification_icons(self, show: bool) -> None:
+        """Set move classification icons visibility."""
+        if self._show_move_classification_icons != show:
+            self._show_move_classification_icons = show
+            self.move_classification_icons_visibility_changed.emit(show)
+    
+    def toggle_move_classification_icons_visibility(self) -> None:
+        """Toggle move classification icons visibility."""
+        self.set_show_move_classification_icons(not self._show_move_classification_icons)
     
     @property
     def best_next_move(self) -> Optional[chess.Move]:

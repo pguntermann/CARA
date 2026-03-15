@@ -1,10 +1,6 @@
 """Service for storing and loading chessboard annotations in PGN tags."""
 
 import json
-import gzip
-import zlib
-import base64
-import hashlib
 from typing import Dict, List, Optional, Any
 from io import StringIO
 from datetime import datetime
@@ -15,6 +11,11 @@ from app.models.database_model import GameData
 from app.services.pgn_service import PgnService
 from app.models.annotation_model import Annotation, AnnotationType
 from app.services.logging_service import LoggingService
+from app.utils.pgn_tag_compression import (
+    decode_and_decompress_to_str,
+    compress_and_encode_from_str,
+    compute_checksum,
+)
 
 
 class AnnotationStorageService:
@@ -78,15 +79,9 @@ class AnnotationStorageService:
                 return None
             
             encoded = chess_game.headers[AnnotationStorageService.TAG_NAME]
-            compressed = base64.b64decode(encoded.encode('ascii'))
-            
-            try:
-                json_str = gzip.decompress(compressed).decode('utf-8')
-            except (gzip.BadGzipFile, OSError, zlib.error) as e:
-                raise ValueError(f"Annotations data decompression failed: {e}") from e
-            
+            json_str = decode_and_decompress_to_str(encoded)
             return json_str
-        except Exception:
+        except (ValueError, Exception):
             return None
     
     @staticmethod
@@ -140,15 +135,9 @@ class AnnotationStorageService:
             
             # Convert to JSON string
             json_str = json.dumps(annotations_data, ensure_ascii=False)
-            
-            # Calculate checksum
-            checksum = hashlib.sha256(json_str.encode('utf-8')).hexdigest()
-            
-            # Compress with gzip
-            compressed = gzip.compress(json_str.encode('utf-8'), compresslevel=9)
-            
-            # Base64 encode
-            encoded = base64.b64encode(compressed).decode('ascii')
+            data_bytes = json_str.encode("utf-8")
+            checksum = compute_checksum(data_bytes)
+            encoded = compress_and_encode_from_str(json_str, compresslevel=9)
             
             # Get app version from config
             app_version = config.get('version', '1.0') if config else '1.0'
@@ -204,18 +193,16 @@ class AnnotationStorageService:
                 return None
             
             encoded = chess_game.headers[AnnotationStorageService.TAG_NAME]
-            compressed = base64.b64decode(encoded.encode('ascii'))
-            
             try:
-                json_str = gzip.decompress(compressed).decode('utf-8')
-            except (gzip.BadGzipFile, OSError, zlib.error) as e:
+                json_str = decode_and_decompress_to_str(encoded)
+            except ValueError:
                 AnnotationStorageService._remove_corrupted_annotation_tags(game)
-                raise ValueError(f"Annotations data decompression failed: {e}") from e
+                raise
             
             # Verify checksum if present
             if AnnotationStorageService.TAG_CHECKSUM in chess_game.headers:
                 stored_checksum = chess_game.headers[AnnotationStorageService.TAG_CHECKSUM]
-                calculated_checksum = hashlib.sha256(json_str.encode('utf-8')).hexdigest()
+                calculated_checksum = compute_checksum(json_str.encode("utf-8"))
                 
                 if stored_checksum != calculated_checksum:
                     AnnotationStorageService._remove_corrupted_annotation_tags(game)
@@ -251,6 +238,8 @@ class AnnotationStorageService:
                     annotations[ply_index].append(ann)
             
             return annotations
+        except ValueError:
+            raise
         except Exception:
             return None
     

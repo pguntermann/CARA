@@ -163,6 +163,7 @@ class MainWindow(QMainWindow):
         self._setup_annotations_menu(menu_bar)
         self._setup_engines_menu(menu_bar)
         self._setup_ai_summary_menu(menu_bar)
+        self._setup_notes_menu(menu_bar)
         self._setup_view_menu(menu_bar)
         self._setup_help_menu(menu_bar)
         self._setup_debug_menu(menu_bar)
@@ -424,6 +425,13 @@ class MainWindow(QMainWindow):
         self.bestalternativemove_arrow_action.triggered.connect(self.controller.toggle_bestalternativemove_arrow_visibility)
         board_menu.addAction(self.bestalternativemove_arrow_action)
         
+        # Show Move Classification Icons action (checkable to show toggle state)
+        self.move_classification_icons_action = QAction("Show Move Classification Icons", self)
+        self.move_classification_icons_action.setShortcut(QKeySequence("Alt+4"))
+        self.move_classification_icons_action.setCheckable(True)
+        self.move_classification_icons_action.triggered.connect(self.controller.toggle_move_classification_icons_visibility)
+        board_menu.addAction(self.move_classification_icons_action)
+        
         board_menu.addSeparator()
         
         # Show Annotations Layer action (checkable to show toggle state)
@@ -472,6 +480,7 @@ class MainWindow(QMainWindow):
         board_model.playedmove_arrow_visibility_changed.connect(self._on_playedmove_arrow_visibility_changed)
         board_model.bestnextmove_arrow_visibility_changed.connect(self._on_bestnextmove_arrow_visibility_changed)
         board_model.bestalternativemove_arrow_visibility_changed.connect(self._on_bestalternativemove_arrow_visibility_changed)
+        board_model.move_classification_icons_visibility_changed.connect(self._on_move_classification_icons_visibility_changed)
         board_model.evaluation_bar_visibility_changed.connect(self._on_evaluation_bar_visibility_changed)
         board_model.material_widget_visibility_changed.connect(self._on_material_widget_visibility_changed)
         
@@ -485,6 +494,7 @@ class MainWindow(QMainWindow):
         self._update_pv2_arrow_action_state(board_model.show_pv2_arrow)
         self._update_pv3_arrow_action_state(board_model.show_pv3_arrow)
         self._update_bestalternativemove_arrow_action_state(board_model.show_bestalternativemove_arrow)
+        self._update_move_classification_icons_action_state(board_model.show_move_classification_icons)
         self._update_evaluation_bar_action_state(board_model.show_evaluation_bar)
         self._update_material_widget_action_state(board_model.show_material_widget)
         
@@ -899,6 +909,18 @@ class MainWindow(QMainWindow):
         setup_preferences_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         setup_preferences_action.triggered.connect(self._show_annotation_preferences)
         annotations_menu.addAction(setup_preferences_action)
+
+    def _setup_notes_menu(self, menu_bar: QMenuBar) -> None:
+        """Setup the Notes menu."""
+        notes_menu = menu_bar.addMenu("Notes")
+        clear_notes_action = QAction("Clear Notes for current game", self)
+        clear_notes_action.setShortcut(QKeySequence("Ctrl+Shift+E"))
+        clear_notes_action.triggered.connect(self._clear_notes_for_current_game)
+        notes_menu.addAction(clear_notes_action)
+        save_notes_action = QAction("Save Notes to current game", self)
+        save_notes_action.setShortcut(QKeySequence("Ctrl+Alt+N"))
+        save_notes_action.triggered.connect(self._save_notes_to_current_game)
+        notes_menu.addAction(save_notes_action)
     
     def _setup_engines_menu(self, menu_bar: QMenuBar) -> None:
         """Setup the Engines menu."""
@@ -953,6 +975,11 @@ class MainWindow(QMainWindow):
         self.ai_summary_use_anthropic_action.setCheckable(True)
         self.ai_summary_use_anthropic_action.triggered.connect(lambda: self._on_ai_summary_provider_selected("anthropic"))
         ai_summary_menu.addAction(self.ai_summary_use_anthropic_action)
+        
+        self.ai_summary_use_custom_action = QAction("Use Custom Endpoint", self)
+        self.ai_summary_use_custom_action.setCheckable(True)
+        self.ai_summary_use_custom_action.triggered.connect(lambda: self._on_ai_summary_provider_selected("custom"))
+        ai_summary_menu.addAction(self.ai_summary_use_custom_action)
         
         ai_summary_menu.addSeparator()
         
@@ -1020,6 +1047,13 @@ class MainWindow(QMainWindow):
         self.view_ai_summary_action.triggered.connect(lambda: self._switch_detail_tab(6))
         view_menu.addAction(self.view_ai_summary_action)
         
+        # Notes action
+        self.view_notes_action = QAction("Notes", self)
+        self.view_notes_action.setShortcut(QKeySequence("F8"))
+        self.view_notes_action.setCheckable(True)
+        self.view_notes_action.triggered.connect(lambda: self._switch_detail_tab(7))
+        view_menu.addAction(self.view_notes_action)
+        
         # Separator
         view_menu.addSeparator()
         
@@ -1030,7 +1064,7 @@ class MainWindow(QMainWindow):
         self.view_hide_database_panel_action.triggered.connect(self._toggle_database_panel)
         view_menu.addAction(self.view_hide_database_panel_action)
         
-        # Store view menu actions for later connection
+        # Store view menu actions for later connection (order must match detail panel tab order)
         self.view_menu_actions = [
             self.view_moves_list_action,
             self.view_metadata_action,
@@ -1038,7 +1072,8 @@ class MainWindow(QMainWindow):
             self.view_game_summary_action,
             self.view_player_stats_action,
             self.view_annotations_action,
-            self.view_ai_summary_action
+            self.view_ai_summary_action,
+            self.view_notes_action
         ]
     
     def _setup_help_menu(self, menu_bar: QMenuBar) -> None:
@@ -1445,21 +1480,18 @@ class MainWindow(QMainWindow):
         
         self.controller.set_status(status_message)
     
+    def _on_database_removed(self, identifier: str) -> None:
+        """When any database tab is closed (file menu or context menu), clear active game and update menu state."""
+        self.controller.get_game_controller().set_active_game(None)
+        self._update_save_menu_state()
+        self._update_close_menu_state()
+
     def _close_pgn_database(self) -> None:
         """Close the currently selected PGN database tab."""
-        # Close the active PGN database via controller (handles business logic)
         database_controller = self.controller.get_database_controller()
         closed = database_controller.close_active_pgn_database()
-        
         if closed:
-            # Clear active game if it was from the closed tab
-            # (The game might still be active, but we clear it for safety)
-            self.controller.get_game_controller().set_active_game(None)
             self.controller.set_status("PGN database closed")
-            # Update save menu state
-            self._update_save_menu_state()
-            # Update close menu state
-            self._update_close_menu_state()
         else:
             self.controller.set_status("No PGN database tab selected to close")
     
@@ -1467,18 +1499,11 @@ class MainWindow(QMainWindow):
         """Close all PGN databases except clipboard and search results."""
         database_controller = self.controller.get_database_controller()
         closed_count = database_controller.close_all_pgn_databases()
-        
         if closed_count > 0:
-            # Clear active game if it was from a closed tab
-            self.controller.get_game_controller().set_active_game(None)
             if closed_count == 1:
                 self.controller.set_status("1 database closed")
             else:
                 self.controller.set_status(f"{closed_count} databases closed")
-            # Update save menu state
-            self._update_save_menu_state()
-            # Update close menu state
-            self._update_close_menu_state()
         else:
             self.controller.set_status("No databases to close")
     
@@ -1506,6 +1531,7 @@ class MainWindow(QMainWindow):
             database_controller = self.controller.get_database_controller()
             panel_model = database_controller.get_panel_model()
             panel_model.active_database_changed.connect(self._on_database_tab_changed)
+            panel_model.database_removed.connect(self._on_database_removed)
             # Initialize save and close menu state
             self._update_save_menu_state()
             self._update_close_menu_state()
@@ -2247,11 +2273,38 @@ class MainWindow(QMainWindow):
         """Save annotations into the active game's PGN tag."""
         if not self.controller:
             return
-        
+
         annotation_controller = self.controller.get_annotation_controller()
         if annotation_controller:
             annotation_controller.save_annotations()
-    
+
+    def _clear_notes_for_current_game(self) -> None:
+        """Clear notes for the current game (removes CARANotes tag in memory)."""
+        if not self.controller:
+            return
+        game_controller = self.controller.get_game_controller()
+        if game_controller and game_controller.clear_notes_for_current_game():
+            if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'notes_view'):
+                self.detail_panel.notes_view.set_notes_text("")
+            self.controller.set_status("Notes cleared for current game")
+
+    def _save_notes_to_current_game(self) -> None:
+        """Save notes from the Notes view into the active game's PGN tag (in memory)."""
+        if not self.controller:
+            return
+        if not hasattr(self, 'detail_panel') or not hasattr(self.detail_panel, 'notes_view'):
+            return
+        notes_text = self.detail_panel.notes_view.get_plain_text()
+        game_controller = self.controller.get_game_controller()
+        if game_controller and game_controller.save_notes_to_current_game(notes_text):
+            # Mark the game as having unsaved changes (same as annotations / metadata)
+            database_model = self.controller.get_database_model_for_active_game()
+            if database_model:
+                active_game = game_controller.get_game_model().active_game
+                if active_game and database_model.update_game(active_game):
+                    self.controller.get_database_controller().mark_database_unsaved(database_model)
+            self.controller.set_status("Notes saved to current game")
+
     def _show_ai_model_settings(self) -> None:
         """Show the AI model settings dialog."""
         from app.views.ai_model_settings_dialog import AIModelSettingsDialog
@@ -2405,13 +2458,22 @@ class MainWindow(QMainWindow):
     
     def _update_bestalternativemove_arrow_action_state(self, visible: bool) -> None:
         """Update best alternative move arrow menu action checked state.
-        
+
         Args:
             visible: True if best alternative move arrow is visible, False otherwise.
         """
         if hasattr(self, 'bestalternativemove_arrow_action'):
             self.bestalternativemove_arrow_action.setChecked(visible)
-    
+
+    def _on_move_classification_icons_visibility_changed(self, visible: bool) -> None:
+        """Handle move classification icons visibility change to update menu toggle."""
+        self._update_move_classification_icons_action_state(visible)
+
+    def _update_move_classification_icons_action_state(self, visible: bool) -> None:
+        """Update move classification icons menu action checked state."""
+        if hasattr(self, 'move_classification_icons_action'):
+            self.move_classification_icons_action.setChecked(visible)
+
     def _on_active_move_changed(self, ply_index: int) -> None:
         """Handle active move change to update best alternative move arrow.
         
@@ -2706,9 +2768,11 @@ class MainWindow(QMainWindow):
             )
             self.database_panel.selection_changed.connect(player_stats_controller.notify_selection_changed)
 
-        # Set moves list model in game analysis controller
+        # Set moves list model in game analysis controller and on chessboard (for move classification badges)
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
             self.controller.set_moves_list_model(self.detail_panel.moveslist_model)
+            if hasattr(self, 'main_panel') and hasattr(self.main_panel, 'chessboard_view') and hasattr(self.main_panel.chessboard_view, 'chessboard'):
+                self.main_panel.chessboard_view.chessboard.set_moveslist_model(self.detail_panel.moveslist_model)
             # Connect bulk analysis finished so active game's Game Summary becomes available after bulk run
             if not getattr(self, '_bulk_analysis_finished_connected', False):
                 self.controller.get_bulk_analysis_controller().finished.connect(
@@ -4250,17 +4314,20 @@ Visibility Settings:
         """Handle AI Summary provider toggle selection."""
         use_openai = provider == "openai"
         use_anthropic = provider == "anthropic"
+        use_custom = provider == "custom"
         
         # Update menu states to enforce exclusivity
         self.ai_summary_use_openai_action.setChecked(use_openai)
         self.ai_summary_use_anthropic_action.setChecked(use_anthropic)
+        self.ai_summary_use_custom_action.setChecked(use_custom)
         
         # Persist setting
         from app.services.user_settings_service import UserSettingsService
         settings_service = UserSettingsService.get_instance()
         settings_service.update_ai_summary_settings({
             "use_openai_models": use_openai,
-            "use_anthropic_models": use_anthropic
+            "use_anthropic_models": use_anthropic,
+            "use_custom_models": use_custom
         })
         settings_service.save()
         
@@ -4305,16 +4372,20 @@ Visibility Settings:
         ai_summary_settings = settings.get("ai_summary", {})
         use_openai = ai_summary_settings.get("use_openai_models", True)
         use_anthropic = ai_summary_settings.get("use_anthropic_models", False)
+        use_custom = ai_summary_settings.get("use_custom_models", False)
         
-        # Enforce exclusivity: if both or neither are selected, default to OpenAI
-        if use_openai == use_anthropic:
+        # Enforce exactly one provider: default to OpenAI if invalid
+        if sum([use_openai, use_anthropic, use_custom]) != 1:
             use_openai = True
             use_anthropic = False
+            use_custom = False
         
         if hasattr(self, 'ai_summary_use_openai_action'):
             self.ai_summary_use_openai_action.setChecked(use_openai)
         if hasattr(self, 'ai_summary_use_anthropic_action'):
             self.ai_summary_use_anthropic_action.setChecked(use_anthropic)
+        if hasattr(self, 'ai_summary_use_custom_action'):
+            self.ai_summary_use_custom_action.setChecked(use_custom)
     
     def _on_manual_analysis_state_changed(self, is_analyzing: bool) -> None:
         """Handle manual analysis state change to update menu toggle.
@@ -4401,7 +4472,7 @@ Visibility Settings:
         """Switch to the specified detail panel tab.
         
         Args:
-            index: Tab index (0=Moves List, 1=Metadata, 2=Manual Analysis, 3=Game Summary, 4=Player Stats, 5=Annotations, 6=AI Summary).
+            index: Tab index (0=Moves List, 1=Metadata, 2=Manual Analysis, 3=Game Summary, 4=Player Stats, 5=Annotations, 6=AI Summary, 7=Notes).
         """
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'tab_widget'):
             tab_widget = self.detail_panel.tab_widget
@@ -4763,6 +4834,11 @@ Visibility Settings:
         board_model.set_show_bestalternativemove_arrow(show_bestalternativemove_arrow)
         self._update_bestalternativemove_arrow_action_state(show_bestalternativemove_arrow)
         
+        # Show Move Classification Icons
+        show_move_classification_icons = board_visibility.get("show_move_classification_icons", False)
+        board_model.set_show_move_classification_icons(show_move_classification_icons)
+        self._update_move_classification_icons_action_state(show_move_classification_icons)
+        
         # Show Annotations Layer (already loaded above, just ensure signal is connected)
         # Signal connection is done above in the annotation layer loading section
         
@@ -4912,13 +4988,17 @@ Visibility Settings:
         ai_summary_settings = settings.get("ai_summary", {})
         use_openai = ai_summary_settings.get("use_openai_models", True)
         use_anthropic = ai_summary_settings.get("use_anthropic_models", False)
-        if use_openai == use_anthropic:
+        use_custom = ai_summary_settings.get("use_custom_models", False)
+        if sum([use_openai, use_anthropic, use_custom]) != 1:
             use_openai = True
             use_anthropic = False
+            use_custom = False
         if hasattr(self, 'ai_summary_use_openai_action'):
             self.ai_summary_use_openai_action.setChecked(use_openai)
         if hasattr(self, 'ai_summary_use_anthropic_action'):
             self.ai_summary_use_anthropic_action.setChecked(use_anthropic)
+        if hasattr(self, 'ai_summary_use_custom_action'):
+            self.ai_summary_use_custom_action.setChecked(use_custom)
         
         # Include Analysis Data in Pre-Prompt toggle
         include_analysis_data = ai_summary_settings.get("include_analysis_data_in_preprompt", False)
@@ -4985,7 +5065,8 @@ Visibility Settings:
         if hasattr(self, 'ai_summary_use_openai_action'):
             ai_summary_settings = {
                 "use_openai_models": self.ai_summary_use_openai_action.isChecked(),
-                "use_anthropic_models": self.ai_summary_use_anthropic_action.isChecked() if hasattr(self, 'ai_summary_use_anthropic_action') else False
+                "use_anthropic_models": self.ai_summary_use_anthropic_action.isChecked() if hasattr(self, 'ai_summary_use_anthropic_action') else False,
+                "use_custom_models": self.ai_summary_use_custom_action.isChecked() if hasattr(self, 'ai_summary_use_custom_action') else False
             }
             settings_service = getattr(self, '_settings_service', None)
             if settings_service is None:

@@ -14,6 +14,7 @@ from app.views.detail_summary_view import DetailSummaryView
 from app.views.detail_manual_analysis_view import DetailManualAnalysisView
 from app.views.detail_annotation_view import DetailAnnotationView
 from app.views.detail_ai_chat_view import DetailAIChatView
+from app.views.detail_notes_view import DetailNotesView
 from app.models.game_model import GameModel
 from app.models.moveslist_model import MovesListModel
 from app.models.metadata_model import MetadataModel
@@ -346,6 +347,14 @@ class DetailPanel(QWidget):
         )
         self.tab_widget.addTab(self.ai_chat_view, "AI Summary")
         
+        # Notes tab (after AI Summary)
+        self.notes_view = DetailNotesView(
+            self.config,
+            game_model=self._game_model,
+            game_controller=self._game_controller
+        )
+        self.tab_widget.addTab(self.notes_view, "Notes")
+        
         # Connect manual analysis controller if provided
         if self._manual_analysis_controller:
             self.manual_analysis_view.set_analysis_controller(self._manual_analysis_controller)
@@ -357,6 +366,12 @@ class DetailPanel(QWidget):
         # Connect AI chat view to game model if available
         if self._game_model:
             self.ai_chat_view.set_game_model(self._game_model)
+        
+        # Connect notes view to game model and controller
+        if self._game_model:
+            self.notes_view.set_game_model(self._game_model)
+        if self._game_controller:
+            self.notes_view.set_game_controller(self._game_controller)
     
     def set_game_model(self, model: GameModel) -> None:
         """Set the game model to observe.
@@ -383,6 +398,10 @@ class DetailPanel(QWidget):
         # Connect metadata view to game model for active game tracking
         if hasattr(self, 'metadata_view'):
             self.metadata_view.set_game_model(model)
+        
+        # Connect notes view to game model
+        if hasattr(self, 'notes_view'):
+            self.notes_view.set_game_model(model)
         
         # Connect summary view to game model for analysis status tracking
         if hasattr(self, 'summary_view'):

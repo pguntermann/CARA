@@ -318,6 +318,25 @@ class MovesListModel(QAbstractTableModel):
         b = int(b * (1 - blend) + 255 * blend)
         return QColor(r, g, b)
 
+    def get_assessment_for_ply(self, ply_index: int) -> Optional[str]:
+        """Get the move assessment string for a given ply (e.g. 'Best Move', 'Blunder').
+        
+        Args:
+            ply_index: Ply index (1 = after white's first move, 2 = after black's first move, etc.).
+            
+        Returns:
+            Assessment string for that move, or None if ply_index <= 0 or no move/assessment at that row.
+        """
+        if ply_index <= 0:
+            return None
+        row = (ply_index - 1) // 2
+        if row < 0 or row >= len(self._moves):
+            return None
+        move = self._moves[row]
+        if ply_index % 2 == 1:
+            return (move.assess_white or "").strip() or None
+        return (move.assess_black or "").strip() or None
+    
     def set_active_move_ply(self, ply_index: int) -> None:
         """Set the active move ply index for highlighting.
         

@@ -46,6 +46,7 @@ class AIProvider(str, Enum):
     """AI provider types."""
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
+    CUSTOM = "custom"
 
 
 class AIService:
@@ -75,6 +76,38 @@ class AIService:
         self.OPENAI_CHAT_URL = openai_config.get("chat", "https://api.openai.com/v1/chat/completions")
         self.ANTHROPIC_MESSAGES_URL = anthropic_config.get("messages", "https://api.anthropic.com/v1/messages")
     
+    @staticmethod
+    def _extract_error_message(response: requests.Response, status_code: int) -> str:
+        """Extract a human-readable error message from an API error response."""
+        fallback = f"API error: {status_code}"
+        try:
+            body = response.json() if response.content else None
+        except Exception:
+            body = None
+        if body is None:
+            return fallback
+        if isinstance(body, dict):
+            # OpenAI-style: {"error": {"message": "..."}}
+            err = body.get("error")
+            if isinstance(err, dict) and err.get("message"):
+                return f"API error: {status_code} - {err.get('message')}"
+            if isinstance(err, str):
+                return f"API error: {status_code} - {err}"
+            # Common alternatives: detail, message
+            for key in ("detail", "message", "error"):
+                val = body.get(key)
+                if isinstance(val, str) and val:
+                    return f"API error: {status_code} - {val}"
+            if isinstance(body.get("detail"), list) and body["detail"]:
+                # e.g. FastAPI validation: [{"loc": [...], "msg": "..."}]
+                first = body["detail"][0]
+                msg = first.get("msg") if isinstance(first, dict) else str(first)
+                if msg:
+                    return f"API error: {status_code} - {msg}"
+        if isinstance(body, str) and body.strip():
+            return f"API error: {status_code} - {body[:300]}"
+        return fallback
+
     def _debug_console(self, message: str, direction: str) -> None:
         """Log debug message to console if console debugging is enabled.
         
@@ -122,27 +155,36 @@ class AIService:
         api_key: str,
         messages: List[Dict[str, str]],
         system_prompt: Optional[str] = None,
-        token_limit: Optional[int] = None
+        token_limit: Optional[int] = None,
+        base_url_override: Optional[str] = None,
+        timeout_seconds: int = 60
     ) -> Tuple[bool, str]:
         """Send a message to an AI provider and get response.
         
         Args:
-            provider: Provider name ("openai" or "anthropic").
+            provider: Provider name ("openai", "anthropic", or "custom").
             model: Model ID (e.g., "gpt-4", "claude-3-5-sonnet-20241022").
-            api_key: API key for the provider.
+            api_key: API key for the provider (optional for custom endpoints).
             messages: List of message dicts with "role" and "content" keys.
             system_prompt: Optional system prompt (for OpenAI, included in messages; for Anthropic, separate).
+            base_url_override: For custom provider, the base URL (e.g. http://localhost:1234/v1).
+            timeout_seconds: Request timeout in seconds.
             
         Returns:
             Tuple of (success: bool, response_text: str or error_message: str).
         """
         try:
             if provider == AIProvider.OPENAI:
-                return self._send_openai_message(model, api_key, messages, system_prompt, token_limit)
+                return self._send_openai_message(model, api_key, messages, system_prompt, token_limit, timeout_seconds=timeout_seconds)
             elif provider == AIProvider.ANTHROPIC:
-                return self._send_anthropic_message(model, api_key, messages, system_prompt)
+                return self._send_anthropic_message(model, api_key, messages, system_prompt, timeout_seconds=timeout_seconds)
+            elif provider == AIProvider.CUSTOM and base_url_override:
+                chat_url = base_url_override.rstrip("/") + "/chat/completions"
+                return self._send_openai_message(
+                    model, api_key or "", messages, system_prompt, token_limit, chat_url=chat_url, timeout_seconds=timeout_seconds
+                )
             else:
-                return False, f"Unknown provider: {provider}"
+                return False, f"Unknown or misconfigured provider: {provider}"
         except Exception as e:
             return False, str(e)
     
@@ -152,19 +194,24 @@ class AIService:
         api_key: str,
         messages: List[Dict[str, str]],
         system_prompt: Optional[str] = None,
-        token_limit: Optional[int] = None
+        token_limit: Optional[int] = None,
+        chat_url: Optional[str] = None,
+        timeout_seconds: int = 60
     ) -> Tuple[bool, str]:
-        """Send message to OpenAI API.
+        """Send message to OpenAI API or OpenAI-compatible endpoint.
         
         Args:
             model: Model ID.
-            api_key: OpenAI API key.
+            api_key: API key (optional for local endpoints).
             messages: List of message dicts.
             system_prompt: Optional system prompt.
+            chat_url: Optional override URL (for custom provider); default is self.OPENAI_CHAT_URL.
+            timeout_seconds: Request timeout in seconds.
             
         Returns:
             Tuple of (success: bool, response_text: str or error_message: str).
         """
+        url = chat_url if chat_url is not None else self.OPENAI_CHAT_URL
         # Prepare messages for OpenAI
         openai_messages = []
         
@@ -232,16 +279,16 @@ class AIService:
         # Debug outbound: log request payload (hide API key)
         debug_payload = payload.copy()
         debug_headers = {k: ("Bearer ***" if k == "Authorization" else v) for k, v in headers.items()}
-        debug_message = ("POST " + str(self.OPENAI_CHAT_URL) + "\nHeaders: " + 
+        debug_message = ("POST " + str(url) + "\nHeaders: " + 
                         json.dumps(debug_headers, indent=2) + "\nPayload: " + 
                         json.dumps(debug_payload, indent=2))
         self._debug_console(debug_message, "SEND")
         
         response = requests.post(
-            self.OPENAI_CHAT_URL,
+            url,
             headers=headers,
             json=payload,
-            timeout=60
+            timeout=timeout_seconds
         )
         
         # Debug inbound: log response
@@ -264,9 +311,8 @@ class AIService:
             self._debug_console(debug_message, "RECV")
         
         if response.status_code != 200:
-            error_data = response.json() if response.content else {}
-            error_message = error_data.get("error", {}).get("message", f"API error: {response.status_code}")
-            
+            error_message = self._extract_error_message(response, response.status_code)
+
             # Handle max_tokens error - retry with max_completion_tokens
             if "max_tokens" in error_message and "max_completion_tokens" in error_message.lower():
                 # This model requires max_completion_tokens instead of max_tokens
@@ -287,16 +333,16 @@ class AIService:
                 
                 # Debug retry
                 debug_payload_retry = payload_retry.copy()
-                debug_message_retry = ("POST (RETRY) " + str(self.OPENAI_CHAT_URL) + "\nPayload: " + 
+                debug_message_retry = ("POST (RETRY) " + str(url) + "\nPayload: " +
                                       json.dumps(debug_payload_retry, indent=2))
                 self._debug_console(debug_message_retry, "SEND")
                 
                 # Retry request
                 response = requests.post(
-                    self.OPENAI_CHAT_URL,
+                    url,
                     headers=headers,
                     json=payload_retry,
-                    timeout=60
+                    timeout=timeout_seconds
                 )
                 
                 # Debug retry response
@@ -318,9 +364,7 @@ class AIService:
                 
                 # If retry also failed, return the error
                 if response.status_code != 200:
-                    error_data_retry = response.json() if response.content else {}
-                    error_message_retry = error_data_retry.get("error", {}).get("message", f"API error: {response.status_code}")
-                    return False, error_message_retry
+                    return False, self._extract_error_message(response, response.status_code)
                 # Otherwise, continue processing the successful retry response below (fall through to normal processing)
             
             # Handle temperature error - retry without temperature parameter
@@ -340,16 +384,16 @@ class AIService:
                 
                 # Debug retry
                 debug_payload_retry = payload_retry.copy()
-                debug_message_retry = ("POST (RETRY) " + str(self.OPENAI_CHAT_URL) + "\nPayload: " + 
+                debug_message_retry = ("POST (RETRY) " + str(url) + "\nPayload: " +
                                       json.dumps(debug_payload_retry, indent=2))
                 self._debug_console(debug_message_retry, "SEND")
                 
                 # Retry request
                 response = requests.post(
-                    self.OPENAI_CHAT_URL,
+                    url,
                     headers=headers,
                     json=payload_retry,
-                    timeout=60
+                    timeout=timeout_seconds
                 )
                 
                 # Debug retry response
@@ -371,9 +415,7 @@ class AIService:
                 
                 # If retry also failed, return the error
                 if response.status_code != 200:
-                    error_data_retry = response.json() if response.content else {}
-                    error_message_retry = error_data_retry.get("error", {}).get("message", f"API error: {response.status_code}")
-                    return False, error_message_retry
+                    return False, self._extract_error_message(response, response.status_code)
                 # Otherwise, continue processing the successful retry response below (fall through to normal processing)
             
             # Provide helpful error messages for other common issues
@@ -394,7 +436,12 @@ class AIService:
         
         try:
             data = response.json()
-            
+            if not isinstance(data, dict):
+                return False, (
+                    f"Unexpected API response format (expected JSON object, got {type(data).__name__}). "
+                    "The server may have returned an error or non-standard response."
+                )
+
             # Extract content from response
             # Structure: {"choices": [{"message": {"content": "..."}}]}
             choices = data.get("choices", [])
@@ -433,7 +480,8 @@ class AIService:
         model: str,
         api_key: str,
         messages: List[Dict[str, str]],
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        timeout_seconds: int = 60
     ) -> Tuple[bool, str]:
         """Send message to Anthropic API.
         
@@ -488,7 +536,7 @@ class AIService:
             self.ANTHROPIC_MESSAGES_URL,
             headers=headers,
             json=payload,
-            timeout=60
+            timeout=timeout_seconds
         )
         
         # Debug inbound: log response
@@ -541,6 +589,8 @@ class AIService:
                 return AIProvider.OPENAI, model
             elif provider_name == "anthropic":
                 return AIProvider.ANTHROPIC, model
+            elif provider_name == "custom":
+                return AIProvider.CUSTOM, model
         
         # Default to OpenAI if no prefix
         return AIProvider.OPENAI, model_string

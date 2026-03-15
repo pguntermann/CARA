@@ -366,7 +366,8 @@
             ]
           },
           "pieces": {
-            "svg_path": "app/resources/chesspieces/default"
+            "svg_path": "app/resources/chesspieces/default",
+            "padding_ratio": 0.05
           },
           "turn_indicator": {
             "size": 16,
@@ -590,6 +591,51 @@
               100,
               105
             ]
+          },
+          "move_classification_badges": {
+            "inset_ratio": 0.04,
+            "colors": {
+              "book_move": [
+                150,
+                150,
+                150
+              ],
+              "brilliant": [
+                255,
+                215,
+                0
+              ],
+              "best_move": [
+                100,
+                255,
+                100
+              ],
+              "good_move": [
+                150,
+                255,
+                150
+              ],
+              "inaccuracy": [
+                255,
+                255,
+                100
+              ],
+              "mistake": [
+                255,
+                200,
+                100
+              ],
+              "miss": [
+                200,
+                100,
+                255
+              ],
+              "blunder": [
+                255,
+                100,
+                100
+              ]
+            }
           },
           "initial_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
         }
@@ -1982,11 +2028,12 @@
             }
           },
           "tokens": {
+            "spacing_before": 12,
             "minimum": 256,
             "maximum": 16000,
             "default": 2000,
             "step": 100,
-            "width": 100,
+            "width": 92,
             "height": 30,
             "collapse_width_threshold": 520,
             "collapse_animation_duration_ms": 200,
@@ -2018,6 +2065,11 @@
               6,
               8
             ]
+          },
+          "timeout": {
+            "spacing_before": 12,
+            "width": 56,
+            "height": 30
           }
         },
         "splitter": {
@@ -2094,6 +2146,16 @@
               ]
             }
           }
+        },
+        "notes": {
+          "font_family": "Courier New",
+          "font_size": 11,
+          "text_color": [
+            255,
+            255,
+            255
+          ],
+          "placeholder_text": "Add notes about this game..."
         }
       },
       "database": {
@@ -2531,7 +2593,9 @@
       },
       "ai_model_settings": {
         "width": 600,
-        "height": 400,
+        "height": 640,
+        "default_custom_base_url": "http://localhost:1234/v1",
+        "form_label_min_width": 180,
         "background_color": [
           40,
           40,
@@ -2578,7 +2642,7 @@
         },
         "labels": {
           "font_family": "Helvetica Neue",
-          "font_size": 10,
+          "font_size": 11,
           "text_color": [
             200,
             200,
@@ -2603,7 +2667,7 @@
           ],
           "border_width": 1,
           "border_radius": 3,
-          "padding": 5,
+          "padding": 3,
           "font_family": "Cascadia Mono, Menlo",
           "font_size": 11,
           "focus_border_color": [
@@ -3891,11 +3955,11 @@
       "engine_validation_messages": {
         "no_engines": {
           "title": "No Engine Configured",
-          "message_template": "Please add at least one UCI chess engine before {action}.\n\nGo to Engines → Add Engine... to configure an engine."
+          "message_template": "Please add at least one UCI chess engine before {action}.<br><br>Go to Engines → Add Engine... to configure an engine."
         },
         "no_assignment": {
           "title": "No Engine Assigned",
-          "message_template": "Please assign an engine to the {task} task before {action}.\n\nGo to Engines → [Engine Name] → Assign to {task}."
+          "message_template": "Please assign an engine to the {task} task before {action}.<br><br>Go to Engines → [Engine Name] → Assign to {task}."
         },
         "actions": {
           "game_analysis": "starting game analysis",

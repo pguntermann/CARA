@@ -55,6 +55,7 @@ class MiniChessBoardWidget(QWidget):
         # Pieces
         pieces_config = board_config.get('pieces', {})
         self.svg_path = pieces_config.get('svg_path', 'app/resources/chesspieces/default')
+        self.piece_padding_ratio = max(0.0, min(0.5, float(pieces_config.get('padding_ratio', 0.1))))
         
         # Border
         border_config = board_config.get('border', {})
@@ -238,8 +239,8 @@ class MiniChessBoardWidget(QWidget):
             board_start_x: X position where the board squares start.
             board_start_y: Y position where the board squares start.
         """
-        piece_padding = 0.1  # 10% padding on each side
-        
+        piece_padding = self.piece_padding_ratio
+
         for row in range(self.square_count):
             for col in range(self.square_count):
                 piece = self.board[row][col]

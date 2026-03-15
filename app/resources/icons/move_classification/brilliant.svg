@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ffffff">
+  <!-- 5-pointed star with one point up; rotated 180° around center (12,12); same padding as other badges (translate+scale) -->
+  <g transform="translate(3,3) scale(0.75)">
+    <path transform="rotate(180 12 12)" d="M12 22 L9.65 15.24 L2.5 15.1 L8.2 10.76 L6.12 3.91 L12 8 L17.88 3.91 L15.8 10.76 L21.5 15.1 L14.35 15.24 Z"/>
+  </g>
+</svg>

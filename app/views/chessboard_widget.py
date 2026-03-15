@@ -4,13 +4,17 @@ from PyQt6.QtWidgets import QWidget, QGridLayout, QLabel, QToolTip
 from app.utils.rule_explanation_formatter import RuleExplanationFormatter
 from PyQt6.QtGui import QPainter, QColor, QFont, QPen, QBrush, QPolygon, QPolygonF, QMouseEvent, QFontMetrics, QPainterPath
 from PyQt6.QtSvg import QSvgRenderer
-from PyQt6.QtCore import Qt, QRect, QRectF, QPointF, QTimer, QPoint
+from PyQt6.QtCore import Qt, QRect, QRectF, QPointF, QTimer, QPoint, QByteArray
 from pathlib import Path
 import sys
+from colorsys import rgb_to_hls, hls_to_rgb
 import chess
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, TYPE_CHECKING
 
 from app.models.board_model import BoardModel
+
+if TYPE_CHECKING:
+    from app.models.moveslist_model import MovesListModel
 from app.models.evaluation_model import EvaluationModel
 from app.models.annotation_model import AnnotationModel, Annotation, AnnotationType
 from app.views.material_widget import MaterialWidget
@@ -93,6 +97,8 @@ class ChessBoardWidget(QWidget):
         self.show_pv2_arrow = True  # Default visibility state
         self.show_pv3_arrow = True  # Default visibility state
         self.show_bestalternativemove_arrow = True  # Default visibility state
+        self.show_move_classification_icons = False  # Default visibility state for move classification badges
+        self._moveslist_model: Optional["MovesListModel"] = None  # For move assessment badges
         self._last_move: Optional[chess.Move] = None  # Track last move for arrow drawing
         self._best_next_move: Optional[chess.Move] = None  # Track best next move for arrow drawing
         self._pv2_move: Optional[chess.Move] = None  # Track PV2 move for arrow drawing
@@ -131,6 +137,7 @@ class ChessBoardWidget(QWidget):
         # Pieces
         pieces_config = board_config.get('pieces', {})
         self.svg_path = pieces_config.get('svg_path', 'resources/chesspieces/default')
+        self.piece_padding_ratio = max(0.0, min(0.5, float(pieces_config.get('padding_ratio', 0.1))))
         
         # Turn indicator
         indicator_config = board_config.get('turn_indicator', {})
@@ -495,6 +502,11 @@ class ChessBoardWidget(QWidget):
             not should_hide_other_arrows):
             self._draw_arrow(painter, self._best_alternative_move, self.bestalternativemove_arrow_color, start_x, start_y)
         
+        # Draw move classification badge on last move destination (same hide condition as arrows)
+        if (self.show_move_classification_icons and not should_hide_other_arrows and
+            self._last_move is not None and self._game_model and self._moveslist_model):
+            self._draw_move_classification_badge(painter, start_x, start_y)
+        
         # Draw positional plan trajectories if active
         if self._board_model and self._board_model.positional_plans:
             for idx, trajectory in enumerate(self._board_model.positional_plans):
@@ -589,6 +601,96 @@ class ChessBoardWidget(QWidget):
                 )
             ])
             painter.drawPolygon(arrowhead_points)
+    
+    # Map assessment display strings (from moves list) to config color keys
+    _ASSESSMENT_TO_CONFIG_KEY = {
+        "Book Move": "book_move",
+        "Brilliant": "brilliant",
+        "Best Move": "best_move",
+        "Good Move": "good_move",
+        "Inaccuracy": "inaccuracy",
+        "Mistake": "mistake",
+        "Miss": "miss",
+        "Blunder": "blunder",
+    }
+    
+    @staticmethod
+    def _contrast_color_for_badge(rgb: List[int]) -> List[int]:
+        """Return a stroke/fill color that is visible on the badge background.
+        Keeps the badge hue and saturation but uses opposite lightness (e.g. bright yellow -> dark yellow).
+        When badge L is near 0.5 (e.g. saturated yellow), inverting would give the same color, so we
+        force icon to dark (L=0.2) on light badges and light (L=0.8) on dark badges.
+        """
+        if len(rgb) < 3:
+            return [255, 255, 255]
+        r, g, b = rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0
+        h, l, s = rgb_to_hls(r, g, b)
+        if l > 0.55:
+            l_icon = 0.2   # dark icon on light badge
+        elif l < 0.45:
+            l_icon = 0.8   # light icon on dark badge
+        else:
+            l_icon = 1.0 - l  # mid range: invert (may still be mid; prefer dark for consistency)
+            if 0.4 <= l_icon <= 0.6:
+                l_icon = 0.2
+        r_out, g_out, b_out = hls_to_rgb(h, l_icon, s)
+        return [
+            max(0, min(255, round(r_out * 255))),
+            max(0, min(255, round(g_out * 255))),
+            max(0, min(255, round(b_out * 255))),
+        ]
+    
+    def _draw_move_classification_badge(self, painter: QPainter, board_start_x: int, board_start_y: int) -> None:
+        """Draw the move classification badge (colored circle + icon) on the last move's destination square."""
+        active_ply = self._game_model.get_active_move_ply()
+        if active_ply <= 0:
+            return
+        assessment = self._moveslist_model.get_assessment_for_ply(active_ply)
+        if not assessment:
+            return
+        config_key = self._ASSESSMENT_TO_CONFIG_KEY.get(assessment)
+        if not config_key:
+            return
+        badges_config = (self.config.get("ui", {}) or {}).get("panels", {}).get("main", {}).get("board", {}).get("move_classification_badges", {})
+        badge_colors = badges_config.get("colors", {})
+        color_rgb = badge_colors.get(config_key)
+        if not color_rgb or len(color_rgb) < 3:
+            return
+        stroke_rgb = self._contrast_color_for_badge(color_rgb)
+        stroke_hex = f"#{stroke_rgb[0]:02x}{stroke_rgb[1]:02x}{stroke_rgb[2]:02x}"
+        to_square = self._last_move.to_square
+        is_flipped = bool(self._board_model and self._board_model.is_flipped)
+        to_file = chess.square_file(to_square)
+        to_rank = chess.square_rank(to_square)
+        if is_flipped:
+            to_file = 7 - to_file
+            to_rank = 7 - to_rank
+        to_visual_rank = 7 - to_rank
+        square_x = board_start_x + to_file * self.square_size
+        square_y = board_start_y + to_visual_rank * self.square_size
+        badge_radius = max(4, int(self.square_size * 0.18))
+        inset_ratio = badges_config.get("inset_ratio", 0.04)
+        inset = max(0, min(1.0, float(inset_ratio))) * self.square_size
+        center_x = square_x + self.square_size - badge_radius - inset
+        center_y = square_y + badge_radius + inset
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(QColor(color_rgb[0], color_rgb[1], color_rgb[2])))
+        painter.drawEllipse(QPointF(center_x, center_y), badge_radius, badge_radius)
+        icon_size = badge_radius * 2
+        icon_path = Path(__file__).resolve().parent.parent / "resources" / "icons" / "move_classification" / f"{config_key}.svg"
+        if icon_path.exists():
+            try:
+                svg_bytes = icon_path.read_bytes()
+                svg_str = svg_bytes.decode("utf-8")
+                # Replace white stroke/fill with contrast color so icon is visible on any badge
+                svg_str = svg_str.replace("#ffffff", stroke_hex).replace("#FFFFFF", stroke_hex)
+                renderer = QSvgRenderer(QByteArray(svg_str.encode("utf-8")))
+                if renderer.isValid():
+                    icon_rect = QRectF(center_x - badge_radius, center_y - badge_radius, icon_size, icon_size)
+                    renderer.render(painter, icon_rect)
+            except (OSError, UnicodeDecodeError):
+                pass
+    
     def _draw_trajectory(self, painter: QPainter, trajectory, board_start_x: int, board_start_y: int, trajectory_index: int = 0) -> None:
         """Draw a piece trajectory showing its path through multiple moves.
         
@@ -1296,6 +1398,7 @@ class ChessBoardWidget(QWidget):
         model.pv2_arrow_visibility_changed.connect(self._on_pv2_arrow_visibility_changed)
         model.pv3_arrow_visibility_changed.connect(self._on_pv3_arrow_visibility_changed)
         model.bestalternativemove_arrow_visibility_changed.connect(self._on_bestalternativemove_arrow_visibility_changed)
+        model.move_classification_icons_visibility_changed.connect(self._on_move_classification_icons_visibility_changed)
         model.last_move_changed.connect(self._on_last_move_changed)
         model.best_next_move_changed.connect(self._on_best_next_move_changed)
         model.pv2_move_changed.connect(self._on_pv2_move_changed)
@@ -1318,6 +1421,7 @@ class ChessBoardWidget(QWidget):
         self._update_pv2_arrow_visibility(model.show_pv2_arrow)
         self._update_pv3_arrow_visibility(model.show_pv3_arrow)
         self._update_bestalternativemove_arrow_visibility(model.show_bestalternativemove_arrow)
+        self._update_move_classification_icons_visibility(model.show_move_classification_icons)
         self._update_last_move(model.last_move)
         self._update_best_next_move(model.best_next_move)
         self._update_pv2_move(model.pv2_move)
@@ -1551,13 +1655,22 @@ class ChessBoardWidget(QWidget):
     
     def _update_bestalternativemove_arrow_visibility(self, visible: bool) -> None:
         """Update best alternative move arrow visibility state.
-        
+
         Args:
             visible: True if best alternative move arrow should be visible, False otherwise.
         """
         self.show_bestalternativemove_arrow = visible
         self.update()  # Trigger repaint
-    
+
+    def _on_move_classification_icons_visibility_changed(self, visible: bool) -> None:
+        """Handle move classification icons visibility change from board model."""
+        self._update_move_classification_icons_visibility(visible)
+
+    def _update_move_classification_icons_visibility(self, visible: bool) -> None:
+        """Update move classification icons visibility state."""
+        self.show_move_classification_icons = visible
+        self.update()  # Trigger repaint
+
     def _on_best_alternative_move_changed(self, move: Optional[chess.Move]) -> None:
         """Handle best alternative move change from board model.
         
@@ -1734,9 +1847,9 @@ class ChessBoardWidget(QWidget):
             board_start_x: X position where the board squares start.
             board_start_y: Y position where the board squares start.
         """
-        # Piece padding (margin from square edges)
-        piece_padding = 0.1  # 10% padding on each side
-        
+        # Piece padding (margin from square edges), from config
+        piece_padding = self.piece_padding_ratio
+
         for row in range(self.square_count):
             for col in range(self.square_count):
                 piece = self.board[row][col]
@@ -1981,6 +2094,15 @@ class ChessBoardWidget(QWidget):
             game_model: GameModel instance.
         """
         self._game_model = game_model
+    
+    def set_moveslist_model(self, moveslist_model: Optional["MovesListModel"]) -> None:
+        """Set the moves list model for move classification badges.
+        
+        Args:
+            moveslist_model: MovesListModel instance or None.
+        """
+        self._moveslist_model = moveslist_model
+        self.update()
     
     def _draw_annotations(self, painter: QPainter, board_start_x: int, board_start_y: int) -> None:
         """Draw annotations on the board.

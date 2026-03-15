@@ -581,17 +581,20 @@ class UserSettingsService:
         self.get_model().set_active_profile(profile_name)
 
     def _normalize_ai_summary_settings(self, ai_summary_settings: Dict[str, Any]) -> None:
-        """Ensure AI summary provider toggles remain mutually exclusive."""
+        """Ensure AI summary provider toggles remain mutually exclusive (exactly one)."""
         use_openai = bool(ai_summary_settings.get("use_openai_models", True))
         use_anthropic = bool(ai_summary_settings.get("use_anthropic_models", False))
+        use_custom = bool(ai_summary_settings.get("use_custom_models", False))
         
-        # Enforce exclusivity: if both or neither are selected, default to OpenAI
-        if use_openai == use_anthropic:
+        # Enforce exactly one provider: default to OpenAI if invalid
+        if sum([use_openai, use_anthropic, use_custom]) != 1:
             use_openai = True
             use_anthropic = False
+            use_custom = False
         
         ai_summary_settings["use_openai_models"] = use_openai
         ai_summary_settings["use_anthropic_models"] = use_anthropic
+        ai_summary_settings["use_custom_models"] = use_custom
     
     def update_profile_order(self, order: list) -> None:
         """Update profile order.

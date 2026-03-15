@@ -62,7 +62,39 @@ class GameController:
             The GameModel instance for observing active game state.
         """
         return self.game_model
-    
+
+    def get_notes_for_current_game(self) -> str:
+        """Get notes for the active game, loading from CARANotes tag if not cached."""
+        from app.services.notes_storage_service import NotesStorageService
+        game = self.game_model.active_game
+        if game is None:
+            return ""
+        if game.notes is not None:
+            return game.notes
+        return NotesStorageService.load_notes(game)
+
+    def save_notes_to_current_game(self, notes_text: str) -> bool:
+        """Save notes to the active game's PGN (in memory). Returns True on success."""
+        from app.services.notes_storage_service import NotesStorageService
+        game = self.game_model.active_game
+        if game is None:
+            return False
+        ok = NotesStorageService.store_notes(game, notes_text, self.config)
+        if ok:
+            self.game_model.refresh_active_game()
+        return ok
+
+    def clear_notes_for_current_game(self) -> bool:
+        """Clear notes for the active game (remove CARANotes tags in memory). Returns True on success."""
+        from app.services.notes_storage_service import NotesStorageService
+        game = self.game_model.active_game
+        if game is None:
+            return False
+        ok = NotesStorageService.clear_notes(game)
+        if ok:
+            self.game_model.refresh_active_game()
+        return ok
+
     def set_active_game(self, game: GameData) -> None:
         """Set a game as active and load its starting position to the board.
         
@@ -284,7 +316,37 @@ class GameController:
             
         except Exception:
             return False
-    
+
+    def get_move_notation_to_ply_map(self) -> Dict[str, int]:
+        """Build a map of move notation string -> ply index for the active game (for move linking).
+        Notation format: '1.e4' for white, '13...Rb7' for black (no space after number/dots).
+        """
+        result: Dict[str, int] = {}
+        game = self.game_model.active_game
+        if not game or not game.pgn:
+            return result
+        try:
+            pgn_io = io.StringIO(game.pgn)
+            parsed = chess.pgn.read_game(pgn_io)
+            if not parsed:
+                return result
+            board = parsed.board()
+            ply = 0
+            for move in parsed.mainline_moves():
+                is_white = board.turn == chess.WHITE
+                move_number = board.fullmove_number
+                san = board.san(move)
+                ply += 1
+                notation = f"{move_number}.{san}" if is_white else f"{move_number}...{san}"
+                result[notation] = ply
+                # Also allow with space after dot(s) for matching in text
+                notation_spaced = f"{move_number}. {san}" if is_white else f"{move_number}... {san}"
+                result[notation_spaced] = ply
+                board.push(move)
+        except Exception:
+            pass
+        return result
+
     def validate_and_clamp_active_move_ply(self) -> bool:
         """Validate and clamp the active move ply to the current game length.
         
