@@ -83,13 +83,15 @@ class DetailNotesView(QWidget):
         self._notes_edit = NotesTextEdit(self)
         self._notes_edit.setFont(QFont(font_family, font_size))
         self._notes_edit.setAcceptRichText(True)
-        self._notes_edit.setPlaceholderText(notes_config.get("placeholder_text", "Add notes about this game..."))
 
         tabs_config = panel_config.get("tabs", {})
         pane_bg = tabs_config.get("pane_background", [30, 30, 35])
+        notes_text_color = notes_config.get("text_color", [220, 220, 220])
         bg_rgb = f"rgb({pane_bg[0]},{pane_bg[1]},{pane_bg[2]})"
-        style = f"QTextEdit {{ background-color: {bg_rgb}; border: none; padding: 6px; }}"
+        text_rgb = f"rgb({notes_text_color[0]},{notes_text_color[1]},{notes_text_color[2]})"
+        style = f"QTextEdit {{ background-color: {bg_rgb}; color: {text_rgb}; border: none; padding: 6px; }}"
         StyleManager.style_text_edit_scrollbar(self._notes_edit, self.config, pane_bg, [60, 60, 65], style)
+        self._notes_edit.setPlaceholderText(notes_config.get("placeholder_text", "Add notes about this game..."))
 
         copy_shortcut = QShortcut(QKeySequence("Ctrl+C"), self._notes_edit)
         copy_shortcut.activated.connect(self._notes_edit.copy)
@@ -168,7 +170,8 @@ class DetailNotesView(QWidget):
             return ""
         notation_to_ply = self._game_controller.get_move_notation_to_ply_map() if self._game_controller else {}
         # Find all numbered move-like tokens (e.g. "1. e4", "13... Rb7")
-        move_pattern = re.compile(r"\d+\.\s*\S+|\d+\.\.\.\s*\S+")
+        # (?!\.) ensures white move pattern does not consume the ".." of black moves (e.g. "7... Bxf3")
+        move_pattern = re.compile(r"\d+\.(?!\.)\s*\S+|\d+\.\.\.\s*\S+")
         tokens: List[Tuple[int, int, str]] = []
         for m in move_pattern.finditer(plain):
             tokens.append((m.start(), m.end(), m.group(0)))
