@@ -163,6 +163,7 @@ class MainWindow(QMainWindow):
         self._setup_annotations_menu(menu_bar)
         self._setup_engines_menu(menu_bar)
         self._setup_ai_summary_menu(menu_bar)
+        self._setup_notes_menu(menu_bar)
         self._setup_view_menu(menu_bar)
         self._setup_help_menu(menu_bar)
         self._setup_debug_menu(menu_bar)
@@ -908,6 +909,18 @@ class MainWindow(QMainWindow):
         setup_preferences_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
         setup_preferences_action.triggered.connect(self._show_annotation_preferences)
         annotations_menu.addAction(setup_preferences_action)
+
+    def _setup_notes_menu(self, menu_bar: QMenuBar) -> None:
+        """Setup the Notes menu."""
+        notes_menu = menu_bar.addMenu("Notes")
+        clear_notes_action = QAction("Clear Notes for current game", self)
+        clear_notes_action.setShortcut(QKeySequence("Ctrl+Shift+E"))
+        clear_notes_action.triggered.connect(self._clear_notes_for_current_game)
+        notes_menu.addAction(clear_notes_action)
+        save_notes_action = QAction("Save Notes to current game", self)
+        save_notes_action.setShortcut(QKeySequence("Ctrl+Alt+N"))
+        save_notes_action.triggered.connect(self._save_notes_to_current_game)
+        notes_menu.addAction(save_notes_action)
     
     def _setup_engines_menu(self, menu_bar: QMenuBar) -> None:
         """Setup the Engines menu."""
@@ -1034,6 +1047,13 @@ class MainWindow(QMainWindow):
         self.view_ai_summary_action.triggered.connect(lambda: self._switch_detail_tab(6))
         view_menu.addAction(self.view_ai_summary_action)
         
+        # Notes action
+        self.view_notes_action = QAction("Notes", self)
+        self.view_notes_action.setShortcut(QKeySequence("F8"))
+        self.view_notes_action.setCheckable(True)
+        self.view_notes_action.triggered.connect(lambda: self._switch_detail_tab(7))
+        view_menu.addAction(self.view_notes_action)
+        
         # Separator
         view_menu.addSeparator()
         
@@ -1044,7 +1064,7 @@ class MainWindow(QMainWindow):
         self.view_hide_database_panel_action.triggered.connect(self._toggle_database_panel)
         view_menu.addAction(self.view_hide_database_panel_action)
         
-        # Store view menu actions for later connection
+        # Store view menu actions for later connection (order must match detail panel tab order)
         self.view_menu_actions = [
             self.view_moves_list_action,
             self.view_metadata_action,
@@ -1052,7 +1072,8 @@ class MainWindow(QMainWindow):
             self.view_game_summary_action,
             self.view_player_stats_action,
             self.view_annotations_action,
-            self.view_ai_summary_action
+            self.view_ai_summary_action,
+            self.view_notes_action
         ]
     
     def _setup_help_menu(self, menu_bar: QMenuBar) -> None:
@@ -1459,21 +1480,18 @@ class MainWindow(QMainWindow):
         
         self.controller.set_status(status_message)
     
+    def _on_database_removed(self, identifier: str) -> None:
+        """When any database tab is closed (file menu or context menu), clear active game and update menu state."""
+        self.controller.get_game_controller().set_active_game(None)
+        self._update_save_menu_state()
+        self._update_close_menu_state()
+
     def _close_pgn_database(self) -> None:
         """Close the currently selected PGN database tab."""
-        # Close the active PGN database via controller (handles business logic)
         database_controller = self.controller.get_database_controller()
         closed = database_controller.close_active_pgn_database()
-        
         if closed:
-            # Clear active game if it was from the closed tab
-            # (The game might still be active, but we clear it for safety)
-            self.controller.get_game_controller().set_active_game(None)
             self.controller.set_status("PGN database closed")
-            # Update save menu state
-            self._update_save_menu_state()
-            # Update close menu state
-            self._update_close_menu_state()
         else:
             self.controller.set_status("No PGN database tab selected to close")
     
@@ -1481,18 +1499,11 @@ class MainWindow(QMainWindow):
         """Close all PGN databases except clipboard and search results."""
         database_controller = self.controller.get_database_controller()
         closed_count = database_controller.close_all_pgn_databases()
-        
         if closed_count > 0:
-            # Clear active game if it was from a closed tab
-            self.controller.get_game_controller().set_active_game(None)
             if closed_count == 1:
                 self.controller.set_status("1 database closed")
             else:
                 self.controller.set_status(f"{closed_count} databases closed")
-            # Update save menu state
-            self._update_save_menu_state()
-            # Update close menu state
-            self._update_close_menu_state()
         else:
             self.controller.set_status("No databases to close")
     
@@ -1520,6 +1531,7 @@ class MainWindow(QMainWindow):
             database_controller = self.controller.get_database_controller()
             panel_model = database_controller.get_panel_model()
             panel_model.active_database_changed.connect(self._on_database_tab_changed)
+            panel_model.database_removed.connect(self._on_database_removed)
             # Initialize save and close menu state
             self._update_save_menu_state()
             self._update_close_menu_state()
@@ -2261,11 +2273,38 @@ class MainWindow(QMainWindow):
         """Save annotations into the active game's PGN tag."""
         if not self.controller:
             return
-        
+
         annotation_controller = self.controller.get_annotation_controller()
         if annotation_controller:
             annotation_controller.save_annotations()
-    
+
+    def _clear_notes_for_current_game(self) -> None:
+        """Clear notes for the current game (removes CARANotes tag in memory)."""
+        if not self.controller:
+            return
+        game_controller = self.controller.get_game_controller()
+        if game_controller and game_controller.clear_notes_for_current_game():
+            if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'notes_view'):
+                self.detail_panel.notes_view.set_notes_text("")
+            self.controller.set_status("Notes cleared for current game")
+
+    def _save_notes_to_current_game(self) -> None:
+        """Save notes from the Notes view into the active game's PGN tag (in memory)."""
+        if not self.controller:
+            return
+        if not hasattr(self, 'detail_panel') or not hasattr(self.detail_panel, 'notes_view'):
+            return
+        notes_text = self.detail_panel.notes_view.get_plain_text()
+        game_controller = self.controller.get_game_controller()
+        if game_controller and game_controller.save_notes_to_current_game(notes_text):
+            # Mark the game as having unsaved changes (same as annotations / metadata)
+            database_model = self.controller.get_database_model_for_active_game()
+            if database_model:
+                active_game = game_controller.get_game_model().active_game
+                if active_game and database_model.update_game(active_game):
+                    self.controller.get_database_controller().mark_database_unsaved(database_model)
+            self.controller.set_status("Notes saved to current game")
+
     def _show_ai_model_settings(self) -> None:
         """Show the AI model settings dialog."""
         from app.views.ai_model_settings_dialog import AIModelSettingsDialog
@@ -4433,7 +4472,7 @@ Visibility Settings:
         """Switch to the specified detail panel tab.
         
         Args:
-            index: Tab index (0=Moves List, 1=Metadata, 2=Manual Analysis, 3=Game Summary, 4=Player Stats, 5=Annotations, 6=AI Summary).
+            index: Tab index (0=Moves List, 1=Metadata, 2=Manual Analysis, 3=Game Summary, 4=Player Stats, 5=Annotations, 6=AI Summary, 7=Notes).
         """
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'tab_widget'):
             tab_widget = self.detail_panel.tab_widget

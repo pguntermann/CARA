@@ -28,6 +28,8 @@ class GameData:
                  time_control: str = "",
                  analyzed: bool = False,
                  annotated: bool = False,
+                 has_notes: bool = False,
+                 notes: Optional[str] = None,
                  source_database: str = "",
                  file_position: int = 0,
                  ref_ply: int = 0) -> None:
@@ -48,7 +50,9 @@ class GameData:
             black_elo: Black player Elo rating (PGN tag [BlackElo]).
             time_control: Time control (PGN tag [TimeControl]).
             analyzed: Whether the game has been analyzed (has CARAAnalysisData tag).
-                annotated: Whether the game has saved annotations (has CARAAnnotations tag).
+            annotated: Whether the game has saved annotations (has CARAAnnotations tag).
+            has_notes: Whether the game has a CARANotes tag.
+            notes: Optional cached notes text (from CARANotes tag); None until loaded.
             source_database: Name of the database this game came from (for search results).
             file_position: Original position of game in file (1-based, 0 if not from file).
             ref_ply: Optional reference ply index used by search results to open a game
@@ -69,6 +73,8 @@ class GameData:
         self.time_control = time_control
         self.analyzed = analyzed
         self.annotated = annotated
+        self.has_notes = has_notes
+        self.notes = notes  # Cached notes from CARANotes tag; None until loaded
         self.source_database = source_database
         self.file_position = file_position
         self.ref_ply = ref_ply
@@ -100,9 +106,10 @@ class DatabaseModel(QAbstractTableModel):
     COL_TC_TYPE = 14
     COL_ANALYZED = 15
     COL_ANNOTATED = 16
-    COL_SOURCE_DB = 17
-    COL_REF_PLY = 18
-    COL_PGN = 19
+    COL_NOTES = 17
+    COL_SOURCE_DB = 18
+    COL_REF_PLY = 19
+    COL_PGN = 20
     
     def __init__(self, file_path: Optional[str] = None, config: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the database model.
@@ -142,9 +149,9 @@ class DatabaseModel(QAbstractTableModel):
             parent: Parent index (unused for table models).
             
         Returns:
-            Number of columns (20: includes TimeControl, TC Type, Ref Ply).
+            Number of columns (21: includes TimeControl, TC Type, Notes, Ref Ply).
         """
-        return 20
+        return 21
     
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         """Get item flags for the given index.
@@ -235,6 +242,8 @@ class DatabaseModel(QAbstractTableModel):
             return "✓" if game.analyzed else ""
         elif col == self.COL_ANNOTATED:
             return "✓" if getattr(game, "annotated", False) else ""
+        elif col == self.COL_NOTES:
+            return "✓" if getattr(game, "has_notes", False) else ""
         elif col == self.COL_SOURCE_DB:
             return game.source_database
         elif col == self.COL_REF_PLY:
@@ -289,6 +298,7 @@ class DatabaseModel(QAbstractTableModel):
                 "TC Type",
                 "Analyzed",
                 "Annotated",
+                "Notes",
                 "Source DB",
                 "Ref Ply",
                 "PGN",
@@ -934,6 +944,8 @@ class DatabaseModel(QAbstractTableModel):
                 return game.analyzed
             elif column == self.COL_ANNOTATED:
                 return getattr(game, "annotated", False)
+            elif column == self.COL_NOTES:
+                return getattr(game, "has_notes", False)
             elif column == self.COL_SOURCE_DB:
                 return game.source_database or ""
             elif column == self.COL_REF_PLY:

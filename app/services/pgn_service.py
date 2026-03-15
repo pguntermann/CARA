@@ -967,6 +967,10 @@ class PgnService:
             annotated = "CARAAnnotations" in headers
             if not annotated:
                 annotated = "[CARAAnnotations" in game_pgn
+
+            has_notes = "CARANotes" in headers
+            if not has_notes:
+                has_notes = "[CARANotes" in game_pgn
             
             # Validate that we have meaningful game data
             # If the PGN is empty or too short, skip it
@@ -1014,6 +1018,7 @@ class PgnService:
                 "time_control": time_control,
                 "analyzed": analyzed,
                 "annotated": annotated,
+                "has_notes": has_notes,
                 "tags": tag_names  # Tag names extracted during parsing
             }
             

@@ -404,13 +404,10 @@ class PgnFormatterService:
         Returns:
             PGN text without CARA analysis and annotation tags.
         """
-        # Remove CARA analysis and annotation tags using regex to handle tags on same line or separate lines
-        # Pattern matches: 
-        # - [CARAAnalysisData "..."] or [CARAAnalysisInfo "..."] or [CARAAnalysisChecksum "..."]
-        # - [CARAAnnotations "..."] or [CARAAnnotationsInfo "..."] or [CARAAnnotationsChecksum "..."]
-        # The pattern handles tags that may be on the same line as other tags
+        # Remove CARA analysis, annotation, and notes tags using regex to handle tags on same line or separate lines
+        # Pattern matches: CARAAnalysis*, CARAAnnotations*, CARANotes*
         cara_tag_pattern = re.compile(
-            r'\[CARA(?:Analysis(?:Data|Info|Checksum)|Annotations(?:Info|Checksum)?)\s+"[^"]*"\]\s*'
+            r'\[CARA(?:Analysis(?:Data|Info|Checksum)|Annotations(?:Info|Checksum)?|Notes(?:Info|Checksum)?)\s+"[^"]*"\]\s*'
         )
         result = cara_tag_pattern.sub('', pgn_text)
         

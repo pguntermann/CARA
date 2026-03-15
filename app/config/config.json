@@ -2146,6 +2146,11 @@
               ]
             }
           }
+        },
+        "notes": {
+          "font_family": "Courier New",
+          "font_size": 11,
+          "placeholder_text": "Add notes about this game..."
         }
       },
       "database": {

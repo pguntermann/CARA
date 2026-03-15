@@ -4,6 +4,7 @@ from io import StringIO
 from typing import Dict, Any, List, Optional, Tuple
 
 from app.models.progress_model import ProgressModel
+from app.models.database_model import DatabaseModel
 from app.services.progress_service import ProgressService
 from app.controllers.board_controller import BoardController
 from app.controllers.database_controller import DatabaseController
@@ -696,12 +697,24 @@ class AppController:
     
     def get_game_controller(self) -> GameController:
         """Get the game controller.
-        
+
         Returns:
             The GameController instance for managing active game operations.
         """
         return self.game_controller
-    
+
+    def get_database_model_for_active_game(self) -> Optional[DatabaseModel]:
+        """Return the database model that contains the active game, or None."""
+        game_model = self.game_controller.get_game_model()
+        active_game = game_model.active_game
+        if not active_game:
+            return None
+        panel_model = self.database_controller.get_panel_model()
+        for _identifier, db_info in panel_model.get_all_databases().items():
+            if db_info.model.find_game(active_game) is not None:
+                return db_info.model
+        return None
+
     def get_column_profile_controller(self) -> ColumnProfileController:
         """Get the column profile controller.
         

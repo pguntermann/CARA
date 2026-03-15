@@ -126,10 +126,11 @@ class MetadataModel(QAbstractTableModel):
         if 0 <= row < len(self._metadata):
             tag_name = self._metadata[row][0]
             
-            # CARA analysis and annotation tags are read-only
+            # CARA analysis, annotation, and notes tags are read-only
             read_only_tags = {
                 "CARAAnalysisData", "CARAAnalysisInfo", "CARAAnalysisChecksum",
-                "CARAAnnotations", "CARAAnnotationsInfo", "CARAAnnotationsChecksum"
+                "CARAAnnotations", "CARAAnnotationsInfo", "CARAAnnotationsChecksum",
+                "CARANotes", "CARANotesInfo", "CARANotesChecksum"
             }
             is_read_only = tag_name in read_only_tags
         
@@ -169,10 +170,11 @@ class MetadataModel(QAbstractTableModel):
         # Validate value
         name, old_value = self._metadata[row]
         
-        # CARA analysis and annotation tags are read-only and cannot be edited
+        # CARA analysis, annotation, and notes tags are read-only and cannot be edited
         read_only_tags = {
             "CARAAnalysisData", "CARAAnalysisInfo", "CARAAnalysisChecksum",
-            "CARAAnnotations", "CARAAnnotationsInfo", "CARAAnnotationsChecksum"
+            "CARAAnnotations", "CARAAnnotationsInfo", "CARAAnnotationsChecksum",
+            "CARANotes", "CARANotesInfo", "CARANotesChecksum"
         }
         if name in read_only_tags:
             return False

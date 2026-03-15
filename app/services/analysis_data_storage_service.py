@@ -1,10 +1,6 @@
 """Service for storing and loading game analysis results in PGN tags."""
 
 import json
-import gzip
-import zlib
-import base64
-import hashlib
 from typing import List, Optional, Dict, Any
 from io import StringIO
 from datetime import datetime
@@ -15,6 +11,11 @@ from app.models.moveslist_model import MoveData
 from app.services.pgn_service import PgnService
 from app.models.database_model import GameData
 from app.services.logging_service import LoggingService
+from app.utils.pgn_tag_compression import (
+    decode_and_decompress_to_str,
+    compress_and_encode_from_str,
+    compute_checksum,
+)
 
 
 class AnalysisDataStorageService:
@@ -84,19 +85,8 @@ class AnalysisDataStorageService:
             if AnalysisDataStorageService.TAG_NAME not in chess_game.headers:
                 return None
             
-            # Get encoded data
             encoded = chess_game.headers[AnalysisDataStorageService.TAG_NAME]
-            
-            # Base64 decode
-            compressed = base64.b64decode(encoded.encode('ascii'))
-            
-            # Decompress
-            try:
-                json_str = gzip.decompress(compressed).decode('utf-8')
-            except (gzip.BadGzipFile, OSError, zlib.error) as e:
-                # Decompression error
-                raise ValueError(f"Analysis data decompression failed: {e}") from e
-            
+            json_str = decode_and_decompress_to_str(encoded)
             return json_str
         except Exception:
             # On any error, return None
@@ -166,17 +156,10 @@ class AnalysisDataStorageService:
                 }
                 moves_data.append(move_dict)
             
-            # Convert to JSON string
             json_str = json.dumps(moves_data, ensure_ascii=False)
-            
-            # Calculate checksum (SHA256 hash of JSON string)
-            checksum = hashlib.sha256(json_str.encode('utf-8')).hexdigest()
-            
-            # Compress with gzip (level 9 for maximum compression)
-            compressed = gzip.compress(json_str.encode('utf-8'), compresslevel=9)
-            
-            # Base64 encode
-            encoded = base64.b64encode(compressed).decode('ascii')
+            data_bytes = json_str.encode("utf-8")
+            checksum = compute_checksum(data_bytes)
+            encoded = compress_and_encode_from_str(json_str, compresslevel=9)
             
             # Get app version from config
             app_version = config.get('version', '1.0') if config else '1.0'
@@ -243,26 +226,16 @@ class AnalysisDataStorageService:
             if AnalysisDataStorageService.TAG_NAME not in chess_game.headers:
                 return None
             
-            # Get encoded data
             encoded = chess_game.headers[AnalysisDataStorageService.TAG_NAME]
-            
-            # Base64 decode
-            compressed = base64.b64decode(encoded.encode('ascii'))
-            
-            # Decompress
             try:
-                json_str = gzip.decompress(compressed).decode('utf-8')
-            except (gzip.BadGzipFile, OSError, zlib.error) as e:
-                # Decompression error detected - remove corrupted tags from game
+                json_str = decode_and_decompress_to_str(encoded)
+            except ValueError:
                 AnalysisDataStorageService._remove_corrupted_analysis_tags(game)
-                # Re-raise as a more specific exception for decompression errors
-                # OSError/zlib.error is raised for errors like "Error -3 while decompressing data: invalid code lengths set"
-                raise ValueError(f"Analysis data decompression failed: {e}") from e
+                raise
             
-            # Verify checksum if present
             if AnalysisDataStorageService.TAG_CHECKSUM in chess_game.headers:
                 stored_checksum = chess_game.headers[AnalysisDataStorageService.TAG_CHECKSUM]
-                calculated_checksum = hashlib.sha256(json_str.encode('utf-8')).hexdigest()
+                calculated_checksum = compute_checksum(json_str.encode("utf-8"))
                 
                 if stored_checksum != calculated_checksum:
                     # Checksum mismatch - data may be corrupted

@@ -5,15 +5,48 @@ import re
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton,
     QScrollArea, QFrame, QSizePolicy, QLabel, QComboBox, QSpinBox,
-    QGraphicsOpacityEffect
+    QGraphicsOpacityEffect, QMenu, QApplication
 )
 from PyQt6.QtCore import Qt, QTimer, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
-from PyQt6.QtGui import QPalette, QColor
+from PyQt6.QtGui import QPalette, QColor, QAction, QContextMenuEvent, QTextDocument
 from typing import Dict, Any, Optional, List
 
 from app.models.game_model import GameModel
 from app.controllers.ai_chat_controller import AIChatController
 from app.utils.font_utils import resolve_font_family, scale_font_size
+
+
+class MessageLabel(QLabel):
+    """QLabel that shows a custom context menu with enabled Copy (plain text, no HTML)."""
+
+    def __init__(self, text: str, parent_view: Optional[QWidget] = None, parent: Optional[QWidget] = None) -> None:
+        super().__init__(text, parent)
+        self._parent_view = parent_view
+
+    def _copy_plain_text(self) -> None:
+        """Copy label content as plain text (strip HTML)."""
+        raw = self.text()
+        if not raw:
+            return
+        doc = QTextDocument()
+        doc.setHtml(raw)
+        plain = doc.toPlainText()
+        QApplication.clipboard().setText(plain)
+
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        if not self.text():
+            super().contextMenuEvent(event)
+            return
+        menu = QMenu(self)
+        copy_action = QAction("Copy", self)
+        copy_action.triggered.connect(self._copy_plain_text)
+        menu.addAction(copy_action)
+        if self._parent_view and getattr(self._parent_view, "config", None) is not None:
+            from app.views.style import StyleManager
+            bg_color = getattr(self._parent_view, "background_color", [40, 40, 45])
+            StyleManager.style_context_menu(menu, self._parent_view.config, bg_color)
+        menu.exec(event.globalPosition().toPoint() if hasattr(event, "globalPosition") else event.globalPos())
+        event.accept()
 
 
 class DetailAIChatView(QWidget):
@@ -627,8 +660,8 @@ class DetailAIChatView(QWidget):
         # Format message text (convert markdown bold for AI messages)
         formatted_content = self._format_message_text(content, role)
         
-        # Create message label
-        message_label = QLabel(formatted_content)
+        # Create message label (MessageLabel provides context menu with enabled Copy)
+        message_label = MessageLabel(formatted_content, parent_view=self)
         message_label.setWordWrap(True)
         
         # Enable RichText format for AI messages (to render bold HTML)
