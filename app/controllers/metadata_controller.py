@@ -237,6 +237,13 @@ class MetadataController:
                         index = database_model.index(row, column_index)
                         database_model.dataChanged.emit(index, index, 
                                                        [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole])
+                        # PGN changed even when a tag maps to another column: refresh PGN column too.
+                        pgn_index = database_model.index(row, database_model.COL_PGN)
+                        database_model.dataChanged.emit(
+                            pgn_index,
+                            pgn_index,
+                            [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole],
+                        )
                         database_model._unsaved_games.add(game)
                 else:
                     # Tag doesn't map to a column, use full row update
@@ -383,6 +390,13 @@ class MetadataController:
                         index = database_model.index(row, column_index)
                         database_model.dataChanged.emit(index, index, 
                                                        [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole])
+                        # PGN changed even when a tag maps to another column: refresh PGN column too.
+                        pgn_index = database_model.index(row, database_model.COL_PGN)
+                        database_model.dataChanged.emit(
+                            pgn_index,
+                            pgn_index,
+                            [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole],
+                        )
                         database_model._unsaved_games.add(game)
                 else:
                     # Tag doesn't map to a column, use full row update
@@ -490,6 +504,13 @@ class MetadataController:
                         index = database_model.index(row, column_index)
                         database_model.dataChanged.emit(index, index, 
                                                        [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole])
+                        # PGN changed even when a tag maps to another column: refresh PGN column too.
+                        pgn_index = database_model.index(row, database_model.COL_PGN)
+                        database_model.dataChanged.emit(
+                            pgn_index,
+                            pgn_index,
+                            [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole],
+                        )
                         database_model._unsaved_games.add(game)
                 else:
                     # Tag doesn't map to a column, use full row update
