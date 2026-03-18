@@ -251,7 +251,7 @@
                     
                     <li><strong>AI Summary:</strong> Interactive chat interface allowing you to discuss any position in a game with a Large Language Model (LLM). The AI model has access to extensive game data, including detailed engine analysis, move classifications, evaluation metrics, and positional information, enabling it to provide accurate assessments of the game, played moves, and current position.</li>
                     
-                    <li><strong>Notes:</strong> Plain-text notes for the current game, stored in a PGN metadata tag (CARANotes). You can write free-form comments, plans, or analysis; move notation in the text is automatically linked so you can click a move to jump to that position. Notes are saved in memory and persisted when you save the database.</li>
+                    <li><strong>Notes:</strong> Plain-text notes for the current game, stored in a PGN metadata tag (CARANotes). You can write free-form comments, plans, or analysis; move notation in the text is automatically linked so you can click a move to jump to that position. Notes also support a small Markdown subset (headings, bold/italic, inline code, strikethrough, and blockquotes) via the formatting toolbar. Notes are saved in memory and persisted when you save the database.</li>
                 </ul>
                 
                 <p>These features work together to provide a complete analysis environment, from importing and organizing games to deep positional understanding and statistical insights.</p>
@@ -955,6 +955,18 @@
                 <p>Use the Notes tab to keep your own comments, plans, or post-mortem thoughts with a game.</p>
                 
                 <p>When you type move notation (e.g. <code>1. e4</code>, <code>13... Rb7</code>), CARA recognizes it and formats it for you. Moves that were actually played in the current game become <strong>clickable links</strong>—click one to jump to that position. Other move notation (for example from variations or lines you're discussing) is shown in <strong>bold</strong> only, so it still stands out but doesn't link. That way you can refer to specific moves or positions and jump straight to them when the move is in the game.</p>
+
+                <p><strong>Markdown formatting in Notes:</strong> Use the formatting toolbar above the editor to apply a small Markdown subset to the currently selected text. Supported syntax:</p>
+                
+                <ul>
+                    <li><strong>Headings:</strong> <code># </code>, <code>## </code>, <code>### </code> at the start of a line (H1/H2/H3 buttons).</li>
+                    <li><strong>Bold:</strong> <code>**text**</code> (also supported: <code>__text__</code>).</li>
+                    <li><strong>Italic:</strong> <code>*text*</code> (also supported: <code>_text_</code>).</li>
+                    <li><strong>Bold + italic:</strong> <code>***text***</code> (also supported: <code>___text___</code>).</li>
+                    <li><strong>Inline code:</strong> <code>`code`</code>.</li>
+                    <li><strong>Strikethrough:</strong> <code>~~text~~</code>.</li>
+                    <li><strong>Blockquote:</strong> <code>&gt; text</code> at the start of a line.</li>
+                </ul>
                 
                 <p>To attach your text to the current game, use <span class="menu-item">Notes → Save Notes to current game</span> (<code>Ctrl+Alt+N</code>). To remove the notes for the current game, use <span class="menu-item">Notes → Clear Notes for current game</span> (<code>Ctrl+Shift+E</code>). Notes are written to the PGN when you save the database.</p>
                 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import html
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from app.controllers.game_controller import GameController
 from app.services.notes_storage_service import NotesStorageService
@@ -61,6 +61,25 @@ class NotesController:
             link_style=link_style,
             bold_style=bold_style,
         )
+
+    def get_notes_format_spans(self, plain: str) -> List[NotesFormatterService.FormatSpan]:
+        """Return formatting spans for in-place Notes rendering."""
+        notation_to_ply = self._game_controller.get_move_notation_to_ply_map()
+        return NotesFormatterService.get_notes_format_spans(plain, notation_to_ply)
+
+    def selection_intersects_heading_line(self, plain: str, start: int, end: int) -> bool:
+        """Return True if selection intersects a markdown heading line."""
+        return NotesFormatterService.selection_intersects_heading_line(plain, start, end)
+
+    def apply_notes_toolbar_action(
+        self,
+        kind: str,
+        plain: str,
+        start: int,
+        end: int,
+    ) -> tuple[str, int, int]:
+        """Apply a toolbar formatting action to the selected plain-text range."""
+        return NotesFormatterService.apply_toolbar_action(kind=kind, plain=plain, start=start, end=end)
 
     def navigate_from_move_link(self, notation: str) -> bool:
         """Navigate to the move referenced by a clicked link (notation from href)."""

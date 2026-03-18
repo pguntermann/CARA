@@ -2300,6 +2300,7 @@ class MainWindow(QMainWindow):
             # Mark the game as having unsaved changes (same as annotations / metadata)
             database_model = self.controller.get_database_model_for_active_game()
             if database_model:
+                game_controller = self.controller.get_game_controller()
                 active_game = game_controller.get_game_model().active_game
                 if active_game and database_model.update_game(active_game):
                     self.controller.get_database_controller().mark_database_unsaved(database_model)

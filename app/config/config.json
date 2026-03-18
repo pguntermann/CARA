@@ -2155,6 +2155,33 @@
             255,
             255
           ],
+          "blockquote_text_color": [
+            210,
+            190,
+            130
+          ],
+          "hidden_marker_font_point_size": 0.5,
+          "toolbar_separator_color": [
+            60,
+            60,
+            65
+          ],
+          "inline_code_background_color": [
+            90,
+            110,
+            160
+          ],
+          "inline_code_background_alpha": 170,
+          "inline_code_text_color": [
+            255,
+            255,
+            255
+          ],
+          "move_link_text_color": [
+            100,
+            150,
+            255
+          ],
           "placeholder_text": "Add notes about this game..."
         }
       },
