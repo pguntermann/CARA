@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QRect, QPointF, QPoint
 from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QFontMetrics, QMouseEvent, QContextMenuEvent
-from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING
+from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING, Callable
 import math
 
 from app.models.game_model import GameModel
@@ -118,8 +118,10 @@ class EvaluationGraphWidget(QWidget):
         
         # Data
         self.evaluation_data: List[Tuple[int, float]] = []  # (ply_index, evaluation_centipawns)
+        self._available_plys: List[int] = []  # Sorted unique ply indices present in evaluation_data
         self.current_ply: int = 0
         self.max_ply: int = 0
+        self._navigate_to_ply_callback: Optional[Callable[[int], None]] = None
         
         # Graph mode: False = zero-based (0.00 at bottom), True = normalized (0.00 in middle)
         self.normalized_mode: bool = False
@@ -180,12 +182,17 @@ class EvaluationGraphWidget(QWidget):
             evaluation_data: List of (ply_index, evaluation_centipawns) tuples.
         """
         self.evaluation_data = evaluation_data
+        self._available_plys = sorted({ply for ply, _ in evaluation_data})
         if evaluation_data:
             self.max_ply = max(ply for ply, _ in evaluation_data)
         else:
             self.max_ply = 0
         self.update()
     
+    def set_navigation_callback(self, callback: Optional[Callable[[int], None]]) -> None:
+        """Set callback invoked with target ply when graph is clicked."""
+        self._navigate_to_ply_callback = callback
+
     def set_current_ply(self, ply: int) -> None:
         """Set current move ply index for vertical line indicator.
         
@@ -208,6 +215,52 @@ class EvaluationGraphWidget(QWidget):
             self.middlegame_end = middlegame_end
             self.update()
     
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        """Handle click-to-navigate on the graph plot area."""
+        if not self._navigate_to_ply_callback:
+            super().mousePressEvent(event)
+            return
+
+        # No data -> nothing to navigate.
+        if not self.evaluation_data or self.max_ply <= 0:
+            super().mousePressEvent(event)
+            return
+
+        # Recompute the plot rect exactly like paintEvent.
+        width = self.width()
+        height = self.height()
+        left = float(self.padding[0])
+        top = float(self.padding[1])
+        right = float(width - self.padding[2])
+        bottom = float(height - self.padding[3])
+        graph_width = right - left
+
+        if graph_width <= 0:
+            super().mousePressEvent(event)
+            return
+
+        x = float(event.position().x())
+        y = float(event.position().y())
+
+        # Only react to clicks inside the actual plot area.
+        if x < left or x > right or y < top or y > bottom:
+            super().mousePressEvent(event)
+            return
+
+        # Map click x-position to an estimated ply index.
+        relative = (x - left) / graph_width
+        ply_est = int(round(relative * self.max_ply))
+        ply_est = max(0, min(self.max_ply, ply_est))
+
+        # Snap to closest ply that exists in evaluation_data for better UX.
+        if self._available_plys:
+            ply = min(self._available_plys, key=lambda p: abs(p - ply_est))
+        else:
+            ply = ply_est
+
+        self._navigate_to_ply_callback(ply)
+        event.accept()
+
     def set_critical_moments(self, white_top_worst: List, white_top_best: List, 
                              black_top_worst: List, black_top_best: List) -> None:
         """Set critical moments for critical moment indicators.
@@ -773,6 +826,14 @@ class DetailSummaryView(QWidget):
             game_controller: The GameController instance.
         """
         self._game_controller = game_controller
+        if hasattr(self, 'evaluation_graph') and self.evaluation_graph:
+            self.evaluation_graph.set_navigation_callback(self._navigate_to_ply_from_graph)
+
+    def _navigate_to_ply_from_graph(self, ply: int) -> None:
+        """Navigate to the ply selected by clicking the evaluation graph."""
+        if not self._game_controller:
+            return
+        self._game_controller.navigate_to_ply(ply)
     
     def set_summary_controller(self, summary_controller: "GameSummaryController") -> None:
         """Attach the summary controller supplying data for this view."""
