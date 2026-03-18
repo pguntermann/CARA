@@ -27,6 +27,7 @@ from app.controllers.game_summary_controller import GameSummaryController
 from app.controllers.player_stats_controller import PlayerStatsController
 from app.controllers.metadata_controller import MetadataController
 from app.controllers.search_controller import SearchController
+from app.controllers.notes_controller import NotesController
 from app.services.version_check_service import VersionCheckService
 
 
@@ -59,6 +60,9 @@ class AppController:
         
         # Initialize game controller (depends on board controller)
         self.game_controller = GameController(config, self.board_controller)
+
+        # Initialize notes controller (depends on game controller)
+        self.notes_controller = NotesController(config, self.game_controller)
         
         # Initialize column profile controller
         self.column_profile_controller = ColumnProfileController()
@@ -702,6 +706,14 @@ class AppController:
             The GameController instance for managing active game operations.
         """
         return self.game_controller
+
+    def get_notes_controller(self) -> NotesController:
+        """Get the notes controller.
+
+        Returns:
+            The NotesController instance for managing notes operations.
+        """
+        return self.notes_controller
 
     def get_database_model_for_active_game(self) -> Optional[DatabaseModel]:
         """Return the database model that contains the active game, or None."""

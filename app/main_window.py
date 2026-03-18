@@ -80,6 +80,12 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._setup_shortcuts()
         
+        # First-run welcome dialog (deferred until the window is shown).
+        self._welcome_dialog_pending = False
+        self._welcome_dialog_done = False
+        self._welcome_dialog_title = ""
+        self._welcome_dialog_message = ""
+        
         # Load user settings after UI is set up (so detail_panel is available)
         self._load_user_settings()
         
@@ -2215,6 +2221,48 @@ class MainWindow(QMainWindow):
         
         self._save_user_settings()
         event.accept()
+
+    def showEvent(self, event) -> None:
+        """Handle first paint/show for deferred welcome dialogs."""
+        super().showEvent(event)
+
+        if self._welcome_dialog_done:
+            return
+
+        if not getattr(self, "_welcome_dialog_pending", False):
+            return
+
+        # Ensure main window has had a chance to appear before showing a
+        # modal dialog.
+        self._welcome_dialog_pending = False
+
+        def _show_welcome() -> None:
+            if self._welcome_dialog_done:
+                return
+
+            # Show welcome dialog (modal).
+            MessageDialog.show_information(
+                self.config,
+                self._welcome_dialog_title or "Welcome to CARA",
+                self._welcome_dialog_message
+                or 'Welcome to CARA!<br><br>Start by reading <a href="manual://getting-started">Getting Started</a>.',
+                self,
+            )
+
+            # Mark as shown and persist immediately.
+            settings_service = getattr(self, "_settings_service", None)
+            if settings_service:
+                ui_settings = settings_service.get_settings().get("ui", {})
+                if not isinstance(ui_settings, dict):
+                    ui_settings = {}
+                ui_settings = dict(ui_settings)
+                ui_settings["welcome_shown"] = True
+                settings_service.get_model().update_from_dict({"ui": ui_settings})
+                settings_service.save()
+
+            self._welcome_dialog_done = True
+
+        QTimer.singleShot(0, _show_welcome)
     
     def _on_board_flip_state_changed(self, is_flipped: bool) -> None:
         """Handle board flip state change to update menu toggle.
@@ -2282,8 +2330,8 @@ class MainWindow(QMainWindow):
         """Clear notes for the current game (removes CARANotes tag in memory)."""
         if not self.controller:
             return
-        game_controller = self.controller.get_game_controller()
-        if game_controller and game_controller.clear_notes_for_current_game():
+        notes_controller = self.controller.get_notes_controller()
+        if notes_controller and notes_controller.clear_notes_for_current_game():
             if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'notes_view'):
                 self.detail_panel.notes_view.set_notes_text("")
             self.controller.set_status("Notes cleared for current game")
@@ -2295,11 +2343,12 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'detail_panel') or not hasattr(self.detail_panel, 'notes_view'):
             return
         notes_text = self.detail_panel.notes_view.get_plain_text()
-        game_controller = self.controller.get_game_controller()
-        if game_controller and game_controller.save_notes_to_current_game(notes_text):
+        notes_controller = self.controller.get_notes_controller()
+        if notes_controller and notes_controller.save_notes_to_current_game(notes_text):
             # Mark the game as having unsaved changes (same as annotations / metadata)
             database_model = self.controller.get_database_model_for_active_game()
             if database_model:
+                game_controller = self.controller.get_game_controller()
                 active_game = game_controller.get_game_model().active_game
                 if active_game and database_model.update_game(active_game):
                     self.controller.get_database_controller().mark_database_unsaved(database_model)
@@ -2699,7 +2748,9 @@ class MainWindow(QMainWindow):
         game_summary_controller = self.controller.get_game_summary_controller()
         player_stats_controller = self.controller.get_player_stats_controller()
         metadata_controller = self.controller.get_metadata_controller()
-        self.detail_panel = DetailPanel(self.config, game_model, game_controller, engine_model, 
+        notes_controller = self.controller.get_notes_controller()
+        self.detail_panel = DetailPanel(self.config, game_model, game_controller,
+                                        notes_controller, engine_model,
                                         manual_analysis_controller, database_model, classification_model,
                                         annotation_controller, board_widget, ai_chat_controller,
                                         game_summary_controller, player_stats_controller,
@@ -4740,6 +4791,20 @@ Visibility Settings:
         
         # Store settings service reference for saving later
         self._settings_service = settings_service
+
+        # First-run welcome message: only set a pending flag here.
+        # The actual dialog is shown in `showEvent()` so the main window
+        # appears first.
+        ui_settings = settings.get("ui", {}) if isinstance(settings.get("ui", {}), dict) else {}
+        welcome_shown = bool(ui_settings.get("welcome_shown", False))
+        if not welcome_shown:
+            welcome_cfg = self.config.get("ui", {}).get("welcome_dialog", {})
+            self._welcome_dialog_title = welcome_cfg.get("title", "Welcome to CARA")
+            self._welcome_dialog_message = welcome_cfg.get(
+                "message",
+                'Hi!<br><br>Thanks for installing CARA. On this first start, start with <a href="manual://getting-started">Getting Started</a> (engines, analysis, and navigating moves).',
+            )
+            self._welcome_dialog_pending = True
         
         # Update controller with settings service (should already be the same instance)
         self.controller.user_settings_service = settings_service

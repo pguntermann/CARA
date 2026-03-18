@@ -1475,12 +1475,12 @@ class PlayerStatsController(QObject):
             # "None" selected - don't update
             return
 
-        # If "Active Database" is selected and the active database was closed/cleared,
-        # switch to "None" to avoid showing stale stats.
-        if self._source_selection == 1 and database is None:
-            self.set_source_selection(0)
-            return
-        
+        # Active Database source (source_selection == 1) can temporarily become None when
+        # the user closes the active DB. In that case, the dropdown should be refreshed
+        # to an empty list, and once a new active DB is opened, it should repopulate.
+        # Crucially, we do not switch the source to "None" here, otherwise later active
+        # database changes won't trigger dropdown updates.
+
         # Only repopulate if "Active Database" is selected (not "All Open Databases")
         if not self._use_all_databases:
             self._schedule_dropdown_update()

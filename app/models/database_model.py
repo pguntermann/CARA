@@ -65,7 +65,8 @@ class GameData:
         self.date = date
         self.moves = moves
         self.eco = eco
-        self.pgn = pgn
+        # Backing storage for pgn property (auto-invalidates display cache when modified)
+        self._pgn: str = pgn
         self.event = event
         self.site = site
         self.white_elo = white_elo
@@ -78,6 +79,19 @@ class GameData:
         self.source_database = source_database
         self.file_position = file_position
         self.ref_ply = ref_ply
+
+    @property
+    def pgn(self) -> str:
+        """Full PGN text (source of truth for exports and detail views)."""
+        return self._pgn
+
+    @pgn.setter
+    def pgn(self, value: str) -> None:
+        """Set full PGN text and invalidate the database panel preview cache."""
+        self._pgn = value
+        # Database panel caches a truncated display preview in `data()` for COL_PGN.
+        # If PGN changes (e.g. tag edits, bulk tag operations), we must invalidate it.
+        self._pgn_preview = None
 
 
 class DatabaseModel(QAbstractTableModel):

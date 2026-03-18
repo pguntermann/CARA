@@ -1870,11 +1870,6 @@ class DetailPlayerStatsView(QWidget):
             "detail_label": detail_label,
         }
     
-    def _on_refresh_clicked(self) -> None:
-        """Handle refresh button click."""
-        if self._stats_controller:
-            self._stats_controller._schedule_dropdown_update()
-    
     def _on_source_changed(self, index: int = -1) -> None:
         """Handle data source combobox change."""
         if not self._stats_controller:

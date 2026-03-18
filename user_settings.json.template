@@ -949,5 +949,8 @@
     "include_analysis_data_in_preprompt": true,
     "include_metadata_in_preprompt": true,
     "request_timeout_seconds": 60
+  },
+  "ui": {
+    "welcome_shown": false
   }
 }

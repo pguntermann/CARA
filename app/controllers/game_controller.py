@@ -63,38 +63,6 @@ class GameController:
         """
         return self.game_model
 
-    def get_notes_for_current_game(self) -> str:
-        """Get notes for the active game, loading from CARANotes tag if not cached."""
-        from app.services.notes_storage_service import NotesStorageService
-        game = self.game_model.active_game
-        if game is None:
-            return ""
-        if game.notes is not None:
-            return game.notes
-        return NotesStorageService.load_notes(game)
-
-    def save_notes_to_current_game(self, notes_text: str) -> bool:
-        """Save notes to the active game's PGN (in memory). Returns True on success."""
-        from app.services.notes_storage_service import NotesStorageService
-        game = self.game_model.active_game
-        if game is None:
-            return False
-        ok = NotesStorageService.store_notes(game, notes_text, self.config)
-        if ok:
-            self.game_model.refresh_active_game()
-        return ok
-
-    def clear_notes_for_current_game(self) -> bool:
-        """Clear notes for the active game (remove CARANotes tags in memory). Returns True on success."""
-        from app.services.notes_storage_service import NotesStorageService
-        game = self.game_model.active_game
-        if game is None:
-            return False
-        ok = NotesStorageService.clear_notes(game)
-        if ok:
-            self.game_model.refresh_active_game()
-        return ok
-
     def set_active_game(self, game: GameData) -> None:
         """Set a game as active and load its starting position to the board.
         

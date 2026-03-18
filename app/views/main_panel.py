@@ -143,6 +143,11 @@ class MainPanel(QWidget):
         # Initialize with current active game if any
         if model.active_game:
             self._on_active_game_changed(model.active_game)
+        else:
+            # Ensure header reflects controller defaults when there is no active game.
+            # Otherwise, MainGameInfoView keeps its constructor placeholders until
+            # the first time a game becomes None later.
+            self._clear_game_info()
     
     def _on_active_game_changed(self, game) -> None:
         """Handle active game change from model.

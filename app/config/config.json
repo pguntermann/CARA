@@ -1,6 +1,10 @@
 {
   "version": "2.6.4",
   "ui": {
+    "welcome_dialog": {
+      "title": "Welcome to CARA",
+      "message": "<b>Thanks for installing CARA</b>. As this is your first time starting the application, I would recommend that you take a quick look at the <a href=\"manual://getting-started\">Getting Started</a> section of the manual.<br><br>It covers the most important aspects of configuring and using CARA, so that you will hopefully have a great time and enjoy using the application.<br><br>You will also find a link to CARA's YouTube channel with many tutorial videos in the Help menu.<br><br>If you enjoy the project, please consider leaving a Star on the GitHub repository, subscribing to and liking the YouTube channel/videos, and spreading the word!<br><br>Best regards, Philipp."
+    },
     "styles": {
       "scrollbar": {
         "width": 6,
@@ -2062,14 +2066,18 @@
               212
             ],
             "padding": [
-              6,
-              8
+              3,
+              3
             ]
           },
           "timeout": {
             "spacing_before": 12,
             "width": 56,
-            "height": 30
+            "height": 30,
+            "padding": [
+              3,
+              3
+            ]
           }
         },
         "splitter": {
@@ -2153,6 +2161,33 @@
           "text_color": [
             255,
             255,
+            255
+          ],
+          "blockquote_text_color": [
+            210,
+            190,
+            130
+          ],
+          "hidden_marker_font_point_size": 0.5,
+          "toolbar_separator_color": [
+            60,
+            60,
+            65
+          ],
+          "inline_code_background_color": [
+            90,
+            110,
+            160
+          ],
+          "inline_code_background_alpha": 170,
+          "inline_code_text_color": [
+            255,
+            255,
+            255
+          ],
+          "move_link_text_color": [
+            100,
+            150,
             255
           ],
           "placeholder_text": "Add notes about this game..."
@@ -2596,6 +2631,10 @@
         "height": 640,
         "default_custom_base_url": "http://localhost:1234/v1",
         "form_label_min_width": 180,
+        "custom_endpoint_disclaimer": {
+          "title": "Custom Endpoint Disclaimer",
+          "message": "<b>Experimental feature:</b> Custom endpoint support is an experimental implementation. Responses from locally run models may not match the quality of top-tier cloud models (e.g. OpenAI GPT-4, Anthropic Claude).<br><br>Local models may be less accurate, less consistent, or occasionally produce incorrect or irrelevant answers. Use at your own discretion."
+        },
         "background_color": [
           40,
           40,

@@ -22,6 +22,7 @@ from app.models.engine_model import EngineModel
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.models.database_model import DatabaseModel
 from app.controllers.game_controller import GameController
+from app.controllers.notes_controller import NotesController
 from typing import Optional
 
 
@@ -30,6 +31,7 @@ class DetailPanel(QWidget):
     
     def __init__(self, config: Dict[str, Any], game_model: Optional[GameModel] = None,
                  game_controller: Optional[GameController] = None,
+                 notes_controller: Optional[NotesController] = None,
                  engine_model: Optional[EngineModel] = None,
                  manual_analysis_controller = None,
                  database_model: Optional[DatabaseModel] = None,
@@ -54,6 +56,7 @@ class DetailPanel(QWidget):
         self.config = config
         self._game_model: Optional[GameModel] = None
         self._game_controller = game_controller
+        self._notes_controller = notes_controller
         self._engine_model = engine_model
         self._manual_analysis_controller = manual_analysis_controller
         self._database_model = database_model
@@ -351,7 +354,7 @@ class DetailPanel(QWidget):
         self.notes_view = DetailNotesView(
             self.config,
             game_model=self._game_model,
-            game_controller=self._game_controller
+            notes_controller=self._notes_controller
         )
         self.tab_widget.addTab(self.notes_view, "Notes")
         
@@ -370,8 +373,8 @@ class DetailPanel(QWidget):
         # Connect notes view to game model and controller
         if self._game_model:
             self.notes_view.set_game_model(self._game_model)
-        if self._game_controller:
-            self.notes_view.set_game_controller(self._game_controller)
+        if self._notes_controller:
+            self.notes_view.set_notes_controller(self._notes_controller)
     
     def set_game_model(self, model: GameModel) -> None:
         """Set the game model to observe.
