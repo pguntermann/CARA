@@ -1,5 +1,29 @@
 # Release Notes
 
+# CARA v2.6.5 - Better Notes, Some minor UI/UX Improvements and Bug Fixes
+
+**Release Date:** 18.03.2026
+
+This release improves overall UX, enhances the Notes View and fixes some bugs. You can now click directly on the Evaluation Graph to jump to the corresponding move, the Notes view was improved for better Move Detection/Formatting and gained the ability to use Markdown formatting, like `# Headers`, `**bold**`, `*italic*`, `***bold and italic***`, etc. It fixes several small bugs and includes some minor UI/UX improvements.
+
+## Enhancements
+
+- **Evaluation graph navigation:** Click on the Evaluation Graph in the Game Summary view to navigate directly to the corresponding move.
+- **Notes view – Markdown support:** The Notes view now supports a limited subset of markdown formatting syntax. The manual includes a detailed description. Additionally when you select a text in the Notes view, you can use corresponding toolbar buttons instead of directly entering the markdown syntax.
+- **User manual:** Updated HTML manual
+
+## Bug Fixes
+
+- **Database view – PGN preview:** Fixed a bug where the displayed PGN column in the database view didn't update when the game model updated, for example when changing PGN tags.
+- **Player Stats:** Fixed an issue where the player dropdown could stay empty when switching databases while using “Active Database” as the source.
+- **Notes view:** Fixed false positves in the move SAN detection logic.
+
+## Refactoring and Technical Improvements
+
+- **Notes move formatting:** Refactored Notes move parsing/linking and added corresponding unit tests.
+
+---
+
 # CARA v2.6.4 - Notes View, Move Classification Badges and Custom LLM Endpoints
 
 **Release Date:** 15.03.2026
