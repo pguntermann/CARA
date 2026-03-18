@@ -115,6 +115,10 @@ class AIModelSettingsDialog(QDialog):
         
         # Track refresh state
         self._refresh_results: List[tuple] = []
+        # Custom endpoint disclaimer: only show once per dialog lifetime,
+        # and only on the first user-driven enable action.
+        self._custom_endpoint_disclaimer_shown = False
+        self._suppress_custom_endpoint_disclaimer = True
         # Password reveal state for API key line edits (id(edit) -> {action, icon_show, icon_hide})
         self._password_reveal_data: Dict[int, Dict[str, Any]] = {}
         
@@ -163,6 +167,22 @@ class AIModelSettingsDialog(QDialog):
         
         # Buttons
         self.buttons_config = dialog_config.get('buttons', {})
+
+        # Custom endpoint disclaimer content (configurable so it can be updated
+        # without touching code).
+        disclaimer_config = dialog_config.get('custom_endpoint_disclaimer', {})
+        self.custom_endpoint_disclaimer_title = disclaimer_config.get(
+            'title',
+            'Custom Endpoint Disclaimer',
+        )
+        self.custom_endpoint_disclaimer_message = disclaimer_config.get(
+            'message',
+            "<b>Experimental feature:</b> Custom endpoint support is an experimental implementation. "
+            "Responses from locally run models may not match the quality of top-tier cloud models "
+            "(e.g. OpenAI GPT-4, Anthropic Claude)."
+            "<br><br>Local models may be less accurate, less consistent, or occasionally produce incorrect "
+            "or irrelevant answers. Use at your own discretion.",
+        )
     
     def showEvent(self, event: QShowEvent) -> None:
         """Handle show event to enforce fixed size and refresh values."""
@@ -365,6 +385,23 @@ class AIModelSettingsDialog(QDialog):
         self.custom_base_url_input.setEnabled(checked)
         self.custom_api_key_input.setEnabled(checked)
         self.custom_model_combo.setEnabled(checked)
+
+        if not checked:
+            return
+
+        # Show disclaimer only for user-driven enable actions.
+        if self._suppress_custom_endpoint_disclaimer or self._custom_endpoint_disclaimer_shown:
+            return
+
+        from app.views.message_dialog import MessageDialog
+
+        MessageDialog.show_warning(
+            self.config,
+            self.custom_endpoint_disclaimer_title,
+            self.custom_endpoint_disclaimer_message,
+            self,
+        )
+        self._custom_endpoint_disclaimer_shown = True
     
     def _add_password_reveal(self, line_edit: QLineEdit) -> None:
         """Set password echo mode and add a trailing action to toggle visibility.
@@ -448,6 +485,9 @@ class AIModelSettingsDialog(QDialog):
         """Load settings into UI fields."""
         settings = self.user_settings_service.get_settings()
         self.current_settings = settings.get("ai_models", {})
+
+        # Suppress disclaimer while we populate the checkbox from persisted settings.
+        self._suppress_custom_endpoint_disclaimer = True
         
         # OpenAI settings
         openai_settings = self.current_settings.get("openai", {})
@@ -474,6 +514,7 @@ class AIModelSettingsDialog(QDialog):
         # Custom endpoint settings
         custom_settings = self.current_settings.get("custom", {})
         custom_enabled = custom_settings.get("enabled", False)
+        self._custom_endpoint_disclaimer_shown = bool(custom_enabled)
         self.custom_enabled_checkbox.setChecked(custom_enabled)
         custom_base_url_saved = (custom_settings.get("base_url") or "").strip()
         self.custom_base_url_input.setText(
@@ -493,6 +534,8 @@ class AIModelSettingsDialog(QDialog):
         ai_summary = settings.get("ai_summary", {})
         timeout = max(10, min(600, int(ai_summary.get("request_timeout_seconds", 60))))
         self.request_timeout_spinbox.setValue(timeout)
+
+        self._suppress_custom_endpoint_disclaimer = False
     
     def _refresh_all_models(self) -> None:
         """Refresh model lists for all providers that have API keys.

@@ -174,7 +174,7 @@ class DetailNotesView(QWidget):
         btn_b = QPushButton("B", toolbar)
         btn_i = QPushButton("I", toolbar)
         btn_code = QPushButton("`", toolbar)
-        btn_strike = QPushButton("~~", toolbar)
+        btn_strike = QPushButton("S", toolbar)
         btn_quote = QPushButton(">", toolbar)
 
         buttons.extend([btn_h1, btn_h2, btn_h3, btn_b, btn_i, btn_code, btn_strike, btn_quote])
@@ -194,7 +194,7 @@ class DetailNotesView(QWidget):
         toolbar_font = QFont(font_family, int(font_size))
         metrics = QFontMetrics(toolbar_font)
         widest = max(
-            ["H1", "H2", "H3", "B", "I", "`", "~~", ">"],
+            ["H1", "H2", "H3", "B", "I", "`", "S", ">"],
             key=lambda t: metrics.horizontalAdvance(t),
         )
         fixed_w = metrics.horizontalAdvance(widest) + 22
@@ -246,6 +246,20 @@ class DetailNotesView(QWidget):
             font_size=font_size,
             min_height=24,
         )
+
+        # Make markdown-format buttons self-descriptive via font styling.
+        # (This affects only the button label, not the markdown inserted.)
+        btn_b_font = QFont(font_family, int(font_size))
+        btn_b_font.setBold(True)
+        btn_b.setFont(btn_b_font)
+
+        btn_i_font = QFont(font_family, int(font_size))
+        btn_i_font.setItalic(True)
+        btn_i.setFont(btn_i_font)
+
+        btn_strike_font = QFont(font_family, int(font_size))
+        btn_strike_font.setStrikeOut(True)
+        btn_strike.setFont(btn_strike_font)
 
         # Add grouped buttons + visual separators.
         group_headings = [btn_h1, btn_h2, btn_h3]

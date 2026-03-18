@@ -435,15 +435,26 @@ class DetailAIChatView(QWidget):
         
         # Convert padding to [horizontal, vertical] format if needed
         if isinstance(token_padding, (int, float)):
-            spinbox_padding = [token_padding, token_padding]
+            spinbox_padding_tokens = [token_padding, token_padding]
         elif isinstance(token_padding, list) and len(token_padding) == 2:
-            spinbox_padding = token_padding
+            spinbox_padding_tokens = token_padding
         else:
-            spinbox_padding = [6, 8]
+            spinbox_padding_tokens = [6, 8]
+
+        timeout_config = self.timeout_config
+        timeout_padding = timeout_config.get('padding', token_padding)
+
+        # Convert padding to [horizontal, vertical] format if needed
+        if isinstance(timeout_padding, (int, float)):
+            spinbox_padding_timeout = [timeout_padding, timeout_padding]
+        elif isinstance(timeout_padding, list) and len(timeout_padding) == 2:
+            spinbox_padding_timeout = timeout_padding
+        else:
+            spinbox_padding_timeout = spinbox_padding_tokens
         
-        # Apply unified spinbox styling using StyleManager (tokens and timeout)
+        # Apply spinbox styling using StyleManager (tokens and timeout separately)
         StyleManager.style_spinboxes(
-            [self.tokens_spin, self.timeout_spin],
+            [self.tokens_spin],
             self.config,
             text_color=token_text,
             font_family=resolved_token_font_family,
@@ -453,7 +464,21 @@ class DetailAIChatView(QWidget):
             focus_border_color=token_focus,
             border_width=token_border_width,
             border_radius=token_border_radius,
-            padding=spinbox_padding
+            padding=spinbox_padding_tokens
+        )
+
+        StyleManager.style_spinboxes(
+            [self.timeout_spin],
+            self.config,
+            text_color=token_text,
+            font_family=resolved_token_font_family,
+            font_size=token_font_size,
+            bg_color=token_bg,
+            border_color=token_border,
+            focus_border_color=token_focus,
+            border_width=token_border_width,
+            border_radius=token_border_radius,
+            padding=spinbox_padding_timeout
         )
         
         # Label styling
