@@ -2282,8 +2282,8 @@ class MainWindow(QMainWindow):
         """Clear notes for the current game (removes CARANotes tag in memory)."""
         if not self.controller:
             return
-        game_controller = self.controller.get_game_controller()
-        if game_controller and game_controller.clear_notes_for_current_game():
+        notes_controller = self.controller.get_notes_controller()
+        if notes_controller and notes_controller.clear_notes_for_current_game():
             if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'notes_view'):
                 self.detail_panel.notes_view.set_notes_text("")
             self.controller.set_status("Notes cleared for current game")
@@ -2295,8 +2295,8 @@ class MainWindow(QMainWindow):
         if not hasattr(self, 'detail_panel') or not hasattr(self.detail_panel, 'notes_view'):
             return
         notes_text = self.detail_panel.notes_view.get_plain_text()
-        game_controller = self.controller.get_game_controller()
-        if game_controller and game_controller.save_notes_to_current_game(notes_text):
+        notes_controller = self.controller.get_notes_controller()
+        if notes_controller and notes_controller.save_notes_to_current_game(notes_text):
             # Mark the game as having unsaved changes (same as annotations / metadata)
             database_model = self.controller.get_database_model_for_active_game()
             if database_model:
@@ -2699,7 +2699,9 @@ class MainWindow(QMainWindow):
         game_summary_controller = self.controller.get_game_summary_controller()
         player_stats_controller = self.controller.get_player_stats_controller()
         metadata_controller = self.controller.get_metadata_controller()
-        self.detail_panel = DetailPanel(self.config, game_model, game_controller, engine_model, 
+        notes_controller = self.controller.get_notes_controller()
+        self.detail_panel = DetailPanel(self.config, game_model, game_controller,
+                                        notes_controller, engine_model,
                                         manual_analysis_controller, database_model, classification_model,
                                         annotation_controller, board_widget, ai_chat_controller,
                                         game_summary_controller, player_stats_controller,

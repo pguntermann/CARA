@@ -1,8 +1,6 @@
 """Notes view for detail panel: plain-text game notes with move linking."""
 
-import html
-import re
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTextEdit, QMenu, QApplication,
@@ -17,7 +15,7 @@ from app.views.style.style_manager import StyleManager
 
 if __name__ != "__main__":
     from app.models.game_model import GameModel
-    from app.controllers.game_controller import GameController
+    from app.controllers.notes_controller import NotesController
 
 
 class NotesTextEdit(QTextEdit):
@@ -51,12 +49,12 @@ class DetailNotesView(QWidget):
         self,
         config: Dict[str, Any],
         game_model: Optional["GameModel"] = None,
-        game_controller: Optional["GameController"] = None,
+        notes_controller: Optional["NotesController"] = None,
     ) -> None:
         super().__init__()
         self.config = config
         self._game_model = game_model
-        self._game_controller = game_controller
+        self._notes_controller = notes_controller
         self._current_plain: str = ""
         self._updating_links = False
         self._link_debounce_timer = QTimer(self)
@@ -65,7 +63,7 @@ class DetailNotesView(QWidget):
         self._setup_ui()
         if game_model:
             game_model.active_game_changed.connect(self._on_active_game_changed)
-        if game_controller:
+        if notes_controller:
             self._notes_edit.set_link_click_handler(self._on_move_link_clicked)
 
     def _setup_ui(self) -> None:
@@ -116,9 +114,9 @@ class DetailNotesView(QWidget):
             self._current_plain = ""
             self._set_content_with_links("")
             return
-        if not self._game_controller:
+        if not self._notes_controller:
             return
-        plain = self._game_controller.get_notes_for_current_game()
+        plain = self._notes_controller.get_notes_for_current_game()
         self._current_plain = plain
         self._set_content_with_links(plain)
 
@@ -131,7 +129,7 @@ class DetailNotesView(QWidget):
 
     def _reapply_move_links(self) -> None:
         """Re-build HTML with links from current plain text and restore cursor."""
-        if self._updating_links or not self._game_controller:
+        if self._updating_links or not self._notes_controller:
             return
         edit = self._notes_edit
         plain = edit.toPlainText()
@@ -165,51 +163,21 @@ class DetailNotesView(QWidget):
         QTimer.singleShot(0, self._clear_updating_links)
 
     def _plain_to_html_with_links(self, plain: str) -> str:
-        """Convert plain text to HTML: game moves as clickable bold links, other move notation as bold only."""
+        """Convert plain text to HTML with move links."""
         if not plain:
             return ""
-        notation_to_ply = self._game_controller.get_move_notation_to_ply_map() if self._game_controller else {}
-        # Find all numbered move-like tokens (e.g. "1. e4", "13... Rb7")
-        # (?!\.) ensures white move pattern does not consume the ".." of black moves (e.g. "7... Bxf3")
-        move_pattern = re.compile(r"\d+\.(?!\.)\s*\S+|\d+\.\.\.\s*\S+")
-        tokens: List[Tuple[int, int, str]] = []
-        for m in move_pattern.finditer(plain):
-            tokens.append((m.start(), m.end(), m.group(0)))
-        # Build output: link+bold for game moves, bold-only for other move notation
+        if not self._notes_controller:
+            # Fallback: show raw text (no links) if controller isn't wired yet.
+            return plain.replace("\n", "<br>")
+
         link_style = "color: rgb(100,150,255); text-decoration: underline; font-weight: bold;"
         bold_style = "font-weight: bold;"
-        parts: List[str] = []
-        i = 0
-        for start, end, text in tokens:
-            if start > i:
-                parts.append(html.escape(plain[i:start]).replace("\n", "<br>"))
-            safe = html.escape(text)
-            # Normalize for lookup: strip trailing punctuation (regex may capture "2. d4," etc.)
-            text_clean = text.rstrip(".,;:!?)")
-            in_game = (
-                text_clean in notation_to_ply
-                or (" " in text_clean and text_clean.replace(" ", "", 1) in notation_to_ply)
-            )
-            if in_game:
-                parts.append(f'<a href="move:{safe}" style="{link_style}">{safe}</a>')
-            else:
-                parts.append(f'<span style="{bold_style}">{safe}</span>')
-            i = end
-        if i < len(plain):
-            parts.append(html.escape(plain[i:]).replace("\n", "<br>"))
-        return "".join(parts)
+        return self._notes_controller.render_notes_html(plain, link_style=link_style, bold_style=bold_style)
 
     def _on_move_link_clicked(self, notation: str) -> bool:
-        if not self._game_controller or not notation:
+        if not self._notes_controller or not notation:
             return False
-        notation = html.unescape(notation).strip().rstrip(".,;:!?)")
-        notation_to_ply = self._game_controller.get_move_notation_to_ply_map()
-        ply = notation_to_ply.get(notation)
-        if ply is None and " " in notation:
-            ply = notation_to_ply.get(notation.replace(" ", "", 1))
-        if ply is None:
-            return False
-        return self._game_controller.navigate_to_ply(ply)
+        return self._notes_controller.navigate_from_move_link(notation)
 
     def get_plain_text(self) -> str:
         return self._notes_edit.toPlainText()
@@ -227,7 +195,7 @@ class DetailNotesView(QWidget):
             model.active_game_changed.connect(self._on_active_game_changed)
             self._on_active_game_changed(model.active_game)
 
-    def set_game_controller(self, controller: Optional["GameController"]) -> None:
-        self._game_controller = controller
+    def set_notes_controller(self, controller: Optional["NotesController"]) -> None:
+        self._notes_controller = controller
         if self._notes_edit and controller:
             self._notes_edit.set_link_click_handler(self._on_move_link_clicked)
