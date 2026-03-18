@@ -55,17 +55,52 @@ class NotesController:
     def render_notes_html(self, plain: str, link_style: str, bold_style: str) -> str:
         """Render notes as HTML with move links (and bold-only tokens)."""
         notation_to_ply = self._game_controller.get_move_notation_to_ply_map()
+        heading_font_point_sizes = self._get_scaled_heading_font_point_sizes()
         return NotesFormatterService.plain_to_html_with_move_links(
             plain=plain,
             notation_to_ply=notation_to_ply,
             link_style=link_style,
             bold_style=bold_style,
+            heading_font_point_sizes=heading_font_point_sizes,
         )
 
     def get_notes_format_spans(self, plain: str) -> List[NotesFormatterService.FormatSpan]:
         """Return formatting spans for in-place Notes rendering."""
         notation_to_ply = self._game_controller.get_move_notation_to_ply_map()
-        return NotesFormatterService.get_notes_format_spans(plain, notation_to_ply)
+        heading_font_point_sizes = self._get_scaled_heading_font_point_sizes()
+        return NotesFormatterService.get_notes_format_spans(
+            plain,
+            notation_to_ply,
+            heading_font_point_sizes=heading_font_point_sizes,
+        )
+
+    def _get_scaled_heading_font_point_sizes(self) -> Optional[Dict[str, int]]:
+        """Return DPI-scaled heading point sizes for the Notes renderers.
+
+        Formatter/utils modules are intentionally UI-independent, so DPI scaling
+        happens here (controller/UI layer) instead of in the formatter itself.
+        """
+        base_heading_font_point_sizes = (
+            self.config.get("ui", {})
+            .get("panels", {})
+            .get("detail", {})
+            .get("notes", {})
+            .get("heading_font_point_sizes")
+        )
+        if not base_heading_font_point_sizes:
+            return None
+
+        try:
+            from app.utils.font_utils import scale_font_size
+
+            return {
+                str(k): int(scale_font_size(float(v)))
+                for k, v in base_heading_font_point_sizes.items()
+            }
+        except Exception:
+            # If PyQt (or QApplication) isn't available (e.g. headless tests),
+            # fall back to unscaled values.
+            return {str(k): int(v) for k, v in base_heading_font_point_sizes.items()}
 
     def selection_intersects_heading_line(self, plain: str, start: int, end: int) -> bool:
         """Return True if selection intersects a markdown heading line."""

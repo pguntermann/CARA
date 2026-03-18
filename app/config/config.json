@@ -2158,6 +2158,14 @@
         "notes": {
           "font_family": "Courier New",
           "font_size": 11,
+          "heading_font_point_sizes": {
+            "h1": 13,
+            "h2": 14,
+            "h3": 15,
+            "h4": 16,
+            "h5": 17,
+            "h6": 18
+          },
           "text_color": [
             255,
             255,

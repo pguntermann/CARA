@@ -93,7 +93,11 @@ def markdown_inline_to_html(md: str) -> str:
     return _process_inline(md)
 
 
-def markdown_notes_to_html(md: str, heading_level_offset: int = 0) -> str:
+def markdown_notes_to_html(
+    md: str,
+    heading_font_point_sizes: dict[str, float | int] | None = None,
+    heading_level_offset: int = 0,
+) -> str:
     """Markdown-to-HTML renderer optimized for Notes.
 
     Goals:
@@ -240,11 +244,17 @@ def markdown_notes_to_html(md: str, heading_level_offset: int = 0) -> str:
             effective_level = min(6, level + heading_level_offset)
             content = heading_match.group(2).strip()
             hid = _escape_attr(_heading_id(content))
+            base_pt = (
+                float(heading_font_point_sizes.get(f"h{effective_level}", 12 + effective_level))
+                if heading_font_point_sizes
+                else float(12 + effective_level)
+            )
+            font_pt = int(round(base_pt))
             # Preserve heading marker in underlying plain text but hide it visually.
             marker_prefix = heading_match.group(1) + " "
             out.append(
                 f'<span style="{md_marker_style}">{_escape(marker_prefix)}</span>'
-                f'<span id="{hid}" style="font-weight:bold; font-size:{12 + effective_level}px;">'
+                f'<span id="{hid}" style="font-weight:bold; font-size:{font_pt}pt;">'
                 f"{_process_inline_notes_preserve_markers(content)}"
                 "</span>"
             )

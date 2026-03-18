@@ -31,6 +31,8 @@ class NotesFormatterService:
         notation_to_ply: Dict[str, int],
         link_style: str,
         bold_style: str,
+        *,
+        heading_font_point_sizes: Optional[Dict[str, int]] = None,
     ) -> str:
         if not plain:
             return ""
@@ -160,7 +162,10 @@ class NotesFormatterService:
         # Render remaining text with a Notes-optimized markdown renderer.
         # This preserves user typing/whitespace better than the full markdown renderer,
         # avoiding cursor/space glitches while still supporting headings + inline markdown.
-        rendered_html = markdown_notes_to_html(protected_plain)
+        rendered_html = markdown_notes_to_html(
+            protected_plain,
+            heading_font_point_sizes=heading_font_point_sizes,
+        )
 
         # Substitute placeholders with protected move HTML.
         for placeholder, token_html in placeholder_to_html.items():
@@ -187,6 +192,7 @@ class NotesFormatterService:
         notation_to_ply: Dict[str, int],
         *,
         hide_markdown_markers: bool = True,
+        heading_font_point_sizes: Optional[Dict[str, int]] = None,
     ) -> List["NotesFormatterService.FormatSpan"]:
         """Detect spans for in-place formatting (no HTML rendering).
 
@@ -264,7 +270,12 @@ class NotesFormatterService:
                 _add_hidden(hashes_start, ws_end)
                 # Make headings visually stronger but keep size reasonable.
                 heading_level = len(line_match.group("hashes"))
-                _add_bold(text_start, text_end, point_size=12 + heading_level)
+                point_size = (
+                    int(heading_font_point_sizes.get(f"h{heading_level}", 12 + heading_level))
+                    if heading_font_point_sizes
+                    else int(12 + heading_level)
+                )
+                _add_bold(text_start, text_end, point_size=point_size)
 
             # Inline code: `code` (single-line).
             for m in re.finditer(r"(?<!`)`(?P<content>[^\n`]+?)`(?!`)", line_no_ending):
