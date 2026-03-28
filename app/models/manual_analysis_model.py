@@ -42,7 +42,7 @@ class ManualAnalysisModel(QObject):
         self._multipv: int = 2  # Number of lines to analyze
         self._start_time: Optional[float] = None  # Timestamp when analysis started (None if not analyzing)
         self._enable_miniature_preview: bool = True  # Enable miniature board preview on PV hover
-        self._miniature_preview_scale_factor: float = 1.0  # Scale factor for miniature board preview (1.0 = default size)
+        self._miniature_preview_scale_factor: float = 1.25  # Matches template default; menu presets 1.0–2.0
     
     @property
     def lines(self) -> List[AnalysisLine]:

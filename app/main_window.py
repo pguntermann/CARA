@@ -4981,7 +4981,7 @@ Visibility Settings:
             self.enable_miniature_preview_action.setChecked(enable_miniature_preview)
         
         # Miniature preview scale factor
-        scale_factor = manual_analysis_settings.get("miniature_preview_scale_factor", 1.0)
+        scale_factor = manual_analysis_settings.get("miniature_preview_scale_factor", 1.25)
         if manual_analysis_controller:
             manual_analysis_model = manual_analysis_controller.get_analysis_model()
             if manual_analysis_model:

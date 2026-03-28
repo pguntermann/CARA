@@ -864,7 +864,7 @@
     "max_pieces_to_explore": 3,
     "max_exploration_depth": 3,
     "enable_miniature_preview": true,
-    "miniature_preview_scale_factor": 1.0
+    "miniature_preview_scale_factor": 1.25
   },
   "annotations": {
     "preset_colors": [
