@@ -2,14 +2,15 @@
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTableView, 
                              QPushButton, QDialog, QLabel, QLineEdit, QDialogButtonBox,
-                             QFormLayout, QSizePolicy)
-from PyQt6.QtCore import Qt, QTimer, QSize
+                             QFormLayout, QSizePolicy, QMenu, QApplication)
+from PyQt6.QtCore import Qt, QTimer, QSize, QPoint, QModelIndex
 from PyQt6.QtGui import QPalette, QColor
 from typing import Dict, Any, Optional, List, Tuple
 
 from app.models.metadata_model import MetadataModel
 from app.models.game_model import GameModel
 from app.controllers.metadata_controller import MetadataController
+from app.utils.table_export import table_to_delimited, get_copy_table_config
 
 
 class DetailMetadataView(QWidget):
@@ -72,6 +73,8 @@ class DetailMetadataView(QWidget):
         
         # Create table view
         self.metadata_table = QTableView()
+        self.metadata_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.metadata_table.customContextMenuRequested.connect(self._on_metadata_table_context_menu)
         layout.addWidget(self.metadata_table)
         
         # Get column widths from config (will be set when model is connected)
@@ -260,7 +263,80 @@ class DetailMetadataView(QWidget):
             vertical_header_palette.setColor(vertical_header.foregroundRole(), header_text_color)
             vertical_header.setPalette(vertical_header_palette)
             vertical_header.setAutoFillBackground(True)
-    
+
+    def _on_metadata_table_context_menu(self, pos: QPoint) -> None:
+        """Context menu: copy cell and export full table (metadata has no hidden logical columns)."""
+        from app.views.style import StyleManager
+
+        index = self.metadata_table.indexAt(pos)
+        model = self._metadata_model
+        if not model:
+            return
+
+        menu = QMenu(self)
+        ui_config = self.config.get("ui", {})
+        metadata_config = ui_config.get("panels", {}).get("detail", {}).get("metadata", {})
+        bg_color = metadata_config.get("background_color", [40, 40, 45])
+        StyleManager.style_context_menu(menu, self.config, bg_color)
+
+        copy_value_action = menu.addAction("Copy value")
+        copy_value_action.triggered.connect(lambda: self._copy_metadata_cell_value(index))
+        copy_value_action.setEnabled(index.isValid())
+
+        menu.addSeparator()
+        menu.addAction("Copy Table as CSV").triggered.connect(self._copy_metadata_table_csv)
+        menu.addAction("Copy Table as TSV").triggered.connect(self._copy_metadata_table_tsv)
+
+        menu.exec(self.metadata_table.viewport().mapToGlobal(pos))
+
+    def _copy_metadata_cell_value(self, index: QModelIndex) -> None:
+        if not index.isValid() or not self._metadata_model:
+            return
+        val = self._metadata_model.data(index, Qt.ItemDataRole.DisplayRole)
+        text = "" if val is None else str(val)
+        QApplication.clipboard().setText(text)
+        from app.services.progress_service import ProgressService
+        ProgressService.get_instance().set_status("Copied value to clipboard")
+
+    def _copy_metadata_table_csv(self) -> None:
+        cfg = get_copy_table_config(self.config)["csv"]
+        self._copy_metadata_table_delimited(
+            delimiter=cfg["delimiter"],
+            use_csv_escaping=cfg["use_escaping"],
+            always_quote_values=cfg["always_quote_values"],
+            status_message="Copied metadata table as CSV to clipboard",
+        )
+
+    def _copy_metadata_table_tsv(self) -> None:
+        cfg = get_copy_table_config(self.config)["tsv"]
+        self._copy_metadata_table_delimited(
+            delimiter=cfg["delimiter"],
+            use_csv_escaping=cfg["use_escaping"],
+            always_quote_values=cfg["always_quote_values"],
+            status_message="Copied metadata table as TSV to clipboard",
+        )
+
+    def _copy_metadata_table_delimited(
+        self,
+        delimiter: str,
+        use_csv_escaping: bool,
+        always_quote_values: bool,
+        status_message: str,
+    ) -> None:
+        if not self._metadata_model:
+            return
+        column_indices = list(range(self._metadata_model.columnCount()))
+        text = table_to_delimited(
+            self._metadata_model,
+            column_indices,
+            delimiter,
+            use_csv_escaping,
+            always_quote_values=always_quote_values,
+        )
+        QApplication.clipboard().setText(text)
+        from app.services.progress_service import ProgressService
+        ProgressService.get_instance().set_status(status_message)
+
     def set_model(self, model: MetadataModel) -> None:
         """Set the metadata model to observe.
         
