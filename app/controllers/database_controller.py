@@ -177,6 +177,29 @@ class DatabaseController:
         """
         self.panel_model.set_active_database(database)
     
+    def find_database_model_for_game(self, game: Optional[GameData]) -> Optional[DatabaseModel]:
+        """Return the database model that contains this game (identity match on GameData).
+        
+        Checks the clipboard database first, then every other database registered on the panel.
+        
+        Args:
+            game: GameData instance stored in a database row.
+        
+        Returns:
+            The DatabaseModel that contains ``game``, or None if not found.
+        """
+        if not game:
+            return None
+        clipboard = self.database_model
+        if clipboard.find_game(game) is not None:
+            return clipboard
+        for _identifier, info in self.panel_model.get_all_databases().items():
+            if info.model is clipboard:
+                continue
+            if info.model.find_game(game) is not None:
+                return info.model
+        return None
+    
     def format_pgn_error_message(self, error_message: str) -> str:
         """Format error message for PGN parsing failures.
         

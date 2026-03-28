@@ -2795,6 +2795,8 @@ class MainWindow(QMainWindow):
             if hasattr(self.detail_panel, 'player_stats_view'):
                 self.detail_panel.player_stats_view._database_controller = database_controller
                 self.detail_panel.player_stats_view._database_panel = self.database_panel
+            if hasattr(self.detail_panel, 'moves_view'):
+                self.detail_panel.moves_view.set_database_controller(database_controller)
                 self.detail_panel.player_stats_view._on_open_pattern_games_in_search_results = self._open_pattern_games_in_search_results
                 self.detail_panel.player_stats_view._on_open_best_games_in_search_results = self._open_best_games_in_search_results
                 self.detail_panel.player_stats_view._on_open_worst_games_in_search_results = self._open_worst_games_in_search_results
@@ -3988,7 +3990,7 @@ Visibility Settings:
             return
         
         # Find the database model that contains this game and update it
-        database_model = self._find_database_model_for_game(game)
+        database_model = self.controller.get_database_controller().find_database_model_for_game(game)
         if database_model:
             database_model.update_game(game)
             # Mark database as having unsaved changes
@@ -4038,32 +4040,6 @@ Visibility Settings:
             QTimer.singleShot(200, ensure_navigation_and_highlighting)
         
         self.controller.set_status(f"Removed {element_name} from PGN")
-    
-    def _find_database_model_for_game(self, game: GameData) -> Optional[DatabaseModel]:
-        """Find the database model that contains the given game.
-        
-        Args:
-            game: GameData instance to find.
-            
-        Returns:
-            DatabaseModel that contains the game, or None if not found.
-        """
-        # First try the active database
-        database_controller = self.controller.get_database_controller()
-        active_database = database_controller.get_active_database()
-        
-        if active_database and active_database.find_game(game) is not None:
-            return active_database
-        
-        # If not found, search through all databases in the panel model
-        panel_model = database_controller.get_panel_model()
-        if panel_model:
-            all_databases = panel_model.get_all_databases()
-            for identifier, info in all_databases.items():
-                if info.model.find_game(game) is not None:
-                    return info.model
-        
-        return None
     
     def _on_return_to_first_move_toggled(self, checked: bool) -> None:
         """Handle Return to PLY 0 after analysis completes toggle.

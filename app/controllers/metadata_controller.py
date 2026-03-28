@@ -149,25 +149,18 @@ class MetadataController:
     def find_database_model_for_game(self, game: GameData) -> Optional[DatabaseModel]:
         """Find the database model that contains the given game.
         
+        Delegates to DatabaseController when available; otherwise checks the clipboard model only.
+        
         Args:
             game: GameData instance to find.
             
         Returns:
             DatabaseModel that contains the game, or None if not found.
         """
-        # First try the stored database model
+        if self._database_controller:
+            return self._database_controller.find_database_model_for_game(game)
         if self._database_model and self._database_model.find_game(game) is not None:
             return self._database_model
-        
-        # If not found, search through all databases in the panel model
-        if self._database_controller:
-            panel_model = self._database_controller.get_panel_model()
-            if panel_model:
-                all_databases = panel_model.get_all_databases()
-                for identifier, info in all_databases.items():
-                    if info.model.find_game(game) is not None:
-                        return info.model
-        
         return None
     
     def update_metadata_tag(self, tag_name: str, new_value: str) -> bool:

@@ -1,9 +1,12 @@
 """Moves List view for detail panel."""
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTableView, QStyledItemDelegate, QMenu, QApplication
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTableView, QStyledItemDelegate, QMenu, QApplication, QDialog
 from PyQt6.QtCore import Qt, QModelIndex, QTimer, QPoint
 from PyQt6.QtGui import QPalette, QColor, QBrush
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.controllers.database_controller import DatabaseController
 
 from app.utils.table_export import table_to_delimited, get_visual_column_indices, get_copy_table_config
 
@@ -41,6 +44,7 @@ class DetailMovesListView(QWidget):
         self._moveslist_model: Optional[MovesListModel] = None
         self._game_model: Optional[GameModel] = None
         self._game_controller: Optional[GameController] = None
+        self._database_controller: Optional["DatabaseController"] = None
         self._column_profile_model: Optional[ColumnProfileModel] = None
         self._active_move_ply: int = 0
         self._setup_ui()
@@ -57,6 +61,10 @@ class DetailMovesListView(QWidget):
         
         if column_profile_model:
             self.set_column_profile_model(column_profile_model)
+    
+    def set_database_controller(self, controller: Optional["DatabaseController"]) -> None:
+        """Set database controller for persisting PGN edits (update row, mark unsaved)."""
+        self._database_controller = controller
     
     def _setup_ui(self) -> None:
         """Setup the moves list UI."""
@@ -220,8 +228,13 @@ class DetailMovesListView(QWidget):
         # Enable word wrapping in the table view so text wraps within column width
         self.moves_table.setWordWrap(True)
         
-        # Connect click handler to table view
+        # Connect click / double-click handlers
         self.moves_table.clicked.connect(self._on_table_clicked)
+        try:
+            self.moves_table.doubleClicked.disconnect(self._on_table_double_clicked)
+        except (TypeError, RuntimeError):
+            pass
+        self.moves_table.doubleClicked.connect(self._on_table_double_clicked)
     
     def set_game_model(self, model: GameModel) -> None:
         """Set the game model to observe for active move changes.
@@ -232,11 +245,16 @@ class DetailMovesListView(QWidget):
         if self._game_model:
             # Disconnect from old model
             self._game_model.active_move_changed.disconnect(self._on_active_move_changed)
+            try:
+                self._game_model.metadata_updated.disconnect(self._on_metadata_updated_refresh_moves)
+            except (TypeError, RuntimeError):
+                pass
         
         self._game_model = model
         
         # Connect to model signals
         model.active_move_changed.connect(self._on_active_move_changed)
+        model.metadata_updated.connect(self._on_metadata_updated_refresh_moves)
         
         # Set highlight color in moves list model if available
         if self._moveslist_model:
@@ -245,6 +263,23 @@ class DetailMovesListView(QWidget):
         
         # Initialize with current active move if any
         self._on_active_move_changed(model.get_active_move_ply())
+    
+    def _on_metadata_updated_refresh_moves(self) -> None:
+        """Rebuild moves list when PGN changed (e.g. comments, headers)."""
+        if (
+            not self._game_model
+            or not self._game_model.active_game
+            or not self._game_controller
+            or not self._moveslist_model
+        ):
+            return
+        game = self._game_model.active_game
+        current_ply = self._game_model.get_active_move_ply()
+        moves = self._game_controller.extract_moves_from_game(game)
+        self._moveslist_model.clear()
+        for move in moves:
+            self._moveslist_model.add_move(move)
+        self._moveslist_model.set_active_move_ply(current_ply)
     
     def _on_active_move_changed(self, ply_index: int) -> None:
         """Handle active move change from model.
@@ -334,6 +369,69 @@ class DetailMovesListView(QWidget):
                     else:
                         # Fallback: just set active move in model (board won't update)
                         self._game_model.set_active_move_ply(ply_index)
+    
+    def _on_table_double_clicked(self, index: QModelIndex) -> None:
+        """Open comment editor when double-clicking the Comment column."""
+        if not index.isValid() or not self._game_model or not self._game_model.active_game:
+            return
+        if not self._moveslist_model or not self._game_controller:
+            return
+        logical_col = index.column()
+        if logical_col != MovesListModel.COL_COMMENT:
+            return
+        self._open_move_comment_editor(index.row())
+    
+    def open_move_comment_editor(self, row_index: int) -> None:
+        """Open the move-comment dialog for ``row_index`` (moves list row)."""
+        self._open_move_comment_editor(row_index)
+    
+    def _open_move_comment_editor(self, row_index: int) -> None:
+        """Edit main-line comments for the given moves-list row."""
+        if not self._game_model or not self._game_model.active_game or not self._game_controller:
+            return
+        game = self._game_model.active_game
+        read_result = self._game_controller.read_mainline_move_comments(game, row_index)
+        if read_result is None:
+            from app.views.message_dialog import MessageDialog
+            MessageDialog.show_warning(
+                self.config,
+                "Comments",
+                "Could not read comments for this row.",
+                self,
+            )
+            return
+        white_c, black_c, has_black = read_result
+        move_data = self._moveslist_model.get_move(row_index)
+        white_san = (move_data.white_move or "").strip() if move_data else ""
+        black_san = (move_data.black_move or "").strip() if move_data else ""
+        from app.views.move_comment_dialog import MoveCommentDialog
+        
+        dlg = MoveCommentDialog(
+            self.config,
+            row_index + 1,
+            white_san,
+            black_san,
+            white_c,
+            black_c,
+            has_black,
+            self,
+        )
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        new_w, new_b = dlg.get_comments()
+        ok, err = self._game_controller.apply_mainline_move_comments(
+            game, row_index, new_w, new_b
+        )
+        if not ok:
+            from app.views.message_dialog import MessageDialog
+            MessageDialog.show_warning(self.config, "Comments", err, self)
+            return
+        if self._database_controller:
+            db_model = self._database_controller.find_database_model_for_game(game)
+            if db_model:
+                db_model.update_game(game)
+                self._database_controller.mark_database_unsaved(db_model)
+        self._game_model.metadata_updated.emit()
 
     def _on_moves_table_context_menu(self, pos: QPoint) -> None:
         """Show context menu for copy actions at the cell under the cursor."""
@@ -353,6 +451,19 @@ class DetailMovesListView(QWidget):
         copy_value_action = menu.addAction("Copy value")
         copy_value_action.triggered.connect(lambda: self._copy_cell_value(index))
         copy_value_action.setEnabled(index.isValid())
+
+        if index.isValid() and index.column() == MovesListModel.COL_COMMENT:
+            edit_comments_action = menu.addAction("Edit Comments")
+            can_edit_comments = (
+                self._game_model is not None
+                and self._game_model.active_game is not None
+                and self._game_controller is not None
+            )
+            edit_comments_action.setEnabled(can_edit_comments)
+            row = index.row()
+            edit_comments_action.triggered.connect(
+                lambda _checked=False, r=row: self._open_move_comment_editor(r)
+            )
 
         menu.addSeparator()
         menu.addAction("Copy Table as CSV (Visual Columns)").triggered.connect(self._copy_table_csv_visual)

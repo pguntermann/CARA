@@ -18,13 +18,85 @@ def make_ply_sentinel(ply: int) -> str:
     return PGN_PLY_SENTINEL_PREFIX + (_PLY_SENTINEL_ZERO_WIDTH * ply) + PGN_PLY_SENTINEL_SUFFIX
 
 
+# Invisible sentinel for main-line PGN comments (double-click → move row). Distinct from ply sentinels.
+PGN_COMMENT_SENTINEL_PREFIX = "\u2060\u200C"  # word joiner + ZWNJ
+PGN_COMMENT_SENTINEL_SUFFIX = "\u200C\u2060"
+
+
+def make_comment_sentinel(ply: int) -> str:
+    """Return invisible marker encoding 1-based half-move ply for a main-line comment (ply > 0)."""
+    if ply <= 0:
+        return ""
+    return PGN_COMMENT_SENTINEL_PREFIX + (_PLY_SENTINEL_ZERO_WIDTH * ply) + PGN_COMMENT_SENTINEL_SUFFIX
+
+
+# Same SAN pattern as main-line move formatting (must stay in sync).
+PGN_MAINLINE_SAN_PATTERN = re.compile(
+    r"\b("
+    r"(?:[NBRQK]?[a-h]?[1-8]?[x\-]?[a-h][1-8]"
+    r"(?:[=][NBRQ])?"
+    r"(?:[+#]|e\.p\.)?"
+    r")|"
+    r"(?:O-O-O|O-O)"
+    r")(?=\s|$|[!?]|\d|<)"
+)
+
+
+def _parse_comment_sentinel_at(text: str, prefix_at: int) -> Optional[int]:
+    """Decode ply from comment sentinel starting at ``prefix_at``, or None if not a valid sentinel."""
+    n = len(text)
+    p = prefix_at + len(PGN_COMMENT_SENTINEL_PREFIX)
+    zw = 0
+    while p < n and text[p] == _PLY_SENTINEL_ZERO_WIDTH:
+        zw += 1
+        p += 1
+    suf = PGN_COMMENT_SENTINEL_SUFFIX
+    if p + len(suf) > n or text[p : p + len(suf)] != suf:
+        return None
+    return zw if zw > 0 else None
+
+
+def _find_pgn_comment_brace_end(text: str, open_brace_idx: int) -> int:
+    """Return index of closing ``}`` for PGN comment starting at ``open_brace_idx``, or -1."""
+    depth = 0
+    k = open_brace_idx
+    n = len(text)
+    while k < n:
+        if text[k] == "{":
+            depth += 1
+        elif text[k] == "}":
+            depth -= 1
+            if depth == 0:
+                return k
+        k += 1
+    return -1
+
+
+def find_mainline_comment_ply_at_plaintext_position(text: str, position: int) -> Optional[int]:
+    """If ``position`` lies inside a main-line comment with a sentinel, return owning 1-based ply."""
+    if not text or position < 0:
+        return None
+    pos = min(position, len(text) - 1)
+    search_end = pos + 1
+    p = text.rfind(PGN_COMMENT_SENTINEL_PREFIX, 0, search_end)
+    while p != -1:
+        if p > 0 and text[p - 1] == "{":
+            ply = _parse_comment_sentinel_at(text, p)
+            open_idx = p - 1
+            end_idx = _find_pgn_comment_brace_end(text, open_idx)
+            if ply is not None and end_idx != -1 and open_idx <= pos <= end_idx:
+                return ply
+        p = text.rfind(PGN_COMMENT_SENTINEL_PREFIX, 0, p)
+    return None
+
+
 def clean_pgn_text(text: str) -> str:
     """Clean and format PGN text for copying to clipboard.
     
     This function:
     1. Separates metadata tags from move notation (adds CRLF between them)
     2. Applies fixed-width formatting using export config settings
-    3. Removes invisible sentinel characters used for move identification/highlighting
+    3. Removes invisible sentinel characters used for move identification/highlighting and main-line comments
     4. Normalizes line endings to CRLF
     
     Args:
@@ -41,6 +113,8 @@ def clean_pgn_text(text: str) -> str:
     # Pattern matches: PREFIX + (zero or more zero-width spaces) + SUFFIX
     pattern = re.escape(PGN_PLY_SENTINEL_PREFIX) + r'\u200B*' + re.escape(PGN_PLY_SENTINEL_SUFFIX)
     text = re.sub(pattern, '', text)
+    comment_pat = re.escape(PGN_COMMENT_SENTINEL_PREFIX) + r'\u200B*' + re.escape(PGN_COMMENT_SENTINEL_SUFFIX)
+    text = re.sub(comment_pat, '', text)
     
     # Also remove any remaining standalone invisible characters that might have been left
     # This ensures we catch any edge cases where sentinels might be malformed
@@ -1039,6 +1113,86 @@ class PgnFormatterService:
         return result.strip()
     
     @staticmethod
+    def _mainline_ply_for_comment_open_brace(
+        formatted: str, open_brace_idx: int, header_color: Tuple[int, int, int]
+    ) -> Optional[int]:
+        """Count completed main-line half-moves before ``{`` at ``open_brace_idx`` (SECOND-pass string)."""
+        if open_brace_idx < 0 or open_brace_idx >= len(formatted) or formatted[open_brace_idx] != "{":
+            return None
+        header_marker = f"color: rgb({header_color[0]}, {header_color[1]}, {header_color[2]})"
+        move_num_pattern = re.compile(r"(?<![0-9])(?<![a-zA-Z])(\s*\d+\.\s*)")
+        i = 0
+        in_header_span = False
+        pgn_comment_depth = 0
+        var_depth = 0
+        mainline_ply = 0
+        limit = open_brace_idx
+        while i < limit:
+            c = formatted[i]
+            if c == "<":
+                if i + 7 <= len(formatted) and formatted[i : i + 7] == "</span>":
+                    if in_header_span:
+                        in_header_span = False
+                    i += 7
+                    continue
+                tag_end = formatted.find(">", i)
+                if tag_end == -1:
+                    i += 1
+                    continue
+                tag = formatted[i : tag_end + 1]
+                if tag.startswith("<span") and header_marker in tag:
+                    in_header_span = True
+                i = tag_end + 1
+                continue
+            if in_header_span:
+                i += 1
+                continue
+            if pgn_comment_depth > 0:
+                if c == "{":
+                    pgn_comment_depth += 1
+                elif c == "}":
+                    pgn_comment_depth -= 1
+                i += 1
+                continue
+            if c == "{":
+                pgn_comment_depth = 1
+                i += 1
+                continue
+            if var_depth > 0:
+                if c == "(":
+                    var_depth += 1
+                elif c == ")":
+                    var_depth -= 1
+                i += 1
+                continue
+            if c == "(":
+                var_depth += 1
+                i += 1
+                continue
+            rest = formatted[i:limit]
+            if rest and rest[0].isdigit():
+                bdm = re.match(r"\d+\.\.\.\s*", rest)
+                if bdm:
+                    i += bdm.end()
+                    continue
+            mn = move_num_pattern.match(formatted, i)
+            if mn and mn.start() == i:
+                i = mn.end()
+                continue
+            if not (i > 0 and formatted[i - 1].isdigit()):
+                sm = PGN_MAINLINE_SAN_PATTERN.match(formatted, i)
+                if sm:
+                    mainline_ply += 1
+                    i = sm.end()
+                    continue
+            i += 1
+        if var_depth != 0 or pgn_comment_depth != 0:
+            return None
+        if mainline_ply <= 0:
+            return None
+        return mainline_ply
+    
+    @staticmethod
     def format_pgn_to_html(pgn_text: str, config: Dict[str, Any], active_move_ply: int = 0, pgn_notation_settings: Optional[Dict[str, Any]] = None) -> Tuple[str, List[Tuple[str, int, bool]]]:
         """Format plain PGN text to HTML with colors and styles.
         
@@ -1261,6 +1415,11 @@ class PgnFormatterService:
                         if depth == 0:
                             end = j + 1
                             comment_text = formatted[start:end]
+                            ply_own = PgnFormatterService._mainline_ply_for_comment_open_brace(
+                                formatted, start, (int(header_color[0]), int(header_color[1]), int(header_color[2]))
+                            )
+                            if ply_own is not None:
+                                comment_text = "{" + make_comment_sentinel(ply_own) + comment_text[1:]
                             result_parts.append(span(comment_text, comment_color, italic=comment_italic))
                             i = end
                             found_end = True
@@ -1501,20 +1660,7 @@ class PgnFormatterService:
         move_color = moves_config.get('color', default_color)  # Default to text_color if not specified
         move_bold = moves_config.get('bold', False)
         
-        # Pattern to match move SANs in mainline (not in variations, comments, or headers)
-        # Move SAN pattern: piece (optional), source square (optional), capture (optional), destination, promotion (optional), check/mate (optional)
-        # This matches moves like: e4, Nf3, O-O, Qxd1, e8=Q, e4+, e4#
-        # Must be a word boundary to avoid matching parts of other text
-        move_san_pattern = re.compile(
-            r'\b('
-            r'(?:[NBRQK]?[a-h]?[1-8]?[x\-]?[a-h][1-8]'  # Standard moves: piece, source, capture, dest
-            r'(?:[=][NBRQ])?'  # Promotion
-            r'(?:[+#]|e\.p\.)?'  # Check, mate, or en passant
-            r')|'
-            r'(?:O-O-O|O-O)'  # Castling: try long (O-O-O) before short (O-O) so one SAN gets one sentinel
-            r')(?=\s|$|[!?]|\d|<)'  # Followed by space, end, !?, digit, or < (HTML tag, e.g. "O-O-O<span> 14.")
-        )
-        
+        # Main-line SAN pattern (shared with comment-ply scanner; see PGN_MAINLINE_SAN_PATTERN).
         result_parts = []
         i = 0
         in_tag = False
@@ -1592,7 +1738,7 @@ class PgnFormatterService:
                 # Only format if we're not inside a variation, header, comment, or NAG span
                 # Also skip if we're right after a move number (which is already formatted)
                 # Check if previous character is part of a formatted move number span
-                match = move_san_pattern.search(formatted, i)
+                match = PGN_MAINLINE_SAN_PATTERN.search(formatted, i)
                 if match and match.start() == i:
                     # Found a potential move SAN - verify it's not part of already-formatted content
                     # Check if we're immediately after a closing span tag (could be a move number)

@@ -17,6 +17,56 @@ from app.utils.pgn_tag_compression import (
     compute_checksum,
 )
 
+# MoveData / JSON keys copied from CARAAnalysisData onto PGN-built rows during merge.
+# SAN, comments, eco, opening, captures, material, FEN, piece counts always come from PGN extraction.
+CARA_ANALYSIS_OVERLAY_FIELD_KEYS: frozenset[str] = frozenset(
+    {
+        "eval_white",
+        "eval_black",
+        "cpl_white",
+        "cpl_black",
+        "cpl_white_2",
+        "cpl_white_3",
+        "cpl_black_2",
+        "cpl_black_3",
+        "assess_white",
+        "assess_black",
+        "best_white",
+        "best_black",
+        "best_white_2",
+        "best_white_3",
+        "best_black_2",
+        "best_black_3",
+        "white_is_top3",
+        "black_is_top3",
+        "white_depth",
+        "black_depth",
+        "white_seldepth",
+        "black_seldepth",
+    }
+)
+
+
+def merge_cara_analysis_overlay_onto_base(
+    base_moves: List[MoveData],
+    stored_moves: List[MoveData],
+) -> None:
+    """Copy engine/analysis fields from stored snapshot onto PGN-derived rows (in place)."""
+    if not base_moves or not stored_moves:
+        return
+    if len(base_moves) != len(stored_moves):
+        logging_service = LoggingService.get_instance()
+        logging_service.warning(
+            f"CARAAnalysisData row count ({len(stored_moves)}) differs from PGN-derived moves "
+            f"({len(base_moves)}); merging analysis overlay only for the common prefix."
+        )
+    n = min(len(base_moves), len(stored_moves))
+    for i in range(n):
+        base = base_moves[i]
+        stored = stored_moves[i]
+        for key in CARA_ANALYSIS_OVERLAY_FIELD_KEYS:
+            setattr(base, key, getattr(stored, key))
+
 
 class AnalysisDataStorageService:
     """Service for storing and loading game analysis results in PGN tags.

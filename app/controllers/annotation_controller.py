@@ -439,8 +439,7 @@ class AnnotationController:
             
             # Update database model to persist the change and mark as unsaved
             if self.database_controller:
-                # Find the database model that contains this game
-                database_model = self._find_database_model_for_game(game)
+                database_model = self.database_controller.find_database_model_for_game(game)
                 if database_model:
                     # Update the game in the database model
                     database_model.update_game(game)
@@ -459,36 +458,9 @@ class AnnotationController:
             return
         
         game = self.game_model.active_game
-        database_model = self._find_database_model_for_game(game)
+        database_model = self.database_controller.find_database_model_for_game(game)
         if database_model:
             self.database_controller.mark_database_unsaved(database_model)
-    
-    def _find_database_model_for_game(self, game: GameData) -> Optional[Any]:
-        """Find the database model that contains the given game.
-        
-        Args:
-            game: GameData instance to find.
-            
-        Returns:
-            DatabaseModel that contains the game, or None if not found.
-        """
-        if not self.database_controller or not game:
-            return None
-        
-        # First try the active database
-        active_database = self.database_controller.get_active_database()
-        if active_database and active_database.find_game(game) is not None:
-            return active_database
-        
-        # If not found, search through all databases in the panel model
-        panel_model = self.database_controller.get_panel_model()
-        if panel_model:
-            all_databases = panel_model.get_all_databases()
-            for identifier, info in all_databases.items():
-                if info.model.find_game(game) is not None:
-                    return info.model
-        
-        return None
     
     def get_square_from_coords(self, x: float, y: float) -> Optional[str]:
         """Convert board coordinates to chess square.

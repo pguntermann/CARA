@@ -1,6 +1,6 @@
 """Game controller for managing active game operations."""
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
 
 import chess
@@ -14,6 +14,49 @@ from app.utils.material_tracker import get_captured_piece_letter, calculate_mate
 from app.controllers.board_controller import BoardController
 from app.services.opening_service import OpeningService
 from app.services.logging_service import LoggingService
+from app.services.pgn_service import PgnService
+
+
+def _normalize_pgn_comment_text(text: str) -> str:
+    """Collapse whitespace for safe PGN comment storage."""
+    return " ".join((text or "").replace("\r\n", " ").replace("\n", " ").split())
+
+
+def _pgn_child_node_comment_joined(node: chess.pgn.ChildNode) -> str:
+    """Single string for editing: python-chess stores move comments on ``ChildNode.comments`` (list)."""
+    parts = getattr(node, "comments", None) or []
+    pieces = [str(p).strip() for p in parts if str(p).strip()]
+    return " ".join(pieces)
+
+
+def _set_pgn_child_node_comment(node: chess.pgn.ChildNode, text: str) -> None:
+    norm = _normalize_pgn_comment_text(text)
+    if norm:
+        node.comments = [norm]
+    else:
+        node.comments = []
+
+
+def _mainline_white_child_for_row(
+    chess_game: chess.pgn.Game, row_index: int
+) -> Optional[Tuple[chess.pgn.ChildNode, bool]]:
+    """Locate the main-line child node after White's move for the given row (0-based full-move index).
+
+    Returns:
+        (node_after_white_move, has_black_reply) or None if row is out of range.
+    """
+    node: chess.pgn.GameNode = chess_game
+    move_number = 0
+    while node.variations:
+        next_node = node.variation(0)
+        board_before = node.board()
+        if board_before.turn == chess.WHITE:
+            move_number += 1
+            if move_number - 1 == row_index:
+                has_black = bool(next_node.variations)
+                return (next_node, has_black)
+        node = next_node
+    return None
 
 
 @dataclass
@@ -117,8 +160,9 @@ class GameController:
             return
         if moves_list_model is not None:
             current_ply = self.game_model.get_active_move_ply()
+            merged_moves = self.extract_moves_from_game(active_game)
             moves_list_model.clear()
-            for move in stored_moves:
+            for move in merged_moves:
                 moves_list_model.add_move(move)
             moves_list_model.set_active_move_ply(current_ply)
         self.game_model.set_is_game_analyzed(True)
@@ -718,37 +762,108 @@ class GameController:
         )
     
     def extract_moves_from_game(self, game: Optional[GameData]) -> List[MoveData]:
-        """Extract moves and comments from a game's PGN.
+        """Extract moves from PGN main line; merge engine fields from CARAAnalysisData when present.
         
-        This method parses the PGN and extracts move information including
-        move numbers, white/black moves, and comments.
-        If analysis data is stored in a PGN tag, it will be loaded and merged.
-        
-        Args:
-            game: GameData instance to extract moves from, or None.
-            
-        Returns:
-            List of MoveData instances with moves and comments populated.
-            If analysis data exists in PGN tag, analysis fields will be populated.
+        Move text, comments, ECO/opening, material, and FEN always come from PGN parsing.
+        Eval/CPL/assessment/best-move/depth fields are overlaid from the analysis tag when valid.
         """
         if game is None:
             return []
-        
-        # First, try to load analysis data from PGN tag
-        from app.services.analysis_data_storage_service import AnalysisDataStorageService
+
+        base_moves = self._extract_moves_from_pgn_only(game)
+
+        from app.services.analysis_data_storage_service import (
+            AnalysisDataStorageService,
+            merge_cara_analysis_overlay_onto_base,
+        )
+
+        stored_moves: Optional[List[MoveData]] = None
         try:
             stored_moves = AnalysisDataStorageService.load_analysis_data(game)
-            
-            # If analysis data exists, return it (it already contains all move data)
-            if stored_moves:
-                return stored_moves
-        except ValueError as e:
-            # Decompression error - show warning message
+        except ValueError:
             from app.services.progress_service import ProgressService
-            progress_service = ProgressService.get_instance()
-            progress_service.set_status("Warning: Analysis data could not be restored (corrupted or invalid)")
-            # Continue to parse PGN normally
-        
+            ProgressService.get_instance().set_status(
+                "Warning: Analysis data could not be restored (corrupted or invalid)"
+            )
+            stored_moves = None
+
+        if base_moves and stored_moves:
+            merge_cara_analysis_overlay_onto_base(base_moves, stored_moves)
+
+        return base_moves
+
+    def read_mainline_move_comments(
+        self, game: GameData, row_index: int
+    ) -> Optional[Tuple[str, str, bool]]:
+        """Read comments on the main line after White's and Black's half-moves for one row.
+
+        Args:
+            game: Active game (PGN source).
+            row_index: 0-based full-move row (same as moves list row).
+
+        Returns:
+            (white_comment, black_comment, has_black_half_move) or None if unavailable.
+        """
+        if row_index < 0 or not game or not (game.pgn or "").strip():
+            return None
+        try:
+            chess_game = chess.pgn.read_game(io.StringIO(game.pgn))
+            if chess_game is None:
+                return None
+            loc = _mainline_white_child_for_row(chess_game, row_index)
+            if loc is None:
+                return None
+            wnode, has_black = loc
+            white_c = _pgn_child_node_comment_joined(wnode)
+            black_c = ""
+            if has_black:
+                black_c = _pgn_child_node_comment_joined(wnode.variation(0))
+            return (white_c, black_c, has_black)
+        except Exception as e:
+            LoggingService.get_instance().error(
+                f"read_mainline_move_comments: {e}", exc_info=e
+            )
+            return None
+
+    def apply_mainline_move_comments(
+        self, game: GameData, row_index: int, white_comment: str, black_comment: str
+    ) -> Tuple[bool, str]:
+        """Set main-line comments for one row; rewrite ``game.pgn`` and refresh CARAAnalysisData if present.
+
+        Black's comment is applied only when a black half-move exists on the main line.
+        """
+        if row_index < 0 or not game or not (game.pgn or "").strip():
+            return False, "No PGN to edit."
+        try:
+            chess_game = chess.pgn.read_game(io.StringIO(game.pgn))
+            if chess_game is None:
+                return False, "Could not parse PGN."
+            loc = _mainline_white_child_for_row(chess_game, row_index)
+            if loc is None:
+                return False, "Move row is out of range."
+            wnode, has_black = loc
+            _set_pgn_child_node_comment(wnode, white_comment)
+            if has_black:
+                _set_pgn_child_node_comment(wnode.variation(0), black_comment)
+            game.pgn = PgnService.export_game_to_pgn(chess_game)
+
+            from app.services.analysis_data_storage_service import AnalysisDataStorageService
+
+            if AnalysisDataStorageService.has_analysis_data(game):
+                moves = self.extract_moves_from_game(game)
+                if moves:
+                    AnalysisDataStorageService.store_analysis_data(
+                        game, moves, self.config
+                    )
+            return True, ""
+        except Exception as e:
+            LoggingService.get_instance().error(
+                f"apply_mainline_move_comments: {e}", exc_info=e
+            )
+            return False, str(e) if str(e) else "Failed to update comments."
+
+    def _extract_moves_from_pgn_only(self, game: GameData) -> List[MoveData]:
+        """Build MoveData rows from game.pgn main line only (no CARAAnalysisData)."""
         moves: List[MoveData] = []
         
         try:

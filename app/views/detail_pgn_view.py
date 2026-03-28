@@ -6,7 +6,12 @@ from PyQt6.QtCore import Qt, QRegularExpression
 from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING, Callable
 import re
 
-from app.services.pgn_formatter_service import PgnFormatterService, make_ply_sentinel, clean_pgn_text
+from app.services.pgn_formatter_service import (
+    PgnFormatterService,
+    make_ply_sentinel,
+    clean_pgn_text,
+    find_mainline_comment_ply_at_plaintext_position,
+)
 from app.models.game_model import GameModel
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.views.style.style_manager import StyleManager
@@ -27,6 +32,7 @@ class ClickablePgnTextEdit(QTextEdit):
         super().__init__(parent)
         self._click_handler: Optional[Callable[[int], int]] = None
         self._move_checker: Optional[Callable[[int], int]] = None
+        self._comment_double_click_handler: Optional[Callable[[int], bool]] = None
         
         # Install a shortcut to override default Ctrl+C behavior
         # This ensures our custom copy() method is called even if Qt handles the shortcut
@@ -51,6 +57,21 @@ class ClickablePgnTextEdit(QTextEdit):
             checker: Function that takes a document position and returns ply index (or 0 if no move).
         """
         self._move_checker = checker
+    
+    def set_comment_double_click_handler(self, handler: Optional[Callable[[int], bool]]) -> None:
+        """Set handler for left double-clicks on PGN comment text (returns True if handled)."""
+        self._comment_double_click_handler = handler
+    
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+        if (
+            event.button() == Qt.MouseButton.LeftButton
+            and self._comment_double_click_handler
+        ):
+            cursor = self.cursorForPosition(event.pos())
+            if self._comment_double_click_handler(cursor.position()):
+                event.accept()
+                return
+        super().mouseDoubleClickEvent(event)
     
     def mousePressEvent(self, event: QMouseEvent) -> None:
         """Handle mouse click to navigate to clicked move.
@@ -215,6 +236,7 @@ class DetailPgnView(QWidget):
         self._show_results: bool = True  # Whether to show results in PGN view
         self._show_non_standard_tags: bool = False  # Whether to show non-standard tags like [%evp], [%mdl] in comments
         self._pgn_notation_settings: Dict[str, Any] = {}  # PGN notation settings (use_symbols_for_nags, show_nag_text)
+        self._open_move_comment_row: Optional[Callable[[int], None]] = None
         self._setup_ui()
         
         # Load initial PGN notation settings from user settings
@@ -253,6 +275,7 @@ class DetailPgnView(QWidget):
         self.pgn_text.set_click_handler(self._handle_pgn_click)
         # Set move checker for cursor changes (without navigating)
         self.pgn_text.set_move_checker(self._find_mainline_move_at_position)
+        self.pgn_text.set_comment_double_click_handler(self._handle_pgn_comment_double_click)
         
         # Configure PGN text styling
         pgn_font_family = resolve_font_family(pgn_config.get('font_family', 'Courier New'))
@@ -452,6 +475,12 @@ class DetailPgnView(QWidget):
         """
         self._game_controller = controller
     
+    def set_open_move_comment_row_callback(
+        self, callback: Optional[Callable[[int], None]]
+    ) -> None:
+        """Register callback (moves-list row index) to open the move-comment editor from the PGN pane."""
+        self._open_move_comment_row = callback
+    
     def _on_active_move_changed(self, ply_index: int) -> None:
         """Handle active move change from model.
         
@@ -641,6 +670,26 @@ class DetailPgnView(QWidget):
             Current PGN text content.
         """
         return self._current_pgn_text if self._current_pgn_text else self.pgn_text.toPlainText()
+    
+    def _moves_list_row_for_pgn_comment_at_position(self, position: int) -> Optional[int]:
+        """Map a document position inside a main-line comment to moves-list row (0-based)."""
+        if not self._show_comments:
+            return None
+        document = self.pgn_text.document()
+        if not document or position < 0 or position >= document.characterCount():
+            return None
+        plain = document.toPlainText()
+        ply = find_mainline_comment_ply_at_plaintext_position(plain, position)
+        if ply is None:
+            return None
+        return (ply - 1) // 2
+    
+    def _handle_pgn_comment_double_click(self, position: int) -> bool:
+        row = self._moves_list_row_for_pgn_comment_at_position(position)
+        if row is None or self._open_move_comment_row is None:
+            return False
+        self._open_move_comment_row(row)
+        return True
     
     def _handle_pgn_click(self, click_pos: int) -> int:
         """Handle click on PGN text at given position.

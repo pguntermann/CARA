@@ -289,6 +289,7 @@ class DetailPanel(QWidget):
         self.moveslist_model = MovesListModel()
         self.moves_view = DetailMovesListView(self.config, self.moveslist_model, game_controller=self._game_controller)
         self.tab_widget.addTab(self.moves_view, "Moves List")
+        self.pgn_view.set_open_move_comment_row_callback(self.moves_view.open_move_comment_editor)
         
         # Metadata tab - initialize with empty model for now
         # Game model will be connected in set_game_model
