@@ -18,6 +18,7 @@ from typing import Optional, Dict, Any
 
 from app.controllers.bulk_clean_pgn_controller import BulkCleanPgnController
 from app.models.database_model import DatabaseModel
+from app.utils.bulk_operation_summary import format_bulk_operation_summary_html
 from app.utils.path_display_utils import truncate_path_for_display, truncate_text_middle
 
 
@@ -545,9 +546,7 @@ class BulkCleanPgnDialog(QDialog):
         MessageDialog.show_information(
             self.config,
             "Bulk Clean PGN Complete",
-            f"Processed {result.games_processed} game(s).<br>"
-            f"Updated {result.games_updated} game(s).<br>"
-            f"Failed {result.games_failed} game(s).",
+            format_bulk_operation_summary_html(result),
             self
         )
         

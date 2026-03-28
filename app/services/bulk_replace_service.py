@@ -7,26 +7,15 @@ import chess.pgn
 from io import StringIO
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Callable, Tuple
-from dataclasses import dataclass
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from app.models.database_model import DatabaseModel, GameData
+from app.services.bulk_operation_stats import BulkOperationStats, BulkProcessingOutcome
 from app.services.uci_communication_service import UCICommunicationService
 from app.services.opening_service import OpeningService
 from app.services.pgn_service import PgnService
 from app.services.logging_service import LoggingService
 from app.utils.concurrency_utils import get_process_pool_max_workers
-
-
-@dataclass
-class BulkReplaceResult:
-    """Result of a bulk replace operation."""
-    success: bool
-    games_processed: int
-    games_updated: int
-    games_failed: int
-    games_skipped: int
-    error_message: Optional[str] = None
 
 
 def _process_game_for_replace_multiple_tags(
@@ -37,29 +26,15 @@ def _process_game_for_replace_multiple_tags(
     case_sensitive: bool,
     use_regex: bool,
     overwrite_all: bool
-) -> Tuple[Optional[str], Dict[str, str], bool]:
-    """Process a single game for multiple tag replacements (for parallel execution).
-    
-    Args:
-        game_pgn: PGN string of the game.
-        tag_names: List of PGN tag names to replace.
-        find_text: Text to find.
-        replace_text: Text to replace with.
-        case_sensitive: If True, match case exactly.
-        use_regex: If True, treat find_text as regex pattern.
-        overwrite_all: If True, replace any value with replace_text.
-        
-    Returns:
-        Tuple of (new_pgn, field_values_dict, updated) or (None, {}, False) if failed/skipped.
-        field_values_dict maps tag names to their new field values (for tags that map to GameData fields).
-    """
+) -> Tuple[Optional[str], Dict[str, str], BulkProcessingOutcome]:
+    """Process a single game for multiple tag replacements (for parallel execution)."""
     try:
         # Parse PGN once
         pgn_io = StringIO(game_pgn)
         chess_game = chess.pgn.read_game(pgn_io)
         
         if not chess_game:
-            return (None, {}, False)
+            return (None, {}, BulkProcessingOutcome.FAILED)
         
         updated = False
         field_values: Dict[str, str] = {}
@@ -129,12 +104,12 @@ def _process_game_for_replace_multiple_tags(
         if updated:
             # Regenerate PGN once for all changes
             new_pgn = PgnService.export_game_to_pgn(chess_game)
-            return (new_pgn, field_values, True)
+            return (new_pgn, field_values, BulkProcessingOutcome.UPDATED)
         
-        return (None, {}, False)
+        return (None, {}, BulkProcessingOutcome.SKIPPED)
         
     except Exception:
-        return (None, {}, False)
+        return (None, {}, BulkProcessingOutcome.FAILED)
 
 
 def _process_game_for_replace_tag(
@@ -145,28 +120,15 @@ def _process_game_for_replace_tag(
     case_sensitive: bool,
     use_regex: bool,
     overwrite_all: bool
-) -> Tuple[Optional[str], Optional[str], bool]:
-    """Process a single game for tag replacement (for parallel execution).
-    
-    Args:
-        game_pgn: PGN string of the game.
-        tag_name: PGN tag name to replace.
-        find_text: Text to find.
-        replace_text: Text to replace with.
-        case_sensitive: If True, match case exactly.
-        use_regex: If True, treat find_text as regex pattern.
-        overwrite_all: If True, replace any value with replace_text.
-        
-    Returns:
-        Tuple of (new_pgn, new_field_value, updated) or (None, None, False) if failed/skipped.
-    """
+) -> Tuple[Optional[str], Optional[str], BulkProcessingOutcome]:
+    """Process a single game for tag replacement (for parallel execution)."""
     try:
         # Parse PGN
         pgn_io = StringIO(game_pgn)
         chess_game = chess.pgn.read_game(pgn_io)
         
         if not chess_game:
-            return (None, None, False)
+            return (None, None, BulkProcessingOutcome.FAILED)
         
         # Get current tag value
         current_value = chess_game.headers.get(tag_name, "")
@@ -185,7 +147,7 @@ def _process_game_for_replace_tag(
                     should_update = False
                     new_value = current_value
             except re.error:
-                return (None, None, False)
+                return (None, None, BulkProcessingOutcome.FAILED)
         else:
             if case_sensitive:
                 if find_text in current_value:
@@ -229,44 +191,33 @@ def _process_game_for_replace_tag(
                 
                 field_value = new_value if tag_name in tag_to_field_mapping else None
                 
-                return (new_pgn, field_value, True)
+                return (new_pgn, field_value, BulkProcessingOutcome.UPDATED)
         
-        return (None, None, False)
+        return (None, None, BulkProcessingOutcome.SKIPPED)
         
     except Exception:
-        return (None, None, False)
+        return (None, None, BulkProcessingOutcome.FAILED)
 
 
 def _process_game_for_copy_multiple_tags(
     game_pgn: str,
     target_tags: List[str],
     source_tag: str
-) -> Tuple[Optional[str], Dict[str, str], bool]:
-    """Process a single game for multiple tag copying (for parallel execution).
-    
-    Args:
-        game_pgn: PGN string of the game.
-        target_tags: List of PGN tag names to update.
-        source_tag: PGN tag name to copy from.
-        
-    Returns:
-        Tuple of (new_pgn, field_values_dict, updated) or (None, {}, False) if failed/skipped.
-        field_values_dict maps tag names to their new field values (for tags that map to GameData fields).
-    """
+) -> Tuple[Optional[str], Dict[str, str], BulkProcessingOutcome]:
+    """Process a single game for multiple tag copying (for parallel execution)."""
     try:
         # Parse PGN once
         pgn_io = StringIO(game_pgn)
         chess_game = chess.pgn.read_game(pgn_io)
         
         if not chess_game:
-            return (None, {}, False)
+            return (None, {}, BulkProcessingOutcome.FAILED)
         
         # Get source tag value
         source_value = chess_game.headers.get(source_tag, "")
         
         if not source_value:
-            # No source value to copy
-            return (None, {}, False)
+            return (None, {}, BulkProcessingOutcome.SKIPPED)
         
         updated = False
         field_values: Dict[str, str] = {}
@@ -302,36 +253,27 @@ def _process_game_for_copy_multiple_tags(
         if updated:
             # Regenerate PGN once for all changes
             new_pgn = PgnService.export_game_to_pgn(chess_game)
-            return (new_pgn, field_values, True)
+            return (new_pgn, field_values, BulkProcessingOutcome.UPDATED)
         
-        return (None, {}, False)
+        return (None, {}, BulkProcessingOutcome.SKIPPED)
         
     except Exception:
-        return (None, {}, False)
+        return (None, {}, BulkProcessingOutcome.FAILED)
 
 
 def _process_game_for_copy_tag(
     game_pgn: str,
     target_tag: str,
     source_tag: str
-) -> Tuple[Optional[str], Optional[str], bool]:
-    """Process a single game for tag copying (for parallel execution).
-    
-    Args:
-        game_pgn: PGN string of the game.
-        target_tag: PGN tag name to update.
-        source_tag: PGN tag name to copy from.
-        
-    Returns:
-        Tuple of (new_pgn, new_field_value, updated) or (None, None, False) if failed/skipped.
-    """
+) -> Tuple[Optional[str], Optional[str], BulkProcessingOutcome]:
+    """Process a single game for tag copying (for parallel execution)."""
     try:
         # Parse PGN
         pgn_io = StringIO(game_pgn)
         chess_game = chess.pgn.read_game(pgn_io)
         
         if not chess_game:
-            return (None, None, False)
+            return (None, None, BulkProcessingOutcome.FAILED)
         
         # Get source tag value
         source_value = chess_game.headers.get(source_tag, "")
@@ -339,8 +281,10 @@ def _process_game_for_copy_tag(
         # Get current target tag value
         current_value = chess_game.headers.get(target_tag, "")
         
-        # Only update if source has a value and it's different from current
-        if source_value and source_value != current_value:
+        if not source_value:
+            return (None, None, BulkProcessingOutcome.SKIPPED)
+        
+        if source_value != current_value:
             # Update target tag
             chess_game.headers[target_tag] = source_value
             
@@ -363,12 +307,12 @@ def _process_game_for_copy_tag(
             
             field_value = source_value if target_tag in tag_to_field_mapping else None
             
-            return (new_pgn, field_value, True)
+            return (new_pgn, field_value, BulkProcessingOutcome.UPDATED)
         
-        return (None, None, False)
+        return (None, None, BulkProcessingOutcome.SKIPPED)
         
     except Exception:
-        return (None, None, False)
+        return (None, None, BulkProcessingOutcome.FAILED)
 
 
 class BulkReplaceService:
@@ -394,7 +338,7 @@ class BulkReplaceService:
         game_indices: Optional[List[int]] = None,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
         cancellation_check: Optional[Callable[[], bool]] = None
-    ) -> BulkReplaceResult:
+    ) -> BulkOperationStats:
         """Replace text in metadata tags.
         
         Args:
@@ -410,7 +354,7 @@ class BulkReplaceService:
             cancellation_check: Optional function that returns True if operation should be cancelled.
             
         Returns:
-            BulkReplaceResult with operation statistics.
+            BulkOperationStats with operation statistics.
         """
         games = database.get_all_games()
         
@@ -426,7 +370,7 @@ class BulkReplaceService:
         if total_games == 0:
             if progress_callback:
                 progress_callback(0, 0, "No games to process")
-            return BulkReplaceResult(
+            return BulkOperationStats(
                 success=True,
                 games_processed=0,
                 games_updated=0,
@@ -439,7 +383,7 @@ class BulkReplaceService:
             try:
                 re.compile(find_text, 0 if case_sensitive else re.IGNORECASE)
             except re.error as e:
-                return BulkReplaceResult(
+                return BulkOperationStats(
                     success=False,
                     games_processed=0,
                     games_updated=0,
@@ -455,8 +399,10 @@ class BulkReplaceService:
         updated_games = []
         games_updated = 0
         games_failed = 0
+        games_skipped = 0
         
         executor = None
+        completed = 0
         try:
             executor = ProcessPoolExecutor(max_workers=max_workers)
             
@@ -475,8 +421,6 @@ class BulkReplaceService:
                 for game in games_to_process
             }
             
-            # Process results as they complete
-            completed = 0
             tag_to_field_mapping = {
                 "White": "white",
                 "Black": "black",
@@ -505,22 +449,21 @@ class BulkReplaceService:
                     progress_callback(completed, total_games, f"Processing game {completed}/{total_games}")
                 
                 try:
-                    new_pgn, new_field_value, updated = future.result()
+                    new_pgn, new_field_value, outcome = future.result()
                     
-                    if updated and new_pgn:
-                        # Update game data
-                        game.pgn = new_pgn
-                        
-                        # Update corresponding GameData fields if tag maps to a field
-                        if tag_name in tag_to_field_mapping and new_field_value is not None:
-                            field_name = tag_to_field_mapping[tag_name]
-                            setattr(game, field_name, new_field_value)
-                        
-                        # Collect game for batch update
-                        updated_games.append(game)
-                        games_updated += 1
-                    elif new_pgn is None and updated is False:
-                        # Processing failed
+                    if outcome == BulkProcessingOutcome.UPDATED:
+                        if new_pgn:
+                            game.pgn = new_pgn
+                            if tag_name in tag_to_field_mapping and new_field_value is not None:
+                                field_name = tag_to_field_mapping[tag_name]
+                                setattr(game, field_name, new_field_value)
+                            updated_games.append(game)
+                            games_updated += 1
+                        else:
+                            games_failed += 1
+                    elif outcome == BulkProcessingOutcome.SKIPPED:
+                        games_skipped += 1
+                    else:
                         games_failed += 1
                 except Exception:
                     games_failed += 1
@@ -536,14 +479,17 @@ class BulkReplaceService:
         # Log bulk replace operation (replace_metadata_tag)
         logging_service = LoggingService.get_instance()
         tags_str = tag_name
-        logging_service.info(f"Bulk replace operation completed: tags=[{tags_str}], pattern={find_text[:50] if find_text else 'overwrite_all'}, games_processed={total_games}, games_updated={games_updated}, games_failed={games_failed}")
+        logging_service.info(
+            f"Bulk replace operation completed: tags=[{tags_str}], pattern={find_text[:50] if find_text else 'overwrite_all'}, "
+            f"games_processed={completed}, games_updated={games_updated}, games_failed={games_failed}, games_skipped={games_skipped}"
+        )
         
-        return BulkReplaceResult(
+        return BulkOperationStats(
             success=True,
-            games_processed=total_games,
+            games_processed=completed,
             games_updated=games_updated,
             games_failed=games_failed,
-            games_skipped=0
+            games_skipped=games_skipped
         )
     
     def replace_metadata_tags(
@@ -558,7 +504,7 @@ class BulkReplaceService:
         game_indices: Optional[List[int]] = None,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
         cancellation_check: Optional[Callable[[], bool]] = None
-    ) -> BulkReplaceResult:
+    ) -> BulkOperationStats:
         """Replace text in multiple metadata tags in a single pass.
         
         This method processes each game once and updates all selected tags,
@@ -577,10 +523,10 @@ class BulkReplaceService:
             cancellation_check: Optional function that returns True if operation should be cancelled.
             
         Returns:
-            BulkReplaceResult with operation statistics.
+            BulkOperationStats with operation statistics.
         """
         if not tag_names:
-            return BulkReplaceResult(
+            return BulkOperationStats(
                 success=False,
                 games_processed=0,
                 games_updated=0,
@@ -603,7 +549,7 @@ class BulkReplaceService:
         if total_games == 0:
             if progress_callback:
                 progress_callback(0, 0, "No games to process")
-            return BulkReplaceResult(
+            return BulkOperationStats(
                 success=True,
                 games_processed=0,
                 games_updated=0,
@@ -616,7 +562,7 @@ class BulkReplaceService:
             try:
                 re.compile(find_text, 0 if case_sensitive else re.IGNORECASE)
             except re.error as e:
-                return BulkReplaceResult(
+                return BulkOperationStats(
                     success=False,
                     games_processed=0,
                     games_updated=0,
@@ -632,8 +578,10 @@ class BulkReplaceService:
         updated_games = []
         games_updated = 0
         games_failed = 0
+        games_skipped = 0
         
         executor = None
+        completed = 0
         try:
             executor = ProcessPoolExecutor(max_workers=max_workers)
             
@@ -652,8 +600,6 @@ class BulkReplaceService:
                 for game in games_to_process
             }
             
-            # Process results as they complete
-            completed = 0
             tag_to_field_mapping = {
                 "White": "white",
                 "Black": "black",
@@ -682,23 +628,22 @@ class BulkReplaceService:
                     progress_callback(completed, total_games, f"Processing game {completed}/{total_games}")
                 
                 try:
-                    new_pgn, field_values_dict, updated = future.result()
+                    new_pgn, field_values_dict, outcome = future.result()
                     
-                    if updated and new_pgn:
-                        # Update game data
-                        game.pgn = new_pgn
-                        
-                        # Update corresponding GameData fields if tags map to fields
-                        for tag_name, field_value in field_values_dict.items():
-                            if tag_name in tag_to_field_mapping:
-                                field_name = tag_to_field_mapping[tag_name]
-                                setattr(game, field_name, field_value)
-                        
-                        # Collect game for batch update
-                        updated_games.append(game)
-                        games_updated += 1
-                    elif new_pgn is None and updated is False:
-                        # Processing failed
+                    if outcome == BulkProcessingOutcome.UPDATED:
+                        if new_pgn:
+                            game.pgn = new_pgn
+                            for tname, field_value in field_values_dict.items():
+                                if tname in tag_to_field_mapping:
+                                    field_name = tag_to_field_mapping[tname]
+                                    setattr(game, field_name, field_value)
+                            updated_games.append(game)
+                            games_updated += 1
+                        else:
+                            games_failed += 1
+                    elif outcome == BulkProcessingOutcome.SKIPPED:
+                        games_skipped += 1
+                    else:
                         games_failed += 1
                 except Exception:
                     games_failed += 1
@@ -714,14 +659,17 @@ class BulkReplaceService:
         # Log bulk replace operation (replace_metadata_tags)
         logging_service = LoggingService.get_instance()
         tags_str = ", ".join(tag_names) if tag_names else "none"
-        logging_service.info(f"Bulk replace operation completed: tags=[{tags_str}], pattern={find_text[:50] if find_text else 'overwrite_all'}, games_processed={total_games}, games_updated={games_updated}, games_failed={games_failed}")
+        logging_service.info(
+            f"Bulk replace operation completed: tags=[{tags_str}], pattern={find_text[:50] if find_text else 'overwrite_all'}, "
+            f"games_processed={completed}, games_updated={games_updated}, games_failed={games_failed}, games_skipped={games_skipped}"
+        )
         
-        return BulkReplaceResult(
+        return BulkOperationStats(
             success=True,
-            games_processed=total_games,
+            games_processed=completed,
             games_updated=games_updated,
             games_failed=games_failed,
-            games_skipped=0
+            games_skipped=games_skipped
         )
     
     def copy_metadata_tag(
@@ -732,7 +680,7 @@ class BulkReplaceService:
         game_indices: Optional[List[int]] = None,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
         cancellation_check: Optional[Callable[[], bool]] = None
-    ) -> BulkReplaceResult:
+    ) -> BulkOperationStats:
         """Copy value from one metadata tag to another.
         
         Args:
@@ -744,7 +692,7 @@ class BulkReplaceService:
             cancellation_check: Optional function that returns True if operation should be cancelled.
             
         Returns:
-            BulkReplaceResult with operation statistics.
+            BulkOperationStats with operation statistics.
         """
         games = database.get_all_games()
         
@@ -760,7 +708,7 @@ class BulkReplaceService:
         if total_games == 0:
             if progress_callback:
                 progress_callback(0, 0, "No games to process")
-            return BulkReplaceResult(
+            return BulkOperationStats(
                 success=True,
                 games_processed=0,
                 games_updated=0,
@@ -775,8 +723,10 @@ class BulkReplaceService:
         updated_games = []
         games_updated = 0
         games_failed = 0
+        games_skipped = 0
         
         executor = None
+        completed = 0
         try:
             executor = ProcessPoolExecutor(max_workers=max_workers)
             
@@ -791,8 +741,6 @@ class BulkReplaceService:
                 for game in games_to_process
             }
             
-            # Process results as they complete
-            completed = 0
             tag_to_field_mapping = {
                 "White": "white",
                 "Black": "black",
@@ -821,22 +769,21 @@ class BulkReplaceService:
                     progress_callback(completed, total_games, f"Processing game {completed}/{total_games}")
                 
                 try:
-                    new_pgn, new_field_value, updated = future.result()
+                    new_pgn, new_field_value, outcome = future.result()
                     
-                    if updated and new_pgn:
-                        # Update game data
-                        game.pgn = new_pgn
-                        
-                        # Update corresponding GameData fields if tag maps to a field
-                        if target_tag in tag_to_field_mapping and new_field_value is not None:
-                            field_name = tag_to_field_mapping[target_tag]
-                            setattr(game, field_name, new_field_value)
-                        
-                        # Collect game for batch update
-                        updated_games.append(game)
-                        games_updated += 1
-                    elif new_pgn is None and updated is False:
-                        # Processing failed
+                    if outcome == BulkProcessingOutcome.UPDATED:
+                        if new_pgn:
+                            game.pgn = new_pgn
+                            if target_tag in tag_to_field_mapping and new_field_value is not None:
+                                field_name = tag_to_field_mapping[target_tag]
+                                setattr(game, field_name, new_field_value)
+                            updated_games.append(game)
+                            games_updated += 1
+                        else:
+                            games_failed += 1
+                    elif outcome == BulkProcessingOutcome.SKIPPED:
+                        games_skipped += 1
+                    else:
                         games_failed += 1
                 except Exception:
                     games_failed += 1
@@ -851,14 +798,17 @@ class BulkReplaceService:
         
         # Log bulk replace operation (copy_metadata_tag)
         logging_service = LoggingService.get_instance()
-        logging_service.info(f"Bulk replace operation completed: operation=copy_tag, target_tag={target_tag}, source_tag={source_tag}, games_processed={total_games}, games_updated={games_updated}, games_failed={games_failed}")
+        logging_service.info(
+            f"Bulk replace operation completed: operation=copy_tag, target_tag={target_tag}, source_tag={source_tag}, "
+            f"games_processed={completed}, games_updated={games_updated}, games_failed={games_failed}, games_skipped={games_skipped}"
+        )
         
-        return BulkReplaceResult(
+        return BulkOperationStats(
             success=True,
-            games_processed=total_games,
+            games_processed=completed,
             games_updated=games_updated,
             games_failed=games_failed,
-            games_skipped=0
+            games_skipped=games_skipped
         )
     
     def copy_metadata_tags(
@@ -869,7 +819,7 @@ class BulkReplaceService:
         game_indices: Optional[List[int]] = None,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
         cancellation_check: Optional[Callable[[], bool]] = None
-    ) -> BulkReplaceResult:
+    ) -> BulkOperationStats:
         """Copy value from one metadata tag to multiple target tags in a single pass.
         
         This method processes each game once and updates all selected tags,
@@ -884,10 +834,10 @@ class BulkReplaceService:
             cancellation_check: Optional function that returns True if operation should be cancelled.
             
         Returns:
-            BulkReplaceResult with operation statistics.
+            BulkOperationStats with operation statistics.
         """
         if not target_tags:
-            return BulkReplaceResult(
+            return BulkOperationStats(
                 success=False,
                 games_processed=0,
                 games_updated=0,
@@ -910,7 +860,7 @@ class BulkReplaceService:
         if total_games == 0:
             if progress_callback:
                 progress_callback(0, 0, "No games to process")
-            return BulkReplaceResult(
+            return BulkOperationStats(
                 success=True,
                 games_processed=0,
                 games_updated=0,
@@ -925,8 +875,10 @@ class BulkReplaceService:
         updated_games = []
         games_updated = 0
         games_failed = 0
+        games_skipped = 0
         
         executor = None
+        completed = 0
         try:
             executor = ProcessPoolExecutor(max_workers=max_workers)
             
@@ -941,8 +893,6 @@ class BulkReplaceService:
                 for game in games_to_process
             }
             
-            # Process results as they complete
-            completed = 0
             tag_to_field_mapping = {
                 "White": "white",
                 "Black": "black",
@@ -971,23 +921,22 @@ class BulkReplaceService:
                     progress_callback(completed, total_games, f"Processing game {completed}/{total_games}")
                 
                 try:
-                    new_pgn, field_values_dict, updated = future.result()
+                    new_pgn, field_values_dict, outcome = future.result()
                     
-                    if updated and new_pgn:
-                        # Update game data
-                        game.pgn = new_pgn
-                        
-                        # Update corresponding GameData fields if tags map to fields
-                        for tag_name, field_value in field_values_dict.items():
-                            if tag_name in tag_to_field_mapping:
-                                field_name = tag_to_field_mapping[tag_name]
-                                setattr(game, field_name, field_value)
-                        
-                        # Collect game for batch update
-                        updated_games.append(game)
-                        games_updated += 1
-                    elif new_pgn is None and updated is False:
-                        # Processing failed
+                    if outcome == BulkProcessingOutcome.UPDATED:
+                        if new_pgn:
+                            game.pgn = new_pgn
+                            for tname, field_value in field_values_dict.items():
+                                if tname in tag_to_field_mapping:
+                                    field_name = tag_to_field_mapping[tname]
+                                    setattr(game, field_name, field_value)
+                            updated_games.append(game)
+                            games_updated += 1
+                        else:
+                            games_failed += 1
+                    elif outcome == BulkProcessingOutcome.SKIPPED:
+                        games_skipped += 1
+                    else:
                         games_failed += 1
                 except Exception:
                     games_failed += 1
@@ -1003,14 +952,17 @@ class BulkReplaceService:
         # Log bulk replace operation (copy_metadata_tags)
         logging_service = LoggingService.get_instance()
         targets_str = ", ".join(target_tags) if target_tags else "none"
-        logging_service.info(f"Bulk replace operation completed: operation=copy_tags, target_tags=[{targets_str}], source_tag={source_tag}, games_processed={total_games}, games_updated={games_updated}, games_failed={games_failed}")
+        logging_service.info(
+            f"Bulk replace operation completed: operation=copy_tags, target_tags=[{targets_str}], source_tag={source_tag}, "
+            f"games_processed={completed}, games_updated={games_updated}, games_failed={games_failed}, games_skipped={games_skipped}"
+        )
         
-        return BulkReplaceResult(
+        return BulkOperationStats(
             success=True,
-            games_processed=total_games,
+            games_processed=completed,
             games_updated=games_updated,
             games_failed=games_failed,
-            games_skipped=0
+            games_skipped=games_skipped
         )
     
     def update_result_tags(
@@ -1024,7 +976,7 @@ class BulkReplaceService:
         game_indices: Optional[List[int]] = None,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
         cancel_flag: Optional[Callable[[], bool]] = None
-    ) -> BulkReplaceResult:
+    ) -> BulkOperationStats:
         """Update Result tags based on final position evaluation.
         
         Args:
@@ -1039,7 +991,7 @@ class BulkReplaceService:
             cancel_flag: Optional function that returns True if operation should be cancelled.
             
         Returns:
-            BulkReplaceResult with operation statistics.
+            BulkOperationStats with operation statistics.
         """
         games = database.get_all_games()
         
@@ -1055,7 +1007,7 @@ class BulkReplaceService:
         if total_games == 0:
             if progress_callback:
                 progress_callback(0, 0, "No games to process")
-            return BulkReplaceResult(
+            return BulkOperationStats(
                 success=True,
                 games_processed=0,
                 games_updated=0,
@@ -1066,6 +1018,7 @@ class BulkReplaceService:
         games_updated = 0
         games_failed = 0
         games_skipped = 0
+        games_processed_count = 0
         
         # Initialize engine once and reuse across games
         uci = None
@@ -1078,7 +1031,7 @@ class BulkReplaceService:
             
             # Spawn engine process
             if not uci.spawn_process():
-                return BulkReplaceResult(
+                return BulkOperationStats(
                     success=False,
                     games_processed=0,
                     games_updated=0,
@@ -1091,7 +1044,7 @@ class BulkReplaceService:
             success, _ = uci.initialize_uci(timeout=5.0)
             if not success:
                 uci.cleanup()
-                return BulkReplaceResult(
+                return BulkOperationStats(
                     success=False,
                     games_processed=0,
                     games_updated=0,
@@ -1112,7 +1065,7 @@ class BulkReplaceService:
             # Confirm engine is ready
             if not uci.confirm_ready():
                 uci.cleanup()
-                return BulkReplaceResult(
+                return BulkOperationStats(
                     success=False,
                     games_processed=0,
                     games_updated=0,
@@ -1128,6 +1081,7 @@ class BulkReplaceService:
             for idx, game in enumerate(games_to_process):
                 if cancel_flag and cancel_flag():
                     break
+                games_processed_count += 1
                 
                 if progress_callback:
                     progress_callback(idx, total_games, f"Analyzing game {idx + 1}/{total_games}")
@@ -1235,11 +1189,14 @@ class BulkReplaceService:
         
         # Log bulk replace operation (update_result_tags)
         logging_service = LoggingService.get_instance()
-        logging_service.info(f"Bulk replace operation completed: operation=update_result_tags, engine={engine_path.name if engine_path else 'unknown'}, games_processed={total_games}, games_updated={games_updated}, games_failed={games_failed}, games_skipped={games_skipped}")
+        logging_service.info(
+            f"Bulk replace operation completed: operation=update_result_tags, engine={engine_path.name if engine_path else 'unknown'}, "
+            f"games_processed={games_processed_count}, games_updated={games_updated}, games_failed={games_failed}, games_skipped={games_skipped}"
+        )
         
-        return BulkReplaceResult(
+        return BulkOperationStats(
             success=True,
-            games_processed=total_games,
+            games_processed=games_processed_count,
             games_updated=games_updated,
             games_failed=games_failed,
             games_skipped=games_skipped
@@ -1377,7 +1334,7 @@ class BulkReplaceService:
         game_indices: Optional[List[int]] = None,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
         cancel_flag: Optional[Callable[[], bool]] = None
-    ) -> BulkReplaceResult:
+    ) -> BulkOperationStats:
         """Update ECO tags based on opening analysis of game moves.
         
         Args:
@@ -1388,7 +1345,7 @@ class BulkReplaceService:
             cancel_flag: Optional function that returns True if operation should be cancelled.
             
         Returns:
-            BulkReplaceResult with operation statistics.
+            BulkOperationStats with operation statistics.
         """
         games = database.get_all_games()
         
@@ -1404,7 +1361,7 @@ class BulkReplaceService:
         if total_games == 0:
             if progress_callback:
                 progress_callback(0, 0, "No games to process")
-            return BulkReplaceResult(
+            return BulkOperationStats(
                 success=True,
                 games_processed=0,
                 games_updated=0,
@@ -1415,6 +1372,7 @@ class BulkReplaceService:
         games_updated = 0
         games_failed = 0
         games_skipped = 0
+        games_processed_count = 0
         
         # Collect all updated games for batch update
         updated_games = []
@@ -1423,6 +1381,7 @@ class BulkReplaceService:
         for idx, game in enumerate(games_to_process):
             if cancel_flag and cancel_flag():
                 break
+            games_processed_count += 1
             
             if progress_callback:
                 progress_callback(idx, total_games, f"Processing game {idx + 1}/{total_games}")
@@ -1474,9 +1433,9 @@ class BulkReplaceService:
         if updated_games:
             database.batch_update_games(updated_games)
         
-        return BulkReplaceResult(
+        return BulkOperationStats(
             success=True,
-            games_processed=total_games,
+            games_processed=games_processed_count,
             games_updated=games_updated,
             games_failed=games_failed,
             games_skipped=games_skipped

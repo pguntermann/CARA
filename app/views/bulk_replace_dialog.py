@@ -25,6 +25,7 @@ from typing import Optional, Dict, Any, List
 
 from app.controllers.bulk_replace_controller import BulkReplaceController
 from app.models.database_model import DatabaseModel
+from app.utils.bulk_operation_summary import format_bulk_operation_summary_plain
 from app.utils.path_display_utils import truncate_path_for_display, truncate_text_middle
 
 
@@ -972,11 +973,7 @@ class BulkReplaceDialog(QDialog):
             # Show success message using styled dialog
             self._show_success_dialog(
                 "Bulk Replace Complete",
-                f"Operation completed:\n\n"
-                f"Games processed: {result.games_processed}\n"
-                f"Games updated: {result.games_updated}\n"
-                f"Games failed: {result.games_failed}\n"
-                f"Games skipped: {result.games_skipped}"
+                format_bulk_operation_summary_plain(result)
             )
             
             self.accept()

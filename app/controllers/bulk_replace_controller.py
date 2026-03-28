@@ -1,14 +1,45 @@
 """Bulk replace controller for managing bulk replacement operations."""
 
+import hashlib
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from app.models.database_model import DatabaseModel
-from app.services.bulk_replace_service import BulkReplaceService, BulkReplaceResult
+from app.models.database_model import DatabaseModel, GameData
+from app.services.bulk_operation_stats import BulkOperationStats
+from app.services.bulk_replace_service import BulkReplaceService
 from app.services.progress_service import ProgressService
 from app.services.engine_parameters_service import EngineParametersService
 from app.services.opening_service import OpeningService
+
+
+def _pgn_fingerprint(pgn: str) -> bytes:
+    """Compact digest for comparing PGN before/after multi-step bulk replace (low collision risk)."""
+    return hashlib.blake2b(pgn.encode("utf-8"), digest_size=16).digest()
+
+
+def _combine_multi_step_bulk_stats(
+    step_results: List[BulkOperationStats],
+    games_in_scope: List[GameData],
+    initial_fingerprints: Dict[int, bytes],
+) -> BulkOperationStats:
+    """Single summary for multiple bulk-replace phases: unique games via PGN fingerprint delta."""
+    if not step_results:
+        return BulkOperationStats(True, 0, 0, 0, 0)
+    if len(step_results) == 1:
+        return step_results[0]
+    n = len(games_in_scope)
+    modified = sum(
+        1 for g in games_in_scope if _pgn_fingerprint(g.pgn) != initial_fingerprints[id(g)]
+    )
+    failed_sum = sum(r.games_failed for r in step_results)
+    return BulkOperationStats(
+        success=True,
+        games_processed=n,
+        games_updated=modified,
+        games_failed=failed_sum,
+        games_skipped=n - modified,
+    )
 
 
 class BulkReplaceController(QObject):
@@ -19,7 +50,7 @@ class BulkReplaceController(QObject):
     """
     
     # Signal emitted when operation completes
-    operation_complete = pyqtSignal(BulkReplaceResult)  # result
+    operation_complete = pyqtSignal(BulkOperationStats)  # result
     
     def __init__(self, config: Dict[str, Any], database_controller, engine_controller, evaluation_controller, game_controller=None) -> None:
         """Initialize the bulk replace controller.
@@ -65,7 +96,7 @@ class BulkReplaceController(QObject):
         use_regex: bool = False,
         overwrite_all: bool = False,
         game_indices: Optional[List[int]] = None
-    ) -> BulkReplaceResult:
+    ) -> BulkOperationStats:
         """Replace text in metadata tags.
         
         Args:
@@ -78,7 +109,7 @@ class BulkReplaceController(QObject):
             game_indices: Optional list of game indices to process (None = all games).
             
         Returns:
-            BulkReplaceResult with operation statistics.
+            BulkOperationStats with operation statistics.
         """
         self._cancelled = False
         
@@ -139,7 +170,7 @@ class BulkReplaceController(QObject):
         use_regex: bool = False,
         overwrite_all: bool = False,
         game_indices: Optional[List[int]] = None
-    ) -> BulkReplaceResult:
+    ) -> BulkOperationStats:
         """Replace text in multiple metadata tags in a single pass.
         
         This method processes each game once and updates all selected tags,
@@ -156,7 +187,7 @@ class BulkReplaceController(QObject):
             game_indices: Optional list of game indices to process (None = all games).
             
         Returns:
-            BulkReplaceResult with operation statistics.
+            BulkOperationStats with operation statistics.
         """
         self._cancelled = False
         
@@ -213,7 +244,7 @@ class BulkReplaceController(QObject):
         target_tags: List[str],
         source_tag: str,
         game_indices: Optional[List[int]] = None
-    ) -> BulkReplaceResult:
+    ) -> BulkOperationStats:
         """Copy value from one metadata tag to multiple target tags in a single pass.
         
         This method processes each game once and updates all selected tags,
@@ -226,7 +257,7 @@ class BulkReplaceController(QObject):
             game_indices: Optional list of game indices to process (None = all games).
             
         Returns:
-            BulkReplaceResult with operation statistics.
+            BulkOperationStats with operation statistics.
         """
         self._cancelled = False
         
@@ -279,7 +310,7 @@ class BulkReplaceController(QObject):
         target_tag: str,
         source_tag: str,
         game_indices: Optional[List[int]] = None
-    ) -> BulkReplaceResult:
+    ) -> BulkOperationStats:
         """Copy value from one metadata tag to another.
         
         Args:
@@ -289,7 +320,7 @@ class BulkReplaceController(QObject):
             game_indices: Optional list of game indices to process (None = all games).
             
         Returns:
-            BulkReplaceResult with operation statistics.
+            BulkOperationStats with operation statistics.
         """
         self._cancelled = False
         
@@ -340,7 +371,7 @@ class BulkReplaceController(QObject):
         self,
         database: DatabaseModel,
         game_indices: Optional[List[int]] = None
-    ) -> BulkReplaceResult:
+    ) -> BulkOperationStats:
         """Update Result tags based on final position evaluation.
         
         Args:
@@ -348,7 +379,7 @@ class BulkReplaceController(QObject):
             game_indices: Optional list of game indices to process (None = all games).
             
         Returns:
-            BulkReplaceResult with operation statistics.
+            BulkOperationStats with operation statistics.
         """
         self._cancelled = False
         
@@ -356,7 +387,7 @@ class BulkReplaceController(QObject):
         from app.controllers.engine_controller import TASK_EVALUATION
         engine_id = self.engine_controller.get_engine_assignment(TASK_EVALUATION)
         if not engine_id:
-            return BulkReplaceResult(
+            return BulkOperationStats(
                 success=False,
                 games_processed=0,
                 games_updated=0,
@@ -368,7 +399,7 @@ class BulkReplaceController(QObject):
         # Get engine data
         engine = self.engine_controller.get_engine_model().get_engine(engine_id)
         if not engine:
-            return BulkReplaceResult(
+            return BulkOperationStats(
                 success=False,
                 games_processed=0,
                 games_updated=0,
@@ -456,7 +487,7 @@ class BulkReplaceController(QObject):
         self,
         database: DatabaseModel,
         game_indices: Optional[List[int]] = None
-    ) -> BulkReplaceResult:
+    ) -> BulkOperationStats:
         """Update ECO tags based on opening analysis of game moves.
         
         Args:
@@ -464,7 +495,7 @@ class BulkReplaceController(QObject):
             game_indices: Optional list of game indices to process (None = all games).
             
         Returns:
-            BulkReplaceResult with operation statistics.
+            BulkOperationStats with operation statistics.
         """
         self._cancelled = False
         
@@ -564,7 +595,7 @@ class BulkReplaceController(QObject):
         has_result_update: bool,
         has_eco_update: bool,
         game_indices: Optional[List[int]]
-    ) -> BulkReplaceResult:
+    ) -> BulkOperationStats:
         """Execute bulk replace operations with validation and result aggregation.
         
         This method validates inputs, executes operations, and aggregates results.
@@ -587,12 +618,12 @@ class BulkReplaceController(QObject):
             game_indices: Optional list of game indices to process.
             
         Returns:
-            BulkReplaceResult with aggregated operation statistics.
+            BulkOperationStats with aggregated operation statistics.
         """
         # Validate at least one operation is selected
         has_replace = is_copy_mode or overwrite_all or (has_find_text and has_replace_text)
         if not has_replace and not has_result_update and not has_eco_update:
-            return BulkReplaceResult(
+            return BulkOperationStats(
                 success=False,
                 games_processed=0,
                 games_updated=0,
@@ -603,7 +634,7 @@ class BulkReplaceController(QObject):
         
         # Validate game selection
         if game_indices is not None and len(game_indices) == 0:
-            return BulkReplaceResult(
+            return BulkOperationStats(
                 success=False,
                 games_processed=0,
                 games_updated=0,
@@ -615,7 +646,7 @@ class BulkReplaceController(QObject):
         # Validate replace/copy operation
         if has_replace:
             if not selected_tags:
-                return BulkReplaceResult(
+                return BulkOperationStats(
                     success=False,
                     games_processed=0,
                     games_updated=0,
@@ -626,7 +657,7 @@ class BulkReplaceController(QObject):
             
             if is_copy_mode:
                 if not source_tag or not source_tag.strip():
-                    return BulkReplaceResult(
+                    return BulkOperationStats(
                         success=False,
                         games_processed=0,
                         games_updated=0,
@@ -636,7 +667,7 @@ class BulkReplaceController(QObject):
                     )
                 
                 if source_tag in selected_tags:
-                    return BulkReplaceResult(
+                    return BulkOperationStats(
                         success=False,
                         games_processed=0,
                         games_updated=0,
@@ -645,22 +676,25 @@ class BulkReplaceController(QObject):
                         error_message="Source tag cannot be in the target tags list"
                     )
         
-        # Execute operations and aggregate results
-        result = None
+        games = database.get_all_games()
+        if game_indices is not None:
+            games_in_scope = [games[i] for i in game_indices if 0 <= i < len(games)]
+        else:
+            games_in_scope = list(games)
+        initial_fingerprints = {id(g): _pgn_fingerprint(g.pgn) for g in games_in_scope}
         
-        # Metadata replacement or copy
+        step_results: List[BulkOperationStats] = []
+        
         if has_replace:
             if is_copy_mode:
-                # Copy from source tag to all target tags in a single pass
-                result = self.copy_metadata_tags(
+                meta_result = self.copy_metadata_tags(
                     database,
                     selected_tags,
                     source_tag,
                     game_indices
                 )
             else:
-                # Text replacement in all selected tags in a single pass
-                result = self.replace_metadata_tags(
+                meta_result = self.replace_metadata_tags(
                     database,
                     selected_tags,
                     find_text,
@@ -670,53 +704,21 @@ class BulkReplaceController(QObject):
                     overwrite_all,
                     game_indices
                 )
-            
-            if not result.success:
-                return result
+            if not meta_result.success:
+                return meta_result
+            step_results.append(meta_result)
         
-        # Result update
         if has_result_update:
-            result_update = self.update_result_tags(
-                database,
-                game_indices
-            )
-            
+            result_update = self.update_result_tags(database, game_indices)
             if not result_update.success:
                 return result_update
-            
-            # Aggregate with previous result
-            if result:
-                result = BulkReplaceResult(
-                    success=True,
-                    games_processed=max(result.games_processed, result_update.games_processed),
-                    games_updated=result.games_updated + result_update.games_updated,
-                    games_failed=result.games_failed + result_update.games_failed,
-                    games_skipped=result.games_skipped + result_update.games_skipped
-                )
-            else:
-                result = result_update
+            step_results.append(result_update)
         
-        # ECO update
         if has_eco_update:
-            eco_result = self.update_eco_tags(
-                database,
-                game_indices
-            )
-            
+            eco_result = self.update_eco_tags(database, game_indices)
             if not eco_result.success:
                 return eco_result
-            
-            # Aggregate with previous result
-            if result:
-                result = BulkReplaceResult(
-                    success=True,
-                    games_processed=max(result.games_processed, eco_result.games_processed),
-                    games_updated=result.games_updated + eco_result.games_updated,
-                    games_failed=result.games_failed + eco_result.games_failed,
-                    games_skipped=result.games_skipped + eco_result.games_skipped
-                )
-            else:
-                result = eco_result
+            step_results.append(eco_result)
         
-        return result
+        return _combine_multi_step_bulk_stats(step_results, games_in_scope, initial_fingerprints)
 

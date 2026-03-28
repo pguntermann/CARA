@@ -30,13 +30,13 @@ All bulk operations follow this pattern:
 5. **Progress reporting**: Report progress via callback
 6. **Error handling**: Continue processing on errors, track failures
 
-### Result Classes
+### Result type and UI summaries
 
-Each operation returns a result dataclass with statistics:
+All bulk tag, bulk replace, and bulk clean PGN services return **`BulkOperationStats`** from `app/services/bulk_operation_stats.py` (same fields as below). Dialogs format results via **`format_bulk_operation_summary_plain`** / **`format_bulk_operation_summary_html`** in `app/utils/bulk_operation_summary.py`.
 
 ```python
 @dataclass
-class BulkOperationResult:
+class BulkOperationStats:
     success: bool
     games_processed: int
     games_updated: int

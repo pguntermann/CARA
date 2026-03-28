@@ -5,7 +5,8 @@ from typing import Dict, Any, Optional, List
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from app.models.database_model import DatabaseModel
-from app.services.bulk_tag_service import BulkTagService, BulkTagResult
+from app.services.bulk_operation_stats import BulkOperationStats
+from app.services.bulk_tag_service import BulkTagService
 from app.services.progress_service import ProgressService
 
 
@@ -17,7 +18,7 @@ class BulkTagController(QObject):
     """
     
     # Signal emitted when operation completes
-    operation_complete = pyqtSignal(BulkTagResult)  # result
+    operation_complete = pyqtSignal(BulkOperationStats)  # result
     
     def __init__(self, config: Dict[str, Any], database_controller, game_controller=None) -> None:
         """Initialize the bulk tag controller.
@@ -81,7 +82,7 @@ class BulkTagController(QObject):
         tag_value: Optional[str] = None,
         source_tag: Optional[str] = None,
         game_indices: Optional[List[int]] = None
-    ) -> BulkTagResult:
+    ) -> BulkOperationStats:
         """Add a tag to games.
         
         Args:
@@ -92,7 +93,7 @@ class BulkTagController(QObject):
             game_indices: Optional list of game indices to process (None = all games).
             
         Returns:
-            BulkTagResult with operation statistics.
+            BulkOperationStats with operation statistics.
         """
         self._cancelled = False
         
@@ -163,7 +164,7 @@ class BulkTagController(QObject):
         database: DatabaseModel,
         tag_name: str,
         game_indices: Optional[List[int]] = None
-    ) -> BulkTagResult:
+    ) -> BulkOperationStats:
         """Remove a tag from games.
         
         Args:
@@ -172,7 +173,7 @@ class BulkTagController(QObject):
             game_indices: Optional list of game indices to process (None = all games).
             
         Returns:
-            BulkTagResult with operation statistics.
+            BulkOperationStats with operation statistics.
         """
         self._cancelled = False
         

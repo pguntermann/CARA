@@ -4,7 +4,8 @@ from typing import Dict, Any, Optional, List
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from app.models.database_model import DatabaseModel
-from app.services.bulk_clean_pgn_service import BulkCleanPgnService, BulkCleanPgnResult
+from app.services.bulk_operation_stats import BulkOperationStats
+from app.services.bulk_clean_pgn_service import BulkCleanPgnService
 from app.services.progress_service import ProgressService
 
 
@@ -16,7 +17,7 @@ class BulkCleanPgnController(QObject):
     """
     
     # Signal emitted when operation completes
-    operation_complete = pyqtSignal(BulkCleanPgnResult)  # result
+    operation_complete = pyqtSignal(BulkOperationStats)  # result
     
     def __init__(self, config: Dict[str, Any], database_controller, game_controller=None) -> None:
         """Initialize the bulk clean PGN controller.
@@ -56,7 +57,7 @@ class BulkCleanPgnController(QObject):
         remove_non_standard_tags: bool = False,
         remove_annotations: bool = False,
         game_indices: Optional[List[int]] = None
-    ) -> BulkCleanPgnResult:
+    ) -> BulkOperationStats:
         """Clean PGN notation for games in a database.
         
         Args:
@@ -68,7 +69,7 @@ class BulkCleanPgnController(QObject):
             game_indices: Optional list of game indices to process (None = all games).
             
         Returns:
-            BulkCleanPgnResult with operation statistics.
+            BulkOperationStats with operation statistics.
         """
         self._cancelled = False
         
