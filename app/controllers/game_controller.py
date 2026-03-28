@@ -61,8 +61,13 @@ def _comment_text_for_moves_list_display(raw: str) -> str:
 
 
 def _pgn_child_node_comment_joined(node: chess.pgn.ChildNode) -> str:
-    """Single string for the move-comment dialog (raw PGN comment text, including ``[%clk]`` etc.)."""
-    return _pgn_child_node_raw_comment(node)
+    """Single string for the move-comment dialog.
+
+    PGN export may wrap long ``{ ... }`` comments across lines at the configured width; those
+    newlines are not meaningful for editing. Collapse whitespace the same way as when applying
+    from the dialog (``_normalize_pgn_comment_text``) so reopen shows one line per field.
+    """
+    return _normalize_pgn_comment_text(_pgn_child_node_raw_comment(node))
 
 
 def _set_pgn_child_node_comment(node: chess.pgn.ChildNode, text: str) -> None:
