@@ -2,6 +2,7 @@
 
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
+import re
 
 import chess
 import chess.pgn
@@ -22,19 +23,57 @@ def _normalize_pgn_comment_text(text: str) -> str:
     return " ".join((text or "").replace("\r\n", " ").replace("\n", " ").split())
 
 
+_NON_STANDARD_INLINE_TAG_RE = re.compile(r"\[%[^\]]+\]")
+_VARIATION_ARROW_IN_COMMENT_RE = re.compile(r"\(\s*->\s*[^)]+\)")
+
+
+def _pgn_child_node_raw_comment(node: chess.pgn.ChildNode) -> str:
+    """Full brace text for one half-move: pre-move + post-move comment from the parsed tree.
+
+    python-chess 1.x uses ``ChildNode.comment`` (str) and ``starting_comment``; older builds
+    used a ``comments`` list. Both are supported so the moves list and edit dialog stay in sync.
+    """
+    parts: List[str] = []
+    sc = (getattr(node, "starting_comment", None) or "").strip()
+    if sc:
+        parts.append(sc)
+    c = (getattr(node, "comment", None) or "").strip()
+    if c:
+        parts.append(c)
+    if not parts:
+        legacy = getattr(node, "comments", None)
+        if legacy:
+            parts.extend(str(p).strip() for p in legacy if str(p).strip())
+    return " ".join(parts)
+
+
+def _comment_text_for_moves_list_display(raw: str) -> str:
+    """Strip machine-only ``[%...]`` tags (e.g. ``[%clk]``) for the Comment column."""
+    if not (raw or "").strip():
+        return ""
+    t = raw.strip()
+    if (t.startswith("'") and t.endswith("'")) or (t.startswith('"') and t.endswith('"')):
+        t = t[1:-1].strip()
+    t = _NON_STANDARD_INLINE_TAG_RE.sub("", t)
+    t = _VARIATION_ARROW_IN_COMMENT_RE.sub("", t)
+    t = re.sub(r"\s+", " ", t).strip().strip(";").strip()
+    return t
+
+
 def _pgn_child_node_comment_joined(node: chess.pgn.ChildNode) -> str:
-    """Single string for editing: python-chess stores move comments on ``ChildNode.comments`` (list)."""
-    parts = getattr(node, "comments", None) or []
-    pieces = [str(p).strip() for p in parts if str(p).strip()]
-    return " ".join(pieces)
+    """Single string for the move-comment dialog (raw PGN comment text, including ``[%clk]`` etc.)."""
+    return _pgn_child_node_raw_comment(node)
 
 
 def _set_pgn_child_node_comment(node: chess.pgn.ChildNode, text: str) -> None:
     norm = _normalize_pgn_comment_text(text)
-    if norm:
-        node.comments = [norm]
-    else:
-        node.comments = []
+    node.comment = norm
+    node.starting_comment = ""
+    legacy = getattr(node, "comments", None)
+    if isinstance(legacy, list):
+        legacy.clear()
+        if norm:
+            legacy.append(norm)
 
 
 def _mainline_white_child_for_row(
@@ -874,73 +913,11 @@ class GameController:
             if chess_game is None:
                 return []
             
-            # Use a custom StringExporter visitor to collect comments from main line
-            # This is the most reliable way since we can intercept comments during export
-            comments_by_ply = {}  # Map ply_index -> comment
-            
-            class CommentCollector(chess.pgn.StringExporter):
-                def __init__(self):
-                    super().__init__(headers=False, variations=False, comments=True)
-                    self.ply_index = 0
-                    self.comments = {}
-                    self._current_node = None
-                
-                def visit_move(self, board, move):
-                    # Called for each move - board is the position before the move
-                    # We need to access the node to get the comment
-                    self.ply_index += 1
-                    # Call parent first to let it process the move
-                    result = super().visit_move(board, move)
-                    # After parent processes, try to access comment from the current node
-                    # The node should be accessible through the visitor's state
-                    return result
-                
-                def visit_comment(self, comment):
-                    # This is called when a comment is encountered during export
-                    # This is the correct way to intercept comments!
-                    if comment:
-                        # Clean the comment - remove any brackets or extra formatting
-                        comment_text = str(comment).strip()
-                        # Remove surrounding brackets if present (handle both [ and ])
-                        while comment_text.startswith('[') and comment_text.endswith(']'):
-                            comment_text = comment_text[1:-1].strip()
-                        # Also remove any leading/trailing quotes if present
-                        if (comment_text.startswith("'") and comment_text.endswith("'")) or \
-                           (comment_text.startswith('"') and comment_text.endswith('"')):
-                            comment_text = comment_text[1:-1].strip()
-                        
-                        # Remove non-standard PGN tags like [%eval], [%wdl], [%mdl], [%clk], etc.
-                        import re
-                        # Pattern matches: [%tag content] or [%tag] or [#] or [tag]
-                        tag_pattern = re.compile(r'\[%?[^\]]+\]')
-                        comment_text = tag_pattern.sub('', comment_text).strip()
-                        
-                        # Remove variation-like patterns: ( -> ...move) or (-> move) etc.
-                        # Pattern matches parentheses with arrow and move notation
-                        variation_pattern = re.compile(r'\(\s*->\s*[^)]+\)')
-                        comment_text = variation_pattern.sub('', comment_text).strip()
-                        
-                        # Clean up multiple spaces and semicolons
-                        comment_text = re.sub(r'\s+', ' ', comment_text).strip()
-                        # Remove leading/trailing semicolons and spaces
-                        comment_text = comment_text.strip(';').strip()
-                        
-                        # Only store if there's actual content left after cleaning
-                        if comment_text:
-                            self.comments[self.ply_index] = comment_text
-                    # Call parent to continue export
-                    return super().visit_comment(comment)
-            
-            # Export main line and collect comments
-            collector = CommentCollector()
-            chess_game.accept(collector)
-            comments_by_ply = collector.comments
-            
             # Traverse the game tree to extract moves and map comments
             node = chess_game
             move_number = 0
             current_move_data: Optional[MoveData] = None
-            ply_count = 0  # Track plies to match with comments
+            ply_count = 0
             last_known_eco = None  # Track last known ECO (for positions not in database)
             last_known_opening_name = None  # Track last known opening name (for positions not in database)
             previous_move_eco = None  # Track previous move's ECO for comparison
@@ -952,8 +929,8 @@ class GameController:
                 next_node = node.variation(0)
                 ply_count += 1
                 
-                # Get comment from comments_by_ply map (extracted from main line PGN only)
-                node_comment = comments_by_ply.get(ply_count, "")
+                raw_comment = _pgn_child_node_raw_comment(next_node)
+                node_comment = _comment_text_for_moves_list_display(raw_comment)
                 
                 # Get the board position after the move (for opening lookup)
                 board_after = next_node.board()
