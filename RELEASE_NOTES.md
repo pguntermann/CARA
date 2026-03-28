@@ -1,5 +1,35 @@
 # Release Notes
 
+# CARA v2.6.6 - Move Comment Editing, Database Drag & Drop, and Metadata Context Menu
+
+**Release Date:** 28.03.2026
+
+This release adds **editing of main-line move comments** from the Moves List and the PGN pane, **drag-and-drop** in the database view, and a **right-click context menu** for the Metadata view. It refines how stored game analysis is read back from the PGN tag, improves the bulk-replace summaries, adjusts the default miniature-board preview scale in manual analysis, and contains some minor bug fixes and refactorings.
+
+## New Features
+
+- **Move comment editing:** Edit main-line comments from the **Moves List** (double-click the Comment column, or right-click and choose **Edit Comments**) and from the **PGN** pane (double-click inside a main-line comment when **PGN → Show Comments** is enabled). The dialog allows editing White's and Black's comments for the given full move.
+- **Database view – drag and drop:** Drag one or more **PGN files** from the file explorer/finder onto the database panel view to open them, equivalent to opening the files through the File menu.
+- **Metadata view – context menu:** Right-click the metadata table to **copy** the value of the cell under the cursor, or **copy the full table** as CSV or TSV to the clipboard. Similar to the Moves List context menu options.
+
+## Enhancements
+
+- **Manual analysis – miniature preview:** Default scale factor for the optional miniature board preview when hovering principal-variation moves is increased from **1.0** to **1.25**.
+- **Welcome message:** Improved formatting of the application welcome message.
+- **Bulk replace:** Refactored summarization logic for bulk replace operations.
+- **User manual:** Updated the HTML manual to describe editing move comments.
+
+## Bug Fixes
+
+- **Bulk replace:** Fixed misleading summary information.
+- **PGN comments:** Fixed parsing when non-standard tags appear inside comments in certain move/annotation contexts.
+
+## Refactoring and Technical Improvements
+
+- **Analysis tag handling:** Refactored deserialization of the CARA analysis metadata tag when loading games.
+
+---
+
 # CARA v2.6.5 - Better Notes, Some minor UI/UX Improvements and Bug Fixes
 
 **Release Date:** 18.03.2026
