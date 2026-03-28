@@ -1419,58 +1419,47 @@ class MainWindow(QMainWindow):
     
     def _open_pgn_database(self) -> None:
         """Open one or more PGN databases from file(s)."""
-        # Open file dialog to select PGN file(s) - supports multiple selection
         file_paths, _ = QFileDialog.getOpenFileNames(
             self,
             "Open PGN Database(s)",
             "",
             "PGN Files (*.pgn);;All Files (*)"
         )
-        
         if not file_paths:
-            # User cancelled
             return
-        
+        self._open_pgn_database_paths(list(file_paths))
+
+    def _open_pgn_database_paths(self, file_paths: List[str]) -> None:
+        """Open one or more PGN databases from filesystem paths (dialog or drag-and-drop)."""
+        if not file_paths:
+            return
         database_controller = self.controller.get_database_controller()
-        
-        # Handle single file (backward compatible behavior)
+
         if len(file_paths) == 1:
             file_path = file_paths[0]
             success, message, first_game = database_controller.open_pgn_database(file_path)
-            
-            # Update UI based on result
+
             if success:
-                # Update save menu state
                 self._update_save_menu_state()
-                # Update close menu state
                 self._update_close_menu_state()
-                
-                # Set first game as active if available
                 if first_game:
                     self.controller.get_game_controller().set_active_game(first_game)
-            
-            # Set status message
+
             self.controller.set_status(message)
             return
-        
-        # Handle multiple files - delegate to controller
-        opened_count, skipped_count, failed_count, messages, last_successful_database, last_first_game = database_controller.open_pgn_databases(file_paths)
-        
-        # Update save menu state if any databases were opened
+
+        opened_count, skipped_count, failed_count, messages, last_successful_database, last_first_game = (
+            database_controller.open_pgn_databases(file_paths)
+        )
+
         if opened_count > 0:
             self._update_save_menu_state()
-            # Update close menu state
             self._update_close_menu_state()
-            
-            # Set last successfully opened database as active
             if last_successful_database:
                 database_controller.set_active_database(last_successful_database)
-            
-            # Set first game from last opened database as active if available
             if last_first_game:
                 self.controller.get_game_controller().set_active_game(last_first_game)
-        
-        # Create aggregated status message
+
         status_parts = []
         if opened_count > 0:
             status_parts.append(f"Opened {opened_count} database(s)")
@@ -1478,12 +1467,12 @@ class MainWindow(QMainWindow):
             status_parts.append(f"Skipped {skipped_count} (already open)")
         if failed_count > 0:
             status_parts.append(f"Failed {failed_count}")
-        
+
         if status_parts:
             status_message = ", ".join(status_parts)
         else:
             status_message = "No databases opened"
-        
+
         self.controller.set_status(status_message)
     
     def _on_database_removed(self, identifier: str) -> None:
@@ -2786,6 +2775,7 @@ class MainWindow(QMainWindow):
             panel_model,
             on_row_double_click=self._on_database_row_double_click,
             on_add_tab_clicked=self._open_pgn_database,
+            on_open_pgn_paths=self._open_pgn_database_paths,
             on_close_database=database_controller.close_database_by_identifier,
             on_close_all_but_database=database_controller.close_all_pgn_databases_except,
             on_close_search_results=self._close_search_results_tab,

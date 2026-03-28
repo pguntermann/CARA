@@ -4,7 +4,17 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTabWidget, QTableView, QMenu, QApplication
 )
 from PyQt6.QtCore import QItemSelectionModel, QPoint, QEvent, pyqtSignal
-from PyQt6.QtGui import QPalette, QColor, QPixmap, QPainter, QIcon, QBrush
+from PyQt6.QtGui import (
+    QPalette,
+    QColor,
+    QPixmap,
+    QPainter,
+    QIcon,
+    QBrush,
+    QDragEnterEvent,
+    QDragMoveEvent,
+    QDropEvent,
+)
 from PyQt6.QtCore import Qt, QModelIndex, QTimer, QSize, QRect
 from typing import Any, Callable, Dict, List, Optional
 from pathlib import Path
@@ -26,6 +36,7 @@ class DatabasePanel(QWidget):
     def __init__(self, config: Dict[str, Any], panel_model: Optional[DatabasePanelModel] = None,
                  on_row_double_click: Optional[Callable[[int], None]] = None,
                  on_add_tab_clicked: Optional[Callable[[], None]] = None,
+                 on_open_pgn_paths: Optional[Callable[[List[str]], None]] = None,
                  on_close_database: Optional[Callable[[str], None]] = None,
                  on_close_all_but_database: Optional[Callable[[str], None]] = None,
                  on_close_search_results: Optional[Callable[[], None]] = None,
@@ -43,6 +54,8 @@ class DatabasePanel(QWidget):
                                Receives the row index as argument.
             on_add_tab_clicked: Optional callback function called when the "+" tab is clicked.
                               Should trigger the open PGN database dialog.
+            on_open_pgn_paths: Optional callback(list of filesystem paths) to open PGN files
+                              (same as File → Open; used for drag-and-drop).
             on_close_database: Optional callback(identifier) for closing a single database tab (e.g. from context menu).
             on_close_all_but_database: Optional callback(identifier) for closing all database tabs except the given one.
             on_close_search_results: Optional callback for closing the Search Results tab (e.g. from context menu).
@@ -56,6 +69,7 @@ class DatabasePanel(QWidget):
         self._panel_model: Optional[DatabasePanelModel] = None
         self._on_row_double_click = on_row_double_click
         self._on_add_tab_clicked = on_add_tab_clicked
+        self._on_open_pgn_paths = on_open_pgn_paths
         self._on_close_database = on_close_database
         self._on_close_all_but_database = on_close_all_but_database
         self._on_close_search_results = on_close_search_results
@@ -478,6 +492,7 @@ class DatabasePanel(QWidget):
         from PyQt6.QtWidgets import QAbstractItemView
         tab_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         tab_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        tab_table.setAcceptDrops(True)
         
         # Set model on table view
         tab_table.setModel(model)
@@ -821,8 +836,54 @@ class DatabasePanel(QWidget):
                         result.append(game)
         return result
 
+    @staticmethod
+    def _local_file_paths_from_mime(mime_data) -> List[str]:
+        """Ordered unique paths for local files (same sources as QFileDialog open)."""
+        if not mime_data.hasUrls():
+            return []
+        seen: set = set()
+        out: List[str] = []
+        for url in mime_data.urls():
+            if not url.isLocalFile():
+                continue
+            path_str = url.toLocalFile()
+            try:
+                p = Path(path_str)
+            except OSError:
+                continue
+            if not p.is_file():
+                continue
+            if path_str in seen:
+                continue
+            seen.add(path_str)
+            out.append(path_str)
+        return out
+
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
         """Intercept right-click on database table viewport so selection is not changed before the context menu."""
+        if obj in self._database_table_viewports:
+            if isinstance(event, QDragEnterEvent):
+                paths = self._local_file_paths_from_mime(event.mimeData())
+                if paths and self._on_open_pgn_paths:
+                    event.acceptProposedAction()
+                else:
+                    event.ignore()
+                return True
+            if isinstance(event, QDragMoveEvent):
+                paths = self._local_file_paths_from_mime(event.mimeData())
+                if paths and self._on_open_pgn_paths:
+                    event.acceptProposedAction()
+                else:
+                    event.ignore()
+                return True
+            if isinstance(event, QDropEvent):
+                paths = self._local_file_paths_from_mime(event.mimeData())
+                if paths and self._on_open_pgn_paths:
+                    self._on_open_pgn_paths(paths)
+                    event.acceptProposedAction()
+                else:
+                    event.ignore()
+                return True
         if (
             event.type() == QEvent.Type.MouseButtonPress
             and obj in self._database_table_viewports
