@@ -1,8 +1,12 @@
 # Build Linux amd64 and arm64 PyInstaller onedir bundles (manual trigger only).
 # Artifacts: one ZIP per architecture (same idea as the macOS ZIP in build-appbundles.yml).
 #
-# ARM64 jobs use GitHub's ubuntu-24.04-arm runners. Those are available for public repos;
-# private repos may need larger/self-hosted runners or a single-arch workflow until enabled.
+# Use Ubuntu 22.04 images (not 24.04) so the bundle links against an older glibc (~2.35).
+# That way builds run on Debian 12 (~2.36), Ubuntu 22.04+, and newer distros. Building on
+# 24.04 pulled in GLIBC_2.38 and broke Debian 12 and similar older baselines.
+#
+# ARM64: ubuntu-22.04-arm. Public-repo runner availability applies; private repos may need
+# alternatives until ARM runners are enabled.
 #
 # Archive format: ZIP matches the existing macOS artifact and opens everywhere. Tar.gz is
 # more typical on Linux (permissions/symlinks, smaller with gzip) — switch the packaging
@@ -25,9 +29,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          - os: ubuntu-22.04
             arch: amd64
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-22.04-arm
             arch: arm64
 
     runs-on: ${{ matrix.os }}
