@@ -163,8 +163,8 @@ class BulkAnalysisDialog(QDialog):
         options_grid = QGridLayout()
         options_grid.setHorizontalSpacing(spacing_config.get('options_grid_horizontal', 14))
         options_grid.setVerticalSpacing(spacing_config.get('options_grid_vertical', 18))
-        # Indent options grid to line up with checkbox label text (indicator + gap); config, not runtime style
-        grid_left = int(spacing_config.get('options_controls_left_margin', 22))
+        # Left margin for options grid: 0 aligns labels with checkbox widget (indicator); increase via config to match caption
+        grid_left = int(spacing_config.get('options_controls_left_margin', 0))
         options_grid.setContentsMargins(grid_left, 0, 0, 0)
         
         # Get parallel games config

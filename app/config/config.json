@@ -3783,7 +3783,7 @@
           "progress_bar": 8,
           "options_grid_horizontal": 14,
           "options_grid_vertical": 20,
-          "options_controls_left_margin": 22
+          "options_controls_left_margin": 0
         },
         "buttons": {
           "spacing": 10,
@@ -3813,12 +3813,12 @@
           ],
           "content_margins": [
             10,
-            20,
+            12,
             10,
             15
           ],
-          "margin_top": 10,
-          "padding_top": 5,
+          "margin_top": 6,
+          "padding_top": 3,
           "title_left": 10,
           "title_padding": [
             0,
