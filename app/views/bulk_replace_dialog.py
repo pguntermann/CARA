@@ -100,7 +100,7 @@ class BulkReplaceDialog(QDialog):
         spacing_config = dialog_config.get("spacing", {})
         self.section_spacing = spacing_config.get("section", 15)
         self.form_spacing = spacing_config.get("form", 15)
-        self.options_spacing = spacing_config.get("options", 15)
+        self.options_spacing = spacing_config.get("options", 22)
         self.result_spacing = spacing_config.get("result", 8)
         
         # Buttons

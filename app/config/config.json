@@ -3216,10 +3216,10 @@
         "font_family": "Helvetica Neue",
         "layout": {
           "margins": [
-            18,
-            18,
-            18,
-            18
+            25,
+            25,
+            25,
+            25
           ],
           "spacing": 12
         },
@@ -3227,7 +3227,7 @@
           "layout": 10,
           "section": 8,
           "form": 14,
-          "options": 15,
+          "options": 22,
           "result": 8
         },
         "buttons": {
