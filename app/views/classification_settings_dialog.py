@@ -49,7 +49,7 @@ class CPLScaleWidget(QWidget):
         self.scale_max = scale_config.get('scale_max', 500)
         self.blunder_compression_enabled = scale_config.get('blunder_compression_enabled', True)
         self.blunder_compression_factor = scale_config.get('blunder_compression_factor', 0.4)
-        self.background_color = QColor(*scale_config.get('background_color', [40, 40, 45]))
+        self.background_color = QColor(*scale_config.get('background_color', [30, 30, 35]))
         self.scale_line_color = QColor(*scale_config.get('scale_line_color', [150, 150, 150]))
         self.tick_color = QColor(*scale_config.get('tick_color', [200, 200, 200]))
         self.text_color = QColor(*scale_config.get('text_color', [220, 220, 220]))
@@ -348,20 +348,24 @@ class ClassificationSettingsDialog(QDialog):
         layout_config = dialog_config.get('layout', {})
         buttons_config = dialog_config.get('buttons', {})
         layout_spacing = layout_config.get('spacing', 15)
-        layout_margins = layout_config.get('margins', [20, 20, 20, 20])
+        layout_margins = layout_config.get('margins', [25, 25, 25, 25])
         section_spacing = layout_config.get('section_spacing', 20)
         
         layout = QVBoxLayout(self)
-        layout.setSpacing(layout_spacing)
+        layout.setSpacing(0)
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
+        
+        between_sections = layout_spacing + section_spacing
         
         # Move Quality Thresholds group
         thresholds_group = self._create_thresholds_group()
         layout.addWidget(thresholds_group)
+        layout.addSpacing(between_sections)
         
         # CPL Scale visualization
         self.cpl_scale_widget = self._create_cpl_scale_widget()
         layout.addWidget(self.cpl_scale_widget)
+        layout.addSpacing(between_sections)
         
         # Brilliant Move Criteria group
         brilliant_group = self._create_brilliant_group()
@@ -400,23 +404,22 @@ class ClassificationSettingsDialog(QDialog):
         
         form_layout = QFormLayout()
         form_layout.setSpacing(fields_config.get('spacing', 8))
-        # Set alignment for macOS compatibility (left-align labels and form)
-        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
-        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+        form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         input_width = fields_config.get('input_width', 100)
         label_width = fields_config.get('label_width', 200)
-        right_padding = fields_config.get('right_padding', 20)
+        right_padding = fields_config.get('right_padding', 0)
         
-        # Helper to create aligned label
         def create_label(text: str) -> QLabel:
             label = QLabel(text)
             label.setFixedWidth(label_width)
             label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             return label
         
-        # Helper to wrap input in a right-aligned container with padding
         def create_input_widget(input_widget: QSpinBox) -> QWidget:
             container = QWidget()
+            container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             container_layout = QHBoxLayout(container)
             container_layout.setContentsMargins(0, 0, right_padding, 0)
             container_layout.setSpacing(0)
@@ -430,7 +433,6 @@ class ClassificationSettingsDialog(QDialog):
         self.good_move_spinbox.setValue(self.current_thresholds.get("good_move_max_cpl", 50))
         self.good_move_spinbox.setToolTip("Maximum CPL (centipawns) for a move to be considered 'Good Move'")
         self.good_move_spinbox.setFixedWidth(input_width)
-        self.good_move_spinbox.setMinimumHeight(25)
         self.good_move_spinbox.valueChanged.connect(self._on_good_move_changed)
         form_layout.addRow(create_label("Good Move Max CPL:"), create_input_widget(self.good_move_spinbox))
         
@@ -440,7 +442,6 @@ class ClassificationSettingsDialog(QDialog):
         self.inaccuracy_spinbox.setValue(self.current_thresholds.get("inaccuracy_max_cpl", 100))
         self.inaccuracy_spinbox.setToolTip("Maximum CPL (centipawns) for a move to be considered 'Inaccuracy'")
         self.inaccuracy_spinbox.setFixedWidth(input_width)
-        self.inaccuracy_spinbox.setMinimumHeight(25)
         self.inaccuracy_spinbox.valueChanged.connect(self._on_inaccuracy_changed)
         form_layout.addRow(create_label("Inaccuracy Max CPL:"), create_input_widget(self.inaccuracy_spinbox))
         
@@ -450,7 +451,6 @@ class ClassificationSettingsDialog(QDialog):
         self.mistake_spinbox.setValue(self.current_thresholds.get("mistake_max_cpl", 200))
         self.mistake_spinbox.setToolTip("Maximum CPL (centipawns) for a move to be considered 'Mistake'")
         self.mistake_spinbox.setFixedWidth(input_width)
-        self.mistake_spinbox.setMinimumHeight(25)
         self.mistake_spinbox.valueChanged.connect(self._on_mistake_changed)
         form_layout.addRow(create_label("Mistake Max CPL:"), create_input_widget(self.mistake_spinbox))
         
@@ -569,23 +569,22 @@ class ClassificationSettingsDialog(QDialog):
         
         form_layout = QFormLayout()
         form_layout.setSpacing(fields_config.get('spacing', 8))
-        # Set alignment for macOS compatibility (left-align labels and form)
-        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
-        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+        form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         input_width = fields_config.get('input_width', 100)
         label_width = fields_config.get('label_width', 200)
-        right_padding = fields_config.get('right_padding', 20)
+        right_padding = fields_config.get('right_padding', 0)
         
-        # Helper to create aligned label
         def create_label(text: str) -> QLabel:
             label = QLabel(text)
             label.setFixedWidth(label_width)
             label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             return label
         
-        # Helper to wrap input in a right-aligned container with padding
         def create_input_widget(input_widget: QSpinBox) -> QWidget:
             container = QWidget()
+            container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             container_layout = QHBoxLayout(container)
             container_layout.setContentsMargins(0, 0, right_padding, 0)
             container_layout.setSpacing(0)
@@ -593,22 +592,19 @@ class ClassificationSettingsDialog(QDialog):
             container_layout.addWidget(input_widget)
             return container
         
-        # Helper to wrap checkbox to align with left edge of input fields
         def create_checkbox_widget(checkbox: QCheckBox) -> QWidget:
             container = QWidget()
+            container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             container_layout = QHBoxLayout(container)
-            # Add extra right margin to prevent checkbox border truncation
             container_layout.setContentsMargins(0, 0, right_padding + 2, 0)
             container_layout.setSpacing(0)
-            # Use the same stretch as input fields to position checkbox indicator at the same horizontal start position
             container_layout.addStretch()
-            # Add checkbox - this aligns the checkbox indicator's left edge with input field left edge
             container_layout.addWidget(checkbox)
             return container
         
-        # Helper to wrap combobox to align with input fields
         def create_combobox_widget(combobox: QComboBox) -> QWidget:
             container = QWidget()
+            container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             container_layout = QHBoxLayout(container)
             container_layout.setContentsMargins(0, 0, right_padding, 0)
             container_layout.setSpacing(0)
@@ -621,7 +617,6 @@ class ClassificationSettingsDialog(QDialog):
         self.shallow_depth_min_spinbox.setRange(1, 10)
         self.shallow_depth_min_spinbox.setValue(self.current_brilliant.get("shallow_depth_min", 3))
         self.shallow_depth_min_spinbox.setFixedWidth(input_width)
-        self.shallow_depth_min_spinbox.setMinimumHeight(25)
         self.shallow_depth_min_spinbox.setToolTip(wrap_tooltip_text("Minimum shallow depth to check for brilliancy detection. Candidate moves will be re-analyzed starting at this depth."))
         form_layout.addRow(create_label("Shallow Depth Min:"), create_input_widget(self.shallow_depth_min_spinbox))
         
@@ -630,7 +625,6 @@ class ClassificationSettingsDialog(QDialog):
         self.shallow_depth_max_spinbox.setRange(1, 10)
         self.shallow_depth_max_spinbox.setValue(self.current_brilliant.get("shallow_depth_max", 7))
         self.shallow_depth_max_spinbox.setFixedWidth(input_width)
-        self.shallow_depth_max_spinbox.setMinimumHeight(25)
         self.shallow_depth_max_spinbox.setToolTip(wrap_tooltip_text("Maximum shallow depth to check for brilliancy detection. Candidate moves will be checked iteratively from Shallow Depth Min up to this depth."))
         form_layout.addRow(create_label("Shallow Depth Max:"), create_input_widget(self.shallow_depth_max_spinbox))
         
@@ -639,7 +633,6 @@ class ClassificationSettingsDialog(QDialog):
         self.min_depths_show_error_spinbox.setRange(1, 10)
         self.min_depths_show_error_spinbox.setValue(self.current_brilliant.get("min_depths_show_error", 3))
         self.min_depths_show_error_spinbox.setFixedWidth(input_width)
-        self.min_depths_show_error_spinbox.setMinimumHeight(25)
         self.min_depths_show_error_spinbox.setToolTip(wrap_tooltip_text("Minimum number of shallow depths (between Min and Max) at which a candidate move must show an error to be marked brilliant. Higher values reduce false positives."))
         form_layout.addRow(create_label("Min Agreement:"), create_input_widget(self.min_depths_show_error_spinbox))
         
@@ -651,7 +644,6 @@ class ClassificationSettingsDialog(QDialog):
         # Make combobox wider to display full "Best or Good Move" text (about 75% wider)
         combobox_width = int(input_width * 1.75)
         self.candidate_selection_combobox.setFixedWidth(combobox_width)
-        self.candidate_selection_combobox.setMinimumHeight(25)
         self.candidate_selection_combobox.setToolTip(wrap_tooltip_text("Choose which candidate moves to check for brilliancy detection. Selecting \"Best or Good Move\" may increase detection time."))
         form_layout.addRow(create_label("Move Candidate:"), create_combobox_widget(self.candidate_selection_combobox))
         
@@ -667,6 +659,7 @@ class ClassificationSettingsDialog(QDialog):
         
         # Dialog background
         dialog_bg_color = dialog_config.get('background_color', [40, 40, 45])
+        self.setAutoFillBackground(True)
         palette = self.palette()
         palette.setColor(QPalette.ColorRole.Window, QColor(dialog_bg_color[0], dialog_bg_color[1], dialog_bg_color[2]))
         self.setPalette(palette)
@@ -679,9 +672,10 @@ class ClassificationSettingsDialog(QDialog):
         title_font_family = resolve_font_family(groups_config.get('title_font_family', 'Helvetica Neue'))
         title_font_size = scale_font_size(groups_config.get('title_font_size', 11))
         margin_top = groups_config.get('margin_top', 10)
-        padding_top = groups_config.get('padding_top', 10)
+        padding_top = groups_config.get('padding_top', 5)
         title_left = groups_config.get('title_left', 10)
         title_padding = groups_config.get('title_padding', [0, 5])
+        group_content_margins = groups_config.get('content_margins', [10, 20, 10, 15])
         
         group_boxes = list(self.findChildren(QGroupBox))
         if group_boxes:
@@ -700,6 +694,7 @@ class ClassificationSettingsDialog(QDialog):
                 title_color=title_color,
                 title_left=title_left,
                 title_padding=title_padding,
+                content_margins=group_content_margins,
                 use_transparent_palette=True  # Set palette for macOS
             )
         
@@ -769,7 +764,10 @@ class ClassificationSettingsDialog(QDialog):
                 border_radius=input_border_radius,
                 padding=spinbox_padding
             )
-        
+            for spin in spinboxes:
+                le = spin.lineEdit()
+                if le is not None:
+                    le.setAlignment(Qt.AlignmentFlag.AlignRight)
         
         # Apply checkbox styling using StyleManager
         from app.views.style import StyleManager
@@ -821,6 +819,11 @@ class ClassificationSettingsDialog(QDialog):
                 border_radius=input_border_radius,
                 padding=spinbox_padding
             )
+            ui_styles = self.config.get('ui', {}).get('styles', {})
+            field_min_h = int(ui_styles.get('spinbox', {}).get('minimum_height', 30))
+            if field_min_h > 0:
+                for cb in comboboxes:
+                    cb.setMinimumHeight(field_min_h)
         
         # Apply button styling using StyleManager (uses unified config)
         button_width = buttons_config.get('width', 120)

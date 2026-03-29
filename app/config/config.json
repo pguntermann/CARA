@@ -127,7 +127,8 @@
           6
         ],
         "disabled_brightness_factor": 0.5,
-        "hide_buttons": true
+        "hide_buttons": true,
+        "minimum_height": 30
       },
       "date_edit": {
         "text_color": [
@@ -2516,14 +2517,14 @@
     "dialogs": {
       "classification_settings": {
         "width": 480,
-        "height": 550,
+        "height": 640,
         "layout": {
-          "spacing": 15,
+          "spacing": 5,
           "margins": [
-            20,
-            20,
-            20,
-            20
+            25,
+            25,
+            25,
+            25
           ],
           "section_spacing": 10
         },
@@ -2536,11 +2537,17 @@
             240
           ],
           "margin_top": 10,
-          "padding_top": 10,
+          "padding_top": 5,
           "title_left": 10,
           "title_padding": [
             0,
             5
+          ],
+          "content_margins": [
+            10,
+            20,
+            10,
+            15
           ]
         },
         "fields": {
@@ -2553,7 +2560,7 @@
             220
           ],
           "spacing": 12,
-          "right_padding": 20,
+          "right_padding": 0,
           "disabled_background_color": [
             35,
             35,
@@ -2575,9 +2582,9 @@
           "blunder_compression_enabled": true,
           "blunder_compression_factor": 0.4,
           "background_color": [
-            40,
-            40,
-            45
+            30,
+            30,
+            35
           ],
           "scale_line_color": [
             150,

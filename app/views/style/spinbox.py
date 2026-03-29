@@ -1,6 +1,6 @@
 """Spinbox styling utilities."""
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from PyQt6.QtWidgets import QSpinBox, QDoubleSpinBox
 
 
@@ -105,7 +105,8 @@ def apply_spinbox_styling(
     border_radius: int = 3,
     padding: List[int] = None,
     disabled_brightness_factor: float = 0.5,
-    hide_buttons: bool = True
+    hide_buttons: bool = True,
+    minimum_height: int = 0,
 ) -> None:
     """Apply styling to QSpinBox and QDoubleSpinBox widgets.
     
@@ -123,6 +124,7 @@ def apply_spinbox_styling(
         padding: Padding as [horizontal, vertical] or [left, top, right, bottom] (default: [8, 6]).
         disabled_brightness_factor: Brightness factor for disabled state (default: 0.5).
         hide_buttons: Whether to hide up/down buttons (default: True).
+        minimum_height: If > 0, set ``setMinimumHeight`` on each spin box (helps Linux/Fusion layout).
     """
     stylesheet = generate_spinbox_stylesheet(
         config, text_color, font_family, font_size, bg_color, border_color,
@@ -132,4 +134,6 @@ def apply_spinbox_styling(
     
     for spinbox in spinboxes:
         spinbox.setStyleSheet(stylesheet)
+        if minimum_height > 0:
+            spinbox.setMinimumHeight(minimum_height)
 

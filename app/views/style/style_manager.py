@@ -1,7 +1,7 @@
 """Style manager for applying consistent UI element styling."""
 
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from PyQt6.QtWidgets import QScrollArea, QCheckBox, QComboBox, QRadioButton, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox, QDateEdit, QTimeEdit, QDateTimeEdit, QGroupBox, QTextEdit, QMenu, QTreeWidget
 
 from app.views.style.scrollbar import (
@@ -365,7 +365,8 @@ class StyleManager:
         border_radius: int = None,
         padding: List[int] = None,
         disabled_brightness_factor: float = None,
-        hide_buttons: bool = None
+        hide_buttons: bool = None,
+        minimum_height: Optional[int] = None,
     ) -> None:
         """Apply spinbox styling to a list of QSpinBox and QDoubleSpinBox widgets.
         
@@ -383,6 +384,8 @@ class StyleManager:
             padding: Padding as [horizontal, vertical] or [left, top, right, bottom]. If None, reads from centralized config.
             disabled_brightness_factor: Brightness factor for disabled state. If None, reads from centralized config.
             hide_buttons: Whether to hide up/down buttons. If None, reads from centralized config.
+            minimum_height: Minimum widget height in pixels. If None, uses ``ui.styles.spinbox.minimum_height``
+                (default 30). Pass ``0`` to skip setting height (e.g. compact toolbars).
         """
         from app.utils.font_utils import resolve_font_family, scale_font_size
         
@@ -414,11 +417,16 @@ class StyleManager:
             disabled_brightness_factor = spinbox_config.get('disabled_brightness_factor', 0.5)
         if hide_buttons is None:
             hide_buttons = spinbox_config.get('hide_buttons', True)
+        if minimum_height is None:
+            min_h = int(spinbox_config.get('minimum_height', 30))
+        else:
+            min_h = int(minimum_height)
         
         apply_spinbox_styling(
             spinboxes, config, text_color, font_family, font_size,
             bg_color, border_color, focus_border_color, border_width,
-            border_radius, padding, disabled_brightness_factor, hide_buttons
+            border_radius, padding, disabled_brightness_factor, hide_buttons,
+            minimum_height=min_h,
         )
     
     @staticmethod

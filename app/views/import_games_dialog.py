@@ -253,6 +253,7 @@ class ImportGamesDialog(QDialog):
         self.max_games_spin.setValue(1000)
         self.max_games_spin.setEnabled(False)
         self.max_games_spin.setMinimumWidth(self.input_minimum_width)
+        self.max_games_spin.setMinimumHeight(self.input_minimum_height)
         self.max_games_spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.max_games_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         max_games_label = QLabel("Maximum games:")
@@ -271,6 +272,7 @@ class ImportGamesDialog(QDialog):
         self.since_date_edit.setDate(QDate.currentDate().addYears(-1))
         self.since_date_edit.setEnabled(False)
         self.since_date_edit.setMinimumWidth(self.input_minimum_width)
+        self.since_date_edit.setMinimumHeight(self.input_minimum_height)
         self.since_date_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         since_date_label = QLabel("From date:")
         since_date_label.setMinimumWidth(self.label_minimum_width)
@@ -282,6 +284,7 @@ class ImportGamesDialog(QDialog):
         self.until_date_edit.setDate(QDate.currentDate())
         self.until_date_edit.setEnabled(False)
         self.until_date_edit.setMinimumWidth(self.input_minimum_width)
+        self.until_date_edit.setMinimumHeight(self.input_minimum_height)
         self.until_date_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         until_date_label = QLabel("To date:")
         until_date_label.setMinimumWidth(self.label_minimum_width)
@@ -439,7 +442,8 @@ class ImportGamesDialog(QDialog):
             focus_border_color=spinbox_focus_border_color,  # Match input focus border color
             border_width=input_border_width,
             border_radius=self.input_border_radius,
-            padding=spinbox_padding  # Preserve existing padding for alignment
+            padding=spinbox_padding,  # Preserve existing padding for alignment
+            minimum_height=self.input_minimum_height,
         )
         
         # Apply unified date edit styling using StyleManager
