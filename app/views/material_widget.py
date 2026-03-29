@@ -70,8 +70,29 @@ class MaterialWidget(QWidget):
         self.difference_text_color = QColor(*material_config.get("difference_text_color", [255, 255, 100]))
         self.separator_color = QColor(*material_config.get("separator_color", [100, 100, 105]))
         
-        # Set fixed size
+        required_height = self._minimum_widget_height_for_layout()
+        self.widget_height = max(self.widget_height, required_height)
         self.setFixedSize(self.widget_width, self.widget_height)
+
+    def _minimum_widget_height_for_layout(self) -> int:
+        """Minimum height so paintEvent's vertical stack fits; mirrors paintEvent spacing exactly."""
+        spacing = 10
+        text_spacing = 6
+        rows_per_side = 2
+        spacing_unit = spacing // 2
+        separator_thickness = 1
+        font = QFont(self.font_family, self.font_size)
+        fm = QFontMetrics(font)
+        line_height = fm.height()
+        fixed_side_height = rows_per_side * line_height + (rows_per_side - 1) * text_spacing
+        score_line_height = fm.height()
+        content_height = (
+            2 * fixed_side_height
+            + 4 * spacing_unit
+            + 2 * separator_thickness
+            + score_line_height
+        )
+        return self.padding[0] + content_height + self.padding[2]
     
     
     def _setup_ui(self) -> None:

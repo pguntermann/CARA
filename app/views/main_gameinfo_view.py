@@ -29,8 +29,8 @@ class MainGameInfoView(QWidget):
         panel_config = ui_config.get('panels', {}).get('main', {})
         gameinfo_config = panel_config.get('gameinfo', {})
         
-        # Get spacing and padding from config
-        padding = gameinfo_config.get('padding', [10, 10, 10, 10])
+        # Padding: left, top, right, bottom (Qt setContentsMargins order)
+        padding = gameinfo_config.get('padding', [10, 18, 10, 10])
         layout.setContentsMargins(padding[0], padding[1], padding[2], padding[3])
         spacing = gameinfo_config.get('spacing', 8)
         layout.setSpacing(spacing)

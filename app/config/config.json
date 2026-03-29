@@ -321,9 +321,9 @@
           ],
           "padding": [
             10,
+            25,
             10,
-            10,
-            10
+            0
           ],
           "spacing": 8,
           "separator": {
