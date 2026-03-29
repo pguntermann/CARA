@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, QMutex, QMutexLocker, QTimer
 
 from app.models.database_model import DatabaseModel
+from app.models.moveslist_model import MoveData
 
 if TYPE_CHECKING:
     from app.models.database_model import GameData
@@ -260,11 +261,39 @@ class PlayerStatsCalculationWorker(QThread):
                 self.stats_unavailable.emit("calculation_error")
                 return
             
+            # One move extraction per game — reused by all error-pattern detectors (avoids repeated PGN parse)
+            precomputed_moves: List[Optional[List[MoveData]]] = []
+            gc = self.stats_controller._game_controller
+            n_for_moves = len(analyzed_games)
+            if gc and n_for_moves > 0:
+                for idx, g in enumerate(analyzed_games):
+                    if self._is_cancelled():
+                        return
+                    # Map this sub-phase to 88–90% so the bar advances while loading each game
+                    pct = 88 + int((idx + 1) / max(n_for_moves, 1) * 2)
+                    if pct > 90:
+                        pct = 90
+                    self.progress_update.emit(
+                        pct,
+                        f"Loading moves for pattern detection ({idx + 1}/{n_for_moves})...",
+                    )
+                    try:
+                        precomputed_moves.append(gc.extract_moves_from_game(g))
+                    except Exception:
+                        precomputed_moves.append(None)
+            else:
+                self.progress_update.emit(88, "Loading moves for pattern detection...")
+                precomputed_moves = [None] * n_for_moves
+            
             # Detect error patterns (using summaries already calculated in parallel)
             self.progress_update.emit(90, "Detecting error patterns...")
             
             error_patterns = self.stats_controller.error_pattern_service.detect_error_patterns(
-                self.player_name, analyzed_games, aggregated_stats, game_summaries
+                self.player_name,
+                analyzed_games,
+                aggregated_stats,
+                game_summaries,
+                precomputed_moves=precomputed_moves,
             )
             
             if not self._is_cancelled():

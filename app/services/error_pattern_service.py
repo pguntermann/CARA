@@ -4,14 +4,13 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 
 from app.models.database_model import GameData
+from app.models.moveslist_model import MoveData
 from app.services.game_summary_service import GameSummary, PlayerStatistics, PhaseStatistics
 from app.services.game_highlights.base_rule import GameHighlight
 from app.services.game_highlights.highlight_detector import HighlightDetector
 from app.services.game_highlights.rule_registry import RuleRegistry
 from app.controllers.game_controller import GameController
 from app.services.opening_service import OpeningService
-from app.services.analysis_data_storage_service import AnalysisDataStorageService
-
 
 @dataclass
 class ErrorPattern:
@@ -46,18 +45,44 @@ class ErrorPatternService:
         self.phase_blunder_threshold = self.thresholds.get('phase_blunder_percentage', 20.0)
         self.tactical_miss_threshold = self.thresholds.get('tactical_miss_count', 10)
         self.opening_error_threshold = self.thresholds.get('opening_error_rate', 30.0)
-    
-    def detect_error_patterns(self, player_name: str, games: List[GameData],
-                             aggregated_stats: Optional[Any],
-                             game_summaries: List[GameSummary]) -> List[ErrorPattern]:
+
+    def _moves_for(
+        self,
+        index: int,
+        game: GameData,
+        precomputed_moves: Optional[List[Optional[List[MoveData]]]],
+    ) -> Optional[List[MoveData]]:
+        """Resolve moves for a game: use precomputed list when set, else extract via controller."""
+        if precomputed_moves is not None and index < len(precomputed_moves):
+            cached = precomputed_moves[index]
+            if cached is not None:
+                return cached
+        if self.game_controller:
+            try:
+                return self.game_controller.extract_moves_from_game(game)
+            except Exception:
+                return None
+        return None
+
+    def detect_error_patterns(
+        self,
+        player_name: str,
+        games: List[GameData],
+        aggregated_stats: Optional[Any],
+        game_summaries: List[GameSummary],
+        precomputed_moves: Optional[List[Optional[List[MoveData]]]] = None,
+    ) -> List[ErrorPattern]:
         """Detect error patterns for a player.
-        
+
         Args:
             player_name: Player name.
             games: List of GameData instances (analyzed games).
             aggregated_stats: AggregatedPlayerStats instance.
             game_summaries: List of GameSummary instances for the games.
-            
+            precomputed_moves: Optional list aligned with ``games`` — one move list per game
+                (e.g. from a single ``extract_moves_from_game`` pass). Avoids re-parsing PGN
+                in each detector.
+
         Returns:
             List of ErrorPattern instances.
         """
@@ -68,7 +93,7 @@ class ErrorPatternService:
         
         # Pattern 1: Phase-specific blunders (only show phase with most blunders)
         phase_patterns = self._detect_phase_blunder_patterns(
-            player_name, games, game_summaries, aggregated_stats
+            player_name, games, game_summaries, aggregated_stats, precomputed_moves
         )
         patterns.extend(phase_patterns)
         
@@ -80,13 +105,13 @@ class ErrorPatternService:
         
         # Pattern 3: Opening-specific errors
         opening_patterns = self._detect_opening_error_patterns(
-            player_name, games, game_summaries, aggregated_stats
+            player_name, games, game_summaries, aggregated_stats, precomputed_moves
         )
         patterns.extend(opening_patterns)
         
         # Pattern 4: High CPL patterns (consistently high centipawn loss)
         high_cpl_patterns = self._detect_high_cpl_patterns(
-            player_name, games, game_summaries, aggregated_stats
+            player_name, games, game_summaries, aggregated_stats, precomputed_moves
         )
         patterns.extend(high_cpl_patterns)
         
@@ -104,7 +129,7 @@ class ErrorPatternService:
         
         # Pattern 7: Defensive weaknesses (problems when defending)
         defensive_patterns = self._detect_defensive_weaknesses(
-            player_name, games, game_summaries
+            player_name, games, game_summaries, precomputed_moves
         )
         patterns.extend(defensive_patterns)
         
@@ -116,7 +141,7 @@ class ErrorPatternService:
         
         # Pattern 9: Repeated errors in the same position (blunders, misses, inaccuracies)
         repeated_position_patterns = self._detect_repeated_position_errors(
-            player_name, games
+            player_name, games, precomputed_moves
         )
         patterns.extend(repeated_position_patterns)
         
@@ -128,9 +153,14 @@ class ErrorPatternService:
         
         return patterns
     
-    def _detect_phase_blunder_patterns(self, player_name: str, games: List[GameData],
-                                      game_summaries: List[GameSummary],
-                                      aggregated_stats: Any) -> List[ErrorPattern]:
+    def _detect_phase_blunder_patterns(
+        self,
+        player_name: str,
+        games: List[GameData],
+        game_summaries: List[GameSummary],
+        aggregated_stats: Any,
+        precomputed_moves: Optional[List[Optional[List[MoveData]]]],
+    ) -> List[ErrorPattern]:
         """Detect blunder patterns by phase."""
         patterns: List[ErrorPattern] = []
         
@@ -164,7 +194,7 @@ class ErrorPatternService:
                     player_name, games, game_summaries, phase_name
                 )
                 related_ref_plies = self._collect_phase_blunder_ref_plies(
-                    player_name, games, game_summaries, phase_name
+                    player_name, games, game_summaries, phase_name, precomputed_moves
                 )
                 severity = self._determine_severity(phase_percentage, [30, 50, 70])
                 patterns.append(ErrorPattern(
@@ -200,14 +230,16 @@ class ErrorPatternService:
         
         return patterns
     
-    def _detect_opening_error_patterns(self, player_name: str, games: List[GameData],
-                                      game_summaries: List[GameSummary],
-                                      aggregated_stats: Any) -> List[ErrorPattern]:
+    def _detect_opening_error_patterns(
+        self,
+        player_name: str,
+        games: List[GameData],
+        game_summaries: List[GameSummary],
+        aggregated_stats: Any,
+        precomputed_moves: Optional[List[Optional[List[MoveData]]]],
+    ) -> List[ErrorPattern]:
         """Detect opening-specific error patterns."""
         patterns: List[ErrorPattern] = []
-        
-        if not self.game_controller:
-            return patterns
         
         # Get repeat indicator from config
         repeat_indicator = self.config.get('resources', {}).get('opening_repeat_indicator', '*')
@@ -224,8 +256,7 @@ class ErrorPatternService:
             # Determine if player is white or black
             is_white = (game.white == player_name)
             
-            # Get moves for this game
-            moves = self.game_controller.extract_moves_from_game(game)
+            moves = self._moves_for(i, game, precomputed_moves)
             if not moves:
                 continue
             
@@ -354,15 +385,13 @@ class ErrorPatternService:
         games: List[GameData],
         game_summaries: List[GameSummary],
         phase: str,
+        precomputed_moves: Optional[List[Optional[List[MoveData]]]],
     ) -> List[Tuple[GameData, int]]:
         """Collect (game, ref_ply) pairs for blunders in the specified phase.
 
         Uses per-phase move counts from GameSummary to map a player's moves to
         opening/middlegame/endgame and records blunders in the dominant phase.
         """
-        if not self.game_controller:
-            return []
-
         results: List[Tuple[GameData, int]] = []
 
         for i, game in enumerate(games):
@@ -381,10 +410,7 @@ class ErrorPatternService:
                 middlegame_moves = summary.black_middlegame.moves
                 endgame_moves = summary.black_endgame.moves
 
-            try:
-                moves = self.game_controller.extract_moves_from_game(game)
-            except Exception:
-                moves = None
+            moves = self._moves_for(i, game, precomputed_moves)
             if not moves:
                 continue
 
@@ -424,9 +450,14 @@ class ErrorPatternService:
 
         return results
     
-    def _detect_high_cpl_patterns(self, player_name: str, games: List[GameData],
-                                  game_summaries: List[GameSummary],
-                                  aggregated_stats: Any) -> List[ErrorPattern]:
+    def _detect_high_cpl_patterns(
+        self,
+        player_name: str,
+        games: List[GameData],
+        game_summaries: List[GameSummary],
+        aggregated_stats: Any,
+        precomputed_moves: Optional[List[Optional[List[MoveData]]]],
+    ) -> List[ErrorPattern]:
         """Detect patterns of consistently high centipawn loss."""
         patterns: List[ErrorPattern] = []
         
@@ -446,10 +477,7 @@ class ErrorPatternService:
                 if player_stats.average_cpl >= high_cpl_threshold:
                     related_games.append(game)
                     # Collect a few of the worst moves by CPL for jump-to-move
-                    try:
-                        moves = AnalysisDataStorageService.load_analysis_data(game)
-                    except Exception:
-                        moves = None
+                    moves = self._moves_for(i, game, precomputed_moves)
                     if not moves:
                         continue
                     cpl_field = "cpl_white" if is_white else "cpl_black"
@@ -583,13 +611,15 @@ class ErrorPatternService:
         
         return patterns
     
-    def _detect_defensive_weaknesses(self, player_name: str, games: List[GameData],
-                                    game_summaries: List[GameSummary]) -> List[ErrorPattern]:
+    def _detect_defensive_weaknesses(
+        self,
+        player_name: str,
+        games: List[GameData],
+        game_summaries: List[GameSummary],
+        precomputed_moves: Optional[List[Optional[List[MoveData]]]],
+    ) -> List[ErrorPattern]:
         """Detect problems when defending (playing from worse positions)."""
         patterns: List[ErrorPattern] = []
-        
-        if not self.game_controller:
-            return patterns
         
         defensive_errors = 0
         related_games: List[GameData] = []
@@ -608,8 +638,7 @@ class ErrorPatternService:
             defensive_blunders = 0
             game_ref_plies: List[Tuple[GameData, int]] = []
             
-            # Get moves for this game
-            moves = self.game_controller.extract_moves_from_game(game)
+            moves = self._moves_for(i, game, precomputed_moves)
             if not moves:
                 continue
             
@@ -702,18 +731,23 @@ class ErrorPatternService:
         parts = fen.strip().split()
         return " ".join(parts[:2]) if len(parts) >= 2 else fen.strip()
     
-    def _detect_repeated_position_errors(self, player_name: str, games: List[GameData]) -> List[ErrorPattern]:
+    def _detect_repeated_position_errors(
+        self,
+        player_name: str,
+        games: List[GameData],
+        precomputed_moves: Optional[List[Optional[List[MoveData]]]],
+    ) -> List[ErrorPattern]:
         """Detect repeated blunders, mistakes, misses, or inaccuracies in the same position across games."""
         patterns: List[ErrorPattern] = []
-        if not self.game_controller or not games:
+        if not games:
             return patterns
         
         start_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
         # (normalized_fen, assessment_type) -> list of (game, ref_ply) where player made that error in that position
         collector: Dict[tuple, List[Tuple[GameData, int]]] = {}
         
-        for game in games:
-            moves = self.game_controller.extract_moves_from_game(game)
+        for gi, game in enumerate(games):
+            moves = self._moves_for(gi, game, precomputed_moves)
             if not moves:
                 continue
             is_white = (game.white == player_name)
