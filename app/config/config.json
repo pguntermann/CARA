@@ -3325,9 +3325,7 @@
       },
       "bulk_tag": {
         "width": 600,
-        "height": 550,
-        "minimum_width": 550,
-        "minimum_height": 630,
+        "height": 480,
         "background_color": [
           40,
           40,
@@ -3352,11 +3350,14 @@
             25,
             25
           ],
-          "spacing": 15
+          "spacing": 12
         },
         "spacing": {
-          "section": 15,
-          "form": 15
+          "layout": 10,
+          "section": 8,
+          "form": 14,
+          "options": 22,
+          "result": 8
         },
         "buttons": {
           "spacing": 10,
@@ -3371,6 +3372,7 @@
             200,
             200
           ],
+          "note_font_size": 10,
           "minimum_width": 90
         },
         "radio_buttons": {
@@ -3422,9 +3424,9 @@
           ],
           "content_margins": [
             10,
-            20,
+            14,
             10,
-            15
+            10
           ],
           "margin_top": 10,
           "padding_top": 5,

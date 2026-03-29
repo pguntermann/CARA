@@ -826,8 +826,6 @@ class ConfigLoader:
             'ui.dialogs.bulk_replace.quick_select_buttons.height',
             'ui.dialogs.bulk_tag.width',
             'ui.dialogs.bulk_tag.height',
-            'ui.dialogs.bulk_tag.minimum_width',
-            'ui.dialogs.bulk_tag.minimum_height',
             'ui.dialogs.bulk_tag.background_color',
             'ui.dialogs.bulk_tag.border_color',
             'ui.dialogs.bulk_tag.text_color',
