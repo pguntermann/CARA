@@ -1099,6 +1099,7 @@ class ConfigLoader:
             'ui.dialogs.message_dialog.message.font_size',
             'ui.dialogs.message_dialog.message.padding',
             'ui.dialogs.message_dialog.message.text_color',
+            'ui.dialogs.message_dialog.message.link_color',
             'ui.dialogs.message_dialog.message.base_height',
             'ui.dialogs.message_dialog.message.line_height',
             'ui.dialogs.message_dialog.buttons.spacing',

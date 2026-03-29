@@ -16,6 +16,30 @@ import sys
 import subprocess
 
 
+def _inject_rich_text_link_color(html: str, r: int, g: int, b: int) -> str:
+    """Apply link color inside HTML for QLabel rich text.
+
+    On macOS (and often elsewhere), Qt ignores ``QLabel a {{ color: ... }}`` stylesheets for
+    embedded rich text and uses the system link color instead. Inline ``style`` on each ``<a>``
+    is honored.
+    """
+    style_fragment = f"color: rgb({r}, {g}, {b}); text-decoration: underline;"
+
+    def patch_anchor(match: re.Match[str]) -> str:
+        tag = match.group(0)
+        if re.search(r"\bstyle\s*=", tag, re.IGNORECASE):
+            return tag
+        return re.sub(
+            r"<a\b",
+            f'<a style="{style_fragment}" ',
+            tag,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+
+    return re.sub(r"<a\b[^>]*>", patch_anchor, html, flags=re.IGNORECASE)
+
+
 class MessageDialog(QDialog):
     """Styled message dialog for warnings, information, and errors."""
     
@@ -102,7 +126,10 @@ class MessageDialog(QDialog):
         message_font_size = msg_font_size
         message_padding = message_config.get('padding', 5)
         message_text_color = message_config.get('text_color', [200, 200, 200])
-        message_label = QLabel(message)
+        link_color = message_config.get('link_color', [150, 180, 255])
+        lr, lg, lb = int(link_color[0]), int(link_color[1]), int(link_color[2])
+        message_html = _inject_rich_text_link_color(message, lr, lg, lb)
+        message_label = QLabel(message_html)
         message_label.setWordWrap(True)
         # Enable rich text/HTML support for links
         message_label.setTextFormat(Qt.TextFormat.RichText)
@@ -111,13 +138,10 @@ class MessageDialog(QDialog):
         message_label.linkActivated.connect(self._on_link_activated)
         # Set minimum width to ensure proper word wrapping calculation
         message_label.setMinimumWidth(dialog_width - layout_margins[0] - layout_margins[2] - (message_padding * 2))
-        # Get link color from config or use a slightly lighter shade of text color
-        link_color = message_config.get('link_color', [150, 180, 255])
         message_label.setStyleSheet(
             f"font-size: {message_font_size}pt; "
             f"padding: {message_padding}px; "
             f"color: rgb({message_text_color[0]}, {message_text_color[1]}, {message_text_color[2]});"
-            f"QLabel a {{ color: rgb({link_color[0]}, {link_color[1]}, {link_color[2]}); text-decoration: underline; }}"
         )
         layout.addWidget(message_label)
         
