@@ -1,0 +1,58 @@
+# -*- mode: python ; coding: utf-8 -*-
+# PyInstaller spec for Linux (onedir). Based on CARA_windows.spec.
+# Build from repo root, e.g.: pyinstaller CARA_linux.spec
+# For a desktop icon, ship a .desktop file pointing at dist/CARA/CARA and a PNG.
+
+a = Analysis(
+    ['cara.py'],
+    pathex=[],
+    binaries=[],
+    datas=[
+        ('app/config/config.json', 'app/config'),
+        ('app/resources', 'app/resources'),
+        ('appicon.svg', '.'),
+        ('manual.html', '.'),
+        ('LICENSE', '.'),
+        ('README.md', '.'),
+        ('RELEASE_NOTES.md', '.'),
+        ('THIRD_PARTY_LICENSES.md', '.'),
+        ('engine_parameters.json', '.'),
+        ('user_settings.json', '.'),
+        ('user_settings.json.template', '.'),
+    ],
+    hiddenimports=['_charset_normalizer'],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+    optimize=0,
+)
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name='CARA',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='CARA',
+)

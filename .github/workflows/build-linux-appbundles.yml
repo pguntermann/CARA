@@ -1,0 +1,107 @@
+# Build Linux amd64 and arm64 PyInstaller onedir bundles (manual trigger only).
+# Artifacts: one ZIP per architecture (same idea as the macOS ZIP in build-appbundles.yml).
+#
+# ARM64 jobs use GitHub's ubuntu-24.04-arm runners. Those are available for public repos;
+# private repos may need larger/self-hosted runners or a single-arch workflow until enabled.
+#
+# Archive format: ZIP matches the existing macOS artifact and opens everywhere. Tar.gz is
+# more typical on Linux (permissions/symlinks, smaller with gzip) — switch the packaging
+# step if you prefer native-style archives for Linux-only distribution.
+
+name: Build Linux AppBundles
+
+on:
+  workflow_dispatch:
+    inputs:
+      use_config_version:
+        description: "Use version from config.json (if false, use timestamp)"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies (Qt runtime for tests/build + UPX)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libegl1 \
+            libgl1 \
+            libxcb-cursor0 \
+            libxcb-xinerama0 \
+            libxkbcommon0 \
+            upx-ucl \
+            zip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install PyQt6==6.10.0
+          pip install pyinstaller==6.17.0
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event.inputs.use_config_version }}" = "true" ]; then
+            VERSION=$(python -c "import json; print(json.load(open('app/config/config.json'))['version'])")
+          else
+            VERSION=$(date +%Y%m%d_%H%M%S)
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Update config.json version for timestamp builds
+        if: github.event.inputs.use_config_version == 'false'
+        shell: bash
+        env:
+          BUILD_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python - << 'EOF'
+          import json
+          import os
+          from pathlib import Path
+
+          cfg_path = Path("app/config/config.json")
+          data = json.loads(cfg_path.read_text(encoding="utf-8"))
+          data["version"] = os.environ["BUILD_VERSION"]
+          cfg_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+          EOF
+
+      - name: Build with PyInstaller
+        run: pyinstaller CARA_linux.spec
+
+      - name: Create Linux ZIP
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          arch="${{ matrix.arch }}"
+          zipName="CARA.${version}.linux.${arch}.AppBundle.zip"
+          (cd dist && zip -ry "../${zipName}" CARA)
+          echo "ZIP_NAME=${zipName}" >> "$GITHUB_ENV"
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CARA.${{ steps.version.outputs.version }}.linux.${{ matrix.arch }}.AppBundle
+          path: ${{ env.ZIP_NAME }}
