@@ -283,6 +283,7 @@ class BulkReplaceDialog(QDialog):
         
         # Target Games group
         games_group = QGroupBox("Target Games")
+        games_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         games_layout = QHBoxLayout()
         games_layout.setSpacing(self.section_spacing)
         dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("bulk_replace", {})
@@ -314,6 +315,7 @@ class BulkReplaceDialog(QDialog):
         
         # Metadata Tag Replacement group
         replace_group = QGroupBox("Metadata Tag Replacement")
+        replace_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         replace_layout = QFormLayout()
         replace_layout.setSpacing(self.form_spacing)
         replace_layout.setVerticalSpacing(self.form_spacing)  # Ensure vertical spacing between rows
@@ -531,6 +533,7 @@ class BulkReplaceDialog(QDialog):
         
         # Smart Update group
         smart_update_group = QGroupBox("Smart Update")
+        smart_update_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         smart_update_layout = QVBoxLayout()
         smart_update_layout.setSpacing(self.result_spacing)
         smart_update_content_margins = groups_config.get("content_margins", [10, 20, 10, 15])
@@ -549,7 +552,8 @@ class BulkReplaceDialog(QDialog):
         smart_update_group.setLayout(smart_update_layout)
         main_layout.addWidget(smart_update_group)
         
-        main_layout.addStretch()
+        # Absorb extra height when the window is taller than content (avoids stretching group boxes on macOS)
+        main_layout.addStretch(1)
         
         # Buttons
         buttons_layout = QHBoxLayout()

@@ -3194,9 +3194,7 @@
       },
       "bulk_replace": {
         "width": 600,
-        "height": 760,
-        "minimum_width": 550,
-        "minimum_height": 710,
+        "height": 800,
         "background_color": [
           40,
           40,

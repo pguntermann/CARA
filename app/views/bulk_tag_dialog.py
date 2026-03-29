@@ -257,6 +257,7 @@ class BulkTagDialog(QDialog):
         
         # Target Games group
         games_group = QGroupBox("Target Games")
+        games_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         games_layout = QHBoxLayout()
         games_layout.setSpacing(self.section_spacing)
         dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("bulk_tag", {})
@@ -293,6 +294,7 @@ class BulkTagDialog(QDialog):
         
         # Operation Selection group
         operation_group = QGroupBox("Operation")
+        operation_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         operation_layout = QHBoxLayout()
         operation_layout.setSpacing(self.section_spacing)
         operation_content_margins = groups_config.get("content_margins", [10, 14, 10, 10])
@@ -325,6 +327,7 @@ class BulkTagDialog(QDialog):
         
         # Tag Operation group
         tag_group = QGroupBox("Tag Operation")
+        tag_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         tag_layout = QFormLayout()
         tag_layout.setSpacing(self.form_spacing)
         # Set field growth policy to make fields expand
@@ -410,7 +413,8 @@ class BulkTagDialog(QDialog):
         tag_group.setLayout(tag_layout)
         main_layout.addWidget(tag_group)
         
-        main_layout.addStretch()
+        # Absorb extra height when the window is taller than content (avoids stretching group boxes on macOS)
+        main_layout.addStretch(1)
         
         # Buttons
         buttons_layout = QHBoxLayout()

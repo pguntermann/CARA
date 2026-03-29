@@ -774,8 +774,6 @@ class ConfigLoader:
             'ui.dialogs.engine_dialog.group_box.content_margins',
             'ui.dialogs.bulk_replace.width',
             'ui.dialogs.bulk_replace.height',
-            'ui.dialogs.bulk_replace.minimum_width',
-            'ui.dialogs.bulk_replace.minimum_height',
             'ui.dialogs.bulk_replace.background_color',
             'ui.dialogs.bulk_replace.border_color',
             'ui.dialogs.bulk_replace.text_color',
@@ -1430,4 +1428,31 @@ class ConfigLoader:
                 pass  # Fall through to print
         print(f"Configuration Error: {message}", file=sys.stderr)
         sys.exit(1)
+
+def read_ui_dialog_section(
+    dialog_key: str,
+    *,
+    config_path: Optional[Path] = None,
+) -> Optional[Dict[str, Any]]:
+    """Load ``ui.dialogs.<dialog_key>`` from config.json on disk.
+
+    Modal dialogs use this so width, height, and other keys reflect edits to the file
+    without restarting the application. Startup still uses :meth:`ConfigLoader.load`.
+
+    Returns:
+        The dialog subsection dict, or None if the file is missing, JSON is invalid,
+        or the section is absent or not a dict.
+    """
+    if config_path is None:
+        config_path = Path(__file__).resolve().parent / "config.json"
+    try:
+        if not config_path.is_file():
+            return None
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        section = data.get("ui", {}).get("dialogs", {}).get(dialog_key)
+        return section if isinstance(section, dict) else None
+    except (OSError, json.JSONDecodeError, TypeError):
+        return None
+
 
