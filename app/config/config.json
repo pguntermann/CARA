@@ -2517,7 +2517,7 @@
     "dialogs": {
       "classification_settings": {
         "width": 480,
-        "height": 640,
+        "height": 660,
         "layout": {
           "spacing": 5,
           "margins": [
