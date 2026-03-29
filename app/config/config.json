@@ -3780,7 +3780,10 @@
           "section": 15,
           "controls_row": 20,
           "label_spinbox": 8,
-          "progress_bar": 8
+          "progress_bar": 8,
+          "options_grid_horizontal": 14,
+          "options_grid_vertical": 12,
+          "options_controls_left_margin": 22
         },
         "buttons": {
           "spacing": 10,
@@ -3885,7 +3888,8 @@
           "suffix": ""
         },
         "spinboxes": {
-          "fixed_width": 120
+          "parallel_movetime_width": 104,
+          "max_threads_min_width": 128
         },
         "progress_display": {
           "max_progress_cap": 99.9999,

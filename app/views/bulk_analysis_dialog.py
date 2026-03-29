@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
     QHBoxLayout,
+    QGridLayout,
     QLabel,
     QPushButton,
     QRadioButton,
@@ -160,13 +161,16 @@ class BulkAnalysisDialog(QDialog):
         self.re_analyze_checkbox.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         options_layout.addWidget(self.re_analyze_checkbox)
         
-        # Controls row: parallel games and max_threads on same row
-        controls_row_layout = QHBoxLayout()
-        controls_row_layout.setSpacing(spacing_config.get('controls_row', 20))
+        # Left-aligned labels (same as typical form dialogs); grid column width follows longest label
+        label_align = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         
-        # Parallel games input
-        parallel_games_row_layout = QHBoxLayout()
-        parallel_games_row_layout.setSpacing(spacing_config.get('label_spinbox', 8))
+        # Options grid: stable columns on all platforms (Fusion vs native styles)
+        options_grid = QGridLayout()
+        options_grid.setHorizontalSpacing(spacing_config.get('options_grid_horizontal', 14))
+        options_grid.setVerticalSpacing(spacing_config.get('options_grid_vertical', 12))
+        # Indent options grid to line up with checkbox label text (indicator + gap); config, not runtime style
+        grid_left = int(spacing_config.get('options_controls_left_margin', 22))
+        options_grid.setContentsMargins(grid_left, 0, 0, 0)
         
         # Get parallel games config
         parallel_games_config = dialog_config.get('parallel_games_spinbox', {})
@@ -180,21 +184,10 @@ class BulkAnalysisDialog(QDialog):
         # Store original max for "all games" mode
         self._parallel_games_max_all = parallel_games_max
         
-        # Parallel games label (set fixed width to align with move time)
-        labels_config = dialog_config.get('labels', {})
         parallel_games_label = QLabel("Parallel games:")
-        parallel_games_label.setStyleSheet(
-            f"font-size: {scale_font_size(labels_config.get('font_size', 11))}pt; "
-            f"color: rgb({labels_config.get('text_color', [200, 200, 200])[0]}, "
-            f"{labels_config.get('text_color', [200, 200, 200])[1]}, "
-            f"{labels_config.get('text_color', [200, 200, 200])[2]});"
-        )
-        # Set fixed width to match "Move Time (ply):" label for vertical alignment
-        label_fixed_width = labels_config.get('fixed_width', 110)
-        parallel_games_label.setFixedWidth(label_fixed_width)
-        parallel_games_row_layout.addWidget(parallel_games_label)
+        parallel_games_label.setObjectName("bulk_option_label")
+        parallel_games_label.setAlignment(label_align)
         
-        # Parallel games spinbox
         self.parallel_games_spinbox = QSpinBox()
         self.parallel_games_spinbox.setMinimum(parallel_games_min)
         self.parallel_games_spinbox.setMaximum(parallel_games_max)
@@ -202,16 +195,6 @@ class BulkAnalysisDialog(QDialog):
         self.parallel_games_spinbox.setValue(parallel_games_default)
         if parallel_games_suffix:
             self.parallel_games_spinbox.setSuffix(parallel_games_suffix)
-        parallel_games_row_layout.addWidget(self.parallel_games_spinbox)
-        
-        controls_row_layout.addLayout(parallel_games_row_layout, 0)  # Stretch factor 0 to prevent stretching
-        
-        # Add stretch to push max threads to the right
-        controls_row_layout.addStretch()
-        
-        # Max threads input (on same row as parallel games, aligned to the right)
-        max_threads_row_layout = QHBoxLayout()
-        max_threads_row_layout.setSpacing(spacing_config.get('label_spinbox', 8))
         
         # Get max threads config
         max_threads_config = dialog_config.get('max_threads_spinbox', {})
@@ -222,23 +205,15 @@ class BulkAnalysisDialog(QDialog):
         max_threads_suffix = max_threads_config.get('suffix', '')
         max_threads_special_text = max_threads_config.get('special_value_text', 'Unlimited')
         
-        # Use available cores as maximum if not specified or if specified max is too high
         cpu_count_fallback = threading_config.get('cpu_count_fallback', 4)
         available_cores = os.cpu_count() or cpu_count_fallback
         if max_threads_max > available_cores:
             max_threads_max = available_cores
         
-        # Max threads label
         max_threads_label = QLabel("Max threads:")
-        max_threads_label.setStyleSheet(
-            f"font-size: {scale_font_size(labels_config.get('font_size', 11))}pt; "
-            f"color: rgb({labels_config.get('text_color', [200, 200, 200])[0]}, "
-            f"{labels_config.get('text_color', [200, 200, 200])[1]}, "
-            f"{labels_config.get('text_color', [200, 200, 200])[2]});"
-        )
-        max_threads_row_layout.addWidget(max_threads_label)
+        max_threads_label.setObjectName("bulk_option_label")
+        max_threads_label.setAlignment(label_align)
         
-        # Max threads spinbox
         self.max_threads_spinbox = QSpinBox()
         self.max_threads_spinbox.setMinimum(max_threads_min)
         self.max_threads_spinbox.setMaximum(max_threads_max)
@@ -248,36 +223,17 @@ class BulkAnalysisDialog(QDialog):
             self.max_threads_spinbox.setSuffix(max_threads_suffix)
         if max_threads_special_text and max_threads_min == 0:
             self.max_threads_spinbox.setSpecialValueText(max_threads_special_text)
-        max_threads_row_layout.addWidget(self.max_threads_spinbox)
-        
-        controls_row_layout.addLayout(max_threads_row_layout, 0)  # Stretch factor 0 to prevent stretching
-        
-        options_layout.addLayout(controls_row_layout)
-        
-        # Time per move row (below parallel games and max threads)
-        movetime_row_layout = QHBoxLayout()
-        movetime_row_layout.setSpacing(spacing_config.get('label_spinbox', 8))
         
         movetime_label = QLabel("Move Time (ply):")
-        movetime_label.setStyleSheet(
-            f"font-size: {scale_font_size(labels_config.get('font_size', 11))}pt; "
-            f"color: rgb({labels_config.get('text_color', [200, 200, 200])[0]}, "
-            f"{labels_config.get('text_color', [200, 200, 200])[1]}, "
-            f"{labels_config.get('text_color', [200, 200, 200])[2]});"
-        )
-        # Set same fixed width as parallel games label for vertical alignment
-        movetime_label.setFixedWidth(label_fixed_width)
-        movetime_row_layout.addWidget(movetime_label)
+        movetime_label.setObjectName("bulk_option_label")
+        movetime_label.setAlignment(label_align)
         
-        # Get movetime spinbox config
         movetime_config = dialog_config.get('movetime_spinbox', {})
         movetime_min = movetime_config.get('min_value', 100)
         movetime_max = movetime_config.get('max_value', 60000)
         movetime_step = movetime_config.get('single_step', 100)
         movetime_suffix = movetime_config.get('suffix', ' ms')
         movetime_fallback_default = movetime_config.get('fallback_default', 1000)
-        
-        # Get default movetime from controller
         default_movetime = self.controller.get_default_movetime(movetime_fallback_default)
         
         self.movetime_spinbox = QSpinBox()
@@ -286,18 +242,25 @@ class BulkAnalysisDialog(QDialog):
         self.movetime_spinbox.setSingleStep(movetime_step)
         self.movetime_spinbox.setValue(default_movetime)
         self.movetime_spinbox.setSuffix(movetime_suffix)
-        movetime_row_layout.addWidget(self.movetime_spinbox)
         
-        # Set fixed width for all spinboxes (after all are created)
         spinboxes_config = dialog_config.get('spinboxes', {})
-        spinbox_fixed_width = spinboxes_config.get('fixed_width', 80)
-        self.parallel_games_spinbox.setFixedWidth(spinbox_fixed_width)
-        self.max_threads_spinbox.setFixedWidth(spinbox_fixed_width)
-        self.movetime_spinbox.setFixedWidth(spinbox_fixed_width)
+        parallel_movetime_w = int(spinboxes_config.get('parallel_movetime_width', 104))
+        max_threads_w = int(spinboxes_config.get('max_threads_min_width', 128))
+        self.parallel_games_spinbox.setFixedWidth(parallel_movetime_w)
+        self.movetime_spinbox.setFixedWidth(parallel_movetime_w)
+        self.max_threads_spinbox.setFixedWidth(max_threads_w)
+        self.parallel_games_spinbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.movetime_spinbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.max_threads_spinbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         
-        movetime_row_layout.addStretch()
+        options_grid.addWidget(parallel_games_label, 0, 0, label_align)
+        options_grid.addWidget(self.parallel_games_spinbox, 0, 1)
+        options_grid.addWidget(max_threads_label, 0, 2, label_align)
+        options_grid.addWidget(self.max_threads_spinbox, 0, 3)
+        options_grid.addWidget(movetime_label, 1, 0, label_align)
+        options_grid.addWidget(self.movetime_spinbox, 1, 1)
         
-        options_layout.addLayout(movetime_row_layout)
+        options_layout.addLayout(options_grid)
         
         layout.addWidget(options_group)
         
@@ -643,6 +606,9 @@ class BulkAnalysisDialog(QDialog):
             f"color: rgb({label_text_color[0]}, {label_text_color[1]}, {label_text_color[2]});"
             f"margin: 0px;"
             f"padding: 0px;"
+            f"}}"
+            f"QLabel#bulk_option_label {{"
+            f"qproperty-alignment: 'AlignLeft|AlignVCenter';"
             f"}}"
         )
         
