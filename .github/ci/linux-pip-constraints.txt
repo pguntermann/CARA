@@ -1,0 +1,2 @@
+# Linux CI only (build-linux-appbundles): passed to `pip install -r requirements.txt -c ...`
+PyQt6==6.7.1
