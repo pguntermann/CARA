@@ -3749,7 +3749,7 @@
       },
       "bulk_analysis_dialog": {
         "width": 600,
-        "height": 520,
+        "height": 540,
         "background_color": [
           40,
           40,
@@ -3782,7 +3782,7 @@
           "label_spinbox": 8,
           "progress_bar": 8,
           "options_grid_horizontal": 14,
-          "options_grid_vertical": 12,
+          "options_grid_vertical": 20,
           "options_controls_left_margin": 22
         },
         "buttons": {

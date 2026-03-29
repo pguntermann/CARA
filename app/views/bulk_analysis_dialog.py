@@ -109,9 +109,9 @@ class BulkAnalysisDialog(QDialog):
         layout.setSpacing(0)
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
-        # Game selection group
+        # Game selection group (Preferred vertically so extra dialog height does not stretch this box)
         selection_group = QGroupBox("Game Selection")
-        selection_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        selection_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         selection_layout = QVBoxLayout(selection_group)
         groups_config = dialog_config.get('groups', {})
         group_margins = groups_config.get('content_margins', [10, 20, 10, 15])
@@ -148,9 +148,9 @@ class BulkAnalysisDialog(QDialog):
         
         layout.addSpacing(section_spacing)
         
-        # Options group
+        # Options group (Preferred vertically — same as game selection)
         options_group = QGroupBox("Options")
-        options_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        options_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         options_layout = QVBoxLayout(options_group)
         options_layout.setContentsMargins(group_margins[0], group_margins[1], group_margins[2], group_margins[3])
         options_layout.setSpacing(section_spacing)
@@ -167,7 +167,7 @@ class BulkAnalysisDialog(QDialog):
         # Options grid: stable columns on all platforms (Fusion vs native styles)
         options_grid = QGridLayout()
         options_grid.setHorizontalSpacing(spacing_config.get('options_grid_horizontal', 14))
-        options_grid.setVerticalSpacing(spacing_config.get('options_grid_vertical', 12))
+        options_grid.setVerticalSpacing(spacing_config.get('options_grid_vertical', 18))
         # Indent options grid to line up with checkbox label text (indicator + gap); config, not runtime style
         grid_left = int(spacing_config.get('options_controls_left_margin', 22))
         options_grid.setContentsMargins(grid_left, 0, 0, 0)
@@ -253,12 +253,14 @@ class BulkAnalysisDialog(QDialog):
         self.movetime_spinbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.max_threads_spinbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         
+        # Explicit AlignVCenter on spinboxes so they match labels in tall rows (Fusion / Linux)
+        cell_v = Qt.AlignmentFlag.AlignVCenter
         options_grid.addWidget(parallel_games_label, 0, 0, label_align)
-        options_grid.addWidget(self.parallel_games_spinbox, 0, 1)
+        options_grid.addWidget(self.parallel_games_spinbox, 0, 1, cell_v)
         options_grid.addWidget(max_threads_label, 0, 2, label_align)
-        options_grid.addWidget(self.max_threads_spinbox, 0, 3)
+        options_grid.addWidget(self.max_threads_spinbox, 0, 3, cell_v)
         options_grid.addWidget(movetime_label, 1, 0, label_align)
-        options_grid.addWidget(self.movetime_spinbox, 1, 1)
+        options_grid.addWidget(self.movetime_spinbox, 1, 1, cell_v)
         
         options_layout.addLayout(options_grid)
         
@@ -313,6 +315,9 @@ class BulkAnalysisDialog(QDialog):
         progress_layout.addWidget(self.status_label)
         
         layout.addWidget(self.progress_group)
+        
+        # Absorb extra height when the window is taller than content (avoids stretching group boxes on macOS)
+        layout.addStretch(1)
         
         # Buttons
         button_layout = QHBoxLayout()
