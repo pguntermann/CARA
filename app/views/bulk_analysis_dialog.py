@@ -109,28 +109,23 @@ class BulkAnalysisDialog(QDialog):
         layout.setSpacing(0)
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
-        # Game selection group (Preferred vertically so extra dialog height does not stretch this box)
+        # Game selection group — same pattern as Bulk Replace "Target Games" (horizontal row, group margins)
         selection_group = QGroupBox("Game Selection")
         selection_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        selection_layout = QVBoxLayout(selection_group)
         groups_config = dialog_config.get('groups', {})
         group_margins = groups_config.get('content_margins', [10, 20, 10, 15])
+        selection_layout = QHBoxLayout(selection_group)
         selection_layout.setContentsMargins(group_margins[0], group_margins[1], group_margins[2], group_margins[3])
         selection_layout.setSpacing(section_spacing)
         
-        # Radio buttons for selection
         self.selection_button_group = QButtonGroup()
-        self.selected_games_radio = QRadioButton("Selected games only")
         self.all_games_radio = QRadioButton("All games")
+        self.selected_games_radio = QRadioButton("Selected games only")
+        self.selection_button_group.addButton(self.all_games_radio, 0)
+        self.selection_button_group.addButton(self.selected_games_radio, 1)
+        self.all_games_radio.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        self.selected_games_radio.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         
-        # Ensure radio buttons have proper size policy to prevent truncation
-        self.selected_games_radio.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed)
-        self.all_games_radio.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed)
-        
-        self.selection_button_group.addButton(self.selected_games_radio, 0)
-        self.selection_button_group.addButton(self.all_games_radio, 1)
-        
-        # Default to selected games if any are selected, otherwise all games
         if self._has_selected_games():
             self.selected_games_radio.setChecked(True)
             self._update_selected_games()
@@ -140,9 +135,9 @@ class BulkAnalysisDialog(QDialog):
         self.selected_games_radio.toggled.connect(self._on_selection_changed)
         self.all_games_radio.toggled.connect(self._on_selection_changed)
         
-        # Radio buttons in a vertical layout
-        selection_layout.addWidget(self.selected_games_radio)
         selection_layout.addWidget(self.all_games_radio)
+        selection_layout.addWidget(self.selected_games_radio)
+        selection_layout.addStretch()
         
         layout.addWidget(selection_group)
         

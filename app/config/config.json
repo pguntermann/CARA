@@ -3749,7 +3749,7 @@
       },
       "bulk_analysis_dialog": {
         "width": 600,
-        "height": 540,
+        "height": 500,
         "background_color": [
           40,
           40,
