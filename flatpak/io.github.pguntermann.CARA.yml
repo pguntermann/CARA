@@ -28,11 +28,16 @@ modules:
       - type: dir
         path: ..
     build-commands:
-      # Python is bundled in org.freedesktop.Sdk (no separate Flathub extension).
-      - python3 -m pip install --upgrade pip
-      - python3 -m pip install -r requirements.txt -c .github/ci/linux-pip-constraints.txt
-      - python3 -m pip install pyinstaller==6.17.0
-      - python3 -m PyInstaller CARA_linux.spec
+      # Pip falls back to user site when /usr is not writable; system python3 then
+      # cannot find PyInstaller. Use a venv so pip, pyinstaller, and deps share one env.
+      - |
+        set -euo pipefail
+        python3 -m venv .flatpak-venv
+        . .flatpak-venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt -c .github/ci/linux-pip-constraints.txt
+        pip install pyinstaller==6.17.0
+        pyinstaller CARA_linux.spec
       - install -d /app/CARA
       - cp -a dist/CARA/. /app/CARA/
       - install -d /app/bin
