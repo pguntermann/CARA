@@ -200,7 +200,8 @@ class InlineContentDialog(QDialog):
             else:
                 url = QUrl.fromLocalFile(url.path())
 
-        QDesktopServices.openUrl(url)
+        from app.utils.external_open import open_url
+        open_url(url, context="inline_content.anchor_clicked")
 
     def _build_heading_inline_styles(self, content_config: Dict[str, Any]) -> Dict[str, str]:
         """Build a dict of h1–h6 to inline style strings (for markdown_to_html). Uses config + DPI scaling."""

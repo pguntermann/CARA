@@ -194,6 +194,7 @@ class MessageDialog(QDialog):
         Args:
             link: The link URL that was clicked.
         """
+        from app.utils.external_open import open_url
         # Handle manual:// links (custom scheme for manual anchors)
         if link.startswith("manual://"):
             # Extract anchor (everything after manual://)
@@ -218,10 +219,10 @@ class MessageDialog(QDialog):
                 url = QUrl.fromLocalFile(str(manual_path))
                 if anchor:
                     url.setFragment(anchor)
-                QDesktopServices.openUrl(url)
+                open_url(url, context="message_dialog.manual_link")
         else:
             # For other links, use default behavior
-            QDesktopServices.openUrl(QUrl(link))
+            open_url(QUrl(link), context="message_dialog.external_link")
     
     @staticmethod
     def show_warning(config: Dict[str, Any], title: str, message: str, parent=None) -> None:

@@ -17,6 +17,39 @@ from app.utils.path_resolver import get_app_resource_path
 # Set environment variable to reduce Qt font logging
 os.environ.setdefault("QT_LOGGING_RULES", "qt.qpa.fonts.warning=false")
 
+def _is_kde_plasma_session() -> bool:
+    """Best-effort detection of KDE Plasma desktop sessions (Linux only)."""
+    if not sys.platform.startswith("linux"):
+        return False
+    xdg_current = (os.environ.get("XDG_CURRENT_DESKTOP") or "").lower()
+    desktop_session = (os.environ.get("DESKTOP_SESSION") or "").lower()
+    kde_full = (os.environ.get("KDE_FULL_SESSION") or "").lower()
+    return (
+        "kde" in xdg_current
+        or "plasma" in xdg_current
+        or "plasma" in desktop_session
+        or kde_full in {"1", "true", "yes"}
+    )
+
+
+def _disable_plasma_platform_theme_plugin() -> None:
+    """Disable KDE/Plasma Qt platform theme integration
+    """
+    if not _is_kde_plasma_session():
+        return
+
+    # Allow users to opt out explicitly.
+    if (os.environ.get("CARA_DISABLE_PLASMA_PLATFORMTHEME") or "").strip() in {"0", "false", "no"}:
+        return
+
+    # If the user already configured a platform theme, don't override it.
+    if os.environ.get("QT_QPA_PLATFORMTHEME"):
+        return
+
+    # Use a non-Plasma platform theme plugin to bypass Breeze/Plasma integration.
+    # Qt will ignore this if the plugin is not available.
+    os.environ["QT_QPA_PLATFORMTHEME"] = "gtk3"
+
 
 def _qt_message_handler(msg_type: QtMsgType, context, message: str) -> None:
     """Filter out harmless Qt font warnings on Windows.
@@ -38,6 +71,7 @@ def _qt_message_handler(msg_type: QtMsgType, context, message: str) -> None:
 def main() -> None:
     """Run CARA: Chess Analysis Review Application."""
 
+    _disable_plasma_platform_theme_plugin()
     
     # Suppress harmless Qt font warnings before creating QApplication
     qInstallMessageHandler(_qt_message_handler)

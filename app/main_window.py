@@ -2031,24 +2031,26 @@ class MainWindow(QMainWindow):
     
     def _open_manual(self) -> None:
         """Open the user manual in the default browser."""
+        from app.utils.external_open import open_path
         # Get the path to the manual HTML file
         # __file__ is app/main_window.py, so parent is app/, then resources/manual/index.html
         manual_path = Path(__file__).resolve().parent / "resources" / "manual" / "index.html"
-        # Convert to QUrl and open in default browser
-        url = QUrl.fromLocalFile(str(manual_path))
-        QDesktopServices.openUrl(url)
+        open_path(manual_path, context="help.manual")
     
     def _open_video_tutorials(self) -> None:
         """Open the CARA Chess YouTube channel in the default browser."""
-        QDesktopServices.openUrl(QUrl("https://www.youtube.com/@CARA-Chess"))
+        from app.utils.external_open import open_url
+        open_url(QUrl("https://www.youtube.com/@CARA-Chess"), context="help.youtube")
     
     def _open_github_repository(self) -> None:
         """Open the CARA GitHub repository in the default browser."""
-        QDesktopServices.openUrl(QUrl("https://github.com/pguntermann/CARA"))
+        from app.utils.external_open import open_url
+        open_url(QUrl("https://github.com/pguntermann/CARA"), context="help.github")
     
     def _open_user_data_directory(self) -> None:
         """Open the user data directory in the file explorer/finder."""
         from app.utils.path_resolver import resolve_data_file_path
+        from app.utils.external_open import open_path
         
         # Get the resolved path for a user data file to determine the actual directory being used
         # This works correctly whether in portable mode or user data directory mode
@@ -2059,8 +2061,7 @@ class MainWindow(QMainWindow):
         user_data_dir.mkdir(parents=True, exist_ok=True)
         
         # Open the directory in the file explorer/finder
-        url = QUrl.fromLocalFile(str(user_data_dir))
-        QDesktopServices.openUrl(url)
+        open_path(user_data_dir, context="help.user_data_dir")
     
     def _show_about_dialog(self) -> None:
         """Show the about dialog."""
@@ -2166,7 +2167,8 @@ class MainWindow(QMainWindow):
             if confirmed:
                 # Open download page in browser
                 download_url = self.config.get('download_url', 'https://pguntermann.github.io/CARA/')
-                QDesktopServices.openUrl(QUrl(download_url))
+                from app.utils.external_open import open_url
+                open_url(QUrl(download_url), context="help.download_url")
         else:
             # Show up-to-date message
             MessageDialog.show_information(
