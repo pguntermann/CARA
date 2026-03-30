@@ -1,0 +1,66 @@
+name: Build Linux Flatpak
+
+on:
+  workflow_dispatch:
+    inputs:
+      use_config_version:
+        description: "Use version from config.json (if false, use timestamp)"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build-flatpak:
+    name: Build Flatpak (${{ matrix.arch }})
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Compute version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event.inputs.use_config_version }}" = "true" ]; then
+            VERSION=$(python -c "import json; print(json.load(open('app/config/config.json'))['version'])")
+          else
+            VERSION=$(date +%Y%m%d_%H%M%S)
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Update config.json version for timestamp builds
+        if: github.event.inputs.use_config_version == 'false'
+        shell: bash
+        env:
+          BUILD_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python - << 'EOF'
+          import json
+          import os
+          from pathlib import Path
+
+          cfg_path = Path("app/config/config.json")
+          data = json.loads(cfg_path.read_text(encoding="utf-8"))
+          data["version"] = os.environ["BUILD_VERSION"]
+          cfg_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+          EOF
+
+      - name: Build Flatpak
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: CARA.${{ steps.version.outputs.version }}.linux.${{ matrix.arch }}.flatpak
+          manifest-path: flatpak/io.github.pguntermann.CARA.yml
+          cache-key: flatpak-builder-${{ github.sha }}-${{ matrix.arch }}
+          arch: ${{ matrix.arch }}
+
+      - name: Upload Flatpak artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: CARA.${{ steps.version.outputs.version }}.linux.${{ matrix.arch }}.flatpak
+          path: CARA.${{ steps.version.outputs.version }}.linux.${{ matrix.arch }}.flatpak
+

@@ -1,0 +1,41 @@
+app-id: io.github.pguntermann.CARA
+runtime: org.freedesktop.Platform
+runtime-version: "24.08"
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.python3
+command: cara
+
+finish-args:
+  # GUI
+  - --share=ipc
+  - --socket=x11
+  - --socket=wayland
+  - --device=dri
+  # Networking (e.g. engine downloads / online resources)
+  - --share=network
+  # "Behave like the tar" defaults: access user files without portal friction.
+  - --filesystem=home
+  # Allow opening files/URLs via portals where used.
+  - --talk-name=org.freedesktop.portal.Desktop
+
+modules:
+  - name: cara
+    buildsystem: simple
+    sources:
+      - type: dir
+        path: ..
+    build-commands:
+      - /usr/lib/sdk/python3/enable.sh
+      - python -m pip install --upgrade pip
+      - pip install -r requirements.txt -c .github/ci/linux-pip-constraints.txt
+      - pip install pyinstaller==6.17.0
+      - pyinstaller CARA_linux.spec
+      - install -d /app/CARA
+      - cp -a dist/CARA/. /app/CARA/
+      - install -d /app/bin
+      - install -Dm755 flatpak/cara.sh /app/bin/cara
+      - install -Dm644 flatpak/io.github.pguntermann.CARA.desktop /app/share/applications/io.github.pguntermann.CARA.desktop
+      - install -Dm644 flatpak/io.github.pguntermann.CARA.metainfo.xml /app/share/metainfo/io.github.pguntermann.CARA.metainfo.xml
+      - install -Dm644 appicon.svg /app/share/icons/hicolor/scalable/apps/io.github.pguntermann.CARA.svg
+

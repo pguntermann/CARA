@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=CARA
+Comment=Chess Analysis Review Application
+Exec=cara %u
+Icon=io.github.pguntermann.CARA
+Terminal=false
+Categories=Game;Education;
+StartupWMClass=CARA
+
