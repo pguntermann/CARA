@@ -43,6 +43,8 @@ modules:
       - install -d /app/bin
       - install -Dm755 flatpak/cara.sh /app/bin/cara
       - install -Dm644 flatpak/io.github.pguntermann.CARA.desktop /app/share/applications/io.github.pguntermann.CARA.desktop
-      - install -Dm644 flatpak/io.github.pguntermann.CARA.metainfo.xml /app/share/metainfo/io.github.pguntermann.CARA.metainfo.xml
+      # Do not install metainfo here: Ubuntu 22.04 flatpak-builder runs appstream-compose,
+      # which is missing inside the build sandbox. flatpak/io.github.pguntermann.CARA.metainfo.xml
+      # remains in-repo for Flathub / manual packaging with a newer builder.
       - install -Dm644 appicon.svg /app/share/icons/hicolor/scalable/apps/io.github.pguntermann.CARA.svg
 

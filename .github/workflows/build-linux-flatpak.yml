@@ -86,7 +86,6 @@ jobs:
         run: |
           set -euo pipefail
           export GSETTINGS_BACKEND=memory
-          # Skip appstream-compose (not available in bwrap); metainfo is installed as-is.
           MANIFEST=flatpak/io.github.pguntermann.CARA.yml
           APP_ID=$(grep -E '^app-id:' "$MANIFEST" | awk '{print $2}')
           BRANCH=master
@@ -102,7 +101,6 @@ jobs:
             --default-branch="$BRANCH" \
             --arch="$ARCH" \
             --ccache \
-            --no-appstream-compose \
             --state-dir .flatpak-builder \
             flatpak_app \
             "$MANIFEST"
