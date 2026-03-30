@@ -20,6 +20,10 @@ finish-args:
 modules:
   - name: cara
     buildsystem: simple
+    # flatpak-builder build sandbox has no network unless granted (pip needs PyPI).
+    build-options:
+      build-args:
+        - --share=network
     sources:
       - type: dir
         path: ..
