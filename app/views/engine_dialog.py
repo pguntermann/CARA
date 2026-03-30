@@ -222,16 +222,16 @@ class EngineDialog(QDialog):
         self.validate_button = QPushButton("Validate Engine")
         self.validate_button.setEnabled(False)
         self.validate_button.clicked.connect(self._validate_engine)
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(self.cancel_button)
+        
         button_layout.addWidget(self.validate_button)
         
         self.add_button = QPushButton("Add Engine")
         self.add_button.setEnabled(False)
         self.add_button.clicked.connect(self._add_engine)
         button_layout.addWidget(self.add_button)
-        
-        self.cancel_button = QPushButton("Cancel")
-        self.cancel_button.clicked.connect(self.reject)
-        button_layout.addWidget(self.cancel_button)
         
         # Add spacing before buttons
         layout.addSpacing(layout_spacing)

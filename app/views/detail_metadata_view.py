@@ -739,13 +739,18 @@ class AddTagDialog(QDialog):
         
         layout.addLayout(form_layout)
         
-        # Create button box
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        button_box.accepted.connect(self._on_ok_clicked)
-        button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
+        # Buttons (explicit order): Cancel (left), OK (right)
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(self.button_spacing)
+        button_layout.addStretch()
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_button)
+        ok_button = QPushButton("OK")
+        ok_button.setDefault(True)
+        ok_button.clicked.connect(self._on_ok_clicked)
+        button_layout.addWidget(ok_button)
+        layout.addLayout(button_layout)
         
         # Set focus on tag name input
         self.tag_name_input.setFocus()

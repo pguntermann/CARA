@@ -318,11 +318,10 @@ class EngineConfigurationDialog(QDialog):
         
         self.ok_button = QPushButton("Save Changes")
         self.ok_button.clicked.connect(self._on_ok_clicked)
-        button_layout.addWidget(self.ok_button)
-        
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_button)
+        button_layout.addWidget(self.ok_button)
         
         layout.addLayout(button_layout)
     

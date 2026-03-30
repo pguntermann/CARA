@@ -686,11 +686,10 @@ class SearchDialog(QDialog):
         
         self.search_btn = QPushButton("Search")
         self.search_btn.clicked.connect(self._on_search_clicked)
-        buttons_layout.addWidget(self.search_btn)
-        
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.clicked.connect(self.reject)
         buttons_layout.addWidget(self.cancel_btn)
+        buttons_layout.addWidget(self.search_btn)
         
         # Add spacing before buttons
         main_layout.addSpacing(self.section_spacing)

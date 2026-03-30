@@ -306,11 +306,10 @@ class BulkCleanPgnDialog(QDialog):
         
         self.apply_button = QPushButton("Apply")
         self.apply_button.clicked.connect(self._on_apply_clicked)
-        buttons_layout.addWidget(self.apply_button)
-        
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.clicked.connect(self._on_cancel_clicked)
         buttons_layout.addWidget(self.cancel_button)
+        buttons_layout.addWidget(self.apply_button)
         
         # Add spacing before buttons
         main_layout.addSpacing(self.section_spacing)

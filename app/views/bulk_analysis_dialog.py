@@ -323,11 +323,10 @@ class BulkAnalysisDialog(QDialog):
         
         self.start_button = QPushButton("Start Analysis")
         self.start_button.clicked.connect(self._start_analysis)
-        button_layout.addWidget(self.start_button)
-        
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.clicked.connect(self._on_cancel)
         button_layout.addWidget(self.cancel_button)
+        button_layout.addWidget(self.start_button)
         
         # Add spacing before buttons
         layout.addSpacing(section_spacing)

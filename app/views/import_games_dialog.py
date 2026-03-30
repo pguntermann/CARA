@@ -314,11 +314,10 @@ class ImportGamesDialog(QDialog):
         self.import_button = QPushButton("Import")
         self.import_button.clicked.connect(self._on_import_clicked)
         self.import_button.setDefault(True)
-        buttons_layout.addWidget(self.import_button)
-        
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.clicked.connect(self.reject)
         buttons_layout.addWidget(self.cancel_button)
+        buttons_layout.addWidget(self.import_button)
         
         # Add spacing before buttons
         main_layout.addSpacing(self.section_spacing)

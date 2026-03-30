@@ -232,9 +232,9 @@ class MoveCommentDialog(QDialog):
         )
         footer_layout.setSpacing(0)
         footer_layout.addStretch(1)
-        footer_layout.addWidget(self._ok_button)
-        footer_layout.addSpacing(self._button_spacing)
         footer_layout.addWidget(self._cancel_button)
+        footer_layout.addSpacing(self._button_spacing)
+        footer_layout.addWidget(self._ok_button)
         main_layout.addWidget(footer)
 
     def _apply_styling(self) -> None:
