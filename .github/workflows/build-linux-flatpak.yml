@@ -36,6 +36,11 @@ jobs:
             flatpak-builder \
             xvfb
 
+      - name: Add Flathub remote
+        shell: bash
+        run: |
+          sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
       - name: Compute version
         id: version
         shell: bash
