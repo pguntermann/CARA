@@ -30,6 +30,30 @@ def _debug(message: str) -> None:
         pass
 
 
+def _sanitized_env_for_external_open() -> dict[str, str]:
+    """Return a sanitized environment for launching external desktop handlers.
+
+    In PyInstaller bundles, the parent process often sets loader-related variables
+    so the app can find its bundled Qt/libstdc++ at runtime. If we spawn system
+    tools like xdg-open/gio/kde-open with that same environment, they may try to
+    load the bundled libs (older Qt / different libstdc++) and crash with errors
+    like "version `Qt_6.9' not found" or "GLIBCXX_x.y.z not found".
+    """
+    env = dict(os.environ)
+    for key in (
+        "LD_LIBRARY_PATH",
+        "DYLD_LIBRARY_PATH",
+        "DYLD_FALLBACK_LIBRARY_PATH",
+        "QT_PLUGIN_PATH",
+        "QT_QPA_PLATFORM_PLUGIN_PATH",
+        "QML2_IMPORT_PATH",
+        "QML_IMPORT_PATH",
+        "PYTHONPATH",
+    ):
+        env.pop(key, None)
+    return env
+
+
 def open_url(url: QUrl, *, context: str = "") -> bool:
     """Open a URL using the platform default handler.
 
@@ -48,15 +72,19 @@ def open_url(url: QUrl, *, context: str = "") -> bool:
         url_str = url.toString()
 
     _debug(f"{ctx}open_url: attempting QDesktopServices.openUrl({url_str!r})")
-    try:
-        ok = bool(QDesktopServices.openUrl(url))
-    except Exception as e:
-        _debug(f"{ctx}open_url: QDesktopServices.openUrl raised {type(e).__name__}: {e}")
-        ok = False
+    # On Linux, QDesktopServices typically dispatches to xdg-open/gio/kde-open.
+    # In frozen (PyInstaller) bundles we prefer running the external opener
+    # ourselves with a sanitized environment, otherwise KDE/GIO helpers may
+    # accidentally load bundled Qt/libstdc++ and fail.
+    if not sys.platform.startswith("linux"):
+        try:
+            ok = bool(QDesktopServices.openUrl(url))
+        except Exception as e:
+            _debug(f"{ctx}open_url: QDesktopServices.openUrl raised {type(e).__name__}: {e}")
+            ok = False
 
-    _debug(f"{ctx}open_url: QDesktopServices.openUrl returned {ok}")
-    if ok:
-        return True
+        _debug(f"{ctx}open_url: QDesktopServices.openUrl returned {ok}")
+        return ok
 
     if not sys.platform.startswith("linux"):
         return False
@@ -67,7 +95,15 @@ def open_url(url: QUrl, *, context: str = "") -> bool:
     for cmd in ([xdg_open, url_str], ["gio", "open", url_str]):
         _debug(f"{ctx}open_url: fallback trying {cmd!r}")
         try:
-            completed = subprocess.run(cmd, check=False)
+            # Fire-and-forget: desktop openers may return quickly but still launch
+            # a handler; we only use the exit code as a best-effort signal.
+            completed = subprocess.run(
+                cmd,
+                check=False,
+                env=_sanitized_env_for_external_open(),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
             _debug(f"{ctx}open_url: fallback exit_code={completed.returncode} cmd={cmd!r}")
             if completed.returncode == 0:
                 return True
