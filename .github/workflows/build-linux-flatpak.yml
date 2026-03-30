@@ -12,11 +12,18 @@ on:
 jobs:
   build-flatpak:
     name: Build Flatpak (${{ matrix.arch }})
-    runs-on: ubuntu-22.04
+    # aarch64 must run on ARM runners: x86_64 hosts cannot execute aarch64 SDK/bubblewrap
+    # without full qemu+binfmt (Exec format error on /bin/sh). Matches build-linux-appbundles.yml.
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64]
+        include:
+          - os: ubuntu-22.04
+            arch: x86_64
+          - os: ubuntu-22.04-arm
+            arch: aarch64
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
