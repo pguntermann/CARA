@@ -2,8 +2,6 @@ app-id: io.github.pguntermann.CARA
 runtime: org.freedesktop.Platform
 runtime-version: "24.08"
 sdk: org.freedesktop.Sdk
-sdk-extensions:
-  - org.freedesktop.Sdk.Extension.python3
 command: cara
 
 finish-args:
@@ -26,11 +24,11 @@ modules:
       - type: dir
         path: ..
     build-commands:
-      - /usr/lib/sdk/python3/enable.sh
-      - python -m pip install --upgrade pip
-      - pip install -r requirements.txt -c .github/ci/linux-pip-constraints.txt
-      - pip install pyinstaller==6.17.0
-      - pyinstaller CARA_linux.spec
+      # Python is bundled in org.freedesktop.Sdk (no separate Flathub extension).
+      - python3 -m pip install --upgrade pip
+      - python3 -m pip install -r requirements.txt -c .github/ci/linux-pip-constraints.txt
+      - python3 -m pip install pyinstaller==6.17.0
+      - python3 -m PyInstaller CARA_linux.spec
       - install -d /app/CARA
       - cp -a dist/CARA/. /app/CARA/
       - install -d /app/bin
