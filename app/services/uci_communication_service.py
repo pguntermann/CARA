@@ -5,6 +5,7 @@ allowing all engine services to share the same communication logic and
 enabling easier debugging of UCI interactions.
 """
 
+import os
 import subprocess
 import sys
 import time
@@ -54,6 +55,30 @@ def set_debug_flags(outbound_enabled: bool = False, inbound_enabled: bool = Fals
     # Debug output to verify flags are being set (commented out for production)
     # import sys
     # print("DEBUG: set_debug_flags called - outbound=" + str(outbound_enabled) + ", inbound=" + str(inbound_enabled), file=sys.stderr, flush=True)
+
+
+def _sanitized_env_for_engine_subprocess() -> dict[str, str]:
+    """Environment for spawning external engine binaries.
+
+    PyInstaller bundles and dev runs may set loader/Qt/Python paths so the app
+    can load bundled libraries. Child engine processes inherit that environment
+    and may then load the wrong libstdc++/Qt and exit immediately on Linux/macOS.
+    Strip those variables so the engine uses normal system resolution.
+    """
+    env = dict(os.environ)
+    for key in (
+        "LD_LIBRARY_PATH",
+        "DYLD_LIBRARY_PATH",
+        "DYLD_FALLBACK_LIBRARY_PATH",
+        "DYLD_INSERT_LIBRARIES",
+        "QT_PLUGIN_PATH",
+        "QT_QPA_PLATFORM_PLUGIN_PATH",
+        "QML2_IMPORT_PATH",
+        "QML_IMPORT_PATH",
+        "PYTHONPATH",
+    ):
+        env.pop(key, None)
+    return env
 
 
 class UCICommand(Enum):
@@ -262,18 +287,23 @@ class UCICommunicationService:
         try:
             # Use binary mode to avoid Windows text mode blocking issues
             # On Windows, suppress console window creation for GUI applications
+            resolved_engine = self.engine_path.resolve()
             popen_kwargs = {
                 'stdin': subprocess.PIPE,
                 'stdout': subprocess.PIPE,
-                'stderr': subprocess.PIPE,
+                # Avoid stderr pipe fill blocking the engine; UCI speaks on stdout only.
+                'stderr': subprocess.DEVNULL,
                 'text': False,  # Binary mode
-                'bufsize': 0  # Unbuffered for immediate data availability
+                'bufsize': 0,  # Unbuffered for immediate data availability
+                # Many engines load NN/config files relative to the binary directory.
+                'cwd': str(resolved_engine.parent),
+                'env': _sanitized_env_for_engine_subprocess(),
             }
             if sys.platform == 'win32':
                 popen_kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
             
             self.process = subprocess.Popen(
-                [str(self.engine_path)],
+                [str(resolved_engine)],
                 **popen_kwargs
             )
             # Start stdout reader (binary, manual line splitting in thread)
