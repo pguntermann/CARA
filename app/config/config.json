@@ -4115,11 +4115,11 @@
       "engine_validation_messages": {
         "no_engines": {
           "title": "No Engine Configured",
-          "message_template": "Please add at least one UCI chess engine before {action}.<br><br>Go to Engines → Add Engine... to configure an engine."
+          "message_template": "Please add at least one UCI chess engine before {action}.<br><br>Go to <b>Engines → Add Engine...</b> to configure an engine."
         },
         "no_assignment": {
           "title": "No Engine Assigned",
-          "message_template": "Please assign an engine to the {task} task before {action}.<br><br>Go to Engines → [Engine Name] → Assign to {task}."
+          "message_template": "Please assign an engine to the {task} task before {action}.<br><br>Go to <b>Engines → [Engine Name] → Assign to {task}</b>."
         },
         "actions": {
           "game_analysis": "starting game analysis",
