@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 import threading
+import queue
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Callable, Dict, Any
@@ -110,6 +111,68 @@ class UCICommunicationService:
         self._initialized = False
         self._uciok_received = False
         self._crash_logged = False  # Track if crash has been logged to avoid duplicates
+        # Cross-platform stdout reader: background thread feeds decoded lines into a queue.
+        # This avoids blocking pipe reads defeating timeouts (notably on Linux/macOS),
+        # while also avoiding readline() edge cases seen with some engines.
+        self._stdout_queue: "queue.Queue[Optional[str]]" = queue.Queue()
+        self._stdout_thread: Optional[threading.Thread] = None
+        self._stdout_stop = threading.Event()
+        self._read_buffer = b""
+
+    def _start_stdout_reader(self) -> None:
+        """Start background reader thread (idempotent)."""
+        if self._stdout_thread and self._stdout_thread.is_alive():
+            return
+        self._stdout_stop.clear()
+        self._stdout_thread = threading.Thread(
+            target=self._stdout_reader_loop,
+            name=f"UCIStdoutReader{(':' + self.identifier) if self.identifier else ''}",
+            daemon=True,
+        )
+        self._stdout_thread.start()
+
+    def _stdout_reader_loop(self) -> None:
+        """Continuously read engine stdout, split into lines, push to queue."""
+        try:
+            proc = self.process
+            if not proc or not proc.stdout:
+                return
+
+            while not self._stdout_stop.is_set():
+                try:
+                    chunk = proc.stdout.read(4096)
+                except Exception:
+                    break
+
+                if not chunk:
+                    # EOF (process exited or pipe closed).
+                    break
+
+                self._read_buffer += chunk
+                while b"\n" in self._read_buffer:
+                    newline_pos = self._read_buffer.find(b"\n")
+                    line_bytes = self._read_buffer[:newline_pos]
+                    self._read_buffer = self._read_buffer[newline_pos + 1 :]
+                    try:
+                        line = (
+                            line_bytes.decode("utf-8", errors="replace")
+                            .rstrip("\r")
+                            .strip()
+                        )
+                    except Exception:
+                        continue
+
+                    # Some engines emit empty/whitespace-only lines; ignore them.
+                    if not line:
+                        continue
+
+                    self._stdout_queue.put(line)
+        finally:
+            # Sentinel so readers can unblock if waiting.
+            try:
+                self._stdout_queue.put(None)
+            except Exception:
+                pass
     
     def _debug_lifecycle(self, event: str, details: str = "") -> None:
         """Log lifecycle event to console if lifecycle debugging is enabled.
@@ -213,8 +276,11 @@ class UCICommunicationService:
                 [str(self.engine_path)],
                 **popen_kwargs
             )
-            # Initialize binary read buffer for manual line splitting
-            self._read_buffer = b''
+            # Start stdout reader (binary, manual line splitting in thread)
+            self._read_buffer = b""
+            # Reset queue so stale lines from prior runs aren't consumed.
+            self._stdout_queue = queue.Queue()
+            self._start_stdout_reader()
             self._crash_logged = False  # Reset crash flag when engine starts
             self._debug_lifecycle("STARTED", "PID:" + str(self.process.pid))
             
@@ -310,72 +376,28 @@ class UCICommunicationService:
             return False
     
     def read_line(self, timeout: float) -> Optional[str]:
-        """Read a line from engine stdout using binary mode with manual line buffering.
-        
-        This avoids Windows text mode blocking issues while maintaining zero latency
-        when data is available.
-        
-        Args:
-            timeout: Timeout in seconds (required). Returns None if no line received within timeout.
-            
-        Returns:
-            Line string (stripped) or None if timeout/error.
+        """Read the next decoded non-empty stdout line from the engine.
+
+        Uses a background reader thread and a queue so timeouts work reliably on all platforms.
         """
-        if not self.process or self.process.poll() is not None:
-            return None
-        
-        # Ensure buffer exists
-        if not hasattr(self, '_read_buffer'):
-            self._read_buffer = b''
-        
+        if timeout is None:
+            raise ValueError("read_line() requires a timeout value")
+
+        # Ensure reader is running (helps if read_line is called before spawn completes).
+        if self.process and self._stdout_thread is None:
+            self._start_stdout_reader()
+
         try:
-            # Fast path: check buffer first (zero latency if line already buffered)
-            if b'\n' in self._read_buffer:
-                newline_pos = self._read_buffer.find(b'\n')
-                line_bytes = self._read_buffer[:newline_pos]
-                self._read_buffer = self._read_buffer[newline_pos + 1:]
-                try:
-                    line = line_bytes.decode('utf-8', errors='replace').rstrip('\r').strip()
-                    if line:
-                        self._debug_console(line, "RECV")
-                    return line
-                except Exception as e:
-                    self._debug_lifecycle("ERROR", f"Error decoding line: {str(e)}")
-                    return None
-            
-            # Non-blocking read with timeout
-            # Note: timeout is required - all callers provide a timeout value
-            if timeout is None:
-                raise ValueError("read_line() requires a timeout value")
-            
-            start_time = time.time()
-            while (time.time() - start_time) < timeout:
-                # Read chunk (returns immediately, empty bytes if no data)
-                chunk = self.process.stdout.read(1024)
-                if chunk:
-                    self._read_buffer += chunk
-                    # Check if we now have a complete line
-                    if b'\n' in self._read_buffer:
-                        newline_pos = self._read_buffer.find(b'\n')
-                        line_bytes = self._read_buffer[:newline_pos]
-                        self._read_buffer = self._read_buffer[newline_pos + 1:]
-                        try:
-                            line = line_bytes.decode('utf-8', errors='replace').rstrip('\r').strip()
-                            if line:
-                                self._debug_console(line, "RECV")
-                            return line
-                        except Exception as e:
-                            self._debug_lifecycle("ERROR", f"Error decoding line: {str(e)}")
-                            return None
-                else:
-                    # No data available - check timeout immediately (no sleep)
-                    if (time.time() - start_time) >= timeout:
-                        return None
-                    # Continue loop immediately - timeout check limits iterations
+            line = self._stdout_queue.get(timeout=timeout)
+        except queue.Empty:
             return None
-        except Exception as e:
-            self._debug_lifecycle("ERROR", f"Error reading line: {str(e)}")
+
+        # None is a sentinel indicating EOF/reader shutdown.
+        if line is None:
             return None
+
+        self._debug_console(line, "RECV")
+        return line
     
     def wait_for_readyok(self, timeout: float = 5.0) -> bool:
         """Wait for readyok response after sending isready.
@@ -624,6 +646,10 @@ class UCICommunicationService:
             
             # Close pipes
             try:
+                self._stdout_stop.set()
+            except Exception:
+                pass
+            try:
                 if self.process.stdin:
                     self.process.stdin.close()
             except Exception:
@@ -638,6 +664,13 @@ class UCICommunicationService:
             try:
                 if self.process.stderr:
                     self.process.stderr.close()
+            except Exception:
+                pass
+
+            # Best-effort join of reader thread after pipes are closed.
+            try:
+                if self._stdout_thread and self._stdout_thread.is_alive():
+                    self._stdout_thread.join(timeout=0.5)
             except Exception:
                 pass
             
