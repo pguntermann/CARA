@@ -654,7 +654,7 @@
           45
         ],
         "pgn_notation": {
-          "font_family": "Courier New",
+          "font_family": "Courier New, monospace",
           "font_size": 11,
           "text_color": [
             220,
@@ -2157,7 +2157,7 @@
           }
         },
         "notes": {
-          "font_family": "Courier New",
+          "font_family": "Courier New, monospace",
           "font_size": 11,
           "heading_font_point_sizes": {
             "h1": 13,
