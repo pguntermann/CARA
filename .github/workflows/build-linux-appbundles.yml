@@ -1,5 +1,5 @@
 # Build Linux amd64 and arm64 PyInstaller onedir bundles (manual trigger only).
-# Artifacts: one ZIP per architecture (same idea as the macOS ZIP in build-appbundles.yml).
+# Artifacts: one tar.gz per architecture.
 #
 # Use Ubuntu 22.04 images (not 24.04) so the bundle links against an older glibc (~2.35).
 # That way builds run on Debian 12 (~2.36), Ubuntu 22.04+, and newer distros. Building on
@@ -8,9 +8,9 @@
 # ARM64: ubuntu-22.04-arm. Public-repo runner availability applies; private repos may need
 # alternatives until ARM runners are enabled.
 #
-# Archive format: ZIP matches the existing macOS artifact and opens everywhere. Tar.gz is
-# more typical on Linux (permissions/symlinks, smaller with gzip) — switch the packaging
-# step if you prefer native-style archives for Linux-only distribution.
+# Archive format: tar.gz is more typical on Linux and preserves permissions/symlinks.
+# This avoids issues where ZIP extraction tools turn symlinks (e.g. Qt .so SONAME links)
+# into tiny regular files, which can crash at runtime with "file too short".
 
 name: Build Linux AppBundles
 
@@ -55,7 +55,7 @@ jobs:
             libxcb-xinerama0 \
             libxkbcommon0 \
             upx-ucl \
-            zip
+            tar
 
       - name: Install dependencies
         run: |
@@ -94,17 +94,17 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller CARA_linux.spec
 
-      - name: Create Linux ZIP
+      - name: Create Linux tar.gz
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
           arch="${{ matrix.arch }}"
-          zipName="CARA.${version}.linux.${arch}.AppBundle.zip"
-          (cd dist && zip -ry "../${zipName}" CARA)
-          echo "ZIP_NAME=${zipName}" >> "$GITHUB_ENV"
+          archiveName="CARA.${version}.linux.${arch}.AppBundle.tar.gz"
+          (cd dist && tar -czf "../${archiveName}" CARA)
+          echo "ARCHIVE_NAME=${archiveName}" >> "$GITHUB_ENV"
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v6
         with:
           name: CARA.${{ steps.version.outputs.version }}.linux.${{ matrix.arch }}.AppBundle
-          path: ${{ env.ZIP_NAME }}
+          path: ${{ env.ARCHIVE_NAME }}
