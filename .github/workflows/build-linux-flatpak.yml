@@ -36,10 +36,11 @@ jobs:
             flatpak-builder \
             xvfb
 
-      - name: Add Flathub remote
+      # User install: GitHub runners cannot deploy to the system Flatpak store without polkit/root.
+      - name: Add Flathub remote (user)
         shell: bash
         run: |
-          sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
       - name: Compute version
         id: version
@@ -69,13 +70,40 @@ jobs:
           cfg_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
           EOF
 
+      # flatpak-github-actions does not pass --user; without it, deps install fails on CI (system Deploy denied).
       - name: Build Flatpak
-        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
-        with:
-          bundle: CARA.${{ steps.version.outputs.version }}.linux.${{ matrix.arch }}.flatpak
-          manifest-path: flatpak/io.github.pguntermann.CARA.yml
-          cache-key: flatpak-builder-${{ github.sha }}-${{ matrix.arch }}
-          arch: ${{ matrix.arch }}
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          export GSETTINGS_BACKEND=memory
+          MANIFEST=flatpak/io.github.pguntermann.CARA.yml
+          APP_ID=$(grep -E '^app-id:' "$MANIFEST" | awk '{print $2}')
+          BRANCH=master
+          BUNDLE="CARA.${VERSION}.linux.${ARCH}.flatpak"
+          SUBJECT="Built from ${GITHUB_SHA:-unknown}"
+          xvfb-run --auto-servernum flatpak-builder \
+            --user \
+            --repo=repo \
+            --disable-rofiles-fuse \
+            --install-deps-from=flathub \
+            --subject="$SUBJECT" \
+            --force-clean \
+            --default-branch="$BRANCH" \
+            --arch="$ARCH" \
+            --ccache \
+            --state-dir .flatpak-builder \
+            flatpak_app \
+            "$MANIFEST"
+          flatpak build-bundle \
+            repo \
+            "$BUNDLE" \
+            --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
+            --arch="$ARCH" \
+            "$APP_ID" \
+            "$BRANCH"
 
       - name: Upload Flatpak artifact
         uses: actions/upload-artifact@v6
