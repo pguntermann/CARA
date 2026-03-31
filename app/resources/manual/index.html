@@ -201,6 +201,7 @@
                         <li><a href="#moves-list-columns-reference">7.7 Moves List Columns Reference</a></li>
                         <li><a href="#customizing-formulas">7.8 Customizing ELO and Accuracy Formulas</a></li>
                         <li><a href="#custom-ai-endpoint">7.9 Using a Custom AI Endpoint (Local LLM)</a></li>
+                        <li><a href="#recommended-engines">7.10 Recommended Chess Engines</a></li>
                     </ul>
                 </li>
             </ul>
@@ -219,7 +220,8 @@
                 
                 <img src="screenshots/app_overview.png" alt="CARA Application Overview - Main interface showing chess board, game database, and analysis panels" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
-                <p>CARA is built with PyQt6 and follows PyQt's Model/View architecture with additional separation of business logic using Controllers and signal observation patterns, ensuring a responsive user interface and clean separation of concerns. Views observe models through Qt's signal/slot mechanism, automatically updating when model data changes, while Controllers orchestrate business logic and coordinate between services and models. Following a strict coding convention, all UI styling, including fonts, colors, sizes, and dimensions, is defined in a centralized configuration file with no hardcoded values in the view components. This allows for complete customization of the application's appearance without modifying code. The application supports multiple chess engines via the UCI (Universal Chess Interface) protocol, allowing you to use engines like Stockfish, Shredder, Lc0, Komodo, Berserk, or any other UCI-compatible engine.</p>
+                <p>CARA is built with PyQt6 and follows PyQt's Model/View architecture with additional separation of business logic using Controllers and signal observation patterns, ensuring a responsive user interface and clean separation of concerns. Views observe models through Qt's signal/slot mechanism, automatically updating when model data changes, while Controllers orchestrate business logic and coordinate between services and models. Following a strict coding convention, all UI styling, including fonts, colors, sizes, and dimensions, is defined in a centralized configuration file with no hardcoded values in the view components. This allows for complete customization of the application's appearance without modifying code. The application supports multiple chess engines via the UCI (Universal Chess Interface) protocol, so you can use any UCI-compatible engine (for example Stockfish, Lc0, Komodo, Shredder).</p>
+                <p>If you’re not sure what to install, see <a href="#recommended-engines">section 7.10 “Recommended Chess Engines”</a>.</p>
                 
                 <p>Whether you're analyzing your own games, studying master games, or reviewing games from online platforms like Lichess or Chess.com, CARA provides the tools you need to gain deep insights into chess positions, moves, and patterns.</p>
             </div>
@@ -262,7 +264,7 @@
                 <ul>
                     <li><strong>Introduction:</strong> Overview of CARA, its features, and what makes it unique</li>
                     <li><strong>Attributions:</strong> Credits for libraries, resources, and licensing information</li>
-                    <li><strong>Installation:</strong> Step-by-step installation instructions for Windows and macOS</li>
+                    <li><strong>Installation:</strong> Step-by-step installation instructions for Windows, macOS, and Linux</li>
                     <li><strong>Getting Started:</strong> Interface overview and your first game analysis</li>
                     <li><strong>Common Tasks:</strong> Detailed guides for everyday operations</li>
                     <li><strong>Complete Reference:</strong> Comprehensive menu and keyboard shortcut documentation</li>
@@ -536,9 +538,9 @@
                 <div class="tip-box">
                     <strong>Finding Your Configuration Files:</strong> If you're using an app bundle and need to locate your configuration files:
                     <ul style="margin-top: 10px;">
+                        <li><strong>All platforms:</strong> Use <span class="menu-item">Help → Open User Data Directory</span> to open the folder CARA is currently using.</li>
                         <li><strong>Windows:</strong> First check the directory where CARA.exe is located. If the files are not there, press <code>Win+R</code>, type <code>%APPDATA%\CARA</code>, and press Enter to open the folder in File Explorer.</li>
                         <li><strong>macOS:</strong> Open Finder, press <code>⌘+Shift+G</code> (Go to Folder), type <code>~/Library/Application Support/CARA</code>, and press Enter.</li>
-                        <li><strong>Linux:</strong> Use <span class="menu-item">Help → Open User Data Directory</span> to open the folder CARA is currently using.</li>
                     </ul>
                 </div>
             </div>
@@ -1113,7 +1115,7 @@
                 
                 <ol>
                     <li><strong>Ensure you have a chess engine configured:</strong><br>
-                    Before starting, make sure you have at least one UCI-compatible chess engine added to CARA. See <a href="#configuring-engines">section 5.1</a> for instructions on configuring engines. If you're unsure which engine to choose, <a href="https://stockfishchess.org/download/" target="_blank">Stockfish</a> is an excellent free option to get started.</li>
+                    Before starting, make sure you have at least one UCI-compatible chess engine added to CARA. See <a href="#configuring-engines">section 5.1</a> for instructions on configuring engines. For engine suggestions, see <a href="#recommended-engines">section 7.10</a>.</li>
                     
                     <li><strong>Open a game or paste PGN:</strong><br>
                     Open a PGN database using <span class="menu-item">File → Open PGN Database</span> (<code>Ctrl+O</code> / <code>⌘+O</code>), or paste PGN text into the Clipboard database using <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+V</code> / <code>⌘+V</code>)—the pasted game gets loaded automatically.</li>
@@ -1143,7 +1145,7 @@
                     <li><strong>Conventional alpha-beta search engines</strong> (e.g., Stockfish, Berserk, Komodo): These engines use traditional search algorithms and are typically faster, making them ideal for quick analysis and when you need responsive performance. They work well on standard CPUs and don't require specialized hardware.</li>
                     <li><strong>Neural network-based engines</strong> (e.g., Leela Chess Zero, Maia): These engines use machine learning models and often provide different evaluation perspectives compared to conventional engines. They are generally slower than conventional engines and may benefit from a powerful graphics card (GPU) for optimal performance. They can be useful when you want alternative analysis perspectives on positions. For example, with sufficient hardware, you can use neural network-based engines with the <a href="#manual-analysis-task">manual analysis function</a> to get a different perspective than you would from using a conventional engine.</li>
                 </ul>
-                <p>For most users, starting with a conventional engine like Stockfish is recommended due to its speed and strength. You can always add additional engines later to compare different analysis approaches.</p>
+                <p>For a short, consistent list of engine suggestions (free and commercial) and best use cases inside CARA, see <a href="#recommended-engines">section 7.10</a>.</p>
                 
                 <h5 id="adding-first-engine">5.1.1 Adding Your First Engine</h5>
                 <p>To add your first engine:</p>
@@ -1152,7 +1154,7 @@
                     Use <span class="menu-item">Engines → Add Engine...</span> or press <code>Ctrl+E</code>.</li>
                     
                     <li><strong>Select the engine executable:</strong><br>
-                    Click "Browse" to locate your chess engine executable file (e.g., <code>stockfish.exe</code> for Stockfish on Windows).</li>
+                    Click "Browse" to locate your chess engine executable file (e.g., <code>stockfish.exe</code> on Windows, or <code>stockfish</code> on Linux/macOS).</li>
                     
                     <li><strong>Validate the engine:</strong><br>
                     CARA will automatically validate that the engine supports the UCI protocol. The engine name, author, and version will be detected automatically.</li>
@@ -1164,13 +1166,7 @@
                 <img src="screenshots/add_engine_dialog.png" alt="CARA Add Engine Dialog - Dialog for adding UCI chess engines with browse button, validation, and engine information fields" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
                 <div class="tip-box">
-                    <strong>Don't have a chess engine yet?</strong> Here are some excellent free engines you can download:
-                    <ul style="margin-top: 10px; margin-bottom: 0;">
-                        <li><strong><a href="https://stockfishchess.org/download/" target="_blank">Stockfish</a></strong> — Open-source, very strong conventional engine. Recommended for most users due to its speed and strength. Available for Windows, macOS, and Linux. This is the best starting choice for most users.</li>
-                        <li><strong><a href="https://github.com/Matthies/RubiChess/releases" target="_blank">RubiChess</a></strong> — Strong engine written in C++. Features advanced search techniques and is actively maintained. Available for Windows, macOS, and Linux.</li>
-                        <li><strong><a href="https://github.com/jhonnold/berserk/releases" target="_blank">Berserk</a></strong> — Free, open-source engine written in C with NNUE evaluation. Very strong (3500+ Elo) with modern search techniques. Pre-built binaries available for Windows; can be compiled from source for macOS and Linux.</li>
-                    </ul>
-                    <p style="margin-top: 10px; margin-bottom: 0;">After downloading, extract the executable file and point CARA to it when adding your first engine. <strong>Stockfish</strong> is recommended as the best starting choice for most users.</p>
+                    <strong>Don’t have a chess engine yet?</strong> See <a href="#recommended-engines">section 7.10 “Recommended Chess Engines”</a> for a short list of suggested free and commercial engines (with links) and when to use them in CARA.
                 </div>
                 
                 <h5 id="adding-additional-engines">5.1.2 Adding Additional Engines and Advanced Configuration</h5>
@@ -2024,11 +2020,7 @@
                 <p>Opens a dialog to add a new UCI-compatible chess engine to CARA. You can browse for the engine executable file, and CARA will automatically validate that it supports the UCI protocol. The first engine you add is automatically assigned to all analysis tasks.<br>See <a href="#adding-first-engine">section 5.1.1</a> for detailed instructions.</p>
                 
                 <div class="tip-box">
-                    <strong>Quick Tip:</strong> CARA works with any UCI-compatible chess engine. Here are some recommended options:
-                    <ul style="margin-top: 8px; margin-bottom: 0;">
-                        <li><strong>Free engines:</strong> <a href="https://stockfishchess.org/download/" target="_blank">Stockfish</a> (open-source, very strong), <a href="https://github.com/official-stockfish/Stockfish" target="_blank">Berserk</a> (Stockfish derivative), <a href="https://lczero.org/" target="_blank">Leela Chess Zero (Lc0)</a> (neural network-based)</li>
-                        <li><strong>Commercial engines:</strong> <a href="https://www.shredderchess.com/" target="_blank">Shredder</a>, <a href="https://komodochess.com/" target="_blank">Komodo</a>, <a href="https://www.chessbase.com/en/product/chessbase-engines" target="_blank">ChessBase engines</a> (Fritz, Houdini, etc.)</li>
-                    </ul>
+                    <strong>Quick Tip:</strong> CARA works with any UCI-compatible chess engine. For a short list of recommended engines (free and commercial) with links and best use cases, see <a href="#recommended-engines">section 7.10</a>.
                 </div>
                 
                 <h5>6.9.2 Engine Submenus</h5>
@@ -3095,6 +3087,41 @@
                     <li><strong>Requests fail or time out:</strong> Increase the request timeout in AI Model Settings and confirm a model is loaded.</li>
                     <li><strong>API error 400 – context length:</strong> The prompt exceeds the model’s context window. Configure and reload the model with a larger context length in your server (e.g. LM Studio), or reduce the amount of data sent in the prompt by disabling <span class="menu-item">AI Summary → Include Game Analysis Data in Pre-Prompt</span> and <span class="menu-item">AI Summary → Include PGN Metadata tags in Pre-Prompt</span>.</li>
                     <li><strong>Output used only for reasoning:</strong> The model might use the full output context only for reasoning, leaving no room for the actual answer. Disable reasoning/thinking in your server. In LM Studio you can do this by adding <code>{%- set enable_thinking = false %}</code> to the prompt template (Jinja) in AI Model Settings.</li>
+                </ul>
+            </div>
+
+            <div class="outline-item">
+                <h4 id="recommended-engines">7.10 Recommended Chess Engines</h4>
+                <p>CARA works with any <strong>UCI-compatible</strong> engine. If you just want one strong default, start with <a href="https://stockfishchess.org/download/" target="_blank" rel="noopener noreferrer"><strong>Stockfish</strong></a>.</p>
+                
+                <h5>Recommended free engines</h5>
+                <p><strong>Conventional (alpha-beta) engines</strong> are typically faster, making them a great choice for responsive analysis and day-to-day use. They run well on standard CPUs and don’t require specialized hardware.</p>
+                <ul>
+                    <li><strong><a href="https://stockfishchess.org/download/" target="_blank" rel="noopener noreferrer">Stockfish</a></strong> — Best all-around choice for most users (fast, strong, easy to set up).</li>
+                    <li><strong><a href="https://github.com/Matthies/RubiChess/releases" target="_blank" rel="noopener noreferrer">RubiChess</a></strong> — Strong conventional engine; a good second opinion next to Stockfish.</li>
+                    <li><strong><a href="https://github.com/jhonnold/berserk/releases" target="_blank" rel="noopener noreferrer">Berserk</a></strong> — Strong and fast; useful as an alternative to Stockfish for comparison.</li>
+                    <li><strong><a href="https://github.com/Yoshie2000/PlentyChess" target="_blank" rel="noopener noreferrer">PlentyChess</a></strong> — Strong modern engine; good for comparing evaluations and getting another top-tier viewpoint.</li>
+                </ul>
+
+                <p><strong>Neural network-based engines</strong> can provide a different evaluation perspective. They are often slower and may benefit from stronger hardware (especially a GPU, depending on the engine/build), but they can be very insightful for exploring plans and positional ideas.</p>
+                <ul>
+                    <li><strong><a href="https://lczero.org/" target="_blank" rel="noopener noreferrer">Leela Chess Zero (Lc0)</a></strong> — Neural-network engine; great for alternative perspectives (often benefits from a GPU).</li>
+                    <li><strong><a href="https://maiachess.com/" target="_blank" rel="noopener noreferrer">Maia</a></strong> — Human-like play style (Lc0-based); useful when you want “human” plans rather than pure engine perfection.</li>
+                </ul>
+                
+                <h5>Recommended commercial engines</h5>
+                <ul>
+                    <li><strong><a href="https://www.shredderchess.com/" target="_blank" rel="noopener noreferrer">Shredder</a></strong> — Mature engine with a long track record; good as a paid “second opinion”.</li>
+                    <li><strong><a href="https://komodochess.com/" target="_blank" rel="noopener noreferrer">Komodo</a></strong> — Strong commercial engine; useful if you already own it and want to compare styles.</li>
+                    <li><strong><a href="https://www.hiarcs.com/hiarcs-chess-engine.html" target="_blank" rel="noopener noreferrer">HIARCS</a></strong> — Commercial engine with a distinct style; useful as a paid “second opinion” and for comparison.</li>
+                </ul>
+                
+                <h5>Best use cases inside CARA</h5>
+                <ul>
+                    <li><strong>Evaluation bar (continuous):</strong> Use a fast conventional engine (Stockfish is a great default).</li>
+                    <li><strong>Game Analysis:</strong> Use a fast conventional engine. If you use a neural network-based engine, set a <strong>longer movetime</strong> to get stable results.</li>
+                    <li><strong>Manual Analysis:</strong> Use either a conventional or a neural network-based engine—this is a great place to compare “styles” and explore plans.</li>
+                    <li><strong>Brilliancy Detection:</strong> Experiment with using a different, slightly weaker conventional engine as a second opinion. Avoid neural network-based engines here. See <a href="#brilliant-move-detection">section 5.5.3 “Brilliant Move Detection”</a>.</li>
                 </ul>
             </div>
         </section>
