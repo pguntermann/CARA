@@ -362,7 +362,7 @@
         <section id="installation">
             <h2>3. Installation</h2>
             <div class="tip-box" style="margin-bottom: 20px;">
-                <strong>App Bundles (Recommended):</strong> Pre-built application bundles are available for Windows and macOS, which include all dependencies and can be run directly without Python installation. See the <a href="https://github.com/pguntermann/CARA/releases" target="_blank">releases page</a> for download options.
+                <strong>App Bundles (Recommended):</strong> Pre-built application bundles are available for Windows, macOS, and Linux. They include all dependencies, so you can run CARA without installing Python. See the <a href="https://github.com/pguntermann/CARA/releases" target="_blank">releases page</a> for downloads (Linux bundles are published as <code>.tar.gz</code> per architecture).
                 <p style="margin-top: 10px; margin-bottom: 0;"><strong>macOS users:</strong> Due to macOS security settings, you may need to allow the app to run. If you see a security warning when trying to open the app, follow these steps:</p>
                 <ol style="margin-top: 10px; margin-bottom: 10px;">
                     <li>Right-click the app and select "Open"</li>
@@ -370,7 +370,7 @@
                     <li>Open System Settings → Privacy & Security</li>
                     <li>Scroll down to find the blocked app notification and click "Open Anyway"</li>
                 </ol>
-                After completing these steps, you can launch the app normally.
+                After completing these steps, you can launch the app normally. For background and troubleshooting details, see <a href="https://github.com/pguntermann/CARA/discussions/72" target="_blank" rel="noopener noreferrer">this Q&amp;A post</a>.
             </div>
             <p style="margin-bottom: 20px;"><strong>Manual Installation:</strong> The following sections describe how to manually install Python and CARA dependencies, if you don't want to use the pre-built application bundles.</p>
             <div class="outline-item">
@@ -378,7 +378,7 @@
                 <p>Before installing CARA, ensure your system meets the following requirements:</p>
                 
                 <h5>Operating System</h5>
-                <p>The application has been tested on Windows 11 and macOS Tahoe 26.2. In general, CARA should also run on Linux, but it has not been tested on Linux and may require some minor adjustments.</p>
+                <p>The application has been tested on Windows 11, macOS Tahoe 26.2, and Linux Ubuntu, Debian (Gnome) and Fedora (KDE Plasma). Linux app bundles are provided for <strong>x86_64 (amd64)</strong> and <strong>aarch64 (arm64)</strong>.</p>
                 
                 <h5>Python</h5>
                 <p>Python 3.8 or higher is required. CARA uses PyQt6, which requires Python 3.8+. See <a href="#installing-python">section 3.2</a> for installation instructions.</p>
@@ -504,6 +504,7 @@
             </div>
             <div class="outline-item">
                 <h4 id="running-application">3.5 Running the Application</h4>
+                <p><strong>App bundles:</strong> Download the bundle for your platform, extract it, and start CARA from the extracted folder.</p>
                 <p>To start CARA, open a terminal (PowerShell or Command Prompt on Windows, Terminal on macOS), navigate to the CARA directory, and run:</p>
                 <code class="command">python cara.py</code><br>
                 <p><strong>Note:</strong> On macOS, you may need to use <code>python3</code> instead of <code>python</code>.</p>
@@ -528,6 +529,8 @@
                     <li><strong>Windows:</strong> Files are stored in the app directory (where CARA.exe is located) if the directory has write access (portable mode). If the app directory cannot be written to, files are stored in your user data directory: <code>%APPDATA%\CARA\</code> (usually <code>C:\Users\YourUsername\AppData\Roaming\CARA\</code>).</li>
                     
                     <li><strong>macOS:</strong> Files are stored in <code>~/Library/Application Support/CARA/</code>.</li>
+
+                    <li><strong>Linux:</strong> Files are stored in the app directory if it is writable (portable mode). Otherwise, CARA uses <code>$XDG_DATA_HOME/CARA/</code> (if set) or <code>~/.local/share/CARA/</code>.</li>
                 </ul>
                 
                 <div class="tip-box">
@@ -535,6 +538,7 @@
                     <ul style="margin-top: 10px;">
                         <li><strong>Windows:</strong> First check the directory where CARA.exe is located. If the files are not there, press <code>Win+R</code>, type <code>%APPDATA%\CARA</code>, and press Enter to open the folder in File Explorer.</li>
                         <li><strong>macOS:</strong> Open Finder, press <code>⌘+Shift+G</code> (Go to Folder), type <code>~/Library/Application Support/CARA</code>, and press Enter.</li>
+                        <li><strong>Linux:</strong> Use <span class="menu-item">Help → Open User Data Directory</span> to open the folder CARA is currently using.</li>
                     </ul>
                 </div>
             </div>
@@ -2451,21 +2455,21 @@
                 <h5 id="configuring-logging-settings">7.1.7 Configuring Logging Settings</h5>
                 <p>CARA provides configurable logging to help with debugging and troubleshooting. Logging can be configured for both console output and file output, with separate log levels for each.</p>
                 
-                <p><strong>Important:</strong> Console logging is only available when running CARA from the console on manual installation. When using app bundles (pre-built Windows or macOS applications), console logging is not available and only file-based logging can be used.</p>
+                <p><strong>Important:</strong> Console logging is only visible when you launch CARA from a terminal. This is always true for manual installations. For app bundles, it depends on the platform: Windows and macOS bundles are typically started via the GUI (no console), while Linux bundles can be started from a terminal to see console output.</p>
                 
                 <p>To configure logging settings:</p>
                 <ol>
                     <li><strong>Locate the logging configuration:</strong><br>
                     Open <code>config.json</code> in a text editor and navigate to: <code>logging</code></li>
                     
-                    <li><strong>Configure console logging (manual installations only):</strong><br>
+                    <li><strong>Configure console logging:</strong><br>
                     The console logging section contains:
                     <ul>
                         <li><code>"enabled": true</code> - Enable or disable console logging. Set to <code>false</code> to disable console output.</li>
                         <li><code>"level": "ERROR"</code> - Log level for console output. Valid values are: <code>"DEBUG"</code>, <code>"INFO"</code>, <code>"WARNING"</code>, <code>"ERROR"</code>. Only messages at or above this level will be displayed.</li>
                     </ul>
                     <div class="tip-box">
-                        <strong>Note:</strong> Console logging has no effect when running app bundles, as there is no console available. For app bundles, use file logging instead.
+                        <strong>Tip:</strong> If you’re using an app bundle and want console logs, start CARA from a terminal (especially on Linux). Otherwise, rely on file logs.
                     </div>
                     </li>
                     
@@ -2500,12 +2504,14 @@
                         <li><strong>Manual installations:</strong> Log files are created in the CARA root directory (where <code>cara.py</code> is located).</li>
                         <li><strong>Windows app bundles:</strong> Log files are stored in the app directory (where CARA.exe is located) if the directory has write access (portable mode). If the app directory cannot be written to, log files are stored in <code>%APPDATA%\CARA\</code> (usually <code>C:\Users\YourUsername\AppData\Roaming\CARA\</code>).</li>
                         <li><strong>macOS app bundles:</strong> Log files are stored in <code>~/Library/Application Support/CARA/</code>.</li>
+                        <li><strong>Linux app bundles:</strong> Log files are stored in the app directory if it is writable (portable mode). Otherwise, CARA uses <code>$XDG_DATA_HOME/CARA/</code> (if set) or <code>~/.local/share/CARA/</code>.</li>
                     </ul>
                     <div class="tip-box">
                         <strong>Finding Your Log Files:</strong> If you're using an app bundle and need to locate your log files:
                         <ul style="margin-top: 10px;">
                             <li><strong>Windows:</strong> First check the directory where CARA.exe is located. If the files are not there, press <code>Win+R</code>, type <code>%APPDATA%\CARA</code>, and press Enter to open the folder in File Explorer.</li>
                             <li><strong>macOS:</strong> Open Finder, press <code>⌘+Shift+G</code> (Go to Folder), type <code>~/Library/Application Support/CARA</code>, and press Enter.</li>
+                            <li><strong>Linux:</strong> Use <span class="menu-item">Help → Open User Data Directory</span> to open the folder CARA is currently using.</li>
                         </ul>
                     </div>
                     </li>
