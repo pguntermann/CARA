@@ -2,9 +2,9 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-lightgrey.svg)]()
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-**Version 2.6.6**
+**Version 2.6.7**
 
 CARA is a full-featured desktop application designed for analyzing and reviewing chess games. Unlike chess playing applications or puzzle solvers, CARA focuses exclusively on post-game analysis and review, helping you understand your games, identify mistakes, recognize patterns, and improve your chess understanding.
 
@@ -48,14 +48,14 @@ CARA was built in large part by an AI model under the author's direction. The au
 
 ## System Requirements
 
-- **Operating System**: The application has been tested on Windows 11 and macOS Tahoe 26.2. In general, CARA should also run on Linux, but it has not been tested on Linux and may require some minor adjustments.
+- **Operating System**: The application has been tested on Windows 11, macOS Tahoe 26.2, and Linux (GNOME / KDE Plasma). 
 - **Python**: 3.8 or higher (CARA uses PyQt6, which requires Python 3.8+)
 - **Screen Resolution**: A minimum screen resolution of 1280×1024 pixels is recommended. Some dialogs require at least 800 pixels in width and 900 pixels in height to display properly. Lower resolutions may cause dialogs to be cut off or difficult to use.
 - **Hardware**: No specific hardware requirements beyond what is needed to run Python and the operating system. For optimal performance when analyzing games with chess engines, a modern multi-core processor is recommended.
 
 ## Installation
 
-> **App Bundles (Recommended)**: Pre-built application bundles are available for Windows and macOS, which include all dependencies and can be run directly without Python installation. See the [releases page](https://github.com/pguntermann/CARA/releases) for download options.
+> **App Bundles (Recommended)**: Pre-built application bundles are available for Windows, macOS, and Linux. They include all dependencies and can be run directly without a separate Python installation. See the [releases page](https://github.com/pguntermann/CARA/releases) for download options.
 >
 > **macOS users**: Due to macOS security settings, you may need to allow the app to run. If you see a security warning when trying to open the app, follow these steps:
 > 1. Right-click the app and select "Open"
@@ -63,11 +63,22 @@ CARA was built in large part by an AI model under the author's direction. The au
 > 3. Open System Settings → Privacy & Security
 > 4. Scroll down to find the blocked app notification and click "Open Anyway"
 >
-> After completing these steps, you can launch the app normally.
+> After completing these steps, you can launch the app normally. For background and troubleshooting details, see [this Q&A post](https://github.com/pguntermann/CARA/discussions/72).
 
 ---
 
 **Manual Installation**: The following subsections describe how to manually install Python and CARA dependencies, if you don't want to use the pre-built application bundles.
+
+### Linux App Bundle Notes
+
+- Linux App Bundles are published as `.tar.gz`. Extract the archive and run the app from the extracted folder.
+- Make sure you download the correct build for your system architecture (e.g. x86_64 vs arm64).
+- Example:
+
+```bash
+tar -xzf CARA.2.6.7.linux.amd64.AppBundle.tar.gz
+./CARA/CARA
+```
 
 ### 1. Install Python
 

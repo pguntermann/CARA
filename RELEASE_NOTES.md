@@ -1,5 +1,23 @@
 # Release Notes
 
+# CARA v2.6.7 - Linux App Bundles, Faster Player Stats and UI Polish
+
+**Release Date:** 31.03.2026
+
+This release introduces **Linux support** via pre-built Linux amd64 and aarch64 App Bundles, improves **performance** during Player Stats calculation (notably error-pattern detection), and includes multiple **UI refinements** across dialogs for a more consistent look and feel.
+
+## New Features
+
+- **Linux support (App Bundles):** Linux builds are now available as pre-built App Bundles (per-architecture tarballs). Tested with GNOME (Debian, Ubuntu) and KDE Plasma (Fedora).
+
+## Enhancements
+
+- **Player Stats performance:** Improved computation performance during Player Stats calculation, including faster error-pattern detection.
+- **UI consistency:** Standardized dialog button order/alignment so **Cancel/Abort** options are always on the left and **OK/Accept** options are always on the right side, as well as additional layout refinements mostly for better Linux compatibility.
+- **User manual:** Updated the HTML manual to reflect Linux availability and added guidance on recommended chess engines.
+
+---
+
 # CARA v2.6.6 - Move Comment Editing, Database Drag & Drop, and Metadata Context Menu
 
 **Release Date:** 28.03.2026
@@ -46,7 +64,7 @@ This release improves overall UX, enhances the Notes View and fixes some bugs. Y
 
 - **Database view – PGN preview:** Fixed a bug where the displayed PGN column in the database view didn't update when the game model updated, for example when changing PGN tags.
 - **Player Stats:** Fixed an issue where the player dropdown could stay empty when switching databases while using “Active Database” as the source.
-- **Notes view:** Fixed false positves in the move SAN detection logic.
+- **Notes view:** Fixed false positives in the move SAN detection logic.
 
 ## Refactoring and Technical Improvements
 
