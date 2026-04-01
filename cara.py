@@ -4,6 +4,34 @@ import sys
 import os
 import multiprocessing
 from pathlib import Path
+
+
+def _configure_linux_frozen_runtime() -> None:
+    """Mitigate GLib/GIO plugin mismatch and GNOME Wayland decoration issues when frozen.
+
+    System GIO modules under /usr/lib/.../gio/modules expect the distro GLib; a bundled
+    older GLib causes undefined-symbol failures. GNOME on Wayland with some stacks (e.g.
+    certain VMs) can show missing window frames unless Qt uses the X11/XWayland plugin.
+    """
+    if not getattr(sys, "frozen", False):
+        return
+    if not sys.platform.startswith("linux"):
+        return
+
+    os.environ.pop("GIO_MODULE_DIR", None)
+    os.environ.setdefault("GIO_USE_VFS", "local")
+
+    if os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland":
+        desktop = (os.environ.get("XDG_CURRENT_DESKTOP") or "").upper()
+        if "GNOME" in desktop:
+            os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
+
+
+_configure_linux_frozen_runtime()
+
+# Suppress Qt font warnings before importing Qt modules
+os.environ.setdefault("QT_LOGGING_RULES", "qt.qpa.fonts.warning=false")
+
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import QtMsgType, qInstallMessageHandler, QLoggingCategory
@@ -12,10 +40,6 @@ from app.config.config_loader import ConfigLoader
 from app.main_window import MainWindow
 from app.services.error_handler import ErrorHandler
 from app.utils.path_resolver import get_app_resource_path
-
-# Suppress Qt font warnings before importing Qt modules
-# Set environment variable to reduce Qt font logging
-os.environ.setdefault("QT_LOGGING_RULES", "qt.qpa.fonts.warning=false")
 
 def _is_kde_plasma_session() -> bool:
     """Best-effort detection of KDE Plasma desktop sessions (Linux only)."""
