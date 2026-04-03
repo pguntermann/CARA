@@ -223,6 +223,37 @@ def _game_date_to_ordinal(date_str: str) -> Optional[int]:
         return None
 
 
+def _game_date_ordinal_for_trends(date_str: str) -> Optional[int]:
+    """Ordinal for time-series charts (accuracy, move quality, ACPL by phase).
+
+    Fully specified PGN dates use the real calendar day. Partial dates use stable
+    stand-ins so games still contribute to bins (otherwise long games with
+    ``YYYY.??.??`` or ``YYYY.MM.??`` were dropped entirely while still showing
+    full phase stats when opened individually).
+
+    - Year only (``YYYY.??.??``): July 1 of that year
+    - Year-month (``YYYY.MM.??``): 15th of that month (clamped to month length)
+    """
+    if not date_str or not isinstance(date_str, str):
+        return None
+    parsed = DateMatcher.parse_date(date_str.strip())
+    if not parsed:
+        return None
+    y, m, d = parsed
+    if y is None:
+        return None
+    try:
+        if m is None:
+            return date(y, 7, 1).toordinal()
+        if d is None:
+            last = calendar.monthrange(y, m)[1]
+            d_use = min(15, last)
+            return date(y, m, d_use).toordinal()
+        return date(y, m, d).toordinal()
+    except ValueError:
+        return None
+
+
 def _week_start_monday_ordinal(ord_val: int) -> int:
     d = date.fromordinal(ord_val)
     return (d - timedelta(days=d.weekday())).toordinal()
@@ -281,18 +312,165 @@ def _initial_calendar_mode(span_days: int, chart_cfg: Dict[str, Any]) -> str:
     return "year"
 
 
+def _should_use_ordinal_quantile_fallback(
+    chart_cfg: Dict[str, Any],
+    *,
+    n_calendar_groups: int,
+    n_samples: int,
+    span_days: int,
+    min_span_days: int,
+) -> bool:
+    """Use date-sorted equal-count bands when strict calendar keys collapse too many games."""
+    thr = int(chart_cfg.get("min_calendar_bins_before_ordinal_fallback", 5))
+    if thr <= 0:
+        return False
+    if n_calendar_groups >= thr:
+        return False
+    min_g = int(chart_cfg.get("min_games_for_ordinal_fallback", 15))
+    if n_samples < min_g:
+        return False
+    if span_days > 0 and span_days < min_span_days:
+        return False
+    return True
+
+
+def _ordinal_quantile_target_bins(chart_cfg: Dict[str, Any], n_samples: int, max_calendar_bins: int) -> int:
+    target = int(chart_cfg.get("ordinal_quantile_bin_count", 12))
+    return max(2, min(target, n_samples, max_calendar_bins))
+
+
+def _calendar_bin_center_time_pct(lo_o: int, hi_o: int, t_min: int, t_max: int) -> float:
+    """Map a bin's calendar range to 0–100 chart X (same linear scale as the date axis).
+
+    Ordinal-quantile bins slice the game list by equal counts; their median accuracy still
+    refers to real dates (``lab0``–``lab1``). Using rank index for ``time_pct`` placed points
+    on the wrong calendar position when game density over time was uneven.
+    """
+    span = float(t_max - t_min)
+    if span <= 0:
+        return 50.0
+    center = (float(lo_o) + float(hi_o)) / 2.0
+    pct = (center - float(t_min)) / span * 100.0
+    return max(0.0, min(100.0, pct))
+
+
+def _accuracy_series_ordinal_quantile_bins(
+    samples: List[Tuple[int, float]],
+    n_bins: int,
+    t_min: int,
+    t_max: int,
+) -> List[Tuple[float, float, int, str, str]]:
+    sorted_s = sorted(samples, key=lambda x: x[0])
+    n = len(sorted_s)
+    n_bins = max(2, min(n_bins, n))
+    rows: List[Tuple[float, float, int, str, str]] = []
+    for b in range(n_bins):
+        lo_i = b * n // n_bins
+        hi_i = (b + 1) * n // n_bins if b < n_bins - 1 else n
+        chunk = sorted_s[lo_i:hi_i]
+        ords = [x[0] for x in chunk]
+        accs = [x[1] for x in chunk]
+        lo_o = max(min(ords), t_min)
+        hi_o = min(max(ords), t_max)
+        if lo_o > hi_o:
+            lo_o, hi_o = hi_o, lo_o
+        time_pct = _calendar_bin_center_time_pct(lo_o, hi_o, t_min, t_max)
+        p_med = float(median(accs))
+        cnt = len(accs)
+        lab0 = date.fromordinal(lo_o).isoformat()
+        lab1 = date.fromordinal(hi_o).isoformat()
+        rows.append((time_pct, p_med, cnt, lab0, lab1))
+    rows.sort(key=lambda x: x[0])
+    return rows
+
+
+def _move_quality_bins_ordinal_quantile(
+    samples_vec: List[Tuple[int, Tuple[float, ...]]],
+    n_bins: int,
+    n_series: int,
+    t_min: int,
+    t_max: int,
+) -> List[Tuple[float, int, str, str, Tuple[float, ...]]]:
+    sorted_s = sorted(samples_vec, key=lambda x: x[0])
+    n = len(sorted_s)
+    n_bins = max(2, min(n_bins, n))
+    bins_out: List[Tuple[float, int, str, str, Tuple[float, ...]]] = []
+    for b in range(n_bins):
+        lo_i = b * n // n_bins
+        hi_i = (b + 1) * n // n_bins if b < n_bins - 1 else n
+        chunk = sorted_s[lo_i:hi_i]
+        ords = [x[0] for x in chunk]
+        vecs = [x[1] for x in chunk]
+        lo_o = max(min(ords), t_min)
+        hi_o = min(max(ords), t_max)
+        if lo_o > hi_o:
+            lo_o, hi_o = hi_o, lo_o
+        time_pct = _calendar_bin_center_time_pct(lo_o, hi_o, t_min, t_max)
+        medians_list: List[float] = []
+        for i in range(n_series):
+            col = [v[i] for v in vecs]
+            medians_list.append(float(median(col)) if col else 0.0)
+        cnt = len(vecs)
+        lab0 = date.fromordinal(lo_o).isoformat()
+        lab1 = date.fromordinal(hi_o).isoformat()
+        bins_out.append((time_pct, cnt, lab0, lab1, tuple(medians_list)))
+    bins_out.sort(key=lambda x: x[0])
+    return bins_out
+
+
+def _acpl_phase_bins_ordinal_quantile(
+    samples_vec: List[Tuple[int, Tuple[Optional[float], Optional[float], Optional[float]]]],
+    n_bins: int,
+    t_min: int,
+    t_max: int,
+) -> List[Tuple[float, int, str, str, Tuple[float, ...]]]:
+    sorted_s = sorted(samples_vec, key=lambda x: x[0])
+    n = len(sorted_s)
+    n_bins = max(2, min(n_bins, n))
+    bins_out: List[Tuple[float, int, str, str, Tuple[float, ...]]] = []
+    for b in range(n_bins):
+        lo_i = b * n // n_bins
+        hi_i = (b + 1) * n // n_bins if b < n_bins - 1 else n
+        chunk = sorted_s[lo_i:hi_i]
+        ords = [x[0] for x in chunk]
+        triples = [x[1] for x in chunk]
+        lo_o = max(min(ords), t_min)
+        hi_o = min(max(ords), t_max)
+        if lo_o > hi_o:
+            lo_o, hi_o = hi_o, lo_o
+        time_pct = _calendar_bin_center_time_pct(lo_o, hi_o, t_min, t_max)
+        medians_list: List[float] = []
+        for i_phase in range(3):
+            col = [
+                float(t[i_phase])
+                for t in triples
+                if t[i_phase] is not None and math.isfinite(float(t[i_phase]))
+            ]
+            medians_list.append(float(median(col)) if col else float("nan"))
+        cnt = len(triples)
+        lab0 = date.fromordinal(lo_o).isoformat()
+        lab1 = date.fromordinal(hi_o).isoformat()
+        bins_out.append((time_pct, cnt, lab0, lab1, tuple(medians_list)))
+    bins_out.sort(key=lambda x: x[0])
+    return bins_out
+
+
+def _ordinal_fallback_subcaption_suffix(chart_cfg: Dict[str, Any]) -> str:
+    return str(chart_cfg.get("ordinal_fallback_subcaption_suffix", "")).strip()
+
+
 def _collect_trends_dated_player_stats(
     game_results: List[Dict[str, Any]],
     analyzed_games: List[GameData],
 ) -> List[Tuple[int, PlayerStatistics]]:
-    """(game_date_ordinal, game_stats) for analyzed games with a full PGN date."""
+    """(game_date_ordinal, game_stats) for analyzed games with a usable PGN date (see trends ordinal)."""
     out: List[Tuple[int, PlayerStatistics]] = []
     for result in game_results:
         idx = result.get("index", 0)
         if idx < 0 or idx >= len(analyzed_games):
             continue
         g = analyzed_games[idx]
-        ord_val = _game_date_to_ordinal(g.date)
+        ord_val = _game_date_ordinal_for_trends(g.date)
         if ord_val is None:
             continue
         gs = result.get("game_stats")
@@ -308,6 +486,65 @@ def _merge_move_quality_chart_cfg(ps: Dict[str, Any]) -> Dict[str, Any]:
     mq = dict(ps.get("move_quality_over_time_chart", {}))
     merged = {**acc, **mq}
     return merged
+
+
+def _merge_acpl_phase_chart_cfg(ps: Dict[str, Any]) -> Dict[str, Any]:
+    acc = dict(ps.get("accuracy_over_time_chart", {}))
+    ap = dict(ps.get("acpl_phase_over_time_chart", {}))
+    return {**acc, **ap}
+
+
+def _phase_acpl_for_trends(phase: Optional[PhaseStatistics]) -> Optional[float]:
+    """Per-phase average CPL for time-series aggregation; None if phase unused or non-finite."""
+    if phase is None or phase.moves <= 0:
+        return None
+    v = float(phase.average_cpl)
+    return v if math.isfinite(v) else None
+
+
+def _collect_trends_dated_phase_acpl_triples(
+    game_results: List[Dict[str, Any]],
+    analyzed_games: List[GameData],
+) -> List[Tuple[int, Tuple[Optional[float], Optional[float], Optional[float]]]]:
+    """Per game with full date: median ACPL per phase (None if no moves in that phase)."""
+    out: List[Tuple[int, Tuple[Optional[float], Optional[float], Optional[float]]]] = []
+    for result in game_results:
+        idx = result.get("index", 0)
+        if idx < 0 or idx >= len(analyzed_games):
+            continue
+        g = analyzed_games[idx]
+        ord_val = _game_date_ordinal_for_trends(g.date)
+        if ord_val is None:
+            continue
+        go = result.get("game_opening")
+        gm = result.get("game_middlegame")
+        ge = result.get("game_endgame")
+        o = _phase_acpl_for_trends(go)
+        m = _phase_acpl_for_trends(gm)
+        e = _phase_acpl_for_trends(ge)
+        if o is None and m is None and e is None:
+            continue
+        out.append((ord_val, (o, m, e)))
+    return out
+
+
+def _group_phase_acpl_triples_by_calendar_mode(
+    samples: List[Tuple[int, Tuple[Optional[float], Optional[float], Optional[float]]]],
+    mode: str,
+) -> Dict[Any, List[Tuple[Optional[float], Optional[float], Optional[float]]]]:
+    groups: Dict[Any, List[Tuple[Optional[float], Optional[float], Optional[float]]]] = defaultdict(list)
+    for ord_val, triple in samples:
+        if mode == "day":
+            key: Any = ord_val
+        elif mode == "week":
+            key = _week_start_monday_ordinal(ord_val)
+        elif mode == "month":
+            d = date.fromordinal(ord_val)
+            key = (d.year, d.month)
+        else:
+            key = date.fromordinal(ord_val).year
+        groups[key].append(triple)
+    return groups
 
 
 _MQ_STAT_TO_ATTR = {
@@ -418,7 +655,7 @@ def _build_accuracy_over_time_series(
     template = str(
         chart_cfg.get(
             "subcaption_template",
-            "Chart based on {dated} games with a known date (of {analyzed} analyzed in this selection).",
+            "Based on {dated} dated games (of {analyzed} analyzed).",
         )
     )
     subcaption = template.format(dated=dated_count, analyzed=analyzed_count)
@@ -444,21 +681,35 @@ def _build_accuracy_over_time_series(
     if len(groups) < min_populated_bins:
         return [], "", 0, 0, ""
 
-    series: List[Tuple[float, float, int, str, str]] = []
-    for key, accs in groups.items():
-        lo, hi = _bin_ordinal_range(mode, key)
-        lo = max(lo, t_min)
-        hi = min(hi, t_max)
-        if lo > hi:
-            lo, hi = hi, lo
-        center = (float(lo) + float(hi)) / 2.0
-        time_pct = (center - float(t_min)) / span_f * 100.0 if span_f > 0 else 50.0
-        time_pct = max(0.0, min(100.0, time_pct))
-        p_med = float(median(accs))
-        cnt = len(accs)
-        lab0 = date.fromordinal(lo).isoformat()
-        lab1 = date.fromordinal(hi).isoformat()
-        series.append((time_pct, p_med, cnt, lab0, lab1))
+    use_q = _should_use_ordinal_quantile_fallback(
+        chart_cfg,
+        n_calendar_groups=len(groups),
+        n_samples=len(samples),
+        span_days=span_days,
+        min_span_days=min_span_days,
+    )
+    if use_q:
+        nqb = _ordinal_quantile_target_bins(chart_cfg, len(samples), max_calendar_bins)
+        series = _accuracy_series_ordinal_quantile_bins(samples, nqb, t_min, t_max)
+        suf = _ordinal_fallback_subcaption_suffix(chart_cfg)
+        if suf:
+            subcaption = f"{subcaption} {suf}"
+    else:
+        series = []
+        for key, accs in groups.items():
+            lo, hi = _bin_ordinal_range(mode, key)
+            lo = max(lo, t_min)
+            hi = min(hi, t_max)
+            if lo > hi:
+                lo, hi = hi, lo
+            center = (float(lo) + float(hi)) / 2.0
+            time_pct = (center - float(t_min)) / span_f * 100.0 if span_f > 0 else 50.0
+            time_pct = max(0.0, min(100.0, time_pct))
+            p_med = float(median(accs))
+            cnt = len(accs)
+            lab0 = date.fromordinal(lo).isoformat()
+            lab1 = date.fromordinal(hi).isoformat()
+            series.append((time_pct, p_med, cnt, lab0, lab1))
 
     series.sort(key=lambda x: x[0])
     return series, subcaption, t_min, t_max, mode
@@ -519,7 +770,7 @@ def _build_move_quality_over_time_series(
     template = str(
         chart_cfg.get(
             "subcaption_template",
-            "Chart based on {dated} games with a known date (of {analyzed} analyzed in this selection).",
+            "Based on {dated} dated games (of {analyzed} analyzed).",
         )
     )
     subcaption = template.format(dated=dated_count, analyzed=analyzed_count)
@@ -546,26 +797,160 @@ def _build_move_quality_over_time_series(
         return [], [], [], "", 0, 0, ""
 
     n_series = len(stat_ids)
-    bins_out: List[Tuple[float, int, str, str, Tuple[float, ...]]] = []
-    for key, vecs in groups.items():
-        lo, hi = _bin_ordinal_range(mode, key)
-        lo = max(lo, t_min)
-        hi = min(hi, t_max)
-        if lo > hi:
-            lo, hi = hi, lo
-        center = (float(lo) + float(hi)) / 2.0
-        time_pct = (center - float(t_min)) / span_f * 100.0 if span_f > 0 else 50.0
-        time_pct = max(0.0, min(100.0, time_pct))
-        medians_list: List[float] = []
-        for i in range(n_series):
-            col = [v[i] for v in vecs]
-            medians_list.append(float(median(col)) if col else 0.0)
-        cnt = len(vecs)
-        lab0 = date.fromordinal(lo).isoformat()
-        lab1 = date.fromordinal(hi).isoformat()
-        bins_out.append((time_pct, cnt, lab0, lab1, tuple(medians_list)))
+    use_q = _should_use_ordinal_quantile_fallback(
+        chart_cfg,
+        n_calendar_groups=len(groups),
+        n_samples=len(samples_vec),
+        span_days=span_days,
+        min_span_days=min_span_days,
+    )
+    if use_q:
+        nqb = _ordinal_quantile_target_bins(chart_cfg, len(samples_vec), max_calendar_bins)
+        bins_out = _move_quality_bins_ordinal_quantile(samples_vec, nqb, n_series, t_min, t_max)
+        suf = _ordinal_fallback_subcaption_suffix(chart_cfg)
+        if suf:
+            subcaption = f"{subcaption} {suf}"
+    else:
+        bins_out = []
+        for key, vecs in groups.items():
+            lo, hi = _bin_ordinal_range(mode, key)
+            lo = max(lo, t_min)
+            hi = min(hi, t_max)
+            if lo > hi:
+                lo, hi = hi, lo
+            center = (float(lo) + float(hi)) / 2.0
+            time_pct = (center - float(t_min)) / span_f * 100.0 if span_f > 0 else 50.0
+            time_pct = max(0.0, min(100.0, time_pct))
+            medians_list = []
+            for i in range(n_series):
+                col = [v[i] for v in vecs]
+                medians_list.append(float(median(col)) if col else 0.0)
+            cnt = len(vecs)
+            lab0 = date.fromordinal(lo).isoformat()
+            lab1 = date.fromordinal(hi).isoformat()
+            bins_out.append((time_pct, cnt, lab0, lab1, tuple(medians_list)))
 
     bins_out.sort(key=lambda x: x[0])
+    return bins_out, labels, stat_ids, subcaption, t_min, t_max, mode
+
+
+def _build_acpl_phase_over_time_series(
+    game_results: List[Dict[str, Any]],
+    analyzed_games: List[GameData],
+    config: Dict[str, Any],
+    analyzed_count: int,
+) -> Tuple[
+    List[Tuple[float, int, str, str, Tuple[float, ...]]],
+    List[str],
+    List[str],
+    str,
+    int,
+    int,
+    str,
+]:
+    """Median per-game phase ACPL per calendar bin (opening / middlegame / endgame).
+
+    Missing phase in a bin yields ``nan`` for that series at that bin.
+    """
+    ui = config.get("ui", {})
+    detail = ui.get("panels", {}).get("detail", {})
+    ps = detail.get("player_stats", {})
+    chart_cfg = _merge_acpl_phase_chart_cfg(ps)
+    ap_block = ps.get("acpl_phase_over_time_chart", {})
+    if not ap_block.get("enabled", True):
+        return [], [], [], "", 0, 0, ""
+
+    labels = ["Opening", "Middlegame", "Endgame"]
+    stat_ids = ["opening", "middlegame", "endgame"]
+
+    min_games = int(chart_cfg.get("min_games_with_full_date", 4))
+    min_span_days = int(chart_cfg.get("min_span_days", 14))
+    min_populated_bins = int(chart_cfg.get("min_populated_bins", 1))
+    max_calendar_bins = int(chart_cfg.get("max_calendar_bins", 48))
+    if max_calendar_bins < 4:
+        max_calendar_bins = 48
+
+    samples_vec = _collect_trends_dated_phase_acpl_triples(game_results, analyzed_games)
+    dated_count = len(samples_vec)
+    template = str(
+        chart_cfg.get(
+            "subcaption_template",
+            "Median ACPL per phase; {dated} dated games (of {analyzed} analyzed). Lower is better.",
+        )
+    )
+    subcaption = template.format(dated=dated_count, analyzed=analyzed_count)
+
+    if dated_count < min_games:
+        return [], [], [], "", 0, 0, ""
+
+    ordinals = [s[0] for s in samples_vec]
+    t_min = min(ordinals)
+    t_max = max(ordinals)
+    span_days = t_max - t_min
+    if span_days > 0 and span_days < min_span_days:
+        return [], [], [], "", 0, 0, ""
+
+    span_f = float(span_days) if span_days > 0 else 1.0
+
+    mode = _initial_calendar_mode(span_days, chart_cfg)
+    groups = _group_phase_acpl_triples_by_calendar_mode(samples_vec, mode)
+    while len(groups) > max_calendar_bins and mode != "year":
+        mode = _calendar_mode_coarser(mode)
+        groups = _group_phase_acpl_triples_by_calendar_mode(samples_vec, mode)
+
+    if len(groups) < min_populated_bins:
+        return [], [], [], "", 0, 0, ""
+
+    use_q = _should_use_ordinal_quantile_fallback(
+        chart_cfg,
+        n_calendar_groups=len(groups),
+        n_samples=len(samples_vec),
+        span_days=span_days,
+        min_span_days=min_span_days,
+    )
+    if use_q:
+        nqb = _ordinal_quantile_target_bins(chart_cfg, len(samples_vec), max_calendar_bins)
+        bins_out = _acpl_phase_bins_ordinal_quantile(samples_vec, nqb, t_min, t_max)
+        suf = _ordinal_fallback_subcaption_suffix(chart_cfg)
+        if suf:
+            subcaption = f"{subcaption} {suf}"
+    else:
+        bins_out = []
+        for key, vecs in groups.items():
+            lo, hi = _bin_ordinal_range(mode, key)
+            lo = max(lo, t_min)
+            hi = min(hi, t_max)
+            if lo > hi:
+                lo, hi = hi, lo
+            center = (float(lo) + float(hi)) / 2.0
+            time_pct = (center - float(t_min)) / span_f * 100.0 if span_f > 0 else 50.0
+            time_pct = max(0.0, min(100.0, time_pct))
+            medians_list: List[float] = []
+            for i_phase in range(3):
+                col = [
+                    float(t[i_phase])
+                    for t in vecs
+                    if t[i_phase] is not None and math.isfinite(float(t[i_phase]))
+                ]
+                medians_list.append(float(median(col)) if col else float("nan"))
+            cnt = len(vecs)
+            lab0 = date.fromordinal(lo).isoformat()
+            lab1 = date.fromordinal(hi).isoformat()
+            bins_out.append((time_pct, cnt, lab0, lab1, tuple(medians_list)))
+
+    bins_out.sort(key=lambda x: x[0])
+
+    any_finite = False
+    for row in bins_out:
+        for v in row[4]:
+            if not math.isnan(v):
+                any_finite = True
+                break
+        if any_finite:
+            break
+    if not any_finite:
+        return [], [], [], "", 0, 0, ""
+
     return bins_out, labels, stat_ids, subcaption, t_min, t_max, mode
 
 
@@ -629,6 +1014,14 @@ class AggregatedPlayerStats:
     move_quality_ordinal_min: int
     move_quality_ordinal_max: int
     move_quality_calendar_mode: str
+    # Median phase ACPL vs game date (calendar bins); tuple may contain nan per phase.
+    acpl_phase_over_time: List[Tuple[float, int, str, str, Tuple[float, ...]]]
+    acpl_phase_series_labels: List[str]
+    acpl_phase_series_ids: List[str]
+    acpl_phase_subcaption: str
+    acpl_phase_ordinal_min: int
+    acpl_phase_ordinal_max: int
+    acpl_phase_calendar_mode: str
 
 
 class PlayerStatsService:
@@ -1216,6 +1609,20 @@ class PlayerStatsService:
             mq_labels = []
             mq_ids = []
 
+        ap_bins, ap_labels, ap_ids, ap_sub, ap_omin, ap_omax, ap_cal_mode = _build_acpl_phase_over_time_series(
+            game_results,
+            analyzed_games,
+            self.config,
+            len(analyzed_games),
+        )
+        if not ap_bins:
+            ap_sub = ""
+            ap_omin = 0
+            ap_omax = 0
+            ap_cal_mode = ""
+            ap_labels = []
+            ap_ids = []
+
         aggregated_stats = AggregatedPlayerStats(
             total_games=total_games,
             analyzed_games=len(analyzed_games),
@@ -1257,6 +1664,13 @@ class PlayerStatsService:
             move_quality_ordinal_min=mq_omin,
             move_quality_ordinal_max=mq_omax,
             move_quality_calendar_mode=mq_cal_mode,
+            acpl_phase_over_time=ap_bins,
+            acpl_phase_series_labels=ap_labels,
+            acpl_phase_series_ids=ap_ids,
+            acpl_phase_subcaption=ap_sub,
+            acpl_phase_ordinal_min=ap_omin,
+            acpl_phase_ordinal_max=ap_omax,
+            acpl_phase_calendar_mode=ap_cal_mode,
         )
         
         logging_service.debug(f"Completed player stats aggregation: player={player_name}, games={total_games}, wins={wins}, draws={draws}, losses={losses}, win_rate={win_rate:.1f}%")

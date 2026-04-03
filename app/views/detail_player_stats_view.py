@@ -1,5 +1,6 @@
 """Player Statistics view for detail panel."""
 
+import math
 from datetime import date, timedelta
 
 from PyQt6.QtWidgets import (
@@ -184,6 +185,8 @@ class AccuracyVsProgressChartWidget(QWidget):
         self._hover_pixel: Optional[QPointF] = None  # pixel position for circle
         self._hover_hit_threshold_px = 25
         self._hover_circle_radius = 6
+        self._show_bin_data_markers = bool(chart_config.get("show_bin_data_markers", True))
+        self._bin_data_marker_radius = float(chart_config.get("bin_data_marker_radius", 3))
         self._y_padding_pct = 0.05  # padding as fraction of range (5%)
         self._y_min_range = 5.0  # minimum Y range when min_acc == max_acc
 
@@ -322,6 +325,12 @@ class AccuracyVsProgressChartWidget(QWidget):
                 painter.setPen(pen_opp)
                 for i in range(len(points_opp) - 1):
                     painter.drawLine(points_opp[i], points_opp[i + 1])
+            if self._show_bin_data_markers and points_opp:
+                arm = max(2.0, self._bin_data_marker_radius)
+                pen_opp_m = QPen(self.opponent_line_color, max(1, self.line_width))
+                pen_opp_m.setStyle(self._opponent_line_style)
+                for pt in points_opp:
+                    _draw_bin_data_x_marker(painter, pt.x(), pt.y(), arm, pen_opp_m)
 
         # Player line
         sorted_data = sorted(self._data, key=lambda x: x[0])
@@ -338,6 +347,12 @@ class AccuracyVsProgressChartWidget(QWidget):
             painter.setPen(pen_player)
             for i in range(len(points) - 1):
                 painter.drawLine(points[i], points[i + 1])
+        if self._show_bin_data_markers and points:
+            arm = max(2.0, self._bin_data_marker_radius)
+            pen_pl_m = QPen(self.line_color, max(1, self.line_width))
+            pen_pl_m.setStyle(self._line_style)
+            for pt in points:
+                _draw_bin_data_x_marker(painter, pt.x(), pt.y(), arm, pen_pl_m)
 
         # Legend when both series present
         if self._data and self._data_opponent:
@@ -484,6 +499,25 @@ def _accuracy_over_time_ordinal_to_x(
     return left + (o - omin) / span * graph_width
 
 
+_BIN_DATA_MARKER_ALPHA = 130
+_BIN_DATA_MARKER_LINE_WIDTH = 1
+
+
+def _draw_bin_data_x_marker(painter: QPainter, cx: float, cy: float, arm: float, pen: QPen) -> None:
+    """Draw a light X at (cx, cy); ``arm`` is half-extent along diagonals (hue/style from ``pen``)."""
+    c = QColor(pen.color())
+    c.setAlpha(_BIN_DATA_MARKER_ALPHA)
+    subtle = QPen(c, _BIN_DATA_MARKER_LINE_WIDTH)
+    subtle.setStyle(Qt.PenStyle.SolidLine)
+    subtle.setCapStyle(Qt.PenCapStyle.FlatCap)
+    painter.setPen(subtle)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    xi, yi = int(round(cx)), int(round(cy))
+    a = int(max(2, round(arm * 0.88)))
+    painter.drawLine(xi - a, yi - a, xi + a, yi + a)
+    painter.drawLine(xi - a, yi + a, xi + a, yi - a)
+
+
 class AccuracyOverTimeChartWidget(QWidget):
     """Line chart: X = position along game-date range (0–100%), Y = median accuracy per time bin."""
 
@@ -523,6 +557,8 @@ class AccuracyOverTimeChartWidget(QWidget):
         self.x_axis_label_spacing = chart_config.get("x_axis_label_spacing", 5)
         self._hover_hit_threshold_px = int(chart_config.get("hover_hit_threshold_px", 25))
         self._hover_circle_radius = int(chart_config.get("hover_circle_radius", 6))
+        self._show_bin_data_markers = bool(chart_config.get("show_bin_data_markers", True))
+        self._bin_data_marker_radius = float(chart_config.get("bin_data_marker_radius", 3))
         self._y_padding_pct = 0.05
         self._y_min_range = 5.0
 
@@ -774,7 +810,7 @@ class AccuracyOverTimeChartWidget(QWidget):
             painter.setPen(pen_player)
             for i in range(len(points) - 1):
                 painter.drawLine(points[i], points[i + 1])
-        elif len(points) == 1:
+        elif len(points) == 1 and not self._show_bin_data_markers:
             pen_player = QPen(self.line_color, self.line_width)
             pen_player.setStyle(self._line_style)
             painter.setPen(pen_player)
@@ -782,6 +818,13 @@ class AccuracyOverTimeChartWidget(QWidget):
             r = max(3, self.line_width + 2)
             painter.drawEllipse(points[0], r, r)
             painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        if self._show_bin_data_markers and points:
+            arm = max(2.0, self._bin_data_marker_radius)
+            mpen = QPen(self.line_color, max(1, self.line_width))
+            mpen.setStyle(self._line_style)
+            for pt in points:
+                _draw_bin_data_x_marker(painter, pt.x(), pt.y(), arm, mpen)
 
         if self._hover_pixel is not None and self._hover_vertex_index is not None:
             hover_pen = QPen(self.line_color, 2)
@@ -915,27 +958,37 @@ class AccuracyOverTimeChartWidget(QWidget):
 
 
 class MoveQualityOverTimeChartWidget(QWidget):
-    """Multi-series chart: calendar-aligned date range vs median % of player moves per classification per bin."""
+    """Multi-series chart: calendar-aligned date range vs move-quality % or phase ACPL (see ``chart_style``)."""
 
-    def __init__(self, config: Dict[str, Any], parent: Optional[QWidget] = None) -> None:
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        parent: Optional[QWidget] = None,
+        *,
+        chart_style: str = "move_pct",
+    ) -> None:
         super().__init__(parent)
         self.config = config
+        self._chart_style = chart_style if chart_style in ("move_pct", "acpl_phase") else "move_pct"
         ui_config = config.get("ui", {})
         panel_config = ui_config.get("panels", {}).get("detail", {})
         player_stats_config = panel_config.get("player_stats", {})
         acc_cfg = dict(player_stats_config.get("accuracy_over_time_chart", {}))
-        mq_cfg = dict(player_stats_config.get("move_quality_over_time_chart", {}))
-        self._chart_cfg = {**acc_cfg, **mq_cfg}
-        self._mq_cfg = mq_cfg
+        if self._chart_style == "acpl_phase":
+            own_cfg = dict(player_stats_config.get("acpl_phase_over_time_chart", {}))
+        else:
+            own_cfg = dict(player_stats_config.get("move_quality_over_time_chart", {}))
+        self._own_cfg = own_cfg
+        self._chart_cfg = {**acc_cfg, **own_cfg}
 
         def _rgb(key: str, fallback: List[int]) -> List[int]:
-            v = mq_cfg.get(key)
+            v = own_cfg.get(key)
             if isinstance(v, list) and len(v) >= 3:
                 return [int(v[0]), int(v[1]), int(v[2])]
             return fallback
 
-        self._height = int(mq_cfg.get("height", 240))
-        self._legend_width = int(mq_cfg.get("legend_width", 112))
+        self._height = int(own_cfg.get("height", 240))
+        self._legend_width = int(own_cfg.get("legend_width", 112))
         self.background_color = QColor(*_rgb("background_color", [30, 30, 35]))
         self.grid_color = QColor(*_rgb("grid_color", [60, 60, 65]))
         self.text_color = QColor(*_rgb("text_color", [200, 200, 200]))
@@ -948,24 +1001,26 @@ class MoveQualityOverTimeChartWidget(QWidget):
         self._x_axis_label_min_spacing_px = int(acc_cfg.get("x_axis_label_min_spacing_px", 44))
         self._x_axis_max_labels = int(acc_cfg.get("x_axis_max_labels", 12))
         self._x_axis_week_in_month = bool(acc_cfg.get("x_axis_week_ticks_in_month_mode", True))
-        self.padding = mq_cfg.get("padding", [40, 20, 20, 40])
-        self.font_family = resolve_font_family(mq_cfg.get("font_family", "Helvetica Neue"))
-        self.font_size = int(scale_font_size(mq_cfg.get("font_size", 10)))
-        self.min_font_size = int(scale_font_size(mq_cfg.get("min_font_size", 8)))
-        self.font_size_calculation_divisor = mq_cfg.get("font_size_calculation_divisor", 20)
-        self.min_grid_spacing = mq_cfg.get("min_grid_spacing", 30)
-        self.min_grid_lines = mq_cfg.get("min_grid_lines", 5)
-        self.y_axis_label_spacing = mq_cfg.get("y_axis_label_spacing", 5)
-        self.x_axis_label_spacing = mq_cfg.get("x_axis_label_spacing", 5)
-        self._hover_hit_threshold_px = int(mq_cfg.get("hover_hit_threshold_px", 25))
-        self._legend_font_size = int(scale_font_size(mq_cfg.get("legend_font_size", 8)))
+        self.padding = own_cfg.get("padding", [40, 20, 20, 40])
+        self.font_family = resolve_font_family(own_cfg.get("font_family", "Helvetica Neue"))
+        self.font_size = int(scale_font_size(own_cfg.get("font_size", 10)))
+        self.min_font_size = int(scale_font_size(own_cfg.get("min_font_size", 8)))
+        self.font_size_calculation_divisor = own_cfg.get("font_size_calculation_divisor", 20)
+        self.min_grid_spacing = own_cfg.get("min_grid_spacing", 30)
+        self.min_grid_lines = own_cfg.get("min_grid_lines", 5)
+        self.y_axis_label_spacing = own_cfg.get("y_axis_label_spacing", 5)
+        self.x_axis_label_spacing = own_cfg.get("x_axis_label_spacing", 5)
+        self._hover_hit_threshold_px = int(own_cfg.get("hover_hit_threshold_px", 25))
+        self._legend_font_size = int(scale_font_size(own_cfg.get("legend_font_size", 8)))
+        self._show_bin_data_markers = bool(self._chart_cfg.get("show_bin_data_markers", True))
+        self._bin_data_marker_radius = float(self._chart_cfg.get("bin_data_marker_radius", 3))
         self._default_pen: Tuple[QColor, Qt.PenStyle, int] = (
             QColor(160, 160, 170),
             Qt.PenStyle.SolidLine,
             2,
         )
         self._style_for_id: Dict[str, Tuple[QColor, Qt.PenStyle, int]] = {}
-        for item in mq_cfg.get("series") or []:
+        for item in own_cfg.get("series") or []:
             if not isinstance(item, dict):
                 continue
             sid = str(item.get("id", "")).strip()
@@ -1015,12 +1070,24 @@ class MoveQualityOverTimeChartWidget(QWidget):
         self.update()
 
     def _y_axis_range(self) -> Tuple[float, float]:
-        """Y from 0 to max observed % (plus headroom), capped at 100."""
+        if self._chart_style == "acpl_phase":
+            vals: List[float] = []
+            for row in self._bins:
+                for v in row[4]:
+                    if math.isfinite(float(v)):
+                        vals.append(float(v))
+            if not vals:
+                return 0.0, 100.0
+            cap = float(self._own_cfg.get("y_axis_max_cap", 500.0))
+            data_max = min(cap, max(vals))
+            y_min = 0.0
+            pad = max(3.0, data_max * 0.08)
+            y_max = min(cap, data_max + pad)
+            if y_max <= y_min + 1e-6:
+                y_max = max(10.0, y_min + 10.0)
+            return y_min, y_max
         y_min = 0.0
-        vals: List[float] = []
-        for row in self._bins:
-            for v in row[4]:
-                vals.append(float(v))
+        vals = [float(v) for row in self._bins for v in row[4]]
         if not vals:
             return 0.0, 100.0
         data_max = max(vals)
@@ -1030,6 +1097,13 @@ class MoveQualityOverTimeChartWidget(QWidget):
             y_max = min(100.0, 5.0)
         return y_min, y_max
 
+    @staticmethod
+    def _lerp_acpl_hover(va: float, vb: float, frac: float) -> float:
+        """Interpolate only when both bin medians are finite (no stretching across missing phases)."""
+        if math.isfinite(va) and math.isfinite(vb):
+            return va + frac * (vb - va)
+        return float("nan")
+
     def _interpolate_values_at_chart_time(self, time_pct: float) -> Tuple[float, ...]:
         """Linear interpolation between bin medians; time_pct is 0–100 along the chart X axis."""
         n = len(self._labels)
@@ -1038,6 +1112,8 @@ class MoveQualityOverTimeChartWidget(QWidget):
         tps = [b[0] for b in self._bins]
         if len(self._bins) == 1:
             meds = self._bins[0][4]
+            if self._chart_style == "acpl_phase":
+                return tuple(float(meds[j]) if j < len(meds) else float("nan") for j in range(n))
             return tuple(float(meds[j]) if j < len(meds) else 0.0 for j in range(n))
         ht = max(tps[0], min(tps[-1], time_pct))
         i = 0
@@ -1052,9 +1128,14 @@ class MoveQualityOverTimeChartWidget(QWidget):
         ma, mb = self._bins[i][4], self._bins[i + 1][4]
         out: List[float] = []
         for j in range(n):
-            va = float(ma[j]) if j < len(ma) else 0.0
-            vb = float(mb[j]) if j < len(mb) else 0.0
-            out.append(va + frac * (vb - va))
+            if self._chart_style == "acpl_phase":
+                va = float(ma[j]) if j < len(ma) else float("nan")
+                vb = float(mb[j]) if j < len(mb) else float("nan")
+                out.append(self._lerp_acpl_hover(va, vb, frac))
+            else:
+                va = float(ma[j]) if j < len(ma) else 0.0
+                vb = float(mb[j]) if j < len(mb) else 0.0
+                out.append(va + frac * (vb - va))
         return tuple(out)
 
     def _ordinal_at_chart_time_pct(self, time_pct: float) -> int:
@@ -1231,7 +1312,10 @@ class MoveQualityOverTimeChartWidget(QWidget):
         for i in range(max_grid_lines + 1):
             yv = min_y + i * step
             y = bottom - ((yv - min_y) / y_range * graph_height) if y_range > 0 else bottom
-            yfmt = f"{yv:.1f}%" if max_y < 20.0 else f"{yv:.0f}%"
+            if self._chart_style == "acpl_phase":
+                yfmt = f"{yv:.0f}" if max_y >= 25.0 else f"{yv:.1f}"
+            else:
+                yfmt = f"{yv:.1f}%" if max_y < 20.0 else f"{yv:.0f}%"
             label_width = fm.horizontalAdvance(yfmt)
             painter.drawText(int(left - label_width - self.y_axis_label_spacing), int(y + fm.height() / 2), yfmt)
 
@@ -1262,32 +1346,76 @@ class MoveQualityOverTimeChartWidget(QWidget):
                 label_width = fm.horizontalAdvance(label)
                 painter.drawText(int(x - label_width / 2), int(bottom + fm.height() + self.x_axis_label_spacing), label)
 
-        all_points: List[List[QPointF]] = [[] for _ in range(n_series)]
-        for row in self._bins:
-            t_pct, _c, _l0, _l1, meds = row
-            x = left + (t_pct / 100.0 * graph_width)
-            for j in range(n_series):
-                if j >= len(meds):
-                    continue
-                acc = meds[j]
-                y = bottom - ((acc - min_y) / y_range * graph_height) if y_range > 0 else bottom
-                y = max(top, min(bottom, y))
-                all_points[j].append(QPointF(x, y))
-
-        for j in range(n_series):
-            points = all_points[j]
-            col, line_style, line_width = self._series_visuals[j] if j < len(self._series_visuals) else self._default_pen
+        def _flush_run(col: QColor, line_style: Qt.PenStyle, line_width: int, run: List[QPointF]) -> None:
             pen = QPen(col, line_width)
             pen.setStyle(line_style)
             painter.setPen(pen)
-            if len(points) > 1:
-                for k in range(len(points) - 1):
-                    painter.drawLine(points[k], points[k + 1])
-            elif len(points) == 1:
+            if len(run) > 1:
+                for k in range(len(run) - 1):
+                    painter.drawLine(run[k], run[k + 1])
+            elif len(run) == 1 and not self._show_bin_data_markers:
                 painter.setBrush(QBrush(col))
                 r = max(3, line_width + 2)
-                painter.drawEllipse(points[0], r, r)
+                painter.drawEllipse(run[0], r, r)
                 painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        if self._chart_style == "acpl_phase":
+            # One polyline per phase over all bins that have a finite value (sparse endgame: skip
+            # calendar gaps instead of breaking the line into invisible single-point runs).
+            for j in range(n_series):
+                col, line_style, line_width = (
+                    self._series_visuals[j] if j < len(self._series_visuals) else self._default_pen
+                )
+                run: List[QPointF] = []
+                for row in self._bins:
+                    t_pct, _c, _l0, _l1, meds = row
+                    x = left + (t_pct / 100.0 * graph_width)
+                    if j >= len(meds):
+                        continue
+                    v = float(meds[j])
+                    if not math.isfinite(v):
+                        continue
+                    py = bottom - ((v - min_y) / y_range * graph_height) if y_range > 0 else bottom
+                    py = max(top, min(bottom, py))
+                    run.append(QPointF(x, py))
+                _flush_run(col, line_style, line_width, run)
+        else:
+            all_points: List[List[QPointF]] = [[] for _ in range(n_series)]
+            for row in self._bins:
+                t_pct, _c, _l0, _l1, meds = row
+                x = left + (t_pct / 100.0 * graph_width)
+                for j in range(n_series):
+                    if j >= len(meds):
+                        continue
+                    acc = meds[j]
+                    py = bottom - ((acc - min_y) / y_range * graph_height) if y_range > 0 else bottom
+                    py = max(top, min(bottom, py))
+                    all_points[j].append(QPointF(x, py))
+
+            for j in range(n_series):
+                points = all_points[j]
+                col, line_style, line_width = (
+                    self._series_visuals[j] if j < len(self._series_visuals) else self._default_pen
+                )
+                _flush_run(col, line_style, line_width, points)
+
+        if self._show_bin_data_markers and n_series > 0:
+            arm = max(2.0, self._bin_data_marker_radius)
+            for row in self._bins:
+                t_pct, _c, _l0, _l1, meds = row
+                x = left + (t_pct / 100.0 * graph_width)
+                for j in range(min(n_series, len(meds))):
+                    v = float(meds[j])
+                    if not math.isfinite(v):
+                        continue
+                    py = bottom - ((v - min_y) / y_range * graph_height) if y_range > 0 else bottom
+                    py = max(top, min(bottom, py))
+                    col, line_style, lw = (
+                        self._series_visuals[j] if j < len(self._series_visuals) else self._default_pen
+                    )
+                    mpen = QPen(col, max(1, lw))
+                    mpen.setStyle(line_style)
+                    _draw_bin_data_x_marker(painter, x, py, arm, mpen)
 
         if (
             self._hover_plot_x is not None
@@ -1301,6 +1429,8 @@ class MoveQualityOverTimeChartWidget(QWidget):
             painter.drawLine(int(hx), int(top), int(hx), int(bottom))
             for j in range(min(n_series, len(self._hover_values))):
                 acc = self._hover_values[j]
+                if self._chart_style == "acpl_phase" and not math.isfinite(acc):
+                    continue
                 hy = bottom - ((acc - min_y) / y_range * graph_height) if y_range > 0 else bottom
                 hy = max(top, min(bottom, hy))
                 col, line_style, lw = (
@@ -1354,8 +1484,16 @@ class MoveQualityOverTimeChartWidget(QWidget):
         date_str = date.fromordinal(ord_h).isoformat()
         lines = [date_str]
         for j, lab in enumerate(self._labels):
-            if j < len(values):
-                lines.append(f"{lab}: {values[j]:.1f}%")
+            if j >= len(values):
+                continue
+            v = values[j]
+            if self._chart_style == "acpl_phase":
+                if math.isfinite(v):
+                    lines.append(f"{lab}: {v:.1f} ACPL")
+                else:
+                    lines.append(f"{lab}: n/a")
+            else:
+                lines.append(f"{lab}: {v:.1f}%")
         QToolTip.showText(event.globalPosition().toPoint(), "\n".join(lines), self, QRect(), 4000)
         self._hover_plot_x = mx
         self._hover_values = values
@@ -2300,6 +2438,46 @@ class DetailPlayerStatsView(QWidget):
             mq_layout.addWidget(mq_chart)
             mq_wrap.setProperty("section_name", "Move quality progression")
             self.content_layout.addWidget(mq_wrap)
+            self.content_layout.addSpacing(section_spacing_val)
+
+        ap_cfg = player_stats_config.get("acpl_phase_over_time_chart", {})
+        ap_bins = getattr(self.current_stats, "acpl_phase_over_time", None) or []
+        ap_ids = getattr(self.current_stats, "acpl_phase_series_ids", None) or []
+        if (
+            ap_cfg.get("enabled", True)
+            and ap_bins
+            and ap_ids
+            and int(getattr(self.current_stats, "acpl_phase_ordinal_max", 0)) > 0
+        ):
+            self._add_section_header("ACPL progression by phase", header_font, header_text_color)
+            ap_wrap = QWidget()
+            ap_layout = QVBoxLayout(ap_wrap)
+            ap_layout.setContentsMargins(0, 0, 0, 0)
+            ap_layout.setSpacing(6)
+            ap_sub = QLabel(getattr(self.current_stats, "acpl_phase_subcaption", "") or "")
+            ap_sub.setWordWrap(True)
+            ap_sub_fs = scale_font_size(ap_cfg.get("subcaption_font_size", 9))
+            ap_sub_font = QFont(
+                resolve_font_family(player_stats_config.get("fonts", {}).get("label_font_family", "Helvetica Neue")),
+                int(ap_sub_fs),
+            )
+            ap_sub.setFont(ap_sub_font)
+            ap_sub.setStyleSheet(
+                f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); background: transparent;"
+            )
+            ap_layout.addWidget(ap_sub)
+            ap_chart = MoveQualityOverTimeChartWidget(self.config, chart_style="acpl_phase")
+            ap_chart.set_data(
+                list(ap_bins),
+                list(getattr(self.current_stats, "acpl_phase_series_labels", None) or []),
+                list(ap_ids),
+                int(getattr(self.current_stats, "acpl_phase_ordinal_min", 0)),
+                int(getattr(self.current_stats, "acpl_phase_ordinal_max", 0)),
+                getattr(self.current_stats, "acpl_phase_calendar_mode", "") or "",
+            )
+            ap_layout.addWidget(ap_chart)
+            ap_wrap.setProperty("section_name", "ACPL progression by phase")
+            self.content_layout.addWidget(ap_wrap)
             self.content_layout.addSpacing(section_spacing_val)
         
         # Openings Section (Most Played, Worst/Best accuracy grids only)

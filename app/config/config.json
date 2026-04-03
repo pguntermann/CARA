@@ -1628,7 +1628,9 @@
             "font_size_calculation_divisor": 20,
             "y_axis_label_spacing": 5,
             "x_axis_label_spacing": 5,
-            "progress_bins": 21
+            "progress_bins": 21,
+            "show_bin_data_markers": true,
+            "bin_data_marker_radius": 3
           },
           "accuracy_over_time_chart": {
             "enabled": true,
@@ -1637,10 +1639,13 @@
             "min_span_days": 14,
             "min_populated_bins": 1,
             "max_calendar_bins": 48,
+            "min_calendar_bins_before_ordinal_fallback": 5,
+            "min_games_for_ordinal_fallback": 15,
+            "ordinal_quantile_bin_count": 12,
             "calendar_day_bin_max_span_days": 31,
             "calendar_week_bin_max_span_days": 120,
             "calendar_month_bin_max_span_days": 960,
-            "subcaption_template": "Chart based on {dated} games with a known date (of {analyzed} analyzed in this selection).",
+            "subcaption_template": "Based on {dated} dated games (of {analyzed} analyzed).",
             "subcaption_font_size": 9,
             "background_color": [
               30,
@@ -1685,6 +1690,8 @@
             "x_axis_label_spacing": 5,
             "hover_hit_threshold_px": 25,
             "hover_circle_radius": 6,
+            "show_bin_data_markers": true,
+            "bin_data_marker_radius": 3,
             "x_axis_calendar_enabled": true,
             "x_axis_major_line_color": [
               88,
@@ -1707,7 +1714,7 @@
             "enabled": true,
             "height": 240,
             "legend_width": 112,
-            "subcaption_template": "Chart based on {dated} games with a known date (of {analyzed} analyzed in this selection).",
+            "subcaption_template": "Based on {dated} dated games (of {analyzed} analyzed).",
             "subcaption_font_size": 9,
             "background_color": [
               30,
@@ -1838,6 +1845,88 @@
                   255,
                   200,
                   120
+                ],
+                "line_style": "solid",
+                "line_width": 2
+              }
+            ]
+          },
+          "acpl_phase_over_time_chart": {
+            "enabled": true,
+            "height": 240,
+            "legend_width": 112,
+            "y_axis_max_cap": 500,
+            "subcaption_template": "Median ACPL per phase; {dated} dated games (of {analyzed} analyzed). Lower is better.",
+            "subcaption_font_size": 9,
+            "background_color": [
+              30,
+              30,
+              35
+            ],
+            "grid_color": [
+              60,
+              60,
+              65
+            ],
+            "font_family": "Helvetica Neue",
+            "font_size": 10,
+            "text_color": [
+              200,
+              200,
+              200
+            ],
+            "axis_color": [
+              150,
+              150,
+              150
+            ],
+            "padding": [
+              40,
+              20,
+              20,
+              40
+            ],
+            "min_grid_spacing": 30,
+            "min_grid_lines": 5,
+            "min_font_size": 8,
+            "font_size_calculation_divisor": 20,
+            "y_axis_label_spacing": 5,
+            "x_axis_label_spacing": 5,
+            "hover_hit_threshold_px": 25,
+            "legend_font_size": 8,
+            "series": [
+              {
+                "id": "opening",
+                "label": "Opening",
+                "enabled": true,
+                "line_color": [
+                  100,
+                  150,
+                  255
+                ],
+                "line_style": "solid",
+                "line_width": 2
+              },
+              {
+                "id": "middlegame",
+                "label": "Middlegame",
+                "enabled": true,
+                "line_color": [
+                  150,
+                  255,
+                  100
+                ],
+                "line_style": "solid",
+                "line_width": 2
+              },
+              {
+                "id": "endgame",
+                "label": "Endgame",
+                "enabled": true,
+                "line_color": [
+                  255,
+                  200,
+                  100
                 ],
                 "line_style": "solid",
                 "line_width": 2

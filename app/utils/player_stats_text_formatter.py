@@ -1,5 +1,6 @@
 """Text formatter for player statistics view."""
 
+import math
 from typing import List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -84,6 +85,10 @@ class PlayerStatsTextFormatter:
         if mq_time_lines:
             lines.extend(mq_time_lines)
             lines.append("")
+        ap_time_lines = PlayerStatsTextFormatter._format_acpl_phase_over_time(stats)
+        if ap_time_lines:
+            lines.extend(ap_time_lines)
+            lines.append("")
         lines.extend(PlayerStatsTextFormatter._format_move_accuracy(stats))
         lines.append("")
         lines.extend(PlayerStatsTextFormatter._format_phase_performance(stats))
@@ -158,6 +163,10 @@ class PlayerStatsTextFormatter:
                 lines.extend(section_lines[3:])
         elif section_name == "Move quality progression":
             section_lines = PlayerStatsTextFormatter._format_move_quality_over_time(stats)
+            if section_lines:
+                lines.extend(section_lines[3:])
+        elif section_name == "ACPL progression by phase":
+            section_lines = PlayerStatsTextFormatter._format_acpl_phase_over_time(stats)
             if section_lines:
                 lines.extend(section_lines[3:])
         elif section_name == "Move Accuracy":
@@ -394,6 +403,32 @@ class PlayerStatsTextFormatter:
             cells = [f"{l0} – {l1}", str(cnt)]
             for j in range(len(labels)):
                 cells.append(f"{meds[j]:.1f}%" if j < len(meds) else "n/a")
+            lines.append("\t".join(cells))
+        return lines
+
+    @staticmethod
+    def _format_acpl_phase_over_time(stats: "AggregatedPlayerStats") -> List[str]:
+        """Median phase ACPL vs game date (ACPL progression by phase)."""
+        bins = getattr(stats, "acpl_phase_over_time", None) or []
+        labels = getattr(stats, "acpl_phase_series_labels", None) or []
+        if not bins or not labels:
+            return []
+        sub = getattr(stats, "acpl_phase_subcaption", "") or ""
+        lines: List[str] = []
+        PlayerStatsTextFormatter._add_section_header(lines, "ACPL progression by phase")
+        if sub:
+            lines.append(sub)
+            lines.append("")
+        header = "Bin date range\tGames\t" + "\t".join(labels) + " (median ACPL)"
+        lines.append(header)
+        for row in sorted(bins, key=lambda x: x[0]):
+            _t_pct, cnt, l0, l1, meds = row
+            cells = [f"{l0} – {l1}", str(cnt)]
+            for j in range(len(labels)):
+                if j < len(meds) and math.isfinite(meds[j]):
+                    cells.append(f"{meds[j]:.1f}")
+                else:
+                    cells.append("n/a")
             lines.append("\t".join(cells))
         return lines
     
