@@ -53,6 +53,9 @@ PLAYER_STATS_MENU_SECTIONS: List[Tuple[str, str]] = [
     ("error_patterns", "Error patterns"),
 ]
 
+# TEMPORARY: horizontal scrollbar / min-width diagnosis. Set False to silence stderr output.
+_DEBUG_PLAYER_STATS_HORIZONTAL_SCROLL = False
+
 
 def _configure_player_stats_trend_subcaption_label(label: QLabel) -> None:
     """Word-wrapped QLabels often report a huge minimum width; that widens QScrollArea content so the
@@ -2204,6 +2207,9 @@ class DetailPlayerStatsView(QWidget):
         # List of per-opening row dicts:
         # {eco_label, name_label, games_label, cpl_label (optional), full_name}
         self._openings_items: List[Dict[str, Any]] = []
+        self._openings_grids: List[QGridLayout] = []
+        self._openings_eco_col_min: int = 150
+        self._openings_name_col_min: int = 100
         self._opening_tree_widget: Optional[QTreeWidget] = None
         self._opening_tree_header_compact: str = "Move / Opening"
         self._opening_tree_header_with_hint: str = "Move / Opening (double-click row to open games)"
@@ -2460,6 +2466,7 @@ class DetailPlayerStatsView(QWidget):
         try:
             self._build_stats_content()
             self.apply_player_stats_section_visibility_after_build()
+            self._sync_player_stats_content_widget_width_to_viewport()
         finally:
             self._building_content = False
         if self._pending_stats_content_rebuild:
@@ -2755,6 +2762,7 @@ class DetailPlayerStatsView(QWidget):
         self._pie_chart_widget = None
         self._move_classification_legend_widget = None
         self._openings_widget = None
+        self._openings_grids = []
         self._error_patterns_widget = None
         self._endgame_tree_widget = None
         self._endgame_tree_decrease_button = None
@@ -2829,6 +2837,7 @@ class DetailPlayerStatsView(QWidget):
         self._pie_chart_widget = None
         self._move_classification_legend_widget = None
         self._openings_widget = None
+        self._openings_grids = []
         self._error_patterns_widget = None
         
         # Get config
@@ -4918,6 +4927,7 @@ class DetailPlayerStatsView(QWidget):
         # Store reference for responsive width handling
         self._openings_widget = widget
         self._openings_items = []
+        self._openings_grids = []
         
         # Get grid config for column widths
         ui_config = self.config.get('ui', {})
@@ -4926,6 +4936,8 @@ class DetailPlayerStatsView(QWidget):
         grid_config = player_stats_config.get('grid', {})
         eco_col_min_width = grid_config.get('label_column_minimum_width', 150)
         name_col_min_width = grid_config.get('value_column_minimum_width', 100)
+        self._openings_eco_col_min = int(eco_col_min_width)
+        self._openings_name_col_min = int(name_col_min_width)
 
         def _add_openings_section(
             title: str,
@@ -4954,6 +4966,7 @@ class DetailPlayerStatsView(QWidget):
             grid.setColumnStretch(3, 0)
             grid.setColumnMinimumWidth(0, eco_col_min_width)
             grid.setColumnMinimumWidth(1, name_col_min_width)
+            self._openings_grids.append(grid)
 
             row_idx = 0
             for eco, opening_name, avg_cpl, count in rows:
@@ -5436,6 +5449,29 @@ class DetailPlayerStatsView(QWidget):
         self._move_classification_animation.addAnimation(self._move_classification_width_animation)
         self._move_classification_animation.addAnimation(self._move_classification_min_width_animation)
         self._move_classification_animation.finished.connect(self._on_move_classification_animation_finished)
+
+    def _player_stats_content_inner_width(self) -> int:
+        """Width for children of ``content_layout`` (viewport minus that layout's left/right margins)."""
+        sa = getattr(self, "scroll_area", None)
+        lay = getattr(self, "content_layout", None)
+        if sa is None or lay is None:
+            return 0
+        vw = sa.viewport().width()
+        if vw <= 0:
+            return 0
+        m = lay.contentsMargins()
+        return max(0, vw - m.left() - m.right())
+
+    def _sync_player_stats_content_widget_width_to_viewport(self) -> None:
+        """Keep scroll document width equal to the viewport so wide minimumSizeHints cannot force a horizontal bar."""
+        cw = getattr(self, "content_widget", None)
+        sa = getattr(self, "scroll_area", None)
+        if cw is None or sa is None:
+            return
+        vw = sa.viewport().width()
+        if vw <= 0:
+            return
+        cw.setFixedWidth(vw)
     
     def _update_move_classification_visibility(self) -> None:
         """Update visibility of move classification legend based on available width."""
@@ -5602,15 +5638,16 @@ class DetailPlayerStatsView(QWidget):
             self._error_patterns_widget = None
             return
         
-        # Get current width of the scroll area viewport
-        available_width = self.scroll_area.viewport().width()
-        
-        # If widget hasn't been laid out yet (width is 0), skip check
-        if available_width == 0:
+        # Viewport width drives collapse thresholds; inner width matches the content track (layout margins).
+        viewport_width = self.scroll_area.viewport().width()
+        if viewport_width == 0:
             return
-        
+        inner_w = self._player_stats_content_inner_width()
+        if inner_w <= 0:
+            return
+
         # Determine if we should show full content or compact
-        should_show_full = available_width >= self.error_patterns_collapse_threshold
+        should_show_full = viewport_width >= self.error_patterns_collapse_threshold
 
         ui_config = self.config.get('ui', {})
         panel_config = ui_config.get('panels', {}).get('detail', {})
@@ -5621,6 +5658,11 @@ class DetailPlayerStatsView(QWidget):
         text_color = getattr(self, '_error_patterns_text_color', None)
         if not label_font or not value_font or not text_color:
             return
+
+        ep_lay = self._error_patterns_widget.layout()
+        ep_m = ep_lay.contentsMargins() if ep_lay is not None else None
+        ep_lr = (ep_m.left() + ep_m.right()) if ep_m is not None else 0
+        row_budget = max(50, inner_w - ep_lr)
 
         # Update each error pattern item
         for pattern_data in self._error_pattern_items:
@@ -5659,7 +5701,10 @@ class DetailPlayerStatsView(QWidget):
             min_text_width = truncation_config.get('min_text_width', 50)
             # Reserve space for button when full (so title elides to one line and row height stays consistent)
             button_reserve = 90 if should_show_full else 0
-            estimated_available = max(min_text_width, available_width - item_margins - indicator_width - spacing - button_reserve)
+            estimated_available = max(
+                min_text_width,
+                row_budget - item_margins - indicator_width - spacing - button_reserve,
+            )
             font_metrics = QFontMetrics(label_font)
             title_one_line = font_metrics.elidedText(full_text, Qt.TextElideMode.ElideRight, estimated_available)
 
@@ -5671,11 +5716,11 @@ class DetailPlayerStatsView(QWidget):
                 desc_label.setTextFormat(Qt.TextFormat.RichText)
                 desc_label.setText(html)
                 desc_label.setWordWrap(False)
-                desc_label.setMaximumWidth(16777215)
-                desc_label.setMinimumWidth(0)
+                # Fixed width keeps rich-text QLabel minimumSizeHint from exceeding the row (horizontal scrollbar).
+                desc_label.setFixedWidth(estimated_available)
                 desc_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
                 if item:
-                    item.setMaximumWidth(16777215)
+                    item.setFixedWidth(row_budget)
                     item.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
             else:
                 html = self._build_two_line_html(
@@ -5685,11 +5730,10 @@ class DetailPlayerStatsView(QWidget):
                 desc_label.setTextFormat(Qt.TextFormat.RichText)
                 desc_label.setText(html)
                 desc_label.setWordWrap(False)
-                desc_label.setMaximumWidth(estimated_available)
-                desc_label.setMinimumWidth(0)
+                desc_label.setFixedWidth(estimated_available)
                 desc_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
                 if item:
-                    item.setMaximumWidth(available_width)
+                    item.setFixedWidth(row_budget)
                     item.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
 
     def _update_top_games_visibility(self) -> None:
@@ -5756,15 +5800,30 @@ class DetailPlayerStatsView(QWidget):
             self._openings_widget = None
             return
         
-        # Get current width of the scroll area viewport
-        available_width = self.scroll_area.viewport().width()
-        
-        # If widget hasn't been laid out yet (width is 0), skip check
-        if available_width == 0:
+        viewport_width = self.scroll_area.viewport().width()
+        if viewport_width == 0:
             return
-        
+        inner_w = self._player_stats_content_inner_width()
+        if inner_w <= 0:
+            return
+
         # Determine whether to show full names or elided (shortened) names
-        show_full_names = available_width >= self.openings_collapse_threshold
+        show_full_names = viewport_width >= self.openings_collapse_threshold
+
+        # QGridLayout column minimums (ECO + name) were forcing ~612px width even when names are elided.
+        eco_full = max(0, int(getattr(self, "_openings_eco_col_min", 150)))
+        name_full = max(0, int(getattr(self, "_openings_name_col_min", 100)))
+        for grid in list(getattr(self, "_openings_grids", [])):
+            try:
+                if show_full_names:
+                    grid.setColumnMinimumWidth(0, eco_full)
+                    grid.setColumnMinimumWidth(1, name_full)
+                else:
+                    narrow_eco = max(28, min(eco_full, inner_w // 6))
+                    grid.setColumnMinimumWidth(0, narrow_eco)
+                    grid.setColumnMinimumWidth(1, 0)
+            except RuntimeError:
+                continue
 
         # Update opening tree header hint and columns based on width (when tree is present)
         if self._opening_tree_widget is not None:
@@ -5843,24 +5902,142 @@ class DetailPlayerStatsView(QWidget):
                 min_name_width = openings_config.get('min_value_width', 150)
                 # Reserve some space for ECO and numeric columns (~140px as heuristic)
                 reserved_for_other = label_column_width + margins_width + 140
-                max_name_width = max(min_name_width, available_width - reserved_for_other)
+                max_name_width = max(min_name_width, inner_w - reserved_for_other)
 
                 metrics = QFontMetrics(name_label.font())
                 elided = metrics.elidedText(full_name, Qt.TextElideMode.ElideRight, max_name_width)
                 name_label.setText(elided)
-    
+
+    def _debug_player_stats_horizontal_scroll_after_resize(self) -> None:
+        """TEMPORARY: print why horizontal scrollbar may appear (viewport vs content min widths).
+
+        All output goes to stderr under prefix [PlayerStatsScrollDebug]. Toggle module flag
+        ``_DEBUG_PLAYER_STATS_HORIZONTAL_SCROLL`` to disable.
+        """
+        import sys
+
+        if not _DEBUG_PLAYER_STATS_HORIZONTAL_SCROLL:
+            return
+
+        tag = "[PlayerStatsScrollDebug]"
+        cw = getattr(self, "content_widget", None)
+        sa = getattr(self, "scroll_area", None)
+        if cw is None or sa is None:
+            print(f"{tag} skip: missing content_widget or scroll_area", file=sys.stderr)
+            return
+
+        try:
+            vp = sa.viewport()
+            vw, vh = vp.width(), vp.height()
+            sb = sa.horizontalScrollBar()
+            sb_vis = sb.isVisible() if sb is not None else False
+            sb_page = sb.pageStep() if sb is not None else 0
+            sb_max = sb.maximum() if sb is not None else 0
+            sb_val = sb.value() if sb is not None else 0
+
+            cw_min_w = cw.minimumWidth()
+            cw_w = cw.width()
+            cw_max_w = cw.maximumWidth()
+            cw_sh = cw.sizeHint()
+            cw_msh = cw.minimumSizeHint()
+
+            print(
+                f"{tag} viewport={vw}x{vh}  content_widget: width={cw_w} minW={cw_min_w} maxW={cw_max_w} "
+                f"sizeHint.w={cw_sh.width()} minSizeHint.w={cw_msh.width()}",
+                file=sys.stderr,
+            )
+            print(
+                f"{tag} horizontalScrollBar: visible={sb_vis} value={sb_val} max={sb_max} pageStep={sb_page}",
+                file=sys.stderr,
+            )
+            print(
+                f"{tag} thresholds: move_classification>={getattr(self, 'move_classification_collapse_threshold', '?')} "
+                f"error_patterns>={getattr(self, 'error_patterns_collapse_threshold', '?')} "
+                f"openings>={getattr(self, 'openings_collapse_threshold', '?')}",
+                file=sys.stderr,
+            )
+
+            if vw <= 0:
+                print(f"{tag} skip widget walk: viewport width is 0 (not laid out yet)", file=sys.stderr)
+                return
+
+            widgets: List[QWidget] = [cw]
+            try:
+                widgets.extend(cw.findChildren(QWidget))
+            except RuntimeError:
+                print(f"{tag} aborted: content_widget invalid during findChildren", file=sys.stderr)
+                return
+
+            rows: List[Tuple[int, str, str, int, int, int, int, str, bool, str]] = []
+            for w in widgets:
+                try:
+                    vis = w.isVisible()
+                    min_w = w.minimumWidth()
+                    max_w = w.maximumWidth()
+                    sh_w = w.sizeHint().width()
+                    msh_w = w.minimumSizeHint().width()
+                    pol = w.sizePolicy().horizontalPolicy()
+                    pol_name = str(pol).split(".")[-1] if pol is not None else "?"
+                    eff = max(min_w, msh_w, sh_w)
+                    cls = type(w).__name__
+                    oname = w.objectName() or ""
+                    prop_sec = ""
+                    try:
+                        sid = w.property("player_stats_section_id")
+                        sname = w.property("section_name")
+                        if sid:
+                            prop_sec = str(sid)
+                        elif sname:
+                            prop_sec = str(sname)
+                    except Exception:
+                        prop_sec = ""
+                    rows.append((eff, cls, oname, min_w, msh_w, sh_w, max_w, pol_name, vis, prop_sec))
+                except RuntimeError:
+                    continue
+
+            rows.sort(key=lambda r: r[0], reverse=True)
+            over = [r for r in rows if r[0] > vw]
+            print(
+                f"{tag} widgets with max(minW,minSizeHint.w,sizeHint.w) > viewport_w ({vw}): {len(over)}",
+                file=sys.stderr,
+            )
+            limit = 35
+            for i, r in enumerate(over[:limit]):
+                eff, cls, oname, min_w, msh_w, sh_w, max_w, pol_name, vis, prop_sec = r
+                sec = f" section={prop_sec!r}" if prop_sec else ""
+                print(
+                    f"{tag}   #{i+1} eff={eff} vis={vis} {cls} name={oname!r}{sec} "
+                    f"minW={min_w} mshW={msh_w} shW={sh_w} maxW={max_w} hPolicy={pol_name}",
+                    file=sys.stderr,
+                )
+
+            # Second pass: top eff overall (even if <= vw) for context
+            print(f"{tag} top {limit} by eff (all descendants):", file=sys.stderr)
+            for i, r in enumerate(rows[:limit]):
+                eff, cls, oname, min_w, msh_w, sh_w, max_w, pol_name, vis, prop_sec = r
+                sec = f" section={prop_sec!r}" if prop_sec else ""
+                print(
+                    f"{tag}   #{i+1} eff={eff} vis={vis} {cls} name={oname!r}{sec} "
+                    f"minW={min_w} mshW={msh_w} shW={sh_w} maxW={max_w} hPolicy={pol_name}",
+                    file=sys.stderr,
+                )
+        except Exception as e:
+            print(f"{tag} error: {e}", file=sys.stderr)
+
     def _on_resize_debounce_timeout(self) -> None:
         """Run all visibility updates once after resize has settled (avoids stack overflow from rapid resizes)."""
         if self._updating_visibility:
             return
         self._updating_visibility = True
         try:
+            self._sync_player_stats_content_widget_width_to_viewport()
             self._update_move_classification_visibility()
             self._update_top_games_visibility()
             self._update_error_patterns_visibility()
             self._update_openings_visibility()
         finally:
             self._updating_visibility = False
+        self._debug_player_stats_horizontal_scroll_after_resize()
 
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
         """Event filter to monitor width changes for responsive layout."""
