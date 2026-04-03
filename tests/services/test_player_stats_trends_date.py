@@ -7,9 +7,9 @@ from app.services.player_stats_service import (
     _accuracy_series_ordinal_quantile_bins,
     _game_date_ordinal_for_trends,
     _game_date_to_ordinal,
-    _group_samples_by_calendar_mode,
-    _should_use_ordinal_quantile_fallback,
+    _ordinal_target_bin_count,
     _trend_axis_ordinals_for_quantile_bins,
+    merged_player_stats_time_series_chart_cfg,
 )
 
 
@@ -26,24 +26,38 @@ def test_game_date_ordinal_for_trends_accepts_partial() -> None:
     assert _game_date_ordinal_for_trends("????.??.??") is None
 
 
-def test_calendar_week_two_clusters_triggers_quantile_fallback() -> None:
+def test_merged_time_series_chart_cfg_precedence() -> None:
+    ps = {
+        "time_series": {"target_progression_bins": 10, "font_size": 11},
+        "accuracy_over_time_chart": {"target_progression_bins": 22, "height": 200},
+        "move_quality_over_time_chart": {"legend_width": 99},
+        "top_move_over_time_chart": {"height": 210},
+    }
+    acc_m = merged_player_stats_time_series_chart_cfg(ps, "accuracy_over_time_chart")
+    assert acc_m["target_progression_bins"] == 22
+    assert acc_m["font_size"] == 11
+    mq_m = merged_player_stats_time_series_chart_cfg(ps, "move_quality_over_time_chart")
+    assert mq_m["target_progression_bins"] == 22
+    assert mq_m["font_size"] == 11
+    assert mq_m["legend_width"] == 99
+    tm_m = merged_player_stats_time_series_chart_cfg(ps, "top_move_over_time_chart")
+    assert tm_m["target_progression_bins"] == 22
+    assert tm_m["height"] == 210
+
+
+def test_ordinal_target_bin_count_respects_density_cap() -> None:
+    cfg = {"target_progression_bins": 100, "max_ordinal_bins": 120, "min_games_per_ordinal_bin": 3}
+    assert _ordinal_target_bin_count(cfg, 300) == 100
+    assert _ordinal_target_bin_count(cfg, 20) == min(100, 20 // 3)
+
+
+def test_quantile_progression_honors_target_bin_count() -> None:
+    """Progression always uses ordinal bins; quantile mode yields one point per requested bin."""
     oa = date(2025, 4, 29).toordinal()
     ob = date(2025, 8, 5).toordinal()
-    samples = [(oa, 68.0)] * 50 + [(ob, 87.0)] * 50
-    groups = _group_samples_by_calendar_mode(samples, "week")
-    assert len(groups) == 2
-    cfg = {
-        "min_calendar_bins_before_ordinal_fallback": 5,
-        "min_games_for_ordinal_fallback": 15,
-        "ordinal_quantile_bin_count": 12,
-    }
-    assert _should_use_ordinal_quantile_fallback(
-        cfg,
-        n_calendar_groups=len(groups),
-        n_samples=len(samples),
-        span_days=ob - oa,
-        min_span_days=14,
-    )
+    samples = [(oa, 68.0, True)] * 50 + [(ob, 87.0, False)] * 50
+    series = _accuracy_series_ordinal_quantile_bins(samples, 16, oa, ob)
+    assert len(series) == 16
 
 
 def test_ordinal_quantile_bins_split_many_games_into_more_points() -> None:

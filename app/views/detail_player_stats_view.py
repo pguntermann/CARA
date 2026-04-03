@@ -1,5 +1,6 @@
 """Player Statistics view for detail panel."""
 
+import bisect
 import math
 from datetime import date, timedelta
 
@@ -11,6 +12,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QRect, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QPoint, QPointF
 from PyQt6.QtGui import (
     QPainter,
+    QPainterPath,
     QColor,
     QPen,
     QFont,
@@ -27,6 +29,7 @@ from app.models.database_model import DatabaseModel
 from app.models.game_model import GameModel
 from app.controllers.game_controller import GameController
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.services.player_stats_service import merged_player_stats_time_series_chart_cfg
 
 if TYPE_CHECKING:
     from app.controllers.player_stats_controller import PlayerStatsController
@@ -43,6 +46,7 @@ PLAYER_STATS_MENU_SECTIONS: List[Tuple[str, str]] = [
     ("performance_by_phase", "Performance by phase"),
     ("accuracy_vs_progress", "Avg. accuracy over game duration"),
     ("accuracy_progression", "Accuracy progression"),
+    ("top_move_progression", "Top move progression"),
     ("move_quality_progression", "Move quality progression"),
     ("acpl_phase_progression", "ACPL progression by phase"),
     ("openings", "Openings"),
@@ -550,6 +554,110 @@ def _accuracy_over_time_ordinal_to_x(
     return left + (o - omin) / span * graph_width
 
 
+# Infer X-axis tick density when ``calendar_mode`` was not set on the series (legacy paths).
+_AXIS_FALLBACK_DAY_MAX_SPAN_DAYS = 31
+_AXIS_FALLBACK_WEEK_MAX_SPAN_DAYS = 120
+_AXIS_FALLBACK_MONTH_MAX_SPAN_DAYS = 960
+
+# strftime("%b") follows the process locale; keep chart labels English regardless of OS language.
+_EN_MONTH_ABBREV = (
+    "",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+)
+
+
+def _format_axis_tick_month_year(d: date) -> str:
+    return f"{_EN_MONTH_ABBREV[d.month]} '{d.year % 100:02d}"
+
+
+def _format_axis_tick_day_month(d: date) -> str:
+    return f"{d.day} {_EN_MONTH_ABBREV[d.month]}"
+
+
+_PROGRESSION_X_AXIS_MODES = frozenset({"uniform_bins", "gap_compressed", "calendar_linear"})
+
+
+def _coerce_progression_x_axis_mode(chart_cfg: Dict[str, Any]) -> str:
+    """How progression charts map bins to horizontal position (shared accuracy / MQ / ACPL charts)."""
+    raw = str(chart_cfg.get("progression_x_axis_mode", "")).strip().lower()
+    if raw in _PROGRESSION_X_AXIS_MODES:
+        return raw
+    if chart_cfg.get("compress_time_axis_gaps", True) is False:
+        return "calendar_linear"
+    return "uniform_bins"
+
+
+def _plot_x_uniform_bin_index(i: int, n: int, left: float, graph_width: float) -> float:
+    if n <= 0:
+        return left
+    if n == 1:
+        return left + graph_width / 2.0
+    return left + graph_width * (float(i) / float(n - 1))
+
+
+def _short_label_for_bin_dates(lab0: str, lab1: str) -> str:
+    oc = _bin_ordinal_center_from_iso(lab0, lab1)
+    if oc is None:
+        s = str(lab0).strip()
+        return s[:12] + "…" if len(s) > 12 else s
+    return _format_axis_tick_day_month(date.fromordinal(oc))
+
+
+def _smooth_polyline_path(run: List[QPointF], *, strength: float = 1.0) -> Optional[QPainterPath]:
+    """Cubic Bézier chain (Catmull–Rom style) through ``run`` for a flowing line.
+
+    Vertices are preserved as segment endpoints; the curve may bulge slightly past
+    straight chords (especially at sharp turns). ``strength`` scales handle tension
+    (0 ≈ straight segments, ~1 default, >1 more wavy).
+    """
+    n = len(run)
+    if n < 2:
+        return None
+    path = QPainterPath(run[0])
+    if n == 2:
+        path.lineTo(run[1])
+        return path
+    if strength < 0.05:
+        for k in range(n - 1):
+            path.lineTo(run[k + 1])
+        return path
+    k = strength / 6.0
+
+    def _pt(i: int) -> QPointF:
+        return run[max(0, min(n - 1, i))]
+
+    for i in range(n - 1):
+        p_im1 = _pt(i - 1) if i > 0 else QPointF(2 * run[0].x() - run[1].x(), 2 * run[0].y() - run[1].y())
+        p_i = run[i]
+        p_ip1 = run[i + 1]
+        p_ip2 = (
+            run[i + 2]
+            if i + 2 < n
+            else QPointF(2 * run[n - 1].x() - run[n - 2].x(), 2 * run[n - 1].y() - run[n - 2].y())
+        )
+        c1 = QPointF(
+            p_i.x() + (p_ip1.x() - p_im1.x()) * k,
+            p_i.y() + (p_ip1.y() - p_im1.y()) * k,
+        )
+        c2 = QPointF(
+            p_ip1.x() - (p_ip2.x() - p_i.x()) * k,
+            p_ip1.y() - (p_ip2.y() - p_i.y()) * k,
+        )
+        path.cubicTo(c1, c2, p_ip1)
+    return path
+
+
 def _x_axis_week_minors_in_month_mode(
     chart_cfg: Dict[str, Any], span_days: int, week_ticks_base_enabled: bool
 ) -> bool:
@@ -576,6 +684,120 @@ def _bin_ordinal_center_from_iso(lab0: str, lab1: str) -> Optional[int]:
         return None
 
 
+class GapCompressedTimeLayout:
+    """Non-linear map calendar ordinal → horizontal fraction so long game-free spans use less width."""
+
+    __slots__ = ("_knots", "_cum")
+
+    def __init__(self, knots: List[int], cum_display: List[float]) -> None:
+        self._knots = tuple(knots)
+        self._cum = tuple(cum_display)
+
+    def ordinal_to_frac(self, o: int) -> float:
+        if not self._knots:
+            return 0.0
+        o = max(self._knots[0], min(self._knots[-1], o))
+        for i in range(len(self._knots) - 1):
+            lo, hi = self._knots[i], self._knots[i + 1]
+            if lo <= o <= hi:
+                span = hi - lo
+                f0, f1 = self._cum[i], self._cum[i + 1]
+                if span <= 0:
+                    return f1
+                t = (o - lo) / span
+                return f0 + t * (f1 - f0)
+        return self._cum[-1]
+
+    def frac_to_ordinal(self, frac: float) -> int:
+        """Inverse of ``ordinal_to_frac`` for hover / crosshair date hints."""
+        if not self._knots:
+            return 0
+        frac = max(0.0, min(1.0, frac))
+        cum = self._cum
+        knots = self._knots
+        i = bisect.bisect_right(cum, frac) - 1
+        i = max(0, min(i, len(cum) - 2))
+        f0, f1 = cum[i], cum[i + 1]
+        lo, hi = knots[i], knots[i + 1]
+        denom = f1 - f0
+        if denom <= 1e-15:
+            return int(hi)
+        t = (frac - f0) / denom
+        return int(round(lo + t * (hi - lo)))
+
+
+def _build_gap_compressed_time_layout(
+    omin: int,
+    omax: int,
+    bin_center_ordinals: List[int],
+    max_segment_calendar_days: int,
+) -> Optional[GapCompressedTimeLayout]:
+    """Layout where each segment's horizontal weight is capped (compresses long gaps with no bins).
+
+    Knots span from ``min(omin, first_bin)`` to ``max(omax, last_bin)`` so large calendar gaps
+    between bins are real segments (not lost to axis-only clipping). Callers map ``[omin, omax]``
+    to the plot width via :func:`_ordinal_to_chart_x` (renormalized fractions).
+    """
+    if omax <= omin or max_segment_calendar_days < 1:
+        return None
+    uniq = sorted({int(c) for c in bin_center_ordinals})
+    if len(uniq) < 2:
+        return None
+    k0 = min(omin, uniq[0])
+    kn = max(omax, uniq[-1])
+    if kn <= k0:
+        return None
+    knots: List[int] = [k0]
+    for c in uniq:
+        if c <= k0:
+            continue
+        if c >= kn:
+            break
+        if c > knots[-1]:
+            knots.append(c)
+    if kn > knots[-1]:
+        knots.append(kn)
+    fixed: List[int] = [knots[0]]
+    for k in knots[1:]:
+        if k > fixed[-1]:
+            fixed.append(k)
+    knots = fixed
+    if len(knots) < 2:
+        return None
+    weights: List[float] = []
+    for i in range(len(knots) - 1):
+        d = knots[i + 1] - knots[i]
+        weights.append(max(1.0, float(min(d, max_segment_calendar_days))))
+    total = sum(weights)
+    if total <= 0:
+        return None
+    cum: List[float] = [0.0]
+    for w in weights:
+        cum.append(cum[-1] + w / total)
+    cum[-1] = 1.0
+    return GapCompressedTimeLayout(knots, cum)
+
+
+def _ordinal_to_chart_x(
+    o: int,
+    left: float,
+    graph_width: float,
+    omin: int,
+    omax: int,
+    layout: Optional[GapCompressedTimeLayout],
+) -> float:
+    if layout is not None and omax > omin:
+        o = max(omin, min(omax, o))
+        f = layout.ordinal_to_frac(o)
+        f0 = layout.ordinal_to_frac(omin)
+        f1 = layout.ordinal_to_frac(omax)
+        span_f = f1 - f0
+        if span_f <= 1e-15:
+            return _accuracy_over_time_ordinal_to_x(o, left, graph_width, omin, omax)
+        return left + (f - f0) / span_f * graph_width
+    return _accuracy_over_time_ordinal_to_x(o, left, graph_width, omin, omax)
+
+
 def _chart_x_from_bin_labels(
     lab0: str,
     lab1: str,
@@ -584,12 +806,13 @@ def _chart_x_from_bin_labels(
     graph_width: float,
     omin: int,
     omax: int,
+    time_axis_layout: Optional[GapCompressedTimeLayout] = None,
 ) -> float:
-    """Place a bin on the X axis using the same ordinal scale as calendar ticks (not raw ``time_pct``)."""
+    """Place a bin on the X axis using calendar position (optionally gap-compressed)."""
     oc = _bin_ordinal_center_from_iso(lab0, lab1)
     if oc is not None and omax > omin:
         oc = max(omin, min(omax, oc))
-        return _accuracy_over_time_ordinal_to_x(oc, left, graph_width, omin, omax)
+        return _ordinal_to_chart_x(oc, left, graph_width, omin, omax, time_axis_layout)
     return left + (time_pct / 100.0 * graph_width)
 
 
@@ -635,7 +858,9 @@ class AccuracyOverTimeChartWidget(QWidget):
         ui_config = config.get("ui", {})
         panel_config = ui_config.get("panels", {}).get("detail", {})
         player_stats_config = panel_config.get("player_stats", {})
-        chart_config = player_stats_config.get("accuracy_over_time_chart", {})
+        chart_config = merged_player_stats_time_series_chart_cfg(
+            player_stats_config, "accuracy_over_time_chart"
+        )
         self._chart_cfg = chart_config
 
         self._height = int(chart_config.get("height", 220))
@@ -675,6 +900,17 @@ class AccuracyOverTimeChartWidget(QWidget):
         self._hover_circle_radius = int(chart_config.get("hover_circle_radius", 6))
         self._show_bin_data_markers = bool(chart_config.get("show_bin_data_markers", True))
         self._bin_data_marker_radius = float(chart_config.get("bin_data_marker_radius", 3))
+        self._compress_time_axis_gaps = bool(chart_config.get("compress_time_axis_gaps", True))
+        self._compress_gap_max_segment_days = max(
+            1, int(chart_config.get("compress_gap_max_segment_days", 50) or 50)
+        )
+        self._progression_x_mode = _coerce_progression_x_axis_mode(chart_config)
+        self._time_axis_layout: Optional[GapCompressedTimeLayout] = None
+        _pls = str(chart_config.get("progression_line_style", "smooth")).strip().lower()
+        self._progression_line_smooth = _pls in ("smooth", "bezier", "curve", "curved")
+        self._progression_line_smooth_strength = max(
+            0.0, min(2.0, float(chart_config.get("progression_line_smooth_strength", 1.0) or 1.0))
+        )
         self._y_padding_pct = 0.05
         self._y_min_range = 5.0
 
@@ -709,22 +945,67 @@ class AccuracyOverTimeChartWidget(QWidget):
         self._ordinal_min = ordinal_min
         self._ordinal_max = ordinal_max
         self._calendar_mode = calendar_mode if calendar_mode in ("day", "week", "month", "year") else ""
+        self._time_axis_layout = None
+        if self._progression_x_mode == "gap_compressed":
+            centers: List[int] = []
+            for row in ordered:
+                oc = _bin_ordinal_center_from_iso(row[5], row[6])
+                if oc is not None:
+                    centers.append(oc)
+            self._time_axis_layout = _build_gap_compressed_time_layout(
+                ordinal_min,
+                ordinal_max,
+                centers,
+                self._compress_gap_max_segment_days,
+            )
         self._hover_pixel = None
         self._hover_vertex_index = None
         self.update()
+
+    def _accuracy_plot_x(self, bin_index: int, left: float, gw: float) -> float:
+        n = len(self._data)
+        if self._progression_x_mode == "uniform_bins":
+            return _plot_x_uniform_bin_index(bin_index, n, left, gw)
+        if bin_index < 0 or bin_index >= n:
+            return left
+        pct, _ = self._data[bin_index]
+        _cnt, lab0, lab1, *__ = self._vertex_meta[bin_index]
+        layout = self._time_axis_layout if self._progression_x_mode == "gap_compressed" else None
+        return _chart_x_from_bin_labels(
+            lab0, lab1, pct, left, gw, self._ordinal_min, self._ordinal_max, layout
+        )
+
+    def _uniform_bin_axis_ticks_accuracy(self, left: float, gw: float) -> List[Tuple[float, str]]:
+        n = len(self._data)
+        if n == 0:
+            return []
+        max_l = max(2, min(self._x_axis_max_labels, n))
+        if n == 1:
+            _c, l0, l1, *__ = self._vertex_meta[0]
+            return [(_plot_x_uniform_bin_index(0, n, left, gw), _short_label_for_bin_dates(l0, l1))]
+        indices: List[int] = []
+        seen: set = set()
+        for j in range(max_l):
+            idx = int(round(j * (n - 1) / max(1, max_l - 1)))
+            if idx not in seen:
+                seen.add(idx)
+                indices.append(idx)
+        out: List[Tuple[float, str]] = []
+        for idx in indices:
+            _c, l0, l1, *__ = self._vertex_meta[idx]
+            out.append((_plot_x_uniform_bin_index(idx, n, left, gw), _short_label_for_bin_dates(l0, l1)))
+        out.sort(key=lambda t: t[0])
+        return out
 
     def _effective_calendar_mode(self) -> str:
         if self._calendar_mode:
             return self._calendar_mode
         span = max(0, self._ordinal_max - self._ordinal_min)
-        dmax = int(self._chart_cfg.get("calendar_day_bin_max_span_days", 31))
-        wmax = int(self._chart_cfg.get("calendar_week_bin_max_span_days", 120))
-        mmax = int(self._chart_cfg.get("calendar_month_bin_max_span_days", 960))
-        if span <= dmax:
+        if span <= _AXIS_FALLBACK_DAY_MAX_SPAN_DAYS:
             return "day"
-        if span <= wmax:
+        if span <= _AXIS_FALLBACK_WEEK_MAX_SPAN_DAYS:
             return "week"
-        if span <= mmax:
+        if span <= _AXIS_FALLBACK_MONTH_MAX_SPAN_DAYS:
             return "month"
         return "year"
 
@@ -770,7 +1051,7 @@ class AccuracyOverTimeChartWidget(QWidget):
             while cur <= end_m:
                 o = cur.toordinal()
                 if omin <= o <= omax:
-                    ticks.append((o, True, cur.strftime("%b '%y")))
+                    ticks.append((o, True, _format_axis_tick_month_year(cur)))
                     majors.add(o)
                 if cur.month == 12:
                     cur = date(cur.year + 1, 1, 1)
@@ -793,7 +1074,7 @@ class AccuracyOverTimeChartWidget(QWidget):
             idx = 0
             label_every = max(1, int(max(1, (omax - omin) // 7) // max_l) + 1)
             while w <= omax:
-                lbl = date.fromordinal(w).strftime("%d %b") if idx % label_every == 0 else ""
+                lbl = _format_axis_tick_day_month(date.fromordinal(w)) if idx % label_every == 0 else ""
                 ticks.append((w, True, lbl))
                 idx += 1
                 w += 7
@@ -803,10 +1084,10 @@ class AccuracyOverTimeChartWidget(QWidget):
             step = max(1, (span_days + max_l - 1) // max_l)
             o = omin
             while o <= omax:
-                ticks.append((o, True, date.fromordinal(o).strftime("%d %b")))
+                ticks.append((o, True, _format_axis_tick_day_month(date.fromordinal(o))))
                 o += step
             if ticks and ticks[-1][0] < omax:
-                ticks.append((omax, True, date.fromordinal(omax).strftime("%d %b")))
+                ticks.append((omax, True, _format_axis_tick_day_month(date.fromordinal(omax))))
 
         ticks.sort(key=lambda t: t[0])
         return ticks
@@ -859,17 +1140,29 @@ class AccuracyOverTimeChartWidget(QWidget):
             painter.drawLine(int(left), int(y), int(right_plot), int(y))
 
         tick_list: List[Tuple[int, bool, str]] = []
+        uniform_ticks: List[Tuple[float, str]] = []
         if self._x_axis_calendar_enabled:
-            tick_list = self._calendar_axis_ticks()
-            for o_ord, is_major, _lbl in tick_list:
-                x = _accuracy_over_time_ordinal_to_x(
-                    o_ord, left, graph_width, self._ordinal_min, self._ordinal_max
-                )
-                if is_major:
+            if self._progression_x_mode == "uniform_bins":
+                uniform_ticks = self._uniform_bin_axis_ticks_accuracy(left, graph_width)
+                for xu, _lbl in uniform_ticks:
                     painter.setPen(QPen(self._x_axis_major_color, self._x_axis_major_width))
-                else:
-                    painter.setPen(QPen(self._x_axis_minor_color, self._x_axis_minor_width))
-                painter.drawLine(int(x), int(top), int(x), int(bottom))
+                    painter.drawLine(int(xu), int(top), int(xu), int(bottom))
+            else:
+                tick_list = self._calendar_axis_ticks()
+                for o_ord, is_major, _lbl in tick_list:
+                    x = _ordinal_to_chart_x(
+                        o_ord,
+                        left,
+                        graph_width,
+                        self._ordinal_min,
+                        self._ordinal_max,
+                        self._time_axis_layout,
+                    )
+                    if is_major:
+                        painter.setPen(QPen(self._x_axis_major_color, self._x_axis_major_width))
+                    else:
+                        painter.setPen(QPen(self._x_axis_minor_color, self._x_axis_minor_width))
+                    painter.drawLine(int(x), int(top), int(x), int(bottom))
         else:
             for pct in [0, 25, 50, 75, 100]:
                 x = left + (pct / 100.0 * graph_width)
@@ -891,13 +1184,32 @@ class AccuracyOverTimeChartWidget(QWidget):
             label_width = fm.horizontalAdvance(label)
             painter.drawText(int(left - label_width - self.y_axis_label_spacing), int(y + fm.height() / 2), label)
 
-        if self._x_axis_calendar_enabled and tick_list:
+        if self._x_axis_calendar_enabled and self._progression_x_mode == "uniform_bins" and uniform_ticks:
+            last_label_x = -1e9
+            for xu, lbl in uniform_ticks:
+                if not lbl:
+                    continue
+                if xu - last_label_x < self._x_axis_label_min_spacing_px:
+                    continue
+                label_width = fm.horizontalAdvance(lbl)
+                painter.drawText(
+                    int(xu - label_width / 2),
+                    int(bottom + fm.height() + self.x_axis_label_spacing),
+                    lbl,
+                )
+                last_label_x = xu
+        elif self._x_axis_calendar_enabled and tick_list:
             last_label_x = -1e9
             for o_ord, is_major, lbl in tick_list:
                 if not lbl or not is_major:
                     continue
-                x = _accuracy_over_time_ordinal_to_x(
-                    o_ord, left, graph_width, self._ordinal_min, self._ordinal_max
+                x = _ordinal_to_chart_x(
+                    o_ord,
+                    left,
+                    graph_width,
+                    self._ordinal_min,
+                    self._ordinal_max,
+                    self._time_axis_layout,
                 )
                 if x - last_label_x < self._x_axis_label_min_spacing_px:
                     continue
@@ -918,15 +1230,21 @@ class AccuracyOverTimeChartWidget(QWidget):
                 label_width = fm.horizontalAdvance(label)
                 painter.drawText(int(x - label_width / 2), int(bottom + fm.height() + self.x_axis_label_spacing), label)
 
-        omin, omax = self._ordinal_min, self._ordinal_max
-
         def _flush_run_line(col: QColor, lw: int, run: List[QPointF]) -> None:
             pen_ln = QPen(col, lw)
             pen_ln.setStyle(self._line_style)
             painter.setPen(pen_ln)
             if len(run) > 1:
-                for k in range(len(run) - 1):
-                    painter.drawLine(run[k], run[k + 1])
+                if self._progression_line_smooth and self._line_style == Qt.PenStyle.SolidLine:
+                    spath = _smooth_polyline_path(run, strength=self._progression_line_smooth_strength)
+                    if spath is not None:
+                        painter.drawPath(spath)
+                    else:
+                        for k in range(len(run) - 1):
+                            painter.drawLine(run[k], run[k + 1])
+                else:
+                    for k in range(len(run) - 1):
+                        painter.drawLine(run[k], run[k + 1])
             elif len(run) == 1 and not self._show_bin_data_markers:
                 painter.setBrush(QBrush(col))
                 r = max(3, lw + 2)
@@ -940,8 +1258,7 @@ class AccuracyOverTimeChartWidget(QWidget):
                 if not math.isfinite(av):
                     out_pts.append(None)
                     continue
-                _c, lab0, lab1, *_r = self._vertex_meta[i]
-                x = _chart_x_from_bin_labels(lab0, lab1, pct, left, graph_width, omin, omax)
+                x = self._accuracy_plot_x(i, left, graph_width)
                 y = bottom - ((av - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
                 y = max(top, min(bottom, y))
                 out_pts.append(QPointF(x, y))
@@ -963,33 +1280,36 @@ class AccuracyOverTimeChartWidget(QWidget):
 
         points: List[QPointF] = []
         for i, (pct, acc) in enumerate(self._data):
-            _cnt, lab0, lab1, *_rest = self._vertex_meta[i]
-            x = _chart_x_from_bin_labels(lab0, lab1, pct, left, graph_width, omin, omax)
+            x = self._accuracy_plot_x(i, left, graph_width)
             y = bottom - ((acc - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
             y = max(top, min(bottom, y))
             points.append(QPointF(x, y))
 
         lw = int(self.line_width)
+        lw_main = int(self._chart_cfg.get("combined_line_width", lw + 2 if self._show_by_color else lw))
+        lw_ref = int(self._chart_cfg.get("by_color_line_width", max(1, lw - 1) if self._show_by_color else lw))
+        lw_main = max(1, lw_main)
+        lw_ref = max(1, lw_ref)
         if self._show_by_color:
             for run in _runs_from_optional(_optional_y_points(self._acc_black)):
-                _flush_run_line(self._black_line_color, lw, run)
+                _flush_run_line(self._black_line_color, lw_ref, run)
             for run in _runs_from_optional(_optional_y_points(self._acc_white)):
-                _flush_run_line(self._white_line_color, lw, run)
-        _flush_run_line(self.line_color, lw, points)
+                _flush_run_line(self._white_line_color, lw_ref, run)
+        _flush_run_line(self.line_color, lw_main, points)
 
         if self._show_bin_data_markers and points:
             arm = max(2.0, self._bin_data_marker_radius)
-            mpen = QPen(self.line_color, max(1, lw))
+            mpen = QPen(self.line_color, max(1, lw_main))
             mpen.setStyle(self._line_style)
             for pt in points:
                 _draw_bin_data_x_marker(painter, pt.x(), pt.y(), arm, mpen)
             if self._show_by_color:
-                m_w = QPen(self._white_line_color, max(1, lw))
+                m_w = QPen(self._white_line_color, max(1, lw_ref))
                 m_w.setStyle(self._line_style)
                 for p in _optional_y_points(self._acc_white):
                     if p is not None:
                         _draw_bin_data_x_marker(painter, p.x(), p.y(), arm, m_w)
-                m_b = QPen(self._black_line_color, max(1, lw))
+                m_b = QPen(self._black_line_color, max(1, lw_ref))
                 m_b.setStyle(self._line_style)
                 for p in _optional_y_points(self._acc_black):
                     if p is not None:
@@ -1014,8 +1334,9 @@ class AccuracyOverTimeChartWidget(QWidget):
                 (self._white_line_color, self._label_white),
                 (self._black_line_color, self._label_black),
             ]
-            for col, lbl in legend_rows:
-                pen = QPen(col, max(1, lw))
+            for i_row, (col, lbl) in enumerate(legend_rows):
+                leg_lw = lw_main if i_row == 0 else lw_ref
+                pen = QPen(col, max(1, leg_lw))
                 pen.setStyle(self._line_style)
                 painter.setPen(pen)
                 painter.drawLine(lx, ly + leg_fm.height() // 2, lx + line_seg_w, ly + leg_fm.height() // 2)
@@ -1045,13 +1366,24 @@ class AccuracyOverTimeChartWidget(QWidget):
         *,
         lab0: Optional[str] = None,
         lab1: Optional[str] = None,
+        bin_index: Optional[int] = None,
     ) -> QPointF:
         if min_acc is None or max_acc is None:
             min_acc, max_acc = self._accuracy_range()
         acc_range = max_acc - min_acc
-        if lab0 is not None and lab1 is not None:
+        if bin_index is not None and 0 <= bin_index < len(self._data):
+            x = self._accuracy_plot_x(bin_index, left, graph_width)
+        elif lab0 is not None and lab1 is not None:
+            layout = self._time_axis_layout if self._progression_x_mode == "gap_compressed" else None
             x = _chart_x_from_bin_labels(
-                lab0, lab1, progress, left, graph_width, self._ordinal_min, self._ordinal_max
+                lab0,
+                lab1,
+                progress,
+                left,
+                graph_width,
+                self._ordinal_min,
+                self._ordinal_max,
+                layout,
             )
         else:
             x = left + (progress / 100.0 * graph_width)
@@ -1120,6 +1452,7 @@ class AccuracyOverTimeChartWidget(QWidget):
                 max_acc,
                 lab0=lab0,
                 lab1=lab1,
+                bin_index=i,
             )
             pt.setY(max(top, min(bottom, pt.y())))
             points.append(pt)
@@ -1186,7 +1519,7 @@ class AccuracyOverTimeChartWidget(QWidget):
 
 
 class MoveQualityOverTimeChartWidget(QWidget):
-    """Multi-series chart: calendar-aligned date range vs move-quality % or phase ACPL (see ``chart_style``)."""
+    """Multi-series chart over game dates: move-quality %, top-move metrics, or phase ACPL (``chart_style``)."""
 
     def __init__(
         self,
@@ -1197,58 +1530,72 @@ class MoveQualityOverTimeChartWidget(QWidget):
     ) -> None:
         super().__init__(parent)
         self.config = config
-        self._chart_style = chart_style if chart_style in ("move_pct", "acpl_phase") else "move_pct"
+        self._chart_style = (
+            chart_style if chart_style in ("move_pct", "acpl_phase", "top_move_pct") else "move_pct"
+        )
         ui_config = config.get("ui", {})
         panel_config = ui_config.get("panels", {}).get("detail", {})
         player_stats_config = panel_config.get("player_stats", {})
-        acc_cfg = dict(player_stats_config.get("accuracy_over_time_chart", {}))
         if self._chart_style == "acpl_phase":
-            own_cfg = dict(player_stats_config.get("acpl_phase_over_time_chart", {}))
+            chart_key = "acpl_phase_over_time_chart"
+        elif self._chart_style == "top_move_pct":
+            chart_key = "top_move_over_time_chart"
         else:
-            own_cfg = dict(player_stats_config.get("move_quality_over_time_chart", {}))
-        self._own_cfg = own_cfg
-        self._chart_cfg = {**acc_cfg, **own_cfg}
+            chart_key = "move_quality_over_time_chart"
+        self._own_cfg = dict(player_stats_config.get(chart_key) or {})
+        self._chart_cfg = merged_player_stats_time_series_chart_cfg(player_stats_config, chart_key)
 
-        def _rgb(key: str, fallback: List[int]) -> List[int]:
-            v = own_cfg.get(key)
+        def _rgb(cfg: Dict[str, Any], key: str, fallback: List[int]) -> List[int]:
+            v = cfg.get(key)
             if isinstance(v, list) and len(v) >= 3:
                 return [int(v[0]), int(v[1]), int(v[2])]
             return fallback
 
-        self._height = int(own_cfg.get("height", 240))
-        self._legend_width = int(own_cfg.get("legend_width", 112))
-        self.background_color = QColor(*_rgb("background_color", [30, 30, 35]))
-        self.grid_color = QColor(*_rgb("grid_color", [60, 60, 65]))
-        self.text_color = QColor(*_rgb("text_color", [200, 200, 200]))
-        self.axis_color = QColor(*_rgb("axis_color", [150, 150, 150]))
-        self._x_axis_major_color = QColor(*acc_cfg.get("x_axis_major_line_color", [88, 88, 95]))
-        self._x_axis_minor_color = QColor(*acc_cfg.get("x_axis_minor_line_color", [55, 55, 62]))
-        self._x_axis_major_width = int(acc_cfg.get("x_axis_major_line_width", 1))
-        self._x_axis_minor_width = int(acc_cfg.get("x_axis_minor_line_width", 1))
-        self._x_axis_calendar_enabled = bool(acc_cfg.get("x_axis_calendar_enabled", True))
-        self._x_axis_label_min_spacing_px = int(acc_cfg.get("x_axis_label_min_spacing_px", 44))
-        self._x_axis_max_labels = int(acc_cfg.get("x_axis_max_labels", 12))
-        self._x_axis_week_in_month = bool(acc_cfg.get("x_axis_week_ticks_in_month_mode", True))
-        self.padding = own_cfg.get("padding", [40, 20, 20, 40])
-        self.font_family = resolve_font_family(own_cfg.get("font_family", "Helvetica Neue"))
-        self.font_size = int(scale_font_size(own_cfg.get("font_size", 10)))
-        self.min_font_size = int(scale_font_size(own_cfg.get("min_font_size", 8)))
-        self.font_size_calculation_divisor = own_cfg.get("font_size_calculation_divisor", 20)
-        self.min_grid_spacing = own_cfg.get("min_grid_spacing", 30)
-        self.min_grid_lines = own_cfg.get("min_grid_lines", 5)
-        self.y_axis_label_spacing = own_cfg.get("y_axis_label_spacing", 5)
-        self.x_axis_label_spacing = own_cfg.get("x_axis_label_spacing", 5)
-        self._hover_hit_threshold_px = int(own_cfg.get("hover_hit_threshold_px", 25))
-        self._legend_font_size = int(scale_font_size(own_cfg.get("legend_font_size", 8)))
+        self._height = int(self._chart_cfg.get("height", 240))
+        self._legend_width = int(self._chart_cfg.get("legend_width", 112))
+        self.background_color = QColor(*_rgb(self._chart_cfg, "background_color", [30, 30, 35]))
+        self.grid_color = QColor(*_rgb(self._chart_cfg, "grid_color", [60, 60, 65]))
+        self.text_color = QColor(*_rgb(self._chart_cfg, "text_color", [200, 200, 200]))
+        self.axis_color = QColor(*_rgb(self._chart_cfg, "axis_color", [150, 150, 150]))
+        self._x_axis_major_color = QColor(*self._chart_cfg.get("x_axis_major_line_color", [88, 88, 95]))
+        self._x_axis_minor_color = QColor(*self._chart_cfg.get("x_axis_minor_line_color", [55, 55, 62]))
+        self._x_axis_major_width = int(self._chart_cfg.get("x_axis_major_line_width", 1))
+        self._x_axis_minor_width = int(self._chart_cfg.get("x_axis_minor_line_width", 1))
+        self._x_axis_calendar_enabled = bool(self._chart_cfg.get("x_axis_calendar_enabled", True))
+        self._x_axis_label_min_spacing_px = int(self._chart_cfg.get("x_axis_label_min_spacing_px", 44))
+        self._x_axis_max_labels = int(self._chart_cfg.get("x_axis_max_labels", 12))
+        self._x_axis_week_in_month = bool(self._chart_cfg.get("x_axis_week_ticks_in_month_mode", True))
+        self.padding = self._chart_cfg.get("padding", [40, 20, 20, 40])
+        self.font_family = resolve_font_family(self._chart_cfg.get("font_family", "Helvetica Neue"))
+        self.font_size = int(scale_font_size(self._chart_cfg.get("font_size", 10)))
+        self.min_font_size = int(scale_font_size(self._chart_cfg.get("min_font_size", 8)))
+        self.font_size_calculation_divisor = self._chart_cfg.get("font_size_calculation_divisor", 20)
+        self.min_grid_spacing = self._chart_cfg.get("min_grid_spacing", 30)
+        self.min_grid_lines = self._chart_cfg.get("min_grid_lines", 5)
+        self.y_axis_label_spacing = self._chart_cfg.get("y_axis_label_spacing", 5)
+        self.x_axis_label_spacing = self._chart_cfg.get("x_axis_label_spacing", 5)
+        self._hover_hit_threshold_px = int(self._chart_cfg.get("hover_hit_threshold_px", 25))
+        self._legend_font_size = int(scale_font_size(self._chart_cfg.get("legend_font_size", 8)))
         self._show_bin_data_markers = bool(self._chart_cfg.get("show_bin_data_markers", True))
         self._bin_data_marker_radius = float(self._chart_cfg.get("bin_data_marker_radius", 3))
+        self._compress_time_axis_gaps = bool(self._chart_cfg.get("compress_time_axis_gaps", True))
+        self._compress_gap_max_segment_days = max(
+            1, int(self._chart_cfg.get("compress_gap_max_segment_days", 50) or 50)
+        )
+        self._progression_x_mode = _coerce_progression_x_axis_mode(self._chart_cfg)
+        self._time_axis_layout: Optional[GapCompressedTimeLayout] = None
+        _pls_mq = str(self._chart_cfg.get("progression_line_style", "smooth")).strip().lower()
+        self._progression_line_smooth = _pls_mq in ("smooth", "bezier", "curve", "curved")
+        self._progression_line_smooth_strength = max(
+            0.0, min(2.0, float(self._chart_cfg.get("progression_line_smooth_strength", 1.0) or 1.0))
+        )
         self._default_pen: Tuple[QColor, Qt.PenStyle, int] = (
             QColor(160, 160, 170),
             Qt.PenStyle.SolidLine,
             2,
         )
         self._style_for_id: Dict[str, Tuple[QColor, Qt.PenStyle, int]] = {}
-        for item in own_cfg.get("series") or []:
+        for item in self._own_cfg.get("series") or []:
             if not isinstance(item, dict):
                 continue
             sid = str(item.get("id", "")).strip()
@@ -1295,9 +1642,56 @@ class MoveQualityOverTimeChartWidget(QWidget):
         self._ordinal_max = ordinal_max
         cm = calendar_mode if calendar_mode in ("day", "week", "month", "year") else ""
         self._calendar_mode = cm
+        self._time_axis_layout = None
+        if self._progression_x_mode == "gap_compressed":
+            centers_m: List[int] = []
+            for row in ordered:
+                oc = _bin_ordinal_center_from_iso(row[2], row[3])
+                if oc is not None:
+                    centers_m.append(oc)
+            self._time_axis_layout = _build_gap_compressed_time_layout(
+                ordinal_min,
+                ordinal_max,
+                centers_m,
+                self._compress_gap_max_segment_days,
+            )
         self._hover_plot_x = None
         self._hover_values = None
         self.update()
+
+    def _mq_plot_x(self, bin_index: int, left: float, gw: float) -> float:
+        nb = len(self._bins)
+        if self._progression_x_mode == "uniform_bins":
+            return _plot_x_uniform_bin_index(bin_index, nb, left, gw)
+        if bin_index < 0 or bin_index >= nb:
+            return left
+        t_pct, _c, l0, l1, _meds = self._bins[bin_index]
+        layout = self._time_axis_layout if self._progression_x_mode == "gap_compressed" else None
+        return _chart_x_from_bin_labels(
+            l0, l1, t_pct, left, gw, self._ordinal_min, self._ordinal_max, layout
+        )
+
+    def _uniform_bin_axis_ticks_mq(self, left: float, gw: float) -> List[Tuple[float, str]]:
+        n = len(self._bins)
+        if n == 0:
+            return []
+        max_l = max(2, min(self._x_axis_max_labels, n))
+        if n == 1:
+            _tp, _c, l0, l1, _m = self._bins[0]
+            return [(_plot_x_uniform_bin_index(0, n, left, gw), _short_label_for_bin_dates(l0, l1))]
+        indices: List[int] = []
+        seen: set = set()
+        for j in range(max_l):
+            idx = int(round(j * (n - 1) / max(1, max_l - 1)))
+            if idx not in seen:
+                seen.add(idx)
+                indices.append(idx)
+        out: List[Tuple[float, str]] = []
+        for idx in indices:
+            _tp, _c, l0, l1, _m = self._bins[idx]
+            out.append((_plot_x_uniform_bin_index(idx, n, left, gw), _short_label_for_bin_dates(l0, l1)))
+        out.sort(key=lambda t: t[0])
+        return out
 
     def _y_axis_range(self) -> Tuple[float, float]:
         if self._chart_style == "acpl_phase":
@@ -1339,11 +1733,9 @@ class MoveQualityOverTimeChartWidget(QWidget):
         n = len(self._labels)
         if not self._bins or n == 0:
             return tuple()
-        omin, omax = self._ordinal_min, self._ordinal_max
         xs: List[float] = []
-        for row in self._bins:
-            t_pct, _c, l0, l1, _meds = row
-            xs.append(_chart_x_from_bin_labels(l0, l1, t_pct, left, graph_width, omin, omax))
+        for bi in range(len(self._bins)):
+            xs.append(self._mq_plot_x(bi, left, graph_width))
         if len(self._bins) == 1:
             meds = self._bins[0][4]
             if self._chart_style == "acpl_phase":
@@ -1388,14 +1780,11 @@ class MoveQualityOverTimeChartWidget(QWidget):
         if self._calendar_mode:
             return self._calendar_mode
         span = max(0, self._ordinal_max - self._ordinal_min)
-        dmax = int(self._chart_cfg.get("calendar_day_bin_max_span_days", 31))
-        wmax = int(self._chart_cfg.get("calendar_week_bin_max_span_days", 120))
-        mmax = int(self._chart_cfg.get("calendar_month_bin_max_span_days", 960))
-        if span <= dmax:
+        if span <= _AXIS_FALLBACK_DAY_MAX_SPAN_DAYS:
             return "day"
-        if span <= wmax:
+        if span <= _AXIS_FALLBACK_WEEK_MAX_SPAN_DAYS:
             return "week"
-        if span <= mmax:
+        if span <= _AXIS_FALLBACK_MONTH_MAX_SPAN_DAYS:
             return "month"
         return "year"
 
@@ -1440,7 +1829,7 @@ class MoveQualityOverTimeChartWidget(QWidget):
             while cur <= end_m:
                 o = cur.toordinal()
                 if omin <= o <= omax:
-                    ticks.append((o, True, cur.strftime("%b '%y")))
+                    ticks.append((o, True, _format_axis_tick_month_year(cur)))
                     majors.add(o)
                 if cur.month == 12:
                     cur = date(cur.year + 1, 1, 1)
@@ -1463,7 +1852,7 @@ class MoveQualityOverTimeChartWidget(QWidget):
             idx = 0
             label_every = max(1, int(max(1, (omax - omin) // 7) // max_l) + 1)
             while w <= omax:
-                lbl = date.fromordinal(w).strftime("%d %b") if idx % label_every == 0 else ""
+                lbl = _format_axis_tick_day_month(date.fromordinal(w)) if idx % label_every == 0 else ""
                 ticks.append((w, True, lbl))
                 idx += 1
                 w += 7
@@ -1473,10 +1862,10 @@ class MoveQualityOverTimeChartWidget(QWidget):
             step = max(1, (span_days + max_l - 1) // max_l)
             o = omin
             while o <= omax:
-                ticks.append((o, True, date.fromordinal(o).strftime("%d %b")))
+                ticks.append((o, True, _format_axis_tick_day_month(date.fromordinal(o))))
                 o += step
             if ticks and ticks[-1][0] < omax:
-                ticks.append((omax, True, date.fromordinal(omax).strftime("%d %b")))
+                ticks.append((omax, True, _format_axis_tick_day_month(date.fromordinal(omax))))
 
         ticks.sort(key=lambda t: t[0])
         return ticks
@@ -1513,7 +1902,6 @@ class MoveQualityOverTimeChartWidget(QWidget):
         if graph_width <= 0 or graph_height <= 0:
             return
 
-        omin, omax = self._ordinal_min, self._ordinal_max
         min_y, max_y = self._y_axis_range()
         y_range = max_y - min_y
 
@@ -1526,17 +1914,29 @@ class MoveQualityOverTimeChartWidget(QWidget):
             painter.drawLine(int(left), int(y), int(right_plot), int(y))
 
         tick_list: List[Tuple[int, bool, str]] = []
+        uniform_ticks_mq: List[Tuple[float, str]] = []
         if self._x_axis_calendar_enabled:
-            tick_list = self._calendar_axis_ticks()
-            for o_ord, is_major, _lbl in tick_list:
-                x = _accuracy_over_time_ordinal_to_x(
-                    o_ord, left, graph_width, self._ordinal_min, self._ordinal_max
-                )
-                if is_major:
+            if self._progression_x_mode == "uniform_bins":
+                uniform_ticks_mq = self._uniform_bin_axis_ticks_mq(left, graph_width)
+                for xu, _lbl in uniform_ticks_mq:
                     painter.setPen(QPen(self._x_axis_major_color, self._x_axis_major_width))
-                else:
-                    painter.setPen(QPen(self._x_axis_minor_color, self._x_axis_minor_width))
-                painter.drawLine(int(x), int(top), int(x), int(bottom))
+                    painter.drawLine(int(xu), int(top), int(xu), int(bottom))
+            else:
+                tick_list = self._calendar_axis_ticks()
+                for o_ord, is_major, _lbl in tick_list:
+                    x = _ordinal_to_chart_x(
+                        o_ord,
+                        left,
+                        graph_width,
+                        self._ordinal_min,
+                        self._ordinal_max,
+                        self._time_axis_layout,
+                    )
+                    if is_major:
+                        painter.setPen(QPen(self._x_axis_major_color, self._x_axis_major_width))
+                    else:
+                        painter.setPen(QPen(self._x_axis_minor_color, self._x_axis_minor_width))
+                    painter.drawLine(int(x), int(top), int(x), int(bottom))
         else:
             for pct in [0, 25, 50, 75, 100]:
                 x = left + (pct / 100.0 * graph_width)
@@ -1561,13 +1961,32 @@ class MoveQualityOverTimeChartWidget(QWidget):
             label_width = fm.horizontalAdvance(yfmt)
             painter.drawText(int(left - label_width - self.y_axis_label_spacing), int(y + fm.height() / 2), yfmt)
 
-        if self._x_axis_calendar_enabled and tick_list:
+        if self._x_axis_calendar_enabled and self._progression_x_mode == "uniform_bins" and uniform_ticks_mq:
+            last_label_x = -1e9
+            for xu, lbl in uniform_ticks_mq:
+                if not lbl:
+                    continue
+                if xu - last_label_x < self._x_axis_label_min_spacing_px:
+                    continue
+                label_width = fm.horizontalAdvance(lbl)
+                painter.drawText(
+                    int(xu - label_width / 2),
+                    int(bottom + fm.height() + self.x_axis_label_spacing),
+                    lbl,
+                )
+                last_label_x = xu
+        elif self._x_axis_calendar_enabled and tick_list:
             last_label_x = -1e9
             for o_ord, is_major, lbl in tick_list:
                 if not lbl or not is_major:
                     continue
-                x = _accuracy_over_time_ordinal_to_x(
-                    o_ord, left, graph_width, self._ordinal_min, self._ordinal_max
+                x = _ordinal_to_chart_x(
+                    o_ord,
+                    left,
+                    graph_width,
+                    self._ordinal_min,
+                    self._ordinal_max,
+                    self._time_axis_layout,
                 )
                 if x - last_label_x < self._x_axis_label_min_spacing_px:
                     continue
@@ -1593,8 +2012,16 @@ class MoveQualityOverTimeChartWidget(QWidget):
             pen.setStyle(line_style)
             painter.setPen(pen)
             if len(run) > 1:
-                for k in range(len(run) - 1):
-                    painter.drawLine(run[k], run[k + 1])
+                if self._progression_line_smooth and line_style == Qt.PenStyle.SolidLine:
+                    spath = _smooth_polyline_path(run, strength=self._progression_line_smooth_strength)
+                    if spath is not None:
+                        painter.drawPath(spath)
+                    else:
+                        for k in range(len(run) - 1):
+                            painter.drawLine(run[k], run[k + 1])
+                else:
+                    for k in range(len(run) - 1):
+                        painter.drawLine(run[k], run[k + 1])
             elif len(run) == 1 and not self._show_bin_data_markers:
                 painter.setBrush(QBrush(col))
                 r = max(3, line_width + 2)
@@ -1609,9 +2036,9 @@ class MoveQualityOverTimeChartWidget(QWidget):
                     self._series_visuals[j] if j < len(self._series_visuals) else self._default_pen
                 )
                 run: List[QPointF] = []
-                for row in self._bins:
-                    t_pct, _c, l0, l1, meds = row
-                    x = _chart_x_from_bin_labels(l0, l1, t_pct, left, graph_width, omin, omax)
+                for bi, row in enumerate(self._bins):
+                    _t_pct, _c, _l0, _l1, meds = row
+                    x = self._mq_plot_x(bi, left, graph_width)
                     if j >= len(meds):
                         continue
                     v = float(meds[j])
@@ -1623,9 +2050,9 @@ class MoveQualityOverTimeChartWidget(QWidget):
                 _flush_run(col, line_style, line_width, run)
         else:
             all_points: List[List[QPointF]] = [[] for _ in range(n_series)]
-            for row in self._bins:
-                t_pct, _c, l0, l1, meds = row
-                x = _chart_x_from_bin_labels(l0, l1, t_pct, left, graph_width, omin, omax)
+            for bi, row in enumerate(self._bins):
+                _t_pct, _c, _l0, _l1, meds = row
+                x = self._mq_plot_x(bi, left, graph_width)
                 for j in range(n_series):
                     if j >= len(meds):
                         continue
@@ -1643,9 +2070,9 @@ class MoveQualityOverTimeChartWidget(QWidget):
 
         if self._show_bin_data_markers and n_series > 0:
             arm = max(2.0, self._bin_data_marker_radius)
-            for row in self._bins:
-                t_pct, _c, l0, l1, meds = row
-                x = _chart_x_from_bin_labels(l0, l1, t_pct, left, graph_width, omin, omax)
+            for bi, row in enumerate(self._bins):
+                _t_pct, _c, _l0, _l1, meds = row
+                x = self._mq_plot_x(bi, left, graph_width)
                 for j in range(min(n_series, len(meds))):
                     v = float(meds[j])
                     if not math.isfinite(v):
@@ -1720,9 +2147,34 @@ class MoveQualityOverTimeChartWidget(QWidget):
             self.update()
             return
 
-        chart_t = max(0.0, min(100.0, (mx - left) / graph_width * 100.0))
         values = self._interpolate_values_at_plot_x(mx, left, graph_width)
-        ord_h = self._ordinal_at_chart_time_pct(chart_t)
+        n_bins = len(self._bins)
+        if self._progression_x_mode == "uniform_bins" and n_bins >= 2:
+            frac = max(0.0, min(1.0, (mx - left) / graph_width))
+            idx_f = frac * (n_bins - 1)
+            i0 = int(math.floor(idx_f))
+            i1 = min(n_bins - 1, i0 + 1)
+            t = idx_f - i0 if i1 > i0 else 0.0
+            c0 = _bin_ordinal_center_from_iso(self._bins[i0][2], self._bins[i0][3])
+            c1 = _bin_ordinal_center_from_iso(self._bins[i1][2], self._bins[i1][3])
+            if c0 is not None and c1 is not None:
+                ord_h = int(round(c0 + t * (c1 - c0)))
+            else:
+                ord_h = self._ordinal_min
+        elif self._time_axis_layout is not None:
+            lay = self._time_axis_layout
+            f0 = lay.ordinal_to_frac(self._ordinal_min)
+            f1 = lay.ordinal_to_frac(self._ordinal_max)
+            span_f = f1 - f0
+            if span_f > 1e-15:
+                fp = f0 + (mx - left) / graph_width * span_f
+                ord_h = lay.frac_to_ordinal(fp)
+            else:
+                chart_t = max(0.0, min(100.0, (mx - left) / graph_width * 100.0))
+                ord_h = self._ordinal_at_chart_time_pct(chart_t)
+        else:
+            chart_t = max(0.0, min(100.0, (mx - left) / graph_width * 100.0))
+            ord_h = self._ordinal_at_chart_time_pct(chart_t)
         date_str = date.fromordinal(ord_h).isoformat()
         lines = [date_str]
         for j, lab in enumerate(self._labels):
@@ -2683,6 +3135,9 @@ class DetailPlayerStatsView(QWidget):
         acc = self.player_stats_config.get("accuracy_over_time_chart", {})
         if acc.get("enabled", True) and not (getattr(stats, "accuracy_over_time", None) or []):
             return True
+        tm = self.player_stats_config.get("top_move_over_time_chart", {})
+        if tm.get("enabled", True) and not (getattr(stats, "top_move_over_time", None) or []):
+            return True
         mq = self.player_stats_config.get("move_quality_over_time_chart", {})
         if mq.get("enabled", True) and not (getattr(stats, "move_quality_over_time", None) or []):
             return True
@@ -2989,6 +3444,9 @@ class DetailPlayerStatsView(QWidget):
             )
 
         over_time_cfg = player_stats_config.get("accuracy_over_time_chart", {})
+        over_time_merged = merged_player_stats_time_series_chart_cfg(
+            player_stats_config, "accuracy_over_time_chart"
+        )
         over_time_series = getattr(stats, "accuracy_over_time", None) or []
         if (
             over_time_cfg.get("enabled", True)
@@ -3001,7 +3459,7 @@ class DetailPlayerStatsView(QWidget):
             ot_layout.setSpacing(6)
             ot_layout.addWidget(_player_stats_section_title_label("Accuracy progression", header_font, header_text_color))
             sub = QLabel(getattr(stats, "trends_subcaption", "") or "")
-            sub_cap_fs = scale_font_size(over_time_cfg.get("subcaption_font_size", 9))
+            sub_cap_fs = scale_font_size(over_time_merged.get("subcaption_font_size", 9))
             sub_font = QFont(resolve_font_family(player_stats_config.get("fonts", {}).get("label_font_family", "Helvetica Neue")), int(sub_cap_fs))
             sub.setFont(sub_font)
             sub.setStyleSheet(
@@ -3024,7 +3482,58 @@ class DetailPlayerStatsView(QWidget):
                 section_spacing_val,
             )
 
+        tm_cfg = player_stats_config.get("top_move_over_time_chart", {})
+        tm_merged = merged_player_stats_time_series_chart_cfg(
+            player_stats_config, "top_move_over_time_chart"
+        )
+        tm_bins = getattr(stats, "top_move_over_time", None) or []
+        tm_ids = getattr(stats, "top_move_series_ids", None) or []
+        if (
+            tm_cfg.get("enabled", True)
+            and tm_bins
+            and tm_ids
+            and int(getattr(stats, "top_move_ordinal_max", 0)) > 0
+        ):
+            tm_wrap = QWidget()
+            tm_layout = QVBoxLayout(tm_wrap)
+            tm_layout.setContentsMargins(0, 0, 0, 0)
+            tm_layout.setSpacing(6)
+            tm_layout.addWidget(
+                _player_stats_section_title_label("Top move progression", header_font, header_text_color)
+            )
+            tm_sub = QLabel(getattr(stats, "top_move_subcaption", "") or "")
+            tm_sub_fs = scale_font_size(tm_merged.get("subcaption_font_size", 9))
+            tm_sub_font = QFont(
+                resolve_font_family(player_stats_config.get("fonts", {}).get("label_font_family", "Helvetica Neue")),
+                int(tm_sub_fs),
+            )
+            tm_sub.setFont(tm_sub_font)
+            tm_sub.setStyleSheet(
+                f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); background: transparent;"
+            )
+            _configure_player_stats_trend_subcaption_label(tm_sub)
+            tm_layout.addWidget(tm_sub)
+            tm_chart = MoveQualityOverTimeChartWidget(self.config, chart_style="top_move_pct")
+            tm_chart.set_data(
+                list(tm_bins),
+                list(getattr(stats, "top_move_series_labels", None) or []),
+                list(tm_ids),
+                int(getattr(stats, "top_move_ordinal_min", 0)),
+                int(getattr(stats, "top_move_ordinal_max", 0)),
+                getattr(stats, "top_move_calendar_mode", "") or "",
+            )
+            tm_layout.addWidget(tm_chart)
+            tm_wrap.setProperty("section_name", "Top move progression")
+            self._add_player_stats_section_body_only(
+                "top_move_progression",
+                tm_wrap,
+                section_spacing_val,
+            )
+
         mq_cfg = player_stats_config.get("move_quality_over_time_chart", {})
+        mq_merged = merged_player_stats_time_series_chart_cfg(
+            player_stats_config, "move_quality_over_time_chart"
+        )
         mq_bins = getattr(stats, "move_quality_over_time", None) or []
         mq_ids = getattr(stats, "move_quality_series_ids", None) or []
         if (
@@ -3039,7 +3548,7 @@ class DetailPlayerStatsView(QWidget):
             mq_layout.setSpacing(6)
             mq_layout.addWidget(_player_stats_section_title_label("Move quality progression", header_font, header_text_color))
             mq_sub = QLabel(getattr(stats, "move_quality_subcaption", "") or "")
-            mq_sub_fs = scale_font_size(mq_cfg.get("subcaption_font_size", 9))
+            mq_sub_fs = scale_font_size(mq_merged.get("subcaption_font_size", 9))
             mq_sub_font = QFont(
                 resolve_font_family(player_stats_config.get("fonts", {}).get("label_font_family", "Helvetica Neue")),
                 int(mq_sub_fs),
@@ -3068,6 +3577,9 @@ class DetailPlayerStatsView(QWidget):
             )
 
         ap_cfg = player_stats_config.get("acpl_phase_over_time_chart", {})
+        ap_merged = merged_player_stats_time_series_chart_cfg(
+            player_stats_config, "acpl_phase_over_time_chart"
+        )
         ap_bins = getattr(stats, "acpl_phase_over_time", None) or []
         ap_ids = getattr(stats, "acpl_phase_series_ids", None) or []
         if (
@@ -3084,7 +3596,7 @@ class DetailPlayerStatsView(QWidget):
                 _player_stats_section_title_label("ACPL progression by phase", header_font, header_text_color)
             )
             ap_sub = QLabel(getattr(stats, "acpl_phase_subcaption", "") or "")
-            ap_sub_fs = scale_font_size(ap_cfg.get("subcaption_font_size", 9))
+            ap_sub_fs = scale_font_size(ap_merged.get("subcaption_font_size", 9))
             ap_sub_font = QFont(
                 resolve_font_family(player_stats_config.get("fonts", {}).get("label_font_family", "Helvetica Neue")),
                 int(ap_sub_fs),
@@ -3211,8 +3723,10 @@ class DetailPlayerStatsView(QWidget):
             )
         
         if hasattr(self, "disabled_placeholder") and self.disabled_placeholder:
-            self.content_layout.addWidget(self.disabled_placeholder, 1)
-        self.content_layout.addStretch()
+            # Stretch 0: with setWidgetResizable(True) the content widget is at least viewport tall; a
+            # trailing stretch or stretch on a hidden placeholder would consume that space as a gap.
+            # When visible (no stats / all sections hidden), Expanding size policy lets the label fill.
+            self.content_layout.addWidget(self.disabled_placeholder, 0)
     
     def _create_player_selection_section(self) -> None:
         """Create the player selection section."""
@@ -3403,7 +3917,7 @@ class DetailPlayerStatsView(QWidget):
         self.content_layout.insertWidget(0, container)
         
         # Add placeholder after player selection (will be shown/hidden as needed)
-        self.content_layout.addWidget(self.disabled_placeholder, 1)  # Give it stretch factor
+        self.content_layout.addWidget(self.disabled_placeholder, 0)
         
         # Populate player dropdown if controller is available and source is not None
         # Use QTimer.singleShot to ensure this happens after the UI is fully set up

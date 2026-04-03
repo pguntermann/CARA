@@ -292,7 +292,11 @@ class UserSettingsModel(QObject):
         self.settings_changed.emit()
     
     def get_player_stats_section_visibility(self) -> Dict[str, bool]:
-        """Per-section visibility for the Player Stats detail tab (missing id => default True)."""
+        """Per-section visibility for the Player Stats detail tab (missing id => default True).
+
+        Valid ids are those in ``PLAYER_STATS_MENU_SECTIONS`` (``detail_player_stats_view``).
+        New keys may be added from ``user_settings.json.template`` when settings are merged.
+        """
         raw = self._settings.get("player_stats_section_visibility", {})
         if not isinstance(raw, dict):
             return {}

@@ -953,5 +953,21 @@
   "ui": {
     "welcome_shown": false
   },
-  "player_stats_section_visibility": {}
+  "player_stats_section_visibility": {
+    "overview": true,
+    "accuracy_distribution": true,
+    "move_accuracy": true,
+    "performance_by_phase": true,
+    "accuracy_vs_progress": true,
+    "accuracy_progression": true,
+    "top_move_progression": true,
+    "move_quality_progression": true,
+    "acpl_phase_progression": true,
+    "openings": true,
+    "opening_tree": true,
+    "endgame_tree": true,
+    "games_by_performance": true,
+    "significant_moves": true,
+    "error_patterns": true
+  }
 }

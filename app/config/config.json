@@ -1648,21 +1648,20 @@
             "show_bin_data_markers": true,
             "bin_data_marker_radius": 3
           },
-          "accuracy_over_time_chart": {
-            "enabled": true,
-            "height": 220,
+          "time_series": {
             "min_games_with_full_date": 4,
             "min_span_days": 14,
             "min_populated_bins": 1,
-            "max_calendar_bins": 48,
-            "min_calendar_bins_before_ordinal_fallback": 5,
-            "min_games_for_ordinal_fallback": 15,
-            "ordinal_fallback_mode": "equal_width",
-            "ordinal_quantile_bin_count": 12,
-            "calendar_day_bin_max_span_days": 31,
-            "calendar_week_bin_max_span_days": 120,
-            "calendar_month_bin_max_span_days": 960,
-            "subcaption_template": "Based on {dated} dated games (of {analyzed} analyzed).",
+            "target_progression_bins": 16,
+            "max_ordinal_bins": 120,
+            "min_games_per_ordinal_bin": 3,
+            "ordinal_fallback_mode": "quantile",
+            "ordinal_fallback_subcaption_suffix": "",
+            "progression_x_axis_mode": "uniform_bins",
+            "compress_time_axis_gaps": true,
+            "compress_gap_max_segment_days": 28,
+            "progression_line_style": "smooth",
+            "progression_line_smooth_strength": 1.0,
             "subcaption_font_size": 9,
             "background_color": [
               30,
@@ -1674,29 +1673,6 @@
               60,
               65
             ],
-            "line_color": [
-              120,
-              190,
-              255
-            ],
-            "show_accuracy_by_color_lines": true,
-            "white_line_color": [
-              238,
-              236,
-              230
-            ],
-            "black_line_color": [
-              72,
-              82,
-              98
-            ],
-            "combined_series_label": "Combined",
-            "white_series_label": "As White",
-            "black_series_label": "As Black",
-            "legend_width": 100,
-            "legend_font_size": 9,
-            "line_style": "solid",
-            "line_width": 2,
             "font_family": "Helvetica Neue",
             "font_size": 10,
             "text_color": [
@@ -1712,17 +1688,15 @@
             "padding": [
               40,
               20,
-              20,
+              8,
               40
             ],
             "min_grid_spacing": 30,
-            "min_grid_lines": 3,
             "min_font_size": 8,
             "font_size_calculation_divisor": 20,
             "y_axis_label_spacing": 5,
             "x_axis_label_spacing": 5,
             "hover_hit_threshold_px": 25,
-            "hover_circle_radius": 6,
             "show_bin_data_markers": true,
             "bin_data_marker_radius": 3,
             "x_axis_calendar_enabled": true,
@@ -1744,47 +1718,90 @@
             "x_axis_week_minor_max_calendar_span_days": 100,
             "x_axis_month_ticks_in_year_mode": true
           },
+          "accuracy_over_time_chart": {
+            "enabled": true,
+            "height": 220,
+            "min_grid_lines": 3,
+            "subcaption_template": "Based on {dated} dated games (of {analyzed} analyzed).",
+            "line_color": [
+              120,
+              190,
+              255
+            ],
+            "show_accuracy_by_color_lines": true,
+            "white_line_color": [
+              238,
+              236,
+              230
+            ],
+            "black_line_color": [
+              72,
+              82,
+              98
+            ],
+            "combined_series_label": "Combined",
+            "white_series_label": "As White",
+            "black_series_label": "As Black",
+            "legend_width": 112,
+            "legend_font_size": 9,
+            "line_style": "solid",
+            "line_width": 2,
+            "combined_line_width": 3,
+            "by_color_line_width": 1,
+            "hover_circle_radius": 6
+          },
+          "top_move_over_time_chart": {
+            "enabled": true,
+            "height": 240,
+            "legend_width": 112,
+            "min_grid_lines": 5,
+            "subcaption_template": "Based on {dated} dated games (of {analyzed} analyzed).",
+            "legend_font_size": 8,
+            "series": [
+              {
+                "id": "best_move",
+                "label": "Best Move %",
+                "enabled": true,
+                "line_color": [
+                  100,
+                  200,
+                  140
+                ],
+                "line_style": "solid",
+                "line_width": 2
+              },
+              {
+                "id": "top3_move",
+                "label": "Top3-Move %",
+                "enabled": true,
+                "line_color": [
+                  100,
+                  170,
+                  255
+                ],
+                "line_style": "solid",
+                "line_width": 2
+              },
+              {
+                "id": "blunder_rate",
+                "label": "Blunder %",
+                "enabled": true,
+                "line_color": [
+                  255,
+                  100,
+                  100
+                ],
+                "line_style": "solid",
+                "line_width": 2
+              }
+            ]
+          },
           "move_quality_over_time_chart": {
             "enabled": true,
             "height": 240,
             "legend_width": 112,
-            "subcaption_template": "Based on {dated} dated games (of {analyzed} analyzed).",
-            "subcaption_font_size": 9,
-            "background_color": [
-              30,
-              30,
-              35
-            ],
-            "grid_color": [
-              60,
-              60,
-              65
-            ],
-            "font_family": "Helvetica Neue",
-            "font_size": 10,
-            "text_color": [
-              200,
-              200,
-              200
-            ],
-            "axis_color": [
-              150,
-              150,
-              150
-            ],
-            "padding": [
-              40,
-              20,
-              20,
-              40
-            ],
-            "min_grid_spacing": 30,
             "min_grid_lines": 5,
-            "min_font_size": 8,
-            "font_size_calculation_divisor": 20,
-            "y_axis_label_spacing": 5,
-            "x_axis_label_spacing": 5,
-            "hover_hit_threshold_px": 25,
+            "subcaption_template": "Based on {dated} dated games (of {analyzed} analyzed).",
             "legend_font_size": 8,
             "series": [
               {
@@ -1889,44 +1906,9 @@
             "enabled": true,
             "height": 240,
             "legend_width": 112,
+            "min_grid_lines": 5,
             "y_axis_max_cap": 500,
             "subcaption_template": "Median ACPL per phase; {dated} dated games (of {analyzed} analyzed). Lower is better.",
-            "subcaption_font_size": 9,
-            "background_color": [
-              30,
-              30,
-              35
-            ],
-            "grid_color": [
-              60,
-              60,
-              65
-            ],
-            "font_family": "Helvetica Neue",
-            "font_size": 10,
-            "text_color": [
-              200,
-              200,
-              200
-            ],
-            "axis_color": [
-              150,
-              150,
-              150
-            ],
-            "padding": [
-              40,
-              20,
-              20,
-              40
-            ],
-            "min_grid_spacing": 30,
-            "min_grid_lines": 5,
-            "min_font_size": 8,
-            "font_size_calculation_divisor": 20,
-            "y_axis_label_spacing": 5,
-            "x_axis_label_spacing": 5,
-            "hover_hit_threshold_px": 25,
             "legend_font_size": 8,
             "series": [
               {
