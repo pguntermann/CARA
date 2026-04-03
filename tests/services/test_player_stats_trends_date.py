@@ -3,11 +3,13 @@
 from datetime import date
 
 from app.services.player_stats_service import (
+    _accuracy_series_equal_ordinal_width_bins,
     _accuracy_series_ordinal_quantile_bins,
     _game_date_ordinal_for_trends,
     _game_date_to_ordinal,
     _group_samples_by_calendar_mode,
     _should_use_ordinal_quantile_fallback,
+    _trend_axis_ordinals_for_quantile_bins,
 )
 
 
@@ -52,6 +54,47 @@ def test_ordinal_quantile_bins_split_many_games_into_more_points() -> None:
     assert len(series) == 12
     assert series[0][1] < 72.0
     assert series[-1][1] > 84.0
+
+
+def test_equal_ordinal_width_bins_spread_on_calendar_not_equal_counts() -> None:
+    """Bimodal play dates: quantile stacks many bins at temporal modes; equal-width does not."""
+    o_lo = date(2025, 12, 1).toordinal()
+    o_hi = date(2026, 3, 31).toordinal()
+    span = o_hi - o_lo
+    band = max(12, span // 25)
+    first_band_end = o_lo + band
+    last_band_start = o_hi - band
+    samples = [(o_lo + (i % 4), 70.0) for i in range(48)] + [(o_hi - (i % 4), 85.0) for i in range(48)]
+    t_min, t_max = min(o for o, _ in samples), max(o for o, _ in samples)
+    eq = _accuracy_series_equal_ordinal_width_bins(samples, 12, t_min, t_max)
+    qn = _accuracy_series_ordinal_quantile_bins(samples, 12, t_min, t_max)
+
+    def _n_centers_in(rows, lo: int, hi: int) -> int:
+        n = 0
+        for r in rows:
+            c = (date.fromisoformat(r[3]).toordinal() + date.fromisoformat(r[4]).toordinal()) // 2
+            if lo <= c <= hi:
+                n += 1
+        return n
+
+    q_end_caps = _n_centers_in(qn, t_min, first_band_end) + _n_centers_in(qn, last_band_start, t_max)
+    eq_end_caps = _n_centers_in(eq, t_min, first_band_end) + _n_centers_in(eq, last_band_start, t_max)
+    assert q_end_caps > eq_end_caps + 3
+
+
+def test_trend_axis_tight_around_quantile_bin_centers() -> None:
+    """Wide first-bin lab0–lab1 must not force the chart axis to start at the early outlier date."""
+    oa = date(2024, 4, 28).toordinal()
+    ob = date(2024, 8, 8).toordinal()
+    pairs = [
+        ("2024-04-28", "2024-08-05"),
+        ("2024-08-06", "2024-08-06"),
+        ("2024-08-08", "2024-08-08"),
+    ]
+    amin, amax = _trend_axis_ordinals_for_quantile_bins(pairs, oa, ob)
+    assert amin > date(2024, 5, 20).toordinal()
+    assert amax == ob
+    assert amin < amax
 
 
 def test_ordinal_quantile_bins_x_matches_calendar_not_rank() -> None:

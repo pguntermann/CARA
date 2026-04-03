@@ -952,5 +952,6 @@
   },
   "ui": {
     "welcome_shown": false
-  }
+  },
+  "player_stats_section_visibility": {}
 }

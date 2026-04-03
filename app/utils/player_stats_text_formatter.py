@@ -1,7 +1,7 @@
 """Text formatter for player statistics view."""
 
 import math
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.services.player_stats_service import AggregatedPlayerStats
@@ -43,6 +43,15 @@ class PlayerStatsTextFormatter:
         return lines
     
     @staticmethod
+    def _is_section_visible_for_export(
+        section_id: str, section_visibility: Optional[Dict[str, bool]]
+    ) -> bool:
+        """True if section should appear in full export; missing key => visible (default on)."""
+        if not section_visibility:
+            return True
+        return bool(section_visibility.get(section_id, True))
+
+    @staticmethod
     def format_full_stats(
         stats: "AggregatedPlayerStats",
         patterns: List["ErrorPattern"],
@@ -50,6 +59,7 @@ class PlayerStatsTextFormatter:
         *,
         top_games_summary: Optional[Tuple[int, Optional[float], Optional[float], int, Optional[float], Optional[float]]] = None,
         opening_tree_summary_lines: Optional[List[str]] = None,
+        section_visibility: Optional[Dict[str, bool]] = None,
     ) -> str:
         """Format the full player statistics as text.
         
@@ -58,67 +68,78 @@ class PlayerStatsTextFormatter:
             patterns: List of ErrorPattern instances.
             player_name: Name of the player.
             top_games_summary: Optional (best_count, best_min_acc, best_max_acc, worst_count, worst_min_acc, worst_max_acc).
-            
+            section_visibility: Optional map section_id -> visible (matches Player Stats menu); omitted ids default to True.
+
         Returns:
             Formatted text string for the full stats.
         """
+        vis = section_visibility
+        show = PlayerStatsTextFormatter._is_section_visible_for_export
+
         lines = []
         PlayerStatsTextFormatter._add_section_header(lines, f"Player Statistics: {player_name}")
-        
-        # Add all sections
-        lines.extend(PlayerStatsTextFormatter._format_overview(stats))
-        lines.append("")
-        dist_lines = PlayerStatsTextFormatter._format_accuracy_distribution(stats)
-        if dist_lines:
-            lines.extend(dist_lines)
+
+        if show("overview", vis):
+            lines.extend(PlayerStatsTextFormatter._format_overview(stats))
             lines.append("")
-        # Compact summary of accuracy over game duration (line chart)
-        progress_lines = PlayerStatsTextFormatter._format_accuracy_over_progress(stats)
-        if progress_lines:
-            lines.extend(progress_lines)
+        if show("accuracy_distribution", vis):
+            dist_lines = PlayerStatsTextFormatter._format_accuracy_distribution(stats)
+            if dist_lines:
+                lines.extend(dist_lines)
+                lines.append("")
+        if show("accuracy_vs_progress", vis):
+            progress_lines = PlayerStatsTextFormatter._format_accuracy_over_progress(stats)
+            if progress_lines:
+                lines.extend(progress_lines)
+                lines.append("")
+        if show("accuracy_progression", vis):
+            time_lines = PlayerStatsTextFormatter._format_accuracy_over_time(stats)
+            if time_lines:
+                lines.extend(time_lines)
+                lines.append("")
+        if show("move_quality_progression", vis):
+            mq_time_lines = PlayerStatsTextFormatter._format_move_quality_over_time(stats)
+            if mq_time_lines:
+                lines.extend(mq_time_lines)
+                lines.append("")
+        if show("acpl_phase_progression", vis):
+            ap_time_lines = PlayerStatsTextFormatter._format_acpl_phase_over_time(stats)
+            if ap_time_lines:
+                lines.extend(ap_time_lines)
+                lines.append("")
+        if show("move_accuracy", vis):
+            lines.extend(PlayerStatsTextFormatter._format_move_accuracy(stats))
             lines.append("")
-        time_lines = PlayerStatsTextFormatter._format_accuracy_over_time(stats)
-        if time_lines:
-            lines.extend(time_lines)
+        if show("performance_by_phase", vis):
+            lines.extend(PlayerStatsTextFormatter._format_phase_performance(stats))
             lines.append("")
-        mq_time_lines = PlayerStatsTextFormatter._format_move_quality_over_time(stats)
-        if mq_time_lines:
-            lines.extend(mq_time_lines)
-            lines.append("")
-        ap_time_lines = PlayerStatsTextFormatter._format_acpl_phase_over_time(stats)
-        if ap_time_lines:
-            lines.extend(ap_time_lines)
-            lines.append("")
-        lines.extend(PlayerStatsTextFormatter._format_move_accuracy(stats))
-        lines.append("")
-        lines.extend(PlayerStatsTextFormatter._format_phase_performance(stats))
-        lines.append("")
-        
-        if stats.top_openings or stats.worst_accuracy_openings or stats.best_accuracy_openings:
+
+        if show("openings", vis) and (
+            stats.top_openings or stats.worst_accuracy_openings or stats.best_accuracy_openings
+        ):
             lines.extend(PlayerStatsTextFormatter._format_openings(stats))
             lines.append("")
-        
-        # Optional opening tree summary (passed in from view/controller)
-        if opening_tree_summary_lines:
+
+        if show("opening_tree", vis) and opening_tree_summary_lines:
             lines.append("Opening tree (first 2 moves)")
             lines.append("----------------------------")
             lines.append("")
             lines.extend(opening_tree_summary_lines)
             lines.append("")
-        
-        # Endgame tree summary (high-level, non-redundant)
-        endgame_tree_lines = PlayerStatsTextFormatter._format_endgame_tree(stats)
-        if endgame_tree_lines:
-            lines.extend(endgame_tree_lines)
-            lines.append("")
-        
-        if top_games_summary is not None:
+
+        if show("endgame_tree", vis):
+            endgame_tree_lines = PlayerStatsTextFormatter._format_endgame_tree(stats)
+            if endgame_tree_lines:
+                lines.extend(endgame_tree_lines)
+                lines.append("")
+
+        if show("games_by_performance", vis) and top_games_summary is not None:
             lines.extend(PlayerStatsTextFormatter._format_top_games(*top_games_summary))
             lines.append("")
-        
-        if patterns:
+
+        if show("error_patterns", vis) and patterns:
             lines.extend(PlayerStatsTextFormatter._format_error_patterns(patterns))
-        
+
         return "\n".join(lines)
     
     @staticmethod

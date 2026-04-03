@@ -291,6 +291,28 @@ class UserSettingsModel(QObject):
         self.ai_settings_changed.emit()
         self.settings_changed.emit()
     
+    def get_player_stats_section_visibility(self) -> Dict[str, bool]:
+        """Per-section visibility for the Player Stats detail tab (missing id => default True)."""
+        raw = self._settings.get("player_stats_section_visibility", {})
+        if not isinstance(raw, dict):
+            return {}
+        out: Dict[str, bool] = {}
+        for k, v in raw.items():
+            if isinstance(v, bool):
+                out[str(k)] = v
+        return out
+
+    def set_player_stats_section_visibility(self, visibility: Dict[str, bool]) -> None:
+        """Replace stored Player Stats section visibility map."""
+        self._settings["player_stats_section_visibility"] = {str(k): bool(v) for k, v in visibility.items()}
+        self.settings_changed.emit()
+
+    def update_player_stats_section_visibility(self, section_id: str, visible: bool) -> None:
+        """Set one section's visibility and persist with the rest of the map."""
+        cur = self.get_player_stats_section_visibility()
+        cur[str(section_id)] = bool(visible)
+        self.set_player_stats_section_visibility(cur)
+
     def update_from_dict(self, settings: Dict[str, Any]) -> None:
         """Update settings from a dictionary (used when loading from file).
         

@@ -9,7 +9,17 @@ from PyQt6.QtWidgets import (
     QGraphicsOpacityEffect, QMenu, QTreeWidget, QTreeWidgetItem, QToolButton, QToolTip
 )
 from PyQt6.QtCore import Qt, QRect, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QPoint, QPointF
-from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QBrush, QFontMetrics, QContextMenuEvent, QMouseEvent
+from PyQt6.QtGui import (
+    QPainter,
+    QColor,
+    QPen,
+    QFont,
+    QBrush,
+    QFontMetrics,
+    QContextMenuEvent,
+    QMouseEvent,
+    QResizeEvent,
+)
 from app.views.detail_summary_view import PieChartWidget
 from typing import Callable, Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 from app.models.database_model import DatabaseModel
@@ -17,7 +27,6 @@ from app.models.database_model import DatabaseModel
 from app.models.game_model import GameModel
 from app.controllers.game_controller import GameController
 from app.utils.font_utils import resolve_font_family, scale_font_size
-from app.services.logging_service import LoggingService
 
 if TYPE_CHECKING:
     from app.controllers.player_stats_controller import PlayerStatsController
@@ -26,6 +35,45 @@ if TYPE_CHECKING:
     from app.services.error_pattern_service import ErrorPattern
 
 
+# Section id -> menu label (Player Stats menu). Order is the default display order.
+PLAYER_STATS_MENU_SECTIONS: List[Tuple[str, str]] = [
+    ("overview", "Overview"),
+    ("accuracy_distribution", "Accuracy distribution"),
+    ("move_accuracy", "Move accuracy"),
+    ("performance_by_phase", "Performance by phase"),
+    ("accuracy_vs_progress", "Avg. accuracy over game duration"),
+    ("accuracy_progression", "Accuracy progression"),
+    ("move_quality_progression", "Move quality progression"),
+    ("acpl_phase_progression", "ACPL progression by phase"),
+    ("openings", "Openings"),
+    ("opening_tree", "Opening tree"),
+    ("endgame_tree", "Endgame tree"),
+    ("games_by_performance", "Games by performance"),
+    ("significant_moves", "Significant moves"),
+    ("error_patterns", "Error patterns"),
+]
+
+
+def _configure_player_stats_trend_subcaption_label(label: QLabel) -> None:
+    """Word-wrapped QLabels often report a huge minimum width; that widens QScrollArea content so the
+    viewport shows only the left slice of the chart while polylines use the full widget width — calendar
+    ticks line up with the left edge but the series appears shifted right. Ignored horizontal policy
+    lets the label take the viewport width and wrap instead."""
+    label.setWordWrap(True)
+    label.setMinimumWidth(0)
+    label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Maximum)
+
+
+def _player_stats_section_title_label(title: str, header_font: QFont, header_text_color: QColor) -> QLabel:
+    """Bold section header matching ``_add_player_stats_section`` (short line; no Ignored width policy)."""
+    h = QLabel(title)
+    h.setFont(header_font)
+    h.setStyleSheet(
+        f"color: rgb({header_text_color.red()}, {header_text_color.green()}, {header_text_color.blue()}); border: none;"
+    )
+    h.setMinimumWidth(0)
+    h.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+    return h
 
 
 class PhaseBarChartWidget(QWidget):
@@ -499,6 +547,63 @@ def _accuracy_over_time_ordinal_to_x(
     return left + (o - omin) / span * graph_width
 
 
+def _x_axis_week_minors_in_month_mode(
+    chart_cfg: Dict[str, Any], span_days: int, week_ticks_base_enabled: bool
+) -> bool:
+    """Weekly verticals in *month* axis mode: useful for short spans, noisy when the range is wide."""
+    if not week_ticks_base_enabled:
+        return False
+    raw = chart_cfg.get("x_axis_week_minor_max_calendar_span_days", 100)
+    try:
+        limit = int(raw)
+    except (TypeError, ValueError):
+        limit = 100
+    if limit <= 0:
+        return False
+    return span_days <= limit
+
+
+def _bin_ordinal_center_from_iso(lab0: str, lab1: str) -> Optional[int]:
+    """Midpoint ordinal of inclusive date range from ISO ``YYYY-MM-DD`` labels; None if parse fails."""
+    try:
+        o0 = date.fromisoformat(str(lab0).strip()).toordinal()
+        o1 = date.fromisoformat(str(lab1).strip()).toordinal()
+        return (o0 + o1) // 2
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def _chart_x_from_bin_labels(
+    lab0: str,
+    lab1: str,
+    time_pct: float,
+    left: float,
+    graph_width: float,
+    omin: int,
+    omax: int,
+) -> float:
+    """Place a bin on the X axis using the same ordinal scale as calendar ticks (not raw ``time_pct``)."""
+    oc = _bin_ordinal_center_from_iso(lab0, lab1)
+    if oc is not None and omax > omin:
+        oc = max(omin, min(omax, oc))
+        return _accuracy_over_time_ordinal_to_x(oc, left, graph_width, omin, omax)
+    return left + (time_pct / 100.0 * graph_width)
+
+
+def _accuracy_series_sort_key(row: Tuple[float, float, int, str, str]) -> Tuple[int, float]:
+    oc = _bin_ordinal_center_from_iso(row[3], row[4])
+    if oc is not None:
+        return (0, float(oc))
+    return (1, row[0])
+
+
+def _mq_bin_sort_key(row: Tuple[float, int, str, str, Tuple[float, ...]]) -> Tuple[int, float]:
+    oc = _bin_ordinal_center_from_iso(row[2], row[3])
+    if oc is not None:
+        return (0, float(oc))
+    return (1, row[0])
+
+
 _BIN_DATA_MARKER_ALPHA = 130
 _BIN_DATA_MARKER_LINE_WIDTH = 1
 
@@ -571,6 +676,7 @@ class AccuracyOverTimeChartWidget(QWidget):
         self._hover_vertex_index: Optional[int] = None
 
         self.setFixedHeight(self._height)
+        self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setMouseTracking(True)
 
@@ -582,7 +688,7 @@ class AccuracyOverTimeChartWidget(QWidget):
         calendar_mode: str = "",
     ) -> None:
         """Set binned time series from AggregatedPlayerStats.accuracy_over_time."""
-        ordered = sorted(series, key=lambda x: x[0])
+        ordered = sorted(series, key=_accuracy_series_sort_key)
         self._data = [(row[0], row[1]) for row in ordered]
         self._vertex_meta = [(row[2], row[3], row[4], row[1]) for row in ordered]
         self._ordinal_min = ordinal_min
@@ -655,7 +761,8 @@ class AccuracyOverTimeChartWidget(QWidget):
                     cur = date(cur.year + 1, 1, 1)
                 else:
                     cur = date(cur.year, cur.month + 1, 1)
-            if self._x_axis_week_in_month:
+            span_days = max(0, omax - omin)
+            if _x_axis_week_minors_in_month_mode(self._chart_cfg, span_days, self._x_axis_week_in_month):
                 w = self._week_start_monday_ordinal(omin)
                 while w < omin:
                     w += 7
@@ -796,10 +903,11 @@ class AccuracyOverTimeChartWidget(QWidget):
                 label_width = fm.horizontalAdvance(label)
                 painter.drawText(int(x - label_width / 2), int(bottom + fm.height() + self.x_axis_label_spacing), label)
 
-        sorted_data = sorted(self._data, key=lambda x: x[0])
+        omin, omax = self._ordinal_min, self._ordinal_max
         points: List[QPointF] = []
-        for pct, acc in sorted_data:
-            x = left + (pct / 100.0 * graph_width)
+        for i, (pct, acc) in enumerate(self._data):
+            _cnt, lab0, lab1, _ = self._vertex_meta[i]
+            x = _chart_x_from_bin_labels(lab0, lab1, pct, left, graph_width, omin, omax)
             y = bottom - ((acc - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
             y = max(top, min(bottom, y))
             points.append(QPointF(x, y))
@@ -852,11 +960,19 @@ class AccuracyOverTimeChartWidget(QWidget):
         graph_height: float,
         min_acc: Optional[float] = None,
         max_acc: Optional[float] = None,
+        *,
+        lab0: Optional[str] = None,
+        lab1: Optional[str] = None,
     ) -> QPointF:
         if min_acc is None or max_acc is None:
             min_acc, max_acc = self._accuracy_range()
         acc_range = max_acc - min_acc
-        x = left + (progress / 100.0 * graph_width)
+        if lab0 is not None and lab1 is not None:
+            x = _chart_x_from_bin_labels(
+                lab0, lab1, progress, left, graph_width, self._ordinal_min, self._ordinal_max
+            )
+        else:
+            x = left + (progress / 100.0 * graph_width)
         y = bottom - ((accuracy - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
         return QPointF(x, y)
 
@@ -893,12 +1009,21 @@ class AccuracyOverTimeChartWidget(QWidget):
             self._hover_vertex_index = None
             self.update()
             return
-        sorted_data = sorted(self._data, key=lambda x: x[0])
         min_acc, max_acc = self._accuracy_range()
         points: List[QPointF] = []
-        for pct, acc in sorted_data:
+        for i, (pct, acc) in enumerate(self._data):
+            _c, lab0, lab1, _ = self._vertex_meta[i]
             pt = self._data_to_pixel(
-                pct, acc, left, bottom, graph_width, graph_height, min_acc, max_acc
+                pct,
+                acc,
+                left,
+                bottom,
+                graph_width,
+                graph_height,
+                min_acc,
+                max_acc,
+                lab0=lab0,
+                lab1=lab1,
             )
             pt.setY(max(top, min(bottom, pt.y())))
             points.append(pt)
@@ -954,6 +1079,10 @@ class AccuracyOverTimeChartWidget(QWidget):
         self._hover_pixel = None
         self._hover_vertex_index = None
         QToolTip.hideText()
+        self.update()
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
         self.update()
 
 
@@ -1046,6 +1175,7 @@ class MoveQualityOverTimeChartWidget(QWidget):
         self._hover_values: Optional[Tuple[float, ...]] = None
 
         self.setFixedHeight(self._height)
+        self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setMouseTracking(True)
 
@@ -1058,13 +1188,14 @@ class MoveQualityOverTimeChartWidget(QWidget):
         ordinal_max: int,
         calendar_mode: str = "",
     ) -> None:
-        ordered = sorted(bins, key=lambda x: x[0])
+        ordered = sorted(bins, key=_mq_bin_sort_key)
         self._bins = ordered
         self._labels = list(labels)
         self._series_visuals = [self._style_for_id.get(sid, self._default_pen) for sid in series_ids]
         self._ordinal_min = ordinal_min
         self._ordinal_max = ordinal_max
-        self._calendar_mode = calendar_mode if calendar_mode in ("day", "week", "month", "year") else ""
+        cm = calendar_mode if calendar_mode in ("day", "week", "month", "year") else ""
+        self._calendar_mode = cm
         self._hover_plot_x = None
         self._hover_values = None
         self.update()
@@ -1104,27 +1235,37 @@ class MoveQualityOverTimeChartWidget(QWidget):
             return va + frac * (vb - va)
         return float("nan")
 
-    def _interpolate_values_at_chart_time(self, time_pct: float) -> Tuple[float, ...]:
-        """Linear interpolation between bin medians; time_pct is 0–100 along the chart X axis."""
+    def _interpolate_values_at_plot_x(self, mx: float, left: float, graph_width: float) -> Tuple[float, ...]:
+        """Linear interpolation between bins using the same X placement as the polylines (ordinal scale)."""
         n = len(self._labels)
         if not self._bins or n == 0:
             return tuple()
-        tps = [b[0] for b in self._bins]
+        omin, omax = self._ordinal_min, self._ordinal_max
+        xs: List[float] = []
+        for row in self._bins:
+            t_pct, _c, l0, l1, _meds = row
+            xs.append(_chart_x_from_bin_labels(l0, l1, t_pct, left, graph_width, omin, omax))
         if len(self._bins) == 1:
             meds = self._bins[0][4]
             if self._chart_style == "acpl_phase":
                 return tuple(float(meds[j]) if j < len(meds) else float("nan") for j in range(n))
             return tuple(float(meds[j]) if j < len(meds) else 0.0 for j in range(n))
-        ht = max(tps[0], min(tps[-1], time_pct))
+
+        def _meds_tuple(bidx: int) -> Tuple[float, ...]:
+            meds = self._bins[bidx][4]
+            if self._chart_style == "acpl_phase":
+                return tuple(float(meds[j]) if j < len(meds) else float("nan") for j in range(n))
+            return tuple(float(meds[j]) if j < len(meds) else 0.0 for j in range(n))
+
+        if mx <= xs[0]:
+            return _meds_tuple(0)
+        if mx >= xs[-1]:
+            return _meds_tuple(len(self._bins) - 1)
         i = 0
-        for k in range(len(tps) - 1):
-            if tps[k] <= ht <= tps[k + 1]:
-                i = k
-                break
-        else:
-            i = max(0, len(tps) - 2)
-        span_t = tps[i + 1] - tps[i]
-        frac = 0.0 if span_t <= 1e-9 else (ht - tps[i]) / span_t
+        while i < len(xs) - 1 and mx > xs[i + 1]:
+            i += 1
+        span_x = xs[i + 1] - xs[i]
+        frac = 0.0 if abs(span_x) <= 1e-9 else (mx - xs[i]) / span_x
         ma, mb = self._bins[i][4], self._bins[i + 1][4]
         out: List[float] = []
         for j in range(n):
@@ -1206,7 +1347,8 @@ class MoveQualityOverTimeChartWidget(QWidget):
                     cur = date(cur.year + 1, 1, 1)
                 else:
                     cur = date(cur.year, cur.month + 1, 1)
-            if self._x_axis_week_in_month:
+            span_days = max(0, omax - omin)
+            if _x_axis_week_minors_in_month_mode(self._chart_cfg, span_days, self._x_axis_week_in_month):
                 w = self._week_start_monday_ordinal(omin)
                 while w < omin:
                     w += 7
@@ -1272,6 +1414,7 @@ class MoveQualityOverTimeChartWidget(QWidget):
         if graph_width <= 0 or graph_height <= 0:
             return
 
+        omin, omax = self._ordinal_min, self._ordinal_max
         min_y, max_y = self._y_axis_range()
         y_range = max_y - min_y
 
@@ -1368,8 +1511,8 @@ class MoveQualityOverTimeChartWidget(QWidget):
                 )
                 run: List[QPointF] = []
                 for row in self._bins:
-                    t_pct, _c, _l0, _l1, meds = row
-                    x = left + (t_pct / 100.0 * graph_width)
+                    t_pct, _c, l0, l1, meds = row
+                    x = _chart_x_from_bin_labels(l0, l1, t_pct, left, graph_width, omin, omax)
                     if j >= len(meds):
                         continue
                     v = float(meds[j])
@@ -1382,8 +1525,8 @@ class MoveQualityOverTimeChartWidget(QWidget):
         else:
             all_points: List[List[QPointF]] = [[] for _ in range(n_series)]
             for row in self._bins:
-                t_pct, _c, _l0, _l1, meds = row
-                x = left + (t_pct / 100.0 * graph_width)
+                t_pct, _c, l0, l1, meds = row
+                x = _chart_x_from_bin_labels(l0, l1, t_pct, left, graph_width, omin, omax)
                 for j in range(n_series):
                     if j >= len(meds):
                         continue
@@ -1402,8 +1545,8 @@ class MoveQualityOverTimeChartWidget(QWidget):
         if self._show_bin_data_markers and n_series > 0:
             arm = max(2.0, self._bin_data_marker_radius)
             for row in self._bins:
-                t_pct, _c, _l0, _l1, meds = row
-                x = left + (t_pct / 100.0 * graph_width)
+                t_pct, _c, l0, l1, meds = row
+                x = _chart_x_from_bin_labels(l0, l1, t_pct, left, graph_width, omin, omax)
                 for j in range(min(n_series, len(meds))):
                     v = float(meds[j])
                     if not math.isfinite(v):
@@ -1479,7 +1622,7 @@ class MoveQualityOverTimeChartWidget(QWidget):
             return
 
         chart_t = max(0.0, min(100.0, (mx - left) / graph_width * 100.0))
-        values = self._interpolate_values_at_chart_time(chart_t)
+        values = self._interpolate_values_at_plot_x(mx, left, graph_width)
         ord_h = self._ordinal_at_chart_time_pct(chart_t)
         date_str = date.fromordinal(ord_h).isoformat()
         lines = [date_str]
@@ -1504,6 +1647,10 @@ class MoveQualityOverTimeChartWidget(QWidget):
         self._hover_plot_x = None
         self._hover_values = None
         QToolTip.hideText()
+        self.update()
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
         self.update()
 
 
@@ -1900,7 +2047,17 @@ class DetailPlayerStatsView(QWidget):
             'placeholder_text_no_source',
             'Select a data source above to view player statistics.'
         )
-        
+        self.placeholder_text_all_sections_hidden = self.player_stats_config.get(
+            'placeholder_text_all_sections_hidden',
+            'All player statistics sections are hidden. Use the Player Stats menu to show them again.',
+        )
+
+        self._player_stats_section_wrappers: Dict[str, QWidget] = {}
+        self._section_visibility_prefs: Dict[str, bool] = {}
+        self._player_stats_menu_actions: Optional[Dict[str, Any]] = None
+        self._player_stats_visibility_hint_label: Optional[QLabel] = None
+        self._reload_player_stats_section_visibility_prefs()
+
         self._setup_ui()
         
         # Always create player selection section immediately (not just when stats are available)
@@ -1973,6 +2130,7 @@ class DetailPlayerStatsView(QWidget):
         self._resize_debounce_ms = 80
         self._updating_visibility = False  # Re-entrancy guard for visibility updates
         self._building_content = False  # True while building stats content (skip resize-driven updates)
+        self._pending_stats_content_rebuild = False  # Coalesce rebuilds if re-entered via processEvents while building
         
         # Event filter will be installed on scroll_area in _setup_ui
     
@@ -2142,13 +2300,36 @@ class DetailPlayerStatsView(QWidget):
     
     def _deferred_build_stats_content(self) -> None:
         """Run build on a fresh stack; avoids stack overflow during live updates."""
-        if getattr(self, '_building_content', False):
+        if getattr(self, "_building_content", False):
+            # A nested event loop (e.g. QApplication.processEvents) can deliver this slot while
+            # a build is still running; dropping the second run leaves charts on stale/wrong data.
+            self._pending_stats_content_rebuild = True
             return
         self._building_content = True
         try:
             self._build_stats_content()
+            self.apply_player_stats_section_visibility_after_build()
         finally:
             self._building_content = False
+        if self._pending_stats_content_rebuild:
+            self._pending_stats_content_rebuild = False
+            QTimer.singleShot(0, self._deferred_build_stats_content)
+        else:
+            self._schedule_trend_charts_geometry_refresh()
+
+    def _schedule_trend_charts_geometry_refresh(self) -> None:
+        """After a full stats rebuild, nudge layout so time-series charts repaint at final width."""
+        sa = getattr(self, "scroll_area", None)
+        if sa is None:
+            return
+        w = sa.widget()
+        if w is None:
+            return
+        try:
+            w.updateGeometry()
+            w.update()
+        except RuntimeError:
+            pass
     
     def _handle_stats_unavailable(self, reason: str) -> None:
         """Show appropriate placeholder when stats data is unavailable."""
@@ -2190,7 +2371,166 @@ class DetailPlayerStatsView(QWidget):
                 self.disabled_placeholder.hide()
         except RuntimeError:
             pass
-    
+
+    def _reload_player_stats_section_visibility_prefs(self) -> None:
+        try:
+            from app.services.user_settings_service import UserSettingsService
+
+            self._section_visibility_prefs = UserSettingsService.get_instance().get_model().get_player_stats_section_visibility()
+        except Exception:
+            self._section_visibility_prefs = {}
+
+    def reload_player_stats_section_prefs_from_settings(self) -> None:
+        """Reload visibility map from disk (e.g. after app settings load)."""
+        self._reload_player_stats_section_visibility_prefs()
+        self.apply_player_stats_section_visibility_after_build()
+
+    def _player_stats_section_pref_visible(self, section_id: str) -> bool:
+        return bool(self._section_visibility_prefs.get(section_id, True))
+
+    def set_player_stats_section_menu_actions(self, actions: Optional[Dict[str, Any]]) -> None:
+        """Register menu QAction map (section id -> action) for check-state sync."""
+        self._player_stats_menu_actions = actions
+        self._sync_player_stats_menu_actions()
+
+    def _sync_player_stats_menu_actions(self) -> None:
+        if not self._player_stats_menu_actions:
+            return
+        for sid, act in self._player_stats_menu_actions.items():
+            try:
+                act.blockSignals(True)
+                act.setChecked(self._player_stats_section_pref_visible(sid))
+                act.blockSignals(False)
+            except (RuntimeError, TypeError, AttributeError):
+                pass
+
+    def set_player_stats_section_visible_from_menu(self, section_id: str, visible: bool) -> None:
+        """Menu bar toggle: persist and apply visibility to the current section widget if present."""
+        from app.services.user_settings_service import UserSettingsService
+
+        self._section_visibility_prefs[str(section_id)] = bool(visible)
+        UserSettingsService.get_instance().update_player_stats_section_visibility(str(section_id), bool(visible))
+        w = self._player_stats_section_wrappers.get(str(section_id))
+        if w:
+            w.setVisible(bool(visible))
+        self._update_all_sections_hidden_placeholder()
+
+    def set_all_player_stats_sections_visible_from_menu(self, visible: bool) -> None:
+        """Set every Player Stats menu section on/off, persist once, refresh wrappers and menu checks."""
+        from app.services.user_settings_service import UserSettingsService
+
+        svc = UserSettingsService.get_instance()
+        cur = dict(svc.get_model().get_player_stats_section_visibility())
+        v = bool(visible)
+        for sid, _ in PLAYER_STATS_MENU_SECTIONS:
+            cur[str(sid)] = v
+            self._section_visibility_prefs[str(sid)] = v
+        svc.set_player_stats_section_visibility_map(cur)
+        for _sid, w in list(self._player_stats_section_wrappers.items()):
+            try:
+                w.setVisible(self._player_stats_section_pref_visible(_sid))
+            except RuntimeError:
+                pass
+        self._update_all_sections_hidden_placeholder()
+        self._sync_player_stats_menu_actions()
+
+    def _add_player_stats_section(
+        self,
+        section_id: str,
+        title: str,
+        header_font: QFont,
+        header_text_color: QColor,
+        body: QWidget,
+        bottom_spacing_px: int,
+    ) -> None:
+        """Add header + body in one wrapper for menu-driven show/hide."""
+        wrap = QWidget()
+        wrap.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        wrap.setProperty("player_stats_section_id", section_id)
+        vl = QVBoxLayout(wrap)
+        vl.setContentsMargins(0, 0, 0, bottom_spacing_px)
+        vl.setSpacing(6)
+        header = QLabel(title)
+        header.setFont(header_font)
+        header.setStyleSheet(
+            f"color: rgb({header_text_color.red()}, {header_text_color.green()}, {header_text_color.blue()}); border: none;"
+        )
+        vl.addWidget(header)
+        vl.addWidget(body)
+        body_section = body.property("section_name")
+        if body_section:
+            wrap.setProperty("section_name", body_section)
+        self.content_layout.addWidget(wrap)
+        self._player_stats_section_wrappers[str(section_id)] = wrap
+
+    def _add_player_stats_section_body_only(
+        self,
+        section_id: str,
+        body: QWidget,
+        bottom_spacing_px: int,
+    ) -> None:
+        """Register for menu visibility and add ``body`` directly (no extra wrapper QWidget).
+
+        Trend blocks include an in-layout section title, subcaption, and chart. Using
+        ``_add_player_stats_section`` adds another outer wrapper; that broke width propagation
+        for time-series charts in ``QScrollArea``. Titles live inside ``body`` via
+        ``_player_stats_section_title_label``.
+        """
+        body.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        body.setProperty("player_stats_section_id", section_id)
+        self.content_layout.addWidget(body)
+        self.content_layout.addSpacing(int(bottom_spacing_px))
+        self._player_stats_section_wrappers[str(section_id)] = body
+
+    def apply_player_stats_section_visibility_after_build(self) -> None:
+        """Apply saved visibility to wrappers built in this session."""
+        for sid, w in list(self._player_stats_section_wrappers.items()):
+            try:
+                w.setVisible(self._player_stats_section_pref_visible(sid))
+            except RuntimeError:
+                pass
+        self._update_all_sections_hidden_placeholder()
+        self._sync_player_stats_menu_actions()
+
+    def _some_player_stats_section_hidden_in_prefs(self) -> bool:
+        return any(not self._player_stats_section_pref_visible(sid) for sid, _ in PLAYER_STATS_MENU_SECTIONS)
+
+    def _any_player_stats_section_wrapper_visible(self) -> bool:
+        for w in self._player_stats_section_wrappers.values():
+            try:
+                if w.isVisible():
+                    return True
+            except RuntimeError:
+                continue
+        return False
+
+    def _update_player_stats_visibility_hint(self) -> None:
+        """Show a hint when the user has hidden some (not all) sections via the Player Stats menu."""
+        lbl = self._player_stats_visibility_hint_label
+        if lbl is None:
+            return
+        if not self.current_stats:
+            lbl.hide()
+            return
+        show = self._some_player_stats_section_hidden_in_prefs() and self._any_player_stats_section_wrapper_visible()
+        lbl.setVisible(show)
+
+    def _update_all_sections_hidden_placeholder(self) -> None:
+        if not self.current_stats:
+            return
+        if not hasattr(self, "player_combo") or self.player_combo is None:
+            return
+        if self.player_combo.currentIndex() < 0:
+            return
+        wrappers = list(self._player_stats_section_wrappers.values())
+        if not wrappers:
+            return
+        if all(not w.isVisible() for w in wrappers):
+            self._set_disabled_placeholder_visible(True, self.placeholder_text_all_sections_hidden)
+        else:
+            self._set_disabled_placeholder_visible(False)
+        self._update_player_stats_visibility_hint()
+
     def _clear_content(self) -> None:
         """Clear all content widgets except placeholder and player selection."""
         # Don't clear - we want to keep player selection section visible
@@ -2203,6 +2543,8 @@ class DetailPlayerStatsView(QWidget):
         Keeps the player selection section visible.
         Also removes spacing items to prevent accumulation.
         """
+        self._player_stats_section_wrappers.clear()
+        self._player_stats_visibility_hint_label = None
         # Clear stored widget references first to prevent access to deleted widgets
         self._move_accuracy_widget = None
         self._pie_chart_widget = None
@@ -2260,13 +2602,22 @@ class DetailPlayerStatsView(QWidget):
     
     def _build_stats_content(self) -> None:
         """Build the player statistics content widgets."""
-        if not self.current_stats:
+        stats = self.current_stats
+        patterns = self.current_patterns
+        if not stats:
             return
         
         # Clear existing stats content (but keep player selection section)
         # Find and remove stats sections (everything after player selection)
         # This also clears all stored widget references
         self._clear_stats_sections()
+
+        # The disabled placeholder was originally added right after the player row with stretch
+        # factor 1. If it stays there, the layout order is [player, placeholder, …sections…], which
+        # breaks QScrollArea width propagation to the stats blocks (trend charts mis-draw X). Keep
+        # placeholder at the bottom (after sections) instead.
+        if hasattr(self, "disabled_placeholder") and self.disabled_placeholder:
+            self.content_layout.removeWidget(self.disabled_placeholder)
         
         # Ensure all widget references are None before creating new widgets
         self._move_accuracy_widget = None
@@ -2306,116 +2657,165 @@ class DetailPlayerStatsView(QWidget):
                           int(scale_font_size(fonts_config.get('value_font_size', 11))))
         
         section_spacing_val = layout_config.get('section_spacing', 20)
+
+        self._player_stats_visibility_hint_label = None
+        hint_cfg = player_stats_config.get("section_visibility_hint")
+        if isinstance(hint_cfg, dict):
+            hint_text = str(hint_cfg.get("text", "")).strip()
+            hint_color = hint_cfg.get("text_color")
+            if (
+                hint_text
+                and isinstance(hint_color, (list, tuple))
+                and len(hint_color) >= 3
+            ):
+                hr, hg, hb = int(hint_color[0]), int(hint_color[1]), int(hint_color[2])
+                fam_raw = hint_cfg.get("font_family")
+                fam = (
+                    str(fam_raw).strip()
+                    if isinstance(fam_raw, str) and fam_raw.strip()
+                    else str(fonts_config.get("label_font_family", "Helvetica Neue"))
+                )
+                fs_raw = hint_cfg.get("font_size")
+                hint_fs = int(
+                    scale_font_size(fs_raw if fs_raw is not None else fonts_config.get("label_font_size", 11))
+                )
+                hint_label = QLabel(hint_text)
+                hint_label.setWordWrap(True)
+                hint_label.setMinimumWidth(0)
+                hint_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Maximum)
+                hint_label.setFont(QFont(resolve_font_family(fam), hint_fs))
+                hint_label.setStyleSheet(
+                    f"color: rgb({hr}, {hg}, {hb}); background: transparent; border: none;"
+                )
+                self._player_stats_visibility_hint_label = hint_label
+                hint_label.hide()
+                self.content_layout.addWidget(hint_label)
         
         # Analysis Coverage Banner removed - redundant with "Total Games" in Overview
         
         # Overview Section
-        self._add_section_header("Overview", header_font, header_text_color)
         overview_widget = self._create_overview_widget(
-            self.current_stats, text_color, label_font, value_font,
+            stats, text_color, label_font, value_font,
             section_bg_color, border_color, widgets_config
         )
         overview_widget.setProperty("section_name", "Overview")
-        self.content_layout.addWidget(overview_widget)
-        self.content_layout.addSpacing(section_spacing_val)
+        self._add_player_stats_section(
+            "overview", "Overview", header_font, header_text_color, overview_widget, section_spacing_val
+        )
 
         # Accuracy Distribution Section (optional)
         accuracy_dist_config = player_stats_config.get('accuracy_distribution', {})
-        if accuracy_dist_config.get('enabled', True) and getattr(self.current_stats, "accuracy_values", None):
-            self._add_section_header("Accuracy Distribution", header_font, header_text_color)
+        if accuracy_dist_config.get('enabled', True) and getattr(stats, "accuracy_values", None):
             dist_widget = self._create_accuracy_distribution_widget(
-                self.current_stats,
+                stats,
                 text_color,
                 section_bg_color,
                 border_color,
                 accuracy_dist_config,
             )
             dist_widget.setProperty("section_name", "Accuracy Distribution")
-            self.content_layout.addWidget(dist_widget)
-            self.content_layout.addSpacing(section_spacing_val)
-        
+            self._add_player_stats_section(
+                "accuracy_distribution",
+                "Accuracy Distribution",
+                header_font,
+                header_text_color,
+                dist_widget,
+                section_spacing_val,
+            )
+
         # Move Accuracy Section
-        self._add_section_header("Move Accuracy", header_font, header_text_color)
         move_accuracy_widget = self._create_move_accuracy_widget(
-            self.current_stats, text_color, label_font, value_font,
+            stats, text_color, label_font, value_font,
             section_bg_color, border_color, widgets_config
         )
-        # Store reference for responsive width handling
         self._move_accuracy_widget = move_accuracy_widget
         move_accuracy_widget.setProperty("section_name", "Move Accuracy")
-        self.content_layout.addWidget(move_accuracy_widget)
-        self.content_layout.addSpacing(section_spacing_val)
-        
+        self._add_player_stats_section(
+            "move_accuracy", "Move Accuracy", header_font, header_text_color, move_accuracy_widget, section_spacing_val
+        )
+
         # Performance by Phase Section
-        self._add_section_header("Performance by Phase", header_font, header_text_color)
         phase_widget = self._create_phase_performance_widget(
-            self.current_stats, text_color, label_font, value_font,
+            stats, text_color, label_font, value_font,
             section_bg_color, border_color, widgets_config
         )
         phase_widget.setProperty("section_name", "Performance by Phase")
-        self.content_layout.addWidget(phase_widget)
-        self.content_layout.addSpacing(section_spacing_val)
+        self._add_player_stats_section(
+            "performance_by_phase",
+            "Performance by Phase",
+            header_font,
+            header_text_color,
+            phase_widget,
+            section_spacing_val,
+        )
         
         # Avg. Accuracy over game duration Section (line chart)
         progress_chart_config = player_stats_config.get('accuracy_vs_progress_chart', {})
-        if progress_chart_config.get('enabled', True) and getattr(self.current_stats, 'accuracy_by_progress', None):
-            self._add_section_header("Avg. Accuracy over game duration", header_font, header_text_color)
+        if progress_chart_config.get('enabled', True) and getattr(stats, 'accuracy_by_progress', None):
             progress_chart = AccuracyVsProgressChartWidget(self.config)
-            opponent_progress = getattr(self.current_stats, 'opponent_accuracy_by_progress', None) or []
-            progress_chart.set_data(self.current_stats.accuracy_by_progress, opponent_data=opponent_progress)
+            opponent_progress = getattr(stats, 'opponent_accuracy_by_progress', None) or []
+            progress_chart.set_data(stats.accuracy_by_progress, opponent_data=opponent_progress)
             progress_chart.setProperty("section_name", "Avg. Accuracy over game duration")
-            self.content_layout.addWidget(progress_chart)
-            self.content_layout.addSpacing(section_spacing_val)
+            self._add_player_stats_section(
+                "accuracy_vs_progress",
+                "Avg. Accuracy over game duration",
+                header_font,
+                header_text_color,
+                progress_chart,
+                section_spacing_val,
+            )
 
         over_time_cfg = player_stats_config.get("accuracy_over_time_chart", {})
-        over_time_series = getattr(self.current_stats, "accuracy_over_time", None) or []
+        over_time_series = getattr(stats, "accuracy_over_time", None) or []
         if (
             over_time_cfg.get("enabled", True)
             and over_time_series
-            and getattr(self.current_stats, "trends_ordinal_max", 0) > 0
+            and getattr(stats, "trends_ordinal_max", 0) > 0
         ):
-            self._add_section_header("Accuracy progression", header_font, header_text_color)
             ot_wrap = QWidget()
             ot_layout = QVBoxLayout(ot_wrap)
             ot_layout.setContentsMargins(0, 0, 0, 0)
             ot_layout.setSpacing(6)
-            sub = QLabel(getattr(self.current_stats, "trends_subcaption", "") or "")
-            sub.setWordWrap(True)
+            ot_layout.addWidget(_player_stats_section_title_label("Accuracy progression", header_font, header_text_color))
+            sub = QLabel(getattr(stats, "trends_subcaption", "") or "")
             sub_cap_fs = scale_font_size(over_time_cfg.get("subcaption_font_size", 9))
             sub_font = QFont(resolve_font_family(player_stats_config.get("fonts", {}).get("label_font_family", "Helvetica Neue")), int(sub_cap_fs))
             sub.setFont(sub_font)
             sub.setStyleSheet(
                 f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); background: transparent;"
             )
+            _configure_player_stats_trend_subcaption_label(sub)
             ot_layout.addWidget(sub)
             ot_chart = AccuracyOverTimeChartWidget(self.config)
             ot_chart.set_data(
                 list(over_time_series),
-                int(getattr(self.current_stats, "trends_ordinal_min", 0)),
-                int(getattr(self.current_stats, "trends_ordinal_max", 0)),
-                getattr(self.current_stats, "trends_calendar_mode", "") or "",
+                int(getattr(stats, "trends_ordinal_min", 0)),
+                int(getattr(stats, "trends_ordinal_max", 0)),
+                getattr(stats, "trends_calendar_mode", "") or "",
             )
             ot_layout.addWidget(ot_chart)
             ot_wrap.setProperty("section_name", "Accuracy progression")
-            self.content_layout.addWidget(ot_wrap)
-            self.content_layout.addSpacing(section_spacing_val)
+            self._add_player_stats_section_body_only(
+                "accuracy_progression",
+                ot_wrap,
+                section_spacing_val,
+            )
 
         mq_cfg = player_stats_config.get("move_quality_over_time_chart", {})
-        mq_bins = getattr(self.current_stats, "move_quality_over_time", None) or []
-        mq_ids = getattr(self.current_stats, "move_quality_series_ids", None) or []
+        mq_bins = getattr(stats, "move_quality_over_time", None) or []
+        mq_ids = getattr(stats, "move_quality_series_ids", None) or []
         if (
             mq_cfg.get("enabled", True)
             and mq_bins
             and mq_ids
-            and int(getattr(self.current_stats, "move_quality_ordinal_max", 0)) > 0
+            and int(getattr(stats, "move_quality_ordinal_max", 0)) > 0
         ):
-            self._add_section_header("Move quality progression", header_font, header_text_color)
             mq_wrap = QWidget()
             mq_layout = QVBoxLayout(mq_wrap)
             mq_layout.setContentsMargins(0, 0, 0, 0)
             mq_layout.setSpacing(6)
-            mq_sub = QLabel(getattr(self.current_stats, "move_quality_subcaption", "") or "")
-            mq_sub.setWordWrap(True)
+            mq_layout.addWidget(_player_stats_section_title_label("Move quality progression", header_font, header_text_color))
+            mq_sub = QLabel(getattr(stats, "move_quality_subcaption", "") or "")
             mq_sub_fs = scale_font_size(mq_cfg.get("subcaption_font_size", 9))
             mq_sub_font = QFont(
                 resolve_font_family(player_stats_config.get("fonts", {}).get("label_font_family", "Helvetica Neue")),
@@ -2425,37 +2825,42 @@ class DetailPlayerStatsView(QWidget):
             mq_sub.setStyleSheet(
                 f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); background: transparent;"
             )
+            _configure_player_stats_trend_subcaption_label(mq_sub)
             mq_layout.addWidget(mq_sub)
             mq_chart = MoveQualityOverTimeChartWidget(self.config)
             mq_chart.set_data(
                 list(mq_bins),
-                list(getattr(self.current_stats, "move_quality_series_labels", None) or []),
+                list(getattr(stats, "move_quality_series_labels", None) or []),
                 list(mq_ids),
-                int(getattr(self.current_stats, "move_quality_ordinal_min", 0)),
-                int(getattr(self.current_stats, "move_quality_ordinal_max", 0)),
-                getattr(self.current_stats, "move_quality_calendar_mode", "") or "",
+                int(getattr(stats, "move_quality_ordinal_min", 0)),
+                int(getattr(stats, "move_quality_ordinal_max", 0)),
+                getattr(stats, "move_quality_calendar_mode", "") or "",
             )
             mq_layout.addWidget(mq_chart)
             mq_wrap.setProperty("section_name", "Move quality progression")
-            self.content_layout.addWidget(mq_wrap)
-            self.content_layout.addSpacing(section_spacing_val)
+            self._add_player_stats_section_body_only(
+                "move_quality_progression",
+                mq_wrap,
+                section_spacing_val,
+            )
 
         ap_cfg = player_stats_config.get("acpl_phase_over_time_chart", {})
-        ap_bins = getattr(self.current_stats, "acpl_phase_over_time", None) or []
-        ap_ids = getattr(self.current_stats, "acpl_phase_series_ids", None) or []
+        ap_bins = getattr(stats, "acpl_phase_over_time", None) or []
+        ap_ids = getattr(stats, "acpl_phase_series_ids", None) or []
         if (
             ap_cfg.get("enabled", True)
             and ap_bins
             and ap_ids
-            and int(getattr(self.current_stats, "acpl_phase_ordinal_max", 0)) > 0
+            and int(getattr(stats, "acpl_phase_ordinal_max", 0)) > 0
         ):
-            self._add_section_header("ACPL progression by phase", header_font, header_text_color)
             ap_wrap = QWidget()
             ap_layout = QVBoxLayout(ap_wrap)
             ap_layout.setContentsMargins(0, 0, 0, 0)
             ap_layout.setSpacing(6)
-            ap_sub = QLabel(getattr(self.current_stats, "acpl_phase_subcaption", "") or "")
-            ap_sub.setWordWrap(True)
+            ap_layout.addWidget(
+                _player_stats_section_title_label("ACPL progression by phase", header_font, header_text_color)
+            )
+            ap_sub = QLabel(getattr(stats, "acpl_phase_subcaption", "") or "")
             ap_sub_fs = scale_font_size(ap_cfg.get("subcaption_font_size", 9))
             ap_sub_font = QFont(
                 resolve_font_family(player_stats_config.get("fonts", {}).get("label_font_family", "Helvetica Neue")),
@@ -2465,33 +2870,37 @@ class DetailPlayerStatsView(QWidget):
             ap_sub.setStyleSheet(
                 f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); background: transparent;"
             )
+            _configure_player_stats_trend_subcaption_label(ap_sub)
             ap_layout.addWidget(ap_sub)
             ap_chart = MoveQualityOverTimeChartWidget(self.config, chart_style="acpl_phase")
             ap_chart.set_data(
                 list(ap_bins),
-                list(getattr(self.current_stats, "acpl_phase_series_labels", None) or []),
+                list(getattr(stats, "acpl_phase_series_labels", None) or []),
                 list(ap_ids),
-                int(getattr(self.current_stats, "acpl_phase_ordinal_min", 0)),
-                int(getattr(self.current_stats, "acpl_phase_ordinal_max", 0)),
-                getattr(self.current_stats, "acpl_phase_calendar_mode", "") or "",
+                int(getattr(stats, "acpl_phase_ordinal_min", 0)),
+                int(getattr(stats, "acpl_phase_ordinal_max", 0)),
+                getattr(stats, "acpl_phase_calendar_mode", "") or "",
             )
             ap_layout.addWidget(ap_chart)
             ap_wrap.setProperty("section_name", "ACPL progression by phase")
-            self.content_layout.addWidget(ap_wrap)
-            self.content_layout.addSpacing(section_spacing_val)
-        
+            self._add_player_stats_section_body_only(
+                "acpl_phase_progression",
+                ap_wrap,
+                section_spacing_val,
+            )
+
         # Openings Section (Most Played, Worst/Best accuracy grids only)
-        if self.current_stats and (self.current_stats.top_openings or 
-                                    self.current_stats.worst_accuracy_openings or 
-                                    self.current_stats.best_accuracy_openings):
-            self._add_section_header("Openings", header_font, header_text_color)
+        if stats and (stats.top_openings or 
+                                    stats.worst_accuracy_openings or 
+                                    stats.best_accuracy_openings):
             openings_widget = self._create_openings_widget(
-                self.current_stats, text_color, label_font, value_font,
+                stats, text_color, label_font, value_font,
                 section_bg_color, border_color, widgets_config
             )
             openings_widget.setProperty("section_name", "Openings")
-            self.content_layout.addWidget(openings_widget)
-            self.content_layout.addSpacing(section_spacing_val)
+            self._add_player_stats_section(
+                "openings", "Openings", header_font, header_text_color, openings_widget, section_spacing_val
+            )
 
         # Opening tree Section (separate section, same style as endgame tree)
         if self._stats_controller:
@@ -2500,60 +2909,86 @@ class DetailPlayerStatsView(QWidget):
             min_games = int(tree_config.get('min_games', 1))
             opening_tree = self._stats_controller.get_opening_tree(max_depth=max_depth, min_games=min_games)
             if opening_tree.get("children"):
-                self._add_section_header("Opening tree", header_font, header_text_color)
                 opening_tree_widget = self._create_opening_tree_section_widget(
                     text_color, label_font, value_font,
                     section_bg_color, border_color, widgets_config
                 )
                 if opening_tree_widget:
                     opening_tree_widget.setProperty("section_name", "Opening tree")
-                    self.content_layout.addWidget(opening_tree_widget)
-                    self.content_layout.addSpacing(section_spacing_val)
+                    self._add_player_stats_section(
+                        "opening_tree",
+                        "Opening tree",
+                        header_font,
+                        header_text_color,
+                        opening_tree_widget,
+                        section_spacing_val,
+                    )
 
         # Endgame tree Section (below opening tree; grouped, expand to see types)
-        accuracy_by_endgame_grouped = getattr(self.current_stats, 'accuracy_by_endgame_type_grouped', None)
+        accuracy_by_endgame_grouped = getattr(stats, 'accuracy_by_endgame_type_grouped', None)
         if accuracy_by_endgame_grouped:
-            self._add_section_header("Endgame tree", header_font, header_text_color)
             endgame_type_widget = self._create_endgame_type_performance_widget(
-                self.current_stats, text_color, label_font, value_font,
+                stats, text_color, label_font, value_font,
                 section_bg_color, border_color, widgets_config
             )
             endgame_type_widget.setProperty("section_name", "Endgame tree")
-            self.content_layout.addWidget(endgame_type_widget)
-            self.content_layout.addSpacing(section_spacing_val)
+            self._add_player_stats_section(
+                "endgame_tree",
+                "Endgame tree",
+                header_font,
+                header_text_color,
+                endgame_type_widget,
+                section_spacing_val,
+            )
 
         # Top Games Section (Best/Worst games for this player)
-        self._add_section_header("Games by Performance", header_font, header_text_color)
         top_games_widget = self._create_top_games_widget(
-            self.current_stats, text_color, label_font, value_font,
+            stats, text_color, label_font, value_font,
             section_bg_color, border_color, widgets_config
         )
         top_games_widget.setProperty("section_name", "Top Games")
-        self.content_layout.addWidget(top_games_widget)
-        self.content_layout.addSpacing(section_spacing_val)
-        
+        self._add_player_stats_section(
+            "games_by_performance",
+            "Games by Performance",
+            header_font,
+            header_text_color,
+            top_games_widget,
+            section_spacing_val,
+        )
+
         # Significant Moves Section (Brilliant, Misses, Blunders)
-        self._add_section_header("Significant Moves", header_font, header_text_color)
         significant_widget = self._create_significant_moves_widget(
-            self.current_stats, text_color, label_font, value_font,
+            stats, text_color, label_font, value_font,
             section_bg_color, border_color, widgets_config
         )
         significant_widget.setProperty("section_name", "Significant Moves")
-        self.content_layout.addWidget(significant_widget)
-        self.content_layout.addSpacing(section_spacing_val)
-        
+        self._add_player_stats_section(
+            "significant_moves",
+            "Significant Moves",
+            header_font,
+            header_text_color,
+            significant_widget,
+            section_spacing_val,
+        )
+
         # Error Patterns Section
-        if self.current_patterns:
-            self._add_section_header("Error Patterns", header_font, header_text_color)
+        if patterns:
             patterns_widget = self._create_error_patterns_widget(
-                self.current_patterns, text_color, label_font, value_font,
+                patterns, text_color, label_font, value_font,
                 section_bg_color, border_color, widgets_config
             )
             patterns_widget.setProperty("section_name", "Error Patterns")
-            self.content_layout.addWidget(patterns_widget)
-            self.content_layout.addSpacing(section_spacing_val)
+            self._add_player_stats_section(
+                "error_patterns",
+                "Error Patterns",
+                header_font,
+                header_text_color,
+                patterns_widget,
+                section_spacing_val,
+            )
         
-        # Add stretch at end
+        if hasattr(self, "disabled_placeholder") and self.disabled_placeholder:
+            self.content_layout.addWidget(self.disabled_placeholder, 1)
         self.content_layout.addStretch()
     
     def _create_player_selection_section(self) -> None:
@@ -4526,13 +4961,6 @@ class DetailPlayerStatsView(QWidget):
         target_database = max(games_by_database.items(), key=lambda x: len(x[1]))[0]
         target_row_indices = games_by_database[target_database]
         self._stats_controller.highlight_rows(target_database, target_row_indices)
-    
-    def _add_section_header(self, text: str, font: QFont, color: QColor) -> None:
-        """Add a section header label."""
-        header = QLabel(text)
-        header.setFont(font)
-        header.setStyleSheet(f"color: rgb({color.red()}, {color.green()}, {color.blue()}); border: none;")
-        self.content_layout.addWidget(header)
 
     def _on_endgame_tree_item_double_clicked(self, item) -> None:
         """Open games for the double-clicked endgame type/group row in a Search Results tab."""
@@ -5492,6 +5920,7 @@ class DetailPlayerStatsView(QWidget):
             current_player or "Player",
             top_games_summary=top_games_summary,
             opening_tree_summary_lines=opening_tree_summary_lines if opening_tree_summary_lines else None,
+            section_visibility=self._section_visibility_prefs,
         )
         
         if text:

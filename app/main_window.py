@@ -78,6 +78,7 @@ class MainWindow(QMainWindow):
         self._setup_tooltip_styling()
         self._setup_menu_bar()
         self._setup_ui()
+        self._register_player_stats_menu_with_view()
         self._setup_shortcuts()
         
         # First-run welcome dialog (deferred until the window is shown).
@@ -166,6 +167,7 @@ class MainWindow(QMainWindow):
         self._setup_moves_list_menu(menu_bar)
         self._setup_game_analysis_menu(menu_bar)
         self._setup_manual_analysis_menu(menu_bar)
+        self._setup_player_stats_menu(menu_bar)
         self._setup_annotations_menu(menu_bar)
         self._setup_engines_menu(menu_bar)
         self._setup_ai_summary_menu(menu_bar)
@@ -880,7 +882,58 @@ class MainWindow(QMainWindow):
         
         # Set initial action states
         self._update_manual_analysis_action_states(manual_analysis_model.is_analyzing, manual_analysis_model.multipv)
-    
+
+    def _setup_player_stats_menu(self, menu_bar: QMenuBar) -> None:
+        """Menu to show/hide Player Stats tab sections (persisted in user settings)."""
+        from app.services.user_settings_service import UserSettingsService
+        from app.views.detail_player_stats_view import PLAYER_STATS_MENU_SECTIONS
+
+        ps_menu = menu_bar.addMenu("Player Stats")
+        self._apply_menu_styling(ps_menu)
+        self.player_stats_menu = ps_menu
+        self._player_stats_section_actions: Dict[str, QAction] = {}
+        enable_all_ps = QAction("Enable all", self)
+        enable_all_ps.setMenuRole(QAction.MenuRole.NoRole)
+        enable_all_ps.triggered.connect(self._on_player_stats_menu_enable_all)
+        ps_menu.addAction(enable_all_ps)
+        disable_all_ps = QAction("Disable all", self)
+        disable_all_ps.setMenuRole(QAction.MenuRole.NoRole)
+        disable_all_ps.triggered.connect(self._on_player_stats_menu_disable_all)
+        ps_menu.addAction(disable_all_ps)
+        ps_menu.addSeparator()
+        vis = UserSettingsService.get_instance().get_model().get_player_stats_section_visibility()
+        for section_id, label in PLAYER_STATS_MENU_SECTIONS:
+            act = QAction(label, self)
+            act.setCheckable(True)
+            act.setMenuRole(QAction.MenuRole.NoRole)
+            act.setChecked(bool(vis.get(section_id, True)))
+            act.triggered.connect(
+                lambda checked, sid=section_id: self._on_player_stats_section_menu_toggled(sid, checked)
+            )
+            ps_menu.addAction(act)
+            self._player_stats_section_actions[section_id] = act
+
+    def _on_player_stats_section_menu_toggled(self, section_id: str, checked: bool) -> None:
+        view = getattr(getattr(self, "detail_panel", None), "player_stats_view", None)
+        if view:
+            view.set_player_stats_section_visible_from_menu(section_id, checked)
+
+    def _on_player_stats_menu_enable_all(self) -> None:
+        view = getattr(getattr(self, "detail_panel", None), "player_stats_view", None)
+        if view:
+            view.set_all_player_stats_sections_visible_from_menu(True)
+
+    def _on_player_stats_menu_disable_all(self) -> None:
+        view = getattr(getattr(self, "detail_panel", None), "player_stats_view", None)
+        if view:
+            view.set_all_player_stats_sections_visible_from_menu(False)
+
+    def _register_player_stats_menu_with_view(self) -> None:
+        if hasattr(self, "_player_stats_section_actions") and hasattr(self, "detail_panel"):
+            psv = getattr(self.detail_panel, "player_stats_view", None)
+            if psv:
+                psv.set_player_stats_section_menu_actions(self._player_stats_section_actions)
+
     def _setup_annotations_menu(self, menu_bar: QMenuBar) -> None:
         """Setup the Annotations menu."""
         annotations_menu = menu_bar.addMenu("Annotations")
@@ -4759,6 +4812,11 @@ Visibility Settings:
         
         # Store settings service reference for saving later
         self._settings_service = settings_service
+
+        if hasattr(self, "detail_panel"):
+            psv = getattr(self.detail_panel, "player_stats_view", None)
+            if psv:
+                psv.reload_player_stats_section_prefs_from_settings()
 
         # First-run welcome message: only set a pending flag here.
         # The actual dialog is shown in `showEvent()` so the main window

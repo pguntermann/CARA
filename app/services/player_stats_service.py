@@ -4,7 +4,7 @@ import calendar
 import os
 from datetime import date, timedelta
 from statistics import median
-from typing import List, Dict, Any, Optional, Tuple, Callable
+from typing import List, Dict, Any, Optional, Tuple, Callable, Sequence
 from dataclasses import dataclass
 from collections import Counter, defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -320,7 +320,12 @@ def _should_use_ordinal_quantile_fallback(
     span_days: int,
     min_span_days: int,
 ) -> bool:
-    """Use date-sorted equal-count bands when strict calendar keys collapse too many games."""
+    """When strict calendar keys collapse (few week/month buckets), use fallback binning.
+
+    Default fallback is equal-width calendar slices (``ordinal_fallback_mode`` ``equal_width``),
+    so points spread along the date axis. Optional ``quantile`` mode keeps equal *game counts*
+    per bin, which bunches x when play dates cluster at the ends of the range.
+    """
     thr = int(chart_cfg.get("min_calendar_bins_before_ordinal_fallback", 5))
     if thr <= 0:
         return False
@@ -337,6 +342,11 @@ def _should_use_ordinal_quantile_fallback(
 def _ordinal_quantile_target_bins(chart_cfg: Dict[str, Any], n_samples: int, max_calendar_bins: int) -> int:
     target = int(chart_cfg.get("ordinal_quantile_bin_count", 12))
     return max(2, min(target, n_samples, max_calendar_bins))
+
+
+def _ordinal_fallback_mode(chart_cfg: Dict[str, Any]) -> str:
+    raw = str(chart_cfg.get("ordinal_fallback_mode", "equal_width")).strip().lower()
+    return "quantile" if raw == "quantile" else "equal_width"
 
 
 def _calendar_bin_center_time_pct(lo_o: int, hi_o: int, t_min: int, t_max: int) -> float:
@@ -382,6 +392,166 @@ def _accuracy_series_ordinal_quantile_bins(
         rows.append((time_pct, p_med, cnt, lab0, lab1))
     rows.sort(key=lambda x: x[0])
     return rows
+
+
+def _accuracy_series_equal_ordinal_width_bins(
+    samples: List[Tuple[int, float]],
+    n_bins: int,
+    t_min: int,
+    t_max: int,
+) -> List[Tuple[float, float, int, str, str]]:
+    """Split ``[t_min, t_max]`` (inclusive calendar days) into equal-width ranges; median per bin.
+
+    Omits bins with no games. X positions follow calendar time instead of equal counts per bin.
+    """
+    days = t_max - t_min + 1
+    if days <= 1 or t_max <= t_min:
+        ords = [x[0] for x in samples]
+        lo_o, hi_o = (min(ords), max(ords)) if ords else (t_min, t_max)
+        accs = [x[1] for x in samples]
+        return [
+            (
+                50.0,
+                float(median(accs)) if accs else 0.0,
+                len(accs),
+                date.fromordinal(lo_o).isoformat(),
+                date.fromordinal(hi_o).isoformat(),
+            )
+        ]
+
+    n_bins = max(2, min(n_bins, days))
+    rows: List[Tuple[float, float, int, str, str]] = []
+    for b in range(n_bins):
+        lo_o = t_min + (days * b) // n_bins
+        hi_o = t_min + (days * (b + 1)) // n_bins - 1
+        chunk = [(o, a) for o, a in samples if lo_o <= o <= hi_o]
+        if not chunk:
+            continue
+        ords = [x[0] for x in chunk]
+        accs = [x[1] for x in chunk]
+        lo_g = min(ords)
+        hi_g = max(ords)
+        time_pct = _calendar_bin_center_time_pct(lo_g, hi_g, t_min, t_max)
+        rows.append(
+            (
+                time_pct,
+                float(median(accs)),
+                len(chunk),
+                date.fromordinal(lo_g).isoformat(),
+                date.fromordinal(hi_g).isoformat(),
+            )
+        )
+    rows.sort(key=lambda x: x[0])
+    return rows
+
+
+def _move_quality_bins_equal_ordinal_width(
+    samples_vec: List[Tuple[int, Tuple[float, ...]]],
+    n_bins: int,
+    n_series: int,
+    t_min: int,
+    t_max: int,
+) -> List[Tuple[float, int, str, str, Tuple[float, ...]]]:
+    days = t_max - t_min + 1
+    if days <= 1 or t_max <= t_min:
+        vecs = [x[1] for x in samples_vec]
+        ords = [x[0] for x in samples_vec]
+        lo_o, hi_o = (min(ords), max(ords)) if ords else (t_min, t_max)
+        medians_list: List[float] = []
+        for i in range(n_series):
+            col = [v[i] for v in vecs]
+            medians_list.append(float(median(col)) if col else 0.0)
+        return [(50.0, len(vecs), date.fromordinal(lo_o).isoformat(), date.fromordinal(hi_o).isoformat(), tuple(medians_list))]
+
+    n_bins = max(2, min(n_bins, days))
+    bins_out: List[Tuple[float, int, str, str, Tuple[float, ...]]] = []
+    for b in range(n_bins):
+        lo_o = t_min + (days * b) // n_bins
+        hi_o = t_min + (days * (b + 1)) // n_bins - 1
+        chunk = [(o, v) for o, v in samples_vec if lo_o <= o <= hi_o]
+        if not chunk:
+            continue
+        ords = [x[0] for x in chunk]
+        vecs = [x[1] for x in chunk]
+        lo_g, hi_g = min(ords), max(ords)
+        time_pct = _calendar_bin_center_time_pct(lo_g, hi_g, t_min, t_max)
+        medians_list = []
+        for i in range(n_series):
+            col = [v[i] for v in vecs]
+            medians_list.append(float(median(col)) if col else 0.0)
+        bins_out.append(
+            (
+                time_pct,
+                len(chunk),
+                date.fromordinal(lo_g).isoformat(),
+                date.fromordinal(hi_g).isoformat(),
+                tuple(medians_list),
+            )
+        )
+    bins_out.sort(key=lambda x: x[0])
+    return bins_out
+
+
+def _acpl_phase_bins_equal_ordinal_width(
+    samples_vec: List[Tuple[int, Tuple[Optional[float], Optional[float], Optional[float]]]],
+    n_bins: int,
+    t_min: int,
+    t_max: int,
+) -> List[Tuple[float, int, str, str, Tuple[float, ...]]]:
+    days = t_max - t_min + 1
+    if days <= 1 or t_max <= t_min:
+        triples = [x[1] for x in samples_vec]
+        ords = [x[0] for x in samples_vec]
+        lo_o, hi_o = (min(ords), max(ords)) if ords else (t_min, t_max)
+        medians_list: List[float] = []
+        for i_phase in range(3):
+            col = [
+                float(t[i_phase])
+                for t in triples
+                if t[i_phase] is not None and math.isfinite(float(t[i_phase]))
+            ]
+            medians_list.append(float(median(col)) if col else float("nan"))
+        return [
+            (
+                50.0,
+                len(triples),
+                date.fromordinal(lo_o).isoformat(),
+                date.fromordinal(hi_o).isoformat(),
+                tuple(medians_list),
+            )
+        ]
+
+    n_bins = max(2, min(n_bins, days))
+    bins_out: List[Tuple[float, int, str, str, Tuple[float, ...]]] = []
+    for b in range(n_bins):
+        lo_o = t_min + (days * b) // n_bins
+        hi_o = t_min + (days * (b + 1)) // n_bins - 1
+        chunk = [(o, t) for o, t in samples_vec if lo_o <= o <= hi_o]
+        if not chunk:
+            continue
+        ords = [x[0] for x in chunk]
+        triples = [x[1] for x in chunk]
+        lo_g, hi_g = min(ords), max(ords)
+        time_pct = _calendar_bin_center_time_pct(lo_g, hi_g, t_min, t_max)
+        medians_list = []
+        for i_phase in range(3):
+            col = [
+                float(t[i_phase])
+                for t in triples
+                if t[i_phase] is not None and math.isfinite(float(t[i_phase]))
+            ]
+            medians_list.append(float(median(col)) if col else float("nan"))
+        bins_out.append(
+            (
+                time_pct,
+                len(chunk),
+                date.fromordinal(lo_g).isoformat(),
+                date.fromordinal(hi_g).isoformat(),
+                tuple(medians_list),
+            )
+        )
+    bins_out.sort(key=lambda x: x[0])
+    return bins_out
 
 
 def _move_quality_bins_ordinal_quantile(
@@ -457,6 +627,42 @@ def _acpl_phase_bins_ordinal_quantile(
 
 def _ordinal_fallback_subcaption_suffix(chart_cfg: Dict[str, Any]) -> str:
     return str(chart_cfg.get("ordinal_fallback_subcaption_suffix", "")).strip()
+
+
+def _trend_axis_ordinals_for_quantile_bins(
+    bin_edges_iso: Sequence[Tuple[str, str]],
+    t_min: int,
+    t_max: int,
+) -> Tuple[int, int]:
+    """Chart X extent for ordinal-quantile bins.
+
+    Each bin stores min/max game dates in the slice (``lab0``/``lab1``); the UI draws the point
+    at the midpoint ordinal. Using the global ``t_min``/``t_max`` for the axis then leaves a
+    large empty margin when the first or last bin spans many calendar days. Match the axis to
+    the span of those midpoints (with padding), clamped to the sample range.
+    """
+    centers: List[int] = []
+    for lab0, lab1 in bin_edges_iso:
+        try:
+            o0 = date.fromisoformat(str(lab0).strip()).toordinal()
+            o1 = date.fromisoformat(str(lab1).strip()).toordinal()
+            centers.append((o0 + o1) // 2)
+        except (ValueError, TypeError, AttributeError):
+            continue
+    if not centers:
+        return t_min, t_max
+    c_min = min(centers)
+    c_max = max(centers)
+    span = c_max - c_min
+    if span <= 0:
+        pad = 7
+    else:
+        pad = max(1, min(14, max(3, span // 10)))
+    axis_min = max(t_min, c_min - pad)
+    axis_max = min(t_max, c_max + pad)
+    if axis_max <= axis_min:
+        return t_min, t_max
+    return axis_min, axis_max
 
 
 def _collect_trends_dated_player_stats(
@@ -688,9 +894,14 @@ def _build_accuracy_over_time_series(
         span_days=span_days,
         min_span_days=min_span_days,
     )
+    use_tight_quantile_axis = False
     if use_q:
         nqb = _ordinal_quantile_target_bins(chart_cfg, len(samples), max_calendar_bins)
-        series = _accuracy_series_ordinal_quantile_bins(samples, nqb, t_min, t_max)
+        if _ordinal_fallback_mode(chart_cfg) == "quantile":
+            series = _accuracy_series_ordinal_quantile_bins(samples, nqb, t_min, t_max)
+            use_tight_quantile_axis = True
+        else:
+            series = _accuracy_series_equal_ordinal_width_bins(samples, nqb, t_min, t_max)
         suf = _ordinal_fallback_subcaption_suffix(chart_cfg)
         if suf:
             subcaption = f"{subcaption} {suf}"
@@ -712,7 +923,10 @@ def _build_accuracy_over_time_series(
             series.append((time_pct, p_med, cnt, lab0, lab1))
 
     series.sort(key=lambda x: x[0])
-    return series, subcaption, t_min, t_max, mode
+    ord_lo, ord_hi = t_min, t_max
+    if use_q and series and use_tight_quantile_axis:
+        ord_lo, ord_hi = _trend_axis_ordinals_for_quantile_bins([(r[3], r[4]) for r in series], t_min, t_max)
+    return series, subcaption, ord_lo, ord_hi, mode
 
 
 def _build_move_quality_over_time_series(
@@ -804,9 +1018,14 @@ def _build_move_quality_over_time_series(
         span_days=span_days,
         min_span_days=min_span_days,
     )
+    use_tight_quantile_axis = False
     if use_q:
         nqb = _ordinal_quantile_target_bins(chart_cfg, len(samples_vec), max_calendar_bins)
-        bins_out = _move_quality_bins_ordinal_quantile(samples_vec, nqb, n_series, t_min, t_max)
+        if _ordinal_fallback_mode(chart_cfg) == "quantile":
+            bins_out = _move_quality_bins_ordinal_quantile(samples_vec, nqb, n_series, t_min, t_max)
+            use_tight_quantile_axis = True
+        else:
+            bins_out = _move_quality_bins_equal_ordinal_width(samples_vec, nqb, n_series, t_min, t_max)
         suf = _ordinal_fallback_subcaption_suffix(chart_cfg)
         if suf:
             subcaption = f"{subcaption} {suf}"
@@ -831,7 +1050,10 @@ def _build_move_quality_over_time_series(
             bins_out.append((time_pct, cnt, lab0, lab1, tuple(medians_list)))
 
     bins_out.sort(key=lambda x: x[0])
-    return bins_out, labels, stat_ids, subcaption, t_min, t_max, mode
+    ord_lo, ord_hi = t_min, t_max
+    if use_q and bins_out and use_tight_quantile_axis:
+        ord_lo, ord_hi = _trend_axis_ordinals_for_quantile_bins([(r[2], r[3]) for r in bins_out], t_min, t_max)
+    return bins_out, labels, stat_ids, subcaption, ord_lo, ord_hi, mode
 
 
 def _build_acpl_phase_over_time_series(
@@ -908,9 +1130,14 @@ def _build_acpl_phase_over_time_series(
         span_days=span_days,
         min_span_days=min_span_days,
     )
+    use_tight_quantile_axis = False
     if use_q:
         nqb = _ordinal_quantile_target_bins(chart_cfg, len(samples_vec), max_calendar_bins)
-        bins_out = _acpl_phase_bins_ordinal_quantile(samples_vec, nqb, t_min, t_max)
+        if _ordinal_fallback_mode(chart_cfg) == "quantile":
+            bins_out = _acpl_phase_bins_ordinal_quantile(samples_vec, nqb, t_min, t_max)
+            use_tight_quantile_axis = True
+        else:
+            bins_out = _acpl_phase_bins_equal_ordinal_width(samples_vec, nqb, t_min, t_max)
         suf = _ordinal_fallback_subcaption_suffix(chart_cfg)
         if suf:
             subcaption = f"{subcaption} {suf}"
@@ -951,7 +1178,10 @@ def _build_acpl_phase_over_time_series(
     if not any_finite:
         return [], [], [], "", 0, 0, ""
 
-    return bins_out, labels, stat_ids, subcaption, t_min, t_max, mode
+    ord_lo, ord_hi = t_min, t_max
+    if use_q and bins_out and use_tight_quantile_axis:
+        ord_lo, ord_hi = _trend_axis_ordinals_for_quantile_bins([(r[2], r[3]) for r in bins_out], t_min, t_max)
+    return bins_out, labels, stat_ids, subcaption, ord_lo, ord_hi, mode
 
 
 @dataclass

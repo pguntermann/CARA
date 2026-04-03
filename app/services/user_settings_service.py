@@ -518,7 +518,22 @@ class UserSettingsService:
         current = model.get_annotations()
         current.update(settings)
         model.set_annotations(current)
-    
+
+    def update_player_stats_section_visibility(self, section_id: str, visible: bool) -> None:
+        """Update in-memory visibility for one Player Stats section.
+
+        Written to disk when the application exits (see MainWindow ``closeEvent`` /
+        ``_save_user_settings`` → ``AppController.save_user_settings``).
+        """
+        self.get_model().update_player_stats_section_visibility(section_id, visible)
+
+    def set_player_stats_section_visibility_map(self, visibility: Dict[str, bool]) -> None:
+        """Replace the full Player Stats section visibility map in memory.
+
+        Persisted on application exit like ``update_player_stats_section_visibility``.
+        """
+        self.get_model().set_player_stats_section_visibility(visibility)
+
     def update_engines(self, engines: list) -> None:
         """Update engine list.
         
