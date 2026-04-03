@@ -1,5 +1,7 @@
 """Player Statistics view for detail panel."""
 
+from datetime import date, timedelta
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
     QGridLayout, QSizePolicy, QComboBox, QPushButton, QApplication,
@@ -471,6 +473,898 @@ class AccuracyVsProgressChartWidget(QWidget):
         self._hover_data = None
         self._hover_data_opponent = None
         self._hover_pixel = None
+        QToolTip.hideText()
+        self.update()
+
+
+def _accuracy_over_time_ordinal_to_x(
+    o: int, left: float, graph_width: float, omin: int, omax: int
+) -> float:
+    span = max(1, omax - omin)
+    return left + (o - omin) / span * graph_width
+
+
+class AccuracyOverTimeChartWidget(QWidget):
+    """Line chart: X = position along game-date range (0–100%), Y = median accuracy per time bin."""
+
+    def __init__(self, config: Dict[str, Any], parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.config = config
+        ui_config = config.get("ui", {})
+        panel_config = ui_config.get("panels", {}).get("detail", {})
+        player_stats_config = panel_config.get("player_stats", {})
+        chart_config = player_stats_config.get("accuracy_over_time_chart", {})
+        self._chart_cfg = chart_config
+
+        self._height = int(chart_config.get("height", 220))
+        self.background_color = QColor(*chart_config.get("background_color", [30, 30, 35]))
+        self.grid_color = QColor(*chart_config.get("grid_color", [60, 60, 65]))
+        self.line_color = QColor(*chart_config.get("line_color", [120, 190, 255]))
+        self._line_style = AccuracyVsProgressChartWidget._pen_style_from_config(chart_config.get("line_style", "solid"))
+        self.line_width = chart_config.get("line_width", 2)
+        self.text_color = QColor(*chart_config.get("text_color", [200, 200, 200]))
+        self.axis_color = QColor(*chart_config.get("axis_color", [150, 150, 150]))
+        self._x_axis_major_color = QColor(*chart_config.get("x_axis_major_line_color", [88, 88, 95]))
+        self._x_axis_minor_color = QColor(*chart_config.get("x_axis_minor_line_color", [55, 55, 62]))
+        self._x_axis_major_width = int(chart_config.get("x_axis_major_line_width", 1))
+        self._x_axis_minor_width = int(chart_config.get("x_axis_minor_line_width", 1))
+        self._x_axis_calendar_enabled = bool(chart_config.get("x_axis_calendar_enabled", True))
+        self._x_axis_label_min_spacing_px = int(chart_config.get("x_axis_label_min_spacing_px", 44))
+        self._x_axis_max_labels = int(chart_config.get("x_axis_max_labels", 12))
+        self._x_axis_week_in_month = bool(chart_config.get("x_axis_week_ticks_in_month_mode", True))
+        self.padding = chart_config.get("padding", [40, 20, 20, 40])
+        self.font_family = resolve_font_family(chart_config.get("font_family", "Helvetica Neue"))
+        self.font_size = int(scale_font_size(chart_config.get("font_size", 10)))
+        self.min_font_size = int(scale_font_size(chart_config.get("min_font_size", 8)))
+        self.font_size_calculation_divisor = chart_config.get("font_size_calculation_divisor", 20)
+        self.min_grid_spacing = chart_config.get("min_grid_spacing", 30)
+        self.min_grid_lines = chart_config.get("min_grid_lines", 3)
+        self.y_axis_label_spacing = chart_config.get("y_axis_label_spacing", 5)
+        self.x_axis_label_spacing = chart_config.get("x_axis_label_spacing", 5)
+        self._hover_hit_threshold_px = int(chart_config.get("hover_hit_threshold_px", 25))
+        self._hover_circle_radius = int(chart_config.get("hover_circle_radius", 6))
+        self._y_padding_pct = 0.05
+        self._y_min_range = 5.0
+
+        self._data: List[Tuple[float, float]] = []
+        self._vertex_meta: List[Tuple[int, str, str, float]] = []
+        self._ordinal_min = 0
+        self._ordinal_max = 0
+        self._calendar_mode = ""
+        self._hover_pixel: Optional[QPointF] = None
+        self._hover_vertex_index: Optional[int] = None
+
+        self.setFixedHeight(self._height)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setMouseTracking(True)
+
+    def set_data(
+        self,
+        series: List[Tuple[float, float, int, str, str]],
+        ordinal_min: int,
+        ordinal_max: int,
+        calendar_mode: str = "",
+    ) -> None:
+        """Set binned time series from AggregatedPlayerStats.accuracy_over_time."""
+        ordered = sorted(series, key=lambda x: x[0])
+        self._data = [(row[0], row[1]) for row in ordered]
+        self._vertex_meta = [(row[2], row[3], row[4], row[1]) for row in ordered]
+        self._ordinal_min = ordinal_min
+        self._ordinal_max = ordinal_max
+        self._calendar_mode = calendar_mode if calendar_mode in ("day", "week", "month", "year") else ""
+        self._hover_pixel = None
+        self._hover_vertex_index = None
+        self.update()
+
+    def _effective_calendar_mode(self) -> str:
+        if self._calendar_mode:
+            return self._calendar_mode
+        span = max(0, self._ordinal_max - self._ordinal_min)
+        dmax = int(self._chart_cfg.get("calendar_day_bin_max_span_days", 31))
+        wmax = int(self._chart_cfg.get("calendar_week_bin_max_span_days", 120))
+        mmax = int(self._chart_cfg.get("calendar_month_bin_max_span_days", 960))
+        if span <= dmax:
+            return "day"
+        if span <= wmax:
+            return "week"
+        if span <= mmax:
+            return "month"
+        return "year"
+
+    def _week_start_monday_ordinal(self, ord_val: int) -> int:
+        d = date.fromordinal(ord_val)
+        return (d - timedelta(days=d.weekday())).toordinal()
+
+    def _calendar_axis_ticks(self) -> List[Tuple[int, bool, str]]:
+        """(ordinal, is_major, label) — label empty for tick without text."""
+        omin, omax = self._ordinal_min, self._ordinal_max
+        if omax <= omin:
+            return []
+        mode = self._effective_calendar_mode()
+        max_l = max(4, self._x_axis_max_labels)
+        ticks: List[Tuple[int, bool, str]] = []
+        majors: set = set()
+
+        if mode == "year":
+            y0 = date.fromordinal(omin).year
+            y1 = date.fromordinal(omax).year
+            for y in range(y0, y1 + 1):
+                o = date(y, 1, 1).toordinal()
+                if omin <= o <= omax:
+                    ticks.append((o, True, str(y)))
+                    majors.add(o)
+            if self._chart_cfg.get("x_axis_month_ticks_in_year_mode", True) and (y1 - y0) <= 3:
+                cur = date(y0, 1, 1)
+                end_d = date(y1, 12, 1)
+                while cur <= end_d:
+                    o = cur.toordinal()
+                    if omin <= o <= omax and o not in majors:
+                        ticks.append((o, False, ""))
+                    if cur.month == 12:
+                        cur = date(cur.year + 1, 1, 1)
+                    else:
+                        cur = date(cur.year, cur.month + 1, 1)
+
+        elif mode == "month":
+            d0 = date.fromordinal(omin)
+            d1 = date.fromordinal(omax)
+            cur = date(d0.year, d0.month, 1)
+            end_m = date(d1.year, d1.month, 1)
+            while cur <= end_m:
+                o = cur.toordinal()
+                if omin <= o <= omax:
+                    ticks.append((o, True, cur.strftime("%b '%y")))
+                    majors.add(o)
+                if cur.month == 12:
+                    cur = date(cur.year + 1, 1, 1)
+                else:
+                    cur = date(cur.year, cur.month + 1, 1)
+            if self._x_axis_week_in_month:
+                w = self._week_start_monday_ordinal(omin)
+                while w < omin:
+                    w += 7
+                while w <= omax:
+                    if w not in majors:
+                        ticks.append((w, False, ""))
+                    w += 7
+
+        elif mode == "week":
+            w = self._week_start_monday_ordinal(omin)
+            while w < omin:
+                w += 7
+            idx = 0
+            label_every = max(1, int(max(1, (omax - omin) // 7) // max_l) + 1)
+            while w <= omax:
+                lbl = date.fromordinal(w).strftime("%d %b") if idx % label_every == 0 else ""
+                ticks.append((w, True, lbl))
+                idx += 1
+                w += 7
+
+        else:
+            span_days = omax - omin
+            step = max(1, (span_days + max_l - 1) // max_l)
+            o = omin
+            while o <= omax:
+                ticks.append((o, True, date.fromordinal(o).strftime("%d %b")))
+                o += step
+            if ticks and ticks[-1][0] < omax:
+                ticks.append((omax, True, date.fromordinal(omax).strftime("%d %b")))
+
+        ticks.sort(key=lambda t: t[0])
+        return ticks
+
+    def _accuracy_range(self) -> Tuple[float, float]:
+        accs: List[float] = [acc for _, acc in self._data]
+        if not accs:
+            return 0.0, 100.0
+        lo, hi = min(accs), max(accs)
+        r = hi - lo
+        if r < self._y_min_range:
+            mid = (lo + hi) / 2.0
+            half = self._y_min_range / 2.0
+            lo, hi = mid - half, mid + half
+            r = self._y_min_range
+        pad = max(2.0, r * self._y_padding_pct)
+        return (max(0.0, lo - pad), min(100.0, hi + pad))
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        width = self.width()
+        height = self.height()
+        painter.fillRect(0, 0, width, height, self.background_color)
+
+        if not self._data:
+            painter.setPen(self.text_color)
+            font = QFont(self.font_family, self.font_size)
+            painter.setFont(font)
+            painter.drawText(QRect(0, 0, width, height), Qt.AlignmentFlag.AlignCenter, "No data")
+            return
+
+        left = self.padding[0]
+        top = self.padding[1]
+        right = width - self.padding[2]
+        bottom = height - self.padding[3]
+        graph_width = right - left
+        graph_height = bottom - top
+
+        min_acc, max_acc = self._accuracy_range()
+        acc_range = max_acc - min_acc
+
+        max_grid_lines = max(self.min_grid_lines, int(graph_height / self.min_grid_spacing))
+        step = acc_range / max(1, max_grid_lines - 1) if acc_range > 0 else 1.0
+        painter.setPen(QPen(self.grid_color, 1))
+        for i in range(max_grid_lines + 1):
+            acc = min_acc + i * step
+            y = bottom - ((acc - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
+            painter.drawLine(int(left), int(y), int(right), int(y))
+
+        tick_list: List[Tuple[int, bool, str]] = []
+        if self._x_axis_calendar_enabled:
+            tick_list = self._calendar_axis_ticks()
+            for o_ord, is_major, _lbl in tick_list:
+                x = _accuracy_over_time_ordinal_to_x(
+                    o_ord, left, graph_width, self._ordinal_min, self._ordinal_max
+                )
+                if is_major:
+                    painter.setPen(QPen(self._x_axis_major_color, self._x_axis_major_width))
+                else:
+                    painter.setPen(QPen(self._x_axis_minor_color, self._x_axis_minor_width))
+                painter.drawLine(int(x), int(top), int(x), int(bottom))
+        else:
+            for pct in [0, 25, 50, 75, 100]:
+                x = left + (pct / 100.0 * graph_width)
+                painter.setPen(QPen(self.grid_color, 1))
+                painter.drawLine(int(x), int(top), int(x), int(bottom))
+
+        painter.setPen(self.text_color)
+        adaptive_font_size = max(
+            self.min_font_size, min(self.font_size, int(graph_height / self.font_size_calculation_divisor))
+        )
+        font = QFont(self.font_family, adaptive_font_size)
+        painter.setFont(font)
+        fm = QFontMetrics(font)
+
+        for i in range(max_grid_lines + 1):
+            acc = min_acc + i * step
+            y = bottom - ((acc - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
+            label = f"{acc:.1f}%" if acc != int(acc) or acc_range < 20 else f"{acc:.0f}%"
+            label_width = fm.horizontalAdvance(label)
+            painter.drawText(int(left - label_width - self.y_axis_label_spacing), int(y + fm.height() / 2), label)
+
+        if self._x_axis_calendar_enabled and tick_list:
+            last_label_x = -1e9
+            for o_ord, is_major, lbl in tick_list:
+                if not lbl or not is_major:
+                    continue
+                x = _accuracy_over_time_ordinal_to_x(
+                    o_ord, left, graph_width, self._ordinal_min, self._ordinal_max
+                )
+                if x - last_label_x < self._x_axis_label_min_spacing_px:
+                    continue
+                label_width = fm.horizontalAdvance(lbl)
+                painter.drawText(
+                    int(x - label_width / 2),
+                    int(bottom + fm.height() + self.x_axis_label_spacing),
+                    lbl,
+                )
+                last_label_x = x
+        else:
+            for pct in [0, 25, 50, 75, 100]:
+                x = left + (pct / 100.0 * graph_width)
+                span_o = max(1, self._ordinal_max - self._ordinal_min)
+                o = int(round(self._ordinal_min + span_o * pct / 100.0))
+                o = max(self._ordinal_min, min(self._ordinal_max, o))
+                label = date.fromordinal(o).isoformat()
+                label_width = fm.horizontalAdvance(label)
+                painter.drawText(int(x - label_width / 2), int(bottom + fm.height() + self.x_axis_label_spacing), label)
+
+        sorted_data = sorted(self._data, key=lambda x: x[0])
+        points: List[QPointF] = []
+        for pct, acc in sorted_data:
+            x = left + (pct / 100.0 * graph_width)
+            y = bottom - ((acc - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
+            y = max(top, min(bottom, y))
+            points.append(QPointF(x, y))
+
+        if len(points) > 1:
+            pen_player = QPen(self.line_color, self.line_width)
+            pen_player.setStyle(self._line_style)
+            painter.setPen(pen_player)
+            for i in range(len(points) - 1):
+                painter.drawLine(points[i], points[i + 1])
+        elif len(points) == 1:
+            pen_player = QPen(self.line_color, self.line_width)
+            pen_player.setStyle(self._line_style)
+            painter.setPen(pen_player)
+            painter.setBrush(QBrush(self.line_color))
+            r = max(3, self.line_width + 2)
+            painter.drawEllipse(points[0], r, r)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        if self._hover_pixel is not None and self._hover_vertex_index is not None:
+            hover_pen = QPen(self.line_color, 2)
+            hover_pen.setStyle(self._line_style)
+            painter.setPen(hover_pen)
+            painter.setBrush(QBrush(self.background_color))
+            painter.drawEllipse(self._hover_pixel, self._hover_circle_radius, self._hover_circle_radius)
+
+    def _graph_bounds(self) -> Tuple[float, float, float, float, float, float]:
+        width = self.width()
+        height = self.height()
+        left = self.padding[0]
+        top = self.padding[1]
+        right = width - self.padding[2]
+        bottom = height - self.padding[3]
+        return left, top, right, bottom, right - left, bottom - top
+
+    def _data_to_pixel(
+        self,
+        progress: float,
+        accuracy: float,
+        left: float,
+        bottom: float,
+        graph_width: float,
+        graph_height: float,
+        min_acc: Optional[float] = None,
+        max_acc: Optional[float] = None,
+    ) -> QPointF:
+        if min_acc is None or max_acc is None:
+            min_acc, max_acc = self._accuracy_range()
+        acc_range = max_acc - min_acc
+        x = left + (progress / 100.0 * graph_width)
+        y = bottom - ((accuracy - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
+        return QPointF(x, y)
+
+    def _closest_point_on_segment(
+        self, p: QPointF, a: QPointF, b: QPointF
+    ) -> Tuple[QPointF, float]:
+        vx = b.x() - a.x()
+        vy = b.y() - a.y()
+        wx = p.x() - a.x()
+        wy = p.y() - a.y()
+        c1 = wx * vx + wy * vy
+        c2 = vx * vx + vy * vy
+        if c2 <= 0:
+            cx, cy = a.x(), a.y()
+        elif c1 <= 0:
+            cx, cy = a.x(), a.y()
+        elif c1 >= c2:
+            cx, cy = b.x(), b.y()
+        else:
+            t = c1 / c2
+            cx = a.x() + t * vx
+            cy = a.y() + t * vy
+        dx = p.x() - cx
+        dy = p.y() - cy
+        return QPointF(cx, cy), dx * dx + dy * dy
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        if not self._data:
+            return
+        left, top, right, bottom, graph_width, graph_height = self._graph_bounds()
+        if graph_width <= 0 or graph_height <= 0:
+            self._hover_pixel = None
+            self._hover_vertex_index = None
+            self.update()
+            return
+        sorted_data = sorted(self._data, key=lambda x: x[0])
+        min_acc, max_acc = self._accuracy_range()
+        points: List[QPointF] = []
+        for pct, acc in sorted_data:
+            pt = self._data_to_pixel(
+                pct, acc, left, bottom, graph_width, graph_height, min_acc, max_acc
+            )
+            pt.setY(max(top, min(bottom, pt.y())))
+            points.append(pt)
+        if len(points) == 0:
+            self._hover_pixel = None
+            self._hover_vertex_index = None
+            QToolTip.hideText()
+            self.update()
+            return
+        mp = event.position()
+        threshold_sq = self._hover_hit_threshold_px * self._hover_hit_threshold_px
+        if len(points) == 1:
+            d0 = (mp.x() - points[0].x()) ** 2 + (mp.y() - points[0].y()) ** 2
+            if d0 <= threshold_sq:
+                self._hover_pixel = points[0]
+                self._hover_vertex_index = 0
+                cnt, lab0, lab1, p_acc = self._vertex_meta[0]
+                gw = "game" if cnt == 1 else "games"
+                tip = f"{lab0} – {lab1}\nMedian accuracy: {p_acc:.1f}%\n{cnt} {gw}"
+                QToolTip.showText(event.globalPosition().toPoint(), tip, self, QRect(), 4000)
+            else:
+                self._hover_pixel = None
+                self._hover_vertex_index = None
+                QToolTip.hideText()
+            self.update()
+            return
+        best_dist_sq = float("inf")
+        best_pixel: Optional[QPointF] = None
+        best_vertex: Optional[int] = None
+        for i in range(len(points) - 1):
+            closest, dist_sq = self._closest_point_on_segment(mp, points[i], points[i + 1])
+            if dist_sq < best_dist_sq:
+                best_dist_sq = dist_sq
+                best_pixel = closest
+                d_i = (closest.x() - points[i].x()) ** 2 + (closest.y() - points[i].y()) ** 2
+                d_j = (closest.x() - points[i + 1].x()) ** 2 + (closest.y() - points[i + 1].y()) ** 2
+                best_vertex = i if d_i <= d_j else i + 1
+        if best_dist_sq <= threshold_sq and best_pixel is not None and best_vertex is not None:
+            self._hover_pixel = best_pixel
+            self._hover_vertex_index = best_vertex
+            cnt, lab0, lab1, p_acc = self._vertex_meta[best_vertex]
+            gw = "game" if cnt == 1 else "games"
+            tip = f"{lab0} – {lab1}\nMedian accuracy: {p_acc:.1f}%\n{cnt} {gw}"
+            QToolTip.showText(event.globalPosition().toPoint(), tip, self, QRect(), 4000)
+        else:
+            self._hover_pixel = None
+            self._hover_vertex_index = None
+            QToolTip.hideText()
+        self.update()
+
+    def leaveEvent(self, event) -> None:
+        super().leaveEvent(event)
+        self._hover_pixel = None
+        self._hover_vertex_index = None
+        QToolTip.hideText()
+        self.update()
+
+
+class MoveQualityOverTimeChartWidget(QWidget):
+    """Multi-series chart: calendar-aligned date range vs median % of player moves per classification per bin."""
+
+    def __init__(self, config: Dict[str, Any], parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.config = config
+        ui_config = config.get("ui", {})
+        panel_config = ui_config.get("panels", {}).get("detail", {})
+        player_stats_config = panel_config.get("player_stats", {})
+        acc_cfg = dict(player_stats_config.get("accuracy_over_time_chart", {}))
+        mq_cfg = dict(player_stats_config.get("move_quality_over_time_chart", {}))
+        self._chart_cfg = {**acc_cfg, **mq_cfg}
+        self._mq_cfg = mq_cfg
+
+        def _rgb(key: str, fallback: List[int]) -> List[int]:
+            v = mq_cfg.get(key)
+            if isinstance(v, list) and len(v) >= 3:
+                return [int(v[0]), int(v[1]), int(v[2])]
+            return fallback
+
+        self._height = int(mq_cfg.get("height", 240))
+        self._legend_width = int(mq_cfg.get("legend_width", 112))
+        self.background_color = QColor(*_rgb("background_color", [30, 30, 35]))
+        self.grid_color = QColor(*_rgb("grid_color", [60, 60, 65]))
+        self.text_color = QColor(*_rgb("text_color", [200, 200, 200]))
+        self.axis_color = QColor(*_rgb("axis_color", [150, 150, 150]))
+        self._x_axis_major_color = QColor(*acc_cfg.get("x_axis_major_line_color", [88, 88, 95]))
+        self._x_axis_minor_color = QColor(*acc_cfg.get("x_axis_minor_line_color", [55, 55, 62]))
+        self._x_axis_major_width = int(acc_cfg.get("x_axis_major_line_width", 1))
+        self._x_axis_minor_width = int(acc_cfg.get("x_axis_minor_line_width", 1))
+        self._x_axis_calendar_enabled = bool(acc_cfg.get("x_axis_calendar_enabled", True))
+        self._x_axis_label_min_spacing_px = int(acc_cfg.get("x_axis_label_min_spacing_px", 44))
+        self._x_axis_max_labels = int(acc_cfg.get("x_axis_max_labels", 12))
+        self._x_axis_week_in_month = bool(acc_cfg.get("x_axis_week_ticks_in_month_mode", True))
+        self.padding = mq_cfg.get("padding", [40, 20, 20, 40])
+        self.font_family = resolve_font_family(mq_cfg.get("font_family", "Helvetica Neue"))
+        self.font_size = int(scale_font_size(mq_cfg.get("font_size", 10)))
+        self.min_font_size = int(scale_font_size(mq_cfg.get("min_font_size", 8)))
+        self.font_size_calculation_divisor = mq_cfg.get("font_size_calculation_divisor", 20)
+        self.min_grid_spacing = mq_cfg.get("min_grid_spacing", 30)
+        self.min_grid_lines = mq_cfg.get("min_grid_lines", 5)
+        self.y_axis_label_spacing = mq_cfg.get("y_axis_label_spacing", 5)
+        self.x_axis_label_spacing = mq_cfg.get("x_axis_label_spacing", 5)
+        self._hover_hit_threshold_px = int(mq_cfg.get("hover_hit_threshold_px", 25))
+        self._legend_font_size = int(scale_font_size(mq_cfg.get("legend_font_size", 8)))
+        self._default_pen: Tuple[QColor, Qt.PenStyle, int] = (
+            QColor(160, 160, 170),
+            Qt.PenStyle.SolidLine,
+            2,
+        )
+        self._style_for_id: Dict[str, Tuple[QColor, Qt.PenStyle, int]] = {}
+        for item in mq_cfg.get("series") or []:
+            if not isinstance(item, dict):
+                continue
+            sid = str(item.get("id", "")).strip()
+            if not sid:
+                continue
+            rgb = item.get("line_color", [160, 160, 170])
+            col = (
+                QColor(int(rgb[0]), int(rgb[1]), int(rgb[2]))
+                if isinstance(rgb, (list, tuple)) and len(rgb) >= 3
+                else QColor(160, 160, 170)
+            )
+            st = AccuracyVsProgressChartWidget._pen_style_from_config(item.get("line_style", "solid"))
+            lw = int(item.get("line_width", 2))
+            self._style_for_id[sid] = (col, st, lw)
+
+        self._bins: List[Tuple[float, int, str, str, Tuple[float, ...]]] = []
+        self._labels: List[str] = []
+        self._series_visuals: List[Tuple[QColor, Qt.PenStyle, int]] = []
+        self._ordinal_min = 0
+        self._ordinal_max = 0
+        self._calendar_mode = ""
+        self._hover_plot_x: Optional[float] = None
+        self._hover_values: Optional[Tuple[float, ...]] = None
+
+        self.setFixedHeight(self._height)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setMouseTracking(True)
+
+    def set_data(
+        self,
+        bins: List[Tuple[float, int, str, str, Tuple[float, ...]]],
+        labels: List[str],
+        series_ids: List[str],
+        ordinal_min: int,
+        ordinal_max: int,
+        calendar_mode: str = "",
+    ) -> None:
+        ordered = sorted(bins, key=lambda x: x[0])
+        self._bins = ordered
+        self._labels = list(labels)
+        self._series_visuals = [self._style_for_id.get(sid, self._default_pen) for sid in series_ids]
+        self._ordinal_min = ordinal_min
+        self._ordinal_max = ordinal_max
+        self._calendar_mode = calendar_mode if calendar_mode in ("day", "week", "month", "year") else ""
+        self._hover_plot_x = None
+        self._hover_values = None
+        self.update()
+
+    def _y_axis_range(self) -> Tuple[float, float]:
+        """Y from 0 to max observed % (plus headroom), capped at 100."""
+        y_min = 0.0
+        vals: List[float] = []
+        for row in self._bins:
+            for v in row[4]:
+                vals.append(float(v))
+        if not vals:
+            return 0.0, 100.0
+        data_max = max(vals)
+        pad = max(2.0, data_max * 0.08)
+        y_max = min(100.0, data_max + pad)
+        if y_max <= y_min + 1e-6:
+            y_max = min(100.0, 5.0)
+        return y_min, y_max
+
+    def _interpolate_values_at_chart_time(self, time_pct: float) -> Tuple[float, ...]:
+        """Linear interpolation between bin medians; time_pct is 0–100 along the chart X axis."""
+        n = len(self._labels)
+        if not self._bins or n == 0:
+            return tuple()
+        tps = [b[0] for b in self._bins]
+        if len(self._bins) == 1:
+            meds = self._bins[0][4]
+            return tuple(float(meds[j]) if j < len(meds) else 0.0 for j in range(n))
+        ht = max(tps[0], min(tps[-1], time_pct))
+        i = 0
+        for k in range(len(tps) - 1):
+            if tps[k] <= ht <= tps[k + 1]:
+                i = k
+                break
+        else:
+            i = max(0, len(tps) - 2)
+        span_t = tps[i + 1] - tps[i]
+        frac = 0.0 if span_t <= 1e-9 else (ht - tps[i]) / span_t
+        ma, mb = self._bins[i][4], self._bins[i + 1][4]
+        out: List[float] = []
+        for j in range(n):
+            va = float(ma[j]) if j < len(ma) else 0.0
+            vb = float(mb[j]) if j < len(mb) else 0.0
+            out.append(va + frac * (vb - va))
+        return tuple(out)
+
+    def _ordinal_at_chart_time_pct(self, time_pct: float) -> int:
+        span_o = max(1, self._ordinal_max - self._ordinal_min)
+        t = max(0.0, min(100.0, time_pct))
+        o = int(round(self._ordinal_min + (t / 100.0) * span_o))
+        return max(self._ordinal_min, min(self._ordinal_max, o))
+
+    def _effective_calendar_mode(self) -> str:
+        if self._calendar_mode:
+            return self._calendar_mode
+        span = max(0, self._ordinal_max - self._ordinal_min)
+        dmax = int(self._chart_cfg.get("calendar_day_bin_max_span_days", 31))
+        wmax = int(self._chart_cfg.get("calendar_week_bin_max_span_days", 120))
+        mmax = int(self._chart_cfg.get("calendar_month_bin_max_span_days", 960))
+        if span <= dmax:
+            return "day"
+        if span <= wmax:
+            return "week"
+        if span <= mmax:
+            return "month"
+        return "year"
+
+    def _week_start_monday_ordinal(self, ord_val: int) -> int:
+        d = date.fromordinal(ord_val)
+        return (d - timedelta(days=d.weekday())).toordinal()
+
+    def _calendar_axis_ticks(self) -> List[Tuple[int, bool, str]]:
+        omin, omax = self._ordinal_min, self._ordinal_max
+        if omax <= omin:
+            return []
+        mode = self._effective_calendar_mode()
+        max_l = max(4, self._x_axis_max_labels)
+        ticks: List[Tuple[int, bool, str]] = []
+        majors: set = set()
+
+        if mode == "year":
+            y0 = date.fromordinal(omin).year
+            y1 = date.fromordinal(omax).year
+            for y in range(y0, y1 + 1):
+                o = date(y, 1, 1).toordinal()
+                if omin <= o <= omax:
+                    ticks.append((o, True, str(y)))
+                    majors.add(o)
+            if self._chart_cfg.get("x_axis_month_ticks_in_year_mode", True) and (y1 - y0) <= 3:
+                cur = date(y0, 1, 1)
+                end_d = date(y1, 12, 1)
+                while cur <= end_d:
+                    o = cur.toordinal()
+                    if omin <= o <= omax and o not in majors:
+                        ticks.append((o, False, ""))
+                    if cur.month == 12:
+                        cur = date(cur.year + 1, 1, 1)
+                    else:
+                        cur = date(cur.year, cur.month + 1, 1)
+
+        elif mode == "month":
+            d0 = date.fromordinal(omin)
+            d1 = date.fromordinal(omax)
+            cur = date(d0.year, d0.month, 1)
+            end_m = date(d1.year, d1.month, 1)
+            while cur <= end_m:
+                o = cur.toordinal()
+                if omin <= o <= omax:
+                    ticks.append((o, True, cur.strftime("%b '%y")))
+                    majors.add(o)
+                if cur.month == 12:
+                    cur = date(cur.year + 1, 1, 1)
+                else:
+                    cur = date(cur.year, cur.month + 1, 1)
+            if self._x_axis_week_in_month:
+                w = self._week_start_monday_ordinal(omin)
+                while w < omin:
+                    w += 7
+                while w <= omax:
+                    if w not in majors:
+                        ticks.append((w, False, ""))
+                    w += 7
+
+        elif mode == "week":
+            w = self._week_start_monday_ordinal(omin)
+            while w < omin:
+                w += 7
+            idx = 0
+            label_every = max(1, int(max(1, (omax - omin) // 7) // max_l) + 1)
+            while w <= omax:
+                lbl = date.fromordinal(w).strftime("%d %b") if idx % label_every == 0 else ""
+                ticks.append((w, True, lbl))
+                idx += 1
+                w += 7
+
+        else:
+            span_days = omax - omin
+            step = max(1, (span_days + max_l - 1) // max_l)
+            o = omin
+            while o <= omax:
+                ticks.append((o, True, date.fromordinal(o).strftime("%d %b")))
+                o += step
+            if ticks and ticks[-1][0] < omax:
+                ticks.append((omax, True, date.fromordinal(omax).strftime("%d %b")))
+
+        ticks.sort(key=lambda t: t[0])
+        return ticks
+
+    def _graph_bounds(self) -> Tuple[float, float, float, float, float, float]:
+        width = self.width()
+        height = self.height()
+        left = self.padding[0]
+        top = self.padding[1]
+        right_plot = width - self.padding[2] - self._legend_width
+        bottom = height - self.padding[3]
+        return left, top, right_plot, bottom, right_plot - left, bottom - top
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        width = self.width()
+        height = self.height()
+        painter.fillRect(0, 0, width, height, self.background_color)
+
+        if not self._bins or not self._labels:
+            painter.setPen(self.text_color)
+            font = QFont(self.font_family, self.font_size)
+            painter.setFont(font)
+            painter.drawText(QRect(0, 0, width, height), Qt.AlignmentFlag.AlignCenter, "No data")
+            return
+
+        n_series = len(self._labels)
+        if n_series == 0:
+            return
+
+        left, top, right_plot, bottom, graph_width, graph_height = self._graph_bounds()
+        if graph_width <= 0 or graph_height <= 0:
+            return
+
+        min_y, max_y = self._y_axis_range()
+        y_range = max_y - min_y
+
+        max_grid_lines = max(self.min_grid_lines, int(graph_height / self.min_grid_spacing))
+        step = y_range / max(1, max_grid_lines - 1)
+        painter.setPen(QPen(self.grid_color, 1))
+        for i in range(max_grid_lines + 1):
+            yv = min_y + i * step
+            y = bottom - ((yv - min_y) / y_range * graph_height) if y_range > 0 else bottom
+            painter.drawLine(int(left), int(y), int(right_plot), int(y))
+
+        tick_list: List[Tuple[int, bool, str]] = []
+        if self._x_axis_calendar_enabled:
+            tick_list = self._calendar_axis_ticks()
+            for o_ord, is_major, _lbl in tick_list:
+                x = _accuracy_over_time_ordinal_to_x(
+                    o_ord, left, graph_width, self._ordinal_min, self._ordinal_max
+                )
+                if is_major:
+                    painter.setPen(QPen(self._x_axis_major_color, self._x_axis_major_width))
+                else:
+                    painter.setPen(QPen(self._x_axis_minor_color, self._x_axis_minor_width))
+                painter.drawLine(int(x), int(top), int(x), int(bottom))
+        else:
+            for pct in [0, 25, 50, 75, 100]:
+                x = left + (pct / 100.0 * graph_width)
+                painter.setPen(QPen(self.grid_color, 1))
+                painter.drawLine(int(x), int(top), int(x), int(bottom))
+
+        painter.setPen(self.text_color)
+        adaptive_font_size = max(
+            self.min_font_size, min(self.font_size, int(graph_height / self.font_size_calculation_divisor))
+        )
+        font = QFont(self.font_family, adaptive_font_size)
+        painter.setFont(font)
+        fm = QFontMetrics(font)
+
+        for i in range(max_grid_lines + 1):
+            yv = min_y + i * step
+            y = bottom - ((yv - min_y) / y_range * graph_height) if y_range > 0 else bottom
+            yfmt = f"{yv:.1f}%" if max_y < 20.0 else f"{yv:.0f}%"
+            label_width = fm.horizontalAdvance(yfmt)
+            painter.drawText(int(left - label_width - self.y_axis_label_spacing), int(y + fm.height() / 2), yfmt)
+
+        if self._x_axis_calendar_enabled and tick_list:
+            last_label_x = -1e9
+            for o_ord, is_major, lbl in tick_list:
+                if not lbl or not is_major:
+                    continue
+                x = _accuracy_over_time_ordinal_to_x(
+                    o_ord, left, graph_width, self._ordinal_min, self._ordinal_max
+                )
+                if x - last_label_x < self._x_axis_label_min_spacing_px:
+                    continue
+                label_width = fm.horizontalAdvance(lbl)
+                painter.drawText(
+                    int(x - label_width / 2),
+                    int(bottom + fm.height() + self.x_axis_label_spacing),
+                    lbl,
+                )
+                last_label_x = x
+        else:
+            for pct in [0, 25, 50, 75, 100]:
+                x = left + (pct / 100.0 * graph_width)
+                span_o = max(1, self._ordinal_max - self._ordinal_min)
+                o = int(round(self._ordinal_min + span_o * pct / 100.0))
+                o = max(self._ordinal_min, min(self._ordinal_max, o))
+                label = date.fromordinal(o).isoformat()
+                label_width = fm.horizontalAdvance(label)
+                painter.drawText(int(x - label_width / 2), int(bottom + fm.height() + self.x_axis_label_spacing), label)
+
+        all_points: List[List[QPointF]] = [[] for _ in range(n_series)]
+        for row in self._bins:
+            t_pct, _c, _l0, _l1, meds = row
+            x = left + (t_pct / 100.0 * graph_width)
+            for j in range(n_series):
+                if j >= len(meds):
+                    continue
+                acc = meds[j]
+                y = bottom - ((acc - min_y) / y_range * graph_height) if y_range > 0 else bottom
+                y = max(top, min(bottom, y))
+                all_points[j].append(QPointF(x, y))
+
+        for j in range(n_series):
+            points = all_points[j]
+            col, line_style, line_width = self._series_visuals[j] if j < len(self._series_visuals) else self._default_pen
+            pen = QPen(col, line_width)
+            pen.setStyle(line_style)
+            painter.setPen(pen)
+            if len(points) > 1:
+                for k in range(len(points) - 1):
+                    painter.drawLine(points[k], points[k + 1])
+            elif len(points) == 1:
+                painter.setBrush(QBrush(col))
+                r = max(3, line_width + 2)
+                painter.drawEllipse(points[0], r, r)
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        if (
+            self._hover_plot_x is not None
+            and self._hover_values is not None
+            and left <= self._hover_plot_x <= right_plot
+        ):
+            hx = self._hover_plot_x
+            dash_pen = QPen(self.axis_color, 1)
+            dash_pen.setStyle(Qt.PenStyle.DashLine)
+            painter.setPen(dash_pen)
+            painter.drawLine(int(hx), int(top), int(hx), int(bottom))
+            for j in range(min(n_series, len(self._hover_values))):
+                acc = self._hover_values[j]
+                hy = bottom - ((acc - min_y) / y_range * graph_height) if y_range > 0 else bottom
+                hy = max(top, min(bottom, hy))
+                col, line_style, lw = (
+                    self._series_visuals[j] if j < len(self._series_visuals) else self._default_pen
+                )
+                hover_pen = QPen(col, max(2, lw))
+                hover_pen.setStyle(line_style)
+                painter.setPen(hover_pen)
+                painter.setBrush(QBrush(self.background_color))
+                painter.drawEllipse(QPointF(hx, hy), 5, 5)
+
+        leg_font = QFont(self.font_family, self._legend_font_size)
+        painter.setFont(leg_font)
+        leg_fm = QFontMetrics(leg_font)
+        lx = int(right_plot + 8)
+        ly = int(top + 4)
+        line_w = 14
+        for j in range(n_series):
+            col, line_style, lw = self._series_visuals[j] if j < len(self._series_visuals) else self._default_pen
+            pen = QPen(col, max(1, lw))
+            pen.setStyle(line_style)
+            painter.setPen(pen)
+            painter.drawLine(lx, ly + leg_fm.height() // 2, lx + line_w, ly + leg_fm.height() // 2)
+            painter.setPen(self.text_color)
+            painter.drawText(lx + line_w + 6, ly + leg_fm.ascent(), self._labels[j])
+            ly += leg_fm.height() + 4
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        if not self._bins or not self._labels:
+            return
+        left, top, right_plot, bottom, graph_width, graph_height = self._graph_bounds()
+        if graph_width <= 0 or graph_height <= 0:
+            self._hover_plot_x = None
+            self._hover_values = None
+            self.update()
+            return
+
+        mp = event.position()
+        mx, my = float(mp.x()), float(mp.y())
+        if not (left <= mx <= right_plot and top <= my <= bottom):
+            self._hover_plot_x = None
+            self._hover_values = None
+            QToolTip.hideText()
+            self.update()
+            return
+
+        chart_t = max(0.0, min(100.0, (mx - left) / graph_width * 100.0))
+        values = self._interpolate_values_at_chart_time(chart_t)
+        ord_h = self._ordinal_at_chart_time_pct(chart_t)
+        date_str = date.fromordinal(ord_h).isoformat()
+        lines = [date_str]
+        for j, lab in enumerate(self._labels):
+            if j < len(values):
+                lines.append(f"{lab}: {values[j]:.1f}%")
+        QToolTip.showText(event.globalPosition().toPoint(), "\n".join(lines), self, QRect(), 4000)
+        self._hover_plot_x = mx
+        self._hover_values = values
+        self.update()
+
+    def leaveEvent(self, event) -> None:
+        super().leaveEvent(event)
+        self._hover_plot_x = None
+        self._hover_values = None
         QToolTip.hideText()
         self.update()
 
@@ -1333,6 +2227,79 @@ class DetailPlayerStatsView(QWidget):
             progress_chart.set_data(self.current_stats.accuracy_by_progress, opponent_data=opponent_progress)
             progress_chart.setProperty("section_name", "Avg. Accuracy over game duration")
             self.content_layout.addWidget(progress_chart)
+            self.content_layout.addSpacing(section_spacing_val)
+
+        over_time_cfg = player_stats_config.get("accuracy_over_time_chart", {})
+        over_time_series = getattr(self.current_stats, "accuracy_over_time", None) or []
+        if (
+            over_time_cfg.get("enabled", True)
+            and over_time_series
+            and getattr(self.current_stats, "trends_ordinal_max", 0) > 0
+        ):
+            self._add_section_header("Accuracy progression", header_font, header_text_color)
+            ot_wrap = QWidget()
+            ot_layout = QVBoxLayout(ot_wrap)
+            ot_layout.setContentsMargins(0, 0, 0, 0)
+            ot_layout.setSpacing(6)
+            sub = QLabel(getattr(self.current_stats, "trends_subcaption", "") or "")
+            sub.setWordWrap(True)
+            sub_cap_fs = scale_font_size(over_time_cfg.get("subcaption_font_size", 9))
+            sub_font = QFont(resolve_font_family(player_stats_config.get("fonts", {}).get("label_font_family", "Helvetica Neue")), int(sub_cap_fs))
+            sub.setFont(sub_font)
+            sub.setStyleSheet(
+                f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); background: transparent;"
+            )
+            ot_layout.addWidget(sub)
+            ot_chart = AccuracyOverTimeChartWidget(self.config)
+            ot_chart.set_data(
+                list(over_time_series),
+                int(getattr(self.current_stats, "trends_ordinal_min", 0)),
+                int(getattr(self.current_stats, "trends_ordinal_max", 0)),
+                getattr(self.current_stats, "trends_calendar_mode", "") or "",
+            )
+            ot_layout.addWidget(ot_chart)
+            ot_wrap.setProperty("section_name", "Accuracy progression")
+            self.content_layout.addWidget(ot_wrap)
+            self.content_layout.addSpacing(section_spacing_val)
+
+        mq_cfg = player_stats_config.get("move_quality_over_time_chart", {})
+        mq_bins = getattr(self.current_stats, "move_quality_over_time", None) or []
+        mq_ids = getattr(self.current_stats, "move_quality_series_ids", None) or []
+        if (
+            mq_cfg.get("enabled", True)
+            and mq_bins
+            and mq_ids
+            and int(getattr(self.current_stats, "move_quality_ordinal_max", 0)) > 0
+        ):
+            self._add_section_header("Move quality progression", header_font, header_text_color)
+            mq_wrap = QWidget()
+            mq_layout = QVBoxLayout(mq_wrap)
+            mq_layout.setContentsMargins(0, 0, 0, 0)
+            mq_layout.setSpacing(6)
+            mq_sub = QLabel(getattr(self.current_stats, "move_quality_subcaption", "") or "")
+            mq_sub.setWordWrap(True)
+            mq_sub_fs = scale_font_size(mq_cfg.get("subcaption_font_size", 9))
+            mq_sub_font = QFont(
+                resolve_font_family(player_stats_config.get("fonts", {}).get("label_font_family", "Helvetica Neue")),
+                int(mq_sub_fs),
+            )
+            mq_sub.setFont(mq_sub_font)
+            mq_sub.setStyleSheet(
+                f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); background: transparent;"
+            )
+            mq_layout.addWidget(mq_sub)
+            mq_chart = MoveQualityOverTimeChartWidget(self.config)
+            mq_chart.set_data(
+                list(mq_bins),
+                list(getattr(self.current_stats, "move_quality_series_labels", None) or []),
+                list(mq_ids),
+                int(getattr(self.current_stats, "move_quality_ordinal_min", 0)),
+                int(getattr(self.current_stats, "move_quality_ordinal_max", 0)),
+                getattr(self.current_stats, "move_quality_calendar_mode", "") or "",
+            )
+            mq_layout.addWidget(mq_chart)
+            mq_wrap.setProperty("section_name", "Move quality progression")
+            self.content_layout.addWidget(mq_wrap)
             self.content_layout.addSpacing(section_spacing_val)
         
         # Openings Section (Most Played, Worst/Best accuracy grids only)

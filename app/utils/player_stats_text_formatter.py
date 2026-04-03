@@ -76,6 +76,14 @@ class PlayerStatsTextFormatter:
         if progress_lines:
             lines.extend(progress_lines)
             lines.append("")
+        time_lines = PlayerStatsTextFormatter._format_accuracy_over_time(stats)
+        if time_lines:
+            lines.extend(time_lines)
+            lines.append("")
+        mq_time_lines = PlayerStatsTextFormatter._format_move_quality_over_time(stats)
+        if mq_time_lines:
+            lines.extend(mq_time_lines)
+            lines.append("")
         lines.extend(PlayerStatsTextFormatter._format_move_accuracy(stats))
         lines.append("")
         lines.extend(PlayerStatsTextFormatter._format_phase_performance(stats))
@@ -142,6 +150,14 @@ class PlayerStatsTextFormatter:
                 lines.extend(section_lines[3:])
         elif section_name == "Avg. Accuracy over game duration":
             section_lines = PlayerStatsTextFormatter._format_accuracy_over_progress(stats)
+            if section_lines:
+                lines.extend(section_lines[3:])
+        elif section_name == "Accuracy progression":
+            section_lines = PlayerStatsTextFormatter._format_accuracy_over_time(stats)
+            if section_lines:
+                lines.extend(section_lines[3:])
+        elif section_name == "Move quality progression":
+            section_lines = PlayerStatsTextFormatter._format_move_quality_over_time(stats)
             if section_lines:
                 lines.extend(section_lines[3:])
         elif section_name == "Move Accuracy":
@@ -338,6 +354,47 @@ class PlayerStatsTextFormatter:
             if not all(v is None for v in opp_sampled):
                 opp_cells = [(f"{v:.1f}%" if v is not None else "n/a") for v in opp_sampled]
                 lines.append("Opponents (avg):".ljust(label_width) + "\t" + "\t".join(opp_cells))
+        return lines
+
+    @staticmethod
+    def _format_accuracy_over_time(stats: "AggregatedPlayerStats") -> List[str]:
+        """Text summary for binned accuracy vs game date (accuracy progression chart)."""
+        series = getattr(stats, "accuracy_over_time", None) or []
+        if not series:
+            return []
+        sub = getattr(stats, "trends_subcaption", "") or ""
+        lines: List[str] = []
+        PlayerStatsTextFormatter._add_section_header(lines, "Accuracy progression")
+        if sub:
+            lines.append(sub)
+            lines.append("")
+        lines.append("Bin date range\tGames\tMedian accuracy")
+        for row in sorted(series, key=lambda x: x[0]):
+            _t_pct, p_med, cnt, l0, l1 = row
+            lines.append(f"{l0} – {l1}\t{cnt}\t{p_med:.1f}%")
+        return lines
+
+    @staticmethod
+    def _format_move_quality_over_time(stats: "AggregatedPlayerStats") -> List[str]:
+        """Text summary for median % of moves per classification vs game date (move quality progression)."""
+        bins = getattr(stats, "move_quality_over_time", None) or []
+        labels = getattr(stats, "move_quality_series_labels", None) or []
+        if not bins or not labels:
+            return []
+        sub = getattr(stats, "move_quality_subcaption", "") or ""
+        lines: List[str] = []
+        PlayerStatsTextFormatter._add_section_header(lines, "Move quality progression")
+        if sub:
+            lines.append(sub)
+            lines.append("")
+        header = "Bin date range\tGames\t" + "\t".join(labels)
+        lines.append(header)
+        for row in sorted(bins, key=lambda x: x[0]):
+            _t_pct, cnt, l0, l1, meds = row
+            cells = [f"{l0} – {l1}", str(cnt)]
+            for j in range(len(labels)):
+                cells.append(f"{meds[j]:.1f}%" if j < len(meds) else "n/a")
+            lines.append("\t".join(cells))
         return lines
     
     @staticmethod

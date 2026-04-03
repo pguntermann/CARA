@@ -1630,6 +1630,220 @@
             "x_axis_label_spacing": 5,
             "progress_bins": 21
           },
+          "accuracy_over_time_chart": {
+            "enabled": true,
+            "height": 220,
+            "min_games_with_full_date": 4,
+            "min_span_days": 14,
+            "min_populated_bins": 1,
+            "max_calendar_bins": 48,
+            "calendar_day_bin_max_span_days": 31,
+            "calendar_week_bin_max_span_days": 120,
+            "calendar_month_bin_max_span_days": 960,
+            "subcaption_template": "Chart based on {dated} games with a known date (of {analyzed} analyzed in this selection).",
+            "subcaption_font_size": 9,
+            "background_color": [
+              30,
+              30,
+              35
+            ],
+            "grid_color": [
+              60,
+              60,
+              65
+            ],
+            "line_color": [
+              120,
+              190,
+              255
+            ],
+            "line_style": "solid",
+            "line_width": 2,
+            "font_family": "Helvetica Neue",
+            "font_size": 10,
+            "text_color": [
+              200,
+              200,
+              200
+            ],
+            "axis_color": [
+              150,
+              150,
+              150
+            ],
+            "padding": [
+              40,
+              20,
+              20,
+              40
+            ],
+            "min_grid_spacing": 30,
+            "min_grid_lines": 3,
+            "min_font_size": 8,
+            "font_size_calculation_divisor": 20,
+            "y_axis_label_spacing": 5,
+            "x_axis_label_spacing": 5,
+            "hover_hit_threshold_px": 25,
+            "hover_circle_radius": 6,
+            "x_axis_calendar_enabled": true,
+            "x_axis_major_line_color": [
+              88,
+              88,
+              95
+            ],
+            "x_axis_minor_line_color": [
+              55,
+              55,
+              62
+            ],
+            "x_axis_major_line_width": 1,
+            "x_axis_minor_line_width": 1,
+            "x_axis_label_min_spacing_px": 44,
+            "x_axis_max_labels": 12,
+            "x_axis_week_ticks_in_month_mode": true,
+            "x_axis_month_ticks_in_year_mode": true
+          },
+          "move_quality_over_time_chart": {
+            "enabled": true,
+            "height": 240,
+            "legend_width": 112,
+            "subcaption_template": "Chart based on {dated} games with a known date (of {analyzed} analyzed in this selection).",
+            "subcaption_font_size": 9,
+            "background_color": [
+              30,
+              30,
+              35
+            ],
+            "grid_color": [
+              60,
+              60,
+              65
+            ],
+            "font_family": "Helvetica Neue",
+            "font_size": 10,
+            "text_color": [
+              200,
+              200,
+              200
+            ],
+            "axis_color": [
+              150,
+              150,
+              150
+            ],
+            "padding": [
+              40,
+              20,
+              20,
+              40
+            ],
+            "min_grid_spacing": 30,
+            "min_grid_lines": 5,
+            "min_font_size": 8,
+            "font_size_calculation_divisor": 20,
+            "y_axis_label_spacing": 5,
+            "x_axis_label_spacing": 5,
+            "hover_hit_threshold_px": 25,
+            "legend_font_size": 8,
+            "series": [
+              {
+                "id": "good",
+                "label": "Good",
+                "enabled": true,
+                "line_color": [
+                  130,
+                  200,
+                  130
+                ],
+                "line_style": "solid",
+                "line_width": 2
+              },
+              {
+                "id": "best",
+                "label": "Best",
+                "enabled": true,
+                "line_color": [
+                  100,
+                  170,
+                  255
+                ],
+                "line_style": "solid",
+                "line_width": 2
+              },
+              {
+                "id": "inaccuracy",
+                "label": "Inaccuracy",
+                "enabled": true,
+                "line_color": [
+                  230,
+                  200,
+                  100
+                ],
+                "line_style": "solid",
+                "line_width": 2
+              },
+              {
+                "id": "mistake",
+                "label": "Mistake",
+                "enabled": true,
+                "line_color": [
+                  255,
+                  160,
+                  90
+                ],
+                "line_style": "solid",
+                "line_width": 2
+              },
+              {
+                "id": "blunder",
+                "label": "Blunder",
+                "enabled": true,
+                "line_color": [
+                  255,
+                  100,
+                  100
+                ],
+                "line_style": "solid",
+                "line_width": 2
+              },
+              {
+                "id": "book",
+                "label": "Book",
+                "enabled": false,
+                "line_color": [
+                  150,
+                  150,
+                  160
+                ],
+                "line_style": "dashed",
+                "line_width": 1
+              },
+              {
+                "id": "brilliant",
+                "label": "Brilliant",
+                "enabled": false,
+                "line_color": [
+                  200,
+                  120,
+                  255
+                ],
+                "line_style": "solid",
+                "line_width": 2
+              },
+              {
+                "id": "miss",
+                "label": "Miss",
+                "enabled": false,
+                "line_color": [
+                  255,
+                  200,
+                  120
+                ],
+                "line_style": "solid",
+                "line_width": 2
+              }
+            ]
+          },
           "responsive": {
             "move_classification_collapse_threshold": 500,
             "error_patterns_collapse_threshold": 500,

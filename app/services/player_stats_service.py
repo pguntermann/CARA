@@ -1,13 +1,17 @@
 """Service for aggregating player statistics across multiple games."""
 
+import calendar
 import os
+from datetime import date, timedelta
+from statistics import median
 from typing import List, Dict, Any, Optional, Tuple, Callable
 from dataclasses import dataclass
-from collections import Counter
+from collections import Counter, defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import math
 
 from app.models.database_model import GameData, DatabaseModel
+from app.services.date_matcher import DateMatcher
 from app.models.moveslist_model import MoveData
 from app.services.game_summary_service import GameSummary, PlayerStatistics, PhaseStatistics, GameSummaryService
 from app.controllers.game_controller import GameController
@@ -203,6 +207,368 @@ def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, ga
         return None
 
 
+def _game_date_to_ordinal(date_str: str) -> Optional[int]:
+    """Return proleptic Gregorian ordinal for a PGN [Date] string, or None if not fully specified."""
+    if not date_str or not isinstance(date_str, str):
+        return None
+    parsed = DateMatcher.parse_date(date_str.strip())
+    if not parsed:
+        return None
+    y, m, d = parsed
+    if y is None or m is None or d is None:
+        return None
+    try:
+        return date(y, m, d).toordinal()
+    except ValueError:
+        return None
+
+
+def _week_start_monday_ordinal(ord_val: int) -> int:
+    d = date.fromordinal(ord_val)
+    return (d - timedelta(days=d.weekday())).toordinal()
+
+
+def _calendar_mode_coarser(mode: str) -> str:
+    return {"day": "week", "week": "month", "month": "year", "year": "year"}[mode]
+
+
+def _group_samples_by_calendar_mode(
+    samples: List[Tuple[int, float]],
+    mode: str,
+) -> Dict[Any, List[float]]:
+    groups: Dict[Any, List[float]] = defaultdict(list)
+    for ord_val, acc in samples:
+        if mode == "day":
+            key: Any = ord_val
+        elif mode == "week":
+            key = _week_start_monday_ordinal(ord_val)
+        elif mode == "month":
+            d = date.fromordinal(ord_val)
+            key = (d.year, d.month)
+        else:
+            key = date.fromordinal(ord_val).year
+        groups[key].append(acc)
+    return groups
+
+
+def _bin_ordinal_range(mode: str, key: Any) -> Tuple[int, int]:
+    if mode == "day":
+        o = int(key)
+        return o, o
+    if mode == "week":
+        ws = int(key)
+        return ws, ws + 6
+    if mode == "month":
+        y, m = key  # type: ignore[misc]
+        lo = date(y, m, 1).toordinal()
+        last = calendar.monthrange(y, m)[1]
+        hi = date(y, m, last).toordinal()
+        return lo, hi
+    y = int(key)
+    return date(y, 1, 1).toordinal(), date(y, 12, 31).toordinal()
+
+
+def _initial_calendar_mode(span_days: int, chart_cfg: Dict[str, Any]) -> str:
+    dmax = int(chart_cfg.get("calendar_day_bin_max_span_days", 31))
+    wmax = int(chart_cfg.get("calendar_week_bin_max_span_days", 120))
+    mmax = int(chart_cfg.get("calendar_month_bin_max_span_days", 960))
+    if span_days <= dmax:
+        return "day"
+    if span_days <= wmax:
+        return "week"
+    if span_days <= mmax:
+        return "month"
+    return "year"
+
+
+def _collect_trends_dated_player_stats(
+    game_results: List[Dict[str, Any]],
+    analyzed_games: List[GameData],
+) -> List[Tuple[int, PlayerStatistics]]:
+    """(game_date_ordinal, game_stats) for analyzed games with a full PGN date."""
+    out: List[Tuple[int, PlayerStatistics]] = []
+    for result in game_results:
+        idx = result.get("index", 0)
+        if idx < 0 or idx >= len(analyzed_games):
+            continue
+        g = analyzed_games[idx]
+        ord_val = _game_date_to_ordinal(g.date)
+        if ord_val is None:
+            continue
+        gs = result.get("game_stats")
+        if gs is None:
+            continue
+        out.append((ord_val, gs))
+    return out
+
+
+def _merge_move_quality_chart_cfg(ps: Dict[str, Any]) -> Dict[str, Any]:
+    """Move-quality chart overrides; calendar thresholds fall back to accuracy chart."""
+    acc = dict(ps.get("accuracy_over_time_chart", {}))
+    mq = dict(ps.get("move_quality_over_time_chart", {}))
+    merged = {**acc, **mq}
+    return merged
+
+
+_MQ_STAT_TO_ATTR = {
+    "book": "book_moves",
+    "brilliant": "brilliant_moves",
+    "best": "best_moves",
+    "good": "good_moves",
+    "inaccuracy": "inaccuracies",
+    "mistake": "mistakes",
+    "miss": "misses",
+    "blunder": "blunders",
+}
+
+
+def _player_move_quality_pct_vector(gs: PlayerStatistics, stat_ids: List[str]) -> Optional[Tuple[float, ...]]:
+    """Per-game percentages of total moves for each stat id; None if no moves."""
+    tm = gs.total_moves
+    if tm <= 0:
+        return None
+    vec: List[float] = []
+    for sid in stat_ids:
+        attr = _MQ_STAT_TO_ATTR.get(sid)
+        if not attr:
+            return None
+        n = int(getattr(gs, attr, 0) or 0)
+        vec.append(100.0 * n / tm)
+    return tuple(vec)
+
+
+def _group_vectors_by_calendar_mode(
+    samples: List[Tuple[int, Tuple[float, ...]]],
+    mode: str,
+) -> Dict[Any, List[Tuple[float, ...]]]:
+    groups: Dict[Any, List[Tuple[float, ...]]] = defaultdict(list)
+    for ord_val, vec in samples:
+        if mode == "day":
+            key: Any = ord_val
+        elif mode == "week":
+            key = _week_start_monday_ordinal(ord_val)
+        elif mode == "month":
+            d = date.fromordinal(ord_val)
+            key = (d.year, d.month)
+        else:
+            key = date.fromordinal(ord_val).year
+        groups[key].append(vec)
+    return groups
+
+
+def _parse_move_quality_series_config(chart_cfg: Dict[str, Any]) -> List[Tuple[str, str]]:
+    """Enabled series as (stat_id, label)."""
+    raw = chart_cfg.get("series")
+    if not isinstance(raw, list):
+        return []
+    out: List[Tuple[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        if not item.get("enabled", True):
+            continue
+        sid = str(item.get("id", "")).strip()
+        if sid not in _MQ_STAT_TO_ATTR:
+            continue
+        lbl = str(item.get("label", sid))
+        out.append((sid, lbl))
+    return out
+
+
+def _build_accuracy_over_time_series(
+    game_results: List[Dict[str, Any]],
+    analyzed_games: List[GameData],
+    config: Dict[str, Any],
+    analyzed_count: int,
+) -> Tuple[
+    List[Tuple[float, float, int, str, str]],
+    str,
+    int,
+    int,
+    str,
+]:
+    """Bin games by calendar day / week / month / year; median accuracy per bin.
+
+    Uses ``GameData.date`` and existing per-game stats from ``game_results`` (no extra PGN parse).
+
+    Returns:
+        (series, subcaption, ordinal_min, ordinal_max, calendar_mode).
+        ``calendar_mode`` is ``day`` | ``week`` | ``month`` | ``year`` for axis rendering.
+        Series tuples: (time_pct, player_median_acc, count, bin_start_iso, bin_end_iso).
+        When the chart should not be shown, returns ([], "", 0, 0, "").
+    """
+    ui = config.get("ui", {})
+    detail = ui.get("panels", {}).get("detail", {})
+    ps = detail.get("player_stats", {})
+    chart_cfg = ps.get("accuracy_over_time_chart", {})
+    if not chart_cfg.get("enabled", True):
+        return [], "", 0, 0, ""
+
+    min_games = int(chart_cfg.get("min_games_with_full_date", 4))
+    min_span_days = int(chart_cfg.get("min_span_days", 14))
+    min_populated_bins = int(chart_cfg.get("min_populated_bins", 1))
+    max_calendar_bins = int(chart_cfg.get("max_calendar_bins", 48))
+    if max_calendar_bins < 4:
+        max_calendar_bins = 48
+
+    dated = _collect_trends_dated_player_stats(game_results, analyzed_games)
+    samples: List[Tuple[int, float]] = [(o, float(gs.accuracy)) for o, gs in dated]
+
+    dated_count = len(samples)
+    template = str(
+        chart_cfg.get(
+            "subcaption_template",
+            "Chart based on {dated} games with a known date (of {analyzed} analyzed in this selection).",
+        )
+    )
+    subcaption = template.format(dated=dated_count, analyzed=analyzed_count)
+
+    if dated_count < min_games:
+        return [], "", 0, 0, ""
+
+    ordinals = [s[0] for s in samples]
+    t_min = min(ordinals)
+    t_max = max(ordinals)
+    span_days = t_max - t_min
+    if span_days > 0 and span_days < min_span_days:
+        return [], "", 0, 0, ""
+
+    span_f = float(span_days) if span_days > 0 else 1.0
+
+    mode = _initial_calendar_mode(span_days, chart_cfg)
+    groups = _group_samples_by_calendar_mode(samples, mode)
+    while len(groups) > max_calendar_bins and mode != "year":
+        mode = _calendar_mode_coarser(mode)
+        groups = _group_samples_by_calendar_mode(samples, mode)
+
+    if len(groups) < min_populated_bins:
+        return [], "", 0, 0, ""
+
+    series: List[Tuple[float, float, int, str, str]] = []
+    for key, accs in groups.items():
+        lo, hi = _bin_ordinal_range(mode, key)
+        lo = max(lo, t_min)
+        hi = min(hi, t_max)
+        if lo > hi:
+            lo, hi = hi, lo
+        center = (float(lo) + float(hi)) / 2.0
+        time_pct = (center - float(t_min)) / span_f * 100.0 if span_f > 0 else 50.0
+        time_pct = max(0.0, min(100.0, time_pct))
+        p_med = float(median(accs))
+        cnt = len(accs)
+        lab0 = date.fromordinal(lo).isoformat()
+        lab1 = date.fromordinal(hi).isoformat()
+        series.append((time_pct, p_med, cnt, lab0, lab1))
+
+    series.sort(key=lambda x: x[0])
+    return series, subcaption, t_min, t_max, mode
+
+
+def _build_move_quality_over_time_series(
+    game_results: List[Dict[str, Any]],
+    analyzed_games: List[GameData],
+    config: Dict[str, Any],
+    analyzed_count: int,
+) -> Tuple[
+    List[Tuple[float, int, str, str, Tuple[float, ...]]],
+    List[str],
+    List[str],
+    str,
+    int,
+    int,
+    str,
+]:
+    """Median per-game move-type percentages per calendar bin (same binning as accuracy progression).
+
+    Returns:
+        (bins, series_labels, series_ids, subcaption, ordinal_min, ordinal_max, calendar_mode).
+        Each bin: (time_pct, games_in_bin, start_iso, end_iso, (median_pct per series)).
+        Empty lists and zeros when disabled or ineligible.
+    """
+    ui = config.get("ui", {})
+    detail = ui.get("panels", {}).get("detail", {})
+    ps = detail.get("player_stats", {})
+    chart_cfg = _merge_move_quality_chart_cfg(ps)
+    mq_block = ps.get("move_quality_over_time_chart", {})
+    if not mq_block.get("enabled", True):
+        return [], [], [], "", 0, 0, ""
+
+    series_defs = _parse_move_quality_series_config(chart_cfg)
+    if not series_defs:
+        return [], [], [], "", 0, 0, ""
+
+    stat_ids = [s for s, _ in series_defs]
+    labels = [lb for _, lb in series_defs]
+
+    min_games = int(chart_cfg.get("min_games_with_full_date", 4))
+    min_span_days = int(chart_cfg.get("min_span_days", 14))
+    min_populated_bins = int(chart_cfg.get("min_populated_bins", 1))
+    max_calendar_bins = int(chart_cfg.get("max_calendar_bins", 48))
+    if max_calendar_bins < 4:
+        max_calendar_bins = 48
+
+    dated = _collect_trends_dated_player_stats(game_results, analyzed_games)
+    samples_vec: List[Tuple[int, Tuple[float, ...]]] = []
+    for ord_val, gs in dated:
+        vec = _player_move_quality_pct_vector(gs, stat_ids)
+        if vec is None:
+            continue
+        samples_vec.append((ord_val, vec))
+
+    dated_count = len(samples_vec)
+    template = str(
+        chart_cfg.get(
+            "subcaption_template",
+            "Chart based on {dated} games with a known date (of {analyzed} analyzed in this selection).",
+        )
+    )
+    subcaption = template.format(dated=dated_count, analyzed=analyzed_count)
+
+    if dated_count < min_games:
+        return [], [], [], "", 0, 0, ""
+
+    ordinals = [s[0] for s in samples_vec]
+    t_min = min(ordinals)
+    t_max = max(ordinals)
+    span_days = t_max - t_min
+    if span_days > 0 and span_days < min_span_days:
+        return [], [], [], "", 0, 0, ""
+
+    span_f = float(span_days) if span_days > 0 else 1.0
+
+    mode = _initial_calendar_mode(span_days, chart_cfg)
+    groups = _group_vectors_by_calendar_mode(samples_vec, mode)
+    while len(groups) > max_calendar_bins and mode != "year":
+        mode = _calendar_mode_coarser(mode)
+        groups = _group_vectors_by_calendar_mode(samples_vec, mode)
+
+    if len(groups) < min_populated_bins:
+        return [], [], [], "", 0, 0, ""
+
+    n_series = len(stat_ids)
+    bins_out: List[Tuple[float, int, str, str, Tuple[float, ...]]] = []
+    for key, vecs in groups.items():
+        lo, hi = _bin_ordinal_range(mode, key)
+        lo = max(lo, t_min)
+        hi = min(hi, t_max)
+        if lo > hi:
+            lo, hi = hi, lo
+        center = (float(lo) + float(hi)) / 2.0
+        time_pct = (center - float(t_min)) / span_f * 100.0 if span_f > 0 else 50.0
+        time_pct = max(0.0, min(100.0, time_pct))
+        medians_list: List[float] = []
+        for i in range(n_series):
+            col = [v[i] for v in vecs]
+            medians_list.append(float(median(col)) if col else 0.0)
+        cnt = len(vecs)
+        lab0 = date.fromordinal(lo).isoformat()
+        lab1 = date.fromordinal(hi).isoformat()
+        bins_out.append((time_pct, cnt, lab0, lab1, tuple(medians_list)))
+
+    bins_out.sort(key=lambda x: x[0])
+    return bins_out, labels, stat_ids, subcaption, t_min, t_max, mode
+
+
 @dataclass
 class AggregatedPlayerStats:
     """Aggregated statistics for a player across multiple games."""
@@ -247,6 +613,22 @@ class AggregatedPlayerStats:
     accuracy_by_endgame_type_grouped: List[
         Tuple[str, str, float, float, int, int, int, List[Tuple[str, str, float, float, int, int, int]]]
     ]
+    # Median accuracy vs game date (binned). Empty if eligibility thresholds are not met.
+    # Tuple: (time_pct_along_range, player_median_acc, games_in_bin, bin_start_iso, bin_end_iso).
+    accuracy_over_time: List[Tuple[float, float, int, str, str]]
+    trends_subcaption: str
+    trends_ordinal_min: int
+    trends_ordinal_max: int
+    # Calendar granularity used for binning and x-axis: day | week | month | year
+    trends_calendar_mode: str
+    # Median per-game % of moves per classification vs game date (calendar bins). Parallel labels/ids.
+    move_quality_over_time: List[Tuple[float, int, str, str, Tuple[float, ...]]]
+    move_quality_series_labels: List[str]
+    move_quality_series_ids: List[str]
+    move_quality_subcaption: str
+    move_quality_ordinal_min: int
+    move_quality_ordinal_max: int
+    move_quality_calendar_mode: str
 
 
 class PlayerStatsService:
@@ -808,6 +1190,32 @@ class PlayerStatsService:
             )
         accuracy_by_endgame_type_grouped_list.sort(key=lambda x: x[4], reverse=True)
 
+        over_time, trends_sub, ord_min, ord_max, trends_cal_mode = _build_accuracy_over_time_series(
+            game_results,
+            analyzed_games,
+            self.config,
+            len(analyzed_games),
+        )
+        if not over_time:
+            trends_sub = ""
+            ord_min = 0
+            ord_max = 0
+            trends_cal_mode = ""
+
+        mq_bins, mq_labels, mq_ids, mq_sub, mq_omin, mq_omax, mq_cal_mode = _build_move_quality_over_time_series(
+            game_results,
+            analyzed_games,
+            self.config,
+            len(analyzed_games),
+        )
+        if not mq_bins:
+            mq_sub = ""
+            mq_omin = 0
+            mq_omax = 0
+            mq_cal_mode = ""
+            mq_labels = []
+            mq_ids = []
+
         aggregated_stats = AggregatedPlayerStats(
             total_games=total_games,
             analyzed_games=len(analyzed_games),
@@ -837,6 +1245,18 @@ class PlayerStatsService:
             opponent_accuracy_by_progress=opponent_accuracy_by_progress_list,
             accuracy_by_endgame_type=accuracy_by_endgame_type_list,
             accuracy_by_endgame_type_grouped=accuracy_by_endgame_type_grouped_list,
+            accuracy_over_time=over_time,
+            trends_subcaption=trends_sub,
+            trends_ordinal_min=ord_min,
+            trends_ordinal_max=ord_max,
+            trends_calendar_mode=trends_cal_mode,
+            move_quality_over_time=mq_bins,
+            move_quality_series_labels=mq_labels,
+            move_quality_series_ids=mq_ids,
+            move_quality_subcaption=mq_sub,
+            move_quality_ordinal_min=mq_omin,
+            move_quality_ordinal_max=mq_omax,
+            move_quality_calendar_mode=mq_cal_mode,
         )
         
         logging_service.debug(f"Completed player stats aggregation: player={player_name}, games={total_games}, wins={wins}, draws={draws}, losses={losses}, win_rate={win_rate:.1f}%")
