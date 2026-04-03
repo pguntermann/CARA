@@ -282,6 +282,26 @@ def _group_samples_by_calendar_mode(
     return groups
 
 
+def _group_colored_samples_by_calendar_mode(
+    samples: List[Tuple[int, float, bool]],
+    mode: str,
+) -> Dict[Any, List[Tuple[float, bool]]]:
+    """Like ``_group_samples_by_calendar_mode`` but keep (accuracy, is_white) per game."""
+    groups: Dict[Any, List[Tuple[float, bool]]] = defaultdict(list)
+    for ord_val, acc, is_w in samples:
+        if mode == "day":
+            key: Any = ord_val
+        elif mode == "week":
+            key = _week_start_monday_ordinal(ord_val)
+        elif mode == "month":
+            d = date.fromordinal(ord_val)
+            key = (d.year, d.month)
+        else:
+            key = date.fromordinal(ord_val).year
+        groups[key].append((acc, is_w))
+    return groups
+
+
 def _bin_ordinal_range(mode: str, key: Any) -> Tuple[int, int]:
     if mode == "day":
         o = int(key)
@@ -364,42 +384,59 @@ def _calendar_bin_center_time_pct(lo_o: int, hi_o: int, t_min: int, t_max: int) 
     return max(0.0, min(100.0, pct))
 
 
+def _accuracy_bin_row_from_chunk(
+    chunk: List[Tuple[int, float, bool]],
+    lo_o: int,
+    hi_o: int,
+    t_min: int,
+    t_max: int,
+) -> Tuple[float, float, float, float, int, str, str]:
+    """One accuracy-over-time row: combined + white + black medians (nan if no games of that color)."""
+    accs_all = [x[1] for x in chunk]
+    accs_w = [x[1] for x in chunk if x[2]]
+    accs_b = [x[1] for x in chunk if not x[2]]
+    lo_o = max(lo_o, t_min)
+    hi_o = min(hi_o, t_max)
+    if lo_o > hi_o:
+        lo_o, hi_o = hi_o, lo_o
+    time_pct = _calendar_bin_center_time_pct(lo_o, hi_o, t_min, t_max)
+    p_all = float(median(accs_all))
+    p_w = float(median(accs_w)) if accs_w else float("nan")
+    p_b = float(median(accs_b)) if accs_b else float("nan")
+    cnt = len(accs_all)
+    lab0 = date.fromordinal(lo_o).isoformat()
+    lab1 = date.fromordinal(hi_o).isoformat()
+    return (time_pct, p_all, p_w, p_b, cnt, lab0, lab1)
+
+
 def _accuracy_series_ordinal_quantile_bins(
-    samples: List[Tuple[int, float]],
+    samples: List[Tuple[int, float, bool]],
     n_bins: int,
     t_min: int,
     t_max: int,
-) -> List[Tuple[float, float, int, str, str]]:
+) -> List[Tuple[float, float, float, float, int, str, str]]:
     sorted_s = sorted(samples, key=lambda x: x[0])
     n = len(sorted_s)
     n_bins = max(2, min(n_bins, n))
-    rows: List[Tuple[float, float, int, str, str]] = []
+    rows: List[Tuple[float, float, float, float, int, str, str]] = []
     for b in range(n_bins):
         lo_i = b * n // n_bins
         hi_i = (b + 1) * n // n_bins if b < n_bins - 1 else n
         chunk = sorted_s[lo_i:hi_i]
         ords = [x[0] for x in chunk]
-        accs = [x[1] for x in chunk]
         lo_o = max(min(ords), t_min)
         hi_o = min(max(ords), t_max)
-        if lo_o > hi_o:
-            lo_o, hi_o = hi_o, lo_o
-        time_pct = _calendar_bin_center_time_pct(lo_o, hi_o, t_min, t_max)
-        p_med = float(median(accs))
-        cnt = len(accs)
-        lab0 = date.fromordinal(lo_o).isoformat()
-        lab1 = date.fromordinal(hi_o).isoformat()
-        rows.append((time_pct, p_med, cnt, lab0, lab1))
+        rows.append(_accuracy_bin_row_from_chunk(chunk, lo_o, hi_o, t_min, t_max))
     rows.sort(key=lambda x: x[0])
     return rows
 
 
 def _accuracy_series_equal_ordinal_width_bins(
-    samples: List[Tuple[int, float]],
+    samples: List[Tuple[int, float, bool]],
     n_bins: int,
     t_min: int,
     t_max: int,
-) -> List[Tuple[float, float, int, str, str]]:
+) -> List[Tuple[float, float, float, float, int, str, str]]:
     """Split ``[t_min, t_max]`` (inclusive calendar days) into equal-width ranges; median per bin.
 
     Omits bins with no games. X positions follow calendar time instead of equal counts per bin.
@@ -408,39 +445,33 @@ def _accuracy_series_equal_ordinal_width_bins(
     if days <= 1 or t_max <= t_min:
         ords = [x[0] for x in samples]
         lo_o, hi_o = (min(ords), max(ords)) if ords else (t_min, t_max)
-        accs = [x[1] for x in samples]
+        accs_all = [x[1] for x in samples]
+        accs_w = [x[1] for x in samples if x[2]]
+        accs_b = [x[1] for x in samples if not x[2]]
         return [
             (
                 50.0,
-                float(median(accs)) if accs else 0.0,
-                len(accs),
+                float(median(accs_all)) if accs_all else 0.0,
+                float(median(accs_w)) if accs_w else float("nan"),
+                float(median(accs_b)) if accs_b else float("nan"),
+                len(accs_all),
                 date.fromordinal(lo_o).isoformat(),
                 date.fromordinal(hi_o).isoformat(),
             )
         ]
 
     n_bins = max(2, min(n_bins, days))
-    rows: List[Tuple[float, float, int, str, str]] = []
+    rows: List[Tuple[float, float, float, float, int, str, str]] = []
     for b in range(n_bins):
         lo_o = t_min + (days * b) // n_bins
         hi_o = t_min + (days * (b + 1)) // n_bins - 1
-        chunk = [(o, a) for o, a in samples if lo_o <= o <= hi_o]
+        chunk = [x for x in samples if lo_o <= x[0] <= hi_o]
         if not chunk:
             continue
         ords = [x[0] for x in chunk]
-        accs = [x[1] for x in chunk]
         lo_g = min(ords)
         hi_g = max(ords)
-        time_pct = _calendar_bin_center_time_pct(lo_g, hi_g, t_min, t_max)
-        rows.append(
-            (
-                time_pct,
-                float(median(accs)),
-                len(chunk),
-                date.fromordinal(lo_g).isoformat(),
-                date.fromordinal(hi_g).isoformat(),
-            )
-        )
+        rows.append(_accuracy_bin_row_from_chunk(chunk, lo_g, hi_g, t_min, t_max))
     rows.sort(key=lambda x: x[0])
     return rows
 
@@ -686,6 +717,28 @@ def _collect_trends_dated_player_stats(
     return out
 
 
+def _collect_trends_dated_accuracy_with_color(
+    game_results: List[Dict[str, Any]],
+    analyzed_games: List[GameData],
+) -> List[Tuple[int, float, bool]]:
+    """(ordinal, accuracy, is_white) for dated games; same eligibility as dated player stats."""
+    out: List[Tuple[int, float, bool]] = []
+    for result in game_results:
+        idx = result.get("index", 0)
+        if idx < 0 or idx >= len(analyzed_games):
+            continue
+        g = analyzed_games[idx]
+        ord_val = _game_date_ordinal_for_trends(g.date)
+        if ord_val is None:
+            continue
+        gs = result.get("game_stats")
+        if gs is None:
+            continue
+        is_w = bool(result.get("is_white", False))
+        out.append((ord_val, float(gs.accuracy), is_w))
+    return out
+
+
 def _merge_move_quality_chart_cfg(ps: Dict[str, Any]) -> Dict[str, Any]:
     """Move-quality chart overrides; calendar thresholds fall back to accuracy chart."""
     acc = dict(ps.get("accuracy_over_time_chart", {}))
@@ -824,7 +877,7 @@ def _build_accuracy_over_time_series(
     config: Dict[str, Any],
     analyzed_count: int,
 ) -> Tuple[
-    List[Tuple[float, float, int, str, str]],
+    List[Tuple[float, float, float, float, int, str, str]],
     str,
     int,
     int,
@@ -837,8 +890,11 @@ def _build_accuracy_over_time_series(
     Returns:
         (series, subcaption, ordinal_min, ordinal_max, calendar_mode).
         ``calendar_mode`` is ``day`` | ``week`` | ``month`` | ``year`` for axis rendering.
-        Series tuples: (time_pct, player_median_acc, count, bin_start_iso, bin_end_iso).
-        When the chart should not be shown, returns ([], "", 0, 0, "").
+        Series tuples: (time_pct, median_all, median_white, median_black, count, lab0, lab1).
+        ``median_white`` / ``median_black`` are ``nan`` when that color has no games in the bin.
+        When the chart should not be shown, returns ([], subcaption_or_empty, 0, 0, "").
+        The subcaption still reflects dated vs analyzed counts when the series is empty due to thresholds
+        (too few dated games, span too short, etc.) so the UI can explain why the chart is hidden.
     """
     ui = config.get("ui", {})
     detail = ui.get("panels", {}).get("detail", {})
@@ -854,8 +910,9 @@ def _build_accuracy_over_time_series(
     if max_calendar_bins < 4:
         max_calendar_bins = 48
 
-    dated = _collect_trends_dated_player_stats(game_results, analyzed_games)
-    samples: List[Tuple[int, float]] = [(o, float(gs.accuracy)) for o, gs in dated]
+    samples: List[Tuple[int, float, bool]] = _collect_trends_dated_accuracy_with_color(
+        game_results, analyzed_games
+    )
 
     dated_count = len(samples)
     template = str(
@@ -867,25 +924,25 @@ def _build_accuracy_over_time_series(
     subcaption = template.format(dated=dated_count, analyzed=analyzed_count)
 
     if dated_count < min_games:
-        return [], "", 0, 0, ""
+        return [], subcaption, 0, 0, ""
 
     ordinals = [s[0] for s in samples]
     t_min = min(ordinals)
     t_max = max(ordinals)
     span_days = t_max - t_min
     if span_days > 0 and span_days < min_span_days:
-        return [], "", 0, 0, ""
+        return [], subcaption, 0, 0, ""
 
     span_f = float(span_days) if span_days > 0 else 1.0
 
     mode = _initial_calendar_mode(span_days, chart_cfg)
-    groups = _group_samples_by_calendar_mode(samples, mode)
+    groups = _group_colored_samples_by_calendar_mode(samples, mode)
     while len(groups) > max_calendar_bins and mode != "year":
         mode = _calendar_mode_coarser(mode)
-        groups = _group_samples_by_calendar_mode(samples, mode)
+        groups = _group_colored_samples_by_calendar_mode(samples, mode)
 
     if len(groups) < min_populated_bins:
-        return [], "", 0, 0, ""
+        return [], subcaption, 0, 0, ""
 
     use_q = _should_use_ordinal_quantile_fallback(
         chart_cfg,
@@ -907,7 +964,7 @@ def _build_accuracy_over_time_series(
             subcaption = f"{subcaption} {suf}"
     else:
         series = []
-        for key, accs in groups.items():
+        for key, pairs in groups.items():
             lo, hi = _bin_ordinal_range(mode, key)
             lo = max(lo, t_min)
             hi = min(hi, t_max)
@@ -916,16 +973,21 @@ def _build_accuracy_over_time_series(
             center = (float(lo) + float(hi)) / 2.0
             time_pct = (center - float(t_min)) / span_f * 100.0 if span_f > 0 else 50.0
             time_pct = max(0.0, min(100.0, time_pct))
-            p_med = float(median(accs))
-            cnt = len(accs)
+            accs_all = [p[0] for p in pairs]
+            accs_w = [p[0] for p in pairs if p[1]]
+            accs_b = [p[0] for p in pairs if not p[1]]
+            p_med = float(median(accs_all))
+            p_w = float(median(accs_w)) if accs_w else float("nan")
+            p_b = float(median(accs_b)) if accs_b else float("nan")
+            cnt = len(accs_all)
             lab0 = date.fromordinal(lo).isoformat()
             lab1 = date.fromordinal(hi).isoformat()
-            series.append((time_pct, p_med, cnt, lab0, lab1))
+            series.append((time_pct, p_med, p_w, p_b, cnt, lab0, lab1))
 
     series.sort(key=lambda x: x[0])
     ord_lo, ord_hi = t_min, t_max
     if use_q and series and use_tight_quantile_axis:
-        ord_lo, ord_hi = _trend_axis_ordinals_for_quantile_bins([(r[3], r[4]) for r in series], t_min, t_max)
+        ord_lo, ord_hi = _trend_axis_ordinals_for_quantile_bins([(r[5], r[6]) for r in series], t_min, t_max)
     return series, subcaption, ord_lo, ord_hi, mode
 
 
@@ -990,14 +1052,14 @@ def _build_move_quality_over_time_series(
     subcaption = template.format(dated=dated_count, analyzed=analyzed_count)
 
     if dated_count < min_games:
-        return [], [], [], "", 0, 0, ""
+        return [], [], [], subcaption, 0, 0, ""
 
     ordinals = [s[0] for s in samples_vec]
     t_min = min(ordinals)
     t_max = max(ordinals)
     span_days = t_max - t_min
     if span_days > 0 and span_days < min_span_days:
-        return [], [], [], "", 0, 0, ""
+        return [], [], [], subcaption, 0, 0, ""
 
     span_f = float(span_days) if span_days > 0 else 1.0
 
@@ -1008,7 +1070,7 @@ def _build_move_quality_over_time_series(
         groups = _group_vectors_by_calendar_mode(samples_vec, mode)
 
     if len(groups) < min_populated_bins:
-        return [], [], [], "", 0, 0, ""
+        return [], [], [], subcaption, 0, 0, ""
 
     n_series = len(stat_ids)
     use_q = _should_use_ordinal_quantile_fallback(
@@ -1103,14 +1165,14 @@ def _build_acpl_phase_over_time_series(
     subcaption = template.format(dated=dated_count, analyzed=analyzed_count)
 
     if dated_count < min_games:
-        return [], [], [], "", 0, 0, ""
+        return [], [], [], subcaption, 0, 0, ""
 
     ordinals = [s[0] for s in samples_vec]
     t_min = min(ordinals)
     t_max = max(ordinals)
     span_days = t_max - t_min
     if span_days > 0 and span_days < min_span_days:
-        return [], [], [], "", 0, 0, ""
+        return [], [], [], subcaption, 0, 0, ""
 
     span_f = float(span_days) if span_days > 0 else 1.0
 
@@ -1121,7 +1183,7 @@ def _build_acpl_phase_over_time_series(
         groups = _group_phase_acpl_triples_by_calendar_mode(samples_vec, mode)
 
     if len(groups) < min_populated_bins:
-        return [], [], [], "", 0, 0, ""
+        return [], [], [], subcaption, 0, 0, ""
 
     use_q = _should_use_ordinal_quantile_fallback(
         chart_cfg,
@@ -1229,8 +1291,9 @@ class AggregatedPlayerStats:
         Tuple[str, str, float, float, int, int, int, List[Tuple[str, str, float, float, int, int, int]]]
     ]
     # Median accuracy vs game date (binned). Empty if eligibility thresholds are not met.
-    # Tuple: (time_pct_along_range, player_median_acc, games_in_bin, bin_start_iso, bin_end_iso).
-    accuracy_over_time: List[Tuple[float, float, int, str, str]]
+    # Tuple: (time_pct, median_all, median_white, median_black, games_in_bin, lab0, lab1).
+    # White/black medians are nan when that color has no games in the bin.
+    accuracy_over_time: List[Tuple[float, float, float, float, int, str, str]]
     trends_subcaption: str
     trends_ordinal_min: int
     trends_ordinal_max: int
@@ -1820,7 +1883,6 @@ class PlayerStatsService:
             len(analyzed_games),
         )
         if not over_time:
-            trends_sub = ""
             ord_min = 0
             ord_max = 0
             trends_cal_mode = ""
@@ -1832,7 +1894,6 @@ class PlayerStatsService:
             len(analyzed_games),
         )
         if not mq_bins:
-            mq_sub = ""
             mq_omin = 0
             mq_omax = 0
             mq_cal_mode = ""
@@ -1846,7 +1907,6 @@ class PlayerStatsService:
             len(analyzed_games),
         )
         if not ap_bins:
-            ap_sub = ""
             ap_omin = 0
             ap_omax = 0
             ap_cal_mode = ""

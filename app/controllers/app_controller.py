@@ -172,6 +172,11 @@ class AppController:
             self.game_controller.get_game_model()
         )
         
+        self.bulk_analysis_controller.analysis_started.connect(
+            self.player_stats_controller.notify_bulk_analysis_started
+        )
+        self.bulk_analysis_controller.finished.connect(self._on_bulk_analysis_finished_refresh_player_stats)
+        
         # Initialize metadata controller (depends on game controller and database controller)
         self.metadata_controller = MetadataController(
             self.game_controller.get_game_model(),
@@ -198,6 +203,10 @@ class AppController:
         # Connect ProgressService to ProgressModel
         # Services update models through the controller
         progress_service.set_model(self.progress_model)
+    
+    def _on_bulk_analysis_finished_refresh_player_stats(self, _success: bool, _message: str) -> None:
+        """Bulk analysis thread finished (success, error, or cancel): resume player-stats recalculation."""
+        self.player_stats_controller.notify_bulk_analysis_finished()
     
     def get_progress_model(self) -> ProgressModel:
         """Get the progress model.

@@ -398,10 +398,12 @@ class PlayerStatsTextFormatter:
         if sub:
             lines.append(sub)
             lines.append("")
-        lines.append("Bin date range\tGames\tMedian accuracy")
+        lines.append("Bin date range\tGames\tCombined\tWhite\tBlack")
         for row in sorted(series, key=lambda x: x[0]):
-            _t_pct, p_med, cnt, l0, l1 = row
-            lines.append(f"{l0} – {l1}\t{cnt}\t{p_med:.1f}%")
+            _t_pct, p_all, p_w, p_b, cnt, l0, l1 = row
+            w_cell = f"{p_w:.1f}%" if p_w == p_w else "n/a"
+            b_cell = f"{p_b:.1f}%" if p_b == p_b else "n/a"
+            lines.append(f"{l0} – {l1}\t{cnt}\t{p_all:.1f}%\t{w_cell}\t{b_cell}")
         return lines
 
     @staticmethod

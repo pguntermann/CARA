@@ -49,7 +49,7 @@ def test_calendar_week_two_clusters_triggers_quantile_fallback() -> None:
 def test_ordinal_quantile_bins_split_many_games_into_more_points() -> None:
     oa = date(2025, 4, 29).toordinal()
     ob = date(2025, 8, 5).toordinal()
-    samples = [(oa, 68.0)] * 50 + [(ob, 87.0)] * 50
+    samples = [(oa, 68.0, True)] * 50 + [(ob, 87.0, False)] * 50
     series = _accuracy_series_ordinal_quantile_bins(samples, 12, oa, ob)
     assert len(series) == 12
     assert series[0][1] < 72.0
@@ -64,15 +64,15 @@ def test_equal_ordinal_width_bins_spread_on_calendar_not_equal_counts() -> None:
     band = max(12, span // 25)
     first_band_end = o_lo + band
     last_band_start = o_hi - band
-    samples = [(o_lo + (i % 4), 70.0) for i in range(48)] + [(o_hi - (i % 4), 85.0) for i in range(48)]
-    t_min, t_max = min(o for o, _ in samples), max(o for o, _ in samples)
+    samples = [(o_lo + (i % 4), 70.0, True) for i in range(48)] + [(o_hi - (i % 4), 85.0, False) for i in range(48)]
+    t_min, t_max = min(o for o, _, __ in samples), max(o for o, _, __ in samples)
     eq = _accuracy_series_equal_ordinal_width_bins(samples, 12, t_min, t_max)
     qn = _accuracy_series_ordinal_quantile_bins(samples, 12, t_min, t_max)
 
     def _n_centers_in(rows, lo: int, hi: int) -> int:
         n = 0
         for r in rows:
-            c = (date.fromisoformat(r[3]).toordinal() + date.fromisoformat(r[4]).toordinal()) // 2
+            c = (date.fromisoformat(r[5]).toordinal() + date.fromisoformat(r[6]).toordinal()) // 2
             if lo <= c <= hi:
                 n += 1
         return n
@@ -101,11 +101,11 @@ def test_ordinal_quantile_bins_x_matches_calendar_not_rank() -> None:
     """Dense early + dense late dates: X must follow calendar axis, not list index."""
     o_early = date(2025, 12, 1).toordinal()
     o_late = date(2026, 3, 15).toordinal()
-    samples = [(o_early, 70.0)] * 50 + [(o_late, 80.0)] * 50
+    samples = [(o_early, 70.0, True)] * 50 + [(o_late, 80.0, False)] * 50
     series = _accuracy_series_ordinal_quantile_bins(samples, 4, o_early, o_late)
-    early_rows = [row for row in series if row[3].startswith("2025-12") and row[4].startswith("2025-12")]
+    early_rows = [row for row in series if row[5].startswith("2025-12") and row[6].startswith("2025-12")]
     assert early_rows
     assert all(row[0] < 5.0 for row in early_rows)
-    late_rows = [row for row in series if row[3].startswith("2026-03") and row[4].startswith("2026-03")]
+    late_rows = [row for row in series if row[5].startswith("2026-03") and row[6].startswith("2026-03")]
     assert late_rows
     assert all(row[0] > 95.0 for row in late_rows)

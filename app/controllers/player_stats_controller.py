@@ -19,6 +19,9 @@ from app.controllers.game_controller import GameController
 from app.services.logging_service import LoggingService
 from app.services.opening_service import OpeningService
 
+# Sentinel: use callback / default resolution for selected-games snapshot (see _schedule_dropdown_update).
+_DEFAULT_SELECTION_GAMES = object()
+
 
 class PlayerDropdownWorker(QThread):
     """Worker thread for populating player dropdown asynchronously."""
@@ -186,12 +189,14 @@ class PlayerStatsCalculationWorker(QThread):
     
     def run(self) -> None:
         """Run the worker to calculate statistics."""
+        result_emitted = False
         try:
             if self._is_cancelled():
                 return
             
             if not self.player_name or not self.player_name.strip():
                 self.stats_unavailable.emit("no_player")
+                result_emitted = True
                 return
 
             if self.player_games is not None:
@@ -213,6 +218,7 @@ class PlayerStatsCalculationWorker(QThread):
 
                 if not databases:
                     self.stats_unavailable.emit("no_database")
+                    result_emitted = True
                     return
 
                 # Get player games
@@ -227,12 +233,14 @@ class PlayerStatsCalculationWorker(QThread):
 
             if not player_games:
                 self.stats_unavailable.emit("player_not_found")
+                result_emitted = True
                 return
             
             # Separate analyzed and unanalyzed
             analyzed_games = [g for g in player_games if g.analyzed]
             if not analyzed_games:
                 self.stats_unavailable.emit("no_analyzed_games")
+                result_emitted = True
                 return
             
             # Aggregate statistics (includes parallel game summary calculation)
@@ -259,6 +267,7 @@ class PlayerStatsCalculationWorker(QThread):
             
             if not aggregated_stats:
                 self.stats_unavailable.emit("calculation_error")
+                result_emitted = True
                 return
             
             # One move extraction per game — reused by all error-pattern detectors (avoids repeated PGN parse)
@@ -300,15 +309,28 @@ class PlayerStatsCalculationWorker(QThread):
                 try:
                     self.progress_update.emit(100, f"Statistics calculated for {self.player_name}")
                     self.stats_ready.emit(aggregated_stats, error_patterns, game_summaries)
+                    result_emitted = True
                 except RuntimeError:
                     # Receiver might be deleted, ignore
-                    pass
+                    result_emitted = True
         
         except Exception as e:
             # Emit error signal
             logging_service = LoggingService.get_instance()
             logging_service.error(f"Error in PlayerStatsCalculationWorker: {e}", exc_info=e)
             self.stats_unavailable.emit("error")
+            result_emitted = True
+        finally:
+            # Cancelled exits often return without emitting; clear UI unless a newer worker replaced us.
+            if (
+                not result_emitted
+                and self._is_cancelled()
+                and self.stats_controller._stats_worker is self
+            ):
+                try:
+                    self.stats_unavailable.emit("calculation_cancelled")
+                except RuntimeError:
+                    pass
 
 
 class PlayerStatsController(QObject):
@@ -316,6 +338,8 @@ class PlayerStatsController(QObject):
     
     stats_updated = pyqtSignal(object, list, list)  # AggregatedPlayerStats, List[ErrorPattern], List[GameSummary]
     stats_unavailable = pyqtSignal(str)  # Reason key (e.g., "no_player", "no_analyzed_games")
+    stats_recalculation_started = pyqtSignal()  # Stats worker is about to run (UI may show a short status line)
+    bulk_analysis_blocks_stats_recalculation = pyqtSignal(bool)  # True while bulk analysis runs; pauses DB-driven recalcs
     players_ready = pyqtSignal(list)  # List of (player_name, game_count, analyzed_count) tuples for dropdown
     player_selection_cleared = pyqtSignal()  # Emitted when player selection is cleared
     source_selection_changed = pyqtSignal(int)  # Emitted when source selection changes (0=None, 1=Active, 2=All)
@@ -362,6 +386,7 @@ class PlayerStatsController(QObject):
         self._dropdown_worker: Optional[PlayerDropdownWorker] = None
         self._stats_worker: Optional[PlayerStatsCalculationWorker] = None
         self._recalc_pending: bool = False  # Coalesce recalc requests while worker is running
+        self._bulk_analysis_active: bool = False  # When True, skip scheduling stats recalculation (except explicit end-of-bulk refresh)
         
         # Database change tracking
         self._connected_databases: List[DatabaseModel] = []
@@ -369,6 +394,15 @@ class PlayerStatsController(QObject):
         self._database_update_timer.setSingleShot(True)
         self._database_update_timer.timeout.connect(self._on_database_update_debounced)
         self._database_update_debounce_ms = 500  # Debounce database updates by 500ms
+
+        self._selection_debounce_timer = QTimer(self)
+        self._selection_debounce_timer.setSingleShot(True)
+        self._selection_debounce_timer.timeout.connect(self._on_selection_changed_debounced)
+        self._selection_debounce_ms = 100
+
+        self._dropdown_restart_pending: bool = False
+        self._dropdown_restart_explicit_snapshot: bool = False
+        self._dropdown_restart_snapshot: Optional[List["GameData"]] = None
         
         # Initialize ProgressService
         self._progress_service = ProgressService.get_instance()
@@ -379,6 +413,27 @@ class PlayerStatsController(QObject):
         
         # Connect to database panel model
         self._connect_to_database_panel_model()
+    
+    def notify_bulk_analysis_started(self) -> None:
+        """Pause player-stats recalculation while bulk analysis runs; cancel any in-flight stats worker."""
+        self._bulk_analysis_active = True
+        self._recalc_pending = False
+        self._cancel_stats_worker()
+        self.bulk_analysis_blocks_stats_recalculation.emit(True)
+    
+    def notify_bulk_analysis_finished(self) -> None:
+        """Resume after bulk analysis (including cancel). Refreshes stats once if a player is selected."""
+        self._bulk_analysis_active = False
+        self.bulk_analysis_blocks_stats_recalculation.emit(False)
+        # Defer so BulkAnalysisController.is_analysis_running() is false before we start a new worker
+        def _deferred_recalc() -> None:
+            if self._current_player:
+                self._schedule_stats_recalculation()
+        QTimer.singleShot(0, _deferred_recalc)
+    
+    def is_bulk_blocking_player_stats(self) -> bool:
+        """True while bulk analysis is active and player-stats recalculation is paused."""
+        return self._bulk_analysis_active
     
     def _on_active_game_changed(self, game) -> None:
         """Handle active game change - optionally auto-select player."""
@@ -439,6 +494,10 @@ class PlayerStatsController(QObject):
         
         if not player_name or not player_name.strip():
             self._emit_unavailable("no_player")
+            progress_service.hide_progress()
+            return
+        
+        if self._bulk_analysis_active:
             progress_service.hide_progress()
             return
         
@@ -1240,9 +1299,31 @@ class PlayerStatsController(QObject):
         """Called when database table selection changes. Refreshes dropdown and stats if source is Selected games."""
         if self._source_selection not in (3, 4):
             return
-        self._schedule_dropdown_update()
-        if self._current_player:
-            self._schedule_stats_recalculation()
+        self._selection_debounce_timer.stop()
+        self._selection_debounce_timer.start(self._selection_debounce_ms)
+
+    def _resolve_selected_games_for_dropdown(self) -> List["GameData"]:
+        """Load selected games for sources 3/4 (main thread). Returns [] if unavailable."""
+        if self._source_selection not in (3, 4):
+            return []
+        if not self._get_selected_games_callback:
+            return []
+        try:
+            raw = self._get_selected_games_callback(active_only=(self._source_selection == 3))
+            return list(raw) if raw else []
+        except Exception as e:
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Error getting selected games: {e}", exc_info=e)
+            return []
+
+    def _on_selection_changed_debounced(self) -> None:
+        """After selection settles: one snapshot drives dropdown + stats (sources 3/4 only)."""
+        if self._source_selection not in (3, 4):
+            return
+        snapshot = self._resolve_selected_games_for_dropdown()
+        self._schedule_dropdown_update(snapshot)
+        if self._current_player and not self._bulk_analysis_active:
+            self._schedule_stats_recalculation(snapshot)
 
     # Worker management
     
@@ -1272,9 +1353,17 @@ class PlayerStatsController(QObject):
             self._stats_worker.deleteLater()
             self._stats_worker = None
     
-    def _schedule_stats_recalculation(self) -> None:
-        """Schedule an asynchronous statistics recalculation. Coalesces requests while a worker is running."""
+    def _schedule_stats_recalculation(
+        self, selected_games_snapshot: Any = _DEFAULT_SELECTION_GAMES
+    ) -> None:
+        """Schedule an asynchronous statistics recalculation. Coalesces requests while a worker is running.
+
+        If selected_games_snapshot is a list (possibly empty), use it for sources 3/4 instead of calling
+        get_selected_games again (same tick as dropdown refresh).
+        """
         if not self._current_player:
+            return
+        if self._bulk_analysis_active:
             return
         
         # If a worker is already running, mark that we need one more run when it finishes
@@ -1285,18 +1374,26 @@ class PlayerStatsController(QObject):
         self._recalc_pending = False
         self._cancel_stats_worker()  # Clean up any finished worker
 
+        explicit_snapshot = selected_games_snapshot is not _DEFAULT_SELECTION_GAMES
         player_games_arg: Optional[List["GameData"]] = None
-        if self._source_selection in (3, 4) and self._get_selected_games_callback:
-            try:
-                selected = self._get_selected_games_callback(active_only=(self._source_selection == 3))
-                if selected:
-                    player_games_arg = [
-                        g for g in selected
-                        if (g.white == self._current_player or g.black == self._current_player)
-                    ]
-            except Exception as e:
-                logging_service = LoggingService.get_instance()
-                logging_service.error(f"Error getting selected games for stats: {e}", exc_info=e)
+        if self._source_selection in (3, 4):
+            if explicit_snapshot:
+                raw = list(selected_games_snapshot) if selected_games_snapshot else []
+                player_games_arg = [
+                    g for g in raw
+                    if (g.white == self._current_player or g.black == self._current_player)
+                ]
+            elif self._get_selected_games_callback:
+                try:
+                    selected = self._get_selected_games_callback(active_only=(self._source_selection == 3))
+                    if selected:
+                        player_games_arg = [
+                            g for g in selected
+                            if (g.white == self._current_player or g.black == self._current_player)
+                        ]
+                except Exception as e:
+                    logging_service = LoggingService.get_instance()
+                    logging_service.error(f"Error getting selected games for stats: {e}", exc_info=e)
 
         self._stats_worker = PlayerStatsCalculationWorker(
             self,
@@ -1308,6 +1405,7 @@ class PlayerStatsController(QObject):
         self._stats_worker.stats_unavailable.connect(self._on_stats_worker_unavailable)
         self._stats_worker.progress_update.connect(self._on_stats_worker_progress)
         self._stats_worker.finished.connect(self._on_stats_worker_finished)
+        self.stats_recalculation_started.emit()
         self._stats_worker.start()
     
     def _on_stats_worker_ready(self, stats: AggregatedPlayerStats, patterns: List[ErrorPattern], summaries: List[GameSummary]) -> None:
@@ -1341,72 +1439,31 @@ class PlayerStatsController(QObject):
                 pass
             self._stats_worker = None
             worker.deleteLater()
-            if self._recalc_pending and self._current_player:
+            if self._recalc_pending and self._current_player and not self._bulk_analysis_active:
                 self._recalc_pending = False
                 QTimer.singleShot(0, self._schedule_stats_recalculation)
     
-    def _schedule_dropdown_update(self) -> None:
-        """Schedule an asynchronous dropdown update."""
-        # Don't populate if "None" is selected as data source
-        if self._source_selection == 0:
+    def _dispose_dropdown_worker_non_running(self) -> None:
+        """Disconnect and delete a finished dropdown worker (never call while thread is running)."""
+        if not self._dropdown_worker:
             return
-        
-        # If a worker is already running, cancel it and wait for it to finish
-        if self._dropdown_worker:
-            try:
-                is_running = self._dropdown_worker.isRunning()
-            except RuntimeError:
-                # Worker has been deleted, clean up reference
-                self._dropdown_worker = None
-                is_running = False
-            
-            if is_running:
-                self._dropdown_worker.cancel()
-                # Wait for worker to finish (with timeout)
-                if not self._dropdown_worker.wait(2000):  # Wait up to 2 seconds
-                    # If it didn't finish, disconnect signals and delete later
-                    try:
-                        self._dropdown_worker.players_ready.disconnect()
-                        self._dropdown_worker.progress_update.disconnect()
-                        self._dropdown_worker.finished.disconnect()
-                    except (RuntimeError, TypeError):
-                        pass
-                    self._dropdown_worker.deleteLater()
-                    self._dropdown_worker = None
-                else:
-                    # Worker finished, disconnect and clean up
-                    try:
-                        self._dropdown_worker.players_ready.disconnect()
-                        self._dropdown_worker.progress_update.disconnect()
-                        self._dropdown_worker.finished.disconnect()
-                    except (RuntimeError, TypeError):
-                        pass
-                    self._dropdown_worker.deleteLater()
-                    self._dropdown_worker = None
-            else:
-                # Worker not running, just clean up
-                try:
-                    self._dropdown_worker.players_ready.disconnect()
-                    self._dropdown_worker.progress_update.disconnect()
-                    self._dropdown_worker.finished.disconnect()
-                except (RuntimeError, TypeError):
-                    pass
-                self._dropdown_worker.deleteLater()
-                self._dropdown_worker = None
-        
-        # For "Selected games" source, get games on main thread then run worker with that list
-        selected_games: Optional[List["GameData"]] = None
-        if self._source_selection in (3, 4):
-            if self._get_selected_games_callback:
-                try:
-                    selected_games = self._get_selected_games_callback(active_only=(self._source_selection == 3))
-                except Exception as e:
-                    logging_service = LoggingService.get_instance()
-                    logging_service.error(f"Error getting selected games: {e}", exc_info=e)
-            if selected_games is None:
-                selected_games = []
+        try:
+            if self._dropdown_worker.isRunning():
+                return
+        except RuntimeError:
+            self._dropdown_worker = None
+            return
+        try:
+            self._dropdown_worker.players_ready.disconnect()
+            self._dropdown_worker.progress_update.disconnect()
+            self._dropdown_worker.finished.disconnect()
+        except (RuntimeError, TypeError):
+            pass
+        self._dropdown_worker.deleteLater()
+        self._dropdown_worker = None
 
-        # Create and start new worker
+    def _start_dropdown_worker(self, selected_games: Optional[List["GameData"]]) -> None:
+        """Create and start PlayerDropdownWorker (no running worker must be held)."""
         try:
             self._dropdown_worker = PlayerDropdownWorker(
                 self, self._use_all_databases, selected_games=selected_games
@@ -1421,6 +1478,44 @@ class PlayerStatsController(QObject):
             if self._dropdown_worker:
                 self._dropdown_worker.deleteLater()
                 self._dropdown_worker = None
+
+    def _schedule_dropdown_update(self, selected_games_snapshot: Any = _DEFAULT_SELECTION_GAMES) -> None:
+        """Schedule an asynchronous dropdown update.
+
+        Pass a list for sources 3/4 to reuse a snapshot (e.g. debounced selection). Default fetches via callback.
+        """
+        if self._source_selection == 0:
+            return
+
+        explicit_snapshot = selected_games_snapshot is not _DEFAULT_SELECTION_GAMES
+        if self._source_selection in (3, 4):
+            if explicit_snapshot:
+                sg = list(selected_games_snapshot) if selected_games_snapshot else []
+            else:
+                sg = self._resolve_selected_games_for_dropdown()
+        else:
+            sg = None
+
+        if self._dropdown_worker:
+            try:
+                is_running = self._dropdown_worker.isRunning()
+            except RuntimeError:
+                self._dispose_dropdown_worker_non_running()
+                is_running = False
+        else:
+            is_running = False
+
+        if is_running:
+            self._dropdown_worker.cancel()
+            self._dropdown_restart_pending = True
+            self._dropdown_restart_explicit_snapshot = explicit_snapshot
+            self._dropdown_restart_snapshot = (
+                list(sg) if explicit_snapshot and self._source_selection in (3, 4) else None
+            )
+            return
+
+        self._dispose_dropdown_worker_non_running()
+        self._start_dropdown_worker(sg)
     
     def _on_dropdown_players_ready(self, players_with_analyzed: List[Tuple[str, int, int]]) -> None:
         """Handle players ready from dropdown worker."""
@@ -1447,6 +1542,17 @@ class PlayerStatsController(QObject):
                 pass
             self._dropdown_worker = None
             worker.deleteLater()
+
+            if self._dropdown_restart_pending:
+                self._dropdown_restart_pending = False
+                explicit = self._dropdown_restart_explicit_snapshot
+                snap = self._dropdown_restart_snapshot
+                self._dropdown_restart_explicit_snapshot = False
+                self._dropdown_restart_snapshot = None
+                if explicit and snap is not None:
+                    QTimer.singleShot(0, lambda s=snap: self._schedule_dropdown_update(s))
+                else:
+                    QTimer.singleShot(0, self._schedule_dropdown_update)
     
     # Database connection management
     
@@ -1514,7 +1620,7 @@ class PlayerStatsController(QObject):
         if not self._use_all_databases:
             self._schedule_dropdown_update()
             # If a player was selected, recalculate (might be in different database now)
-            if self._current_player:
+            if self._current_player and not self._bulk_analysis_active:
                 self._schedule_stats_recalculation()
     
     def _on_database_added(self, identifier: str, info) -> None:
@@ -1552,6 +1658,6 @@ class PlayerStatsController(QObject):
         self._schedule_dropdown_update()
         
         # If a player is selected, update their counts and recalculate stats
-        if self._current_player:
+        if self._current_player and not self._bulk_analysis_active:
             self._schedule_stats_recalculation()
 

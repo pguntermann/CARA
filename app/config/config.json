@@ -1191,7 +1191,12 @@
               155
             ]
           },
+          "show_time_trends_unavailability_hint": true,
+          "time_trends_unavailability_message": "Some sections are not available for the given data source, as they require (more) games with valid Date (tag) information.",
           "placeholder_text_loading": "Loading players...",
+          "placeholder_text_calculating_stats": "Calculating statistics…",
+          "placeholder_text_bulk_analysis_stats_disabled": "Disabled during bulk analysis.",
+          "activity_status_font_size": 10,
           "significant_moves": {
             "brilliant_moves": {
               "max_moves": 999
@@ -1674,6 +1679,22 @@
               190,
               255
             ],
+            "show_accuracy_by_color_lines": true,
+            "white_line_color": [
+              238,
+              236,
+              230
+            ],
+            "black_line_color": [
+              72,
+              82,
+              98
+            ],
+            "combined_series_label": "Combined",
+            "white_series_label": "As White",
+            "black_series_label": "As Black",
+            "legend_width": 100,
+            "legend_font_size": 9,
             "line_style": "solid",
             "line_width": 2,
             "font_family": "Helvetica Neue",

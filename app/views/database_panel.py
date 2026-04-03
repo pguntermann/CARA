@@ -15,7 +15,7 @@ from PyQt6.QtGui import (
     QDragMoveEvent,
     QDropEvent,
 )
-from PyQt6.QtCore import Qt, QModelIndex, QTimer, QSize, QRect
+from PyQt6.QtCore import Qt, QModelIndex, QTimer, QSize, QRect, QItemSelection
 from typing import Any, Callable, Dict, List, Optional
 from pathlib import Path
 import math
@@ -895,6 +895,30 @@ class DatabasePanel(QWidget):
                     return True  # consume event so view does not change selection
         return super().eventFilter(obj, event)
 
+    @staticmethod
+    def _item_selection_for_rows(model: DatabaseModel, row_indices: List[int]) -> QItemSelection:
+        """Build a QItemSelection covering all valid rows, merged into contiguous ranges (one select op per range)."""
+        selection = QItemSelection()
+        valid = sorted({r for r in row_indices if 0 <= r < model.rowCount()})
+        if not valid:
+            return selection
+        last_col = max(0, model.columnCount() - 1)
+        start = valid[0]
+        prev = start
+        for r in valid[1:]:
+            if r == prev + 1:
+                prev = r
+                continue
+            top_left = model.index(start, 0)
+            bottom_right = model.index(prev, last_col)
+            selection.select(top_left, bottom_right)
+            start = r
+            prev = r
+        top_left = model.index(start, 0)
+        bottom_right = model.index(prev, last_col)
+        selection.select(top_left, bottom_right)
+        return selection
+
     def _set_table_selection_to_rows(
         self,
         table: QTableView,
@@ -907,22 +931,35 @@ class DatabasePanel(QWidget):
         if append:
             current = set(idx.row() for idx in table.selectionModel().selectedRows())
             row_indices = sorted(set(current) | set(row_indices))
-        table.clearSelection()
-        if not row_indices:
-            return
         selection_model = table.selectionModel()
         if not selection_model:
             return
-        for row_idx in row_indices:
-            if 0 <= row_idx < model.rowCount():
-                for col in range(model.columnCount()):
-                    index = model.index(row_idx, col)
+        valid_rows = sorted({r for r in row_indices if 0 <= r < model.rowCount()})
+        # One logical update: avoid per-cell select() which emits selectionChanged thousands of times.
+        selection_model.blockSignals(True)
+        table.setUpdatesEnabled(False)
+        try:
+            table.clearSelection()
+            if valid_rows:
+                item_sel = self._item_selection_for_rows(model, valid_rows)
+                if not item_sel.isEmpty():
                     selection_model.select(
-                        index,
-                        QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows,
+                        item_sel,
+                        QItemSelectionModel.SelectionFlag.ClearAndSelect,
                     )
-        first_col_index = model.index(row_indices[0], 0)
-        table.scrollTo(first_col_index, QTableView.ScrollHint.EnsureVisible)
+                selection_model.setCurrentIndex(
+                    model.index(valid_rows[0], 0),
+                    QItemSelectionModel.SelectionFlag.NoUpdate,
+                )
+        finally:
+            table.setUpdatesEnabled(True)
+            selection_model.blockSignals(False)
+        self.selection_changed.emit()
+        if valid_rows:
+            table.scrollTo(
+                model.index(valid_rows[0], 0),
+                QTableView.ScrollHint.EnsureVisible,
+            )
 
     def _on_table_context_menu(self, pos: QPoint, table: QTableView) -> None:
         """Show context menu for the database table: Select mode (Replace/Append), Select rows (all, none, by value, empty, not empty), copy, paste."""

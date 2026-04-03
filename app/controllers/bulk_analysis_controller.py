@@ -671,6 +671,7 @@ class BulkAnalysisController(QObject):
     status_update_requested = pyqtSignal()  # Request status update from main thread
     game_analyzed = pyqtSignal(GameData)  # Emitted when a game is analyzed
     finished = pyqtSignal(bool, str)  # success, error_message
+    analysis_started = pyqtSignal()  # After analysis thread starts (main thread)
     
     def __init__(self, config: Dict[str, Any], engine_model: EngineModel,
                  game_analysis_controller, database_controller=None) -> None:
@@ -908,6 +909,7 @@ class BulkAnalysisController(QObject):
         
         # Start the thread
         self._analysis_thread.start()
+        self.analysis_started.emit()
     
     def _on_bulk_analysis_finished(self, success: bool, message: str) -> None:
         """Handle bulk analysis completion.

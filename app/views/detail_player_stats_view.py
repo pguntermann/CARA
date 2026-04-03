@@ -590,8 +590,8 @@ def _chart_x_from_bin_labels(
     return left + (time_pct / 100.0 * graph_width)
 
 
-def _accuracy_series_sort_key(row: Tuple[float, float, int, str, str]) -> Tuple[int, float]:
-    oc = _bin_ordinal_center_from_iso(row[3], row[4])
+def _accuracy_series_sort_key(row: Tuple[float, float, float, float, int, str, str]) -> Tuple[int, float]:
+    oc = _bin_ordinal_center_from_iso(row[5], row[6])
     if oc is not None:
         return (0, float(oc))
     return (1, row[0])
@@ -639,8 +639,16 @@ class AccuracyOverTimeChartWidget(QWidget):
         self.background_color = QColor(*chart_config.get("background_color", [30, 30, 35]))
         self.grid_color = QColor(*chart_config.get("grid_color", [60, 60, 65]))
         self.line_color = QColor(*chart_config.get("line_color", [120, 190, 255]))
+        self._white_line_color = QColor(*chart_config.get("white_line_color", [238, 236, 230]))
+        self._black_line_color = QColor(*chart_config.get("black_line_color", [72, 82, 98]))
         self._line_style = AccuracyVsProgressChartWidget._pen_style_from_config(chart_config.get("line_style", "solid"))
         self.line_width = chart_config.get("line_width", 2)
+        self._show_by_color = bool(chart_config.get("show_accuracy_by_color_lines", True))
+        self._legend_width = int(chart_config.get("legend_width", 100)) if self._show_by_color else 0
+        self._legend_font_size = int(scale_font_size(chart_config.get("legend_font_size", 9)))
+        self._label_combined = str(chart_config.get("combined_series_label", "Combined"))
+        self._label_white = str(chart_config.get("white_series_label", "As White"))
+        self._label_black = str(chart_config.get("black_series_label", "As Black"))
         self.text_color = QColor(*chart_config.get("text_color", [200, 200, 200]))
         self.axis_color = QColor(*chart_config.get("axis_color", [150, 150, 150]))
         self._x_axis_major_color = QColor(*chart_config.get("x_axis_major_line_color", [88, 88, 95]))
@@ -668,7 +676,9 @@ class AccuracyOverTimeChartWidget(QWidget):
         self._y_min_range = 5.0
 
         self._data: List[Tuple[float, float]] = []
-        self._vertex_meta: List[Tuple[int, str, str, float]] = []
+        self._acc_white: List[float] = []
+        self._acc_black: List[float] = []
+        self._vertex_meta: List[Tuple[int, str, str, float, float, float]] = []
         self._ordinal_min = 0
         self._ordinal_max = 0
         self._calendar_mode = ""
@@ -682,7 +692,7 @@ class AccuracyOverTimeChartWidget(QWidget):
 
     def set_data(
         self,
-        series: List[Tuple[float, float, int, str, str]],
+        series: List[Tuple[float, float, float, float, int, str, str]],
         ordinal_min: int,
         ordinal_max: int,
         calendar_mode: str = "",
@@ -690,7 +700,9 @@ class AccuracyOverTimeChartWidget(QWidget):
         """Set binned time series from AggregatedPlayerStats.accuracy_over_time."""
         ordered = sorted(series, key=_accuracy_series_sort_key)
         self._data = [(row[0], row[1]) for row in ordered]
-        self._vertex_meta = [(row[2], row[3], row[4], row[1]) for row in ordered]
+        self._acc_white = [row[2] for row in ordered]
+        self._acc_black = [row[3] for row in ordered]
+        self._vertex_meta = [(row[4], row[5], row[6], row[1], row[2], row[3]) for row in ordered]
         self._ordinal_min = ordinal_min
         self._ordinal_max = ordinal_max
         self._calendar_mode = calendar_mode if calendar_mode in ("day", "week", "month", "year") else ""
@@ -798,6 +810,9 @@ class AccuracyOverTimeChartWidget(QWidget):
 
     def _accuracy_range(self) -> Tuple[float, float]:
         accs: List[float] = [acc for _, acc in self._data]
+        if self._show_by_color:
+            accs.extend(v for v in self._acc_white if math.isfinite(v))
+            accs.extend(v for v in self._acc_black if math.isfinite(v))
         if not accs:
             return 0.0, 100.0
         lo, hi = min(accs), max(accs)
@@ -825,12 +840,9 @@ class AccuracyOverTimeChartWidget(QWidget):
             painter.drawText(QRect(0, 0, width, height), Qt.AlignmentFlag.AlignCenter, "No data")
             return
 
-        left = self.padding[0]
-        top = self.padding[1]
-        right = width - self.padding[2]
-        bottom = height - self.padding[3]
-        graph_width = right - left
-        graph_height = bottom - top
+        left, top, right_plot, bottom, graph_width, graph_height = self._graph_bounds()
+        if graph_width <= 0 or graph_height <= 0:
+            return
 
         min_acc, max_acc = self._accuracy_range()
         acc_range = max_acc - min_acc
@@ -841,7 +853,7 @@ class AccuracyOverTimeChartWidget(QWidget):
         for i in range(max_grid_lines + 1):
             acc = min_acc + i * step
             y = bottom - ((acc - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
-            painter.drawLine(int(left), int(y), int(right), int(y))
+            painter.drawLine(int(left), int(y), int(right_plot), int(y))
 
         tick_list: List[Tuple[int, bool, str]] = []
         if self._x_axis_calendar_enabled:
@@ -904,35 +916,81 @@ class AccuracyOverTimeChartWidget(QWidget):
                 painter.drawText(int(x - label_width / 2), int(bottom + fm.height() + self.x_axis_label_spacing), label)
 
         omin, omax = self._ordinal_min, self._ordinal_max
+
+        def _flush_run_line(col: QColor, lw: int, run: List[QPointF]) -> None:
+            pen_ln = QPen(col, lw)
+            pen_ln.setStyle(self._line_style)
+            painter.setPen(pen_ln)
+            if len(run) > 1:
+                for k in range(len(run) - 1):
+                    painter.drawLine(run[k], run[k + 1])
+            elif len(run) == 1 and not self._show_bin_data_markers:
+                painter.setBrush(QBrush(col))
+                r = max(3, lw + 2)
+                painter.drawEllipse(run[0], r, r)
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        def _optional_y_points(accs: List[float]) -> List[Optional[QPointF]]:
+            out_pts: List[Optional[QPointF]] = []
+            for i, (pct, _) in enumerate(self._data):
+                av = accs[i]
+                if not math.isfinite(av):
+                    out_pts.append(None)
+                    continue
+                _c, lab0, lab1, *_r = self._vertex_meta[i]
+                x = _chart_x_from_bin_labels(lab0, lab1, pct, left, graph_width, omin, omax)
+                y = bottom - ((av - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
+                y = max(top, min(bottom, y))
+                out_pts.append(QPointF(x, y))
+            return out_pts
+
+        def _runs_from_optional(pts: List[Optional[QPointF]]) -> List[List[QPointF]]:
+            runs_acc: List[List[QPointF]] = []
+            cur: List[QPointF] = []
+            for p in pts:
+                if p is None:
+                    if cur:
+                        runs_acc.append(cur)
+                        cur = []
+                    continue
+                cur.append(p)
+            if cur:
+                runs_acc.append(cur)
+            return runs_acc
+
         points: List[QPointF] = []
         for i, (pct, acc) in enumerate(self._data):
-            _cnt, lab0, lab1, _ = self._vertex_meta[i]
+            _cnt, lab0, lab1, *_rest = self._vertex_meta[i]
             x = _chart_x_from_bin_labels(lab0, lab1, pct, left, graph_width, omin, omax)
             y = bottom - ((acc - min_acc) / acc_range * graph_height) if acc_range > 0 else bottom
             y = max(top, min(bottom, y))
             points.append(QPointF(x, y))
 
-        if len(points) > 1:
-            pen_player = QPen(self.line_color, self.line_width)
-            pen_player.setStyle(self._line_style)
-            painter.setPen(pen_player)
-            for i in range(len(points) - 1):
-                painter.drawLine(points[i], points[i + 1])
-        elif len(points) == 1 and not self._show_bin_data_markers:
-            pen_player = QPen(self.line_color, self.line_width)
-            pen_player.setStyle(self._line_style)
-            painter.setPen(pen_player)
-            painter.setBrush(QBrush(self.line_color))
-            r = max(3, self.line_width + 2)
-            painter.drawEllipse(points[0], r, r)
-            painter.setBrush(Qt.BrushStyle.NoBrush)
+        lw = int(self.line_width)
+        if self._show_by_color:
+            for run in _runs_from_optional(_optional_y_points(self._acc_black)):
+                _flush_run_line(self._black_line_color, lw, run)
+            for run in _runs_from_optional(_optional_y_points(self._acc_white)):
+                _flush_run_line(self._white_line_color, lw, run)
+        _flush_run_line(self.line_color, lw, points)
 
         if self._show_bin_data_markers and points:
             arm = max(2.0, self._bin_data_marker_radius)
-            mpen = QPen(self.line_color, max(1, self.line_width))
+            mpen = QPen(self.line_color, max(1, lw))
             mpen.setStyle(self._line_style)
             for pt in points:
                 _draw_bin_data_x_marker(painter, pt.x(), pt.y(), arm, mpen)
+            if self._show_by_color:
+                m_w = QPen(self._white_line_color, max(1, lw))
+                m_w.setStyle(self._line_style)
+                for p in _optional_y_points(self._acc_white):
+                    if p is not None:
+                        _draw_bin_data_x_marker(painter, p.x(), p.y(), arm, m_w)
+                m_b = QPen(self._black_line_color, max(1, lw))
+                m_b.setStyle(self._line_style)
+                for p in _optional_y_points(self._acc_black):
+                    if p is not None:
+                        _draw_bin_data_x_marker(painter, p.x(), p.y(), arm, m_b)
 
         if self._hover_pixel is not None and self._hover_vertex_index is not None:
             hover_pen = QPen(self.line_color, 2)
@@ -941,14 +999,35 @@ class AccuracyOverTimeChartWidget(QWidget):
             painter.setBrush(QBrush(self.background_color))
             painter.drawEllipse(self._hover_pixel, self._hover_circle_radius, self._hover_circle_radius)
 
+        if self._show_by_color and self._legend_width > 0:
+            leg_font = QFont(self.font_family, self._legend_font_size)
+            painter.setFont(leg_font)
+            leg_fm = QFontMetrics(leg_font)
+            lx = int(right_plot + 8)
+            ly = int(top + 4)
+            line_seg_w = 14
+            legend_rows = [
+                (self.line_color, self._label_combined),
+                (self._white_line_color, self._label_white),
+                (self._black_line_color, self._label_black),
+            ]
+            for col, lbl in legend_rows:
+                pen = QPen(col, max(1, lw))
+                pen.setStyle(self._line_style)
+                painter.setPen(pen)
+                painter.drawLine(lx, ly + leg_fm.height() // 2, lx + line_seg_w, ly + leg_fm.height() // 2)
+                painter.setPen(self.text_color)
+                painter.drawText(lx + line_seg_w + 6, ly + leg_fm.ascent(), lbl)
+                ly += leg_fm.height() + 4
+
     def _graph_bounds(self) -> Tuple[float, float, float, float, float, float]:
         width = self.width()
         height = self.height()
         left = self.padding[0]
         top = self.padding[1]
-        right = width - self.padding[2]
+        right_plot = width - self.padding[2] - self._legend_width
         bottom = height - self.padding[3]
-        return left, top, right, bottom, right - left, bottom - top
+        return left, top, right_plot, bottom, right_plot - left, bottom - top
 
     def _data_to_pixel(
         self,
@@ -999,6 +1078,20 @@ class AccuracyOverTimeChartWidget(QWidget):
         dy = p.y() - cy
         return QPointF(cx, cy), dx * dx + dy * dy
 
+    def _accuracy_hover_tooltip(self, vertex_index: int) -> str:
+        cnt, lab0, lab1, p_all, p_w, p_b = self._vertex_meta[vertex_index]
+        gw = "game" if cnt == 1 else "games"
+        parts = [f"{lab0} – {lab1}", f"{self._label_combined}: {p_all:.1f}%"]
+        if self._show_by_color:
+            parts.append(
+                f"{self._label_white}: {p_w:.1f}%" if math.isfinite(p_w) else f"{self._label_white}: n/a"
+            )
+            parts.append(
+                f"{self._label_black}: {p_b:.1f}%" if math.isfinite(p_b) else f"{self._label_black}: n/a"
+            )
+        parts.append(f"{cnt} {gw}")
+        return "\n".join(parts)
+
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         super().mouseMoveEvent(event)
         if not self._data:
@@ -1012,7 +1105,7 @@ class AccuracyOverTimeChartWidget(QWidget):
         min_acc, max_acc = self._accuracy_range()
         points: List[QPointF] = []
         for i, (pct, acc) in enumerate(self._data):
-            _c, lab0, lab1, _ = self._vertex_meta[i]
+            _c, lab0, lab1, *_acc_wb = self._vertex_meta[i]
             pt = self._data_to_pixel(
                 pct,
                 acc,
@@ -1034,15 +1127,20 @@ class AccuracyOverTimeChartWidget(QWidget):
             self.update()
             return
         mp = event.position()
+        mx, my = float(mp.x()), float(mp.y())
+        if not (left <= mx <= right and top <= my <= bottom):
+            self._hover_pixel = None
+            self._hover_vertex_index = None
+            QToolTip.hideText()
+            self.update()
+            return
         threshold_sq = self._hover_hit_threshold_px * self._hover_hit_threshold_px
         if len(points) == 1:
             d0 = (mp.x() - points[0].x()) ** 2 + (mp.y() - points[0].y()) ** 2
             if d0 <= threshold_sq:
                 self._hover_pixel = points[0]
                 self._hover_vertex_index = 0
-                cnt, lab0, lab1, p_acc = self._vertex_meta[0]
-                gw = "game" if cnt == 1 else "games"
-                tip = f"{lab0} – {lab1}\nMedian accuracy: {p_acc:.1f}%\n{cnt} {gw}"
+                tip = self._accuracy_hover_tooltip(0)
                 QToolTip.showText(event.globalPosition().toPoint(), tip, self, QRect(), 4000)
             else:
                 self._hover_pixel = None
@@ -1064,9 +1162,7 @@ class AccuracyOverTimeChartWidget(QWidget):
         if best_dist_sq <= threshold_sq and best_pixel is not None and best_vertex is not None:
             self._hover_pixel = best_pixel
             self._hover_vertex_index = best_vertex
-            cnt, lab0, lab1, p_acc = self._vertex_meta[best_vertex]
-            gw = "game" if cnt == 1 else "games"
-            tip = f"{lab0} – {lab1}\nMedian accuracy: {p_acc:.1f}%\n{cnt} {gw}"
+            tip = self._accuracy_hover_tooltip(best_vertex)
             QToolTip.showText(event.globalPosition().toPoint(), tip, self, QRect(), 4000)
         else:
             self._hover_pixel = None
@@ -2051,11 +2147,22 @@ class DetailPlayerStatsView(QWidget):
             'placeholder_text_all_sections_hidden',
             'All player statistics sections are hidden. Use the Player Stats menu to show them again.',
         )
+        self.placeholder_text_calculating_stats = self.player_stats_config.get(
+            'placeholder_text_calculating_stats',
+            'Calculating statistics…',
+        )
+        self.placeholder_text_bulk_analysis_stats_disabled = self.player_stats_config.get(
+            'placeholder_text_bulk_analysis_stats_disabled',
+            'Disabled during bulk analysis.',
+        )
+        self._bulk_analysis_blocks_stats_ui = False
+        self._stats_recalculation_ui_pending = False
 
         self._player_stats_section_wrappers: Dict[str, QWidget] = {}
         self._section_visibility_prefs: Dict[str, bool] = {}
         self._player_stats_menu_actions: Optional[Dict[str, Any]] = None
         self._player_stats_visibility_hint_label: Optional[QLabel] = None
+        self._section_visibility_hint_static_text: str = ""
         self._reload_player_stats_section_visibility_prefs()
 
         self._setup_ui()
@@ -2232,6 +2339,12 @@ class DetailPlayerStatsView(QWidget):
             try:
                 self._stats_controller.stats_updated.disconnect(self._handle_stats_updated)
                 self._stats_controller.stats_unavailable.disconnect(self._handle_stats_unavailable)
+                self._stats_controller.stats_recalculation_started.disconnect(
+                    self._handle_stats_recalculation_started
+                )
+                self._stats_controller.bulk_analysis_blocks_stats_recalculation.disconnect(
+                    self._handle_bulk_analysis_blocks_stats_changed
+                )
                 self._stats_controller.players_ready.disconnect(self._on_players_ready)
                 self._stats_controller.player_selection_cleared.disconnect(self._on_player_selection_cleared)
                 self._stats_controller.source_selection_changed.disconnect(self._on_source_selection_changed)
@@ -2244,6 +2357,10 @@ class DetailPlayerStatsView(QWidget):
             # Connect to controller signals
             self._stats_controller.stats_updated.connect(self._handle_stats_updated)
             self._stats_controller.stats_unavailable.connect(self._handle_stats_unavailable)
+            self._stats_controller.stats_recalculation_started.connect(self._handle_stats_recalculation_started)
+            self._stats_controller.bulk_analysis_blocks_stats_recalculation.connect(
+                self._handle_bulk_analysis_blocks_stats_changed
+            )
             self._stats_controller.players_ready.connect(self._on_players_ready)
             self._stats_controller.player_selection_cleared.connect(self._on_player_selection_cleared)
             self._stats_controller.source_selection_changed.connect(self._on_source_selection_changed)
@@ -2265,7 +2382,41 @@ class DetailPlayerStatsView(QWidget):
                     combo_value = getattr(self, 'player_combo', None)
                     if combo_value is not None:
                         QTimer.singleShot(100, lambda: stats_controller._schedule_dropdown_update())
+            if stats_controller.is_bulk_blocking_player_stats():
+                self._handle_bulk_analysis_blocks_stats_changed(True)
     
+    def _sync_player_stats_activity_label(self) -> None:
+        """Small status line under player selection: bulk pause or calculating (no overlay)."""
+        lbl = getattr(self, '_player_stats_activity_label', None)
+        if lbl is None:
+            return
+        try:
+            src = self.source_combo.currentIndex()
+        except RuntimeError:
+            return
+        if src == 0:
+            lbl.hide()
+            return
+        if self._bulk_analysis_blocks_stats_ui:
+            lbl.setText(self.placeholder_text_bulk_analysis_stats_disabled)
+            lbl.show()
+            return
+        if self._stats_recalculation_ui_pending:
+            lbl.setText(self.placeholder_text_calculating_stats)
+            lbl.show()
+            return
+        lbl.hide()
+
+    def _handle_stats_recalculation_started(self) -> None:
+        self._stats_recalculation_ui_pending = True
+        self._sync_player_stats_activity_label()
+
+    def _handle_bulk_analysis_blocks_stats_changed(self, blocking: bool) -> None:
+        self._bulk_analysis_blocks_stats_ui = bool(blocking)
+        if blocking:
+            self._stats_recalculation_ui_pending = False
+        self._sync_player_stats_activity_label()
+
     def _on_active_game_changed(self, game) -> None:
         """Handle active game change - auto-select player if available."""
         if not game:
@@ -2315,6 +2466,8 @@ class DetailPlayerStatsView(QWidget):
             self._pending_stats_content_rebuild = False
             QTimer.singleShot(0, self._deferred_build_stats_content)
         else:
+            self._stats_recalculation_ui_pending = False
+            self._sync_player_stats_activity_label()
             self._schedule_trend_charts_geometry_refresh()
 
     def _schedule_trend_charts_geometry_refresh(self) -> None:
@@ -2333,6 +2486,13 @@ class DetailPlayerStatsView(QWidget):
     
     def _handle_stats_unavailable(self, reason: str) -> None:
         """Show appropriate placeholder when stats data is unavailable."""
+        if reason == "calculation_cancelled" and not self._stats_recalculation_ui_pending:
+            # e.g. player cleared first via player_selection_cleared; avoid clobbering placeholder text.
+            self._sync_player_stats_activity_label()
+            return
+
+        self._stats_recalculation_ui_pending = False
+        self._sync_player_stats_activity_label()
         self.current_stats = None
         self.current_patterns = []
         self._last_unavailable_reason = reason or "no_player"
@@ -2346,6 +2506,9 @@ class DetailPlayerStatsView(QWidget):
             placeholder_text = "Player not found in selected database(s)"
         elif reason == "no_database":
             placeholder_text = "No database available"
+        elif reason == "calculation_cancelled":
+            # Worker was cancelled before a result; keep a neutral message (player/source may already be cleared).
+            placeholder_text = self.placeholder_text_no_player
         
         self._set_disabled_placeholder_visible(True, placeholder_text)
     
@@ -2504,16 +2667,58 @@ class DetailPlayerStatsView(QWidget):
                 continue
         return False
 
+    def _should_show_time_trends_unavailability_hint(self, stats: "AggregatedPlayerStats") -> bool:
+        """True when analyzed games exist but at least one enabled over-time chart has no series."""
+        if not stats or not getattr(stats, "analyzed_games", 0):
+            return False
+        if not self.player_stats_config.get("show_time_trends_unavailability_hint", True):
+            return False
+        acc = self.player_stats_config.get("accuracy_over_time_chart", {})
+        if acc.get("enabled", True) and not (getattr(stats, "accuracy_over_time", None) or []):
+            return True
+        mq = self.player_stats_config.get("move_quality_over_time_chart", {})
+        if mq.get("enabled", True) and not (getattr(stats, "move_quality_over_time", None) or []):
+            return True
+        ap = self.player_stats_config.get("acpl_phase_over_time_chart", {})
+        if ap.get("enabled", True) and not (getattr(stats, "acpl_phase_over_time", None) or []):
+            return True
+        return False
+
+    def _full_player_stats_hint_text(self) -> str:
+        """Section menu hint plus optional time-trends unavailability note."""
+        parts: List[str] = []
+        section_txt = (getattr(self, "_section_visibility_hint_static_text", None) or "").strip()
+        if (
+            section_txt
+            and self._some_player_stats_section_hidden_in_prefs()
+            and self._any_player_stats_section_wrapper_visible()
+        ):
+            parts.append(section_txt)
+        if self.current_stats and self._should_show_time_trends_unavailability_hint(self.current_stats):
+            msg = self.player_stats_config.get(
+                "time_trends_unavailability_message",
+                "Some sections are not available for the given data source, as they require games with "
+                "move valid Date (tag) information.",
+            )
+            msg = str(msg).strip()
+            if msg:
+                parts.append(msg)
+        return "\n\n".join(parts)
+
     def _update_player_stats_visibility_hint(self) -> None:
-        """Show a hint when the user has hidden some (not all) sections via the Player Stats menu."""
+        """Show hints for hidden sections and/or missing time-based charts (dated games threshold)."""
         lbl = self._player_stats_visibility_hint_label
         if lbl is None:
             return
         if not self.current_stats:
             lbl.hide()
             return
-        show = self._some_player_stats_section_hidden_in_prefs() and self._any_player_stats_section_wrapper_visible()
-        lbl.setVisible(show)
+        full = self._full_player_stats_hint_text().strip()
+        if not full:
+            lbl.hide()
+            return
+        lbl.setText(full)
+        lbl.setVisible(True)
 
     def _update_all_sections_hidden_placeholder(self) -> None:
         if not self.current_stats:
@@ -2659,37 +2864,46 @@ class DetailPlayerStatsView(QWidget):
         section_spacing_val = layout_config.get('section_spacing', 20)
 
         self._player_stats_visibility_hint_label = None
+        self._section_visibility_hint_static_text = ""
         hint_cfg = player_stats_config.get("section_visibility_hint")
+        placeholder_cfg = player_stats_config.get("placeholder", {})
+        show_trends_unavailability_hint = bool(
+            player_stats_config.get("show_time_trends_unavailability_hint", True)
+        )
+        hint_text = ""
         if isinstance(hint_cfg, dict):
             hint_text = str(hint_cfg.get("text", "")).strip()
+        self._section_visibility_hint_static_text = hint_text
+
+        hint_color = None
+        if isinstance(hint_cfg, dict):
             hint_color = hint_cfg.get("text_color")
-            if (
-                hint_text
-                and isinstance(hint_color, (list, tuple))
-                and len(hint_color) >= 3
-            ):
-                hr, hg, hb = int(hint_color[0]), int(hint_color[1]), int(hint_color[2])
-                fam_raw = hint_cfg.get("font_family")
-                fam = (
-                    str(fam_raw).strip()
-                    if isinstance(fam_raw, str) and fam_raw.strip()
-                    else str(fonts_config.get("label_font_family", "Helvetica Neue"))
-                )
-                fs_raw = hint_cfg.get("font_size")
-                hint_fs = int(
-                    scale_font_size(fs_raw if fs_raw is not None else fonts_config.get("label_font_size", 11))
-                )
-                hint_label = QLabel(hint_text)
-                hint_label.setWordWrap(True)
-                hint_label.setMinimumWidth(0)
-                hint_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Maximum)
-                hint_label.setFont(QFont(resolve_font_family(fam), hint_fs))
-                hint_label.setStyleSheet(
-                    f"color: rgb({hr}, {hg}, {hb}); background: transparent; border: none;"
-                )
-                self._player_stats_visibility_hint_label = hint_label
-                hint_label.hide()
-                self.content_layout.addWidget(hint_label)
+        if not isinstance(hint_color, (list, tuple)) or len(hint_color) < 3:
+            hint_color = placeholder_cfg.get("text_color", [150, 150, 150])
+        hr, hg, hb = int(hint_color[0]), int(hint_color[1]), int(hint_color[2])
+
+        fam = str(fonts_config.get("label_font_family", "Helvetica Neue"))
+        hint_fs = int(scale_font_size(fonts_config.get("label_font_size", 11)))
+        if isinstance(hint_cfg, dict):
+            fam_raw = hint_cfg.get("font_family")
+            if isinstance(fam_raw, str) and fam_raw.strip():
+                fam = str(fam_raw).strip()
+            fs_raw = hint_cfg.get("font_size")
+            if fs_raw is not None:
+                hint_fs = int(scale_font_size(fs_raw))
+
+        if hint_text or show_trends_unavailability_hint:
+            hint_label = QLabel("")
+            hint_label.setWordWrap(True)
+            hint_label.setMinimumWidth(0)
+            hint_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Maximum)
+            hint_label.setFont(QFont(resolve_font_family(fam), hint_fs))
+            hint_label.setStyleSheet(
+                f"color: rgb({hr}, {hg}, {hb}); background: transparent; border: none;"
+            )
+            self._player_stats_visibility_hint_label = hint_label
+            hint_label.hide()
+            self.content_layout.addWidget(hint_label)
         
         # Analysis Coverage Banner removed - redundant with "Total Games" in Overview
         
@@ -3160,6 +3374,19 @@ class DetailPlayerStatsView(QWidget):
         
         layout.addLayout(player_row)
         
+        ph_cfg = player_stats_config.get('placeholder', {})
+        act_rgb = ph_cfg.get('text_color', [150, 150, 150])
+        act_fs = int(scale_font_size(player_stats_config.get('activity_status_font_size', 10)))
+        self._player_stats_activity_label = QLabel()
+        self._player_stats_activity_label.setWordWrap(True)
+        self._player_stats_activity_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._player_stats_activity_label.setStyleSheet(
+            f"color: rgb({int(act_rgb[0])}, {int(act_rgb[1])}, {int(act_rgb[2])});"
+            f" font-size: {act_fs}pt; padding: 4px 8px; background: transparent;"
+        )
+        self._player_stats_activity_label.hide()
+        layout.addWidget(self._player_stats_activity_label)
+        
         # Store reference to widget
         self.player_selection_widget = container
         
@@ -3461,6 +3688,7 @@ class DetailPlayerStatsView(QWidget):
         
         # Call controller method to handle source selection
         self._stats_controller.set_source_selection(index)
+        self._sync_player_stats_activity_label()
     
     
     def _on_players_ready(self, players_with_analyzed: List[Tuple[str, int, int]]) -> None:
@@ -3509,6 +3737,8 @@ class DetailPlayerStatsView(QWidget):
             # Reconnect signal
             self.player_combo.currentIndexChanged.connect(self._on_player_selected)
             self.player_combo.setCurrentIndex(-1)
+            self._stats_recalculation_ui_pending = False
+            self._sync_player_stats_activity_label()
             self._clear_stats_sections()
             # Show placeholder indicating no players with at least 2 analyzed games
             placeholder_text = self.player_stats_config.get(
@@ -3561,6 +3791,8 @@ class DetailPlayerStatsView(QWidget):
                 # Player no longer in list, clear selection
                 self.player_combo.setCurrentIndex(-1)
                 self._stats_controller.set_player_selection(None) if self._stats_controller else None
+                self._stats_recalculation_ui_pending = False
+                self._sync_player_stats_activity_label()
                 self._set_disabled_placeholder_visible(True, self.placeholder_text_no_player)
                 self._clear_stats_sections()
             else:
@@ -3580,6 +3812,8 @@ class DetailPlayerStatsView(QWidget):
                 pass
             self.player_combo.setCurrentIndex(-1)
             self.player_combo.currentIndexChanged.connect(self._on_player_selected)
+        self._stats_recalculation_ui_pending = False
+        self._sync_player_stats_activity_label()
         self._clear_stats_sections()
         self._set_disabled_placeholder_visible(True, self.placeholder_text_no_player)
     
@@ -3603,6 +3837,7 @@ class DetailPlayerStatsView(QWidget):
                 'Loading players...'
             )
             self._set_disabled_placeholder_visible(True, loading_text)
+        self._sync_player_stats_activity_label()
     
     
     def _create_analysis_coverage_banner(self, analyzed_count: int, total_count: int,
