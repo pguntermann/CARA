@@ -992,6 +992,7 @@
     "bin_density": "more",
     "color_preset": "amber",
     "distribution_line_curve": "smooth",
-    "distribution_line_smooth_strength": 1.0
+    "distribution_line_smooth_strength": 1.0,
+    "x_axis_span": "full"
   }
 }

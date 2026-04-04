@@ -19,6 +19,7 @@ def test_normalize_accepts_valid_values() -> None:
         "color_preset": "amber",
         "distribution_line_curve": "straight",
         "distribution_line_smooth_strength": 1.5,
+        "x_axis_span": "data_bounds",
     }
     out = normalize_player_stats_accuracy_distribution_settings(raw)
     assert out == {**DEFAULT_PLAYER_STATS_ACCURACY_DISTRIBUTION, **raw}
@@ -30,6 +31,7 @@ def test_normalize_drops_invalid_keys_uses_defaults() -> None:
         "y_axis_mode": "nope",
         "bin_density": "",
         "color_preset": "ocean_blue",
+        "x_axis_span": "wide",
         "extra": 1,
     }
     out = normalize_player_stats_accuracy_distribution_settings(raw)
@@ -43,4 +45,5 @@ def test_normalize_drops_invalid_keys_uses_defaults() -> None:
     assert out["distribution_line_smooth_strength"] == DEFAULT_PLAYER_STATS_ACCURACY_DISTRIBUTION[
         "distribution_line_smooth_strength"
     ]
+    assert out["x_axis_span"] == DEFAULT_PLAYER_STATS_ACCURACY_DISTRIBUTION["x_axis_span"]
     assert "extra" not in out

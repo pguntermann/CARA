@@ -2407,6 +2407,7 @@ class DetailPlayerStatsView(QWidget):
         self._stats_controller: Optional["PlayerStatsController"] = None
         self._database_panel = database_panel  # For highlighting games in database panel
         self._on_open_pattern_games_in_search_results: Optional[Callable[["ErrorPattern"], None]] = None
+        self._on_open_activity_heatmap_day_in_search_results: Optional[Callable[[int], None]] = None
         self._on_open_best_games_in_search_results: Optional[Callable[[], None]] = None
         self._on_open_worst_games_in_search_results: Optional[Callable[[], None]] = None
         self._on_open_brilliant_moves_in_search_results: Optional[Callable[[], None]] = None
@@ -2579,6 +2580,10 @@ class DetailPlayerStatsView(QWidget):
                 lbl.setText(cap)
         else:
             QTimer.singleShot(0, self._deferred_build_stats_content)
+
+    def _on_activity_heatmap_day_double_clicked(self, day_ordinal: int) -> None:
+        if self._on_open_activity_heatmap_day_in_search_results:
+            self._on_open_activity_heatmap_day_in_search_results(day_ordinal)
 
     def _on_player_stats_accuracy_distribution_settings_changed(self) -> None:
         if self._ps_ad_context_menu_controller is not None:
@@ -3317,6 +3322,7 @@ class DetailPlayerStatsView(QWidget):
             hm = PlayerActivityHeatmapWidget(self.config)
             hm.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
             hm.set_per_game_ordinals(pairs)
+            hm.activity_day_double_clicked.connect(self._on_activity_heatmap_day_double_clicked)
             self._activity_heatmap_widget = hm
             cap = hm.subcaption_text() or ""
             ah_sub = QLabel(cap)
@@ -3331,6 +3337,19 @@ class DetailPlayerStatsView(QWidget):
             )
             _configure_player_stats_trend_subcaption_label(ah_sub)
             ah_layout.addWidget(ah_sub)
+            ah_hint = QLabel("Double-click cell to open games")
+            ah_hint_fs = scale_font_size(int(ah_cfg.get("label_font_size", 8)))
+            ah_hint_font = QFont(
+                resolve_font_family(player_stats_config.get("fonts", {}).get("label_font_family", "Helvetica Neue")),
+                int(ah_hint_fs),
+            )
+            ah_hint.setFont(ah_hint_font)
+            tr, tg, tb = text_color.red(), text_color.green(), text_color.blue()
+            ah_hint.setStyleSheet(
+                f"color: rgba({tr}, {tg}, {tb}, 0.72); background: transparent;"
+            )
+            _configure_player_stats_trend_subcaption_label(ah_hint)
+            ah_layout.addWidget(ah_hint)
             ah_layout.addWidget(hm, stretch=0, alignment=Qt.AlignmentFlag.AlignTop)
             self._activity_heatmap_subcaption_label = ah_sub
             ah_wrap.setProperty("section_name", "Activity heatmap")

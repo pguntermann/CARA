@@ -539,6 +539,39 @@ class UserSettingsService:
         """
         self.get_model().set_player_stats_section_visibility(visibility)
 
+    def reset_player_stats_settings_from_template(self) -> bool:
+        """Apply Player Stats-related keys from ``user_settings.json.template`` and save.
+
+        Updates: ``player_stats_section_visibility``, ``player_stats_time_series``,
+        ``player_stats_activity_heatmap``, ``player_stats_accuracy_distribution``.
+        Keys absent from the template are left unchanged.
+
+        Returns:
+            True if the template loaded and save succeeded.
+        """
+        tmpl = self._load_template()
+        if not tmpl:
+            return False
+        model = self.get_model()
+        if "player_stats_section_visibility" in tmpl:
+            raw_vis = tmpl["player_stats_section_visibility"]
+            if isinstance(raw_vis, dict):
+                vis = {str(k): bool(v) for k, v in raw_vis.items() if isinstance(v, bool)}
+                model.set_player_stats_section_visibility(vis)
+        if "player_stats_time_series" in tmpl:
+            ts = tmpl["player_stats_time_series"]
+            if isinstance(ts, dict):
+                model.set_player_stats_time_series(self._deep_copy(ts))
+        if "player_stats_activity_heatmap" in tmpl:
+            ah = tmpl["player_stats_activity_heatmap"]
+            if isinstance(ah, dict):
+                model.set_player_stats_activity_heatmap(self._deep_copy(ah))
+        if "player_stats_accuracy_distribution" in tmpl:
+            ad = tmpl["player_stats_accuracy_distribution"]
+            if isinstance(ad, dict):
+                model.set_player_stats_accuracy_distribution(self._deep_copy(ad))
+        return bool(self.save())
+
     def update_player_stats_time_series(self, partial: Dict[str, Any]) -> None:
         """Merge keys into Player Stats time-series user settings (binning / chart display)."""
         self.get_model().update_player_stats_time_series(partial)

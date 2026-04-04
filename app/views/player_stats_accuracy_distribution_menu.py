@@ -31,6 +31,7 @@ class PlayerStatsAccuracyDistributionMenuController:
         self._curve_smooth: Optional[QAction] = None
         self._curve_straight: Optional[QAction] = None
         self._smooth_strength: Dict[float, QAction] = {}
+        self._xspan: Dict[str, QAction] = {}
 
     def attach_to_parent_menu(self, parent_menu: QMenu) -> QMenu:
         self.top_menu = parent_menu.addMenu("Accuracy distribution settings")
@@ -104,6 +105,15 @@ class PlayerStatsAccuracyDistributionMenuController:
             act.setMenuRole(QAction.MenuRole.NoRole)
             act.triggered.connect(lambda _c=False, v=x: self._on_smooth_strength(float(v)))
             self._smooth_strength[float(x)] = act
+        for key, label in (
+            ("full", "Full range (0-100%)"),
+            ("data_bounds", "Data range (first bin to last)"),
+        ):
+            act = QAction(label, p)
+            act.setCheckable(True)
+            act.setMenuRole(QAction.MenuRole.NoRole)
+            act.triggered.connect(lambda _c=False, k=key: self._on_xspan(k))
+            self._xspan[key] = act
 
     def _populate_tree(self, root: QMenu) -> None:
         ms = root.addMenu("Accuracy scale")
@@ -114,6 +124,10 @@ class PlayerStatsAccuracyDistributionMenuController:
         self._style(my)
         my.addAction(self._yaxis["count"])
         my.addAction(self._yaxis["percent_of_games"])
+        mx = root.addMenu("Horizontal axis")
+        self._style(mx)
+        mx.addAction(self._xspan["full"])
+        mx.addAction(self._xspan["data_bounds"])
         mb = root.addMenu("Bar count")
         self._style(mb)
         for k in ("auto", "fewer", "more"):
@@ -172,6 +186,12 @@ class PlayerStatsAccuracyDistributionMenuController:
             a.setChecked(abs(x - ss) < 1e-9)
             a.blockSignals(False)
 
+        xs = str(s.get("x_axis_span", "full"))
+        for k, a in self._xspan.items():
+            a.blockSignals(True)
+            a.setChecked(k == xs)
+            a.blockSignals(False)
+
     def _on_skew(self, key: str) -> None:
         for k, a in self._skew.items():
             a.blockSignals(True)
@@ -220,3 +240,10 @@ class PlayerStatsAccuracyDistributionMenuController:
         UserSettingsService.get_instance().update_player_stats_accuracy_distribution(
             {"distribution_line_smooth_strength": value}
         )
+
+    def _on_xspan(self, key: str) -> None:
+        for k, a in self._xspan.items():
+            a.blockSignals(True)
+            a.setChecked(k == key)
+            a.blockSignals(False)
+        UserSettingsService.get_instance().update_player_stats_accuracy_distribution({"x_axis_span": key})

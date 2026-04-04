@@ -49,19 +49,28 @@ def _bar_pixel_spans(
     plot_w: int,
     acc_edges: List[float],
     bar_gap: int,
+    x_display_min: float = 0.0,
+    x_display_max: float = 100.0,
 ) -> List[Tuple[int, int]]:
-    """Non-overlapping (x0, width) for each bin; preserves order, respects gap."""
+    """Non-overlapping (x0, width) for each bin; preserves order, respects gap.
+
+    Accuracy ``acc_edges`` are mapped linearly from ``[x_display_min, x_display_max]`` to plot width
+    (defaults 0–100 for full-range x-axis).
+    """
     plot_right = plot_left + plot_w
     gap = max(0, int(bar_gap))
     n = len(acc_edges) - 1
     if n <= 0 or plot_w <= 0:
         return []
+    span = float(x_display_max) - float(x_display_min)
+    if span <= 1e-12:
+        span = 1e-12
     # Right edge (exclusive) of the previous bar's pixel span.
     prev_excl = plot_left - gap
     out: List[Tuple[int, int]] = []
     for i in range(n):
-        lo_f = plot_left + (acc_edges[i] / 100.0) * plot_w
-        hi_f = plot_left + (acc_edges[i + 1] / 100.0) * plot_w
+        lo_f = plot_left + ((acc_edges[i] - x_display_min) / span) * plot_w
+        hi_f = plot_left + ((acc_edges[i + 1] - x_display_min) / span) * plot_w
         x0 = max(plot_left, int(math.ceil(lo_f - 1e-9)), prev_excl + gap)
         x1 = max(x0 + 1, int(math.floor(hi_f + 1e-9)))
         x1 = min(x1, plot_right)
@@ -291,6 +300,7 @@ class AccuracyDistributionChartWidget(QWidget):
         cfg = self._dist_cfg()
         usr = normalize_player_stats_accuracy_distribution_settings(self._user())
         y_mode = str(usr.get("y_axis_mode", "count"))
+        x_span_mode = str(usr.get("x_axis_span", "full"))
 
         bg = QColor(*cfg.get("background_color", [30, 30, 35]))
         grid_major = QColor(*cfg.get("grid_major_color", [55, 55, 62]))
@@ -419,8 +429,18 @@ class AccuracyDistributionChartWidget(QWidget):
         if max_y <= 0:
             max_y = 1.0
 
+        if x_span_mode == "data_bounds":
+            x_display_min = float(acc_edges[0])
+            x_display_max = float(acc_edges[-1])
+            if x_display_max <= x_display_min:
+                x_display_max = min(100.0, x_display_min + 1e-3)
+        else:
+            x_display_min, x_display_max = 0.0, 100.0
+
         bar_gap = max(0, int(cfg.get("bar_gap_px", 1)))
-        spans = _bar_pixel_spans(plot_left, plot_w, acc_edges, bar_gap)
+        spans = _bar_pixel_spans(
+            plot_left, plot_w, acc_edges, bar_gap, x_display_min, x_display_max
+        )
         while len(spans) < bin_count:
             spans.append((plot_left, 1))
         painter.setPen(Qt.PenStyle.NoPen)
@@ -534,10 +554,17 @@ class AccuracyDistributionChartWidget(QWidget):
                 tick_count = 3
             else:
                 tick_count = 2
+            x_rng = x_display_max - x_display_min
+            if x_rng <= 1e-12:
+                x_rng = 1e-12
             for i in range(tick_count):
-                value = 50.0 if tick_count == 1 else i * (100.0 / max(1, tick_count - 1))
+                if tick_count == 1:
+                    t = 0.5
+                else:
+                    t = i / float(tick_count - 1)
+                value = x_display_min + t * x_rng
                 lab = f"{value:.0f}%"
-                x_pos = plot_left + int((value / 100.0) * plot_w)
+                x_pos = plot_left + int(t * plot_w)
                 tw = fm.horizontalAdvance(lab)
                 painter.drawText(
                     int(x_pos - tw // 2),

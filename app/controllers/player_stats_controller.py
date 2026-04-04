@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from app.models.database_model import GameData
 from app.models.database_panel_model import DatabasePanelModel
 from app.models.game_model import GameModel
+from app.services.player_stats_activity_heatmap_layout import effective_ordinal_for_heatmap
 from app.services.player_stats_service import PlayerStatsService, AggregatedPlayerStats
 from app.services.error_pattern_service import ErrorPatternService, ErrorPattern
 from app.services.game_summary_service import GameSummaryService, GameSummary
@@ -1175,6 +1176,41 @@ class PlayerStatsController(QObject):
             return result
         panel_model = self._database_controller.get_panel_model()
         for game in pattern.related_games:
+            found = self.find_game_in_databases(game, use_all_databases=True)
+            if not found:
+                continue
+            database, _ = found
+            identifier = panel_model.find_database_by_model(database)
+            display_name = "Clipboard" if identifier == "clipboard" else Path(identifier).stem
+            result.append((game, display_name, 0))
+        return result
+
+    def get_activity_heatmap_day_games_with_sources(
+        self, day_ordinal: int
+    ) -> List[Tuple["GameData", str, int]]:
+        """Games whose activity-heatmap effective calendar day matches ``day_ordinal`` (Search Results tab).
+
+        Uses the same partial-date rules as the heatmap. Order follows aggregated game order.
+        """
+        result: List[Tuple["GameData", str, int]] = []
+        stats = self.current_stats
+        if not stats or day_ordinal < 0:
+            return result
+        pairs = list(getattr(stats, "activity_heatmap_per_game_ordinals", None) or [])
+        indices = list(getattr(stats, "activity_heatmap_source_game_indices", None) or [])
+        if len(indices) != len(pairs):
+            return result
+        analyzed_games = getattr(self, "_current_analyzed_games", []) or []
+        usr = UserSettingsService.get_instance().get_model().get_player_stats_activity_heatmap()
+        partial = str(usr.get("partial_dates", "exclude"))
+        panel_model = self._database_controller.get_panel_model()
+        for game_idx, (full_o, trends_o) in zip(indices, pairs):
+            eff = effective_ordinal_for_heatmap(partial, full_o, trends_o)
+            if eff is None or int(eff) != int(day_ordinal):
+                continue
+            if not (0 <= game_idx < len(analyzed_games)):
+                continue
+            game = analyzed_games[game_idx]
             found = self.find_game_in_databases(game, use_all_databases=True)
             if not found:
                 continue

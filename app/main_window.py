@@ -899,6 +899,11 @@ class MainWindow(QMainWindow):
         self._apply_menu_styling(ps_menu)
         self.player_stats_menu = ps_menu
         self._player_stats_section_actions: Dict[str, QAction] = {}
+        reset_ps_defaults = QAction("Reset to defaults", self)
+        reset_ps_defaults.setMenuRole(QAction.MenuRole.NoRole)
+        reset_ps_defaults.triggered.connect(self._on_player_stats_reset_to_template_defaults)
+        ps_menu.addAction(reset_ps_defaults)
+        ps_menu.addSeparator()
         enable_all_ps = QAction("Enable all", self)
         enable_all_ps.setMenuRole(QAction.MenuRole.NoRole)
         enable_all_ps.triggered.connect(self._on_player_stats_menu_enable_all)
@@ -991,6 +996,65 @@ class MainWindow(QMainWindow):
     def _sync_player_stats_accuracy_distribution_menu_from_settings(self) -> None:
         if hasattr(self, "_ps_ad_menu_controller"):
             self._ps_ad_menu_controller.sync_from_settings()
+
+    def _on_player_stats_reset_to_template_defaults(self) -> None:
+        """Restore Player Stats menu settings from ``user_settings.json.template``."""
+        from app.services.progress_service import ProgressService
+        from app.services.user_settings_service import UserSettingsService
+
+        us_cfg = self.config.get("user_settings", {}) if isinstance(self.config.get("user_settings"), dict) else {}
+        reset_cfg = us_cfg.get("player_stats_reset", {}) if isinstance(us_cfg.get("player_stats_reset"), dict) else {}
+        confirm_title = str(
+            reset_cfg.get("confirmation_title", "Reset Player Stats settings")
+        )
+        confirm_message = str(
+            reset_cfg.get(
+                "confirmation_message",
+                "Do you want to reset all Player Stats options to the application defaults?",
+            )
+        )
+        status_success = str(
+            reset_cfg.get("status_success", "Player Stats options reset to application defaults.")
+        )
+        status_failed = str(
+            reset_cfg.get("status_failed", "Could not reset Player Stats options.")
+        )
+
+        confirmed = ConfirmationDialog.show_confirmation(
+            self.config,
+            confirm_title,
+            confirm_message,
+            self,
+        )
+        if not confirmed:
+            return
+        svc = UserSettingsService.get_instance()
+        progress = ProgressService.get_instance()
+        if not svc.reset_player_stats_settings_from_template():
+            progress.set_status(status_failed)
+            MessageDialog.show_warning(
+                self.config,
+                confirm_title,
+                status_failed,
+                self,
+            )
+            return
+        progress.set_status(status_success)
+        vis = svc.get_model().get_player_stats_section_visibility()
+        for sid, act in getattr(self, "_player_stats_section_actions", {}).items():
+            try:
+                act.blockSignals(True)
+                act.setChecked(bool(vis.get(sid, True)))
+                act.blockSignals(False)
+            except (RuntimeError, TypeError, AttributeError):
+                pass
+        self._sync_player_stats_time_series_menu_from_settings()
+        self._sync_player_stats_activity_heatmap_menu_from_settings()
+        self._sync_player_stats_accuracy_distribution_menu_from_settings()
+        psv = getattr(getattr(self, "detail_panel", None), "player_stats_view", None)
+        if psv:
+            psv.reload_player_stats_section_prefs_from_settings()
+            psv._sync_player_stats_menu_actions()
 
     def _on_player_stats_section_menu_toggled(self, section_id: str, checked: bool) -> None:
         view = getattr(getattr(self, "detail_panel", None), "player_stats_view", None)
@@ -1939,6 +2003,20 @@ class MainWindow(QMainWindow):
         search_results_model = search_controller.create_search_results_model(games_with_sources)
         tab_index = self.database_panel.add_search_results_tab(search_results_model)
         # Match regular search behavior: explicitly activate the tab
+        self.database_panel.tab_widget.setCurrentIndex(tab_index)
+        self._on_database_tab_changed(tab_index)
+
+    def _open_activity_heatmap_day_in_search_results(self, day_ordinal: int) -> None:
+        """Open analyzed games played on the given calendar day (activity heatmap double-click)."""
+        if not hasattr(self, "database_panel"):
+            return
+        stats_controller = self.controller.get_player_stats_controller()
+        games_with_sources = stats_controller.get_activity_heatmap_day_games_with_sources(day_ordinal)
+        if not games_with_sources:
+            return
+        search_controller = self.controller.get_search_controller()
+        search_results_model = search_controller.create_search_results_model(games_with_sources)
+        tab_index = self.database_panel.add_search_results_tab(search_results_model)
         self.database_panel.tab_widget.setCurrentIndex(tab_index)
         self._on_database_tab_changed(tab_index)
 
@@ -2929,6 +3007,9 @@ class MainWindow(QMainWindow):
             if hasattr(self.detail_panel, 'player_stats_view'):
                 self.detail_panel.player_stats_view._database_controller = database_controller
                 self.detail_panel.player_stats_view._database_panel = self.database_panel
+                self.detail_panel.player_stats_view._on_open_activity_heatmap_day_in_search_results = (
+                    self._open_activity_heatmap_day_in_search_results
+                )
             if hasattr(self.detail_panel, 'moves_view'):
                 self.detail_panel.moves_view.set_database_controller(database_controller)
                 self.detail_panel.player_stats_view._on_open_pattern_games_in_search_results = self._open_pattern_games_in_search_results

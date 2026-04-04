@@ -16,6 +16,8 @@ DEFAULT_PLAYER_STATS_ACCURACY_DISTRIBUTION: Dict[str, Any] = {
     "color_preset": "github_green",
     "distribution_line_curve": "smooth",
     "distribution_line_smooth_strength": 1.0,
+    # X-axis: map 0–100% across plot width, or only the histogram bin range (first to last edge).
+    "x_axis_span": "full",
 }
 
 VALID_SKEW_MODE: frozenset = frozenset(
@@ -25,6 +27,7 @@ VALID_Y_AXIS_MODE: frozenset = frozenset({"count", "percent_of_games"})
 VALID_BIN_DENSITY: frozenset = frozenset({"auto", "fewer", "more"})
 VALID_COLOR_PRESET: frozenset = frozenset({"github_green", "ocean_blue", "amber"})
 VALID_DISTRIBUTION_LINE_CURVE: frozenset = frozenset({"smooth", "straight"})
+VALID_X_AXIS_SPAN: frozenset = frozenset({"full", "data_bounds"})
 
 
 def normalize_player_stats_accuracy_distribution_settings(
@@ -52,4 +55,7 @@ def normalize_player_stats_accuracy_distribution_settings(
     ss = raw.get("distribution_line_smooth_strength")
     if ss in CHOICES_DISTRIBUTION_LINE_SMOOTH_STRENGTH:
         out["distribution_line_smooth_strength"] = float(ss)
+    xs = str(raw.get("x_axis_span", "")).strip().lower()
+    if xs in VALID_X_AXIS_SPAN:
+        out["x_axis_span"] = xs
     return out

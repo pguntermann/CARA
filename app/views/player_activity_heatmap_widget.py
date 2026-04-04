@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
 
-from PyQt6.QtCore import QRect, QSize, Qt, QTimer
+from PyQt6.QtCore import QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import QSizePolicy, QWidget
 
@@ -77,6 +77,9 @@ def _color_for_count(
 
 class PlayerActivityHeatmapWidget(QWidget):
     """Renders :class:`ActivityHeatmapPaintModel`; cells scale to use full widget width."""
+
+    #: Emitted on double-click a cell with at least one game; ``day_ordinal`` is the calendar day.
+    activity_day_double_clicked = pyqtSignal(int)
 
     _MARGIN_L = 8
     _MARGIN_R = 8
@@ -198,6 +201,39 @@ class PlayerActivityHeatmapWidget(QWidget):
             "band_packs": band_packs,
             "total_h": total_h,
         }
+
+    def _hit_test_at(self, px: float, py: float) -> Optional[Tuple[int, int, int]]:
+        """Return ``(band_idx, row, col)`` for a cell under the point, or ``None``."""
+        m = self._model
+        if not m or not m.bands:
+            return None
+        pack = self._layout_pack(self.width())
+        if not pack:
+            return None
+        cs = pack["cs"]
+        gap = pack["gap"]
+        grid_ox = pack["grid_ox"]
+        band_packs = pack["band_packs"]
+        for bp in band_packs:
+            gb = bp["grid"]
+            bi = int(bp["band_idx"])
+            row_cell_y: List[int] = bp["row_cell_y"]
+            for r in range(gb.n_rows):
+                if r >= len(row_cell_y):
+                    break
+                cy = row_cell_y[r]
+                if not (cy <= py < cy + cs):
+                    continue
+                rel_x = px - grid_ox
+                if rel_x < 0:
+                    break
+                col = int(rel_x // (cs + gap))
+                if col < 0 or col >= gb.n_cols:
+                    break
+                if (rel_x % (cs + gap)) >= cs:
+                    break
+                return (bi, r, col)
+        return None
 
     def heightForWidth(self, width: int) -> int:
         pack = self._layout_pack(width)
@@ -431,44 +467,11 @@ class PlayerActivityHeatmapWidget(QWidget):
         if not m:
             super().mouseMoveEvent(event)
             return
-        pack = self._layout_pack(self.width())
-        if not pack:
-            super().mouseMoveEvent(event)
-            return
-        cs = pack["cs"]
-        gap = pack["gap"]
-        grid_ox = pack["grid_ox"]
-        band_packs = pack["band_packs"]
         px = event.position().x()
         py = event.position().y()
-        hit = False
-        band_i = -1
-        row = -1
-        col = -1
-        for bp in band_packs:
-            gb = bp["grid"]
-            bi = int(bp["band_idx"])
-            row_cell_y: List[int] = bp["row_cell_y"]
-            for r in range(gb.n_rows):
-                if r >= len(row_cell_y):
-                    break
-                cy = row_cell_y[r]
-                if not (cy <= py < cy + cs):
-                    continue
-                rel_x = px - grid_ox
-                if rel_x < 0:
-                    break
-                col = int(rel_x // (cs + gap))
-                if col < 0 or col >= gb.n_cols:
-                    break
-                if (rel_x % (cs + gap)) >= cs:
-                    break
-                row = r
-                band_i = bi
-                hit = True
-                break
-            if hit:
-                break
+        h = self._hit_test_at(px, py)
+        hit = h is not None
+        band_i, row, col = h if h else (-1, -1, -1)
 
         new_hover = (band_i, row, col) if hit else None
         if new_hover != self._hover_brc:
@@ -479,6 +482,34 @@ class PlayerActivityHeatmapWidget(QWidget):
                 tip = m.bands[band_i].labels[row][col] or ""
             self.setToolTip(tip)
         super().mouseMoveEvent(event)
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        m = self._model
+        if not m:
+            super().mouseDoubleClickEvent(event)
+            return
+        h = self._hit_test_at(event.position().x(), event.position().y())
+        if h is None:
+            super().mouseDoubleClickEvent(event)
+            return
+        bi, r, c = h
+        if not (0 <= bi < len(m.bands)):
+            super().mouseDoubleClickEvent(event)
+            return
+        gb = m.bands[bi]
+        if gb.counts[r][c] <= 0:
+            super().mouseDoubleClickEvent(event)
+            return
+        row_o = gb.cell_ordinals[r] if r < len(gb.cell_ordinals) else ()
+        if c >= len(row_o):
+            super().mouseDoubleClickEvent(event)
+            return
+        o = row_o[c]
+        if o < 0:
+            super().mouseDoubleClickEvent(event)
+            return
+        self.activity_day_double_clicked.emit(int(o))
+        event.accept()
 
     def leaveEvent(self, event) -> None:
         self._hover_brc = None
