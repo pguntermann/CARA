@@ -24,6 +24,7 @@ class UserSettingsModel(QObject):
     ai_settings_changed = pyqtSignal()  # Emitted when AI settings change
     player_stats_time_series_changed = pyqtSignal()  # Player Stats time-series binning / display prefs
     player_stats_activity_heatmap_changed = pyqtSignal()  # Player Stats activity heatmap display prefs
+    player_stats_accuracy_distribution_changed = pyqtSignal()  # Player Stats accuracy histogram prefs
 
     def __init__(self, settings: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the user settings model.
@@ -368,6 +369,35 @@ class UserSettingsModel(QObject):
         cur = self.get_player_stats_activity_heatmap()
         cur.update(partial)
         self.set_player_stats_activity_heatmap(cur)
+
+    def get_player_stats_accuracy_distribution(self) -> Dict[str, Any]:
+        """User overrides for Player Stats accuracy distribution chart."""
+        from app.services.player_stats_accuracy_distribution_user import (
+            normalize_player_stats_accuracy_distribution_settings,
+        )
+
+        raw = self._settings.get("player_stats_accuracy_distribution")
+        return normalize_player_stats_accuracy_distribution_settings(
+            raw if isinstance(raw, dict) else None
+        )
+
+    def set_player_stats_accuracy_distribution(self, settings: Dict[str, Any]) -> None:
+        """Replace stored Player Stats accuracy distribution user settings."""
+        from app.services.player_stats_accuracy_distribution_user import (
+            normalize_player_stats_accuracy_distribution_settings,
+        )
+
+        self._settings["player_stats_accuracy_distribution"] = (
+            normalize_player_stats_accuracy_distribution_settings(settings)
+        )
+        self.player_stats_accuracy_distribution_changed.emit()
+        self.settings_changed.emit()
+
+    def update_player_stats_accuracy_distribution(self, partial: Dict[str, Any]) -> None:
+        """Merge keys into Player Stats accuracy distribution settings."""
+        cur = self.get_player_stats_accuracy_distribution()
+        cur.update(partial)
+        self.set_player_stats_accuracy_distribution(cur)
 
     def update_from_dict(self, settings: Dict[str, Any]) -> None:
         """Update settings from a dictionary (used when loading from file).

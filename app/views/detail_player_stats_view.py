@@ -33,7 +33,11 @@ from app.services.player_stats_service import merged_player_stats_time_series_ch
 
 if TYPE_CHECKING:
     from app.controllers.player_stats_controller import PlayerStatsController
+    from app.views.accuracy_distribution_chart_widget import AccuracyDistributionChartWidget
     from app.views.player_activity_heatmap_widget import PlayerActivityHeatmapWidget
+    from app.views.player_stats_accuracy_distribution_menu import (
+        PlayerStatsAccuracyDistributionMenuController,
+    )
     from app.views.player_stats_activity_heatmap_menu import (
         PlayerStatsActivityHeatmapMenuController,
     )
@@ -2308,279 +2312,6 @@ class MoveQualityOverTimeChartWidget(QWidget):
         self.update()
 
 
-class AccuracyDistributionWidget(QWidget):
-    """Widget for displaying a simple histogram of per-game accuracy values."""
-
-    def __init__(
-        self,
-        config: Dict[str, Any],
-        accuracy_values: List[float],
-        text_color: QColor,
-        parent: Optional[QWidget] = None,
-    ) -> None:
-        super().__init__(parent)
-        self._config = config
-        self._accuracy_values: List[float] = accuracy_values or []
-
-        ui_config = config.get('ui', {})
-        panel_config = ui_config.get('panels', {}).get('detail', {})
-        player_stats_config = panel_config.get('player_stats', {})
-        colors_config = player_stats_config.get('colors', {})
-        dist_config = player_stats_config.get('accuracy_distribution', {})
-
-        self._bar_color = QColor(*dist_config.get('bar_color', colors_config.get('phase_opening_color', [100, 150, 255])))
-        self._color_ranges: List[Tuple[float, QColor]] = self._parse_color_ranges(dist_config)
-        self._grid_line_color = QColor(*dist_config.get('grid_line_color', [70, 70, 75]))
-        self._axis_color = QColor(*dist_config.get('axis_color', [140, 140, 145]))
-        self._text_color = text_color
-
-        # Non-linear transform: t = (acc/100)^exponent so high accuracy gets narrower bins
-        self._transform_exponent = float(dist_config.get('transform_exponent', 4.0))
-        if self._transform_exponent < 1.0:
-            self._transform_exponent = 4.0
-        self._height = int(dist_config.get('height', 90))
-        self._margins = dist_config.get('margins', [10, 10, 10, 10])
-
-        label_font_size = scale_font_size(dist_config.get('label_font_size', 9))
-        fonts_config = player_stats_config.get('fonts', {})
-        label_font_family = resolve_font_family(fonts_config.get('label_font_family', 'Helvetica Neue'))
-        self._label_font = QFont(label_font_family, int(label_font_size))
-
-        self.setMinimumHeight(self._height)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-
-        # Hover state: store bin geometry and ranges for tooltips
-        # Each entry: (x_left, x_right, start_acc, end_acc, count)
-        self._bin_info: List[Tuple[float, float, float, float, int]] = []
-        self.setMouseTracking(True)
-
-    def _parse_color_ranges(self, dist_config: Dict[str, Any]) -> List[Tuple[float, QColor]]:
-        """Parse color_ranges from config: list of (max_acc, QColor), sorted by max_acc."""
-        raw = dist_config.get("color_ranges")
-        if not isinstance(raw, list) or len(raw) < 2:
-            return []
-        out: List[Tuple[float, QColor]] = []
-        for entry in raw:
-            if not isinstance(entry, dict):
-                continue
-            max_acc = entry.get("max_acc")
-            color = entry.get("color")
-            if max_acc is None or not isinstance(color, (list, tuple)) or len(color) < 3:
-                continue
-            try:
-                max_acc_f = float(max_acc)
-                out.append((max_acc_f, QColor(int(color[0]), int(color[1]), int(color[2]))))
-            except (TypeError, ValueError):
-                continue
-        out.sort(key=lambda x: x[0])
-        return out if len(out) >= 2 else []
-
-    def _color_for_accuracy(self, acc: float) -> QColor:
-        """Interpolate bar color from color_ranges by accuracy (0-100). Uses bar_color if no ranges."""
-        if not self._color_ranges:
-            return self._bar_color
-        acc = max(0.0, min(100.0, acc))
-        first_max, first_color = self._color_ranges[0]
-        if acc <= first_max:
-            return first_color
-        prev_max = first_max
-        prev_color = first_color
-        for max_acc, color in self._color_ranges[1:]:
-            if acc <= max_acc:
-                t = (acc - prev_max) / (max_acc - prev_max) if max_acc > prev_max else 1.0
-                return QColor(
-                    int(prev_color.red() + t * (color.red() - prev_color.red())),
-                    int(prev_color.green() + t * (color.green() - prev_color.green())),
-                    int(prev_color.blue() + t * (color.blue() - prev_color.blue())),
-                )
-            prev_max = max_acc
-            prev_color = color
-        return self._color_ranges[-1][1]
-
-    def set_accuracy_values(self, values: List[float]) -> None:
-        self._accuracy_values = values or []
-        self.update()
-
-    def sizeHint(self) -> QSize:
-        return QSize(200, self._height)
-
-    def minimumSizeHint(self) -> QSize:
-        return QSize(100, self._height)
-
-    def paintEvent(self, event) -> None:
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        rect = self.rect()
-        left = self._margins[0]
-        top = self._margins[1]
-        right = rect.width() - self._margins[2]
-        bottom = rect.height() - self._margins[3]
-        if right <= left or bottom <= top:
-            return
-
-        # Reserve space for axis labels
-        painter.setFont(self._label_font)
-        fm = QFontMetrics(self._label_font)
-        label_height = fm.height() + 4
-
-        # Reserve horizontal space on the left for y-axis labels
-        # (labels for game counts at 0, mid, max)
-        # Use max label width based on a rough upper bound of counts
-        max_label_text = "999"  # enough for typical game counts
-        y_label_width = fm.horizontalAdvance(max_label_text) + 4
-
-        plot_left = left + y_label_width
-        plot_top = top
-        plot_bottom = bottom - label_height
-        if plot_bottom <= plot_top:
-            plot_bottom = top + 10
-        plot_height = plot_bottom - plot_top
-        plot_width = right - plot_left
-
-        # Draw background grid lines
-        painter.setPen(QPen(self._grid_line_color, 1, Qt.PenStyle.SolidLine))
-        for frac in (0.0, 0.5, 1.0):
-            y = plot_bottom - int(plot_height * frac)
-            painter.drawLine(plot_left, y, right, y)
-
-        # Non-linear binning over data range: t = (acc/100)^k, bin count scales with range
-        # so high-accuracy bins are narrower; wider player range → more bins
-        values = [max(0.0, min(100.0, v)) for v in self._accuracy_values]
-        if not values:
-            painter.setPen(QPen(self._text_color))
-            text = "No analyzed games"
-            text_width = fm.horizontalAdvance(text)
-            x_text = plot_left + (plot_width - text_width) // 2
-            y_text = plot_top + plot_height // 2 + fm.ascent() // 2
-            painter.drawText(x_text, y_text, text)
-            return
-
-        data_min = min(values)
-        data_max = max(values)
-        margin = 2.5
-        low = max(0.0, data_min - margin)
-        high = min(100.0, data_max + margin)
-        if high <= low:
-            high = min(100.0, low + 5.0)
-        range_size = high - low
-        bin_count = max(5, min(25, int(round(range_size / 5.0))))
-
-        k = self._transform_exponent
-        t_low = (low / 100.0) ** k
-        t_high = (high / 100.0) ** k
-        t_range = t_high - t_low
-        t_edges = [t_low + (i / float(bin_count)) * t_range for i in range(bin_count + 1)]
-        acc_edges = [100.0 * (t ** (1.0 / k)) for t in t_edges]
-
-        bins = [0] * bin_count
-        for v in values:
-            t = (v / 100.0) ** k
-            if t <= t_low:
-                idx = 0
-            elif t >= t_high:
-                idx = bin_count - 1
-            else:
-                idx = int((t - t_low) / t_range * bin_count)
-                if idx >= bin_count:
-                    idx = bin_count - 1
-            bins[idx] += 1
-
-        max_count = max(bins) if bins else 0
-        if max_count == 0:
-            max_count = 1
-
-        # Reset bin info for hover handling
-        self._bin_info = []
-
-        # X-axis fixed 0-100%: bar position and width = accuracy range (narrow at high end)
-        painter.setPen(Qt.PenStyle.NoPen)
-        for i in range(bin_count):
-            start_acc = acc_edges[i]
-            end_acc = acc_edges[i + 1]
-            x_start = plot_left + (start_acc / 100.0) * plot_width
-            x_end = plot_left + (end_acc / 100.0) * plot_width
-            x = int(x_start)
-            w = max(1, int(x_end - x_start))
-            count = bins[i]
-
-            if count <= 0:
-                self._bin_info.append((float(x), float(x + w), float(start_acc), float(end_acc), 0))
-                continue
-
-            center_acc = (start_acc + end_acc) / 2.0
-            bar_color = self._color_for_accuracy(center_acc)
-            painter.setBrush(QBrush(bar_color))
-            height_frac = count / float(max_count)
-            bar_h = max(2, int(plot_height * height_frac))
-            y = plot_bottom - bar_h
-            painter.drawRect(x, y, w, bar_h)
-            self._bin_info.append((float(x), float(x + w), float(start_acc), float(end_acc), int(count)))
-
-        # Draw axis line
-        painter.setPen(QPen(self._axis_color, 1))
-        painter.drawLine(plot_left, plot_bottom, right, plot_bottom)
-
-        # Draw y-axis labels. Use 0 and max; add a middle label only when meaningful.
-        painter.setPen(QPen(self._text_color))
-        y_ticks: List[Tuple[float, float]] = []
-        if max_count <= 1:
-            y_ticks = [(0.0, 0.0), (1.0, float(max_count))]
-        else:
-            mid_val = max_count / 2.0
-            y_ticks = [(0.0, 0.0), (0.5, mid_val), (1.0, float(max_count))]
-
-        for frac, value in y_ticks:
-            y = plot_bottom - int(plot_height * frac)
-            label = f"{int(round(value))}"
-            label_width = fm.horizontalAdvance(label)
-            x = plot_left - 4 - label_width
-            painter.drawText(x, y + fm.ascent() // 2, label)
-
-        # Draw x-axis labels: fixed 0-100% scale
-        painter.setPen(QPen(self._text_color))
-        if plot_width > 0:
-            if plot_width >= 480:
-                tick_count = 6
-            elif plot_width >= 320:
-                tick_count = 5
-            elif plot_width >= 200:
-                tick_count = 3
-            else:
-                tick_count = 2
-
-            for i in range(tick_count):
-                if tick_count == 1:
-                    value = 50.0
-                else:
-                    value = i * (100.0 / (tick_count - 1))
-                label = f"{value:.0f}%"
-                x_pos = plot_left + int((value / 100.0) * plot_width)
-                text_width = fm.horizontalAdvance(label)
-                x = x_pos - text_width // 2
-                y = bottom - self._margins[3] + fm.ascent()
-                painter.drawText(x, y, label)
-
-    def mouseMoveEvent(self, event) -> None:
-        """Update tooltip based on hovered bin."""
-        if not self._bin_info:
-            self.setToolTip("")
-            super().mouseMoveEvent(event)
-            return
-
-        pos_x = float(event.position().x())
-        tooltip_text = ""
-        for x_left, x_right, start_acc, end_acc, count in self._bin_info:
-            if x_left <= pos_x <= x_right and count > 0:
-                label = f"{start_acc:.1f}–{end_acc:.1f}%"
-                game_word = "game" if count == 1 else "games"
-                tooltip_text = f"{label} ({count} {game_word})"
-                break
-
-        self.setToolTip(tooltip_text)
-        super().mouseMoveEvent(event)
-
-
 class NoWheelTreeWidget(QTreeWidget):
     """Tree widget that ignores mouse wheel events so the outer scroll area handles scrolling,
     and uses double-click only for custom handlers (no auto expand/collapse)."""
@@ -2803,6 +2534,8 @@ class DetailPlayerStatsView(QWidget):
         self._ps_ah_context_menu_controller: Optional["PlayerStatsActivityHeatmapMenuController"] = None
         self._activity_heatmap_widget: Optional["PlayerActivityHeatmapWidget"] = None
         self._activity_heatmap_subcaption_label: Optional[QLabel] = None
+        self._accuracy_distribution_widget: Optional["AccuracyDistributionChartWidget"] = None
+        self._ps_ad_context_menu_controller: Optional["PlayerStatsAccuracyDistributionMenuController"] = None
 
         from app.services.user_settings_service import UserSettingsService
 
@@ -2811,6 +2544,9 @@ class DetailPlayerStatsView(QWidget):
         )
         UserSettingsService.get_instance().get_model().player_stats_activity_heatmap_changed.connect(
             self._on_player_stats_activity_heatmap_settings_changed
+        )
+        UserSettingsService.get_instance().get_model().player_stats_accuracy_distribution_changed.connect(
+            self._on_player_stats_accuracy_distribution_settings_changed
         )
 
         # Event filter will be installed on scroll_area in _setup_ui
@@ -2841,6 +2577,14 @@ class DetailPlayerStatsView(QWidget):
                         "Include partial PGN dates (stand-ins) in settings, or add full Date tags."
                     )
                 lbl.setText(cap)
+        else:
+            QTimer.singleShot(0, self._deferred_build_stats_content)
+
+    def _on_player_stats_accuracy_distribution_settings_changed(self) -> None:
+        if self._ps_ad_context_menu_controller is not None:
+            self._ps_ad_context_menu_controller.sync_from_settings()
+        if self._accuracy_distribution_widget is not None:
+            self._accuracy_distribution_widget.refresh_from_settings()
         else:
             QTimer.singleShot(0, self._deferred_build_stats_content)
 
@@ -3271,8 +3015,22 @@ class DetailPlayerStatsView(QWidget):
                 continue
         return False
 
+    def _activity_heatmap_has_paint_model(self, stats: "AggregatedPlayerStats") -> bool:
+        """True when current heatmap user prefs produce a drawable model (at least one usable date)."""
+        from app.services.player_stats_activity_heatmap_layout import (
+            build_activity_heatmap_paint_model,
+        )
+        from app.services.user_settings_service import UserSettingsService
+
+        pairs = list(getattr(stats, "activity_heatmap_per_game_ordinals", None) or [])
+        usr = UserSettingsService.get_instance().get_model().get_player_stats_activity_heatmap()
+        return (
+            build_activity_heatmap_paint_model(pairs, usr, date.today().toordinal())
+            is not None
+        )
+
     def _should_show_time_trends_unavailability_hint(self, stats: "AggregatedPlayerStats") -> bool:
-        """True when analyzed games exist but at least one enabled over-time chart has no series."""
+        """True when analyzed games exist but a date-based section is enabled yet has nothing to show."""
         if not stats or not getattr(stats, "analyzed_games", 0):
             return False
         if not self.player_stats_config.get("show_time_trends_unavailability_hint", True):
@@ -3285,6 +3043,9 @@ class DetailPlayerStatsView(QWidget):
             return True
         ap = self.player_stats_config.get("acpl_phase_over_time_chart", {})
         if ap.get("enabled", True) and not (getattr(stats, "acpl_phase_over_time", None) or []):
+            return True
+        ah = self.player_stats_config.get("activity_heatmap", {})
+        if ah.get("enabled", True) and not self._activity_heatmap_has_paint_model(stats):
             return True
         return False
 
@@ -3363,6 +3124,7 @@ class DetailPlayerStatsView(QWidget):
         self._error_patterns_widget = None
         self._activity_heatmap_widget = None
         self._activity_heatmap_subcaption_label = None
+        self._accuracy_distribution_widget = None
         self._endgame_tree_widget = None
         self._endgame_tree_decrease_button = None
         self._endgame_tree_increase_button = None
@@ -3440,6 +3202,7 @@ class DetailPlayerStatsView(QWidget):
         self._error_patterns_widget = None
         self._activity_heatmap_widget = None
         self._activity_heatmap_subcaption_label = None
+        self._accuracy_distribution_widget = None
         
         # Get config
         ui_config = self.config.get('ui', {})
@@ -3535,7 +3298,11 @@ class DetailPlayerStatsView(QWidget):
         )
 
         ah_cfg = player_stats_config.get("activity_heatmap", {})
-        if stats and ah_cfg.get("enabled", True):
+        if (
+            stats
+            and ah_cfg.get("enabled", True)
+            and self._activity_heatmap_has_paint_model(stats)
+        ):
             from app.views.player_activity_heatmap_widget import PlayerActivityHeatmapWidget
 
             pairs = list(getattr(stats, "activity_heatmap_per_game_ordinals", None) or [])
@@ -3551,12 +3318,7 @@ class DetailPlayerStatsView(QWidget):
             hm.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
             hm.set_per_game_ordinals(pairs)
             self._activity_heatmap_widget = hm
-            cap = hm.subcaption_text()
-            if not cap:
-                cap = (
-                    "No games with usable dates for this view. "
-                    "Include partial PGN dates (stand-ins) in settings, or add full Date tags."
-                )
+            cap = hm.subcaption_text() or ""
             ah_sub = QLabel(cap)
             ah_sub_fs = scale_font_size(int(ah_cfg.get("label_font_size", 8)) + 1)
             ah_sub_font = QFont(
@@ -3581,13 +3343,7 @@ class DetailPlayerStatsView(QWidget):
         # Accuracy Distribution Section (optional)
         accuracy_dist_config = player_stats_config.get('accuracy_distribution', {})
         if accuracy_dist_config.get('enabled', True) and getattr(stats, "accuracy_values", None):
-            dist_widget = self._create_accuracy_distribution_widget(
-                stats,
-                text_color,
-                section_bg_color,
-                border_color,
-                accuracy_dist_config,
-            )
+            dist_widget = self._create_accuracy_distribution_widget(stats, text_color)
             dist_widget.setProperty("section_name", "Accuracy Distribution")
             self._add_player_stats_section(
                 "accuracy_distribution",
@@ -4967,32 +4723,15 @@ class DetailPlayerStatsView(QWidget):
         self,
         stats: "AggregatedPlayerStats",
         text_color: QColor,
-        bg_color: QColor,
-        border_color: QColor,
-        dist_config: Dict[str, Any],
     ) -> QWidget:
-        """Create accuracy distribution section widget."""
-        border_radius = dist_config.get('border_radius', 5)
-        section_margins = dist_config.get('margins', [10, 10, 10, 10])
-        section_spacing = dist_config.get('section_spacing', 6)
+        """Chart only (no bordered container), matching accuracy progression time-series layout."""
+        from app.views.accuracy_distribution_chart_widget import AccuracyDistributionChartWidget
 
-        widget = QWidget()
-        widget.setStyleSheet(f"""
-            QWidget {{
-                background-color: rgb({bg_color.red()}, {bg_color.green()}, {bg_color.blue()});
-                border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
-                border-radius: {border_radius}px;
-            }}
-        """)
-
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(section_margins[0], section_margins[1], section_margins[2], section_margins[3])
-        layout.setSpacing(section_spacing)
-
-        dist_widget = AccuracyDistributionWidget(self.config, getattr(stats, "accuracy_values", []), text_color, widget)
-        layout.addWidget(dist_widget)
-
-        return widget
+        dist_widget = AccuracyDistributionChartWidget(
+            self.config, getattr(stats, "accuracy_values", []), text_color, None
+        )
+        self._accuracy_distribution_widget = dist_widget
+        return dist_widget
     
     def _create_move_accuracy_widget(self, stats: "AggregatedPlayerStats",
                                     text_color: QColor, label_font: QFont, value_font: QFont,
@@ -6757,6 +6496,26 @@ class DetailPlayerStatsView(QWidget):
             self, _style_ah_submenu
         )
 
+    def _ensure_player_stats_accuracy_distribution_context_menu_controller(self) -> None:
+        if self._ps_ad_context_menu_controller is not None:
+            return
+        from app.views.player_stats_accuracy_distribution_menu import (
+            PlayerStatsAccuracyDistributionMenuController,
+        )
+        from app.views.style import StyleManager
+
+        def _style_ad_submenu(m: QMenu) -> None:
+            ui_config = self.config.get("ui", {})
+            panel_config = ui_config.get("panels", {}).get("detail", {})
+            ps_cfg = panel_config.get("player_stats", {})
+            colors_config = ps_cfg.get("colors", {})
+            bg_color = colors_config.get("background", [40, 40, 45])
+            StyleManager.style_context_menu(m, self.config, bg_color)
+
+        self._ps_ad_context_menu_controller = PlayerStatsAccuracyDistributionMenuController(
+            self, _style_ad_submenu
+        )
+
     def contextMenuEvent(self, event: QContextMenuEvent) -> None:
         """Handle context menu event for copying sections or full stats.
         
@@ -6847,6 +6606,16 @@ class DetailPlayerStatsView(QWidget):
             self._ensure_player_stats_activity_heatmap_context_menu_controller()
             assert self._ps_ah_context_menu_controller is not None
             self._ps_ah_context_menu_controller.append_to_context_menu(menu)
+
+        from app.views.player_stats_accuracy_distribution_menu import (
+            PLAYER_STATS_ACCURACY_DISTRIBUTION_CONTEXT_SECTIONS,
+        )
+
+        if section_name and section_name in PLAYER_STATS_ACCURACY_DISTRIBUTION_CONTEXT_SECTIONS:
+            menu.addSeparator()
+            self._ensure_player_stats_accuracy_distribution_context_menu_controller()
+            assert self._ps_ad_context_menu_controller is not None
+            self._ps_ad_context_menu_controller.append_to_context_menu(menu)
 
         # When right-clicking inside the opening tree, offer expand/collapse actions
         if click_in_opening_tree and self._opening_tree_widget is not None:

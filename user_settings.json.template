@@ -983,7 +983,15 @@
     "color_preset": "github_green",
     "color_scale_max_mode": "auto",
     "color_scale_max_fixed": 20,
-    "partial_dates": "exclude",
+    "partial_dates": "include_stand_in",
     "date_range": "rolling_12_months"
+  },
+  "player_stats_accuracy_distribution": {
+    "skew_mode": "linear",
+    "y_axis_mode": "count",
+    "bin_density": "more",
+    "color_preset": "amber",
+    "distribution_line_curve": "smooth",
+    "distribution_line_smooth_strength": 1.0
   }
 }

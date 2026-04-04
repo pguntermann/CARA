@@ -1408,58 +1408,171 @@
           },
           "accuracy_distribution": {
             "enabled": true,
-            "transform_exponent": 4.0,
-            "height": 120,
-            "margins": [
-              10,
-              10,
-              10,
-              10
+            "height": 200,
+            "padding": [
+              16,
+              14,
+              16,
+              14
             ],
             "border_radius": 5,
             "section_spacing": 6,
-            "color_ranges": [
-              {
-                "max_acc": 64,
-                "color": [
-                  200,
-                  90,
-                  90
-                ]
-              },
-              {
-                "max_acc": 85,
-                "color": [
-                  220,
-                  180,
-                  80
-                ]
-              },
-              {
-                "max_acc": 100,
-                "color": [
-                  80,
-                  180,
-                  120
-                ]
-              }
+            "background_color": [
+              30,
+              30,
+              35
             ],
+            "plot_corner_radius": 4,
+            "bar_corner_radius": 2,
+            "bar_gap_px": 1,
+            "grid_major_horizontal_lines": 5,
+            "grid_major_color": [
+              55,
+              55,
+              62
+            ],
+            "grid_minor_color": [
+              45,
+              45,
+              50
+            ],
+            "x_axis_minor_grid": true,
+            "axis_color": [
+              120,
+              120,
+              128
+            ],
+            "text_color": [
+              200,
+              200,
+              205
+            ],
+            "font_family": "Helvetica Neue",
+            "font_size": 10,
+            "min_font_size": 8,
+            "font_size_calculation_divisor": 20,
+            "y_axis_label_spacing": 5,
+            "x_axis_label_spacing": 5,
+            "distribution_line_color": [
+              120,
+              190,
+              255
+            ],
+            "distribution_line_width": 2,
+            "distribution_line_pen_style": "solid",
+            "distribution_line_curve": "smooth",
+            "distribution_line_smooth_strength": 1.0,
+            "hover_hit_threshold_px": 25,
+            "hover_circle_radius": 6,
+            "show_distribution_vertex_markers": true,
+            "distribution_vertex_marker_radius": 3,
             "bar_color": [
               120,
               190,
               255
             ],
-            "grid_line_color": [
-              70,
-              70,
-              75
-            ],
-            "axis_color": [
-              140,
-              140,
-              145
-            ],
-            "label_font_size": 9
+            "skew_exponents": {
+              "linear": 1,
+              "high_accuracy_skew": 4,
+              "very_high_accuracy_skew": 6.5
+            },
+            "bin_density_profiles": {
+              "auto": {
+                "min_bins": 5,
+                "max_bins": 25,
+                "range_divisor": 5
+              },
+              "fewer": {
+                "min_bins": 5,
+                "max_bins": 12,
+                "range_divisor": 9
+              },
+              "more": {
+                "min_bins": 14,
+                "max_bins": 38,
+                "range_divisor": 3.2
+              }
+            },
+            "color_presets": {
+              "github_green": [
+                {
+                  "max_acc": 64,
+                  "color": [
+                    200,
+                    90,
+                    90
+                  ]
+                },
+                {
+                  "max_acc": 85,
+                  "color": [
+                    220,
+                    180,
+                    80
+                  ]
+                },
+                {
+                  "max_acc": 100,
+                  "color": [
+                    80,
+                    180,
+                    120
+                  ]
+                }
+              ],
+              "ocean_blue": [
+                {
+                  "max_acc": 64,
+                  "color": [
+                    200,
+                    100,
+                    100
+                  ]
+                },
+                {
+                  "max_acc": 85,
+                  "color": [
+                    120,
+                    160,
+                    220
+                  ]
+                },
+                {
+                  "max_acc": 100,
+                  "color": [
+                    100,
+                    180,
+                    240
+                  ]
+                }
+              ],
+              "amber": [
+                {
+                  "max_acc": 64,
+                  "color": [
+                    180,
+                    80,
+                    80
+                  ]
+                },
+                {
+                  "max_acc": 85,
+                  "color": [
+                    200,
+                    150,
+                    60
+                  ]
+                },
+                {
+                  "max_acc": 100,
+                  "color": [
+                    230,
+                    190,
+                    80
+                  ]
+                }
+              ]
+            }
           },
           "top_games": {
             "max_best": 3,
