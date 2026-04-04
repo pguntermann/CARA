@@ -960,7 +960,6 @@
     "performance_by_phase": true,
     "accuracy_vs_progress": true,
     "accuracy_progression": true,
-    "top_move_progression": true,
     "move_quality_progression": true,
     "acpl_phase_progression": true,
     "openings": true,

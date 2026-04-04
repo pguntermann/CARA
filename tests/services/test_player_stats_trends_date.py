@@ -30,8 +30,7 @@ def test_merged_time_series_chart_cfg_precedence() -> None:
     ps = {
         "time_series": {"target_progression_bins": 10, "font_size": 11},
         "accuracy_over_time_chart": {"target_progression_bins": 22, "height": 200},
-        "move_quality_over_time_chart": {"legend_width": 99},
-        "top_move_over_time_chart": {"height": 210},
+        "move_quality_over_time_chart": {"legend_width": 99, "height": 210},
     }
     acc_m = merged_player_stats_time_series_chart_cfg(ps, "accuracy_over_time_chart")
     assert acc_m["target_progression_bins"] == 22
@@ -40,9 +39,7 @@ def test_merged_time_series_chart_cfg_precedence() -> None:
     assert mq_m["target_progression_bins"] == 22
     assert mq_m["font_size"] == 11
     assert mq_m["legend_width"] == 99
-    tm_m = merged_player_stats_time_series_chart_cfg(ps, "top_move_over_time_chart")
-    assert tm_m["target_progression_bins"] == 22
-    assert tm_m["height"] == 210
+    assert mq_m["height"] == 210
 
 
 def test_ordinal_target_bin_count_respects_density_cap() -> None:

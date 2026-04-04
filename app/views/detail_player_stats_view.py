@@ -46,7 +46,6 @@ PLAYER_STATS_MENU_SECTIONS: List[Tuple[str, str]] = [
     ("performance_by_phase", "Performance by phase"),
     ("accuracy_vs_progress", "Avg. accuracy over game duration"),
     ("accuracy_progression", "Accuracy progression"),
-    ("top_move_progression", "Top move progression"),
     ("move_quality_progression", "Move quality progression"),
     ("acpl_phase_progression", "ACPL progression by phase"),
     ("openings", "Openings"),
@@ -1519,7 +1518,7 @@ class AccuracyOverTimeChartWidget(QWidget):
 
 
 class MoveQualityOverTimeChartWidget(QWidget):
-    """Multi-series chart over game dates: move-quality %, top-move metrics, or phase ACPL (``chart_style``)."""
+    """Multi-series chart over game dates: move-quality progression or phase ACPL (``chart_style``)."""
 
     def __init__(
         self,
@@ -1530,16 +1529,12 @@ class MoveQualityOverTimeChartWidget(QWidget):
     ) -> None:
         super().__init__(parent)
         self.config = config
-        self._chart_style = (
-            chart_style if chart_style in ("move_pct", "acpl_phase", "top_move_pct") else "move_pct"
-        )
+        self._chart_style = chart_style if chart_style in ("move_pct", "acpl_phase") else "move_pct"
         ui_config = config.get("ui", {})
         panel_config = ui_config.get("panels", {}).get("detail", {})
         player_stats_config = panel_config.get("player_stats", {})
         if self._chart_style == "acpl_phase":
             chart_key = "acpl_phase_over_time_chart"
-        elif self._chart_style == "top_move_pct":
-            chart_key = "top_move_over_time_chart"
         else:
             chart_key = "move_quality_over_time_chart"
         self._own_cfg = dict(player_stats_config.get(chart_key) or {})
@@ -3135,9 +3130,6 @@ class DetailPlayerStatsView(QWidget):
         acc = self.player_stats_config.get("accuracy_over_time_chart", {})
         if acc.get("enabled", True) and not (getattr(stats, "accuracy_over_time", None) or []):
             return True
-        tm = self.player_stats_config.get("top_move_over_time_chart", {})
-        if tm.get("enabled", True) and not (getattr(stats, "top_move_over_time", None) or []):
-            return True
         mq = self.player_stats_config.get("move_quality_over_time_chart", {})
         if mq.get("enabled", True) and not (getattr(stats, "move_quality_over_time", None) or []):
             return True
@@ -3479,54 +3471,6 @@ class DetailPlayerStatsView(QWidget):
             self._add_player_stats_section_body_only(
                 "accuracy_progression",
                 ot_wrap,
-                section_spacing_val,
-            )
-
-        tm_cfg = player_stats_config.get("top_move_over_time_chart", {})
-        tm_merged = merged_player_stats_time_series_chart_cfg(
-            player_stats_config, "top_move_over_time_chart"
-        )
-        tm_bins = getattr(stats, "top_move_over_time", None) or []
-        tm_ids = getattr(stats, "top_move_series_ids", None) or []
-        if (
-            tm_cfg.get("enabled", True)
-            and tm_bins
-            and tm_ids
-            and int(getattr(stats, "top_move_ordinal_max", 0)) > 0
-        ):
-            tm_wrap = QWidget()
-            tm_layout = QVBoxLayout(tm_wrap)
-            tm_layout.setContentsMargins(0, 0, 0, 0)
-            tm_layout.setSpacing(6)
-            tm_layout.addWidget(
-                _player_stats_section_title_label("Top move progression", header_font, header_text_color)
-            )
-            tm_sub = QLabel(getattr(stats, "top_move_subcaption", "") or "")
-            tm_sub_fs = scale_font_size(tm_merged.get("subcaption_font_size", 9))
-            tm_sub_font = QFont(
-                resolve_font_family(player_stats_config.get("fonts", {}).get("label_font_family", "Helvetica Neue")),
-                int(tm_sub_fs),
-            )
-            tm_sub.setFont(tm_sub_font)
-            tm_sub.setStyleSheet(
-                f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); background: transparent;"
-            )
-            _configure_player_stats_trend_subcaption_label(tm_sub)
-            tm_layout.addWidget(tm_sub)
-            tm_chart = MoveQualityOverTimeChartWidget(self.config, chart_style="top_move_pct")
-            tm_chart.set_data(
-                list(tm_bins),
-                list(getattr(stats, "top_move_series_labels", None) or []),
-                list(tm_ids),
-                int(getattr(stats, "top_move_ordinal_min", 0)),
-                int(getattr(stats, "top_move_ordinal_max", 0)),
-                getattr(stats, "top_move_calendar_mode", "") or "",
-            )
-            tm_layout.addWidget(tm_chart)
-            tm_wrap.setProperty("section_name", "Top move progression")
-            self._add_player_stats_section_body_only(
-                "top_move_progression",
-                tm_wrap,
                 section_spacing_val,
             )
 

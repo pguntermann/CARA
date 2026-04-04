@@ -304,6 +304,9 @@ class UserSettingsModel(QObject):
         for k, v in raw.items():
             if isinstance(v, bool):
                 out[str(k)] = v
+        # Renamed section: former "Top move progression" merged into "Move quality progression".
+        if "move_quality_progression" not in out and isinstance(raw.get("top_move_progression"), bool):
+            out["move_quality_progression"] = bool(raw["top_move_progression"])
         return out
 
     def set_player_stats_section_visibility(self, visibility: Dict[str, bool]) -> None:

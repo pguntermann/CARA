@@ -1750,7 +1750,7 @@
             "by_color_line_width": 1,
             "hover_circle_radius": 6
           },
-          "top_move_over_time_chart": {
+          "move_quality_over_time_chart": {
             "enabled": true,
             "height": 240,
             "legend_width": 112,
@@ -1790,112 +1790,6 @@
                   255,
                   100,
                   100
-                ],
-                "line_style": "solid",
-                "line_width": 2
-              }
-            ]
-          },
-          "move_quality_over_time_chart": {
-            "enabled": true,
-            "height": 240,
-            "legend_width": 112,
-            "min_grid_lines": 5,
-            "subcaption_template": "Based on {dated} dated games (of {analyzed} analyzed).",
-            "legend_font_size": 8,
-            "series": [
-              {
-                "id": "best",
-                "label": "Best",
-                "enabled": true,
-                "line_color": [
-                  100,
-                  170,
-                  255
-                ],
-                "line_style": "solid",
-                "line_width": 2
-              },
-              {
-                "id": "good",
-                "label": "Good",
-                "enabled": true,
-                "line_color": [
-                  130,
-                  200,
-                  130
-                ],
-                "line_style": "solid",
-                "line_width": 2
-              },
-              {
-                "id": "inaccuracy",
-                "label": "Inaccuracy",
-                "enabled": true,
-                "line_color": [
-                  230,
-                  200,
-                  100
-                ],
-                "line_style": "solid",
-                "line_width": 2
-              },
-              {
-                "id": "mistake",
-                "label": "Mistake",
-                "enabled": true,
-                "line_color": [
-                  255,
-                  160,
-                  90
-                ],
-                "line_style": "solid",
-                "line_width": 2
-              },
-              {
-                "id": "blunder",
-                "label": "Blunder",
-                "enabled": true,
-                "line_color": [
-                  255,
-                  100,
-                  100
-                ],
-                "line_style": "solid",
-                "line_width": 2
-              },
-              {
-                "id": "book",
-                "label": "Book",
-                "enabled": false,
-                "line_color": [
-                  150,
-                  150,
-                  160
-                ],
-                "line_style": "dashed",
-                "line_width": 1
-              },
-              {
-                "id": "brilliant",
-                "label": "Brilliant",
-                "enabled": false,
-                "line_color": [
-                  200,
-                  120,
-                  255
-                ],
-                "line_style": "solid",
-                "line_width": 2
-              },
-              {
-                "id": "miss",
-                "label": "Miss",
-                "enabled": false,
-                "line_color": [
-                  255,
-                  200,
-                  120
                 ],
                 "line_style": "solid",
                 "line_width": 2

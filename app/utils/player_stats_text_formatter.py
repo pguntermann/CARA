@@ -97,11 +97,6 @@ class PlayerStatsTextFormatter:
             if time_lines:
                 lines.extend(time_lines)
                 lines.append("")
-        if show("top_move_progression", vis):
-            tm_lines = PlayerStatsTextFormatter._format_top_move_over_time(stats)
-            if tm_lines:
-                lines.extend(tm_lines)
-                lines.append("")
         if show("move_quality_progression", vis):
             mq_time_lines = PlayerStatsTextFormatter._format_move_quality_over_time(stats)
             if mq_time_lines:
@@ -185,10 +180,6 @@ class PlayerStatsTextFormatter:
                 lines.extend(section_lines[3:])
         elif section_name == "Accuracy progression":
             section_lines = PlayerStatsTextFormatter._format_accuracy_over_time(stats)
-            if section_lines:
-                lines.extend(section_lines[3:])
-        elif section_name == "Top move progression":
-            section_lines = PlayerStatsTextFormatter._format_top_move_over_time(stats)
             if section_lines:
                 lines.extend(section_lines[3:])
         elif section_name == "Move quality progression":
@@ -416,31 +407,8 @@ class PlayerStatsTextFormatter:
         return lines
 
     @staticmethod
-    def _format_top_move_over_time(stats: "AggregatedPlayerStats") -> List[str]:
-        """Median best / top-3 / blunder % vs game date (top move progression)."""
-        bins = getattr(stats, "top_move_over_time", None) or []
-        labels = getattr(stats, "top_move_series_labels", None) or []
-        if not bins or not labels:
-            return []
-        sub = getattr(stats, "top_move_subcaption", "") or ""
-        lines: List[str] = []
-        PlayerStatsTextFormatter._add_section_header(lines, "Top move progression")
-        if sub:
-            lines.append(sub)
-            lines.append("")
-        header = "Bin date range\tGames\t" + "\t".join(labels)
-        lines.append(header)
-        for row in sorted(bins, key=lambda x: x[0]):
-            _t_pct, cnt, l0, l1, meds = row
-            cells = [f"{l0} – {l1}", str(cnt)]
-            for j in range(len(labels)):
-                cells.append(f"{meds[j]:.1f}%" if j < len(meds) else "n/a")
-            lines.append("\t".join(cells))
-        return lines
-
-    @staticmethod
     def _format_move_quality_over_time(stats: "AggregatedPlayerStats") -> List[str]:
-        """Text summary for median % of moves per classification vs game date (move quality progression)."""
+        """Median best-move %, top-3 %, and blunder % vs game date (move quality progression chart)."""
         bins = getattr(stats, "move_quality_over_time", None) or []
         labels = getattr(stats, "move_quality_series_labels", None) or []
         if not bins or not labels:

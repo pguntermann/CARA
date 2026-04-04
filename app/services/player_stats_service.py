@@ -647,8 +647,8 @@ def merged_player_stats_time_series_chart_cfg(
 ) -> Dict[str, Any]:
     """Merge shared ``time_series`` with per-chart settings.
 
-    ``accuracy_over_time_chart`` uses ``time_series`` then its own block. Move-quality,
-    top-move, and ACPL-phase charts also layer ``accuracy_over_time_chart`` in between so
+    ``accuracy_over_time_chart`` uses ``time_series`` then its own block. Move-quality
+    progression and ACPL-phase charts also layer ``accuracy_over_time_chart`` in between so
     legacy configs that only defined binning under accuracy still apply to those charts.
     """
     ts = dict(player_stats.get("time_series") or {})
@@ -659,18 +659,9 @@ def merged_player_stats_time_series_chart_cfg(
     if chart_key in (
         "move_quality_over_time_chart",
         "acpl_phase_over_time_chart",
-        "top_move_over_time_chart",
     ):
         return {**ts, **acc, **own}
     return {**ts, **own}
-
-
-def _merge_move_quality_chart_cfg(ps: Dict[str, Any]) -> Dict[str, Any]:
-    return merged_player_stats_time_series_chart_cfg(ps, "move_quality_over_time_chart")
-
-
-def _merge_top_move_chart_cfg(ps: Dict[str, Any]) -> Dict[str, Any]:
-    return merged_player_stats_time_series_chart_cfg(ps, "top_move_over_time_chart")
 
 
 def _merge_acpl_phase_chart_cfg(ps: Dict[str, Any]) -> Dict[str, Any]:
@@ -711,74 +702,28 @@ def _collect_trends_dated_phase_acpl_triples(
     return out
 
 
-_MQ_STAT_TO_ATTR = {
-    "book": "book_moves",
-    "brilliant": "brilliant_moves",
-    "best": "best_moves",
-    "good": "good_moves",
-    "inaccuracy": "inaccuracies",
-    "mistake": "mistakes",
-    "miss": "misses",
-    "blunder": "blunders",
-}
-
-
-def _player_move_quality_pct_vector(gs: PlayerStatistics, stat_ids: List[str]) -> Optional[Tuple[float, ...]]:
-    """Per-game percentages of total moves for each stat id; None if no moves."""
-    tm = gs.total_moves
-    if tm <= 0:
-        return None
-    vec: List[float] = []
-    for sid in stat_ids:
-        attr = _MQ_STAT_TO_ATTR.get(sid)
-        if not attr:
-            return None
-        n = int(getattr(gs, attr, 0) or 0)
-        vec.append(100.0 * n / tm)
-    return tuple(vec)
-
-
-def _parse_move_quality_series_config(chart_cfg: Dict[str, Any]) -> List[Tuple[str, str]]:
-    """Enabled series as (stat_id, label)."""
-    raw = chart_cfg.get("series")
-    if not isinstance(raw, list):
-        return []
-    out: List[Tuple[str, str]] = []
-    for item in raw:
-        if not isinstance(item, dict):
-            continue
-        if not item.get("enabled", True):
-            continue
-        sid = str(item.get("id", "")).strip()
-        if sid not in _MQ_STAT_TO_ATTR:
-            continue
-        lbl = str(item.get("label", sid))
-        out.append((sid, lbl))
-    return out
-
-
-_TOP_MOVE_STAT_TO_ATTR = {
+_MOVE_QUALITY_PROGRESSION_STAT_TO_ATTR = {
     "best_move": "best_move_percentage",
     "top3_move": "top3_move_percentage",
     "blunder_rate": "blunder_rate",
 }
 
 
-def _player_top_move_pct_vector(gs: PlayerStatistics, stat_ids: List[str]) -> Optional[Tuple[float, ...]]:
+def _player_move_quality_progression_pct_vector(gs: PlayerStatistics, stat_ids: List[str]) -> Optional[Tuple[float, ...]]:
     """Per-game Best / Top3 / Blunder % (already percentages on ``PlayerStatistics``)."""
     if gs.total_moves <= 0:
         return None
     vec: List[float] = []
     for sid in stat_ids:
-        attr = _TOP_MOVE_STAT_TO_ATTR.get(sid)
+        attr = _MOVE_QUALITY_PROGRESSION_STAT_TO_ATTR.get(sid)
         if not attr:
             return None
         vec.append(float(getattr(gs, attr, 0.0)))
     return tuple(vec)
 
 
-def _parse_top_move_series_config(chart_cfg: Dict[str, Any]) -> List[Tuple[str, str]]:
-    """Enabled top-move progression series as (stat_id, label)."""
+def _parse_move_quality_progression_series_config(chart_cfg: Dict[str, Any]) -> List[Tuple[str, str]]:
+    """Enabled move-quality progression series as (stat_id, label)."""
     raw = chart_cfg.get("series")
     if not isinstance(raw, list):
         return []
@@ -789,7 +734,7 @@ def _parse_top_move_series_config(chart_cfg: Dict[str, Any]) -> List[Tuple[str, 
         if not item.get("enabled", True):
             continue
         sid = str(item.get("id", "")).strip()
-        if sid not in _TOP_MOVE_STAT_TO_ATTR:
+        if sid not in _MOVE_QUALITY_PROGRESSION_STAT_TO_ATTR:
             continue
         lbl = str(item.get("label", sid))
         out.append((sid, lbl))
@@ -887,7 +832,7 @@ def _build_move_quality_over_time_series(
     int,
     str,
 ]:
-    """Median move-type % over time; same progression binning as accuracy (``target_progression_bins``).
+    """Median best-move %, top-3 %, and blunder % vs game date (``target_progression_bins`` binning).
 
     Returns:
         (bins, series_labels, series_ids, subcaption, ordinal_min, ordinal_max, calendar_mode).
@@ -896,12 +841,12 @@ def _build_move_quality_over_time_series(
     ui = config.get("ui", {})
     detail = ui.get("panels", {}).get("detail", {})
     ps = detail.get("player_stats", {})
-    chart_cfg = _merge_move_quality_chart_cfg(ps)
+    chart_cfg = merged_player_stats_time_series_chart_cfg(ps, "move_quality_over_time_chart")
     mq_block = ps.get("move_quality_over_time_chart", {})
     if not mq_block.get("enabled", True):
         return [], [], [], "", 0, 0, ""
 
-    series_defs = _parse_move_quality_series_config(chart_cfg)
+    series_defs = _parse_move_quality_progression_series_config(chart_cfg)
     if not series_defs:
         return [], [], [], "", 0, 0, ""
 
@@ -915,91 +860,7 @@ def _build_move_quality_over_time_series(
     dated = _collect_trends_dated_player_stats(game_results, analyzed_games)
     samples_vec: List[Tuple[int, Tuple[float, ...]]] = []
     for ord_val, gs in dated:
-        vec = _player_move_quality_pct_vector(gs, stat_ids)
-        if vec is None:
-            continue
-        samples_vec.append((ord_val, vec))
-
-    dated_count = len(samples_vec)
-    template = str(
-        chart_cfg.get(
-            "subcaption_template",
-            "Based on {dated} dated games (of {analyzed} analyzed).",
-        )
-    )
-    subcaption = template.format(dated=dated_count, analyzed=analyzed_count)
-
-    if dated_count < min_games:
-        return [], [], [], subcaption, 0, 0, ""
-
-    ordinals = [s[0] for s in samples_vec]
-    t_min = min(ordinals)
-    t_max = max(ordinals)
-    span_days = t_max - t_min
-    if span_days > 0 and span_days < min_span_days:
-        return [], [], [], subcaption, 0, 0, ""
-
-    n_series = len(stat_ids)
-    nqb = _ordinal_target_bin_count(chart_cfg, len(samples_vec))
-    use_tight_quantile_axis = False
-    mode = ""
-    if _ordinal_fallback_mode(chart_cfg) == "quantile":
-        bins_out = _move_quality_bins_ordinal_quantile(samples_vec, nqb, n_series, t_min, t_max)
-        use_tight_quantile_axis = True
-    else:
-        bins_out = _move_quality_bins_equal_ordinal_width(samples_vec, nqb, n_series, t_min, t_max)
-    suf = _ordinal_fallback_subcaption_suffix(chart_cfg)
-    if suf:
-        subcaption = f"{subcaption} {suf}"
-
-    if len(bins_out) < min_populated_bins:
-        return [], [], [], subcaption, 0, 0, ""
-
-    bins_out.sort(key=lambda x: x[0])
-    ord_lo, ord_hi = t_min, t_max
-    if bins_out and use_tight_quantile_axis:
-        ord_lo, ord_hi = _trend_axis_ordinals_for_quantile_bins([(r[2], r[3]) for r in bins_out], t_min, t_max)
-    return bins_out, labels, stat_ids, subcaption, ord_lo, ord_hi, mode
-
-
-def _build_top_move_over_time_series(
-    game_results: List[Dict[str, Any]],
-    analyzed_games: List[GameData],
-    config: Dict[str, Any],
-    analyzed_count: int,
-) -> Tuple[
-    List[Tuple[float, int, str, str, Tuple[float, ...]]],
-    List[str],
-    List[str],
-    str,
-    int,
-    int,
-    str,
-]:
-    """Median best-move %, top-3 %, and blunder % vs game date (same binning as move quality)."""
-    ui = config.get("ui", {})
-    detail = ui.get("panels", {}).get("detail", {})
-    ps = detail.get("player_stats", {})
-    chart_cfg = _merge_top_move_chart_cfg(ps)
-    tm_block = ps.get("top_move_over_time_chart", {})
-    if not tm_block.get("enabled", True):
-        return [], [], [], "", 0, 0, ""
-
-    series_defs = _parse_top_move_series_config(chart_cfg)
-    if not series_defs:
-        return [], [], [], "", 0, 0, ""
-
-    stat_ids = [s for s, _ in series_defs]
-    labels = [lb for _, lb in series_defs]
-
-    min_games = int(chart_cfg.get("min_games_with_full_date", 4))
-    min_span_days = int(chart_cfg.get("min_span_days", 14))
-    min_populated_bins = int(chart_cfg.get("min_populated_bins", 1))
-
-    dated = _collect_trends_dated_player_stats(game_results, analyzed_games)
-    samples_vec: List[Tuple[int, Tuple[float, ...]]] = []
-    for ord_val, gs in dated:
-        vec = _player_top_move_pct_vector(gs, stat_ids)
+        vec = _player_move_quality_progression_pct_vector(gs, stat_ids)
         if vec is None:
             continue
         samples_vec.append((ord_val, vec))
@@ -1186,7 +1047,7 @@ class AggregatedPlayerStats:
     trends_ordinal_max: int
     # Empty: x-axis infers tick density from date span. Legacy day|week|month|year when set.
     trends_calendar_mode: str
-    # Median per-game % of moves per classification vs game date (progression bins). Parallel labels/ids.
+    # Median best-move %, top-3 %, blunder % vs game date (progression bins). Parallel labels/ids.
     move_quality_over_time: List[Tuple[float, int, str, str, Tuple[float, ...]]]
     move_quality_series_labels: List[str]
     move_quality_series_ids: List[str]
@@ -1194,14 +1055,6 @@ class AggregatedPlayerStats:
     move_quality_ordinal_min: int
     move_quality_ordinal_max: int
     move_quality_calendar_mode: str
-    # Median best / top-3 / blunder % vs game date (progression bins).
-    top_move_over_time: List[Tuple[float, int, str, str, Tuple[float, ...]]]
-    top_move_series_labels: List[str]
-    top_move_series_ids: List[str]
-    top_move_subcaption: str
-    top_move_ordinal_min: int
-    top_move_ordinal_max: int
-    top_move_calendar_mode: str
     # Median phase ACPL vs game date (calendar bins); tuple may contain nan per phase.
     acpl_phase_over_time: List[Tuple[float, int, str, str, Tuple[float, ...]]]
     acpl_phase_series_labels: List[str]
@@ -1795,19 +1648,6 @@ class PlayerStatsService:
             mq_labels = []
             mq_ids = []
 
-        tm_bins, tm_labels, tm_ids, tm_sub, tm_omin, tm_omax, tm_cal_mode = _build_top_move_over_time_series(
-            game_results,
-            analyzed_games,
-            self.config,
-            len(analyzed_games),
-        )
-        if not tm_bins:
-            tm_omin = 0
-            tm_omax = 0
-            tm_cal_mode = ""
-            tm_labels = []
-            tm_ids = []
-
         ap_bins, ap_labels, ap_ids, ap_sub, ap_omin, ap_omax, ap_cal_mode = _build_acpl_phase_over_time_series(
             game_results,
             analyzed_games,
@@ -1862,13 +1702,6 @@ class PlayerStatsService:
             move_quality_ordinal_min=mq_omin,
             move_quality_ordinal_max=mq_omax,
             move_quality_calendar_mode=mq_cal_mode,
-            top_move_over_time=tm_bins,
-            top_move_series_labels=tm_labels,
-            top_move_series_ids=tm_ids,
-            top_move_subcaption=tm_sub,
-            top_move_ordinal_min=tm_omin,
-            top_move_ordinal_max=tm_omax,
-            top_move_calendar_mode=tm_cal_mode,
             acpl_phase_over_time=ap_bins,
             acpl_phase_series_labels=ap_labels,
             acpl_phase_series_ids=ap_ids,

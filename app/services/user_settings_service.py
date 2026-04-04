@@ -523,7 +523,7 @@ class UserSettingsService:
         """Update in-memory visibility for one Player Stats section.
 
         Section ids match ``PLAYER_STATS_MENU_SECTIONS`` in
-        ``app.views.detail_player_stats_view`` (e.g. ``top_move_progression``).
+        ``app.views.detail_player_stats_view`` (e.g. ``move_quality_progression``).
 
         Written to disk when the application exits (see MainWindow ``closeEvent`` /
         ``_save_user_settings`` → ``AppController.save_user_settings``).
