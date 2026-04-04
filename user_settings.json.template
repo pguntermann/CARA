@@ -955,6 +955,7 @@
   },
   "player_stats_section_visibility": {
     "overview": true,
+    "activity_heatmap": true,
     "accuracy_distribution": true,
     "move_accuracy": true,
     "performance_by_phase": true,
@@ -970,11 +971,19 @@
     "error_patterns": true
   },
   "player_stats_time_series": {
-    "target_progression_bins": 16,
-    "ordinal_fallback_mode": "quantile",
+    "target_progression_bins": 24,
+    "ordinal_fallback_mode": "equal_width",
     "progression_x_axis_mode": "uniform_bins",
-    "compress_gap_max_segment_days": 28,
+    "compress_gap_max_segment_days": 14,
     "progression_line_style": "smooth",
     "progression_line_smooth_strength": 1.0
+  },
+  "player_stats_activity_heatmap": {
+    "week_starts_on": "sunday",
+    "color_preset": "github_green",
+    "color_scale_max_mode": "auto",
+    "color_scale_max_fixed": 20,
+    "partial_dates": "exclude",
+    "date_range": "rolling_12_months"
   }
 }

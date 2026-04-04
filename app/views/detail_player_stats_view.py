@@ -33,6 +33,10 @@ from app.services.player_stats_service import merged_player_stats_time_series_ch
 
 if TYPE_CHECKING:
     from app.controllers.player_stats_controller import PlayerStatsController
+    from app.views.player_activity_heatmap_widget import PlayerActivityHeatmapWidget
+    from app.views.player_stats_activity_heatmap_menu import (
+        PlayerStatsActivityHeatmapMenuController,
+    )
     from app.views.player_stats_time_series_menu import PlayerStatsTimeSeriesMenuController
     from app.controllers.database_controller import DatabaseController
     from app.services.player_stats_service import AggregatedPlayerStats
@@ -42,6 +46,7 @@ if TYPE_CHECKING:
 # Section id -> menu label (Player Stats menu). Order is the default display order.
 PLAYER_STATS_MENU_SECTIONS: List[Tuple[str, str]] = [
     ("overview", "Overview"),
+    ("activity_heatmap", "Activity heatmap"),
     ("accuracy_distribution", "Accuracy distribution"),
     ("move_accuracy", "Move accuracy"),
     ("performance_by_phase", "Performance by phase"),
@@ -2795,11 +2800,17 @@ class DetailPlayerStatsView(QWidget):
         self._building_content = False  # True while building stats content (skip resize-driven updates)
         self._pending_stats_content_rebuild = False  # Coalesce rebuilds if re-entered via processEvents while building
         self._ps_ts_context_menu_controller: Optional["PlayerStatsTimeSeriesMenuController"] = None
+        self._ps_ah_context_menu_controller: Optional["PlayerStatsActivityHeatmapMenuController"] = None
+        self._activity_heatmap_widget: Optional["PlayerActivityHeatmapWidget"] = None
+        self._activity_heatmap_subcaption_label: Optional[QLabel] = None
 
         from app.services.user_settings_service import UserSettingsService
 
         UserSettingsService.get_instance().get_model().player_stats_time_series_changed.connect(
             self._on_player_stats_time_series_settings_changed
+        )
+        UserSettingsService.get_instance().get_model().player_stats_activity_heatmap_changed.connect(
+            self._on_player_stats_activity_heatmap_settings_changed
         )
 
         # Event filter will be installed on scroll_area in _setup_ui
@@ -2815,6 +2826,23 @@ class DetailPlayerStatsView(QWidget):
         if self._ps_ts_context_menu_controller is not None:
             self._ps_ts_context_menu_controller.sync_from_settings()
         QTimer.singleShot(0, self._deferred_build_stats_content)
+
+    def _on_player_stats_activity_heatmap_settings_changed(self) -> None:
+        if self._ps_ah_context_menu_controller is not None:
+            self._ps_ah_context_menu_controller.sync_from_settings()
+        if self._activity_heatmap_widget is not None:
+            self._activity_heatmap_widget.refresh_from_settings()
+            lbl = self._activity_heatmap_subcaption_label
+            if lbl is not None:
+                cap = self._activity_heatmap_widget.subcaption_text()
+                if not cap:
+                    cap = (
+                        "No games with usable dates for this view. "
+                        "Include partial PGN dates (stand-ins) in settings, or add full Date tags."
+                    )
+                lbl.setText(cap)
+        else:
+            QTimer.singleShot(0, self._deferred_build_stats_content)
 
     def cleanup(self) -> None:
         """Clean up resources when view is being destroyed."""
@@ -3333,6 +3361,8 @@ class DetailPlayerStatsView(QWidget):
         self._openings_widget = None
         self._openings_grids = []
         self._error_patterns_widget = None
+        self._activity_heatmap_widget = None
+        self._activity_heatmap_subcaption_label = None
         self._endgame_tree_widget = None
         self._endgame_tree_decrease_button = None
         self._endgame_tree_increase_button = None
@@ -3408,6 +3438,8 @@ class DetailPlayerStatsView(QWidget):
         self._openings_widget = None
         self._openings_grids = []
         self._error_patterns_widget = None
+        self._activity_heatmap_widget = None
+        self._activity_heatmap_subcaption_label = None
         
         # Get config
         ui_config = self.config.get('ui', {})
@@ -3501,6 +3533,50 @@ class DetailPlayerStatsView(QWidget):
         self._add_player_stats_section(
             "overview", "Overview", header_font, header_text_color, overview_widget, section_spacing_val
         )
+
+        ah_cfg = player_stats_config.get("activity_heatmap", {})
+        if stats and ah_cfg.get("enabled", True):
+            from app.views.player_activity_heatmap_widget import PlayerActivityHeatmapWidget
+
+            pairs = list(getattr(stats, "activity_heatmap_per_game_ordinals", None) or [])
+            ah_wrap = QWidget()
+            ah_wrap.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+            ah_layout = QVBoxLayout(ah_wrap)
+            ah_layout.setContentsMargins(0, 0, 0, 0)
+            ah_layout.setSpacing(6)
+            ah_layout.addWidget(
+                _player_stats_section_title_label("Activity heatmap", header_font, header_text_color)
+            )
+            hm = PlayerActivityHeatmapWidget(self.config)
+            hm.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            hm.set_per_game_ordinals(pairs)
+            self._activity_heatmap_widget = hm
+            cap = hm.subcaption_text()
+            if not cap:
+                cap = (
+                    "No games with usable dates for this view. "
+                    "Include partial PGN dates (stand-ins) in settings, or add full Date tags."
+                )
+            ah_sub = QLabel(cap)
+            ah_sub_fs = scale_font_size(int(ah_cfg.get("label_font_size", 8)) + 1)
+            ah_sub_font = QFont(
+                resolve_font_family(player_stats_config.get("fonts", {}).get("label_font_family", "Helvetica Neue")),
+                int(ah_sub_fs),
+            )
+            ah_sub.setFont(ah_sub_font)
+            ah_sub.setStyleSheet(
+                f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); background: transparent;"
+            )
+            _configure_player_stats_trend_subcaption_label(ah_sub)
+            ah_layout.addWidget(ah_sub)
+            ah_layout.addWidget(hm, stretch=0, alignment=Qt.AlignmentFlag.AlignTop)
+            self._activity_heatmap_subcaption_label = ah_sub
+            ah_wrap.setProperty("section_name", "Activity heatmap")
+            self._add_player_stats_section_body_only(
+                "activity_heatmap",
+                ah_wrap,
+                section_spacing_val,
+            )
 
         # Accuracy Distribution Section (optional)
         accuracy_dist_config = player_stats_config.get('accuracy_distribution', {})
@@ -6661,6 +6737,26 @@ class DetailPlayerStatsView(QWidget):
 
         self._ps_ts_context_menu_controller = PlayerStatsTimeSeriesMenuController(self, _style_ts_submenu)
 
+    def _ensure_player_stats_activity_heatmap_context_menu_controller(self) -> None:
+        if self._ps_ah_context_menu_controller is not None:
+            return
+        from app.views.player_stats_activity_heatmap_menu import (
+            PlayerStatsActivityHeatmapMenuController,
+        )
+        from app.views.style import StyleManager
+
+        def _style_ah_submenu(m: QMenu) -> None:
+            ui_config = self.config.get("ui", {})
+            panel_config = ui_config.get("panels", {}).get("detail", {})
+            ps_cfg = panel_config.get("player_stats", {})
+            colors_config = ps_cfg.get("colors", {})
+            bg_color = colors_config.get("background", [40, 40, 45])
+            StyleManager.style_context_menu(m, self.config, bg_color)
+
+        self._ps_ah_context_menu_controller = PlayerStatsActivityHeatmapMenuController(
+            self, _style_ah_submenu
+        )
+
     def contextMenuEvent(self, event: QContextMenuEvent) -> None:
         """Handle context menu event for copying sections or full stats.
         
@@ -6735,6 +6831,9 @@ class DetailPlayerStatsView(QWidget):
         copy_full_action = menu.addAction("Copy stats to clipboard")
         copy_full_action.triggered.connect(self._copy_full_stats_to_clipboard)
 
+        from app.views.player_stats_activity_heatmap_menu import (
+            PLAYER_STATS_ACTIVITY_HEATMAP_CONTEXT_SECTIONS,
+        )
         from app.views.player_stats_time_series_menu import PLAYER_STATS_TIME_SERIES_CONTEXT_SECTIONS
 
         if section_name and section_name in PLAYER_STATS_TIME_SERIES_CONTEXT_SECTIONS:
@@ -6742,6 +6841,12 @@ class DetailPlayerStatsView(QWidget):
             self._ensure_player_stats_time_series_context_menu_controller()
             assert self._ps_ts_context_menu_controller is not None
             self._ps_ts_context_menu_controller.append_to_context_menu(menu)
+
+        if section_name and section_name in PLAYER_STATS_ACTIVITY_HEATMAP_CONTEXT_SECTIONS:
+            menu.addSeparator()
+            self._ensure_player_stats_activity_heatmap_context_menu_controller()
+            assert self._ps_ah_context_menu_controller is not None
+            self._ps_ah_context_menu_controller.append_to_context_menu(menu)
 
         # When right-clicking inside the opening tree, offer expand/collapse actions
         if click_in_opening_tree and self._opening_tree_widget is not None:

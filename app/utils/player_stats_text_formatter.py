@@ -186,6 +186,8 @@ class PlayerStatsTextFormatter:
             section_lines = PlayerStatsTextFormatter._format_move_quality_over_time(stats)
             if section_lines:
                 lines.extend(section_lines[3:])
+        elif section_name == "Activity heatmap":
+            lines.append("Visual games-played heatmap (see Player Stats tab in the app).")
         elif section_name == "ACPL progression by phase":
             section_lines = PlayerStatsTextFormatter._format_acpl_phase_over_time(stats)
             if section_lines:

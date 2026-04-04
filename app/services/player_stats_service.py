@@ -1090,6 +1090,8 @@ class AggregatedPlayerStats:
     acpl_phase_ordinal_min: int
     acpl_phase_ordinal_max: int
     acpl_phase_calendar_mode: str
+    # Per analyzed game (same order as sorted ``game_results``): (full_date_ordinal, trends_ordinal).
+    activity_heatmap_per_game_ordinals: List[Tuple[Optional[int], Optional[int]]]
 
 
 class PlayerStatsService:
@@ -1661,6 +1663,15 @@ class PlayerStatsService:
         detail_agg = ui_agg.get("panels", {}).get("detail", {})
         ps_agg = detail_agg.get("player_stats", {})
 
+        activity_pairs: List[Tuple[Optional[int], Optional[int]]] = []
+        for result in game_results:
+            idx = int(result.get("index", 0))
+            if 0 <= idx < len(analyzed_games):
+                ds = analyzed_games[idx].date
+                activity_pairs.append(
+                    (_game_date_to_ordinal(ds), _game_date_ordinal_for_trends(ds))
+                )
+
         samples_acc = _collect_trends_dated_accuracy_with_color(game_results, analyzed_games)
 
         ts_raw_mq_samples: List[Tuple[int, Tuple[float, ...]]] = []
@@ -1737,6 +1748,7 @@ class PlayerStatsService:
             acpl_phase_ordinal_min=0,
             acpl_phase_ordinal_max=0,
             acpl_phase_calendar_mode="",
+            activity_heatmap_per_game_ordinals=activity_pairs,
         )
 
         apply_player_stats_time_series_binning(

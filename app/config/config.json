@@ -1719,6 +1719,50 @@
             "x_axis_week_minor_max_calendar_span_days": 100,
             "x_axis_month_ticks_in_year_mode": true
           },
+          "activity_heatmap": {
+            "enabled": true,
+            "cell_gap": 2,
+            "two_band_vertical_gap": 12,
+            "min_cell_size": 3,
+            "max_cell_size": 48,
+            "color_presets": {
+              "github_green": [
+                [22, 27, 34],
+                [0, 55, 40],
+                [38, 130, 80],
+                [120, 200, 120]
+              ],
+              "ocean_blue": [
+                [22, 27, 34],
+                [15, 45, 85],
+                [45, 100, 180],
+                [100, 180, 240]
+              ],
+              "amber": [
+                [22, 27, 34],
+                [70, 50, 10],
+                [140, 100, 30],
+                [230, 190, 80]
+              ]
+            },
+            "month_label_band_height": 14,
+            "month_label_font_size": 7,
+            "month_label_text_color": [150, 150, 158],
+            "week_divider_color": [72, 72, 80],
+            "week_divider_line_width": 1,
+            "month_divider_color": [120, 120, 135],
+            "month_divider_line_width": 2,
+            "day_number_min_cell_size": 10,
+            "day_number_text_color": [130, 130, 138],
+            "cell_size_week": 11,
+            "cell_size_day": 10,
+            "cell_size_month": 14,
+            "corner_radius": 2,
+            "row_label_width": 28,
+            "label_font_size": 8,
+            "border_color": [55, 55, 62],
+            "empty_cell_color": [33, 38, 46]
+          },
           "accuracy_over_time_chart": {
             "enabled": true,
             "height": 220,

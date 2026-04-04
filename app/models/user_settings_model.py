@@ -23,6 +23,7 @@ class UserSettingsModel(QObject):
     annotations_changed = pyqtSignal()  # Emitted when annotation settings change
     ai_settings_changed = pyqtSignal()  # Emitted when AI settings change
     player_stats_time_series_changed = pyqtSignal()  # Player Stats time-series binning / display prefs
+    player_stats_activity_heatmap_changed = pyqtSignal()  # Player Stats activity heatmap display prefs
 
     def __init__(self, settings: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the user settings model.
@@ -338,6 +339,35 @@ class UserSettingsModel(QObject):
         cur = self.get_player_stats_time_series()
         cur.update(partial)
         self.set_player_stats_time_series(cur)
+
+    def get_player_stats_activity_heatmap(self) -> Dict[str, Any]:
+        """User overrides for Player Stats activity heatmap (merged at display time)."""
+        from app.services.player_stats_activity_heatmap_user import (
+            normalize_player_stats_activity_heatmap_settings,
+        )
+
+        raw = self._settings.get("player_stats_activity_heatmap")
+        return normalize_player_stats_activity_heatmap_settings(
+            raw if isinstance(raw, dict) else None
+        )
+
+    def set_player_stats_activity_heatmap(self, settings: Dict[str, Any]) -> None:
+        """Replace stored Player Stats activity heatmap user settings."""
+        from app.services.player_stats_activity_heatmap_user import (
+            normalize_player_stats_activity_heatmap_settings,
+        )
+
+        self._settings["player_stats_activity_heatmap"] = (
+            normalize_player_stats_activity_heatmap_settings(settings)
+        )
+        self.player_stats_activity_heatmap_changed.emit()
+        self.settings_changed.emit()
+
+    def update_player_stats_activity_heatmap(self, partial: Dict[str, Any]) -> None:
+        """Merge keys into Player Stats activity heatmap settings."""
+        cur = self.get_player_stats_activity_heatmap()
+        cur.update(partial)
+        self.set_player_stats_activity_heatmap(cur)
 
     def update_from_dict(self, settings: Dict[str, Any]) -> None:
         """Update settings from a dictionary (used when loading from file).

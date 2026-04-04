@@ -543,6 +543,10 @@ class UserSettingsService:
         """Merge keys into Player Stats time-series user settings (binning / chart display)."""
         self.get_model().update_player_stats_time_series(partial)
 
+    def update_player_stats_activity_heatmap(self, partial: Dict[str, Any]) -> None:
+        """Merge keys into Player Stats activity heatmap user settings."""
+        self.get_model().update_player_stats_activity_heatmap(partial)
+
     def update_engines(self, engines: list) -> None:
         """Update engine list.
         
