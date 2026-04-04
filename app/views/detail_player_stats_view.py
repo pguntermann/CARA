@@ -33,6 +33,7 @@ from app.services.player_stats_service import merged_player_stats_time_series_ch
 
 if TYPE_CHECKING:
     from app.controllers.player_stats_controller import PlayerStatsController
+    from app.views.player_stats_time_series_menu import PlayerStatsTimeSeriesMenuController
     from app.controllers.database_controller import DatabaseController
     from app.services.player_stats_service import AggregatedPlayerStats
     from app.services.error_pattern_service import ErrorPattern
@@ -553,7 +554,7 @@ def _accuracy_over_time_ordinal_to_x(
     return left + (o - omin) / span * graph_width
 
 
-# Infer X-axis tick density when ``calendar_mode`` was not set on the series (legacy paths).
+# Infer X-axis tick density when ``calendar_mode`` was not set on the series.
 _AXIS_FALLBACK_DAY_MAX_SPAN_DAYS = 31
 _AXIS_FALLBACK_WEEK_MAX_SPAN_DAYS = 120
 _AXIS_FALLBACK_MONTH_MAX_SPAN_DAYS = 960
@@ -587,13 +588,11 @@ def _format_axis_tick_day_month(d: date) -> str:
 _PROGRESSION_X_AXIS_MODES = frozenset({"uniform_bins", "gap_compressed", "calendar_linear"})
 
 
-def _coerce_progression_x_axis_mode(chart_cfg: Dict[str, Any]) -> str:
+def _effective_progression_x_axis_mode(chart_cfg: Dict[str, Any]) -> str:
     """How progression charts map bins to horizontal position (shared accuracy / MQ / ACPL charts)."""
     raw = str(chart_cfg.get("progression_x_axis_mode", "")).strip().lower()
     if raw in _PROGRESSION_X_AXIS_MODES:
         return raw
-    if chart_cfg.get("compress_time_axis_gaps", True) is False:
-        return "calendar_linear"
     return "uniform_bins"
 
 
@@ -686,11 +685,22 @@ def _bin_ordinal_center_from_iso(lab0: str, lab1: str) -> Optional[int]:
 class GapCompressedTimeLayout:
     """Non-linear map calendar ordinal → horizontal fraction so long game-free spans use less width."""
 
-    __slots__ = ("_knots", "_cum")
+    __slots__ = ("_knots", "_cum", "_compressed_bounds")
 
-    def __init__(self, knots: List[int], cum_display: List[float]) -> None:
+    def __init__(
+        self,
+        knots: List[int],
+        cum_display: List[float],
+        compressed_span_boundary_ordinals: frozenset[int],
+    ) -> None:
         self._knots = tuple(knots)
         self._cum = tuple(cum_display)
+        self._compressed_bounds = compressed_span_boundary_ordinals
+
+    @property
+    def compressed_span_boundary_ordinals(self) -> frozenset[int]:
+        """Knot ordinals at ends of segments where calendar span exceeded the cap (visual hint targets)."""
+        return self._compressed_bounds
 
     def ordinal_to_frac(self, o: int) -> float:
         if not self._knots:
@@ -764,9 +774,13 @@ def _build_gap_compressed_time_layout(
     if len(knots) < 2:
         return None
     weights: List[float] = []
+    compressed_bounds: set[int] = set()
     for i in range(len(knots) - 1):
         d = knots[i + 1] - knots[i]
         weights.append(max(1.0, float(min(d, max_segment_calendar_days))))
+        if d > max_segment_calendar_days:
+            compressed_bounds.add(int(knots[i]))
+            compressed_bounds.add(int(knots[i + 1]))
     total = sum(weights)
     if total <= 0:
         return None
@@ -774,7 +788,7 @@ def _build_gap_compressed_time_layout(
     for w in weights:
         cum.append(cum[-1] + w / total)
     cum[-1] = 1.0
-    return GapCompressedTimeLayout(knots, cum)
+    return GapCompressedTimeLayout(knots, cum, frozenset(compressed_bounds))
 
 
 def _ordinal_to_chart_x(
@@ -795,6 +809,32 @@ def _ordinal_to_chart_x(
             return _accuracy_over_time_ordinal_to_x(o, left, graph_width, omin, omax)
         return left + (f - f0) / span_f * graph_width
     return _accuracy_over_time_ordinal_to_x(o, left, graph_width, omin, omax)
+
+
+def _paint_gap_compressed_span_markers(
+    painter: QPainter,
+    layout: GapCompressedTimeLayout,
+    left: float,
+    top: float,
+    bottom: float,
+    graph_width: float,
+    omin: int,
+    omax: int,
+    color: QColor,
+    line_width: int,
+) -> None:
+    """Dashed verticals at knot dates bounding calendar segments that were width-capped."""
+    bounds = layout.compressed_span_boundary_ordinals
+    if not bounds:
+        return
+    pen = QPen(color, max(1, line_width))
+    pen.setStyle(Qt.PenStyle.DashLine)
+    pen.setCapStyle(Qt.PenCapStyle.FlatCap)
+    painter.setPen(pen)
+    for o_ord in sorted(bounds):
+        x = _ordinal_to_chart_x(o_ord, left, graph_width, omin, omax, layout)
+        xi = int(round(x))
+        painter.drawLine(xi, int(top), xi, int(bottom))
 
 
 def _chart_x_from_bin_labels(
@@ -851,12 +891,22 @@ def _draw_bin_data_x_marker(painter: QPainter, cx: float, cy: float, arm: float,
 class AccuracyOverTimeChartWidget(QWidget):
     """Line chart: X = position along game-date range (0–100%), Y = median accuracy per time bin."""
 
-    def __init__(self, config: Dict[str, Any], parent: Optional[QWidget] = None) -> None:
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        parent: Optional[QWidget] = None,
+        *,
+        player_stats_detail_override: Optional[Dict[str, Any]] = None,
+    ) -> None:
         super().__init__(parent)
         self.config = config
         ui_config = config.get("ui", {})
         panel_config = ui_config.get("panels", {}).get("detail", {})
-        player_stats_config = panel_config.get("player_stats", {})
+        player_stats_config = (
+            player_stats_detail_override
+            if player_stats_detail_override is not None
+            else panel_config.get("player_stats", {})
+        )
         chart_config = merged_player_stats_time_series_chart_cfg(
             player_stats_config, "accuracy_over_time_chart"
         )
@@ -882,6 +932,13 @@ class AccuracyOverTimeChartWidget(QWidget):
         self._x_axis_minor_color = QColor(*chart_config.get("x_axis_minor_line_color", [55, 55, 62]))
         self._x_axis_major_width = int(chart_config.get("x_axis_major_line_width", 1))
         self._x_axis_minor_width = int(chart_config.get("x_axis_minor_line_width", 1))
+        _gcm = chart_config.get("gap_compression_span_marker_color")
+        if isinstance(_gcm, list) and len(_gcm) >= 3:
+            self._gap_compression_marker_color = QColor(int(_gcm[0]), int(_gcm[1]), int(_gcm[2]))
+        else:
+            _mc = self._x_axis_minor_color
+            self._gap_compression_marker_color = QColor(_mc.red(), _mc.green(), _mc.blue(), 210)
+        self._gap_compression_marker_width = max(1, int(chart_config.get("gap_compression_span_marker_line_width", 1)))
         self._x_axis_calendar_enabled = bool(chart_config.get("x_axis_calendar_enabled", True))
         self._x_axis_label_min_spacing_px = int(chart_config.get("x_axis_label_min_spacing_px", 44))
         self._x_axis_max_labels = int(chart_config.get("x_axis_max_labels", 12))
@@ -899,11 +956,10 @@ class AccuracyOverTimeChartWidget(QWidget):
         self._hover_circle_radius = int(chart_config.get("hover_circle_radius", 6))
         self._show_bin_data_markers = bool(chart_config.get("show_bin_data_markers", True))
         self._bin_data_marker_radius = float(chart_config.get("bin_data_marker_radius", 3))
-        self._compress_time_axis_gaps = bool(chart_config.get("compress_time_axis_gaps", True))
         self._compress_gap_max_segment_days = max(
             1, int(chart_config.get("compress_gap_max_segment_days", 50) or 50)
         )
-        self._progression_x_mode = _coerce_progression_x_axis_mode(chart_config)
+        self._progression_x_mode = _effective_progression_x_axis_mode(chart_config)
         self._time_axis_layout: Optional[GapCompressedTimeLayout] = None
         _pls = str(chart_config.get("progression_line_style", "smooth")).strip().lower()
         self._progression_line_smooth = _pls in ("smooth", "bezier", "curve", "curved")
@@ -1167,6 +1223,24 @@ class AccuracyOverTimeChartWidget(QWidget):
                 x = left + (pct / 100.0 * graph_width)
                 painter.setPen(QPen(self.grid_color, 1))
                 painter.drawLine(int(x), int(top), int(x), int(bottom))
+
+        if (
+            self._progression_x_mode == "gap_compressed"
+            and self._time_axis_layout is not None
+            and self._x_axis_calendar_enabled
+        ):
+            _paint_gap_compressed_span_markers(
+                painter,
+                self._time_axis_layout,
+                left,
+                top,
+                bottom,
+                graph_width,
+                self._ordinal_min,
+                self._ordinal_max,
+                self._gap_compression_marker_color,
+                self._gap_compression_marker_width,
+            )
 
         painter.setPen(self.text_color)
         adaptive_font_size = max(
@@ -1526,13 +1600,18 @@ class MoveQualityOverTimeChartWidget(QWidget):
         parent: Optional[QWidget] = None,
         *,
         chart_style: str = "move_pct",
+        player_stats_detail_override: Optional[Dict[str, Any]] = None,
     ) -> None:
         super().__init__(parent)
         self.config = config
         self._chart_style = chart_style if chart_style in ("move_pct", "acpl_phase") else "move_pct"
         ui_config = config.get("ui", {})
         panel_config = ui_config.get("panels", {}).get("detail", {})
-        player_stats_config = panel_config.get("player_stats", {})
+        player_stats_config = (
+            player_stats_detail_override
+            if player_stats_detail_override is not None
+            else panel_config.get("player_stats", {})
+        )
         if self._chart_style == "acpl_phase":
             chart_key = "acpl_phase_over_time_chart"
         else:
@@ -1556,6 +1635,13 @@ class MoveQualityOverTimeChartWidget(QWidget):
         self._x_axis_minor_color = QColor(*self._chart_cfg.get("x_axis_minor_line_color", [55, 55, 62]))
         self._x_axis_major_width = int(self._chart_cfg.get("x_axis_major_line_width", 1))
         self._x_axis_minor_width = int(self._chart_cfg.get("x_axis_minor_line_width", 1))
+        _gcm_mq = self._chart_cfg.get("gap_compression_span_marker_color")
+        if isinstance(_gcm_mq, list) and len(_gcm_mq) >= 3:
+            self._gap_compression_marker_color = QColor(int(_gcm_mq[0]), int(_gcm_mq[1]), int(_gcm_mq[2]))
+        else:
+            _mc_mq = self._x_axis_minor_color
+            self._gap_compression_marker_color = QColor(_mc_mq.red(), _mc_mq.green(), _mc_mq.blue(), 210)
+        self._gap_compression_marker_width = max(1, int(self._chart_cfg.get("gap_compression_span_marker_line_width", 1)))
         self._x_axis_calendar_enabled = bool(self._chart_cfg.get("x_axis_calendar_enabled", True))
         self._x_axis_label_min_spacing_px = int(self._chart_cfg.get("x_axis_label_min_spacing_px", 44))
         self._x_axis_max_labels = int(self._chart_cfg.get("x_axis_max_labels", 12))
@@ -1573,11 +1659,10 @@ class MoveQualityOverTimeChartWidget(QWidget):
         self._legend_font_size = int(scale_font_size(self._chart_cfg.get("legend_font_size", 8)))
         self._show_bin_data_markers = bool(self._chart_cfg.get("show_bin_data_markers", True))
         self._bin_data_marker_radius = float(self._chart_cfg.get("bin_data_marker_radius", 3))
-        self._compress_time_axis_gaps = bool(self._chart_cfg.get("compress_time_axis_gaps", True))
         self._compress_gap_max_segment_days = max(
             1, int(self._chart_cfg.get("compress_gap_max_segment_days", 50) or 50)
         )
-        self._progression_x_mode = _coerce_progression_x_axis_mode(self._chart_cfg)
+        self._progression_x_mode = _effective_progression_x_axis_mode(self._chart_cfg)
         self._time_axis_layout: Optional[GapCompressedTimeLayout] = None
         _pls_mq = str(self._chart_cfg.get("progression_line_style", "smooth")).strip().lower()
         self._progression_line_smooth = _pls_mq in ("smooth", "bezier", "curve", "curved")
@@ -1937,6 +2022,24 @@ class MoveQualityOverTimeChartWidget(QWidget):
                 x = left + (pct / 100.0 * graph_width)
                 painter.setPen(QPen(self.grid_color, 1))
                 painter.drawLine(int(x), int(top), int(x), int(bottom))
+
+        if (
+            self._progression_x_mode == "gap_compressed"
+            and self._time_axis_layout is not None
+            and self._x_axis_calendar_enabled
+        ):
+            _paint_gap_compressed_span_markers(
+                painter,
+                self._time_axis_layout,
+                left,
+                top,
+                bottom,
+                graph_width,
+                self._ordinal_min,
+                self._ordinal_max,
+                self._gap_compression_marker_color,
+                self._gap_compression_marker_width,
+            )
 
         painter.setPen(self.text_color)
         adaptive_font_size = max(
@@ -2691,9 +2794,28 @@ class DetailPlayerStatsView(QWidget):
         self._updating_visibility = False  # Re-entrancy guard for visibility updates
         self._building_content = False  # True while building stats content (skip resize-driven updates)
         self._pending_stats_content_rebuild = False  # Coalesce rebuilds if re-entered via processEvents while building
-        
+        self._ps_ts_context_menu_controller: Optional["PlayerStatsTimeSeriesMenuController"] = None
+
+        from app.services.user_settings_service import UserSettingsService
+
+        UserSettingsService.get_instance().get_model().player_stats_time_series_changed.connect(
+            self._on_player_stats_time_series_settings_changed
+        )
+
         # Event filter will be installed on scroll_area in _setup_ui
-    
+
+    def _on_player_stats_time_series_settings_changed(self) -> None:
+        if not self.current_stats:
+            return
+        from app.services.player_stats_service import apply_player_stats_time_series_binning
+        from app.services.user_settings_service import UserSettingsService
+
+        usr = UserSettingsService.get_instance().get_model().get_player_stats_time_series()
+        apply_player_stats_time_series_binning(self.current_stats, self.config, usr)
+        if self._ps_ts_context_menu_controller is not None:
+            self._ps_ts_context_menu_controller.sync_from_settings()
+        QTimer.singleShot(0, self._deferred_build_stats_content)
+
     def cleanup(self) -> None:
         """Clean up resources when view is being destroyed."""
         # Controller handles worker cleanup
@@ -3291,6 +3413,13 @@ class DetailPlayerStatsView(QWidget):
         ui_config = self.config.get('ui', {})
         panel_config = ui_config.get('panels', {}).get('detail', {})
         player_stats_config = panel_config.get('player_stats', {})
+        from app.services.player_stats_time_series_user import player_stats_block_with_time_series_overrides
+        from app.services.user_settings_service import UserSettingsService
+
+        effective_player_stats = player_stats_block_with_time_series_overrides(
+            player_stats_config,
+            UserSettingsService.get_instance().get_model().get_player_stats_time_series(),
+        )
         colors_config = player_stats_config.get('colors', {})
         fonts_config = player_stats_config.get('fonts', {})
         layout_config = player_stats_config.get('layout', {})
@@ -3437,7 +3566,7 @@ class DetailPlayerStatsView(QWidget):
 
         over_time_cfg = player_stats_config.get("accuracy_over_time_chart", {})
         over_time_merged = merged_player_stats_time_series_chart_cfg(
-            player_stats_config, "accuracy_over_time_chart"
+            effective_player_stats, "accuracy_over_time_chart"
         )
         over_time_series = getattr(stats, "accuracy_over_time", None) or []
         if (
@@ -3459,7 +3588,9 @@ class DetailPlayerStatsView(QWidget):
             )
             _configure_player_stats_trend_subcaption_label(sub)
             ot_layout.addWidget(sub)
-            ot_chart = AccuracyOverTimeChartWidget(self.config)
+            ot_chart = AccuracyOverTimeChartWidget(
+                self.config, player_stats_detail_override=effective_player_stats
+            )
             ot_chart.set_data(
                 list(over_time_series),
                 int(getattr(stats, "trends_ordinal_min", 0)),
@@ -3476,7 +3607,7 @@ class DetailPlayerStatsView(QWidget):
 
         mq_cfg = player_stats_config.get("move_quality_over_time_chart", {})
         mq_merged = merged_player_stats_time_series_chart_cfg(
-            player_stats_config, "move_quality_over_time_chart"
+            effective_player_stats, "move_quality_over_time_chart"
         )
         mq_bins = getattr(stats, "move_quality_over_time", None) or []
         mq_ids = getattr(stats, "move_quality_series_ids", None) or []
@@ -3503,7 +3634,9 @@ class DetailPlayerStatsView(QWidget):
             )
             _configure_player_stats_trend_subcaption_label(mq_sub)
             mq_layout.addWidget(mq_sub)
-            mq_chart = MoveQualityOverTimeChartWidget(self.config)
+            mq_chart = MoveQualityOverTimeChartWidget(
+                self.config, player_stats_detail_override=effective_player_stats
+            )
             mq_chart.set_data(
                 list(mq_bins),
                 list(getattr(stats, "move_quality_series_labels", None) or []),
@@ -3522,7 +3655,7 @@ class DetailPlayerStatsView(QWidget):
 
         ap_cfg = player_stats_config.get("acpl_phase_over_time_chart", {})
         ap_merged = merged_player_stats_time_series_chart_cfg(
-            player_stats_config, "acpl_phase_over_time_chart"
+            effective_player_stats, "acpl_phase_over_time_chart"
         )
         ap_bins = getattr(stats, "acpl_phase_over_time", None) or []
         ap_ids = getattr(stats, "acpl_phase_series_ids", None) or []
@@ -3551,7 +3684,11 @@ class DetailPlayerStatsView(QWidget):
             )
             _configure_player_stats_trend_subcaption_label(ap_sub)
             ap_layout.addWidget(ap_sub)
-            ap_chart = MoveQualityOverTimeChartWidget(self.config, chart_style="acpl_phase")
+            ap_chart = MoveQualityOverTimeChartWidget(
+                self.config,
+                chart_style="acpl_phase",
+                player_stats_detail_override=effective_player_stats,
+            )
             ap_chart.set_data(
                 list(ap_bins),
                 list(getattr(stats, "acpl_phase_series_labels", None) or []),
@@ -6508,6 +6645,22 @@ class DetailPlayerStatsView(QWidget):
             self._resize_debounce_timer.start(self._resize_debounce_ms)
         return super().eventFilter(obj, event)
     
+    def _ensure_player_stats_time_series_context_menu_controller(self) -> None:
+        if self._ps_ts_context_menu_controller is not None:
+            return
+        from app.views.player_stats_time_series_menu import PlayerStatsTimeSeriesMenuController
+        from app.views.style import StyleManager
+
+        def _style_ts_submenu(m: QMenu) -> None:
+            ui_config = self.config.get("ui", {})
+            panel_config = ui_config.get("panels", {}).get("detail", {})
+            ps_cfg = panel_config.get("player_stats", {})
+            colors_config = ps_cfg.get("colors", {})
+            bg_color = colors_config.get("background", [40, 40, 45])
+            StyleManager.style_context_menu(m, self.config, bg_color)
+
+        self._ps_ts_context_menu_controller = PlayerStatsTimeSeriesMenuController(self, _style_ts_submenu)
+
     def contextMenuEvent(self, event: QContextMenuEvent) -> None:
         """Handle context menu event for copying sections or full stats.
         
@@ -6581,6 +6734,14 @@ class DetailPlayerStatsView(QWidget):
         
         copy_full_action = menu.addAction("Copy stats to clipboard")
         copy_full_action.triggered.connect(self._copy_full_stats_to_clipboard)
+
+        from app.views.player_stats_time_series_menu import PLAYER_STATS_TIME_SERIES_CONTEXT_SECTIONS
+
+        if section_name and section_name in PLAYER_STATS_TIME_SERIES_CONTEXT_SECTIONS:
+            menu.addSeparator()
+            self._ensure_player_stats_time_series_context_menu_controller()
+            assert self._ps_ts_context_menu_controller is not None
+            self._ps_ts_context_menu_controller.append_to_context_menu(menu)
 
         # When right-clicking inside the opening tree, offer expand/collapse actions
         if click_in_opening_tree and self._opening_tree_widget is not None:

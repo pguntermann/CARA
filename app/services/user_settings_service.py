@@ -539,6 +539,10 @@ class UserSettingsService:
         """
         self.get_model().set_player_stats_section_visibility(visibility)
 
+    def update_player_stats_time_series(self, partial: Dict[str, Any]) -> None:
+        """Merge keys into Player Stats time-series user settings (binning / chart display)."""
+        self.get_model().update_player_stats_time_series(partial)
+
     def update_engines(self, engines: list) -> None:
         """Update engine list.
         

@@ -32,6 +32,7 @@ from app.views.about_dialog import AboutDialog
 from app.views.inline_content_dialog import InlineContentDialog
 from app.views.message_dialog import MessageDialog
 from app.views.confirmation_dialog import ConfirmationDialog
+from app.views.player_stats_time_series_menu import PlayerStatsTimeSeriesMenuController
 from app.controllers.app_controller import AppController
 from app.input.shortcut_manager import ShortcutManager
 from app.models.column_profile_model import DEFAULT_PROFILE_NAME
@@ -902,16 +903,43 @@ class MainWindow(QMainWindow):
         ps_menu.addAction(disable_all_ps)
         ps_menu.addSeparator()
         vis = UserSettingsService.get_instance().get_model().get_player_stats_section_visibility()
-        for section_id, label in PLAYER_STATS_MENU_SECTIONS:
-            act = QAction(label, self)
-            act.setCheckable(True)
-            act.setMenuRole(QAction.MenuRole.NoRole)
-            act.setChecked(bool(vis.get(section_id, True)))
-            act.triggered.connect(
-                lambda checked, sid=section_id: self._on_player_stats_section_menu_toggled(sid, checked)
-            )
-            ps_menu.addAction(act)
-            self._player_stats_section_actions[section_id] = act
+        sections = list(PLAYER_STATS_MENU_SECTIONS)
+        idx_acpl = next(i for i, (sid, _) in enumerate(sections) if sid == "acpl_phase_progression")
+
+        def _add_player_stats_section_visibility_actions(pairs: list) -> None:
+            for section_id, label in pairs:
+                if section_id == "accuracy_progression":
+                    ps_menu.addSeparator()
+                act = QAction(label, self)
+                act.setCheckable(True)
+                act.setMenuRole(QAction.MenuRole.NoRole)
+                act.setChecked(bool(vis.get(section_id, True)))
+                act.triggered.connect(
+                    lambda checked, sid=section_id: self._on_player_stats_section_menu_toggled(sid, checked)
+                )
+                ps_menu.addAction(act)
+                self._player_stats_section_actions[section_id] = act
+                if section_id == "endgame_tree":
+                    ps_menu.addSeparator()
+
+        _add_player_stats_section_visibility_actions(sections[: idx_acpl + 1])
+        self._setup_player_stats_time_series_submenu(ps_menu)
+        ps_menu.addSeparator()
+        _add_player_stats_section_visibility_actions(sections[idx_acpl + 1 :])
+
+    def _setup_player_stats_time_series_submenu(self, ps_menu: QMenu) -> None:
+        """Submenus for Player Stats date-based trend binning (shared logic in PlayerStatsTimeSeriesMenuController)."""
+        from app.services.user_settings_service import UserSettingsService
+
+        self._ps_ts_menu_controller = PlayerStatsTimeSeriesMenuController(self, self._apply_menu_styling)
+        self.player_stats_time_series_menu = self._ps_ts_menu_controller.attach_to_parent_menu(ps_menu)
+        UserSettingsService.get_instance().get_model().player_stats_time_series_changed.connect(
+            self._ps_ts_menu_controller.sync_from_settings
+        )
+
+    def _sync_player_stats_time_series_menu_from_settings(self) -> None:
+        if hasattr(self, "_ps_ts_menu_controller"):
+            self._ps_ts_menu_controller.sync_from_settings()
 
     def _on_player_stats_section_menu_toggled(self, section_id: str, checked: bool) -> None:
         view = getattr(getattr(self, "detail_panel", None), "player_stats_view", None)
@@ -4817,6 +4845,9 @@ Visibility Settings:
             psv = getattr(self.detail_panel, "player_stats_view", None)
             if psv:
                 psv.reload_player_stats_section_prefs_from_settings()
+
+        if hasattr(self, "_sync_player_stats_time_series_menu_from_settings"):
+            self._sync_player_stats_time_series_menu_from_settings()
 
         # First-run welcome message: only set a pending flag here.
         # The actual dialog is shown in `showEvent()` so the main window

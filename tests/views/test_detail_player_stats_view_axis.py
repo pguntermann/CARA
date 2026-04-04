@@ -4,7 +4,7 @@ from datetime import date
 
 from app.views.detail_player_stats_view import (
     _build_gap_compressed_time_layout,
-    _coerce_progression_x_axis_mode,
+    _effective_progression_x_axis_mode,
     _plot_x_uniform_bin_index,
     _x_axis_week_minors_in_month_mode,
 )
@@ -21,6 +21,17 @@ def test_x_axis_week_minors_in_month_mode_config_overrides() -> None:
     assert _x_axis_week_minors_in_month_mode({"x_axis_week_minor_max_calendar_span_days": 300}, 200, True) is True
 
 
+def test_gap_compressed_layout_records_compressed_segment_boundaries() -> None:
+    o0 = date(2024, 1, 1).toordinal()
+    c1 = o0 + 5
+    c2 = o0 + 95
+    o1 = o0 + 100
+    layout = _build_gap_compressed_time_layout(o0, o1, [c1, c2], max_segment_calendar_days=15)
+    assert layout is not None
+    b = layout.compressed_span_boundary_ordinals
+    assert c1 in b and c2 in b
+
+
 def test_gap_compressed_layout_uses_less_width_for_long_calendar_gaps() -> None:
     """Long spans without bins get capped weight vs. linear calendar X."""
     o0 = date(2024, 1, 1).toordinal()
@@ -34,10 +45,11 @@ def test_gap_compressed_layout_uses_less_width_for_long_calendar_gaps() -> None:
     assert disp_gap_frac < cal_gap_frac
 
 
-def test_coerce_progression_x_axis_mode_defaults() -> None:
-    assert _coerce_progression_x_axis_mode({}) == "uniform_bins"
-    assert _coerce_progression_x_axis_mode({"compress_time_axis_gaps": False}) == "calendar_linear"
-    assert _coerce_progression_x_axis_mode({"progression_x_axis_mode": "gap_compressed"}) == "gap_compressed"
+def test_effective_progression_x_axis_mode() -> None:
+    assert _effective_progression_x_axis_mode({}) == "uniform_bins"
+    assert _effective_progression_x_axis_mode({"progression_x_axis_mode": "gap_compressed"}) == "gap_compressed"
+    assert _effective_progression_x_axis_mode({"progression_x_axis_mode": "calendar_linear"}) == "calendar_linear"
+    assert _effective_progression_x_axis_mode({"progression_x_axis_mode": "unknown"}) == "uniform_bins"
 
 
 def test_plot_x_uniform_bin_index_even_spacing() -> None:

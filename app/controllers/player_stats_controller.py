@@ -18,6 +18,7 @@ from app.services.progress_service import ProgressService
 from app.controllers.game_controller import GameController
 from app.services.logging_service import LoggingService
 from app.services.opening_service import OpeningService
+from app.services.user_settings_service import UserSettingsService
 
 # Sentinel: use callback / default resolution for selected-games snapshot (see _schedule_dropdown_update).
 _DEFAULT_SELECTION_GAMES = object()
@@ -160,6 +161,7 @@ class PlayerStatsCalculationWorker(QThread):
         player_name: str,
         use_all_databases: bool,
         player_games: Optional[List["GameData"]] = None,
+        time_series_user_settings: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Initialize the stats calculation worker.
 
@@ -168,12 +170,16 @@ class PlayerStatsCalculationWorker(QThread):
             player_name: Player name to analyze.
             use_all_databases: Whether to use all databases or just active (ignored if player_games is set).
             player_games: If set, use this list for the player's games instead of querying databases.
+            time_series_user_settings: Snapshot of user time-series prefs (main thread) for binning.
         """
         super().__init__()
         self.stats_controller = stats_controller
         self.player_name = player_name
         self.use_all_databases = use_all_databases
         self.player_games = player_games  # Optional; when set, already filtered to this player
+        self._time_series_user_settings: Dict[str, Any] = (
+            dict(time_series_user_settings) if time_series_user_settings else {}
+        )
         self._cancelled = False
         self._mutex = QMutex()
     
@@ -259,7 +265,12 @@ class PlayerStatsCalculationWorker(QThread):
                 return self._is_cancelled()
             
             aggregated_stats, game_summaries = self.stats_controller.player_stats_service.aggregate_player_statistics(
-                self.player_name, analyzed_games, self.stats_controller._game_controller, progress_callback, cancellation_check
+                self.player_name,
+                analyzed_games,
+                self.stats_controller._game_controller,
+                progress_callback,
+                cancellation_check,
+                time_series_user_settings=self._time_series_user_settings,
             )
             
             if self._is_cancelled():
@@ -1395,11 +1406,13 @@ class PlayerStatsController(QObject):
                     logging_service = LoggingService.get_instance()
                     logging_service.error(f"Error getting selected games for stats: {e}", exc_info=e)
 
+        ts_user = UserSettingsService.get_instance().get_model().get_player_stats_time_series()
         self._stats_worker = PlayerStatsCalculationWorker(
             self,
             self._current_player,
             self._use_all_databases,
             player_games=player_games_arg,
+            time_series_user_settings=ts_user,
         )
         self._stats_worker.stats_ready.connect(self._on_stats_worker_ready)
         self._stats_worker.stats_unavailable.connect(self._on_stats_worker_unavailable)

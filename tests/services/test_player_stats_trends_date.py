@@ -5,6 +5,7 @@ from datetime import date
 from app.services.player_stats_service import (
     _accuracy_series_equal_ordinal_width_bins,
     _accuracy_series_ordinal_quantile_bins,
+    _bin_accuracy_over_time_from_samples,
     _game_date_ordinal_for_trends,
     _game_date_to_ordinal,
     _ordinal_target_bin_count,
@@ -24,6 +25,27 @@ def test_game_date_ordinal_for_trends_accepts_partial() -> None:
     assert _game_date_ordinal_for_trends("2024.06.??") == date(2024, 6, 15).toordinal()
     assert _game_date_ordinal_for_trends("2024.??.??") == date(2024, 7, 1).toordinal()
     assert _game_date_ordinal_for_trends("????.??.??") is None
+
+
+def test_bin_accuracy_respects_target_progression_bins() -> None:
+    o0 = date(2025, 1, 1).toordinal()
+    o1 = date(2025, 6, 1).toordinal()
+    samples = [(o0 + i * 3, 50.0 + float(i), True) for i in range(40)]
+    base_cfg = {
+        "enabled": True,
+        "min_games_with_full_date": 4,
+        "min_span_days": 0,
+        "min_populated_bins": 1,
+        "target_progression_bins": 8,
+        "max_ordinal_bins": 120,
+        "min_games_per_ordinal_bin": 1,
+        "ordinal_fallback_mode": "quantile",
+        "subcaption_template": "{dated} / {analyzed}",
+    }
+    a8, *_ = _bin_accuracy_over_time_from_samples(samples, dict(base_cfg), analyzed_count=40)
+    base_cfg["target_progression_bins"] = 16
+    a16, *_ = _bin_accuracy_over_time_from_samples(samples, dict(base_cfg), analyzed_count=40)
+    assert len(a8) <= len(a16)
 
 
 def test_merged_time_series_chart_cfg_precedence() -> None:

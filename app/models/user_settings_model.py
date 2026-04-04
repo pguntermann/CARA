@@ -22,7 +22,8 @@ class UserSettingsModel(QObject):
     manual_analysis_changed = pyqtSignal()  # Emitted when manual analysis settings change
     annotations_changed = pyqtSignal()  # Emitted when annotation settings change
     ai_settings_changed = pyqtSignal()  # Emitted when AI settings change
-    
+    player_stats_time_series_changed = pyqtSignal()  # Player Stats time-series binning / display prefs
+
     def __init__(self, settings: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the user settings model.
         
@@ -304,9 +305,6 @@ class UserSettingsModel(QObject):
         for k, v in raw.items():
             if isinstance(v, bool):
                 out[str(k)] = v
-        # Renamed section: former "Top move progression" merged into "Move quality progression".
-        if "move_quality_progression" not in out and isinstance(raw.get("top_move_progression"), bool):
-            out["move_quality_progression"] = bool(raw["top_move_progression"])
         return out
 
     def set_player_stats_section_visibility(self, visibility: Dict[str, bool]) -> None:
@@ -319,6 +317,27 @@ class UserSettingsModel(QObject):
         cur = self.get_player_stats_section_visibility()
         cur[str(section_id)] = bool(visible)
         self.set_player_stats_section_visibility(cur)
+
+    def get_player_stats_time_series(self) -> Dict[str, Any]:
+        """User overrides for Player Stats date-based trend charts (merged over app config time_series)."""
+        from app.services.player_stats_time_series_user import normalize_player_stats_time_series_settings
+
+        raw = self._settings.get("player_stats_time_series")
+        return normalize_player_stats_time_series_settings(raw if isinstance(raw, dict) else None)
+
+    def set_player_stats_time_series(self, settings: Dict[str, Any]) -> None:
+        """Replace stored Player Stats time-series user settings."""
+        from app.services.player_stats_time_series_user import normalize_player_stats_time_series_settings
+
+        self._settings["player_stats_time_series"] = normalize_player_stats_time_series_settings(settings)
+        self.player_stats_time_series_changed.emit()
+        self.settings_changed.emit()
+
+    def update_player_stats_time_series(self, partial: Dict[str, Any]) -> None:
+        """Merge keys into Player Stats time-series settings."""
+        cur = self.get_player_stats_time_series()
+        cur.update(partial)
+        self.set_player_stats_time_series(cur)
 
     def update_from_dict(self, settings: Dict[str, Any]) -> None:
         """Update settings from a dictionary (used when loading from file).

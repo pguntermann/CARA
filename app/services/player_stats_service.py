@@ -17,6 +17,7 @@ from app.services.game_summary_service import GameSummary, PlayerStatistics, Pha
 from app.controllers.game_controller import GameController
 from app.services.logging_service import LoggingService, init_worker_logging
 from app.utils.concurrency_utils import get_process_pool_max_workers
+from app.services.player_stats_time_series_user import player_stats_block_with_time_series_overrides
 
 
 def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, game_black: str,
@@ -741,10 +742,24 @@ def _parse_move_quality_progression_series_config(chart_cfg: Dict[str, Any]) -> 
     return out
 
 
-def _build_accuracy_over_time_series(
+def _collect_move_quality_trend_samples(
     game_results: List[Dict[str, Any]],
     analyzed_games: List[GameData],
-    config: Dict[str, Any],
+    stat_ids: List[str],
+) -> List[Tuple[int, Tuple[float, ...]]]:
+    dated = _collect_trends_dated_player_stats(game_results, analyzed_games)
+    samples_vec: List[Tuple[int, Tuple[float, ...]]] = []
+    for ord_val, gs in dated:
+        vec = _player_move_quality_progression_pct_vector(gs, stat_ids)
+        if vec is None:
+            continue
+        samples_vec.append((ord_val, vec))
+    return samples_vec
+
+
+def _bin_accuracy_over_time_from_samples(
+    samples: List[Tuple[int, float, bool]],
+    chart_cfg: Dict[str, Any],
     analyzed_count: int,
 ) -> Tuple[
     List[Tuple[float, float, float, float, int, str, str]],
@@ -753,29 +768,13 @@ def _build_accuracy_over_time_series(
     int,
     str,
 ]:
-    """Median accuracy over time using ``target_progression_bins`` (quantile or equal-width; see config).
-
-    Uses ``GameData.date`` and per-game stats from ``game_results``. X positions follow real dates;
-    ``calendar_mode`` is left empty so the axis picks tick density from the date span.
-
-    Returns:
-        (series, subcaption, ordinal_min, ordinal_max, calendar_mode).
-        Series tuples: (time_pct, median_all, median_white, median_black, count, lab0, lab1).
-    """
-    ui = config.get("ui", {})
-    detail = ui.get("panels", {}).get("detail", {})
-    ps = detail.get("player_stats", {})
-    chart_cfg = merged_player_stats_time_series_chart_cfg(ps, "accuracy_over_time_chart")
+    """Bin dated accuracy samples using ``chart_cfg`` (merged time_series + accuracy chart)."""
     if not chart_cfg.get("enabled", True):
         return [], "", 0, 0, ""
 
     min_games = int(chart_cfg.get("min_games_with_full_date", 4))
     min_span_days = int(chart_cfg.get("min_span_days", 14))
     min_populated_bins = int(chart_cfg.get("min_populated_bins", 1))
-
-    samples: List[Tuple[int, float, bool]] = _collect_trends_dated_accuracy_with_color(
-        game_results, analyzed_games
-    )
 
     dated_count = len(samples)
     template = str(
@@ -818,10 +817,11 @@ def _build_accuracy_over_time_series(
     return series, subcaption, ord_lo, ord_hi, mode
 
 
-def _build_move_quality_over_time_series(
-    game_results: List[Dict[str, Any]],
-    analyzed_games: List[GameData],
-    config: Dict[str, Any],
+def _bin_move_quality_over_time_from_samples(
+    samples_vec: List[Tuple[int, Tuple[float, ...]]],
+    labels: List[str],
+    stat_ids: List[str],
+    chart_cfg: Dict[str, Any],
     analyzed_count: int,
 ) -> Tuple[
     List[Tuple[float, int, str, str, Tuple[float, ...]]],
@@ -832,38 +832,15 @@ def _build_move_quality_over_time_series(
     int,
     str,
 ]:
-    """Median best-move %, top-3 %, and blunder % vs game date (``target_progression_bins`` binning).
-
-    Returns:
-        (bins, series_labels, series_ids, subcaption, ordinal_min, ordinal_max, calendar_mode).
-        Each bin: (time_pct, games_in_bin, start_iso, end_iso, (median_pct per series)).
-    """
-    ui = config.get("ui", {})
-    detail = ui.get("panels", {}).get("detail", {})
-    ps = detail.get("player_stats", {})
-    chart_cfg = merged_player_stats_time_series_chart_cfg(ps, "move_quality_over_time_chart")
-    mq_block = ps.get("move_quality_over_time_chart", {})
-    if not mq_block.get("enabled", True):
+    if not chart_cfg.get("enabled", True):
         return [], [], [], "", 0, 0, ""
 
-    series_defs = _parse_move_quality_progression_series_config(chart_cfg)
-    if not series_defs:
+    if not stat_ids or not labels or len(labels) != len(stat_ids):
         return [], [], [], "", 0, 0, ""
-
-    stat_ids = [s for s, _ in series_defs]
-    labels = [lb for _, lb in series_defs]
 
     min_games = int(chart_cfg.get("min_games_with_full_date", 4))
     min_span_days = int(chart_cfg.get("min_span_days", 14))
     min_populated_bins = int(chart_cfg.get("min_populated_bins", 1))
-
-    dated = _collect_trends_dated_player_stats(game_results, analyzed_games)
-    samples_vec: List[Tuple[int, Tuple[float, ...]]] = []
-    for ord_val, gs in dated:
-        vec = _player_move_quality_progression_pct_vector(gs, stat_ids)
-        if vec is None:
-            continue
-        samples_vec.append((ord_val, vec))
 
     dated_count = len(samples_vec)
     template = str(
@@ -875,14 +852,14 @@ def _build_move_quality_over_time_series(
     subcaption = template.format(dated=dated_count, analyzed=analyzed_count)
 
     if dated_count < min_games:
-        return [], [], [], subcaption, 0, 0, ""
+        return [], labels, stat_ids, subcaption, 0, 0, ""
 
     ordinals = [s[0] for s in samples_vec]
     t_min = min(ordinals)
     t_max = max(ordinals)
     span_days = t_max - t_min
     if span_days > 0 and span_days < min_span_days:
-        return [], [], [], subcaption, 0, 0, ""
+        return [], labels, stat_ids, subcaption, 0, 0, ""
 
     n_series = len(stat_ids)
     nqb = _ordinal_target_bin_count(chart_cfg, len(samples_vec))
@@ -898,7 +875,7 @@ def _build_move_quality_over_time_series(
         subcaption = f"{subcaption} {suf}"
 
     if len(bins_out) < min_populated_bins:
-        return [], [], [], subcaption, 0, 0, ""
+        return [], labels, stat_ids, subcaption, 0, 0, ""
 
     bins_out.sort(key=lambda x: x[0])
     ord_lo, ord_hi = t_min, t_max
@@ -907,10 +884,9 @@ def _build_move_quality_over_time_series(
     return bins_out, labels, stat_ids, subcaption, ord_lo, ord_hi, mode
 
 
-def _build_acpl_phase_over_time_series(
-    game_results: List[Dict[str, Any]],
-    analyzed_games: List[GameData],
-    config: Dict[str, Any],
+def _bin_acpl_phase_over_time_from_samples(
+    samples_vec: List[Tuple[int, Tuple[Optional[float], Optional[float], Optional[float]]]],
+    chart_cfg: Dict[str, Any],
     analyzed_count: int,
 ) -> Tuple[
     List[Tuple[float, int, str, str, Tuple[float, ...]]],
@@ -921,26 +897,16 @@ def _build_acpl_phase_over_time_series(
     int,
     str,
 ]:
-    """Median phase ACPL over time; same progression binning as accuracy (``target_progression_bins``).
-
-    Missing phase in a bin yields ``nan`` for that series at that bin.
-    """
-    ui = config.get("ui", {})
-    detail = ui.get("panels", {}).get("detail", {})
-    ps = detail.get("player_stats", {})
-    chart_cfg = _merge_acpl_phase_chart_cfg(ps)
-    ap_block = ps.get("acpl_phase_over_time_chart", {})
-    if not ap_block.get("enabled", True):
-        return [], [], [], "", 0, 0, ""
-
     labels = ["Opening", "Middlegame", "Endgame"]
     stat_ids = ["opening", "middlegame", "endgame"]
+
+    if not chart_cfg.get("enabled", True):
+        return [], [], [], "", 0, 0, ""
 
     min_games = int(chart_cfg.get("min_games_with_full_date", 4))
     min_span_days = int(chart_cfg.get("min_span_days", 14))
     min_populated_bins = int(chart_cfg.get("min_populated_bins", 1))
 
-    samples_vec = _collect_trends_dated_phase_acpl_triples(game_results, analyzed_games)
     dated_count = len(samples_vec)
     template = str(
         chart_cfg.get(
@@ -951,14 +917,14 @@ def _build_acpl_phase_over_time_series(
     subcaption = template.format(dated=dated_count, analyzed=analyzed_count)
 
     if dated_count < min_games:
-        return [], [], [], subcaption, 0, 0, ""
+        return [], labels, stat_ids, subcaption, 0, 0, ""
 
     ordinals = [s[0] for s in samples_vec]
     t_min = min(ordinals)
     t_max = max(ordinals)
     span_days = t_max - t_min
     if span_days > 0 and span_days < min_span_days:
-        return [], [], [], subcaption, 0, 0, ""
+        return [], labels, stat_ids, subcaption, 0, 0, ""
 
     nqb = _ordinal_target_bin_count(chart_cfg, len(samples_vec))
     use_tight_quantile_axis = False
@@ -973,7 +939,7 @@ def _build_acpl_phase_over_time_series(
         subcaption = f"{subcaption} {suf}"
 
     if len(bins_out) < min_populated_bins:
-        return [], [], [], subcaption, 0, 0, ""
+        return [], labels, stat_ids, subcaption, 0, 0, ""
 
     bins_out.sort(key=lambda x: x[0])
 
@@ -992,6 +958,60 @@ def _build_acpl_phase_over_time_series(
     if bins_out and use_tight_quantile_axis:
         ord_lo, ord_hi = _trend_axis_ordinals_for_quantile_bins([(r[2], r[3]) for r in bins_out], t_min, t_max)
     return bins_out, labels, stat_ids, subcaption, ord_lo, ord_hi, mode
+
+
+def apply_player_stats_time_series_binning(
+    stats: "AggregatedPlayerStats",
+    app_config: Dict[str, Any],
+    user_ts: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Recompute binned time-series fields on ``stats`` from raw samples and merged user overrides."""
+    detail = app_config.get("ui", {}).get("panels", {}).get("detail", {})
+    ps_orig = detail.get("player_stats", {})
+    ps_eff = player_stats_block_with_time_series_overrides(ps_orig, user_ts or {})
+    analyzed_count = int(stats.ts_raw_analyzed_game_count)
+
+    acc_cfg = merged_player_stats_time_series_chart_cfg(ps_eff, "accuracy_over_time_chart")
+    over_time, trends_sub, ord_min, ord_max, trends_cal_mode = _bin_accuracy_over_time_from_samples(
+        list(stats.ts_raw_accuracy_samples),
+        acc_cfg,
+        analyzed_count,
+    )
+    stats.accuracy_over_time = over_time
+    stats.trends_subcaption = trends_sub
+    stats.trends_ordinal_min = ord_min
+    stats.trends_ordinal_max = ord_max
+    stats.trends_calendar_mode = trends_cal_mode
+
+    mq_cfg = merged_player_stats_time_series_chart_cfg(ps_eff, "move_quality_over_time_chart")
+    mq_bins, mq_labels, mq_ids, mq_sub, mq_omin, mq_omax, mq_cal_mode = _bin_move_quality_over_time_from_samples(
+        list(stats.ts_raw_move_quality_samples),
+        list(stats.ts_raw_move_quality_series_labels),
+        list(stats.ts_raw_move_quality_series_ids),
+        mq_cfg,
+        analyzed_count,
+    )
+    stats.move_quality_over_time = mq_bins
+    stats.move_quality_series_labels = mq_labels
+    stats.move_quality_series_ids = mq_ids
+    stats.move_quality_subcaption = mq_sub
+    stats.move_quality_ordinal_min = mq_omin
+    stats.move_quality_ordinal_max = mq_omax
+    stats.move_quality_calendar_mode = mq_cal_mode
+
+    ap_cfg = merged_player_stats_time_series_chart_cfg(ps_eff, "acpl_phase_over_time_chart")
+    ap_bins, ap_labels, ap_ids, ap_sub, ap_omin, ap_omax, ap_cal_mode = _bin_acpl_phase_over_time_from_samples(
+        list(stats.ts_raw_acpl_phase_samples),
+        ap_cfg,
+        analyzed_count,
+    )
+    stats.acpl_phase_over_time = ap_bins
+    stats.acpl_phase_series_labels = ap_labels
+    stats.acpl_phase_series_ids = ap_ids
+    stats.acpl_phase_subcaption = ap_sub
+    stats.acpl_phase_ordinal_min = ap_omin
+    stats.acpl_phase_ordinal_max = ap_omax
+    stats.acpl_phase_calendar_mode = ap_cal_mode
 
 
 @dataclass
@@ -1038,6 +1058,13 @@ class AggregatedPlayerStats:
     accuracy_by_endgame_type_grouped: List[
         Tuple[str, str, float, float, int, int, int, List[Tuple[str, str, float, float, int, int, int]]]
     ]
+    # Raw dated samples for time-series charts (filled during aggregation; binning uses user overrides).
+    ts_raw_analyzed_game_count: int
+    ts_raw_accuracy_samples: List[Tuple[int, float, bool]]
+    ts_raw_move_quality_samples: List[Tuple[int, Tuple[float, ...]]]
+    ts_raw_move_quality_series_ids: List[str]
+    ts_raw_move_quality_series_labels: List[str]
+    ts_raw_acpl_phase_samples: List[Tuple[int, Tuple[Optional[float], Optional[float], Optional[float]]]]
     # Median accuracy vs game date (binned). Empty if eligibility thresholds are not met.
     # Tuple: (time_pct, median_all, median_white, median_black, games_in_bin, lab0, lab1).
     # White/black medians are nan when that color has no games in the bin.
@@ -1113,10 +1140,15 @@ class PlayerStatsService:
         
         return (player_games, total_count)
     
-    def aggregate_player_statistics(self, player_name: str, games: List[GameData],
-                                   game_controller: Optional[GameController] = None,
-                                   progress_callback: Optional[Callable[[int, str], None]] = None,
-                                   cancellation_check: Optional[Callable[[], bool]] = None) -> Tuple[Optional[AggregatedPlayerStats], List[GameSummary]]:
+    def aggregate_player_statistics(
+        self,
+        player_name: str,
+        games: List[GameData],
+        game_controller: Optional[GameController] = None,
+        progress_callback: Optional[Callable[[int, str], None]] = None,
+        cancellation_check: Optional[Callable[[], bool]] = None,
+        time_series_user_settings: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Optional[AggregatedPlayerStats], List[GameSummary]]:
         """Aggregate statistics for a player across multiple games.
         
         Args:
@@ -1125,7 +1157,8 @@ class PlayerStatsService:
             game_controller: Optional GameController for extracting moves (used for fallback).
             progress_callback: Optional callback function(completed: int, status: str) for progress updates.
             cancellation_check: Optional function() -> bool to check if operation should be cancelled.
-            
+            time_series_user_settings: Optional user overrides for time-series binning (main-thread snapshot).
+
         Returns:
             Tuple of (AggregatedPlayerStats instance, List[GameSummary]) or (None, []) if no analyzed games found.
         """
@@ -1624,42 +1657,31 @@ class PlayerStatsService:
             )
         accuracy_by_endgame_type_grouped_list.sort(key=lambda x: x[4], reverse=True)
 
-        over_time, trends_sub, ord_min, ord_max, trends_cal_mode = _build_accuracy_over_time_series(
-            game_results,
-            analyzed_games,
-            self.config,
-            len(analyzed_games),
-        )
-        if not over_time:
-            ord_min = 0
-            ord_max = 0
-            trends_cal_mode = ""
+        ui_agg = self.config.get("ui", {})
+        detail_agg = ui_agg.get("panels", {}).get("detail", {})
+        ps_agg = detail_agg.get("player_stats", {})
 
-        mq_bins, mq_labels, mq_ids, mq_sub, mq_omin, mq_omax, mq_cal_mode = _build_move_quality_over_time_series(
-            game_results,
-            analyzed_games,
-            self.config,
-            len(analyzed_games),
-        )
-        if not mq_bins:
-            mq_omin = 0
-            mq_omax = 0
-            mq_cal_mode = ""
-            mq_labels = []
-            mq_ids = []
+        samples_acc = _collect_trends_dated_accuracy_with_color(game_results, analyzed_games)
 
-        ap_bins, ap_labels, ap_ids, ap_sub, ap_omin, ap_omax, ap_cal_mode = _build_acpl_phase_over_time_series(
-            game_results,
-            analyzed_games,
-            self.config,
-            len(analyzed_games),
-        )
-        if not ap_bins:
-            ap_omin = 0
-            ap_omax = 0
-            ap_cal_mode = ""
-            ap_labels = []
-            ap_ids = []
+        ts_raw_mq_samples: List[Tuple[int, Tuple[float, ...]]] = []
+        ts_raw_mq_ids: List[str] = []
+        ts_raw_mq_labels: List[str] = []
+        mq_block_agg = ps_agg.get("move_quality_over_time_chart", {})
+        if mq_block_agg.get("enabled", True):
+            chart_cfg_mq_agg = merged_player_stats_time_series_chart_cfg(ps_agg, "move_quality_over_time_chart")
+            series_defs_mq = _parse_move_quality_progression_series_config(chart_cfg_mq_agg)
+            if series_defs_mq:
+                ts_raw_mq_ids = [s for s, _ in series_defs_mq]
+                ts_raw_mq_labels = [lb for _, lb in series_defs_mq]
+                ts_raw_mq_samples = _collect_move_quality_trend_samples(
+                    game_results, analyzed_games, ts_raw_mq_ids
+                )
+
+        ap_block_agg = ps_agg.get("acpl_phase_over_time_chart", {})
+        if ap_block_agg.get("enabled", True):
+            samples_ap_raw = _collect_trends_dated_phase_acpl_triples(game_results, analyzed_games)
+        else:
+            samples_ap_raw = []
 
         aggregated_stats = AggregatedPlayerStats(
             total_games=total_games,
@@ -1690,28 +1712,40 @@ class PlayerStatsService:
             opponent_accuracy_by_progress=opponent_accuracy_by_progress_list,
             accuracy_by_endgame_type=accuracy_by_endgame_type_list,
             accuracy_by_endgame_type_grouped=accuracy_by_endgame_type_grouped_list,
-            accuracy_over_time=over_time,
-            trends_subcaption=trends_sub,
-            trends_ordinal_min=ord_min,
-            trends_ordinal_max=ord_max,
-            trends_calendar_mode=trends_cal_mode,
-            move_quality_over_time=mq_bins,
-            move_quality_series_labels=mq_labels,
-            move_quality_series_ids=mq_ids,
-            move_quality_subcaption=mq_sub,
-            move_quality_ordinal_min=mq_omin,
-            move_quality_ordinal_max=mq_omax,
-            move_quality_calendar_mode=mq_cal_mode,
-            acpl_phase_over_time=ap_bins,
-            acpl_phase_series_labels=ap_labels,
-            acpl_phase_series_ids=ap_ids,
-            acpl_phase_subcaption=ap_sub,
-            acpl_phase_ordinal_min=ap_omin,
-            acpl_phase_ordinal_max=ap_omax,
-            acpl_phase_calendar_mode=ap_cal_mode,
+            ts_raw_analyzed_game_count=len(analyzed_games),
+            ts_raw_accuracy_samples=samples_acc,
+            ts_raw_move_quality_samples=ts_raw_mq_samples,
+            ts_raw_move_quality_series_ids=ts_raw_mq_ids,
+            ts_raw_move_quality_series_labels=ts_raw_mq_labels,
+            ts_raw_acpl_phase_samples=samples_ap_raw,
+            accuracy_over_time=[],
+            trends_subcaption="",
+            trends_ordinal_min=0,
+            trends_ordinal_max=0,
+            trends_calendar_mode="",
+            move_quality_over_time=[],
+            move_quality_series_labels=[],
+            move_quality_series_ids=[],
+            move_quality_subcaption="",
+            move_quality_ordinal_min=0,
+            move_quality_ordinal_max=0,
+            move_quality_calendar_mode="",
+            acpl_phase_over_time=[],
+            acpl_phase_series_labels=[],
+            acpl_phase_series_ids=[],
+            acpl_phase_subcaption="",
+            acpl_phase_ordinal_min=0,
+            acpl_phase_ordinal_max=0,
+            acpl_phase_calendar_mode="",
         )
-        
+
+        apply_player_stats_time_series_binning(
+            aggregated_stats,
+            self.config,
+            time_series_user_settings,
+        )
+
         logging_service.debug(f"Completed player stats aggregation: player={player_name}, games={total_games}, wins={wins}, draws={draws}, losses={losses}, win_rate={win_rate:.1f}%")
-        
+
         return (aggregated_stats, game_summaries)
 
