@@ -147,8 +147,23 @@
                         </li>
                         <li><a href="#viewing-player-statistics">5.7 Viewing Player Statistics</a>
                             <ul>
-                                <li><a href="#selecting-player">5.7.1 Selecting a Player</a></li>
-                                <li><a href="#understanding-statistics">5.7.2 Understanding the Statistics</a></li>
+                                <li><a href="#ps-prerequisites">5.7.1 Prerequisites and data scope</a></li>
+                                <li><a href="#ps-sections-visibility">5.7.2 Showing and hiding sections</a></li>
+                                <li><a href="#ps-overview">5.7.3 Overview</a></li>
+                                <li><a href="#ps-activity-heatmap">5.7.4 Activity heatmap</a></li>
+                                <li><a href="#ps-accuracy-distribution">5.7.5 Accuracy distribution</a></li>
+                                <li><a href="#ps-move-accuracy">5.7.6 Move accuracy</a></li>
+                                <li><a href="#ps-performance-by-phase">5.7.7 Performance by phase</a></li>
+                                <li><a href="#ps-accuracy-vs-progress">5.7.8 Avg. accuracy over game duration</a></li>
+                                <li><a href="#ps-accuracy-progression">5.7.9 Accuracy progression</a></li>
+                                <li><a href="#ps-move-quality-progression">5.7.10 Move quality progression</a></li>
+                                <li><a href="#ps-acpl-phase-progression">5.7.11 ACPL progression by phase</a></li>
+                                <li><a href="#ps-openings">5.7.12 Openings</a></li>
+                                <li><a href="#ps-opening-tree">5.7.13 Opening tree</a></li>
+                                <li><a href="#ps-endgame-tree">5.7.14 Endgame tree</a></li>
+                                <li><a href="#ps-games-by-performance">5.7.15 Games by performance</a></li>
+                                <li><a href="#ps-significant-moves">5.7.16 Significant moves</a></li>
+                                <li><a href="#ps-error-patterns">5.7.17 Error patterns</a></li>
                             </ul>
                         </li>
                         <li><a href="#adding-annotations">5.8 Adding Annotations</a>
@@ -243,7 +258,7 @@
                     
                     <li><strong>Moves List:</strong> Centralized table view that encapsulates all important per-move information in one place. The moves list displays move notation, evaluations, move classifications, best move alternatives, Centipawn Loss (CPL) values, engine depth, material counts, FEN positions, and more across 32 available columns. The system features a flexible column profile management system, allowing you to create, save, and switch between different view profiles. Each profile can customize which columns are visible, their display order, and column widths, enabling you to tailor the view to your specific analysis needs—whether focusing on opening transitions, move assessment, or material tracking.</li>
                     
-                    <li><strong>Player Statistics:</strong> Aggregated performance and pattern analysis across multiple games for any selected player (from any or all open databases), including phase breakdown, opening and endgame trees, accuracy over game duration, optional accuracy progression by date, and error pattern detection. See <a href="#viewing-player-statistics">section 5.7</a> for details.</li>
+                    <li><strong>Player Statistics:</strong> A dedicated <strong>Player Stats</strong> tab aggregates results across many <em>analyzed</em> games for one player at a time: overview figures, an optional <strong>activity heatmap</strong> (when you played), accuracy and move-quality charts, date-based progression charts, openings and endgame summaries, best and worst games, significant moves, and automatic error-pattern hints. You can show or hide each section to tailor the page. See <a href="#viewing-player-statistics">section 5.7</a> for a full walkthrough.</li>
                     
                     <li><strong>Manual Analysis:</strong> Perform continuous engine analysis on any position with MultiPV support. You can navigate through game positions while maintaining continuous analysis of the current position. Hovering over principal variation moves displays a beautiful optional miniature board showing the resulting position. Positional plan exploration extracts piece trajectories from PV lines, visualizing how pieces move through the engine's recommended plan on the chessboard. You can explore positional plans for up to three PV lines (PV1, PV2, PV3) independently, with configurable options for the number of pieces to track and exploration depth.</li>
                     
@@ -911,34 +926,10 @@
                 </div>
                 
                 <h5 id="player-stats">4.5.5 Player Stats</h5>
-                <p>The Player Stats tab displays extensive aggregated statistics across multiple games for any selected player. Access this tab using <span class="menu-item">View → Player Stats</span> or press <code>F5</code>.</p>
-                
-                <p><strong>Data source:</strong> Use the Source dropdown at the top of the tab to choose which games the statistics are based on:</p>
-                <ul>
-                    <li><strong>None:</strong> No data; the view is empty.</li>
-                    <li><strong>Active Database:</strong> All games in the currently active database tab.</li>
-                    <li><strong>All Open Databases:</strong> All games from every open database.</li>
-                    <li><strong>Selected games (Active Database):</strong> Only the rows currently selected in the active database tab. Stats update when you change the selection.</li>
-                    <li><strong>Selected games (All Open Databases):</strong> Only the rows currently selected across all database tabs. Stats update when you change the selection.</li>
-                </ul>
-                <p><strong>Requirements:</strong> The view only shows players who have at least two analyzed games in the selected data source.</p>
-                
-                <img src="screenshots/player_stats.png" alt="CARA Player Stats View - Aggregated statistics showing overall performance, phase breakdown, opening analysis, error patterns, accuracy distribution, and top/worst games for a selected player" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
-                
-                <p><strong>Overall Performance:</strong> The system aggregates statistics from all analyzed games for the selected player, calculating overall performance metrics including accuracy, average Centipawn Loss, estimated ELO, win rate, and move classification distributions. Key performance indicators (KPIs) such as minimum and maximum CPL and minimum and maximum accuracy across games are also shown.</p>
-                
-                <p><strong>Accuracy Distribution:</strong> A chart shows how the player's accuracy is distributed across their games, helping you see whether performance is consistent or varies widely.</p>
-                
-                <p><strong>Top and Worst Games:</strong> A section lists the player's best and worst games by performance, so you can quickly open games where they played particularly well or poorly.</p>
-                
-                <p><strong>Phase Breakdown:</strong> The view breaks down performance by game phase (Opening, Middlegame, Endgame), showing how the player performs in different stages of play. This helps identify strengths and weaknesses in specific phases.</p>
-                
-                <p><strong>Opening Analysis:</strong> The system tracks opening usage and accuracy, identifying which openings the player plays most frequently and how well they perform in each opening.</p>
-                
-                <p><strong>Error Pattern Detection:</strong> The system automatically detects error patterns such as phase-specific blunder tendencies, opening-specific errors, consistently high Centipawn Loss, missed opportunities, and conversion issues in winning positions. For each pattern you can use the "View" option to open the matching games in a search tab.</p>
-                
-                <p><strong>Background Updates:</strong> The view updates asynchronously in the background when databases change, ensuring you always have current data without blocking the interface.</p>
-                <p><strong>Copying to clipboard:</strong> Right-click in the Player Stats view to open a context menu. You can copy the section you clicked on (e.g. Overall Performance, Phase Breakdown) or copy the full stats to the clipboard.</p>
+                <p>The <strong>Player Stats</strong> tab answers questions about a player across <em>many games</em> at once (not to be confused with <strong>Game Summary</strong>, which describes a single game). Open it with <span class="menu-item">View → Player Stats</span> or press <code>F5</code>.</p>
+                <p>In short: pick a <strong>Source</strong> (which set of games to use) and a <strong>player</strong>. Only players with at least <strong>two analyzed games</strong> in that source appear in the list, because the figures are meant to reflect a pattern rather than a single outing.</p>
+                <p>The page is made of separate <strong>sections</strong> you can turn on or off; several charts offer their own display options. For prerequisites, every section, chart interactions (such as opening games from a heatmap or a pattern), and settings in everyday language, read <a href="#viewing-player-statistics">section 5.7 Viewing Player Statistics</a>.</p>
+                <img src="screenshots/player_stats_getting_started.png" alt="CARA Player Stats tab — Source and player selection at the top; scrollable sections below" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
                 <h5 id="annotations">4.5.6 Annotations</h5>
                 <p>The Annotations tab provides tools for creating and managing custom CARA annotations on the chessboard. Unlike regular PGN annotations, CARA annotations include free-form text that can be positioned anywhere on the board, adjusted in size and rotated.</p>
@@ -1508,50 +1499,220 @@
 
             <div class="outline-item">
                 <h4 id="viewing-player-statistics">5.7 Viewing Player Statistics</h4>
-                <p>The Player Stats tab provides aggregated statistics across multiple games for any selected player, helping you identify patterns, strengths, and weaknesses in a player's performance. Access this tab using <span class="menu-item">View → Player Stats</span> or press <code>F5</code>.</p>
-                
-                <img src="screenshots/player_stats.png" alt="CARA Player Stats View - Aggregated statistics showing overall performance, phase breakdown, opening analysis, and error patterns for a selected player" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
-                
-                <h5 id="selecting-player">5.7.1 Selecting a Player</h5>
-                <p>To view statistics for a player:</p>
-                <ol>
-                    <li><strong>Choose data source:</strong><br>
-                    Use the Source dropdown to select where the statistics come from: None, Active Database, All Open Databases, Selected games (Active Database), or Selected games (All Open Databases). With "Selected games", statistics are based on the rows currently selected in the database table and update when you change the selection.</li>
-                    
-                    <li><strong>Select a player:</strong><br>
-                    Use the player dropdown to select a player. The dropdown shows each player's name along with the number of analyzed games and total games (e.g., "Player Name (15 analyzed, 20 total)").</li>
-                </ol>
-                
+                <p>The <strong>Player Stats</strong> tab helps you see how a player tends to perform across many games: habits over time, typical accuracy, weak spots, played opening variants, and much more. Open it with <span class="menu-item">View → Player Stats</span> or <code>F5</code>.</p>
                 <div class="tip-box">
-                    <strong>Quick Tip:</strong> The selected data source must contain at least 2 analyzed games for a player for that player to appear in the dropdown. This ensures that statistics are meaningful and based on sufficient data.
+                    <strong>Quick Tip:</strong> Right-click a section to copy just that section or the full stats text.
                 </div>
-                
-                <h5 id="understanding-statistics">5.7.2 Understanding the Statistics</h5>
-                <p>Once a player is selected, the view displays comprehensive aggregated statistics:</p>
+                <p>The view refreshes automatically in the background if your chosen data source changes.</p>
+
+                <h5 id="ps-prerequisites">5.7.1 Prerequisites and data scope</h5>
+                <p><strong>Analyzed games.</strong> Only games that have been run through CARA’s game analysis are included. A player appears in the player list only if they have <em>two or more</em> analyzed games in the <strong>current source</strong>.</p>
+                <p><strong>Source dropdown.</strong> Choose which pool of games to aggregate:</p>
                 <ul>
-                    <li><strong>Overall Performance:</strong> Aggregated metrics including accuracy, average Centipawn Loss (CPL), estimated ELO, win rate, and move classification distributions (Best Move, Good Move, Inaccuracy, Mistake, Blunder, etc.).</li>
-                    
-                    <li><strong>Phase Breakdown:</strong> Performance broken down by game phase (Opening, Middlegame, Endgame), showing how the player performs in different stages of play. This helps identify strengths and weaknesses in specific phases.</li>
-                    
-                    <li><strong>Opening Analysis:</strong> Tracks opening usage and accuracy, identifying which openings the player plays most frequently, best-performing openings, and worst-performing openings with average CPL for each. An opening tree view lets you expand opening branches and see how the player scores and how accurate they are in each part of their repertoire.</li>
-                    
-                    <li><strong>Endgame Tree:</strong> Groups similar endgame structures and typical endgame positions into an endgame tree, so you can quickly see which kinds of endgames the player tends to reach, how often, and how well they convert them.</li>
-                    
-                    <li><strong>Accuracy Over Game Duration:</strong> The "Avg. Accuracy over game duration" chart has two lines, both using the same measure: <em>average accuracy up to that point in the game</em> (over all moves so far), not the accuracy at that single moment. One line shows the selected player's average accuracy across their games; the other shows the same measure for the average of all opponents in those games.</li>
-                    
-                    <li><strong>Accuracy Progression:</strong> When enough games include full game dates in the PGN headers, a separate chart shows how median accuracy changes across <em>calendar time</em> (by day, week, month, or year depending on the date range). This is distinct from the duration chart above, which follows progress <em>within each game</em> (plies), not real-world dates.</li>
-                    
-                    <li><strong>Error Pattern Detection:</strong> Automatically detects error patterns such as:
-                        <ul>
-                            <li>Phase-specific blunder tendencies (e.g., frequent blunders in the endgame)</li>
-                            <li>Recurring misses, inaccuracies, mistakes, or blunders in the same position</li>
-                            <li>Opening-specific errors</li>
-                            <li>Consistently high Centipawn Loss</li>
-                            <li>Missed opportunities</li>
-                            <li>Conversion issues in winning positions</li>
-                        </ul>
-                    </li>
+                    <li><strong>None</strong> — empty view.</li>
+                    <li><strong>Active Database</strong> — all games in the active database tab.</li>
+                    <li><strong>All Open Databases</strong> — games from every open file tab.</li>
+                    <li><strong>Selected games (Active Database)</strong> — only highlighted rows in the active tab; updates when your selection changes.</li>
+                    <li><strong>Selected games (All Open Databases)</strong> — selected rows across all tabs.</li>
                 </ul>
+                <p><strong>Player dropdown.</strong> Each entry shows analyzed and total game counts (for example, “15 analyzed, 20 total”). Pick a player to display their statistics.</p>
+                <p><strong>Dates in PGN.</strong> Some sections (activity heatmap, date-based progression charts) use the game dates stored in the PGN headers. If dates are missing or incomplete, those sections may be hidden and a short notice will be shown on the top of view.</p>
+
+                <h5 id="ps-sections-visibility">5.7.2 Showing and hiding sections</h5>
+                <p>The tab is built from independent <strong>sections</strong> (Overview, charts, trees, lists). Use the <span class="menu-item">Player Stats</span> menu to toggle each section on or off. As with most user settings, your choices will be persisted to your user settings file when you exit the application, so when you open the app again later they will remain exactly as you left them.</p>
+                <ul>
+                    <li><span class="menu-item">Enable all</span> turns on every section in one step.</li>
+                    <li><span class="menu-item">Disable all</span> turns off every section in one step.</li>
+                    <li><span class="menu-item">Reset to defaults</span> restores the application defaults, including which sections are visible and the detail options for those sections.</li>
+                </ul>
+                <p>Several sections also offer <strong>context-menu</strong> settings when you right-click inside that section (for example chart colors or time grouping).</p>
+
+                <h5 id="ps-overview">5.7.3 Overview</h5>
+                <p><strong>Purpose:</strong> Provide high-level, aggregated statistics for the selected player across the games included in the current computation—for example win rate, accuracy, average centipawn loss, estimated ELO rating, and move-classification totals.</p>
+                <p><strong>Interactions:</strong> Right-click to copy this section or the full stats.</p>
+                <p><strong>Settings:</strong> None specific to this section beyond showing or hiding it through the <span class="menu-item">Player Stats</span> menu.</p>
+                <img src="screenshots/player_stats_section_overview.png" alt="CARA Player Stats — Overview section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="ps-activity-heatmap">5.7.4 Activity heatmap</h5>
+                <p><strong>Purpose:</strong> Aggregate analyzed games by calendar date and show the counts in a heatmap calendar so you can compare activity from day to day and see busy periods, gaps, and long quiet stretches at a glance.</p>
+                <p><strong>Interactions:</strong> <strong>Double-click</strong> a day that has at least one game to open a <strong>Search Results</strong> tab listing those games. Hover a cell for the date and count.</p>
+                <p><strong>Settings:</strong></p>
+                <ul>
+                    <li><strong>Week starts on</strong>: Chooses whether calendar rows begin with <span class="menu-item">Monday</span> or <span class="menu-item">Sunday</span>.</li>
+                    <li><strong>Color scale</strong>: Selects the color palette for cell shading: <span class="menu-item">Green</span>, <span class="menu-item">Blue</span>, or <span class="menu-item">Amber</span>.</li>
+                    <li><strong>Intensity scale max</strong>: Sets how daily game counts map to the strongest color. <span class="menu-item">Auto</span> adapts the ceiling to your data; <span class="menu-item">Fixed max</span> uses a fixed ceiling, chosen under <span class="menu-item">Fixed cap (games)</span> as <span class="menu-item">3</span>, <span class="menu-item">5</span>, <span class="menu-item">8</span>, <span class="menu-item">10</span>, <span class="menu-item">15</span>, or <span class="menu-item">20</span> games at full intensity.</li>
+                    <li><strong>Partial PGN dates</strong>: Controls whether games without a complete PGN date are counted in the heatmap: <span class="menu-item">Full dates only</span> omits them, while <span class="menu-item">Include partial-date stand-ins</span> still counts them by assigning a stand-in calendar day when CARA can infer one from partial date information.</li>
+                    <li><strong>Date range</strong>: Limits how much calendar time the heatmap covers: <span class="menu-item">Trim to activity</span> matches your data span, or a rolling <span class="menu-item">Last ~12 months</span> or <span class="menu-item">Last ~24 months</span> window.</li>
+                </ul>
+                <img src="screenshots/player_stats_section_activity_heatmap.png" alt="CARA Player Stats — Activity heatmap section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="ps-accuracy-distribution">5.7.5 Accuracy distribution</h5>
+                <p><strong>Purpose:</strong> Show a histogram of per-game accuracy for the selected player across the games in the current computation, so you can see how often games fall into each accuracy band (tight clusters, wide spread, or multiple peaks).</p>
+                <p><strong>Interactions:</strong></p>
+                <ul>
+                    <li>Hover chart points to see bin ranges and counts.</li>
+                    <li>Right-click the section for <span class="menu-item">Accuracy distribution settings</span>; the same submenu is available from the <span class="menu-item">Player Stats</span> menu.</li>
+                </ul>
+                <p><strong>Settings:</strong></p>
+                <ul>
+                    <li><strong>Accuracy scale</strong>: Chooses how accuracy is spaced along the horizontal axis. <span class="menu-item">Linear</span> keeps uniform spacing. <span class="menu-item">High Accuracy Skew</span> and <span class="menu-item">Very High Accuracy Skew</span> stretch the upper part of the range so more plot width goes to high-accuracy bins; use them when most games cluster in a narrow high band (often the case for very strong players, where per-game accuracy stays high) and you want neighboring high bands easier to tell apart. <span class="menu-item">Very High Accuracy Skew</span> pushes that effect further than <span class="menu-item">High Accuracy Skew</span>.</li>
+                    <li><strong>Vertical axis</strong>: Uses <span class="menu-item">Number of games</span> or <span class="menu-item">Share of games (%)</span> as the Y-axis label (counts per bin vs percentage of games).</li>
+                    <li><strong>Horizontal axis</strong>: Uses the full accuracy span <span class="menu-item">Full range (0-100%)</span> or zooms to <span class="menu-item">Data range (first bin to last)</span> so the plot width matches where your data actually sits.</li>
+                    <li><strong>Bar count</strong>: Sets histogram resolution with <span class="menu-item">Automatic</span>, <span class="menu-item">Fewer bars</span>, or <span class="menu-item">More bars</span>.</li>
+                    <li><strong>Colors</strong>: Selects the palette: <span class="menu-item">Green</span>, <span class="menu-item">Blue</span>, or <span class="menu-item">Amber</span>.</li>
+                    <li><strong>Distribution line curve</strong>: Draws the distribution outline as <span class="menu-item">Smooth</span> or <span class="menu-item">Straight segments</span>.</li>
+                    <li><strong>Distribution smoothing strength</strong>: When the curve is smooth, sets how strongly it is smoothed: <span class="menu-item">0.5</span>, <span class="menu-item">1.0</span>, <span class="menu-item">1.5</span>, or <span class="menu-item">2.0</span> (higher values apply more smoothing).</li>
+                </ul>
+                <img src="screenshots/player_stats_section_accuracy_distribution.png" alt="CARA Player Stats — Accuracy distribution section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="ps-move-accuracy">5.7.6 Move accuracy</h5>
+                <p><strong>Purpose:</strong> Aggregates every classified move for the selected player across the games in the current computation and shows the overall mix as a pie chart with a percentage list: book moves, brilliancies, best and good moves, inaccuracies, mistakes, misses, and blunders (the same classification family as in Game Summary, but pooled across many games instead of one).</p>
+                <p><strong>Interactions:</strong></p>
+                <ul>
+                    <li>Right-click in the section for <span class="menu-item">Copy section to clipboard</span> (this block only) or <span class="menu-item">Copy stats to clipboard</span> (full Player Stats text).</li>
+                    <li>When the Player Stats detail area is narrow, the percentage list beside the pie may hide automatically so the chart keeps more width; widening the area brings the list back.</li>
+                </ul>
+                <p><strong>Settings:</strong> None specific to this section beyond showing or hiding it through the <span class="menu-item">Player Stats</span> menu.</p>
+                <img src="screenshots/player_stats_section_move_accuracy.png" alt="CARA Player Stats — Move accuracy section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="ps-performance-by-phase">5.7.7 Performance by phase</h5>
+                <p><strong>Purpose:</strong> Summarizes the selected player’s results in the three game phases—opening, middlegame, and endgame—across the games in the current computation. A horizontal bar chart shows average <strong>accuracy (%)</strong> per phase; beside it, a small table lists the same phases with average <strong>centipawn loss (CPL)</strong> so you can compare solid play vs typical cost of errors in each phase.</p>
+                <p><strong>Interactions:</strong> Right-click in the section for <span class="menu-item">Copy section to clipboard</span> (this block only) or <span class="menu-item">Copy stats to clipboard</span> (full Player Stats text).</p>
+                <p><strong>Settings:</strong> None specific to this section beyond showing or hiding it through the <span class="menu-item">Player Stats</span> menu.</p>
+                <img src="screenshots/player_stats_section_performance_by_phase.png" alt="CARA Player Stats — Performance by phase section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="ps-accuracy-vs-progress">5.7.8 Avg. accuracy over game duration</h5>
+                <p><strong>Purpose:</strong> For the selected player and the games in the current computation, plots how <strong>running game accuracy</strong> (accuracy of all moves played so far in the game) typically changes as a game goes on. The horizontal axis is <strong>game progress</strong> from start to finish (0–100% of the game’s plies). For each progress step, CARA averages running accuracy across games for the player’s moves and, separately, across the same games for the opponent’s moves, then draws two lines: the player’s series and the opponents’ average series at the same progress. This answers “how does accuracy tend to evolve within a game?” and how the selected player’s accuracy over the game duration compares to their opponents.</p>
+                <p><strong>Interactions:</strong></p>
+                <ul>
+                    <li>Move the mouse over the chart: a tooltip shows the interpolated <strong>game progress</strong> (%) together with the player’s <strong>accuracy</strong> (%) and the opponents’ average accuracy (%) at that progress.</li>
+                    <li>Right-click in the section for <span class="menu-item">Copy section to clipboard</span> (this block only) or <span class="menu-item">Copy stats to clipboard</span> (full Player Stats text). The section copy summarizes representative points along the curve as a small table.</li>
+                </ul>
+                <p><strong>Settings:</strong> None specific to this section beyond showing or hiding it through the <span class="menu-item">Player Stats</span> menu.</p>
+                <img src="screenshots/player_stats_section_accuracy_vs_progress.png" alt="CARA Player Stats — Avg. accuracy over game duration section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="ps-accuracy-progression">5.7.9 Accuracy progression</h5>
+                <p><strong>Purpose:</strong> For the selected player and the games in the current computation that have usable <strong>PGN game dates</strong>, buckets those games along the <strong>calendar</strong> (from the earliest to the latest dated game in the data). In each time bin CARA plots the <strong>median</strong> per-game accuracy so a few outliers do not dominate: a <strong>combined</strong> line plus separate lines for games played as White and as Black. The horizontal axis is <strong>real-world time</strong>.</p>
+                <p><strong>Interactions:</strong></p>
+                <ul>
+                    <li>Move the mouse near the chart line: a tooltip shows the bin’s <strong>date range</strong>, <strong>median</strong> accuracy for the combined, White, and Black series, and <strong>how many games</strong> are in the bin.</li>
+                    <li>Right-click in the section for <span class="menu-item">Copy section to clipboard</span>, <span class="menu-item">Copy stats to clipboard</span>, and <span class="menu-item">Time series settings</span> (the same nested menu is under <span class="menu-item">Player Stats</span> on the menu bar).</li>
+                </ul>
+                <p><strong>Settings:</strong></p>
+                <ul>
+                    <li><strong>Progression bins</strong>: Target number of time bins along the chart: <span class="menu-item">8</span>, <span class="menu-item">12</span>, <span class="menu-item">16</span>, <span class="menu-item">24</span>, or <span class="menu-item">32</span>.</li>
+                    <li><strong>Binning mode</strong>: <span class="menu-item">Quantile (equal games per bin)</span> splits the dated games into bins with similar counts (more detail when you played often); <span class="menu-item">Equal calendar width</span> uses similar calendar spans per bin.</li>
+                    <li><strong>X axis layout</strong>: <span class="menu-item">Uniform bins</span> spaces bins evenly along the plot; <span class="menu-item">Gap compressed</span> squeezes long calendar gaps (with <span class="menu-item">Max gap segment (calendar days)</span> choosing <span class="menu-item">14</span>, <span class="menu-item">28</span>, <span class="menu-item">50</span>, or <span class="menu-item">100</span>); <span class="menu-item">Calendar linear</span> maps bin positions by real dates.</li>
+                    <li><strong>Progression line style</strong>: <span class="menu-item">Smooth</span> or <span class="menu-item">Straight segments</span>.</li>
+                    <li><strong>Smoothing strength</strong> (when the line is smooth): <span class="menu-item">0.5</span>, <span class="menu-item">1.0</span>, <span class="menu-item">1.5</span>, or <span class="menu-item">2.0</span>.</li>
+                </ul>
+                <p>Show or hide this section from the <span class="menu-item">Player Stats</span> menu like other Player Stats blocks. The same <span class="menu-item">Time series settings</span> apply to <a href="#ps-move-quality-progression">Move quality progression</a> and <a href="#ps-acpl-phase-progression">ACPL progression by phase</a>; these charts share the time-series settings.</p>
+                <img src="screenshots/player_stats_section_accuracy_progression.png" alt="CARA Player Stats — Accuracy progression section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="ps-move-quality-progression">5.7.10 Move quality progression</h5>
+                <p><strong>Purpose:</strong> For the selected player, groups dated games from the current computation into the same <strong>calendar</strong> time bins as <a href="#ps-accuracy-progression">Accuracy progression</a> (games need usable <strong>PGN dates</strong>). In each bin the chart shows the <strong>median</strong> per-game rate of <strong>best moves</strong>, <strong>top-three moves</strong>, and <strong>blunders</strong>—three percentage lines on the vertical axis.</p>
+                <p><strong>Interactions:</strong></p>
+                <ul>
+                    <li>Move the mouse over the chart: a tooltip shows a <strong>date</strong> for the position under the cursor and an <strong>interpolated percentage</strong> for each visible series (matching the legend).</li>
+                    <li>Right-click in the section for <span class="menu-item">Copy section to clipboard</span>, <span class="menu-item">Copy stats to clipboard</span>, and <span class="menu-item">Time series settings</span> (the same nested menu is under <span class="menu-item">Player Stats</span> on the menu bar).</li>
+                </ul>
+                <p><strong>Settings:</strong> All <span class="menu-item">Time series settings</span> items (progression bins, binning mode, X axis layout, gap segment length, line style, smoothing strength) work the same way as for <a href="#ps-accuracy-progression">Accuracy progression</a>; see that section for descriptions. Show or hide this section from the <span class="menu-item">Player Stats</span> menu like other Player Stats blocks.</p>
+                <img src="screenshots/player_stats_section_move_quality_progression.png" alt="CARA Player Stats — Move quality progression section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="ps-acpl-phase-progression">5.7.11 ACPL progression by phase</h5>
+                <p><strong>Purpose:</strong> For the selected player, groups dated games from the current computation into the same <strong>calendar</strong> time bins as <a href="#ps-accuracy-progression">Accuracy progression</a> (games need usable <strong>PGN dates</strong>). In each bin the chart shows the <strong>median</strong> per-game <strong>average centipawn loss (ACPL)</strong> separately for the <strong>opening</strong>, <strong>middlegame</strong>, and <strong>endgame</strong>—three lines on the vertical axis. <strong>Lower</strong> ACPL is better play in that phase.</p>
+                <p><strong>Interactions:</strong></p>
+                <ul>
+                    <li>Move the mouse over the chart: a tooltip shows a <strong>date</strong> for the position under the cursor and an <strong>interpolated ACPL</strong> value for each phase line (Opening, Middlegame, Endgame), matching the legend.</li>
+                    <li>Right-click in the section for <span class="menu-item">Copy section to clipboard</span>, <span class="menu-item">Copy stats to clipboard</span>, and <span class="menu-item">Time series settings</span> (the same nested menu is under <span class="menu-item">Player Stats</span> on the menu bar).</li>
+                </ul>
+                <p><strong>Settings:</strong> All <span class="menu-item">Time series settings</span> items work the same way as for <a href="#ps-accuracy-progression">Accuracy progression</a>; see that section for descriptions. Show or hide this section from the <span class="menu-item">Player Stats</span> menu like other Player Stats blocks.</p>
+                <img src="screenshots/player_stats_section_acpl_phase_progression.png" alt="CARA Player Stats — ACPL progression by phase section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="ps-openings">5.7.12 Openings</h5>
+                <p><strong>Purpose:</strong> For the selected player and the games in the current computation, summarizes a few opening lines by <strong>ECO code</strong> and <strong>name</strong>. Up to three blocks appear when there is data: <strong>Most played</strong> (how many games reached each line), <strong>Worst accuracy</strong> (highest average CPL among openings with data), and <strong>Best accuracy</strong> (lowest average CPL). Each block is a small table with game counts; worst and best also show <strong>average CPL</strong> for that opening across the counted games.</p>
+                <p><strong>Interactions:</strong></p>
+                <ul>
+                    <li>Right-click in the section for <span class="menu-item">Copy section to clipboard</span> (this block only) or <span class="menu-item">Copy stats to clipboard</span> (full Player Stats text).</li>
+                    <li>When the Player Stats detail area is narrow, long opening names in the middle column may be shortened with an ellipsis so ECO codes and numbers stay readable.</li>
+                </ul>
+                <p><strong>Settings:</strong> None specific to this section beyond showing or hiding it through the <span class="menu-item">Player Stats</span> menu.</p>
+                <img src="screenshots/player_stats_section_openings.png" alt="CARA Player Stats — Openings section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="ps-opening-tree">5.7.13 Opening tree</h5>
+                <p><strong>Purpose:</strong> For the selected player and the games in the current computation, shows an <strong>expandable tree</strong> of opening variations reached. Each row is a branch for one SAN move; the ECO code and opening name are shown when available from the opening book, along with <strong>aggregated</strong> counts: total games, games as White and as Black, overall <strong>game accuracy</strong> (%), and accuracy in the <strong>opening phase</strong> only (%). Lines are arranged by opening family: continuations nest under their parent line, so related variations stay grouped and you can see how performance correlates along each branch. Together this gives repertoire shape beyond the flat <a href="#ps-openings">Openings</a> summary.</p>
+                <p><strong>Interactions:</strong></p>
+                <ul>
+                    <li><strong>Double-click</strong> a row to open a <strong>Search Results</strong> tab listing games where the player reached that move sequence (that branch).</li>
+                    <li>Click <strong>column headers</strong> to sort; the tree starts sorted by <strong>Total</strong> games (descending).</li>
+                    <li>Expand and collapse branches with the usual tree controls.</li>
+                    <li>Right-click in the section for <span class="menu-item">Copy section to clipboard</span> or <span class="menu-item">Copy stats to clipboard</span>. Section copy is a compact text summary of the tree through the <strong>first two moves</strong>, not the full depth. When the pointer is over the tree, the menu also offers <span class="menu-item">Expand all</span> and <span class="menu-item">Collapse all</span>.</li>
+                    <li>The <strong>+</strong> and <strong>−</strong> buttons beside the tree increase or decrease the tree’s vertical height (within configured limits).</li>
+                    <li>When the Player Stats area is narrow, some numeric columns may hide automatically so the move/opening column stays visible.</li>
+                </ul>
+                <p><strong>Settings:</strong> None specific to this section beyond showing or hiding it through the <span class="menu-item">Player Stats</span> menu.</p>
+                <img src="screenshots/player_stats_section_opening_tree.png" alt="CARA Player Stats — Opening tree section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="ps-endgame-tree">5.7.14 Endgame tree</h5>
+                <p><strong>Purpose:</strong> For the selected player and the games in the current computation, shows a <strong>two-level tree</strong> of classified endgames. <strong>Top-level rows</strong> are endgame <strong>groups</strong> (material-style families); expanding a group lists <strong>specific endgame types</strong> under it. Each row carries <strong>aggregated</strong> counts—total games, games as White and as Black—plus overall <strong>game accuracy</strong> (%) and accuracy in the <strong>endgame phase</strong> only (%), so you can compare whole-game results with performance after the position was classified as endgame. Groups and types are ordered by how many games fall into them (largest first). Together with <a href="#ps-performance-by-phase">Performance by phase</a>, this helps you see <em>which</em> endgame categories the selected player reaches and how that player tends to score in them.</p>
+                <p><strong>Interactions:</strong></p>
+                <ul>
+                    <li><strong>Double-click</strong> a <strong>group</strong> row to open <strong>Search Results</strong> with every game that matches any type in that group; double-click a <strong>type</strong> row to open games for that single endgame type only.</li>
+                    <li>Click <strong>column headers</strong> to sort; the tree starts sorted by <strong>Total</strong> games (descending).</li>
+                    <li>Expand and collapse groups to show or hide the types underneath.</li>
+                    <li>Right-click in the section for <span class="menu-item">Copy section to clipboard</span> or <span class="menu-item">Copy stats to clipboard</span> (section copy uses the usual formatted Player Stats text for this section). When the pointer is over the tree, the menu also offers <span class="menu-item">Expand all</span> and <span class="menu-item">Collapse all</span>.</li>
+                    <li>The <strong>+</strong> and <strong>−</strong> buttons beside the tree increase or decrease the tree’s vertical height (within configured limits).</li>
+                    <li>When the Player Stats area is narrow, some numeric columns may hide automatically so the endgame type column stays readable (same pattern as the <a href="#ps-opening-tree">Opening tree</a>).</li>
+                </ul>
+                <p><strong>Settings:</strong> None specific to this section beyond showing or hiding it through the <span class="menu-item">Player Stats</span> menu.</p>
+                <img src="screenshots/player_stats_section_endgame_tree.png" alt="CARA Player Stats — Endgame tree section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="ps-games-by-performance">5.7.15 Games by performance</h5>
+                <p><strong>Purpose:</strong> Under the <strong>Games by Performance</strong> heading, the panel surfaces standout <strong>analyzed</strong> games for the <strong>selected player</strong> from the current Player Stats run. <strong>Best Games</strong> are the ones with the <strong>lowest average centipawn loss (CPL)</strong> for that player across the whole game; <strong>Worst Games</strong> are those with the <strong>highest</strong> average CPL. Each sub-row summarizes how many games qualify and the <strong>accuracy (%)</strong> range spanned by those picks. The worst list is built from games <em>after</em> reserving slots for the best list, so a game does not appear in both.</p>
+                <p><strong>Interactions:</strong></p>
+                <ul>
+                    <li>Each row has a <strong>View</strong> button (for example <strong>View 3 →</strong> when three games qualify). Click it to open a <strong>Search Results</strong> tab with those games so you can open them from there.</li>
+                    <li>If no games qualify, the button stays disabled.</li>
+                    <li>Right-click in the section for <span class="menu-item">Copy section to clipboard</span> or <span class="menu-item">Copy stats to clipboard</span>. Section copy summarizes best and worst counts and accuracy ranges; in plain text that block is headed <strong>Top Games</strong> (the internal section name).</li>
+                    <li>When the Player Stats area is narrow, the <strong>View</strong> buttons may hide automatically so the description still fits—the same width behavior as <a href="#ps-error-patterns">Error patterns</a>.</li>
+                </ul>
+                <p><strong>Settings:</strong> Show or hide this block with the <span class="menu-item">Player Stats</span> menu entry <span class="menu-item">Games by performance</span>. Caps on how many best and worst games are considered live under <code>ui → panels → detail → player_stats → top_games</code> in <code>config.json</code> (<code>max_best</code> and <code>max_worst</code>); see <a href="#customizing-config">section 7.1 Customizing config.json</a>.</p>
+                <img src="screenshots/player_stats_section_games_by_performance.png" alt="CARA Player Stats — Games by performance section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="ps-significant-moves">5.7.16 Significant moves</h5>
+                <p><strong>Purpose:</strong> Under the <strong>Significant Moves</strong> heading, the panel highlights three move classes for the <strong>selected player</strong> across <strong>analyzed</strong> games in the current Player Stats run: <strong>Brilliant Moves</strong>, <strong>Misses</strong>, and <strong>Blunders</strong> (as recorded in stored analysis). Each row shows how many such moves occurred in aggregate and what share that is of the player’s <strong>total moves</strong> in those games; it also states how many individual instances are listed for the <strong>View</strong> action (capped by configuration). Together with <a href="#ps-move-accuracy">Move accuracy</a>, this gives both headline counts and a direct way to jump into concrete positions. Brilliant classifications depend on analysis settings—see <strong>Settings</strong> below.</p>
+                <p><strong>Interactions:</strong></p>
+                <ul>
+                    <li>Each row has a <strong>View</strong> button (for example <strong>View 5 →</strong> when five moves are listed). Click it to open a <strong>Search Results</strong> tab with <strong>one row per move</strong>; the same game can appear more than once if it contains several qualifying moves.</li>
+                    <li>Search Results carries a <strong>Ref Ply</strong> for each row so opening the game can jump to that move; see <a href="#game-table">section 4.4.2</a>.</li>
+                    <li>Right-click in the section for <span class="menu-item">Copy section to clipboard</span> or <span class="menu-item">Copy stats to clipboard</span>.</li>
+                </ul>
+                <p><strong>Settings:</strong></p>
+                <ul class="settings-list">
+                    <li><strong>Visibility:</strong> <span class="menu-item">Player Stats</span> → <span class="menu-item">Significant moves</span>.</li>
+                    <li><strong><code>max_moves</code>:</strong> In <code>config.json</code>, open <code>ui → panels → detail → player_stats → significant_moves</code>. The settings <code>brilliant_moves</code>, <code>misses</code>, and <code>blunders</code> can each set <code>max_moves</code>—the maximum number of moves that row’s <strong>View</strong> button will include when it opens <strong>Search Results</strong> (defaults are large). Details: <a href="#customizing-config">section 7.1 Customizing config.json</a>.</li>
+                    <li><strong>Brilliant labels in analysis:</strong> <span class="menu-item">Game Analysis → Brilliant Move Detection</span> and related analysis options control brilliant move detection details.</li>
+                </ul>
+                <div class="tip-box">
+                    <strong>Quick Tip:</strong> Brilliant Move Detection runs an optional shallow-depth re-check after analysis to label counterintuitive tactics as Brilliant. How it works and how to configure it: <a href="#brilliant-move-detection">section 5.5.3 Brilliant Move Detection</a>.
+                </div>
+                <img src="screenshots/player_stats_section_significant_moves.png" alt="CARA Player Stats — Significant moves section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="ps-error-patterns">5.7.17 Error patterns</h5>
+                <p><strong>Purpose:</strong> When Player Stats finds candidate issues for the <strong>selected player</strong> across the current analyzed games, this section lists them as separate cards. Each card has a short <strong>description</strong>, a <strong>severity</strong> color (for example critical vs moderate), and a frequency line (how often the pattern shows up and what share of relevant play that is). Rules cover several families of behavior—examples include blunders piling up in one phase, tactical misses, shaky opening error rates, persistently high centipawn loss, conversion or defensive trouble, and repeated slips in the same position.</p>
+                <p><strong>Interactions:</strong></p>
+                <ul>
+                    <li>Each row has a <strong>View</strong> button. The label counts either matching <strong>games</strong> or individual <strong>occurrences</strong> (when the pattern tracks specific positions or moves), for example <strong>View 5 →</strong>.</li>
+                    <li>Click <strong>View</strong> to open a <strong>Search Results</strong> tab. When the pattern supplies reference plies, there is one result row per occurrence and <strong>Ref Ply</strong> tells the game view which move to jump to (see <a href="#game-table">section 4.4.2</a>). Otherwise you get one row per game and opening the game does not target a particular ply.</li>
+                    <li>Right-click in the section for <span class="menu-item">Copy section to clipboard</span> or <span class="menu-item">Copy stats to clipboard</span> (section copy uses the heading <strong>Error Patterns</strong> in plain text).</li>
+                    <li>When the Player Stats area is narrow, the <strong>View</strong> buttons hide and long descriptions are shortened so the cards still fit—similar to <a href="#ps-games-by-performance">Games by performance</a>.</li>
+                </ul>
+                <p><strong>Settings:</strong></p>
+                <ul class="settings-list">
+                    <li><strong>Visibility:</strong> <span class="menu-item">Player Stats</span> → <span class="menu-item">Error patterns</span>.</li>
+                    <li><strong>Detection thresholds:</strong> Under <code>ui → panels → detail → player_stats → error_patterns → thresholds</code> in <code>config.json</code> you can tune when each rule fires (phase blunder share, tactical miss counts, opening error rates, CPL and conversion heuristics, repeated-position minima, and similar). See <a href="#customizing-config">section 7.1 Customizing config.json</a>.</li>
+                </ul>
+                <img src="screenshots/player_stats_section_error_patterns.png" alt="CARA Player Stats — Error patterns section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
             </div>
 
             <div class="outline-item">

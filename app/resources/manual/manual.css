@@ -312,6 +312,15 @@
             margin: 10px 0;
             color: rgb(220, 220, 220);
         }
+
+        /* Sub-lists under a standalone "Settings:" line (e.g. §5.7.16) */
+        ul.settings-list {
+            margin-top: 6px;
+            margin-bottom: 20px;
+        }
+        ul.settings-list li {
+            margin: 7px 0;
+        }
         
         code {
             background-color: rgb(30, 30, 35);
