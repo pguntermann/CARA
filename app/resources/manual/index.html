@@ -193,12 +193,13 @@
                         <li><a href="#moves-list-menu">6.5 Moves List Menu</a></li>
                         <li><a href="#game-analysis-menu">6.6 Game Analysis Menu</a></li>
                         <li><a href="#manual-analysis-menu">6.7 Manual Analysis Menu</a></li>
-                        <li><a href="#annotations-menu">6.8 Annotations Menu</a></li>
-                        <li><a href="#engines-menu">6.9 Engines Menu</a></li>
-                        <li><a href="#ai-summary-menu">6.10 AI Summary Menu</a></li>
-                        <li><a href="#notes-menu">6.11 Notes Menu</a></li>
-                        <li><a href="#help-menu">6.12 Help Menu</a></li>
-                        <li><a href="#complete-keyboard-shortcuts">6.13 Complete Keyboard Shortcuts</a></li>
+                        <li><a href="#player-stats-menu">6.8 Player Stats Menu</a></li>
+                        <li><a href="#annotations-menu">6.9 Annotations Menu</a></li>
+                        <li><a href="#engines-menu">6.10 Engines Menu</a></li>
+                        <li><a href="#ai-summary-menu">6.11 AI Summary Menu</a></li>
+                        <li><a href="#notes-menu">6.12 Notes Menu</a></li>
+                        <li><a href="#help-menu">6.13 Help Menu</a></li>
+                        <li><a href="#complete-keyboard-shortcuts">6.14 Complete Keyboard Shortcuts</a></li>
                     </ul>
                 </li>
                 <li><a href="#advanced-topics">7. Advanced Topics</a>
@@ -942,7 +943,7 @@
                 
                 <h5 id="ai-summary">4.5.7 AI Summary</h5>
                 <p>The AI Summary tab provides an interactive chat interface for discussing any position in a game with a Large Language Model (LLM). The AI model has access to extensive game data, including detailed engine analysis, move classifications, evaluation metrics, and positional information, enabling it to provide accurate assessments of the game, played moves, and current position. You can ask questions about the game, request explanations of moves, or generate summaries. Access this tab using <span class="menu-item">View → AI Summary</span> or press <code>F7</code>.</p>
-                <p>CARA supports OpenAI, Anthropic, and custom OpenAI-compatible endpoints. Configure your provider and API key through the AI Model Settings dialog; see <a href="#ai-summary-menu">section 6.10</a>. See <a href="#custom-ai-endpoint">section 7.9</a> for more information on setting up a custom endpoint.</p>
+                <p>CARA supports OpenAI, Anthropic, and custom OpenAI-compatible endpoints. Configure your provider and API key through the AI Model Settings dialog; see <a href="#ai-summary-menu">section 6.11</a>. See <a href="#custom-ai-endpoint">section 7.9</a> for more information on setting up a custom endpoint.</p>
                 
                 <img src="screenshots/ai_summary.png" alt="CARA AI Summary View - Interactive chat interface for discussing game positions with an AI model that has access to engine analysis and game data" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
@@ -975,7 +976,7 @@
             </div>
             <div class="outline-item">
                 <h4 id="keyboard-shortcuts">4.6 Keyboard Shortcuts</h4>
-                <p>Below you can find a list of the most common keyboard shortcuts, allowing you to work efficiently with the features described in this section. For a complete reference of all keyboard shortcuts organized by category, see <a href="#complete-keyboard-shortcuts">section 6.13</a>.</p>
+                <p>Below you can find a list of the most common keyboard shortcuts, allowing you to work efficiently with the features described in this section. For a complete reference of all keyboard shortcuts organized by category, see <a href="#complete-keyboard-shortcuts">section 6.14</a>.</p>
                 
                 <h5>4.6.1 Navigation</h5>
                 <ul>
@@ -2151,34 +2152,49 @@
                 <p>Toggles whether other board arrows (played move, best alternative move, PV arrows) are hidden when positional plan exploration is active. When enabled, only the piece trajectory lines are displayed, providing a cleaner view focused on the positional plan visualization.</p>
             </div>
 
+            <!-- Player Stats Menu -->
+            <div class="outline-item">
+                <h4 id="player-stats-menu">6.8 Player Stats Menu</h4>
+                <p>The <span class="menu-item">Player Stats</span> menu on the menu bar controls the <strong>Player Stats</strong> tab in the detail panel: which sections are visible and several chart-specific options. The same nested settings also appear when you right-click inside the matching section on the tab. For what each block shows and how to use it, see <a href="#viewing-player-statistics">section 5.7 Viewing Player Statistics</a>.</p>
+
+                <h5>6.8.1 Reset to defaults</h5>
+                <p>Restores Player Stats options to the application template values after confirmation: section visibility, <span class="menu-item">Activity heatmap settings</span>, <span class="menu-item">Accuracy distribution settings</span>, and <span class="menu-item">Time series settings</span> (bins, binning mode, axis layout, gap segments, line style, smoothing, and related choices).</p>
+
+                <h5>6.8.2 Enable all and Disable all</h5>
+                <p><span class="menu-item">Enable all</span> and <span class="menu-item">Disable all</span> turn <strong>every</strong> section’s visibility on or off <strong>together</strong>, so you can quickly show the full page or clear it and then turn individual sections back on—handy when you want a simpler layout without flipping each toggle option one by one. They only update those section visibility toggles; they do not change the saved options inside <span class="menu-item">Activity heatmap settings</span>, <span class="menu-item">Accuracy distribution settings</span>, or <span class="menu-item">Time series settings</span>.</p>
+
+                <h5>6.8.3 Per-section visibility and detail settings</h5>
+                <p>The remaining entries are toggle options for each Player Stats section (on means the section is shown on the tab). Three submenus supply extra display options where they apply: <span class="menu-item">Activity heatmap settings</span>, <span class="menu-item">Accuracy distribution settings</span>, and <span class="menu-item">Time series settings</span> (for the date-based progression charts). What each section shows is described in <a href="#viewing-player-statistics">section 5.7 Viewing Player Statistics</a>.</p>
+            </div>
+
             <!-- Annotations Menu -->
             <div class="outline-item">
-                <h4 id="annotations-menu">6.8 Annotations Menu</h4>
+                <h4 id="annotations-menu">6.9 Annotations Menu</h4>
                 
-                <h5>6.8.1 Clear all Annotations for current game</h5>
+                <h5>6.9.1 Clear all Annotations for current game</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code></p>
                 <p>Removes all annotations from the entire active game. This action affects all positions in the game and cannot be undone.<br>See <a href="#managing-annotations">section 5.8.3</a> for more information.</p>
                 
-                <h5>6.8.2 Clear all Annotations for current move</h5>
+                <h5>6.9.2 Clear all Annotations for current move</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Alt+D</code></p>
                 <p>Removes all annotations for the current position (move) in the game. Annotations for other positions remain unchanged.<br>See <a href="#managing-annotations">section 5.8.3</a> for more information.</p>
                 
-                <h5>6.8.3 Save Annotations to current game</h5>
+                <h5>6.9.3 Save Annotations to current game</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Alt+S</code></p>
                 <p>Saves all annotations to the active game by serializing them into a PGN metadata tag. Annotations are compressed and stored separately from the PGN move notation, keeping the PGN clean. This marks the game as modified, and annotations will be persisted when you save the database.<br>See <a href="#managing-annotations">section 5.8.3</a> for more information.</p>
                 
-                <h5>6.8.4 Highlight annotated moves in moves list</h5>
+                <h5>6.9.4 Highlight annotated moves in moves list</h5>
                 <p>When checked, moves that have annotations are highlighted in the Moves List: the White and Black move columns (algebraic notation) use the dominant color from the annotations for that move as a background, with contrasting text so the move remains readable. This makes it easy to see at a glance which moves in the game have annotations. The setting is saved in your user preferences.</p>
                 
-                <h5>6.8.5 Setup Preferences...</h5>
+                <h5>6.9.5 Setup Preferences...</h5>
                 <p>Opens the Annotation Preferences dialog for customizing the annotation color palette and text font settings. Changes are saved to your user settings and persist across sessions.<br>See <a href="#annotation-preferences">section 5.8.2</a> for detailed instructions.</p>
             </div>
 
             <!-- Engines Menu -->
             <div class="outline-item">
-                <h4 id="engines-menu">6.9 Engines Menu</h4>
+                <h4 id="engines-menu">6.10 Engines Menu</h4>
                 
-                <h5>6.9.1 Add Engine...</h5>
+                <h5>6.10.1 Add Engine...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+E</code></p>
                 <p>Opens a dialog to add a new UCI-compatible chess engine to CARA. You can browse for the engine executable file, and CARA will automatically validate that it supports the UCI protocol. The first engine you add is automatically assigned to all analysis tasks.<br>See <a href="#adding-first-engine">section 5.1.1</a> for detailed instructions.</p>
                 
@@ -2186,7 +2202,7 @@
                     <strong>Quick Tip:</strong> CARA works with any UCI-compatible chess engine. For a short list of recommended engines (free and commercial) with links and best use cases, see <a href="#recommended-engines">section 7.10</a>.
                 </div>
                 
-                <h5>6.9.2 Engine Submenus</h5>
+                <h5>6.10.2 Engine Submenus</h5>
                 <p>For each configured engine, a submenu is displayed with the engine's name. Each submenu provides the following options:</p>
                 <ul>
                     <li><strong>Remove Engine:</strong> Permanently removes the engine from CARA. If the engine is currently assigned to any tasks, those assignments are cleared. CARA automatically ensures that at least one engine is always assigned to each analysis task.</li>
@@ -2202,9 +2218,9 @@
 
             <!-- AI Summary Menu -->
             <div class="outline-item">
-                <h4 id="ai-summary-menu">6.10 AI Summary Menu</h4>
+                <h4 id="ai-summary-menu">6.11 AI Summary Menu</h4>
                 
-                <h5>6.10.1 AI Model Settings...</h5>
+                <h5>6.11.1 AI Model Settings...</h5>
                 <p>Opens a dialog for configuring AI model settings. CARA supports three options: <strong>OpenAI</strong>, <strong>Anthropic</strong>, and <strong>Custom endpoint</strong> (e.g. a local LLM). You must configure at least one provider and select a model before using the AI Summary feature. For custom endpoints, set the base URL (and optionally an API key) and choose a model; see <a href="#custom-ai-endpoint">section 7.9</a>.</p>
                 <p>To acquire API keys for cloud providers:</p>
                 <ul>
@@ -2213,65 +2229,65 @@
                 </ul>
                 <p>For a custom endpoint, an API key is optional (e.g. leave empty for local servers).</p>
                 
-                <h5>6.10.2 Use OpenAI Models</h5>
+                <h5>6.11.2 Use OpenAI Models</h5>
                 <p>Toggles whether to use OpenAI models for AI Summary. When enabled, OpenAI models are available for selection. This option is mutually exclusive with "Use Anthropic Models" and "Use Custom Endpoint"—only one provider can be active at a time.</p>
                 
-                <h5>6.10.3 Use Anthropic Models</h5>
+                <h5>6.11.3 Use Anthropic Models</h5>
                 <p>Toggles whether to use Anthropic models for AI Summary. When enabled, Anthropic models are available for selection. This option is mutually exclusive with "Use OpenAI Models" and "Use Custom Endpoint"—only one provider can be active at a time.</p>
                 
-                <h5>6.10.4 Use Custom Endpoint</h5>
+                <h5>6.11.4 Use Custom Endpoint</h5>
                 <p>Toggles whether to use the custom endpoint (e.g. local LLM) for AI Summary. When enabled, models from the configured custom base URL are available. This option is mutually exclusive with "Use OpenAI Models" and "Use Anthropic Models"—only one provider can be active at a time.</p>
                 
-                <h5>6.10.5 Include Game Analysis Data in Pre-Prompt</h5>
+                <h5>6.11.5 Include Game Analysis Data in Pre-Prompt</h5>
                 <p>Toggles whether game analysis data (evaluations, move classifications, CPL values, best move alternatives) is included in the pre-prompt sent to the AI model. When enabled, the AI has access to detailed engine analysis, enabling more accurate assessments of moves and positions.</p>
                 
-                <h5>6.10.6 Include PGN Metadata tags in Pre-Prompt</h5>
+                <h5>6.11.6 Include PGN Metadata tags in Pre-Prompt</h5>
                 <p>Toggles whether PGN metadata tags (player names, ELO ratings, event information, etc.) are included in the pre-prompt sent to the AI model. When enabled, the AI has access to game metadata, providing context for more informed responses.</p>
             </div>
 
             <!-- Notes Menu -->
             <div class="outline-item">
-                <h4 id="notes-menu">6.11 Notes Menu</h4>
+                <h4 id="notes-menu">6.12 Notes Menu</h4>
                 <p>The Notes menu provides actions for managing game notes stored in the current game's PGN (CARANotes tag).</p>
-                <h5>6.11.1 Clear Notes for current game</h5>
+                <h5>6.12.1 Clear Notes for current game</h5>
                 <p>Removes the notes from the current game in memory (clears the CARANotes tag). Shortcut: <code>Ctrl+Shift+E</code>.</p>
-                <h5>6.11.2 Save Notes to current game</h5>
+                <h5>6.12.2 Save Notes to current game</h5>
                 <p>Saves the text from the Notes tab into the current game's PGN as a CARANotes tag (in memory). The database is marked as having unsaved changes until you save the database. Shortcut: <code>Ctrl+Alt+N</code>.</p>
             </div>
 
             <!-- Help Menu -->
             <div class="outline-item">
-                <h4 id="help-menu">6.12 Help Menu</h4>
+                <h4 id="help-menu">6.13 Help Menu</h4>
                 
-                <h5>6.12.1 Open Manual</h5>
+                <h5>6.13.1 Open Manual</h5>
                 <p>Opens the application manual in your default web browser, providing comprehensive documentation and instructions for using CARA.</p>
                 
-                <h5>6.12.2 Watch Video Tutorials</h5>
+                <h5>6.13.2 Watch Video Tutorials</h5>
                 <p>Opens the CARA Chess YouTube channel in your default web browser, where you can watch video tutorials for using CARA.</p>
                 
-                <h5>6.12.3 Visit GitHub Repository</h5>
+                <h5>6.13.3 Visit GitHub Repository</h5>
                 <p>Opens the CARA project repository on GitHub in your default web browser, where you can view the source code, report issues, or contribute to the project.</p>
                 
-                <h5>6.12.4 Check for Updates...</h5>
+                <h5>6.13.4 Check for Updates...</h5>
                 <p>Checks if a newer version of CARA is available.</p>
                 
-                <h5>6.12.5 About...</h5>
+                <h5>6.13.5 About...</h5>
                 <p>Opens the About dialog displaying application information, including the application name, version number, description, and copyright information. The dialog provides a quick reference for identifying the CARA version you are using.</p>
             </div>
 
             <!-- Keyboard Shortcuts Reference -->
             <div class="outline-item">
-                <h4 id="complete-keyboard-shortcuts">6.13 Complete Keyboard Shortcuts</h4>
+                <h4 id="complete-keyboard-shortcuts">6.14 Complete Keyboard Shortcuts</h4>
                 <p>This section provides a comprehensive reference of all keyboard shortcuts in CARA.</p>
                 
-                <h5>6.13.1 Game Navigation</h5>
+                <h5>6.14.1 Game Navigation</h5>
                 <p>Essential shortcuts for navigating through games:</p>
                 <ul>
                     <li><code>Right Arrow</code>: Navigate to next move</li>
                     <li><code>Left Arrow</code>: Navigate to previous move</li>
                 </ul>
                 
-                <h5>6.13.2 Detail Panel Tabs</h5>
+                <h5>6.14.2 Detail Panel Tabs</h5>
                 <p>Quick access to different analysis views:</p>
                 <ul>
                     <li><code>F1</code>: Switch to Moves List tab</li>
@@ -2284,7 +2300,7 @@
                     <li><code>F8</code>: Switch to Notes tab</li>
                 </ul>
                 
-                <h5>6.13.3 Game Analysis</h5>
+                <h5>6.14.3 Game Analysis</h5>
                 <p>Shortcuts for analyzing games:</p>
                 <ul>
                     <li><code>Ctrl+G</code> / <code>⌘+G</code>: Start game analysis for the current game</li>
@@ -2293,7 +2309,7 @@
                     <li><code>Ctrl+Shift+N</code> / <code>⌘+Shift+N</code>: Toggle normalized evaluation graph mode</li>
                 </ul>
                 
-                <h5>6.13.4 File Operations</h5>
+                <h5>6.14.4 File Operations</h5>
                 <p>Standard file management shortcuts:</p>
                 <ul>
                     <li><code>Ctrl+O</code> / <code>⌘+O</code>: Open PGN database</li>
@@ -2304,7 +2320,7 @@
                     <li><code>Ctrl+Q</code> / <code>⌘+Q</code>: Close application</li>
                 </ul>
                 
-                <h5>6.13.5 Importing and Opening Games</h5>
+                <h5>6.14.5 Importing and Opening Games</h5>
                 <p>Shortcuts for importing and opening games:</p>
                 <ul>
                     <li><code>Ctrl+V</code> / <code>⌘+V</code>: Paste PGN to Clipboard database</li>
@@ -2312,7 +2328,7 @@
                     <li><code>Ctrl+Shift+I</code> / <code>⌘+Shift+I</code>: Import games from online platforms</li>
                 </ul>
                 
-                <h5>6.13.6 Copy and Cut Operations</h5>
+                <h5>6.14.6 Copy and Cut Operations</h5>
                 <p>Shortcuts for copying and moving game data:</p>
                 <ul>
                     <li><code>Ctrl+P</code> / <code>⌘+P</code>: Copy active game PGN to clipboard</li>
@@ -2322,7 +2338,7 @@
                     <li><code>Ctrl+Shift+X</code>: Cut selected games to clipboard</li>
                 </ul>
                 
-                <h5>6.13.7 Moves List Column Profiles</h5>
+                <h5>6.14.7 Moves List Column Profiles</h5>
                 <p>Shortcuts for managing and switching column profiles:</p>
                 <ul>
                     <li><code>1</code> - <code>9</code>: Switch to column profile 1 through 9</li>
@@ -2331,7 +2347,7 @@
                     <li><code>Ctrl+Shift+Delete</code> / <code>⌘+Shift+Delete</code>: Remove current profile</li>
                 </ul>
                 
-                <h5>6.13.8 Board Display Options</h5>
+                <h5>6.14.8 Board Display Options</h5>
                 <p>Shortcuts for toggling board display elements:</p>
                 <ul>
                     <li><code>X</code>: Rotate board 180 degrees</li>
@@ -2350,7 +2366,7 @@
                     <li><code>Alt+L</code> / <code>⌥+L</code>: Toggle annotations layer</li>
                 </ul>
 
-                <h5>6.13.9 Manual Analysis</h5>
+                <h5>6.14.9 Manual Analysis</h5>
                 <p>Shortcuts for manual position analysis:</p>
                 <ul>
                     <li><code>Alt+M</code> / <code>⌥+M</code>: Start or stop continuous engine analysis</li>
@@ -2358,7 +2374,7 @@
                     <li><code>Alt+R</code> / <code>⌥+R</code>: Remove principal variation line</li>
                 </ul>
                 
-                <h5>6.13.10 Annotations</h5>
+                <h5>6.14.10 Annotations</h5>
                 <p>Shortcuts for managing annotations:</p>
                 <ul>
                     <li><code>Ctrl+Alt+S</code>: Save annotations to current game</li>
@@ -2366,13 +2382,13 @@
                     <li><code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>: Clear all annotations for current game</li>
                 </ul>
                 
-                <h5>6.13.11 Engine Management</h5>
+                <h5>6.14.11 Engine Management</h5>
                 <p>Shortcuts for managing chess engines:</p>
                 <ul>
                     <li><code>Ctrl+E</code>: Add engine</li>
                 </ul>
                 
-                <h5>6.13.12 Database Operations</h5>
+                <h5>6.14.12 Database Operations</h5>
                 <p>Shortcuts for database management and bulk operations:</p>
                 <ul>
                     <li><code>Ctrl+Shift+F</code> / <code>⌘+Shift+F</code>: Search games across databases</li>
@@ -2384,7 +2400,7 @@
                     <li><code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code>: Clear Clipboard database</li>
                 </ul>
                 
-                <h5>6.13.13 PGN Display Options</h5>
+                <h5>6.14.13 PGN Display Options</h5>
                 <p>Shortcuts for controlling PGN notation display:</p>
                 <ul>
                     <li><code>Ctrl+M</code> / <code>⌘+M</code>: Toggle metadata display</li>
@@ -2395,7 +2411,7 @@
                     <li><code>Ctrl+R</code> / <code>⌘+R</code>: Toggle results display</li>
                 </ul>
                 
-                <h5>6.13.14 Notes</h5>
+                <h5>6.14.14 Notes</h5>
                 <p>Shortcuts for game notes:</p>
                 <ul>
                     <li><code>Ctrl+Shift+E</code>: Clear notes for current game</li>
