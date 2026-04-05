@@ -10,6 +10,23 @@ from app.services.player_stats_activity_heatmap_user import (
     normalize_player_stats_activity_heatmap_settings,
 )
 
+# strftime("%b") follows the process locale; keep heatmap month labels English like other player-stats charts.
+_EN_MONTH_ABBREV = (
+    "",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+)
+
 
 def effective_ordinal_for_heatmap(
     partial_dates: str,
@@ -97,10 +114,11 @@ def _build_calendar_day_grid(
 
 
 def _month_tick_label(prev_ym: Optional[Tuple[int, int]], d: date) -> str:
-    """Short month label; add year when calendar year changes."""
+    """Short English month label; add year when calendar year changes."""
+    mon = _EN_MONTH_ABBREV[d.month]
     if prev_ym is not None and d.year != prev_ym[0]:
-        return d.strftime("%b %Y")
-    return d.strftime("%b")
+        return f"{mon} {d.year}"
+    return mon
 
 
 def _month_ticks_day_calendar(anchor: int, n_cols: int) -> Tuple[Tuple[Tuple[Tuple[int, str], ...], ...], Tuple[int, ...]]:
