@@ -1,5 +1,38 @@
 # Release Notes
 
+# CARA v2.6.8 - Expanded Player Stats and Bug Fixes
+
+**Release Date:** 05.04.2026
+
+This release substantially extends the **Player Stats** view with new **calendar-based progression charts** (**Accuracy progression**, **Move quality progression**, **ACPL progression by phase**), a **configurable activity heatmap**, richer **chart customization** (including context-menu toggles for time-series charts), and reworks the **accuracy distribution** chart to match the newer implementations.
+
+**Player Stats** is now **fully customizable**: you can **show or hide** individual sections to match your preferences. It also improves narrow-layout behavior, addresses a **rare crash** during bulk analysis when stats **recalculated intermittently**, fixes **missing window borders** on some **Linux** variants, and updates the **HTML user manual** for the new capabilities.
+
+## New Features
+
+- **Player Stats – Customization:** Use **menu toggles** to show or hide **any section**.
+- **Player Stats – Accuracy progression:** For games with usable **PGN dates**, buckets games along a **calendar** timeline and plots **median** per-game accuracy (combined, as White, and as Black).
+- **Player Stats – Move quality progression:** Uses the same **calendar** time bins as Accuracy progression. In each bin, plots **median** per-game shares of **best moves**, **top-three moves**, and **blunders** as three lines on one chart.
+- **Player Stats – ACPL progression by phase:** Uses the same **calendar** time bins as Accuracy progression. In each bin, plots **median** per-game **ACPL** (average centipawn loss) for **opening**, **middlegame**, and **endgame** separately (lower is better).
+- **Player Stats – Activity heatmap:** New **configurable** chart of when games were played (requires **PGN dates**).
+
+## Enhancements
+
+- **Accuracy distribution chart:** Reworked to align with **newer chart implementations**.
+- **Player Stats – UI/UX:** Clearer indication when statistics are **(re-)calculating**.
+- **Player Stats – Narrow layouts:** Better **narrow-width** / **reactive** layout behavior in the Player Stats view.
+
+## Bug Fixes
+
+- **Player Stats:** Fixed a rare **stack overflow** issue during **bulk analysis** when stats were recalculated intermittently.
+- **Linux (amd64, Wayland):** Fixed **missing window borders** on some amd64 **Wayland** configurations.
+
+## Documentation
+
+- **User manual:** HTML manual updated with expanded **Player Stats** documentation and follow-up refinements.
+
+---
+
 # CARA v2.6.7 - Linux App Bundles, Faster Player Stats and UI Polish
 
 **Release Date:** 31.03.2026
