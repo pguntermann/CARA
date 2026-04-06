@@ -8,11 +8,21 @@
 
 CARA is a full-featured desktop application designed for analyzing and reviewing chess games. Unlike chess playing applications or puzzle solvers, CARA focuses exclusively on post-game analysis and review, helping you understand your games, identify mistakes, recognize patterns, and improve your chess understanding.
 
-CARA was built in large part by an AI model under the author's direction. The author took special care to ensure the AI adhered to the established architectural guidelines and coding conventions throughout the development process, while proposing the features, user stories, and UX design. This project served as an experiment to explore the feasibility of building a full-fledged, complex desktop application with Python using AI code completion, testing whether modern AI tools can produce polished, fully-featured software when guided by clear architectural principles and consistent oversight.
+The project started from a desire for a tool that stays out of the way during real review sessions: less friction between your games and the questions you care about, and more support for turning engine output and patterns into lessons you can use—not just another busy interface or a stack of numbers without context. Over the course of development, the tool has become a very feature-rich integrated environment for chess game analysis, with a [complete HTML user manual](https://pguntermann.github.io/CARA/manual.html) and a [YouTube channel](https://www.youtube.com/@CARA-Chess) with tutorial videos.
 
 ![CARA Application Overview](app/resources/manual/screenshots/app_overview.png)
 
+**Contents:**
+
+[Download](#download) · [Features](#features) · [System requirements](#system-requirements) · [Installation](#installation) · [Usage](#usage) · [Documentation](#documentation) · [Keyboard shortcuts](#keyboard-shortcuts) · [License](#license) · [Contributing](#contributing) · [Contact](#contact) · [Acknowledgments](#acknowledgments) · [Special mentions](#special-mentions)
+
+## Download
+
+**[CARA download page](https://pguntermann.github.io/CARA/)** — Pre-built app bundles for Windows, macOS, and Linux. For release assets, tags, and changelogs, use **[GitHub Releases](https://github.com/pguntermann/CARA/releases)**. Per-version changes are summarized in **[Release notes](RELEASE_NOTES.md)**. For manual Python installation, see [Manual Python installation](#1-manual-python-installation).
+
 ## Features
+
+For a structured overview of everything CARA can do, see **[Key Features](https://pguntermann.github.io/CARA/manual.html#key-features)** in the [user manual](https://pguntermann.github.io/CARA/manual.html).
 
 ### Core Capabilities
 
@@ -28,13 +38,15 @@ CARA was built in large part by an AI model under the author's direction. The au
 
 - **Moves List**: Centralized table view that encapsulates all important per-move information in one place. The moves list displays move notation, evaluations, move classifications, best move alternatives, Centipawn Loss (CPL) values, engine depth, material counts, FEN positions, and more across 32 available columns. The system features a flexible column profile management system, allowing you to create, save, and switch between different view profiles. Each profile can customize which columns are visible, their display order, and column widths, enabling you to tailor the view to your specific analysis needs—whether focusing on opening transitions, move assessment, or material tracking.
 
-- **Player Statistics**: Extensive aggregated statistics across multiple games, providing deep insights into playing patterns and performance. You can analyze any player from any or all open databases. The system calculates overall performance metrics, breaks down performance by game phase (Opening, Middlegame, Endgame), and tracks opening usage and accuracy. The system detects error patterns such as phase-specific blunder tendencies, tactical misses, opening-specific errors, consistently high Centipawn Loss, missed opportunities, and conversion issues in winning positions. The view updates asynchronously in the background when databases change, ensuring you always have current data without blocking the interface.
+- **Player Statistics**: The **Player Stats** tab aggregates **analyzed** games for one player at a time (from any or all open databases), with an optional **activity heatmap**, accuracy and progression charts, openings and endgame summaries, significant moves, and automatic error-pattern hints. You can **show or hide** each section to tailor the page. The view updates asynchronously when databases change.
 
 - **Manual Analysis**: Perform continuous engine analysis on any position with MultiPV support. You can navigate through game positions while maintaining continuous analysis of the current position. Hovering over principal variation moves displays a beautiful optional miniature board showing the resulting position. Positional plan exploration extracts piece trajectories from PV lines, visualizing how pieces move through the engine's recommended plan on the chessboard. You can explore positional plans for up to three PV lines (PV1, PV2, PV3) independently, with configurable options for the number of pieces to track and exploration depth.
 
 - **Annotations**: Powerful free-form annotation system for marking positions, ideas, and analysis insights. Unlike other chess applications, text can be freely positioned anywhere on the board, adjusted in size and rotated. In addition to text, you can add arrows, circles, and square highlighting with customizable colors. Annotations are position-specific, attached to individual moves in the game, and are compressed and serialized in a PGN metadata tag to keep the PGN move notation clean. This flexible annotation system enables you to create rich, personalized study materials and analysis notes.
 
-- **AI Summary**: Interactive chat interface allowing you to discuss any position in a game with a Large Language Model (LLM). The AI model has access to extensive game data, including detailed engine analysis, move classifications, evaluation metrics, and positional information, enabling it to provide accurate assessments of the game, played moves, and current position. Generate AI-powered game summaries using OpenAI or Anthropic models.
+- **AI Summary**: Interactive chat to discuss positions with an LLM, with context from engine analysis, classifications, and evaluations. Supports **OpenAI**, **Anthropic**, and **custom OpenAI-compatible APIs** (including **local LLMs**). See the [user manual](https://pguntermann.github.io/CARA/manual.html) for configuration details.
+
+- **Notes**: Plain-text notes for the current game (PGN metadata), with **clickable move references** and basic **Markdown** support.
 
 - **Online Import**: Import games directly from Lichess and Chess.com with filtering options.
 
@@ -55,7 +67,7 @@ CARA was built in large part by an AI model under the author's direction. The au
 
 ## Installation
 
-> **App Bundles (Recommended)**: Pre-built application bundles are available for Windows, macOS, and Linux. They include all dependencies and can be run directly without a separate Python installation. See the [releases page](https://github.com/pguntermann/CARA/releases) for download options.
+> **App Bundles (Recommended)**: Pre-built application bundles are available for Windows, macOS, and Linux. They include all dependencies and can be run directly without a separate Python installation. Download from the **[project website](https://pguntermann.github.io/CARA/)** (recommended for choosing your platform and bundle) or from **[GitHub Releases](https://github.com/pguntermann/CARA/releases)** (direct assets and release notes).
 >
 > **macOS users**: Due to macOS security settings, you may need to allow the app to run. If you see a security warning when trying to open the app, follow these steps:
 > 1. Right-click the app and select "Open"
@@ -72,15 +84,15 @@ CARA was built in large part by an AI model under the author's direction. The au
 ### Linux App Bundle Notes
 
 - Linux App Bundles are published as `.tar.gz`. Extract the archive and run the app from the extracted folder.
-- Make sure you download the correct build for your system architecture (e.g. x86_64 vs arm64).
-- Example:
+- Use the [download page](https://pguntermann.github.io/CARA/) to pick the correct Linux build for your architecture (x86_64 vs aarch64 / arm64) when in doubt.
+- Example (replace `<version>` and `<arch>` with the values in your bundle filename, e.g. `amd64` or `arm64`):
 
 ```bash
-tar -xzf CARA.2.6.7.linux.amd64.AppBundle.tar.gz
+tar -xzf CARA.<version>.linux.<arch>.AppBundle.tar.gz
 ./CARA/CARA
 ```
 
-### 1. Install Python
+### 1. Manual Python installation
 
 CARA requires Python 3.8 or higher. If you don't have Python installed:
 
@@ -182,7 +194,7 @@ CARA uses three configuration files:
 
 - **`user_settings.json`**: This file stores your personal preferences and settings, including moves list column profiles, board visibility settings, PGN display options, engine configurations, AI model settings, and other user-specific configurations. The file is automatically created in the CARA root directory when you first save settings, and it persists your preferences between application sessions.
 
-- **`engine_parameters.json`**: This file stores engine-specific parameters and options for each configured chess engine. Engine settings are automatically saved to this file when you configure engines through the application interface. Each engine entry includes per-task parameters (separate parameter sets for evaluation, game analysis, and manual analysis tasks), thread count, depth limits, time limits, and engine-specific UCI options.
+- **`engine_parameters.json`**: This file stores engine-specific parameters and options for each configured chess engine. Engine settings are automatically saved to this file when you configure engines through the application interface. Each engine entry includes per-task parameters (separate parameter sets for evaluation, game analysis, manual analysis, and brilliancy detection), thread count, depth limits, time limits, and engine-specific UCI options.
 
 ## Documentation
 
@@ -194,7 +206,7 @@ CARA uses three configuration files:
 
 [YouTube Channel](https://www.youtube.com/@CARA-Chess)
 
-Technical documentation for developers:
+### Technical documentation for developers
 
 ### Architecture & UI
 
@@ -230,6 +242,10 @@ Technical documentation for developers:
 
 - **Bulk Operations**: [`doc/bulk_operations_system.md`](doc/bulk_operations_system.md)
 
+### AI-assisted development
+
+CARA was built in large part by an AI model under the author's direction. The author took special care to ensure the AI adhered to the established [architectural guidelines](doc/architecture_outline.md) and coding conventions throughout the development process, while proposing the features, user stories, and UX design. This project served as an experiment to explore the feasibility of building a full-fledged, complex desktop application with Python using AI code completion, testing whether modern AI tools can produce polished, fully-featured software when guided by clear architectural principles and consistent oversight.
+
 ## Keyboard Shortcuts
 
 - `←` / `→`: Navigate through game moves
@@ -242,7 +258,7 @@ Technical documentation for developers:
 - `Ctrl+V` / `⌘+V`: Paste PGN to Clipboard database
 - `Ctrl+Alt+V` / `⌘+⌥+V`: Paste PGN to active database
 
-See the user manual for a complete list of keyboard shortcuts.
+See the user manual for a [complete list of keyboard shortcuts](https://pguntermann.github.io/CARA/manual.html#complete-keyboard-shortcuts).
 
 ## License
 
