@@ -8,7 +8,7 @@
 
 CARA is a full-featured desktop application designed for analyzing and reviewing chess games. Unlike chess playing applications or puzzle solvers, CARA focuses exclusively on post-game analysis and review, helping you understand your games, identify mistakes, recognize patterns, and improve your chess understanding.
 
-The project started from a desire for a tool that stays out of the way during real review sessions: less friction between your games and the questions you care about, and more support for turning engine output and patterns into lessons you can use—not just another busy interface or a stack of numbers without context. Over the course of development, the tool has become a very feature-rich integrated environment for chess game analysis, with a [complete HTML user manual](https://pguntermann.github.io/CARA/manual.html) and a [YouTube channel](https://www.youtube.com/@CARA-Chess) with tutorial videos.
+The project started from a desire for a tool that stays out of the way during real review sessions: less friction between your games and the questions you care about, and for turning engine output into real insights and answers —not just another busy interface or a stack of numbers without context. Over the course of development, the tool has become a feature-rich integrated environment for chess game analysis, with a [complete HTML user manual](https://pguntermann.github.io/CARA/manual.html) and a [YouTube channel](https://www.youtube.com/@CARA-Chess) with tutorial videos.
 
 ![CARA Application Overview](app/resources/manual/screenshots/app_overview.png)
 
