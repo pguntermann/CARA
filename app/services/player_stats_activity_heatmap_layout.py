@@ -63,10 +63,37 @@ def trim_range_ordinals(
     if date_range_mode == "rolling_24_months":
         end_o = today_ordinal
         return end_o - 729, end_o
+    # ~12 / ~24 months ending at latest game in the analyzed set (not calendar "today")
+    if date_range_mode == "games_12_months":
+        if not ordinals:
+            return today_ordinal, today_ordinal
+        end_o = max(ordinals)
+        return end_o - 364, end_o
+    if date_range_mode == "games_24_months":
+        if not ordinals:
+            return today_ordinal, today_ordinal
+        end_o = max(ordinals)
+        return end_o - 729, end_o
     # trim_to_data
     if not ordinals:
         return today_ordinal, today_ordinal
     return min(ordinals), max(ordinals)
+
+
+def _yearish_band_ranges(start_o: int, end_o: int) -> List[Tuple[int, int]]:
+    """Split inclusive [start_o, end_o] into chunks of at most 365 days each, oldest first.
+
+    Matches the rolling ~24 month split (first chunk 365 days, then the next, etc.).
+    """
+    if start_o > end_o:
+        return []
+    ranges: List[Tuple[int, int]] = []
+    cur = start_o
+    while cur <= end_o:
+        hi = min(cur + 364, end_o)
+        ranges.append((cur, hi))
+        cur = hi + 1
+    return ranges
 
 
 def _week_anchor_end_cover(start_o: int, end_o: int, week_start: str) -> Tuple[int, int]:
@@ -239,6 +266,12 @@ def build_activity_heatmap_paint_model(
         sub_parts.append("range: activity bounds")
     elif dr == "rolling_12_months":
         sub_parts.append("range: last ~12 months")
+    elif dr == "rolling_24_months":
+        sub_parts.append("range: last ~24 months")
+    elif dr == "games_12_months":
+        sub_parts.append("range: 1 year span to last game")
+    elif dr == "games_24_months":
+        sub_parts.append("range: 2 year span to last game")
     else:
         sub_parts.append("range: last ~24 months")
     if partial == "exclude":
@@ -257,7 +290,9 @@ def build_activity_heatmap_paint_model(
     bands_t: Tuple[ActivityHeatmapGridBand, ...]
     layout_style: str
 
-    if dr == "rolling_24_months" and (end_o - start_o + 1) >= 730:
+    span_days = end_o - start_o + 1
+
+    if dr in ("rolling_24_months", "games_24_months") and span_days >= 730:
         # ~two years: split into two ~365-day bands (older on top, newer below) for larger cells.
         pivot = start_o + 364
         b0 = _make_grid_band(counts_by_day, start_o, pivot, week_start, True)
@@ -272,6 +307,21 @@ def build_activity_heatmap_paint_model(
                 return None
             bands_t = (b_single,)
             layout_style = "single_band"
+    elif dr == "trim_to_data" and span_days > 365:
+        # Same stacking as ~24 month mode: at most ~365 days per band for readable cell size.
+        chunk_ranges = _yearish_band_ranges(start_o, end_o)
+        built: List[ActivityHeatmapGridBand] = []
+        for i, (lo, hi) in enumerate(chunk_ranges):
+            b = _make_grid_band(counts_by_day, lo, hi, week_start, i == 0)
+            if b is None:
+                return None
+            built.append(b)
+        bands_t = tuple(built)
+        if len(bands_t) == 2:
+            layout_style = "two_year_stacked"
+        else:
+            layout_style = "multi_year_stacked"
+        sub_parts.append("layout: older year above, newer below")
     else:
         b_single = _make_grid_band(counts_by_day, start_o, end_o, week_start, True)
         if b_single is None:

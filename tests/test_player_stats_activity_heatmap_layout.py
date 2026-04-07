@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from app.services.player_stats_activity_heatmap_layout import (
+    _yearish_band_ranges,
     build_activity_heatmap_paint_model,
     effective_ordinal_for_heatmap,
     trim_range_ordinals,
@@ -31,6 +32,15 @@ def test_trim_range() -> None:
     lo3, hi3 = trim_range_ordinals([today], "rolling_24_months", today)
     assert hi3 == today
     assert hi3 - lo3 == 729
+    # Games-anchored: window ends at max game ordinal, same length as rolling modes
+    g_hi = today - 50
+    g_lo = today - 100
+    ga12_lo, ga12_hi = trim_range_ordinals([g_lo, g_hi], "games_12_months", today)
+    assert ga12_hi == g_hi
+    assert ga12_hi - ga12_lo == 364
+    ga24_lo, ga24_hi = trim_range_ordinals([g_lo, g_hi], "games_24_months", today)
+    assert ga24_hi == g_hi
+    assert ga24_hi - ga24_lo == 729
 
 
 def _heatmap_user(**overrides):
@@ -76,6 +86,53 @@ def test_single_game_calendar_grid() -> None:
     assert sum(b0.counts[r][c] for r in range(b0.n_rows) for c in range(b0.n_cols)) == 1
 
 
+def test_yearish_band_ranges() -> None:
+    a = date(2024, 1, 1).toordinal()
+    b = date(2024, 6, 1).toordinal()
+    assert _yearish_band_ranges(a, b) == [(a, b)]
+    c = date(2025, 3, 1).toordinal()
+    ranges = _yearish_band_ranges(a, c)
+    assert len(ranges) == 2
+    assert ranges[0] == (a, a + 364)
+    assert ranges[1] == (a + 365, c)
+
+
+def test_trim_to_data_stacks_bands_when_span_exceeds_365_days() -> None:
+    """Trim to activity: >365 calendar days → multiple stacked bands like rolling ~24 months."""
+    d0 = date(2024, 1, 1).toordinal()
+    d1 = date(2025, 3, 15).toordinal()
+    pairs = [(d0, d0), (d1, d1)]
+    user = _heatmap_user(date_range="trim_to_data")
+    m = build_activity_heatmap_paint_model(pairs, user, date(2026, 1, 1).toordinal())
+    assert m is not None
+    assert len(m.bands) == 2
+    assert m.layout_style == "two_year_stacked"
+    assert len(m.bands[0].row_labels) == 7
+    assert len(m.bands[1].row_labels) == 0
+    assert "older year above" in m.subcaption
+    s = sum(
+        m.bands[i].counts[r][c]
+        for i in range(2)
+        for r in range(7)
+        for c in range(m.bands[i].n_cols)
+    )
+    assert s == 2
+
+
+def test_trim_to_data_multi_band_for_long_span() -> None:
+    lo = date(2022, 1, 1).toordinal()
+    hi = date(2025, 1, 1).toordinal()
+    pairs = [(lo, lo), (hi, hi)]
+    user = _heatmap_user(date_range="trim_to_data")
+    m = build_activity_heatmap_paint_model(pairs, user, date(2026, 1, 1).toordinal())
+    assert m is not None
+    # 1096 inclusive days → four ~365-day chunks (365+365+365+1)
+    assert len(m.bands) == 4
+    assert m.layout_style == "multi_year_stacked"
+    assert len(m.bands[0].row_labels) == 7
+    assert all(len(m.bands[i].row_labels) == 0 for i in range(1, 4))
+
+
 def test_trim_range_calendar_single_band() -> None:
     d0 = date(2024, 1, 1).toordinal()
     pairs = [(d0, d0)]
@@ -85,6 +142,31 @@ def test_trim_range_calendar_single_band() -> None:
     assert m.kind == "month"
     assert m.bands[0].n_rows == 7
     assert m.layout_style == "single_band"
+
+
+def test_games_24_months_stacks_two_year_bands() -> None:
+    """2 year span to last game: same 730-day window and two-band layout as rolling ~24 months."""
+    last_o = date(2023, 8, 1).toordinal()
+    old_o = last_o - 400
+    pairs = [(old_o, old_o), (last_o, last_o)]
+    user = _heatmap_user(date_range="games_24_months")
+    m = build_activity_heatmap_paint_model(pairs, user, date(2026, 4, 4).toordinal())
+    assert m is not None
+    assert m.layout_style == "two_year_stacked"
+    assert len(m.bands) == 2
+    assert "2 year span to last game" in m.subcaption
+    assert "older year above" in m.subcaption
+
+
+def test_games_12_months_single_band() -> None:
+    last_o = date(2024, 3, 1).toordinal()
+    pairs = [(last_o - 200, last_o - 200), (last_o, last_o)]
+    user = _heatmap_user(date_range="games_12_months")
+    m = build_activity_heatmap_paint_model(pairs, user, date(2026, 1, 1).toordinal())
+    assert m is not None
+    assert len(m.bands) == 1
+    assert m.layout_style == "single_band"
+    assert "1 year span to last game" in m.subcaption
 
 
 def test_rolling_24_months_stacks_two_year_bands() -> None:

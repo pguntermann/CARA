@@ -431,8 +431,7 @@ class PlayerActivityHeatmapWidget(QWidget):
         mcb_cfg: Dict[str, Any] = raw_mcb if isinstance(raw_mcb, dict) else {}
         calendar_mesh_above_cells = bool(mcb_cfg.get("draw_above_cells", True))
         preset = str(usr.get("color_preset", "github_green"))
-        date_range = str(usr.get("date_range", "trim_to_data"))
-        show_day_numbers_in_cells = date_range == "trim_to_data"
+        show_day_numbers_in_cells = bool(usr.get("show_day_numbers_in_cells", True))
 
         m = self._model
         p = QPainter(self)

@@ -11,6 +11,7 @@ DEFAULT_PLAYER_STATS_ACTIVITY_HEATMAP: Dict[str, Any] = {
     "color_scale_max_fixed": 5,
     "partial_dates": "include_stand_in",
     "date_range": "trim_to_data",
+    "show_day_numbers_in_cells": True,
     # month dividers: week_anchor = legacy verticals; calendar_mesh = edges along cell grid;
     # off = no month emphasis (week dividers only).
     "month_divider_mode": "week_anchor",
@@ -21,7 +22,13 @@ VALID_COLOR_PRESET: frozenset = frozenset({"github_green", "ocean_blue", "amber"
 VALID_SCALE_MAX_MODE: frozenset = frozenset({"auto", "fixed"})
 VALID_PARTIAL_DATES: frozenset = frozenset({"exclude", "include_stand_in"})
 VALID_DATE_RANGE: frozenset = frozenset(
-    {"trim_to_data", "rolling_12_months", "rolling_24_months"}
+    {
+        "trim_to_data",
+        "rolling_12_months",
+        "rolling_24_months",
+        "games_12_months",
+        "games_24_months",
+    }
 )
 VALID_MONTH_DIVIDER_MODE: frozenset = frozenset(
     {"week_anchor", "calendar_mesh", "off"}
@@ -61,6 +68,20 @@ def normalize_player_stats_activity_heatmap_settings(
     dr = str(raw.get("date_range", "")).strip().lower()
     if dr in VALID_DATE_RANGE:
         out["date_range"] = dr
+    if "show_day_numbers_in_cells" in raw:
+        v = raw["show_day_numbers_in_cells"]
+        if isinstance(v, bool):
+            out["show_day_numbers_in_cells"] = v
+        elif isinstance(v, (int, float)):
+            out["show_day_numbers_in_cells"] = bool(int(v))
+        elif isinstance(v, str):
+            sl = v.strip().lower()
+            if sl in ("true", "1", "yes", "on"):
+                out["show_day_numbers_in_cells"] = True
+            elif sl in ("false", "0", "no", "off"):
+                out["show_day_numbers_in_cells"] = False
+    else:
+        out["show_day_numbers_in_cells"] = out["date_range"] == "trim_to_data"
     md = str(raw.get("month_divider_mode", "")).strip().lower()
     if md in VALID_MONTH_DIVIDER_MODE:
         out["month_divider_mode"] = md

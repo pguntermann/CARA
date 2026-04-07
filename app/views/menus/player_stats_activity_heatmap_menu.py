@@ -33,6 +33,7 @@ class PlayerStatsActivityHeatmapMenuController:
         self._partial: Dict[str, QAction] = {}
         self._date_range: Dict[str, QAction] = {}
         self._month_divider: Dict[str, QAction] = {}
+        self._day_numbers: Optional[QAction] = None
 
     def attach_to_parent_menu(self, parent_menu: QMenu) -> QMenu:
         """Add "Activity heatmap settings" under ``parent_menu`` (menu bar); build once."""
@@ -93,15 +94,22 @@ class PlayerStatsActivityHeatmapMenuController:
             act.triggered.connect(lambda _c=False, k=key: self._on_partial(k))
             self._partial[key] = act
         for key, label in (
-            ("trim_to_data", "Trim to activity"),
+            ("games_12_months", "1 year span"),
+            ("games_24_months", "2 year span"),
             ("rolling_12_months", "Last ~12 months"),
             ("rolling_24_months", "Last ~24 months"),
+            ("trim_to_data", "Trim to activity"),
         ):
             act = QAction(label, p)
             act.setCheckable(True)
             act.setMenuRole(QAction.MenuRole.NoRole)
             act.triggered.connect(lambda _c=False, k=key: self._on_date_range(k))
             self._date_range[key] = act
+        dn = QAction("Day numbers in cells", p)
+        dn.setCheckable(True)
+        dn.setMenuRole(QAction.MenuRole.NoRole)
+        dn.triggered.connect(self._on_day_numbers)
+        self._day_numbers = dn
         for key, label in (
             ("week_anchor", "Week-aligned"),
             ("calendar_mesh", "Calendar grid"),
@@ -114,10 +122,21 @@ class PlayerStatsActivityHeatmapMenuController:
             self._month_divider[key] = act
 
     def _populate_tree(self, root: QMenu) -> None:
+        mr = root.addMenu("Date range")
+        self._style(mr)
+        mr.addAction(self._date_range["games_12_months"])
+        mr.addAction(self._date_range["games_24_months"])
+        mr.addSeparator()
+        mr.addAction(self._date_range["rolling_12_months"])
+        mr.addAction(self._date_range["rolling_24_months"])
+        mr.addSeparator()
+        mr.addAction(self._date_range["trim_to_data"])
         mw = root.addMenu("Week starts on")
         self._style(mw)
         mw.addAction(self._week_start["monday"])
         mw.addAction(self._week_start["sunday"])
+        root.addAction(self._day_numbers)
+        root.addSeparator()
         mc = root.addMenu("Color scale")
         self._style(mc)
         mc.addAction(self._preset["github_green"])
@@ -131,15 +150,11 @@ class PlayerStatsActivityHeatmapMenuController:
         self._style(mf)
         for n in CHOICES_COLOR_SCALE_MAX_FIXED:
             mf.addAction(self._scale_fixed[int(n)])
+        root.addSeparator()
         mp = root.addMenu("Partial PGN dates")
         self._style(mp)
         mp.addAction(self._partial["exclude"])
         mp.addAction(self._partial["include_stand_in"])
-        mr = root.addMenu("Date range")
-        self._style(mr)
-        mr.addAction(self._date_range["trim_to_data"])
-        mr.addAction(self._date_range["rolling_12_months"])
-        mr.addAction(self._date_range["rolling_24_months"])
         mm = root.addMenu("Dividers")
         self._style(mm)
         mm.addAction(self._month_divider["week_anchor"])
@@ -180,6 +195,10 @@ class PlayerStatsActivityHeatmapMenuController:
             a.blockSignals(True)
             a.setChecked(k == dr)
             a.blockSignals(False)
+        if self._day_numbers is not None:
+            self._day_numbers.blockSignals(True)
+            self._day_numbers.setChecked(bool(s.get("show_day_numbers_in_cells", True)))
+            self._day_numbers.blockSignals(False)
         md = str(s.get("month_divider_mode", "week_anchor"))
         if md not in VALID_MONTH_DIVIDER_MODE:
             md = "week_anchor"
@@ -229,6 +248,14 @@ class PlayerStatsActivityHeatmapMenuController:
             a.setChecked(k == key)
             a.blockSignals(False)
         UserSettingsService.get_instance().update_player_stats_activity_heatmap({"date_range": key})
+
+    def _on_day_numbers(self, _checked: bool = False) -> None:
+        if self._day_numbers is None:
+            return
+        on = self._day_numbers.isChecked()
+        UserSettingsService.get_instance().update_player_stats_activity_heatmap(
+            {"show_day_numbers_in_cells": on}
+        )
 
     def _on_month_divider(self, key: str) -> None:
         for k, a in self._month_divider.items():

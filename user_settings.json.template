@@ -979,13 +979,14 @@
     "progression_line_smooth_strength": 1.0
   },
   "player_stats_activity_heatmap": {
-    "month_divider_mode": "week_anchor",
     "week_starts_on": "sunday",
-    "color_preset": "github_green",
+    "color_preset": "ocean_blue",
     "color_scale_max_mode": "auto",
     "color_scale_max_fixed": 20,
     "partial_dates": "include_stand_in",
-    "date_range": "rolling_12_months"
+    "date_range": "games_12_months",
+    "show_day_numbers_in_cells": false,
+    "month_divider_mode": "week_anchor"
   },
   "player_stats_accuracy_distribution": {
     "skew_mode": "linear",
