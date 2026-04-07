@@ -17,8 +17,8 @@ if TYPE_CHECKING:
     from app.models.moveslist_model import MovesListModel
 from app.models.evaluation_model import EvaluationModel
 from app.models.annotation_model import AnnotationModel, Annotation, AnnotationType
-from app.views.material_widget import MaterialWidget
-from app.views.evaluation_bar_widget import EvaluationBarWidget
+from app.views.widgets.material_widget import MaterialWidget
+from app.views.widgets.evaluation_bar_widget import EvaluationBarWidget
 from app.services.logging_service import LoggingService
 
 
@@ -677,7 +677,8 @@ class ChessBoardWidget(QWidget):
         painter.setBrush(QBrush(QColor(color_rgb[0], color_rgb[1], color_rgb[2])))
         painter.drawEllipse(QPointF(center_x, center_y), badge_radius, badge_radius)
         icon_size = badge_radius * 2
-        icon_path = Path(__file__).resolve().parent.parent / "resources" / "icons" / "move_classification" / f"{config_key}.svg"
+        app_root = Path(__file__).resolve().parents[2]
+        icon_path = app_root / "resources" / "icons" / "move_classification" / f"{config_key}.svg"
         if icon_path.exists():
             try:
                 svg_bytes = icon_path.read_bytes()
@@ -1253,9 +1254,15 @@ class ChessBoardWidget(QWidget):
     
     def _load_pieces(self) -> None:
         """Load chess piece SVG files from the configured path."""
-        # Resolve path relative to project root
-        project_root = Path(__file__).parent.parent.parent
-        pieces_dir = project_root / self.svg_path
+        # Resolve path relative to repository root (stable regardless of module location)
+        repo_root = Path(__file__).resolve().parents[3]
+        svg_path = Path(self.svg_path)
+        pieces_dir = svg_path if svg_path.is_absolute() else (repo_root / svg_path)
+
+        # Backward compatibility: some configs might be relative to app/ instead of repo root
+        if not pieces_dir.exists():
+            app_root = Path(__file__).resolve().parents[2]
+            pieces_dir = svg_path if svg_path.is_absolute() else (app_root / svg_path)
         
         if not pieces_dir.exists():
             logging_service = LoggingService.get_instance()
@@ -2882,7 +2889,7 @@ class ChessBoardWidget(QWidget):
                     hit = self._hit_test_text_annotation(event.pos(), annotation, start_x, start_y)
                     if hit == "text":  # Only open dialog if clicking on text body, not handles
                         # Open text input dialog to edit text content
-                        from app.views.input_dialog import InputDialog
+                        from app.views.dialogs.input_dialog import InputDialog
                         text, ok = InputDialog.get_text(
                             self.config,
                             "Edit Text Annotation",

@@ -199,9 +199,9 @@ class MessageDialog(QDialog):
         if link.startswith("manual://"):
             # Extract anchor (everything after manual://)
             anchor = link.replace("manual://", "")
-            # Get the path to the manual HTML file
-            # __file__ is app/views/message_dialog.py, so parent is app/, then resources/manual/index.html
-            manual_path = Path(__file__).resolve().parent.parent / "resources" / "manual" / "index.html"
+            # Get the path to the manual HTML file (stable regardless of this module's location)
+            # message_dialog.py lives under app/views/dialogs/, so parents[2] is app/
+            manual_path = Path(__file__).resolve().parents[2] / "resources" / "manual" / "index.html"
             
             # On macOS, use osascript to preserve URL fragments (QDesktopServices strips them)
             if sys.platform == "darwin":

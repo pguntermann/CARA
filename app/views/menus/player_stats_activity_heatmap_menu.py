@@ -17,7 +17,7 @@ PLAYER_STATS_ACTIVITY_HEATMAP_CONTEXT_SECTIONS: frozenset[str] = frozenset({"Act
 
 
 class PlayerStatsActivityHeatmapMenuController:
-    """Nested \"Activity heatmap settings\" menu for one host (menubar or context)."""
+    """Nested "Activity heatmap settings" menu for one host (menubar or context)."""
 
     def __init__(self, action_parent, style_submenu: Callable[[QMenu], None]) -> None:
         self._parent = action_parent
@@ -31,7 +31,7 @@ class PlayerStatsActivityHeatmapMenuController:
         self._date_range: Dict[str, QAction] = {}
 
     def attach_to_parent_menu(self, parent_menu: QMenu) -> QMenu:
-        """Add \"Activity heatmap settings\" under ``parent_menu`` (menu bar); build once."""
+        """Add "Activity heatmap settings" under ``parent_menu`` (menu bar); build once."""
         self.top_menu = parent_menu.addMenu("Activity heatmap settings")
         self._style(self.top_menu)
         self._ensure_actions()
@@ -40,7 +40,7 @@ class PlayerStatsActivityHeatmapMenuController:
         return self.top_menu
 
     def append_to_context_menu(self, context_menu: QMenu) -> None:
-        """Add a fresh \"Activity heatmap settings\" subtree (new QMenus; reuse cached QActions)."""
+        """Add a fresh "Activity heatmap settings" subtree (new QMenus; reuse cached QActions)."""
         hm_menu = context_menu.addMenu("Activity heatmap settings")
         self._style(hm_menu)
         self._ensure_actions()
@@ -188,9 +188,7 @@ class PlayerStatsActivityHeatmapMenuController:
             a.blockSignals(True)
             a.setChecked(n == value)
             a.blockSignals(False)
-        UserSettingsService.get_instance().update_player_stats_activity_heatmap(
-            {"color_scale_max_fixed": value}
-        )
+        UserSettingsService.get_instance().update_player_stats_activity_heatmap({"color_scale_max_fixed": value})
 
     def _on_partial(self, key: str) -> None:
         for k, a in self._partial.items():
@@ -205,3 +203,4 @@ class PlayerStatsActivityHeatmapMenuController:
             a.setChecked(k == key)
             a.blockSignals(False)
         UserSettingsService.get_instance().update_player_stats_activity_heatmap({"date_range": key})
+

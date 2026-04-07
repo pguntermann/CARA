@@ -60,7 +60,10 @@ class DeduplicationController(QObject):
             DeduplicationResult with operation statistics, or None if cancelled.
         """
         # Show criteria selection dialog
-        from app.views.deduplication_criteria_dialog import DeduplicationCriteriaDialog, DeduplicationMode
+        from app.views.dialogs.deduplication_criteria_dialog import (
+            DeduplicationCriteriaDialog,
+            DeduplicationMode,
+        )
         criteria_dialog = DeduplicationCriteriaDialog(self.config, parent)
         if criteria_dialog.exec() != QDialog.DialogCode.Accepted:
             return None

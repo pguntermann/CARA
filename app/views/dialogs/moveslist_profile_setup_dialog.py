@@ -859,7 +859,7 @@ class MovesListProfileSetupDialog(QDialog):
         # Validate that at least one column is selected
         visible_count = sum(1 for v in visibility.values() if v)
         if visible_count == 0:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "No Columns Selected",
@@ -1055,8 +1055,8 @@ class MovesListProfileSetupDialog(QDialog):
         from pathlib import Path
         
         # Get checkmark icon path
-        project_root = Path(__file__).parent.parent.parent
-        checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
+        app_root = Path(__file__).resolve().parents[2]
+        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
         
         # Use input border and background colors for checkbox indicator
         inputs_config = dialog_config.get('inputs', {})

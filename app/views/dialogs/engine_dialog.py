@@ -591,7 +591,7 @@ class EngineDialog(QDialog):
             self.controller.set_status(f"Validation failed: {error}")
             
             # Show error dialog
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Validation Failed",
@@ -607,7 +607,7 @@ class EngineDialog(QDialog):
         # Check if engine already exists through controller
         exists, error_message = self.controller.check_engine_exists(self.engine_path)
         if exists:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Engine Already Exists",
@@ -619,7 +619,7 @@ class EngineDialog(QDialog):
         # Prepare engine for addition (saves options and defaults) through controller
         success, error_message = self.controller.prepare_engine_for_addition(self.engine_path)
         if not success:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Prepare Engine Failed",
@@ -639,7 +639,7 @@ class EngineDialog(QDialog):
         if success:
             self.accept()
         else:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Add Engine Failed",

@@ -3,8 +3,8 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
 from typing import Dict, Any, Optional
 
-from app.views.chessboard_widget import ChessBoardWidget
-from app.views.evaluation_bar_widget import EvaluationBarWidget
+from app.views.widgets.chessboard_widget import ChessBoardWidget
+from app.views.widgets.evaluation_bar_widget import EvaluationBarWidget
 from app.models.board_model import BoardModel
 
 

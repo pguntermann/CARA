@@ -448,8 +448,8 @@ class BulkCleanPgnDialog(QDialog):
         input_bg_color = inputs_config.get("background_color", [30, 30, 35])
         
         # Get checkmark icon path
-        project_root = Path(__file__).parent.parent.parent
-        checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
+        app_root = Path(__file__).resolve().parents[2]
+        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
         
         # Convert QColor to [R, G, B] lists
         text_color = [self.label_text_color.red(), self.label_text_color.green(), self.label_text_color.blue()]
@@ -492,7 +492,7 @@ class BulkCleanPgnDialog(QDialog):
             return
         
         if not self.database:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "No Database", "No database is currently active.", self)
             return
         
@@ -504,7 +504,7 @@ class BulkCleanPgnDialog(QDialog):
         
         if not any([remove_comments, remove_variations, remove_non_standard_tags, 
                    remove_annotations]):
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "No Options Selected", "Please select at least one cleaning option.", self)
             return
         
@@ -531,7 +531,7 @@ class BulkCleanPgnDialog(QDialog):
         self._operation_in_progress = False
         
         if not result.success:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Error",
@@ -541,7 +541,7 @@ class BulkCleanPgnDialog(QDialog):
             return
         
         # Show success message (dialog stays open, user closes it manually)
-        from app.views.message_dialog import MessageDialog
+        from app.views.dialogs.message_dialog import MessageDialog
         MessageDialog.show_information(
             self.config,
             "Bulk Clean PGN Complete",

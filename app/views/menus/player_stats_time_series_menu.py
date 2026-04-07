@@ -18,18 +18,13 @@ from app.services.player_stats_time_series_user import (
 )
 from app.services.user_settings_service import UserSettingsService
 
-# section_name on trend section wrappers (detail_player_stats_view)
 PLAYER_STATS_TIME_SERIES_CONTEXT_SECTIONS: frozenset[str] = frozenset(
-    {
-        "Accuracy progression",
-        "Move quality progression",
-        "ACPL progression by phase",
-    }
+    {"Accuracy progression", "Move quality progression", "ACPL progression by phase"}
 )
 
 
 class PlayerStatsTimeSeriesMenuController:
-    """Creates and syncs the nested \"Time series settings\" menu for one host (menubar or context)."""
+    """Creates and syncs the nested "Time series settings" menu for one host (menubar or context)."""
 
     def __init__(self, action_parent, style_submenu: Callable[[QMenu], None]) -> None:
         self._parent = action_parent
@@ -47,7 +42,7 @@ class PlayerStatsTimeSeriesMenuController:
         self._ps_ts_smooth_strength_actions: Dict[float, QAction] = {}
 
     def attach_to_parent_menu(self, parent_menu: QMenu) -> QMenu:
-        """Add \"Time series settings\" under ``parent_menu`` (menu bar); build once."""
+        """Add "Time series settings" under ``parent_menu`` (menu bar); build once."""
         self.top_menu = parent_menu.addMenu("Time series settings")
         self._style(self.top_menu)
         self._ensure_actions()
@@ -56,7 +51,7 @@ class PlayerStatsTimeSeriesMenuController:
         return self.top_menu
 
     def append_to_context_menu(self, context_menu: QMenu) -> None:
-        """Add a fresh \"Time series settings\" subtree (new QMenus; reuse cached QActions)."""
+        """Add a fresh "Time series settings" subtree (new QMenus; reuse cached QActions)."""
         ts_menu = context_menu.addMenu("Time series settings")
         self._style(ts_menu)
         self._ensure_actions()
@@ -76,33 +71,23 @@ class PlayerStatsTimeSeriesMenuController:
         self._ps_ts_mode_quantile = QAction("Quantile (equal games per bin)", p)
         self._ps_ts_mode_quantile.setCheckable(True)
         self._ps_ts_mode_quantile.setMenuRole(QAction.MenuRole.NoRole)
-        self._ps_ts_mode_quantile.triggered.connect(
-            lambda _c=False: self._on_ordinal_mode_selected("quantile")
-        )
+        self._ps_ts_mode_quantile.triggered.connect(lambda _c=False: self._on_ordinal_mode_selected("quantile"))
         self._ps_ts_mode_equal = QAction("Equal calendar width", p)
         self._ps_ts_mode_equal.setCheckable(True)
         self._ps_ts_mode_equal.setMenuRole(QAction.MenuRole.NoRole)
-        self._ps_ts_mode_equal.triggered.connect(
-            lambda _c=False: self._on_ordinal_mode_selected("equal_width")
-        )
+        self._ps_ts_mode_equal.triggered.connect(lambda _c=False: self._on_ordinal_mode_selected("equal_width"))
         self._ps_ts_x_uniform = QAction("Uniform bins", p)
         self._ps_ts_x_uniform.setCheckable(True)
         self._ps_ts_x_uniform.setMenuRole(QAction.MenuRole.NoRole)
-        self._ps_ts_x_uniform.triggered.connect(
-            lambda _c=False: self._on_x_axis_mode_selected("uniform_bins")
-        )
+        self._ps_ts_x_uniform.triggered.connect(lambda _c=False: self._on_x_axis_mode_selected("uniform_bins"))
         self._ps_ts_x_gap = QAction("Gap compressed", p)
         self._ps_ts_x_gap.setCheckable(True)
         self._ps_ts_x_gap.setMenuRole(QAction.MenuRole.NoRole)
-        self._ps_ts_x_gap.triggered.connect(
-            lambda _c=False: self._on_x_axis_mode_selected("gap_compressed")
-        )
+        self._ps_ts_x_gap.triggered.connect(lambda _c=False: self._on_x_axis_mode_selected("gap_compressed"))
         self._ps_ts_x_cal = QAction("Calendar linear", p)
         self._ps_ts_x_cal.setCheckable(True)
         self._ps_ts_x_cal.setMenuRole(QAction.MenuRole.NoRole)
-        self._ps_ts_x_cal.triggered.connect(
-            lambda _c=False: self._on_x_axis_mode_selected("calendar_linear")
-        )
+        self._ps_ts_x_cal.triggered.connect(lambda _c=False: self._on_x_axis_mode_selected("calendar_linear"))
         for n in CHOICES_COMPRESS_GAP_MAX_SEGMENT_DAYS:
             act = QAction(str(n), p)
             act.setCheckable(True)
@@ -112,15 +97,11 @@ class PlayerStatsTimeSeriesMenuController:
         self._ps_ts_line_smooth = QAction("Smooth", p)
         self._ps_ts_line_smooth.setCheckable(True)
         self._ps_ts_line_smooth.setMenuRole(QAction.MenuRole.NoRole)
-        self._ps_ts_line_smooth.triggered.connect(
-            lambda _c=False: self._on_line_style_selected("smooth")
-        )
+        self._ps_ts_line_smooth.triggered.connect(lambda _c=False: self._on_line_style_selected("smooth"))
         self._ps_ts_line_straight = QAction("Straight segments", p)
         self._ps_ts_line_straight.setCheckable(True)
         self._ps_ts_line_straight.setMenuRole(QAction.MenuRole.NoRole)
-        self._ps_ts_line_straight.triggered.connect(
-            lambda _c=False: self._on_line_style_selected("straight")
-        )
+        self._ps_ts_line_straight.triggered.connect(lambda _c=False: self._on_line_style_selected("straight"))
         for x in CHOICES_PROGRESSION_LINE_SMOOTH_STRENGTH:
             act = QAction(str(x), p)
             act.setCheckable(True)
@@ -268,3 +249,4 @@ class PlayerStatsTimeSeriesMenuController:
             a.setChecked(abs(x - value) < 1e-9)
             a.blockSignals(False)
         UserSettingsService.get_instance().update_player_stats_time_series({"progression_line_smooth_strength": value})
+

@@ -1,7 +1,7 @@
 """Database-Panel below Main-Panel and Detail-Panel."""
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QTabWidget, QTableView, QMenu, QApplication
+    QWidget, QVBoxLayout, QTabWidget, QTableView, QApplication
 )
 from PyQt6.QtCore import QItemSelectionModel, QPoint, QEvent, pyqtSignal
 from PyQt6.QtGui import (
@@ -282,38 +282,29 @@ class DatabasePanel(QWidget):
         if identifier == 'search_results':
             if not self._on_close_search_results:
                 return
-            menu = QMenu(self)
-            close_action = menu.addAction("Close")
-            ui_config = self.config.get('ui', {})
-            panel_config = ui_config.get('panels', {}).get('database', {})
-            bg_color = panel_config.get('background_color', [35, 35, 40])
-            from app.views.style import StyleManager
-            StyleManager.style_context_menu(menu, self.config, bg_color)
-            action = menu.exec(tab_bar.mapToGlobal(pos))
-            menu.close()
-            menu.hide()
-            if action == close_action:
+            from app.views.menus.database_panel_context_menus import build_database_tab_context_menu
+
+            ctx = build_database_tab_context_menu(self, include_close_all_but=False)
+            action = ctx.menu.exec(tab_bar.mapToGlobal(pos))
+            ctx.menu.close()
+            ctx.menu.hide()
+            if action == ctx.close_action:
                 self._tab_context_menu_cooldown_until = time.monotonic() + 0.4
                 QTimer.singleShot(10, self._on_close_search_results)
             return
         if not self._on_close_database and not self._on_close_all_but_database:
             return
-        menu = QMenu(self)
-        close_action = menu.addAction("Close")
-        close_all_but_action = menu.addAction("Close all but this")
-        ui_config = self.config.get('ui', {})
-        panel_config = ui_config.get('panels', {}).get('database', {})
-        bg_color = panel_config.get('background_color', [35, 35, 40])
-        from app.views.style import StyleManager
-        StyleManager.style_context_menu(menu, self.config, bg_color)
-        action = menu.exec(tab_bar.mapToGlobal(pos))
+        from app.views.menus.database_panel_context_menus import build_database_tab_context_menu
+
+        ctx = build_database_tab_context_menu(self, include_close_all_but=True)
+        action = ctx.menu.exec(tab_bar.mapToGlobal(pos))
         # Dismiss menu immediately so it does not stay visible or reopen
-        menu.close()
-        menu.hide()
-        if action == close_action and self._on_close_database:
+        ctx.menu.close()
+        ctx.menu.hide()
+        if action == ctx.close_action and self._on_close_database:
             self._tab_context_menu_cooldown_until = time.monotonic() + 0.4
             QTimer.singleShot(10, lambda: self._on_close_database(identifier))
-        elif action == close_all_but_action and self._on_close_all_but_database:
+        elif action == ctx.close_all_but_action and self._on_close_all_but_database:
             self._tab_context_menu_cooldown_until = time.monotonic() + 0.4
             QTimer.singleShot(10, lambda: self._on_close_all_but_database(identifier))
 
@@ -981,72 +972,27 @@ class DatabasePanel(QWidget):
         if has_cell:
             cell_value = model.data(index, Qt.ItemDataRole.DisplayRole)
 
-        select_rows_menu = QMenu("Select rows", self)
-        select_mode_menu = QMenu("Select mode", self)
-        act_replace = select_mode_menu.addAction("Replace")
-        act_replace.setCheckable(True)
-        act_replace.setChecked(self._selection_mode == "replace")
-        act_append = select_mode_menu.addAction("Append")
-        act_append.setCheckable(True)
-        act_append.setChecked(self._selection_mode == "append")
-        select_rows_menu.addMenu(select_mode_menu)
-        select_rows_menu.addSeparator()
-        act_select_all = select_rows_menu.addAction("Select all rows")
-        act_unselect_all = select_rows_menu.addAction("Unselect all rows")
-        act_invert_selection = select_rows_menu.addAction("Invert Selection")
-        if has_cell:
-            select_rows_menu.addSeparator()
-            act_with_this = select_rows_menu.addAction("With this value")
-            act_with_not_this = select_rows_menu.addAction("With not this value")
-            act_with_empty = select_rows_menu.addAction("With empty value")
-            act_with_not_empty = select_rows_menu.addAction("With not empty value")
+        from app.views.menus.database_panel_context_menus import (
+            build_database_table_context_menu,
+            dismiss_database_table_context_menus,
+        )
 
-        menu = QMenu(self)
-        menu.addMenu(select_rows_menu)
-        menu.addSeparator()
-        act_copy_csv = menu.addAction("Copy table as CSV")
-        act_copy_tsv = menu.addAction("Copy table as TSV")
-        act_copy_selected_csv = menu.addAction("Copy selected rows as CSV")
-        act_copy_selected_tsv = menu.addAction("Copy selected rows as TSV")
-        menu.addSeparator()
-        act_copy_game = menu.addAction("Copy Game") if self._on_copy_game and has_cell else None
-        act_copy_selected_games = menu.addAction("Copy selected Games") if self._on_copy_selected_games else None
-        act_cut_selected_games = menu.addAction("Cut selected Games") if self._on_cut_selected_games else None
-        act_paste_games = menu.addAction("Paste Game(s)") if self._on_paste_games else None
+        ctx = build_database_table_context_menu(
+            self,
+            has_cell=has_cell,
+            selection_mode=self._selection_mode,
+            enable_copy_game=bool(self._on_copy_game),
+            enable_copy_selected_games=bool(self._on_copy_selected_games),
+            enable_cut_selected_games=bool(self._on_cut_selected_games),
+            enable_paste_games=bool(self._on_paste_games),
+        )
 
-        ui_config = self.config.get("ui", {})
-        panel_config = ui_config.get("panels", {}).get("database", {})
-        bg_color = panel_config.get("background_color", [35, 35, 40])
-        from app.views.style import StyleManager
-        StyleManager.style_context_menu(menu, self.config, bg_color)
-        StyleManager.style_context_menu(select_rows_menu, self.config, bg_color)
-        StyleManager.style_context_menu(select_mode_menu, self.config, bg_color)
-
-        action = menu.exec(table.viewport().mapToGlobal(pos))
-
-        def dismiss_menus() -> None:
-            # Close our menu hierarchy (root first so native layer tears down on macOS).
-            menu.close()
-            menu.hide()
-            select_rows_menu.close()
-            select_rows_menu.hide()
-            select_mode_menu.close()
-            select_mode_menu.hide()
-            # On macOS the root menu can remain as the active popup after a submenu action;
-            # process events so close() takes effect, then force-close any remaining active popup.
-            if sys.platform == "darwin":
-                QApplication.processEvents()
-                popup = QApplication.activePopupWidget()
-                while popup is not None:
-                    popup.close()
-                    popup.hide()
-                    QApplication.processEvents()
-                    popup = QApplication.activePopupWidget()
+        action = ctx.menu.exec(table.viewport().mapToGlobal(pos))
 
         if sys.platform == "darwin":
-            QTimer.singleShot(20, dismiss_menus)
+            QTimer.singleShot(20, lambda: dismiss_database_table_context_menus(self, ctx))
         else:
-            dismiss_menus()
+            dismiss_database_table_context_menus(self, ctx)
 
         if action is None:
             return
@@ -1055,67 +1001,67 @@ class DatabasePanel(QWidget):
         progress_service = ProgressService.get_instance()
 
         append = self._selection_mode == "append"
-        if action == act_replace:
+        if action == ctx.act_replace:
             self._selection_mode = "replace"
             return
-        if action == act_append:
+        if action == ctx.act_append:
             self._selection_mode = "append"
             return
-        if action == act_select_all:
+        if action == ctx.act_select_all:
             row_indices = model.get_row_indices_matching_column_value(col_index, "all")
             self._set_table_selection_to_rows(table, model, row_indices, append=append)
             n = len(row_indices)
             progress_service.set_status(f"Selected all {n} row{'s' if n != 1 else ''}" if n else "No rows in database")
-        elif action == act_unselect_all:
+        elif action == ctx.act_unselect_all:
             self._set_table_selection_to_rows(table, model, [])
             progress_service.set_status("Unselected all rows")
-        elif action == act_invert_selection:
+        elif action == ctx.act_invert_selection:
             selected = set(idx.row() for idx in table.selectionModel().selectedRows())
             all_rows = set(range(model.rowCount()))
             inverted = sorted(all_rows - selected)
             self._set_table_selection_to_rows(table, model, inverted)
             n = len(inverted)
             progress_service.set_status(f"Inverted selection: {n} row{'s' if n != 1 else ''} now selected")
-        elif has_cell and action == act_with_this:
+        elif has_cell and ctx.act_with_this and action == ctx.act_with_this:
             row_indices = model.get_row_indices_matching_column_value(col_index, "equals", cell_value)
             self._set_table_selection_to_rows(table, model, row_indices, append=append)
             n = len(row_indices)
             progress_service.set_status(f"Selected {n} row{'s' if n != 1 else ''} with this value")
-        elif has_cell and action == act_with_not_this:
+        elif has_cell and ctx.act_with_not_this and action == ctx.act_with_not_this:
             row_indices = model.get_row_indices_matching_column_value(col_index, "not_equals", cell_value)
             self._set_table_selection_to_rows(table, model, row_indices, append=append)
             n = len(row_indices)
             progress_service.set_status(f"Selected {n} row{'s' if n != 1 else ''} with other values")
-        elif has_cell and action == act_with_empty:
+        elif has_cell and ctx.act_with_empty and action == ctx.act_with_empty:
             row_indices = model.get_row_indices_matching_column_value(col_index, "empty")
             self._set_table_selection_to_rows(table, model, row_indices, append=append)
             n = len(row_indices)
             progress_service.set_status(f"Selected {n} row{'s' if n != 1 else ''} with empty value")
-        elif has_cell and action == act_with_not_empty:
+        elif has_cell and ctx.act_with_not_empty and action == ctx.act_with_not_empty:
             row_indices = model.get_row_indices_matching_column_value(col_index, "not_empty")
             self._set_table_selection_to_rows(table, model, row_indices, append=append)
             n = len(row_indices)
             progress_service.set_status(f"Selected {n} row{'s' if n != 1 else ''} with non-empty value")
-        elif action in (act_copy_csv, act_copy_tsv):
-            self._copy_database_table_as_delimited(table, model, action, act_copy_csv, act_copy_tsv, progress_service)
-        elif action in (act_copy_selected_csv, act_copy_selected_tsv):
+        elif action in (ctx.act_copy_csv, ctx.act_copy_tsv):
+            self._copy_database_table_as_delimited(table, model, action, ctx.act_copy_csv, ctx.act_copy_tsv, progress_service)
+        elif action in (ctx.act_copy_selected_csv, ctx.act_copy_selected_tsv):
             selected = sorted(set(idx.row() for idx in table.selectionModel().selectedRows()))
             if not selected:
                 progress_service.set_status("No rows selected")
                 return
             self._copy_database_table_as_delimited(
-                table, model, action, act_copy_selected_csv, act_copy_selected_tsv, progress_service, row_indices=selected
+                table, model, action, ctx.act_copy_selected_csv, ctx.act_copy_selected_tsv, progress_service, row_indices=selected
             )
-        elif act_copy_game and action == act_copy_game and self._on_copy_game:
+        elif ctx.act_copy_game and action == ctx.act_copy_game and self._on_copy_game:
             game = model.get_game(index.row()) if has_cell else None
             self._on_copy_game(game)
-        elif act_copy_selected_games and action == act_copy_selected_games and self._on_copy_selected_games:
+        elif ctx.act_copy_selected_games and action == ctx.act_copy_selected_games and self._on_copy_selected_games:
             selected = sorted(set(idx.row() for idx in table.selectionModel().selectedRows()))
             self._on_copy_selected_games(model, selected)
-        elif act_cut_selected_games and action == act_cut_selected_games and self._on_cut_selected_games:
+        elif ctx.act_cut_selected_games and action == ctx.act_cut_selected_games and self._on_cut_selected_games:
             selected = sorted(set(idx.row() for idx in table.selectionModel().selectedRows()))
             self._on_cut_selected_games(model, selected)
-        elif act_paste_games and action == act_paste_games and self._on_paste_games:
+        elif ctx.act_paste_games and action == ctx.act_paste_games and self._on_paste_games:
             self._on_paste_games(model)
 
     def _copy_database_table_as_delimited(

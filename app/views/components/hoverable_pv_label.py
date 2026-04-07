@@ -6,7 +6,7 @@ from PyQt6.QtGui import QMouseEvent
 import chess
 from typing import Dict, Any, List, Optional
 
-from app.views.mini_chessboard_widget import MiniChessBoardWidget
+from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
 from app.controllers.board_controller import BoardController
 
 

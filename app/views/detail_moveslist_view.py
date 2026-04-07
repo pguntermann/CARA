@@ -392,7 +392,7 @@ class DetailMovesListView(QWidget):
         game = self._game_model.active_game
         read_result = self._game_controller.read_mainline_move_comments(game, row_index)
         if read_result is None:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Comments",
@@ -404,7 +404,7 @@ class DetailMovesListView(QWidget):
         move_data = self._moveslist_model.get_move(row_index)
         white_san = (move_data.white_move or "").strip() if move_data else ""
         black_san = (move_data.black_move or "").strip() if move_data else ""
-        from app.views.move_comment_dialog import MoveCommentDialog
+        from app.views.dialogs.move_comment_dialog import MoveCommentDialog
         
         dlg = MoveCommentDialog(
             self.config,
@@ -423,7 +423,7 @@ class DetailMovesListView(QWidget):
             game, row_index, new_w, new_b
         )
         if not ok:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "Comments", err, self)
             return
         if self._database_controller:

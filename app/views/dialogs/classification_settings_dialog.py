@@ -774,8 +774,8 @@ class ClassificationSettingsDialog(QDialog):
         from pathlib import Path
         
         # Get checkmark icon path
-        project_root = Path(__file__).parent.parent.parent
-        checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
+        app_root = Path(__file__).resolve().parents[2]
+        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
         
         # Use input border and background colors for checkbox indicator
         input_border_color = border_color
@@ -869,7 +869,7 @@ class ClassificationSettingsDialog(QDialog):
         if not self.classification_controller.reset_to_defaults():
             self.controller.hide_progress()
             self.controller.set_status("Failed to reset settings")
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Reset Failed",
@@ -924,7 +924,7 @@ class ClassificationSettingsDialog(QDialog):
         # Validate thresholds
         is_valid, error_msg = self._validate_thresholds()
         if not is_valid:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Invalid Settings",
@@ -952,7 +952,7 @@ class ClassificationSettingsDialog(QDialog):
         if not self.classification_controller.update_all_settings(thresholds, brilliant):
             self.controller.hide_progress()
             self.controller.set_status("Failed to save settings")
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Save Failed",

@@ -10,7 +10,7 @@ from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap, QPalette, QPen, QMouse
 from typing import Dict, Any, Optional
 
 from app.models.game_model import GameModel
-from app.views.chessboard_widget import ChessBoardWidget
+from app.views.widgets.chessboard_widget import ChessBoardWidget
 from app.controllers.annotation_controller import AnnotationController
 from app.models.annotation_model import AnnotationType
 from app.utils.font_utils import scale_font_size
@@ -1809,7 +1809,7 @@ class DetailAnnotationView(QWidget):
             color: RGB color [r, g, b].
             color_index: Index into color palette.
         """
-        from app.views.input_dialog import InputDialog
+        from app.views.dialogs.input_dialog import InputDialog
         
         text, ok = InputDialog.get_text(
             self.config,

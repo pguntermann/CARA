@@ -33,15 +33,17 @@ from app.services.player_stats_service import merged_player_stats_time_series_ch
 
 if TYPE_CHECKING:
     from app.controllers.player_stats_controller import PlayerStatsController
-    from app.views.accuracy_distribution_chart_widget import AccuracyDistributionChartWidget
-    from app.views.player_activity_heatmap_widget import PlayerActivityHeatmapWidget
-    from app.views.player_stats_accuracy_distribution_menu import (
+    from app.views.widgets.accuracy_distribution_chart_widget import (
+        AccuracyDistributionChartWidget,
+    )
+    from app.views.widgets.player_activity_heatmap_widget import PlayerActivityHeatmapWidget
+    from app.views.menus.player_stats_accuracy_distribution_menu import (
         PlayerStatsAccuracyDistributionMenuController,
     )
-    from app.views.player_stats_activity_heatmap_menu import (
+    from app.views.menus.player_stats_activity_heatmap_menu import (
         PlayerStatsActivityHeatmapMenuController,
     )
-    from app.views.player_stats_time_series_menu import PlayerStatsTimeSeriesMenuController
+    from app.views.menus.player_stats_time_series_menu import PlayerStatsTimeSeriesMenuController
     from app.controllers.database_controller import DatabaseController
     from app.services.player_stats_service import AggregatedPlayerStats
     from app.services.error_pattern_service import ErrorPattern
@@ -3308,7 +3310,9 @@ class DetailPlayerStatsView(QWidget):
             and ah_cfg.get("enabled", True)
             and self._activity_heatmap_has_paint_model(stats)
         ):
-            from app.views.player_activity_heatmap_widget import PlayerActivityHeatmapWidget
+            from app.views.widgets.player_activity_heatmap_widget import (
+                PlayerActivityHeatmapWidget,
+            )
 
             pairs = list(getattr(stats, "activity_heatmap_per_game_ordinals", None) or [])
             ah_wrap = QWidget()
@@ -4744,7 +4748,9 @@ class DetailPlayerStatsView(QWidget):
         text_color: QColor,
     ) -> QWidget:
         """Chart only (no bordered container), matching accuracy progression time-series layout."""
-        from app.views.accuracy_distribution_chart_widget import AccuracyDistributionChartWidget
+        from app.views.widgets.accuracy_distribution_chart_widget import (
+            AccuracyDistributionChartWidget,
+        )
 
         dist_widget = AccuracyDistributionChartWidget(
             self.config, getattr(stats, "accuracy_values", []), text_color, None
@@ -6482,7 +6488,7 @@ class DetailPlayerStatsView(QWidget):
     def _ensure_player_stats_time_series_context_menu_controller(self) -> None:
         if self._ps_ts_context_menu_controller is not None:
             return
-        from app.views.player_stats_time_series_menu import PlayerStatsTimeSeriesMenuController
+        from app.views.menus.player_stats_time_series_menu import PlayerStatsTimeSeriesMenuController
         from app.views.style import StyleManager
 
         def _style_ts_submenu(m: QMenu) -> None:
@@ -6498,7 +6504,7 @@ class DetailPlayerStatsView(QWidget):
     def _ensure_player_stats_activity_heatmap_context_menu_controller(self) -> None:
         if self._ps_ah_context_menu_controller is not None:
             return
-        from app.views.player_stats_activity_heatmap_menu import (
+        from app.views.menus.player_stats_activity_heatmap_menu import (
             PlayerStatsActivityHeatmapMenuController,
         )
         from app.views.style import StyleManager
@@ -6518,7 +6524,7 @@ class DetailPlayerStatsView(QWidget):
     def _ensure_player_stats_accuracy_distribution_context_menu_controller(self) -> None:
         if self._ps_ad_context_menu_controller is not None:
             return
-        from app.views.player_stats_accuracy_distribution_menu import (
+        from app.views.menus.player_stats_accuracy_distribution_menu import (
             PlayerStatsAccuracyDistributionMenuController,
         )
         from app.views.style import StyleManager
@@ -6587,71 +6593,14 @@ class DetailPlayerStatsView(QWidget):
             # If detection fails, just show full stats option
             pass
         
-        # Create context menu
-        menu = QMenu(self)
-        
-        # Get config for styling
-        ui_config = self.config.get('ui', {})
-        panel_config = ui_config.get('panels', {}).get('detail', {})
-        player_stats_config = panel_config.get('player_stats', {})
-        colors_config = player_stats_config.get('colors', {})
-        bg_color = colors_config.get('background', [40, 40, 45])
-        
-        # Style the menu
-        from app.views.style import StyleManager
-        StyleManager.style_context_menu(menu, self.config, bg_color)
-        
-        # Add actions
-        if section_name:
-            copy_section_action = menu.addAction("Copy section to clipboard")
-            copy_section_action.triggered.connect(lambda checked=False, name=section_name: self._copy_section_to_clipboard(name))
-        
-        copy_full_action = menu.addAction("Copy stats to clipboard")
-        copy_full_action.triggered.connect(self._copy_full_stats_to_clipboard)
+        from app.views.menus.player_stats_context_menu import build_player_stats_context_menu
 
-        from app.views.player_stats_activity_heatmap_menu import (
-            PLAYER_STATS_ACTIVITY_HEATMAP_CONTEXT_SECTIONS,
+        menu = build_player_stats_context_menu(
+            self,
+            section_name=section_name,
+            click_in_opening_tree=click_in_opening_tree,
+            click_in_endgame_tree=click_in_endgame_tree,
         )
-        from app.views.player_stats_time_series_menu import PLAYER_STATS_TIME_SERIES_CONTEXT_SECTIONS
-
-        if section_name and section_name in PLAYER_STATS_TIME_SERIES_CONTEXT_SECTIONS:
-            menu.addSeparator()
-            self._ensure_player_stats_time_series_context_menu_controller()
-            assert self._ps_ts_context_menu_controller is not None
-            self._ps_ts_context_menu_controller.append_to_context_menu(menu)
-
-        if section_name and section_name in PLAYER_STATS_ACTIVITY_HEATMAP_CONTEXT_SECTIONS:
-            menu.addSeparator()
-            self._ensure_player_stats_activity_heatmap_context_menu_controller()
-            assert self._ps_ah_context_menu_controller is not None
-            self._ps_ah_context_menu_controller.append_to_context_menu(menu)
-
-        from app.views.player_stats_accuracy_distribution_menu import (
-            PLAYER_STATS_ACCURACY_DISTRIBUTION_CONTEXT_SECTIONS,
-        )
-
-        if section_name and section_name in PLAYER_STATS_ACCURACY_DISTRIBUTION_CONTEXT_SECTIONS:
-            menu.addSeparator()
-            self._ensure_player_stats_accuracy_distribution_context_menu_controller()
-            assert self._ps_ad_context_menu_controller is not None
-            self._ps_ad_context_menu_controller.append_to_context_menu(menu)
-
-        # When right-clicking inside the opening tree, offer expand/collapse actions
-        if click_in_opening_tree and self._opening_tree_widget is not None:
-            menu.addSeparator()
-            expand_all_action = menu.addAction("Expand all")
-            collapse_all_action = menu.addAction("Collapse all")
-            expand_all_action.triggered.connect(lambda checked=False: self._opening_tree_widget.expandAll())
-            collapse_all_action.triggered.connect(lambda checked=False: self._opening_tree_widget.collapseAll())
-        # When right-clicking inside the endgame type tree, offer expand/collapse actions
-        if click_in_endgame_tree and self._endgame_tree_widget is not None:
-            menu.addSeparator()
-            expand_all_action = menu.addAction("Expand all")
-            collapse_all_action = menu.addAction("Collapse all")
-            expand_all_action.triggered.connect(lambda checked=False: self._endgame_tree_widget.expandAll())
-            collapse_all_action.triggered.connect(lambda checked=False: self._endgame_tree_widget.collapseAll())
-        
-        # Show menu
         menu.exec(event.globalPos())
     
     def _get_top_games_summary_for_copy(self):

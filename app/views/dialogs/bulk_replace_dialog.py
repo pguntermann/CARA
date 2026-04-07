@@ -757,9 +757,9 @@ class BulkReplaceDialog(QDialog):
         from app.views.style import StyleManager
         from pathlib import Path
         
-        # Get checkmark icon path
-        project_root = Path(__file__).parent.parent.parent
-        checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
+        # Get checkmark icon path (stable regardless of this module's location)
+        app_root = Path(__file__).resolve().parents[2]
+        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
         
         # Convert QColor to [R, G, B] lists
         text_color = [self.label_text_color.red(), self.label_text_color.green(), self.label_text_color.blue()]
@@ -917,7 +917,7 @@ class BulkReplaceDialog(QDialog):
     def _on_apply_clicked(self) -> None:
         """Handle apply button click."""
         if not self.database:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "Error", "No database selected", self)
             return
         
@@ -967,7 +967,7 @@ class BulkReplaceDialog(QDialog):
             )
             
             if not result.success:
-                from app.views.message_dialog import MessageDialog
+                from app.views.dialogs.message_dialog import MessageDialog
                 MessageDialog.show_warning(self.config, "Error", result.error_message or "Operation failed", self)
                 self._set_controls_enabled(True)
                 self._operation_in_progress = False
@@ -982,7 +982,7 @@ class BulkReplaceDialog(QDialog):
             self.accept()
             
         except Exception as e:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_critical(self.config, "Error", f"An error occurred: {str(e)}", self)
             self._set_controls_enabled(True)
             self._operation_in_progress = False

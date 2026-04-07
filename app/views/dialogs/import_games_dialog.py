@@ -348,8 +348,8 @@ class ImportGamesDialog(QDialog):
         input_bg_color = self.input_bg_color
         
         # Get checkmark icon path
-        project_root = Path(__file__).parent.parent.parent
-        checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
+        app_root = Path(__file__).resolve().parents[2]
+        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
         
         # Convert QColor to [R, G, B] lists
         text_color = [self.label_text_color.red(), self.label_text_color.green(), self.label_text_color.blue()]
@@ -555,7 +555,7 @@ class ImportGamesDialog(QDialog):
         # Validate username
         username = self.username_input.text().strip()
         if not username:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Invalid Input",
@@ -595,7 +595,7 @@ class ImportGamesDialog(QDialog):
         else:
             destination_model = self.active_database
             if not destination_model:
-                from app.views.message_dialog import MessageDialog
+                from app.views.dialogs.message_dialog import MessageDialog
                 MessageDialog.show_warning(
                     self.config,
                     "No Active Database",
@@ -623,7 +623,7 @@ class ImportGamesDialog(QDialog):
         
         if success:
             # Show success message
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_information(
                 self.config,
                 "Import Successful",
@@ -633,7 +633,7 @@ class ImportGamesDialog(QDialog):
             self.accept()
         else:
             # Show error message
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Import Failed",

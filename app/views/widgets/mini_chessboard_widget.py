@@ -92,9 +92,15 @@ class MiniChessBoardWidget(QWidget):
         """Load chess piece SVG files from the configured path."""
         import sys
         
-        # Resolve path relative to project root (same as main board)
-        project_root = Path(__file__).parent.parent.parent
-        pieces_dir = project_root / self.svg_path
+        # Resolve path relative to repository root (stable regardless of module location)
+        repo_root = Path(__file__).resolve().parents[3]
+        svg_path = Path(self.svg_path)
+        pieces_dir = svg_path if svg_path.is_absolute() else (repo_root / svg_path)
+
+        # Backward compatibility: some configs might be relative to app/ instead of repo root
+        if not pieces_dir.exists():
+            app_root = Path(__file__).resolve().parents[2]
+            pieces_dir = svg_path if svg_path.is_absolute() else (app_root / svg_path)
         
         if not pieces_dir.exists():
             logging_service = LoggingService.get_instance()

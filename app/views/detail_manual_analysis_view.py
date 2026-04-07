@@ -12,7 +12,7 @@ from app.models.engine_model import EngineModel
 from app.models.manual_analysis_model import ManualAnalysisModel
 from app.controllers.manual_analysis_controller import ManualAnalysisController
 from app.controllers.engine_controller import TASK_MANUAL_ANALYSIS
-from app.views.message_dialog import MessageDialog
+from app.views.dialogs.message_dialog import MessageDialog
 
 
 class DetailManualAnalysisView(QWidget):
@@ -1810,7 +1810,7 @@ class DetailManualAnalysisView(QWidget):
         # Create line widget with separate labels for each move if hover is enabled
         if (pv_moves and pv_hover_enabled and board_controller and current_fen):
             # Use separate labels for each move
-            from app.views.hoverable_pv_label import HoverablePvLabel
+            from app.views.components.hoverable_pv_label import HoverablePvLabel
             
             # Create horizontal layout for PV section
             pv_layout = QHBoxLayout()

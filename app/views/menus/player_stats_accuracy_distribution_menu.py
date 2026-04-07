@@ -12,13 +12,11 @@ from app.services.player_stats_accuracy_distribution_user import (
 )
 from app.services.user_settings_service import UserSettingsService
 
-PLAYER_STATS_ACCURACY_DISTRIBUTION_CONTEXT_SECTIONS: frozenset[str] = frozenset(
-    {"Accuracy Distribution"}
-)
+PLAYER_STATS_ACCURACY_DISTRIBUTION_CONTEXT_SECTIONS: frozenset[str] = frozenset({"Accuracy Distribution"})
 
 
 class PlayerStatsAccuracyDistributionMenuController:
-    """Nested \"Accuracy distribution settings\" menu for one host (menubar or context)."""
+    """Nested "Accuracy distribution settings" menu for one host (menubar or context)."""
 
     def __init__(self, action_parent, style_submenu: Callable[[QMenu], None]) -> None:
         self._parent = action_parent
@@ -62,30 +60,19 @@ class PlayerStatsAccuracyDistributionMenuController:
             act.setMenuRole(QAction.MenuRole.NoRole)
             act.triggered.connect(lambda _c=False, k=key: self._on_skew(k))
             self._skew[key] = act
-        for key, label in (
-            ("count", "Number of games"),
-            ("percent_of_games", "Share of games (%)"),
-        ):
+        for key, label in (("count", "Number of games"), ("percent_of_games", "Share of games (%)")):
             act = QAction(label, p)
             act.setCheckable(True)
             act.setMenuRole(QAction.MenuRole.NoRole)
             act.triggered.connect(lambda _c=False, k=key: self._on_yaxis(k))
             self._yaxis[key] = act
-        for key, label in (
-            ("auto", "Automatic"),
-            ("fewer", "Fewer bars"),
-            ("more", "More bars"),
-        ):
+        for key, label in (("auto", "Automatic"), ("fewer", "Fewer bars"), ("more", "More bars")):
             act = QAction(label, p)
             act.setCheckable(True)
             act.setMenuRole(QAction.MenuRole.NoRole)
             act.triggered.connect(lambda _c=False, k=key: self._on_bins(k))
             self._bins[key] = act
-        for key, label in (
-            ("github_green", "Green"),
-            ("ocean_blue", "Blue"),
-            ("amber", "Amber"),
-        ):
+        for key, label in (("github_green", "Green"), ("ocean_blue", "Blue"), ("amber", "Amber")):
             act = QAction(label, p)
             act.setCheckable(True)
             act.setMenuRole(QAction.MenuRole.NoRole)
@@ -105,10 +92,7 @@ class PlayerStatsAccuracyDistributionMenuController:
             act.setMenuRole(QAction.MenuRole.NoRole)
             act.triggered.connect(lambda _c=False, v=x: self._on_smooth_strength(float(v)))
             self._smooth_strength[float(x)] = act
-        for key, label in (
-            ("full", "Full range (0-100%)"),
-            ("data_bounds", "Data range (first bin to last)"),
-        ):
+        for key, label in (("full", "Full range (0-100%)"), ("data_bounds", "Data range (first bin to last)")):
             act = QAction(label, p)
             act.setCheckable(True)
             act.setMenuRole(QAction.MenuRole.NoRole)
@@ -228,9 +212,7 @@ class PlayerStatsAccuracyDistributionMenuController:
         self._curve_straight.setChecked(curve == "straight")
         self._curve_smooth.blockSignals(False)
         self._curve_straight.blockSignals(False)
-        UserSettingsService.get_instance().update_player_stats_accuracy_distribution(
-            {"distribution_line_curve": curve}
-        )
+        UserSettingsService.get_instance().update_player_stats_accuracy_distribution({"distribution_line_curve": curve})
 
     def _on_smooth_strength(self, value: float) -> None:
         for x, a in self._smooth_strength.items():
@@ -247,3 +229,4 @@ class PlayerStatsAccuracyDistributionMenuController:
             a.setChecked(k == key)
             a.blockSignals(False)
         UserSettingsService.get_instance().update_player_stats_accuracy_distribution({"x_axis_span": key})
+

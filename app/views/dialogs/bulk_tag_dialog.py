@@ -621,8 +621,8 @@ class BulkTagDialog(QDialog):
         input_bg_color = self.input_bg_color
         
         # Get checkmark icon path
-        project_root = Path(__file__).parent.parent.parent
-        checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
+        app_root = Path(__file__).resolve().parents[2]
+        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
         
         # Convert QColor to [R, G, B] lists
         text_color = [self.label_text_color.red(), self.label_text_color.green(), self.label_text_color.blue()]
@@ -770,7 +770,7 @@ class BulkTagDialog(QDialog):
     def _on_apply_clicked(self) -> None:
         """Handle apply button click."""
         if not self.database:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "Error", "No database selected", self)
             return
         
@@ -780,14 +780,14 @@ class BulkTagDialog(QDialog):
         # Get tag name
         raw_tag_name = self.tag_combo.currentText().strip()
         if not raw_tag_name:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "Error", "Please enter a tag name", self)
             return
         
         # Sanitize tag name using controller method
         tag_name = self.controller.sanitize_tag_name(raw_tag_name)
         if not tag_name:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "Error", "Tag name contains only invalid characters", self)
             return
         
@@ -801,7 +801,7 @@ class BulkTagDialog(QDialog):
         if self.selected_games_radio.isChecked():
             game_indices = self.selected_game_indices if self.selected_game_indices else []
             if not game_indices:
-                from app.views.message_dialog import MessageDialog
+                from app.views.dialogs.message_dialog import MessageDialog
                 MessageDialog.show_warning(self.config, "Error", "No games selected", self)
                 return
         
@@ -824,7 +824,7 @@ class BulkTagDialog(QDialog):
                     # Copy from tag
                     raw_source_tag = self.source_tag_combo.currentText().strip()
                     if not raw_source_tag:
-                        from app.views.message_dialog import MessageDialog
+                        from app.views.dialogs.message_dialog import MessageDialog
                         MessageDialog.show_warning(self.config, "Error", "Please enter a source tag name", self)
                         self._set_controls_enabled(True)
                         self._operation_in_progress = False
@@ -833,7 +833,7 @@ class BulkTagDialog(QDialog):
                     # Sanitize source tag name using controller method
                     source_tag = self.controller.sanitize_tag_name(raw_source_tag)
                     if not source_tag:
-                        from app.views.message_dialog import MessageDialog
+                        from app.views.dialogs.message_dialog import MessageDialog
                         MessageDialog.show_warning(self.config, "Error", "Source tag name contains only invalid characters", self)
                         self._set_controls_enabled(True)
                         self._operation_in_progress = False
@@ -844,7 +844,7 @@ class BulkTagDialog(QDialog):
                         self.source_tag_combo.setCurrentText(source_tag)
                     
                     if source_tag == tag_name:
-                        from app.views.message_dialog import MessageDialog
+                        from app.views.dialogs.message_dialog import MessageDialog
                         MessageDialog.show_warning(self.config, "Error", "Source and target tags must be different", self)
                         self._set_controls_enabled(True)
                         self._operation_in_progress = False
@@ -867,7 +867,7 @@ class BulkTagDialog(QDialog):
                 )
             
             if not result.success:
-                from app.views.message_dialog import MessageDialog
+                from app.views.dialogs.message_dialog import MessageDialog
                 MessageDialog.show_warning(self.config, "Error", result.error_message or "Operation failed", self)
                 self._set_controls_enabled(True)
                 self._operation_in_progress = False
@@ -882,7 +882,7 @@ class BulkTagDialog(QDialog):
             self.accept()
             
         except Exception as e:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_critical(self.config, "Error", f"An error occurred: {str(e)}", self)
             self._set_controls_enabled(True)
             self._operation_in_progress = False

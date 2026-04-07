@@ -485,7 +485,7 @@ class DetailMetadataView(QWidget):
     def _on_add_tag_clicked(self) -> None:
         """Handle Add Tag button click."""
         if not self._game_model or not self._game_model.active_game:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "No Game", "Please select a game first.", self)
             return
         
@@ -499,14 +499,14 @@ class DetailMetadataView(QWidget):
                     # The tag_added signal will be emitted, which will update the PGN
                     pass
                 else:
-                    from app.views.message_dialog import MessageDialog
+                    from app.views.dialogs.message_dialog import MessageDialog
                     MessageDialog.show_warning(self.config, "Add Tag Failed", 
                                       f"Tag '{tag_name}' already exists or validation failed.", self)
     
     def _on_remove_tag_clicked(self) -> None:
         """Handle Remove button click."""
         if not self._game_model or not self._game_model.active_game:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "No Game", "Please select a game first.", self)
             return
         
@@ -518,7 +518,7 @@ class DetailMetadataView(QWidget):
         selected_indexes = selection_model.selectedIndexes()
         
         if not selected_indexes:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "No Selection", "Please select a tag to remove.", self)
             return
         
@@ -539,7 +539,7 @@ class DetailMetadataView(QWidget):
             "CARANotes", "CARANotesInfo", "CARANotesChecksum"
         }
         if tag_name in read_only_tags:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "Cannot Remove Tag", 
                               f"The tag '{tag_name}' is read-only and cannot be removed.", self)
             return
@@ -556,7 +556,7 @@ class DetailMetadataView(QWidget):
                 # The tag_removed signal will be emitted, which will update the PGN
                 pass
             else:
-                from app.views.message_dialog import MessageDialog
+                from app.views.dialogs.message_dialog import MessageDialog
                 MessageDialog.show_warning(self.config, "Remove Tag Failed", 
                                   f"Tag '{tag_name}' was not found.", self)
     
@@ -570,7 +570,7 @@ class DetailMetadataView(QWidget):
         Returns:
             True if user confirmed (Yes), False if cancelled (No).
         """
-        from app.views.confirmation_dialog import ConfirmationDialog
+        from app.views.dialogs.confirmation_dialog import ConfirmationDialog
         return ConfirmationDialog.show_confirmation(self.config, title, message, self)
     
     def _on_tag_added(self, tag_name: str, tag_value: str) -> None:
@@ -823,7 +823,7 @@ class AddTagDialog(QDialog):
         tag_value = self.tag_value_input.text().strip()
         
         if not tag_name:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "Invalid Input", "Tag name cannot be empty.", self)
             return
         

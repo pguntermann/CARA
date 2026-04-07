@@ -56,7 +56,7 @@ class EngineConfigurationDialog(QDialog):
         engine_model = engine_controller.get_engine_model()
         engine = engine_model.get_engine(engine_id)
         if not engine:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Engine Not Found",
@@ -713,7 +713,7 @@ class EngineConfigurationDialog(QDialog):
         """Paste engine-specific parameters from the controller clipboard into the current task."""
         clipboard = self.controller.get_engine_params_clipboard()
         if not clipboard:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_info(
                 self.config,
                 "Nothing to Paste",
@@ -730,7 +730,7 @@ class EngineConfigurationDialog(QDialog):
         QApplication.processEvents()
         err_dialog = self.controller.get_reset_error_dialog(success, status_message)
         if err_dialog:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, err_dialog[0], err_dialog[1], self)
             if not refreshed_options:
                 return
@@ -757,7 +757,7 @@ class EngineConfigurationDialog(QDialog):
         if success:
             self.accept()
         else:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "Save Error", status_message, self)
     
     def _show_validation_dialog(self, validation_results: Dict[str, Any]) -> bool:
@@ -1312,8 +1312,8 @@ class EngineConfigurationDialog(QDialog):
         
         # Get checkmark icon path
         from pathlib import Path
-        project_root = Path(__file__).parent.parent.parent
-        checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
+        app_root = Path(__file__).resolve().parents[2]
+        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
         checkmark_url = str(checkmark_path).replace("\\", "/") if checkmark_path.exists() else ""
         
         # Apply unified line edit styling using StyleManager

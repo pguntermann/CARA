@@ -335,9 +335,9 @@ class DeduplicationCriteriaDialog(QDialog):
         # Apply checkbox styling using StyleManager
         from pathlib import Path
         
-        # Get checkmark icon path
-        project_root = Path(__file__).parent.parent.parent
-        checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
+        # Get checkmark icon path (stable regardless of this module's location)
+        app_root = Path(__file__).resolve().parents[2]
+        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
         
         # Use input border and background colors for checkbox indicator
         input_bg_color = self.input_bg_color
@@ -441,7 +441,7 @@ class DeduplicationCriteriaDialog(QDialog):
             self.selected_headers = [field for field, checkbox in self.header_checkboxes.items() if checkbox.isChecked()]
             # Validate: at least one header must be selected
             if not self.selected_headers:
-                from app.views.message_dialog import MessageDialog
+                from app.views.dialogs.message_dialog import MessageDialog
                 MessageDialog.show_warning(
                     self.config,
                     "Invalid Selection",

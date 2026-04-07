@@ -9,7 +9,7 @@ from app.models.game_model import GameModel
 from app.models.database_model import GameData
 from app.services.annotation_storage_service import AnnotationStorageService
 from app.services.logging_service import LoggingService
-from app.views.chessboard_widget import ChessBoardWidget
+from app.views.widgets.chessboard_widget import ChessBoardWidget
 
 
 class AnnotationController:

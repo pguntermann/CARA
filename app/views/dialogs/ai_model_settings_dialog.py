@@ -393,7 +393,7 @@ class AIModelSettingsDialog(QDialog):
         if self._suppress_custom_endpoint_disclaimer or self._custom_endpoint_disclaimer_shown:
             return
 
-        from app.views.message_dialog import MessageDialog
+        from app.views.dialogs.message_dialog import MessageDialog
 
         MessageDialog.show_warning(
             self.config,
@@ -408,7 +408,8 @@ class AIModelSettingsDialog(QDialog):
         The line edit remains a plain QLineEdit so StyleManager.style_line_edits still applies.
         """
         line_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        icons_dir = Path(__file__).parent.parent.parent / "app" / "resources" / "icons"
+        app_root = Path(__file__).resolve().parents[2]
+        icons_dir = app_root / "resources" / "icons"
         icon_show = QIcon(str(icons_dir / "eye.svg"))
         icon_hide = QIcon(str(icons_dir / "eye_off.svg"))
         action = QAction(self)
@@ -566,7 +567,7 @@ class AIModelSettingsDialog(QDialog):
             self._populate_model_combo("custom", [], "")
         
         if not providers_to_refresh:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Configuration Required",
@@ -664,7 +665,7 @@ class AIModelSettingsDialog(QDialog):
             error: Error message.
         """
         # Show error message
-        from app.views.message_dialog import MessageDialog
+        from app.views.dialogs.message_dialog import MessageDialog
         MessageDialog.show_warning(
             self.config,
             "Model Discovery Failed",
@@ -779,7 +780,7 @@ class AIModelSettingsDialog(QDialog):
         if self.user_settings_service.save():
             self.accept()
         else:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(
                 self.config,
                 "Save Failed",
@@ -880,8 +881,8 @@ class AIModelSettingsDialog(QDialog):
         if checkboxes:
             from pathlib import Path
             from app.views.style import StyleManager
-            project_root = Path(__file__).parent.parent.parent
-            checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
+            app_root = Path(__file__).resolve().parents[2]
+            checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
             checkbox_bg = self.inputs_config.get('background_color', [45, 45, 50])
             checkbox_border = self.inputs_config.get('border_color', [60, 60, 65])
             StyleManager.style_checkboxes(

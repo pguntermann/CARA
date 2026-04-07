@@ -61,7 +61,8 @@ class AboutDialog(QDialog):
         icon_config = dialog_config.get('icon', {})
         icon_size = icon_config.get('size', 120)
         icon_label = QLabel()
-        icon_path = Path(__file__).parent.parent.parent / "appicon.svg"
+        repo_root = Path(__file__).resolve().parents[3]
+        icon_path = repo_root / "appicon.svg"
         if icon_path.exists():
             icon = QIcon(str(icon_path))
             pixmap = icon.pixmap(icon_size, icon_size)

@@ -1,0 +1,157 @@
+"""Context menu builders for DatabasePanel.
+
+Keeps QMenu/QAction construction out of the view implementation. The DatabasePanel
+retains the actual action handling (what to do when an action is chosen).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Optional
+
+import sys
+
+from PyQt6.QtWidgets import QApplication, QMenu
+
+
+@dataclass(frozen=True)
+class DatabaseTabContextMenu:
+    menu: QMenu
+    close_action: Any
+    close_all_but_action: Optional[Any] = None
+
+
+def build_database_tab_context_menu(panel, *, include_close_all_but: bool) -> DatabaseTabContextMenu:
+    menu = QMenu(panel)
+    close_action = menu.addAction("Close")
+    close_all_but_action = None
+    if include_close_all_but:
+        close_all_but_action = menu.addAction("Close all but this")
+
+    ui_config = panel.config.get("ui", {})
+    panel_config = ui_config.get("panels", {}).get("database", {})
+    bg_color = panel_config.get("background_color", [35, 35, 40])
+    from app.views.style import StyleManager
+
+    StyleManager.style_context_menu(menu, panel.config, bg_color)
+    return DatabaseTabContextMenu(menu=menu, close_action=close_action, close_all_but_action=close_all_but_action)
+
+
+@dataclass(frozen=True)
+class DatabaseTableContextMenu:
+    menu: QMenu
+    select_rows_menu: QMenu
+    select_mode_menu: QMenu
+    act_replace: Any
+    act_append: Any
+    act_select_all: Any
+    act_unselect_all: Any
+    act_invert_selection: Any
+    act_with_this: Optional[Any]
+    act_with_not_this: Optional[Any]
+    act_with_empty: Optional[Any]
+    act_with_not_empty: Optional[Any]
+    act_copy_csv: Any
+    act_copy_tsv: Any
+    act_copy_selected_csv: Any
+    act_copy_selected_tsv: Any
+    act_copy_game: Optional[Any]
+    act_copy_selected_games: Optional[Any]
+    act_cut_selected_games: Optional[Any]
+    act_paste_games: Optional[Any]
+
+
+def build_database_table_context_menu(
+    panel,
+    *,
+    has_cell: bool,
+    selection_mode: str,
+    enable_copy_game: bool,
+    enable_copy_selected_games: bool,
+    enable_cut_selected_games: bool,
+    enable_paste_games: bool,
+) -> DatabaseTableContextMenu:
+    select_rows_menu = QMenu("Select rows", panel)
+    select_mode_menu = QMenu("Select mode", panel)
+    act_replace = select_mode_menu.addAction("Replace")
+    act_replace.setCheckable(True)
+    act_replace.setChecked(selection_mode == "replace")
+    act_append = select_mode_menu.addAction("Append")
+    act_append.setCheckable(True)
+    act_append.setChecked(selection_mode == "append")
+    select_rows_menu.addMenu(select_mode_menu)
+    select_rows_menu.addSeparator()
+    act_select_all = select_rows_menu.addAction("Select all rows")
+    act_unselect_all = select_rows_menu.addAction("Unselect all rows")
+    act_invert_selection = select_rows_menu.addAction("Invert Selection")
+    act_with_this = act_with_not_this = act_with_empty = act_with_not_empty = None
+    if has_cell:
+        select_rows_menu.addSeparator()
+        act_with_this = select_rows_menu.addAction("With this value")
+        act_with_not_this = select_rows_menu.addAction("With not this value")
+        act_with_empty = select_rows_menu.addAction("With empty value")
+        act_with_not_empty = select_rows_menu.addAction("With not empty value")
+
+    menu = QMenu(panel)
+    menu.addMenu(select_rows_menu)
+    menu.addSeparator()
+    act_copy_csv = menu.addAction("Copy table as CSV")
+    act_copy_tsv = menu.addAction("Copy table as TSV")
+    act_copy_selected_csv = menu.addAction("Copy selected rows as CSV")
+    act_copy_selected_tsv = menu.addAction("Copy selected rows as TSV")
+    menu.addSeparator()
+    act_copy_game = menu.addAction("Copy Game") if enable_copy_game and has_cell else None
+    act_copy_selected_games = menu.addAction("Copy selected Games") if enable_copy_selected_games else None
+    act_cut_selected_games = menu.addAction("Cut selected Games") if enable_cut_selected_games else None
+    act_paste_games = menu.addAction("Paste Game(s)") if enable_paste_games else None
+
+    ui_config = panel.config.get("ui", {})
+    panel_config = ui_config.get("panels", {}).get("database", {})
+    bg_color = panel_config.get("background_color", [35, 35, 40])
+    from app.views.style import StyleManager
+
+    StyleManager.style_context_menu(menu, panel.config, bg_color)
+    StyleManager.style_context_menu(select_rows_menu, panel.config, bg_color)
+    StyleManager.style_context_menu(select_mode_menu, panel.config, bg_color)
+
+    return DatabaseTableContextMenu(
+        menu=menu,
+        select_rows_menu=select_rows_menu,
+        select_mode_menu=select_mode_menu,
+        act_replace=act_replace,
+        act_append=act_append,
+        act_select_all=act_select_all,
+        act_unselect_all=act_unselect_all,
+        act_invert_selection=act_invert_selection,
+        act_with_this=act_with_this,
+        act_with_not_this=act_with_not_this,
+        act_with_empty=act_with_empty,
+        act_with_not_empty=act_with_not_empty,
+        act_copy_csv=act_copy_csv,
+        act_copy_tsv=act_copy_tsv,
+        act_copy_selected_csv=act_copy_selected_csv,
+        act_copy_selected_tsv=act_copy_selected_tsv,
+        act_copy_game=act_copy_game,
+        act_copy_selected_games=act_copy_selected_games,
+        act_cut_selected_games=act_cut_selected_games,
+        act_paste_games=act_paste_games,
+    )
+
+
+def dismiss_database_table_context_menus(panel, ctx: DatabaseTableContextMenu) -> None:
+    """Close our database table context menu hierarchy reliably (macOS needs extra help)."""
+    ctx.menu.close()
+    ctx.menu.hide()
+    ctx.select_rows_menu.close()
+    ctx.select_rows_menu.hide()
+    ctx.select_mode_menu.close()
+    ctx.select_mode_menu.hide()
+    if sys.platform == "darwin":
+        QApplication.processEvents()
+        popup = QApplication.activePopupWidget()
+        while popup is not None:
+            popup.close()
+            popup.hide()
+            QApplication.processEvents()
+            popup = QApplication.activePopupWidget()
+

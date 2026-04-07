@@ -395,7 +395,7 @@ class BulkAnalysisDialog(QDialog):
         # Validate engine using controller
         is_valid, error_title, error_message = self.controller.validate_engine_for_analysis()
         if not is_valid:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             dialog = MessageDialog(
                 self.config,
                 error_title,
@@ -414,7 +414,7 @@ class BulkAnalysisDialog(QDialog):
         )
         
         if games_to_analyze is None:
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             message_type = "warning" if error_title == "No Games Selected" else "information"
             dialog = MessageDialog(
                 self.config,
@@ -653,8 +653,8 @@ class BulkAnalysisDialog(QDialog):
         from app.views.style import StyleManager
         
         # Get checkmark icon path
-        project_root = Path(__file__).parent.parent.parent
-        checkmark_path = project_root / "app" / "resources" / "icons" / "checkmark.svg"
+        app_root = Path(__file__).resolve().parents[2]
+        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
         
         # Use input border and background colors for checkbox indicator
         input_border_color = dialog_config.get('border_color', [60, 60, 65])

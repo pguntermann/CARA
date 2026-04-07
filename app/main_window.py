@@ -25,20 +25,13 @@ from app.views.main_panel import MainPanel
 from app.views.detail_panel import DetailPanel
 from app.views.database_panel import DatabasePanel
 from app.views.status_panel import StatusPanel
-from app.views.engine_dialog import EngineDialog
-from app.views.engine_configuration_dialog import EngineConfigurationDialog
-from app.views.classification_settings_dialog import ClassificationSettingsDialog
-from app.views.about_dialog import AboutDialog
-from app.views.inline_content_dialog import InlineContentDialog
-from app.views.message_dialog import MessageDialog
-from app.views.confirmation_dialog import ConfirmationDialog
-from app.views.player_stats_accuracy_distribution_menu import (
-    PlayerStatsAccuracyDistributionMenuController,
-)
-from app.views.player_stats_activity_heatmap_menu import (
-    PlayerStatsActivityHeatmapMenuController,
-)
-from app.views.player_stats_time_series_menu import PlayerStatsTimeSeriesMenuController
+from app.views.dialogs.engine_dialog import EngineDialog
+from app.views.dialogs.engine_configuration_dialog import EngineConfigurationDialog
+from app.views.dialogs.classification_settings_dialog import ClassificationSettingsDialog
+from app.views.dialogs.about_dialog import AboutDialog
+from app.views.dialogs.inline_content_dialog import InlineContentDialog
+from app.views.dialogs.message_dialog import MessageDialog
+from app.views.dialogs.confirmation_dialog import ConfirmationDialog
 from app.controllers.app_controller import AppController
 from app.input.shortcut_manager import ShortcutManager
 from app.models.column_profile_model import DEFAULT_PROFILE_NAME
@@ -119,39 +112,11 @@ class MainWindow(QMainWindow):
     
     def _setup_tooltip_styling(self) -> None:
         """Setup QToolTip styling to ensure proper colors regardless of OS theme."""
-        # Get general tooltip configuration
-        tooltip_config = self.config.get('ui', {}).get('styles', {}).get('tooltip', {})
-        
-        # Extract colors with defaults
-        bg_color = tooltip_config.get('background_color', [45, 45, 50])
-        text_color = tooltip_config.get('text_color', [220, 220, 220])
-        border_color = tooltip_config.get('border_color', [60, 60, 65])
-        border_width = tooltip_config.get('border_width', 1)
-        border_radius = tooltip_config.get('border_radius', 5)
-        padding = tooltip_config.get('padding', 10)
-        
-        # Create QToolTip stylesheet
-        # Tooltip text must be wrapped in HTML for word-wrapping to work
-        # See wrap_tooltip_text() utility function
-        tooltip_stylesheet = f"""
-            QToolTip {{
-                background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});
-                color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});
-                border: {border_width}px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});
-                border-radius: {border_radius}px;
-                padding: {padding}px;
-            }}
-        """
-        
-        # Apply stylesheet to QApplication instance (tooltips are application-wide)
         app = QApplication.instance()
         if app:
-            # Get existing stylesheet and append tooltip styling
-            existing_stylesheet = app.styleSheet()
-            if existing_stylesheet:
-                app.setStyleSheet(existing_stylesheet + "\n" + tooltip_stylesheet)
-            else:
-                app.setStyleSheet(tooltip_stylesheet)
+            from app.views.style.tooltip import apply_tooltip_styling
+
+            apply_tooltip_styling(app, self.config)
     
     def _setup_menu_bar(self) -> None:
         """Setup the menu bar with menu items."""
@@ -166,836 +131,10 @@ class MainWindow(QMainWindow):
         # Apply menu bar styling from config
         self._apply_menu_bar_styling(menu_bar)
         
-        # Setup each menu section
-        self._setup_file_menu(menu_bar)
-        self._setup_edit_menu(menu_bar)
-        self._setup_board_menu(menu_bar)
-        self._setup_pgn_menu(menu_bar)
-        self._setup_moves_list_menu(menu_bar)
-        self._setup_game_analysis_menu(menu_bar)
-        self._setup_manual_analysis_menu(menu_bar)
-        self._setup_player_stats_menu(menu_bar)
-        self._setup_annotations_menu(menu_bar)
-        self._setup_engines_menu(menu_bar)
-        self._setup_ai_summary_menu(menu_bar)
-        self._setup_notes_menu(menu_bar)
-        self._setup_view_menu(menu_bar)
-        self._setup_help_menu(menu_bar)
-        self._setup_debug_menu(menu_bar)
-    
-    def _setup_file_menu(self, menu_bar: QMenuBar) -> None:
-        """Setup the File menu."""
-        file_menu = menu_bar.addMenu("File")
-        
-        # Open PGN Database action
-        open_pgn_database_action = QAction("Open PGN Database", self)
-        open_pgn_database_action.setShortcut(QKeySequence("Ctrl+O"))
-        open_pgn_database_action.triggered.connect(self._open_pgn_database)
-        file_menu.addAction(open_pgn_database_action)
-        
-        file_menu.addSeparator()
-        
-        # Close PGN Database action
-        self.close_pgn_database_action = QAction("Close PGN Database", self)
-        self.close_pgn_database_action.setShortcut(QKeySequence("Ctrl+W"))
-        self.close_pgn_database_action.triggered.connect(self._close_pgn_database)
-        file_menu.addAction(self.close_pgn_database_action)
-        
-        # Close All PGN Databases action
-        self.close_all_databases_action = QAction("Close All PGN Databases", self)
-        self.close_all_databases_action.setShortcut(QKeySequence("Ctrl+Alt+W"))
-        self.close_all_databases_action.triggered.connect(self._close_all_pgn_databases)
-        file_menu.addAction(self.close_all_databases_action)
-        
-        # Clear Clipboard Database action
-        clear_clipboard_action = QAction("Clear Clipboard Database", self)
-        clear_clipboard_action.setShortcut(QKeySequence("Ctrl+Shift+C"))
-        clear_clipboard_action.triggered.connect(self._clear_clipboard_database)
-        file_menu.addAction(clear_clipboard_action)
-        
-        file_menu.addSeparator()
-        
-        # Save PGN Database action
-        self.save_pgn_database_action = QAction("Save PGN Database", self)
-        self.save_pgn_database_action.setShortcut(QKeySequence("Ctrl+S"))
-        self.save_pgn_database_action.triggered.connect(self._save_pgn_database)
-        self.save_pgn_database_action.setEnabled(False)  # Disabled by default
-        file_menu.addAction(self.save_pgn_database_action)
-        
-        # Save PGN Database as action
-        save_pgn_database_as_action = QAction("Save PGN Database as...", self)
-        save_pgn_database_as_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
-        save_pgn_database_as_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-        save_pgn_database_as_action.triggered.connect(self._save_pgn_database_as)
-        file_menu.addAction(save_pgn_database_as_action)
-        
-        file_menu.addSeparator()
-        
-        # Import Games from Online action
-        import_online_games_action = QAction("Import Games from Online...", self)
-        import_online_games_action.setShortcut(QKeySequence("Ctrl+Shift+I"))
-        import_online_games_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-        import_online_games_action.triggered.connect(self._import_online_games)
-        file_menu.addAction(import_online_games_action)
-        
-        file_menu.addSeparator()
-        
-        # Bulk Replace action
-        bulk_replace_action = QAction("Bulk Replace Tags...", self)
-        bulk_replace_action.setShortcut(QKeySequence("Ctrl+Shift+R"))
-        bulk_replace_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-        bulk_replace_action.triggered.connect(self._bulk_replace)
-        file_menu.addAction(bulk_replace_action)
-        
-        # Bulk Add/Remove Tags action
-        bulk_tag_action = QAction("Bulk Add/Remove Tags...", self)
-        bulk_tag_action.setShortcut(QKeySequence("Ctrl+Alt+T"))
-        bulk_tag_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-        bulk_tag_action.triggered.connect(self._bulk_tag)
-        file_menu.addAction(bulk_tag_action)
-        
-        # Bulk Clean PGN action
-        bulk_clean_pgn_action = QAction("Bulk Clean PGN...", self)
-        bulk_clean_pgn_action.setShortcut(QKeySequence("Ctrl+Shift+L"))
-        bulk_clean_pgn_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-        bulk_clean_pgn_action.triggered.connect(self._bulk_clean_pgn)
-        file_menu.addAction(bulk_clean_pgn_action)
-        
-        file_menu.addSeparator()
-        
-        # Deduplicate Games action
-        deduplicate_games_action = QAction("Deduplicate Games in Active Database...", self)
-        deduplicate_games_action.setShortcut(QKeySequence("Ctrl+Shift+U"))
-        deduplicate_games_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-        deduplicate_games_action.triggered.connect(self._deduplicate_games)
-        file_menu.addAction(deduplicate_games_action)
-        
-        file_menu.addSeparator()
-        
-        # Search Games action
-        search_games_action = QAction("Search Games...", self)
-        search_games_action.setShortcut(QKeySequence("Ctrl+Shift+F"))
-        search_games_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-        search_games_action.triggered.connect(self._search_games)
-        file_menu.addAction(search_games_action)
-        
-        # Close Search Results action
-        self.close_search_results_action = QAction("Close Search Results", self)
-        self.close_search_results_action.setShortcut(QKeySequence("Ctrl+Shift+W"))
-        self.close_search_results_action.triggered.connect(self._close_search_results)
-        self.close_search_results_action.setEnabled(False)  # Disabled by default
-        file_menu.addAction(self.close_search_results_action)
-        
-        file_menu.addSeparator()
-        
-        # Close Application action
-        close_action = QAction("Close Application", self)
-        close_action.setShortcut("Ctrl+Q")
-        close_action.triggered.connect(self._close_application)
-        file_menu.addAction(close_action)
-    
-    def _setup_edit_menu(self, menu_bar: QMenuBar) -> None:
-        """Setup the Edit menu."""
-        edit_menu = menu_bar.addMenu("Edit")
-        
-        # Copy FEN action
-        copy_fen_action = QAction("Copy FEN", self)
-        copy_fen_action.setShortcut(QKeySequence("Shift+F"))
-        copy_fen_action.triggered.connect(self._copy_fen_to_clipboard)
-        edit_menu.addAction(copy_fen_action)
-        
-        # Copy PGN action
-        copy_pgn_action = QAction("Copy PGN", self)
-        copy_pgn_action.setShortcut(QKeySequence("Ctrl+P"))
-        copy_pgn_action.triggered.connect(self._copy_pgn_to_clipboard)
-        edit_menu.addAction(copy_pgn_action)
-        
-        edit_menu.addSeparator()
-        
-        # Copy selected Games action
-        copy_selected_games_action = QAction("Copy selected Games", self)
-        copy_selected_games_action.setShortcut(QKeySequence("Ctrl+Shift+C"))
-        copy_selected_games_action.triggered.connect(self._copy_selected_games)
-        edit_menu.addAction(copy_selected_games_action)
-        
-        # Cut selected Games action
-        cut_selected_games_action = QAction("Cut selected Games", self)
-        cut_selected_games_action.setShortcut(QKeySequence("Ctrl+Shift+X"))
-        cut_selected_games_action.triggered.connect(self._cut_selected_games)
-        edit_menu.addAction(cut_selected_games_action)
-        
-        edit_menu.addSeparator()
-        
-        # Paste FEN to Board action
-        paste_fen_action = QAction("Paste FEN to Board", self)
-        paste_fen_action.setShortcut(QKeySequence("Ctrl+F"))
-        paste_fen_action.triggered.connect(self._paste_fen_to_board)
-        edit_menu.addAction(paste_fen_action)
-        
-        edit_menu.addSeparator()
-        
-        # Paste PGN to Clipboard DB action
-        paste_pgn_clipboard_action = QAction("Paste PGN to Clipboard DB", self)
-        paste_pgn_clipboard_action.setShortcut(QKeySequence("Ctrl+V"))
-        paste_pgn_clipboard_action.triggered.connect(self._paste_pgn_to_clipboard_db)
-        edit_menu.addAction(paste_pgn_clipboard_action)
-        
-        # Paste PGN to active DB action
-        paste_pgn_active_action = QAction("Paste PGN to active DB", self)
-        paste_pgn_active_action.setShortcut(QKeySequence("Ctrl+Alt+V"))
-        paste_pgn_active_action.triggered.connect(self._paste_pgn_to_active_db)
-        edit_menu.addAction(paste_pgn_active_action)
-    
-    def _setup_board_menu(self, menu_bar: QMenuBar) -> None:
-        """Setup the Board menu."""
-        board_menu = menu_bar.addMenu("Board")
-        
-        # Rotate Board action (checkable to show toggle state)
-        self.rotate_action = QAction("Rotate Board", self)
-        self.rotate_action.setShortcut(QKeySequence("X"))
-        self.rotate_action.setCheckable(True)
-        self.rotate_action.triggered.connect(self.controller.rotate_board)
-        board_menu.addAction(self.rotate_action)
-        
-        board_menu.addSeparator()
-        
-        # Show Game Info action (checkable to show toggle state)
-        self.game_info_action = QAction("Show Game Info", self)
-        self.game_info_action.setShortcut(QKeySequence("Alt+I"))
-        self.game_info_action.setCheckable(True)
-        self.game_info_action.triggered.connect(self.controller.toggle_game_info_visibility)
-        board_menu.addAction(self.game_info_action)
-        
-        # Show/Hide Coordinates action (checkable to show toggle state)
-        self.coordinates_action = QAction("Show Coordinates", self)
-        self.coordinates_action.setShortcut(QKeySequence("Alt+C"))
-        self.coordinates_action.setCheckable(True)
-        self.coordinates_action.triggered.connect(self.controller.toggle_coordinates_visibility)
-        board_menu.addAction(self.coordinates_action)
-        
-        # Show Turn Indicator action (checkable to show toggle state)
-        self.turn_indicator_action = QAction("Show Turn Indicator", self)
-        self.turn_indicator_action.setShortcut(QKeySequence("Alt+T"))
-        self.turn_indicator_action.setCheckable(True)
-        self.turn_indicator_action.triggered.connect(self.controller.toggle_turn_indicator_visibility)
-        board_menu.addAction(self.turn_indicator_action)
-        
-        # Show Material Widget action (checkable to show toggle state)
-        self.material_widget_action = QAction("Show Material", self)
-        self.material_widget_action.setShortcut(QKeySequence("Alt+U"))
-        self.material_widget_action.setCheckable(True)
-        self.material_widget_action.triggered.connect(self.controller.toggle_material_widget_visibility)
-        board_menu.addAction(self.material_widget_action)
-        
-        board_menu.addSeparator()
-        
-        # Show Evaluation Bar action (checkable to show toggle state)
-        self.evaluation_bar_action = QAction("Show Evaluation Bar", self)
-        self.evaluation_bar_action.setShortcut(QKeySequence("Alt+E"))
-        self.evaluation_bar_action.setCheckable(True)
-        self.evaluation_bar_action.triggered.connect(self.controller.toggle_evaluation_bar_visibility)
-        board_menu.addAction(self.evaluation_bar_action)
-        
-        # Show Positional Heat-map action (checkable to show toggle state)
-        self.positional_heatmap_action = QAction("Show Positional Heat-map", self)
-        self.positional_heatmap_action.setShortcut(QKeySequence("Alt+H"))
-        self.positional_heatmap_action.setCheckable(True)
-        self.positional_heatmap_action.triggered.connect(self.controller.toggle_positional_heatmap_visibility)
-        board_menu.addAction(self.positional_heatmap_action)
-        
-        board_menu.addSeparator()
-        
-        # Show Played Move action (checkable to show toggle state)
-        self.playedmove_arrow_action = QAction("Show Played Move", self)
-        self.playedmove_arrow_action.setShortcut(QKeySequence("Alt+P"))
-        self.playedmove_arrow_action.setCheckable(True)
-        self.playedmove_arrow_action.triggered.connect(self.controller.toggle_playedmove_arrow_visibility)
-        board_menu.addAction(self.playedmove_arrow_action)
-        
-        # Show Best Next Move action (checkable to show toggle state)
-        self.bestnextmove_arrow_action = QAction("Show Best Next Move", self)
-        self.bestnextmove_arrow_action.setShortcut(QKeySequence("Alt+B"))
-        self.bestnextmove_arrow_action.setCheckable(True)
-        self.bestnextmove_arrow_action.triggered.connect(self.controller.toggle_bestnextmove_arrow_visibility)
-        board_menu.addAction(self.bestnextmove_arrow_action)
-        
-        # Show Next Best Move (PV2) action (checkable to show toggle state)
-        self.pv2_arrow_action = QAction("Show Next Best Move (PV2)", self)
-        self.pv2_arrow_action.setShortcut(QKeySequence("Alt+2"))
-        self.pv2_arrow_action.setCheckable(True)
-        self.pv2_arrow_action.triggered.connect(self.controller.toggle_pv2_arrow_visibility)
-        board_menu.addAction(self.pv2_arrow_action)
-        
-        # Show Next Best Move (PV3) action (checkable to show toggle state)
-        self.pv3_arrow_action = QAction("Show Next Best Move (PV3)", self)
-        self.pv3_arrow_action.setShortcut(QKeySequence("Alt+3"))
-        self.pv3_arrow_action.setCheckable(True)
-        self.pv3_arrow_action.triggered.connect(self.controller.toggle_pv3_arrow_visibility)
-        board_menu.addAction(self.pv3_arrow_action)
-        
-        # Show Best Alternative Move action (checkable to show toggle state)
-        self.bestalternativemove_arrow_action = QAction("Show Best Alternative Move", self)
-        self.bestalternativemove_arrow_action.setShortcut(QKeySequence("Alt+A"))
-        self.bestalternativemove_arrow_action.setCheckable(True)
-        self.bestalternativemove_arrow_action.triggered.connect(self.controller.toggle_bestalternativemove_arrow_visibility)
-        board_menu.addAction(self.bestalternativemove_arrow_action)
-        
-        # Show Move Classification Icons action (checkable to show toggle state)
-        self.move_classification_icons_action = QAction("Show Move Classification Icons", self)
-        self.move_classification_icons_action.setShortcut(QKeySequence("Alt+4"))
-        self.move_classification_icons_action.setCheckable(True)
-        self.move_classification_icons_action.triggered.connect(self.controller.toggle_move_classification_icons_visibility)
-        board_menu.addAction(self.move_classification_icons_action)
-        
-        board_menu.addSeparator()
-        
-        # Show Annotations Layer action (checkable to show toggle state)
-        self.show_annotations_layer_action = QAction("Show Annotations Layer", self)
-        self.show_annotations_layer_action.setShortcut(QKeySequence("Alt+L"))
-        self.show_annotations_layer_action.setCheckable(True)
-        self.show_annotations_layer_action.setChecked(True)  # Default to showing annotations
-        self.show_annotations_layer_action.triggered.connect(self._on_show_annotations_layer_toggled)
-        board_menu.addAction(self.show_annotations_layer_action)
-        
-        board_menu.addSeparator()
-        
-        # Path trajectory style submenu
-        trajectory_style_menu = board_menu.addMenu("Path trajectory style")
-        
-        # Straight lines action (checkable)
-        self.trajectory_style_straight_action = QAction("Straight", self)
-        self.trajectory_style_straight_action.setCheckable(True)
-        # Load initial state from user settings (fallback to config default)
-        from app.services.user_settings_service import UserSettingsService
-        settings_service = UserSettingsService.get_instance()
-        user_settings = settings_service.get_settings()
-        board_visibility = user_settings.get('board_visibility', {})
-        use_straight_lines = board_visibility.get('use_straight_lines')
-        if use_straight_lines is None:
-            # Fallback to config default
-            positional_plans_config = self.config.get('ui', {}).get('panels', {}).get('main', {}).get('board', {}).get('positional_plans', {})
-            use_straight_lines = positional_plans_config.get('use_straight_lines', False)
-        self.trajectory_style_straight_action.setChecked(use_straight_lines)
-        self.trajectory_style_straight_action.triggered.connect(lambda: self._on_trajectory_style_selected(True))
-        trajectory_style_menu.addAction(self.trajectory_style_straight_action)
-        
-        # Bezier curves action (checkable)
-        self.trajectory_style_bezier_action = QAction("Bezier", self)
-        self.trajectory_style_bezier_action.setCheckable(True)
-        self.trajectory_style_bezier_action.setChecked(not use_straight_lines)
-        self.trajectory_style_bezier_action.triggered.connect(lambda: self._on_trajectory_style_selected(False))
-        trajectory_style_menu.addAction(self.trajectory_style_bezier_action)
-        
-        # Connect to board model state changes to update menu toggles
-        board_model = self.controller.get_board_controller().get_board_model()
-        board_model.flip_state_changed.connect(self._on_board_flip_state_changed)
-        board_model.coordinates_visibility_changed.connect(self._on_coordinates_visibility_changed)
-        board_model.turn_indicator_visibility_changed.connect(self._on_turn_indicator_visibility_changed)
-        board_model.game_info_visibility_changed.connect(self._on_game_info_visibility_changed)
-        board_model.playedmove_arrow_visibility_changed.connect(self._on_playedmove_arrow_visibility_changed)
-        board_model.bestnextmove_arrow_visibility_changed.connect(self._on_bestnextmove_arrow_visibility_changed)
-        board_model.bestalternativemove_arrow_visibility_changed.connect(self._on_bestalternativemove_arrow_visibility_changed)
-        board_model.move_classification_icons_visibility_changed.connect(self._on_move_classification_icons_visibility_changed)
-        board_model.evaluation_bar_visibility_changed.connect(self._on_evaluation_bar_visibility_changed)
-        board_model.material_widget_visibility_changed.connect(self._on_material_widget_visibility_changed)
-        
-        # Set initial toggle states
-        self._update_rotate_action_state(board_model.is_flipped)
-        self._update_coordinates_action_state(board_model.show_coordinates)
-        self._update_turn_indicator_action_state(board_model.show_turn_indicator)
-        self._update_game_info_action_state(board_model.show_game_info)
-        self._update_playedmove_arrow_action_state(board_model.show_playedmove_arrow)
-        self._update_bestnextmove_arrow_action_state(board_model.show_bestnextmove_arrow)
-        self._update_pv2_arrow_action_state(board_model.show_pv2_arrow)
-        self._update_pv3_arrow_action_state(board_model.show_pv3_arrow)
-        self._update_bestalternativemove_arrow_action_state(board_model.show_bestalternativemove_arrow)
-        self._update_move_classification_icons_action_state(board_model.show_move_classification_icons)
-        self._update_evaluation_bar_action_state(board_model.show_evaluation_bar)
-        self._update_material_widget_action_state(board_model.show_material_widget)
-        
-        # Connect positional heat-map model signals and set initial state
-        positional_heatmap_model = self.controller.get_positional_heatmap_controller().get_model()
-        positional_heatmap_model.visibility_changed.connect(self._on_positional_heatmap_visibility_changed)
-        self._update_positional_heatmap_action_state(positional_heatmap_model.is_visible)
-    
-    def _setup_pgn_menu(self, menu_bar: QMenuBar) -> None:
-        """Setup the PGN menu."""
-        pgn_menu = menu_bar.addMenu("PGN")
-        
-        # Show Metadata action (checkable to show toggle state)
-        self.show_metadata_action = QAction("Show Metadata", self)
-        self.show_metadata_action.setShortcut(QKeySequence("Ctrl+M"))
-        self.show_metadata_action.setCheckable(True)
-        self.show_metadata_action.setChecked(True)  # Default to showing metadata (will be loaded from settings)
-        self.show_metadata_action.triggered.connect(self._on_show_metadata_toggled)
-        pgn_menu.addAction(self.show_metadata_action)
-        
-        # Show Comments action
-        self.show_comments_action = QAction("Show Comments", self)
-        self.show_comments_action.setShortcut(QKeySequence("Ctrl+Shift+M"))
-        self.show_comments_action.setCheckable(True)
-        self.show_comments_action.setChecked(True)  # Default to showing comments (will be loaded from settings)
-        self.show_comments_action.triggered.connect(self._on_show_comments_toggled)
-        pgn_menu.addAction(self.show_comments_action)
-        
-        # Show Variations action
-        self.show_variations_action = QAction("Show Variations", self)
-        self.show_variations_action.setShortcut(QKeySequence("Ctrl+Shift+V"))
-        self.show_variations_action.setCheckable(True)
-        self.show_variations_action.setChecked(True)  # Default to showing variations (will be loaded from settings)
-        self.show_variations_action.triggered.connect(self._on_show_variations_toggled)
-        pgn_menu.addAction(self.show_variations_action)
-        
-        # Show Non-Standard Tags action (tags like [%evp], [%mdl] in comments)
-        self.show_non_standard_tags_action = QAction("Show Non-Standard Tags", self)
-        self.show_non_standard_tags_action.setShortcut(QKeySequence("Ctrl+Shift+T"))
-        self.show_non_standard_tags_action.setCheckable(True)
-        self.show_non_standard_tags_action.setChecked(False)  # Default to hiding non-standard tags (will be loaded from settings)
-        self.show_non_standard_tags_action.triggered.connect(self._on_show_non_standard_tags_toggled)
-        pgn_menu.addAction(self.show_non_standard_tags_action)
-        
-        # Show Annotations action
-        self.show_annotations_action = QAction("Show Annotations", self)
-        self.show_annotations_action.setShortcut(QKeySequence("Ctrl+Shift+A"))
-        self.show_annotations_action.setCheckable(True)
-        self.show_annotations_action.setChecked(True)  # Default to showing annotations (will be loaded from settings)
-        self.show_annotations_action.triggered.connect(self._on_show_annotations_toggled)
-        pgn_menu.addAction(self.show_annotations_action)
-        
-        # Show Results action
-        self.show_results_action = QAction("Show Results", self)
-        self.show_results_action.setShortcut(QKeySequence("Ctrl+R"))
-        self.show_results_action.setCheckable(True)
-        self.show_results_action.setChecked(True)  # Default to showing results (will be loaded from settings)
-        self.show_results_action.triggered.connect(self._on_show_results_toggled)
-        pgn_menu.addAction(self.show_results_action)
-        
-        # Separator before NAG display options
-        pgn_menu.addSeparator()
-        
-        # Display NAG move assessments as... submenu
-        self.nag_display_menu = pgn_menu.addMenu("Display NAG move assessments as...")
-        # Apply menu styling to submenu (same as other submenus)
-        self._apply_menu_styling(self.nag_display_menu)
-        
-        # Symbols action (checkable)
-        self.nag_display_symbols_action = QAction("Symbols (??, ?, ?! ..)", self)
-        self.nag_display_symbols_action.setCheckable(True)
-        self.nag_display_symbols_action.setChecked(True)  # Default (will be loaded from settings)
-        self.nag_display_symbols_action.triggered.connect(lambda: self._on_nag_display_mode_selected(True))
-        self.nag_display_menu.addAction(self.nag_display_symbols_action)
-        
-        # Text action (checkable)
-        self.nag_display_text_action = QAction("Text", self)
-        self.nag_display_text_action.setCheckable(True)
-        self.nag_display_text_action.setChecked(False)  # Default (will be loaded from settings)
-        self.nag_display_text_action.triggered.connect(lambda: self._on_nag_display_mode_selected(False))
-        self.nag_display_menu.addAction(self.nag_display_text_action)
-        
-        # Separator for cleaning actions
-        pgn_menu.addSeparator()
-        
-        # Remove Comments action
-        self.remove_comments_action = QAction("Remove Comments", self)
-        self.remove_comments_action.triggered.connect(self._on_remove_comments_clicked)
-        pgn_menu.addAction(self.remove_comments_action)
-        
-        # Remove Variations action
-        self.remove_variations_action = QAction("Remove Variations", self)
-        self.remove_variations_action.triggered.connect(self._on_remove_variations_clicked)
-        pgn_menu.addAction(self.remove_variations_action)
-        
-        # Remove Non-Standard Tags action
-        self.remove_non_standard_tags_action = QAction("Remove Non-Standard Tags", self)
-        self.remove_non_standard_tags_action.triggered.connect(self._on_remove_non_standard_tags_clicked)
-        pgn_menu.addAction(self.remove_non_standard_tags_action)
-        
-        # Remove Annotations action
-        self.remove_annotations_action = QAction("Remove Annotations", self)
-        self.remove_annotations_action.triggered.connect(self._on_remove_annotations_clicked)
-        pgn_menu.addAction(self.remove_annotations_action)
-    
-    def _setup_moves_list_menu(self, menu_bar: QMenuBar) -> None:
-        """Setup the Moves List menu."""
-        moves_list_menu = menu_bar.addMenu("Moves List")
-        
-        # Get column profile model and controller
-        profile_model = self.controller.get_column_profile_controller().get_profile_model()
-        profile_controller = self.controller.get_column_profile_controller()
-        
-        # Store menu reference for updates
-        self.moves_list_menu = moves_list_menu
-        self.profile_model = profile_model
-        self.profile_controller = profile_controller
-        
-        # Profile actions (will be populated dynamically)
-        self.profile_actions: Dict[str, QAction] = {}
-        
-        # Column visibility actions
-        self.column_actions: Dict[str, QAction] = {}
-        
-        # Connect to profile model signals
-        profile_model.active_profile_changed.connect(self._on_active_profile_changed)
-        profile_model.profile_added.connect(self._on_profile_added)
-        profile_model.profile_removed.connect(self._on_profile_removed)
-        profile_model.column_visibility_changed.connect(self._on_column_visibility_changed)
-        
-        # Initialize menu with current profiles and columns
-        self._update_moves_list_menu()
-    
-    def _setup_game_analysis_menu(self, menu_bar: QMenuBar) -> None:
-        """Setup the Game Analysis menu."""
-        game_analysis_menu = menu_bar.addMenu("Game Analysis")
-        
-        # Start Game Analysis action
-        self.start_game_analysis_action = QAction("Start Game Analysis", self)
-        self.start_game_analysis_action.setShortcut(QKeySequence("Ctrl+G"))
-        self.start_game_analysis_action.triggered.connect(self._start_game_analysis)
-        game_analysis_menu.addAction(self.start_game_analysis_action)
-        
-        # Cancel Game Analysis action (initially disabled)
-        self.cancel_game_analysis_action = QAction("Cancel Game Analysis", self)
-        self.cancel_game_analysis_action.setShortcut(QKeySequence("Escape"))
-        self.cancel_game_analysis_action.triggered.connect(self._cancel_game_analysis)
-        self.cancel_game_analysis_action.setEnabled(False)
-        game_analysis_menu.addAction(self.cancel_game_analysis_action)
-        
-        # Separator
-        game_analysis_menu.addSeparator()
-        
-        # Bulk Analyze Database action
-        self.bulk_analyze_database_action = QAction("Bulk Analyze Database...", self)
-        self.bulk_analyze_database_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-        self.bulk_analyze_database_action.triggered.connect(self._on_bulk_analyze_database)
-        game_analysis_menu.addAction(self.bulk_analyze_database_action)
-        
-        # Separator
-        game_analysis_menu.addSeparator()
-        
-        # Configure Classification Settings action
-        self.configure_classification_action = QAction("Configure Classification Settings...", self)
-        self.configure_classification_action.setShortcut(QKeySequence("Ctrl+Shift+K"))
-        self.configure_classification_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-        self.configure_classification_action.triggered.connect(self._open_classification_settings)
-        game_analysis_menu.addAction(self.configure_classification_action)
-        
-        # Separator
-        game_analysis_menu.addSeparator()
-        
-        # Normalized Evaluation Graph
-        self.normalized_graph_action = QAction("Normalized Evaluation Graph", self)
-        self.normalized_graph_action.setShortcut(QKeySequence("Ctrl+Shift+N"))
-        self.normalized_graph_action.setCheckable(True)
-        self.normalized_graph_action.setChecked(False)  # Default (will be loaded from settings)
-        self.normalized_graph_action.triggered.connect(self._on_normalized_graph_toggled)
-        game_analysis_menu.addAction(self.normalized_graph_action)
-        
-        # Separator
-        game_analysis_menu.addSeparator()
-        
-        # Brilliant Move Detection toggle
-        self.brilliant_move_detection_action = QAction("Brilliant Move Detection", self)
-        self.brilliant_move_detection_action.setCheckable(True)
-        self.brilliant_move_detection_action.triggered.connect(self._on_brilliant_move_detection_toggled)
-        game_analysis_menu.addAction(self.brilliant_move_detection_action)
-        
-        # Return to PLY 0 after analysis completes
-        self.return_to_first_move_action = QAction("Return to PLY 0 after analysis completes", self)
-        self.return_to_first_move_action.setCheckable(True)
-        self.return_to_first_move_action.setChecked(False)  # Default (will be loaded from settings)
-        self.return_to_first_move_action.triggered.connect(self._on_return_to_first_move_toggled)
-        game_analysis_menu.addAction(self.return_to_first_move_action)
-        
-        # Switch to Moves List at the start of Analysis
-        self.switch_to_moves_list_action = QAction("Switch to Moves List at the start of Analysis", self)
-        self.switch_to_moves_list_action.setCheckable(True)
-        self.switch_to_moves_list_action.setChecked(True)  # Default (will be loaded from settings)
-        self.switch_to_moves_list_action.triggered.connect(self._on_switch_to_moves_list_toggled)
-        game_analysis_menu.addAction(self.switch_to_moves_list_action)
-        
-        # Switch to Game Summary after Analysis
-        self.switch_to_summary_action = QAction("Switch to Game Summary after Analysis", self)
-        self.switch_to_summary_action.setCheckable(True)
-        self.switch_to_summary_action.setChecked(False)  # Default (will be loaded from settings)
-        self.switch_to_summary_action.triggered.connect(self._on_switch_to_summary_toggled)
-        game_analysis_menu.addAction(self.switch_to_summary_action)
-        
-        # Separator
-        game_analysis_menu.addSeparator()
-        
-        # Store Analysis results in PGN Tag toggle
-        self.store_analysis_results_action = QAction("Store Analysis results in PGN Tag", self)
-        self.store_analysis_results_action.setCheckable(True)
-        self.store_analysis_results_action.triggered.connect(self._on_store_analysis_results_toggled)
-        game_analysis_menu.addAction(self.store_analysis_results_action)
-    
-    def _setup_manual_analysis_menu(self, menu_bar: QMenuBar) -> None:
-        """Setup the Manual Analysis menu."""
-        manual_analysis_menu = menu_bar.addMenu("Manual Analysis")
-        
-        # Start/Stop Manual Analysis action (checkable to show toggle state)
-        self.start_manual_analysis_action = QAction("Start Manual Analysis", self)
-        self.start_manual_analysis_action.setShortcut(QKeySequence("Alt+M"))
-        self.start_manual_analysis_action.setCheckable(True)
-        self.start_manual_analysis_action.setChecked(False)
-        self.start_manual_analysis_action.triggered.connect(self._on_start_manual_analysis_toggled)
-        manual_analysis_menu.addAction(self.start_manual_analysis_action)
-        
-        manual_analysis_menu.addSeparator()
-        
-        # Add PV Line action
-        self.add_pv_line_action = QAction("Add PV Line", self)
-        self.add_pv_line_action.setShortcut(QKeySequence("Alt+N"))
-        self.add_pv_line_action.triggered.connect(self._on_add_pv_line)
-        manual_analysis_menu.addAction(self.add_pv_line_action)
-        
-        # Remove PV Line action
-        self.remove_pv_line_action = QAction("Remove PV Line", self)
-        self.remove_pv_line_action.setShortcut(QKeySequence("Alt+R"))
-        self.remove_pv_line_action.triggered.connect(self._on_remove_pv_line)
-        manual_analysis_menu.addAction(self.remove_pv_line_action)
-        
-        # Separator
-        manual_analysis_menu.addSeparator()
-        
-        # Enable miniature preview action (checkable toggle)
-        self.enable_miniature_preview_action = QAction("Enable miniature preview", self)
-        self.enable_miniature_preview_action.setCheckable(True)
-        self.enable_miniature_preview_action.setChecked(True)  # Default (will be loaded from settings)
-        self.enable_miniature_preview_action.triggered.connect(self._on_enable_miniature_preview_toggled)
-        manual_analysis_menu.addAction(self.enable_miniature_preview_action)
-        
-        # Set miniature preview scale factor menu (submenu)
-        self.miniature_preview_scale_menu = manual_analysis_menu.addMenu("Set miniature preview scale factor")
-        # Apply menu styling to submenu (same as other submenus)
-        self._apply_menu_styling(self.miniature_preview_scale_menu)
-        scale_factors = [1.0, 1.25, 1.5, 1.75, 2.0]
-        self.miniature_preview_scale_actions = {}
-        for scale in scale_factors:
-            action = QAction(f"{scale}x", self)
-            action.setCheckable(True)
-            action.setData(scale)
-            action.triggered.connect(lambda checked, s=scale: self._on_miniature_preview_scale_factor_selected(s))
-            self.miniature_preview_scale_menu.addAction(action)
-            self.miniature_preview_scale_actions[scale] = action
-        
-        # Separator
-        manual_analysis_menu.addSeparator()
-        
-        # Explore PV1 Positional Plans action (checkable toggle)
-        self.explore_pv1_plans_action = QAction("Explore PV1 Positional Plans", self)
-        self.explore_pv1_plans_action.setCheckable(True)
-        self.explore_pv1_plans_action.setChecked(False)
-        self.explore_pv1_plans_action.triggered.connect(self._on_explore_pv1_plans_toggled)
-        manual_analysis_menu.addAction(self.explore_pv1_plans_action)
-        
-        # Explore PV2 Positional Plans action (checkable toggle)
-        self.explore_pv2_plans_action = QAction("Explore PV2 Positional Plans", self)
-        self.explore_pv2_plans_action.setCheckable(True)
-        self.explore_pv2_plans_action.setChecked(False)
-        self.explore_pv2_plans_action.triggered.connect(self._on_explore_pv2_plans_toggled)
-        manual_analysis_menu.addAction(self.explore_pv2_plans_action)
-        
-        # Explore PV3 Positional Plans action (checkable toggle)
-        self.explore_pv3_plans_action = QAction("Explore PV3 Positional Plans", self)
-        self.explore_pv3_plans_action.setCheckable(True)
-        self.explore_pv3_plans_action.setChecked(False)
-        self.explore_pv3_plans_action.triggered.connect(self._on_explore_pv3_plans_toggled)
-        manual_analysis_menu.addAction(self.explore_pv3_plans_action)
-        
-        #manual_analysis_menu.addSeparator()
-        
-        # Max number of pieces to explore submenu
-        max_pieces_menu = manual_analysis_menu.addMenu("Max number of pieces to explore")
-        
-        # Load initial state from user settings (fallback to defaults)
-        from app.services.user_settings_service import UserSettingsService
-        settings_service = UserSettingsService.get_instance()
-        user_settings = settings_service.get_settings()
-        manual_analysis_settings = user_settings.get('manual_analysis', {})
-        max_pieces = manual_analysis_settings.get('max_pieces_to_explore', 1)
-        
-        # Max pieces 1 action (checkable)
-        self.max_pieces_1_action = QAction("1", self)
-        self.max_pieces_1_action.setCheckable(True)
-        self.max_pieces_1_action.setChecked(max_pieces == 1)
-        self.max_pieces_1_action.triggered.connect(lambda: self._on_max_pieces_selected(1))
-        max_pieces_menu.addAction(self.max_pieces_1_action)
-        
-        # Max pieces 2 action (checkable)
-        self.max_pieces_2_action = QAction("2", self)
-        self.max_pieces_2_action.setCheckable(True)
-        self.max_pieces_2_action.setChecked(max_pieces == 2)
-        self.max_pieces_2_action.triggered.connect(lambda: self._on_max_pieces_selected(2))
-        max_pieces_menu.addAction(self.max_pieces_2_action)
-        
-        # Max pieces 3 action (checkable)
-        self.max_pieces_3_action = QAction("3", self)
-        self.max_pieces_3_action.setCheckable(True)
-        self.max_pieces_3_action.setChecked(max_pieces == 3)
-        self.max_pieces_3_action.triggered.connect(lambda: self._on_max_pieces_selected(3))
-        max_pieces_menu.addAction(self.max_pieces_3_action)
-        
-        #manual_analysis_menu.addSeparator()
-        
-        # Max exploration depth submenu
-        max_depth_menu = manual_analysis_menu.addMenu("Max Exploration depth")
-        
-        # Load initial state from user settings (fallback to defaults)
-        max_depth = manual_analysis_settings.get('max_exploration_depth', 2)
-        
-        # Max depth 2 action (checkable)
-        self.max_depth_2_action = QAction("2", self)
-        self.max_depth_2_action.setCheckable(True)
-        self.max_depth_2_action.setChecked(max_depth == 2)
-        self.max_depth_2_action.triggered.connect(lambda: self._on_max_exploration_depth_selected(2))
-        max_depth_menu.addAction(self.max_depth_2_action)
-        
-        # Max depth 3 action (checkable)
-        self.max_depth_3_action = QAction("3", self)
-        self.max_depth_3_action.setCheckable(True)
-        self.max_depth_3_action.setChecked(max_depth == 3)
-        self.max_depth_3_action.triggered.connect(lambda: self._on_max_exploration_depth_selected(3))
-        max_depth_menu.addAction(self.max_depth_3_action)
-        
-        # Max depth 4 action (checkable)
-        self.max_depth_4_action = QAction("4", self)
-        self.max_depth_4_action.setCheckable(True)
-        self.max_depth_4_action.setChecked(max_depth == 4)
-        self.max_depth_4_action.triggered.connect(lambda: self._on_max_exploration_depth_selected(4))
-        max_depth_menu.addAction(self.max_depth_4_action)
-        
-        #manual_analysis_menu.addSeparator()
-        
-        # Hide other arrows during plan exploration action (checkable toggle)
-        # Load initial state from user settings (fallback to default)
-        board_visibility = user_settings.get('board_visibility', {})
-        hide_other_arrows = board_visibility.get('hide_other_arrows_during_plan_exploration', False)
-        
-        self.hide_other_arrows_during_plan_exploration_action = QAction("Hide other arrows during plan exploration", self)
-        self.hide_other_arrows_during_plan_exploration_action.setCheckable(True)
-        self.hide_other_arrows_during_plan_exploration_action.setChecked(hide_other_arrows)
-        self.hide_other_arrows_during_plan_exploration_action.triggered.connect(self._on_hide_other_arrows_during_plan_exploration_toggled)
-        manual_analysis_menu.addAction(self.hide_other_arrows_during_plan_exploration_action)
-        
-        # Store menu reference
-        self.manual_analysis_menu = manual_analysis_menu
-        
-        # Connect to manual analysis model signals
-        manual_analysis_controller = self.controller.get_manual_analysis_controller()
-        manual_analysis_model = manual_analysis_controller.get_analysis_model()
-        manual_analysis_model.is_analyzing_changed.connect(self._on_manual_analysis_state_changed)
-        manual_analysis_model.lines_changed.connect(self._on_manual_analysis_lines_changed)
-        
-        # Set initial action states
-        self._update_manual_analysis_action_states(manual_analysis_model.is_analyzing, manual_analysis_model.multipv)
+        # Setup each menu section (definitions live in app/views/menus/)
+        from app.views.menus.menu_bar import setup_menu_bar as _setup_menu_bar_definitions
 
-    def _setup_player_stats_menu(self, menu_bar: QMenuBar) -> None:
-        """Menu to show/hide Player Stats tab sections (persisted in user settings)."""
-        from app.services.user_settings_service import UserSettingsService
-        from app.views.detail_player_stats_view import PLAYER_STATS_MENU_SECTIONS
-
-        ps_menu = menu_bar.addMenu("Player Stats")
-        self._apply_menu_styling(ps_menu)
-        self.player_stats_menu = ps_menu
-        self._player_stats_section_actions: Dict[str, QAction] = {}
-        reset_ps_defaults = QAction("Reset to defaults", self)
-        reset_ps_defaults.setMenuRole(QAction.MenuRole.NoRole)
-        reset_ps_defaults.triggered.connect(self._on_player_stats_reset_to_template_defaults)
-        ps_menu.addAction(reset_ps_defaults)
-        ps_menu.addSeparator()
-        enable_all_ps = QAction("Enable all", self)
-        enable_all_ps.setMenuRole(QAction.MenuRole.NoRole)
-        enable_all_ps.triggered.connect(self._on_player_stats_menu_enable_all)
-        ps_menu.addAction(enable_all_ps)
-        disable_all_ps = QAction("Disable all", self)
-        disable_all_ps.setMenuRole(QAction.MenuRole.NoRole)
-        disable_all_ps.triggered.connect(self._on_player_stats_menu_disable_all)
-        ps_menu.addAction(disable_all_ps)
-        ps_menu.addSeparator()
-        vis = UserSettingsService.get_instance().get_model().get_player_stats_section_visibility()
-        sections = list(PLAYER_STATS_MENU_SECTIONS)
-        idx_ov = next(i for i, (sid, _) in enumerate(sections) if sid == "overview")
-        idx_ah = next(i for i, (sid, _) in enumerate(sections) if sid == "activity_heatmap")
-        idx_ad = next(i for i, (sid, _) in enumerate(sections) if sid == "accuracy_distribution")
-        idx_acpl = next(i for i, (sid, _) in enumerate(sections) if sid == "acpl_phase_progression")
-
-        def _add_player_stats_section_visibility_actions(pairs: list) -> None:
-            for section_id, label in pairs:
-                if section_id == "accuracy_progression":
-                    ps_menu.addSeparator()
-                act = QAction(label, self)
-                act.setCheckable(True)
-                act.setMenuRole(QAction.MenuRole.NoRole)
-                act.setChecked(bool(vis.get(section_id, True)))
-                act.triggered.connect(
-                    lambda checked, sid=section_id: self._on_player_stats_section_menu_toggled(sid, checked)
-                )
-                ps_menu.addAction(act)
-                self._player_stats_section_actions[section_id] = act
-                if section_id == "endgame_tree":
-                    ps_menu.addSeparator()
-
-        _add_player_stats_section_visibility_actions([sections[idx_ov]])
-        ps_menu.addSeparator()
-        _add_player_stats_section_visibility_actions([sections[idx_ah]])
-        self._setup_player_stats_activity_heatmap_submenu(ps_menu)
-        ps_menu.addSeparator()
-        _add_player_stats_section_visibility_actions([sections[idx_ad]])
-        self._setup_player_stats_accuracy_distribution_submenu(ps_menu)
-        ps_menu.addSeparator()
-        _add_player_stats_section_visibility_actions(sections[idx_ad + 1 : idx_acpl + 1])
-        self._setup_player_stats_time_series_submenu(ps_menu)
-        ps_menu.addSeparator()
-        _add_player_stats_section_visibility_actions(sections[idx_acpl + 1 :])
-
-    def _setup_player_stats_time_series_submenu(self, ps_menu: QMenu) -> None:
-        """Submenus for Player Stats date-based trend binning (shared logic in PlayerStatsTimeSeriesMenuController)."""
-        from app.services.user_settings_service import UserSettingsService
-
-        self._ps_ts_menu_controller = PlayerStatsTimeSeriesMenuController(self, self._apply_menu_styling)
-        self.player_stats_time_series_menu = self._ps_ts_menu_controller.attach_to_parent_menu(ps_menu)
-        UserSettingsService.get_instance().get_model().player_stats_time_series_changed.connect(
-            self._ps_ts_menu_controller.sync_from_settings
-        )
-
-    def _setup_player_stats_activity_heatmap_submenu(self, ps_menu: QMenu) -> None:
-        from app.services.user_settings_service import UserSettingsService
-
-        self._ps_ah_menu_controller = PlayerStatsActivityHeatmapMenuController(
-            self, self._apply_menu_styling
-        )
-        self.player_stats_activity_heatmap_menu = self._ps_ah_menu_controller.attach_to_parent_menu(
-            ps_menu
-        )
-        UserSettingsService.get_instance().get_model().player_stats_activity_heatmap_changed.connect(
-            self._ps_ah_menu_controller.sync_from_settings
-        )
-
-    def _setup_player_stats_accuracy_distribution_submenu(self, ps_menu: QMenu) -> None:
-        from app.services.user_settings_service import UserSettingsService
-
-        self._ps_ad_menu_controller = PlayerStatsAccuracyDistributionMenuController(
-            self, self._apply_menu_styling
-        )
-        self.player_stats_accuracy_distribution_menu = (
-            self._ps_ad_menu_controller.attach_to_parent_menu(ps_menu)
-        )
-        UserSettingsService.get_instance().get_model().player_stats_accuracy_distribution_changed.connect(
-            self._ps_ad_menu_controller.sync_from_settings
-        )
-
-    def _sync_player_stats_time_series_menu_from_settings(self) -> None:
-        if hasattr(self, "_ps_ts_menu_controller"):
-            self._ps_ts_menu_controller.sync_from_settings()
-
-    def _sync_player_stats_activity_heatmap_menu_from_settings(self) -> None:
-        if hasattr(self, "_ps_ah_menu_controller"):
-            self._ps_ah_menu_controller.sync_from_settings()
-
-    def _sync_player_stats_accuracy_distribution_menu_from_settings(self) -> None:
-        if hasattr(self, "_ps_ad_menu_controller"):
-            self._ps_ad_menu_controller.sync_from_settings()
+        _setup_menu_bar_definitions(self, menu_bar)
 
     def _on_player_stats_reset_to_template_defaults(self) -> None:
         """Restore Player Stats menu settings from ``user_settings.json.template``."""
@@ -1076,452 +215,28 @@ class MainWindow(QMainWindow):
             psv = getattr(self.detail_panel, "player_stats_view", None)
             if psv:
                 psv.set_player_stats_section_menu_actions(self._player_stats_section_actions)
+    
+    def _sync_player_stats_time_series_menu_from_settings(self) -> None:
+        if hasattr(self, "_ps_ts_menu_controller"):
+            self._ps_ts_menu_controller.sync_from_settings()
 
-    def _setup_annotations_menu(self, menu_bar: QMenuBar) -> None:
-        """Setup the Annotations menu."""
-        annotations_menu = menu_bar.addMenu("Annotations")
-        
-        clear_all_annotations_action = QAction("Clear all Annotations for current game", self)
-        clear_all_annotations_action.setShortcut(QKeySequence("Ctrl+Shift+D"))
-        clear_all_annotations_action.triggered.connect(self._clear_all_annotations_for_game)
-        annotations_menu.addAction(clear_all_annotations_action)
-        
-        clear_move_annotations_action = QAction("Clear all Annotations for current move", self)
-        clear_move_annotations_action.setShortcut(QKeySequence("Ctrl+Alt+D"))
-        clear_move_annotations_action.triggered.connect(self._clear_annotations_for_current_move)
-        annotations_menu.addAction(clear_move_annotations_action)
-        
-        save_annotations_action = QAction("Save Annotations to current game", self)
-        save_annotations_action.setShortcut(QKeySequence("Ctrl+Alt+S"))
-        save_annotations_action.triggered.connect(self._save_annotations_to_current_game)
-        annotations_menu.addAction(save_annotations_action)
-        
-        annotations_menu.addSeparator()
-        
-        # Highlight annotated moves in moves list (checkable)
-        self.highlight_annotated_moves_action = QAction("Highlight annotated moves in moves list", self)
-        self.highlight_annotated_moves_action.setCheckable(True)
-        self.highlight_annotated_moves_action.setChecked(False)
-        self.highlight_annotated_moves_action.triggered.connect(self._on_highlight_annotated_moves_toggled)
-        annotations_menu.addAction(self.highlight_annotated_moves_action)
-        
-        annotations_menu.addSeparator()
-        
-        setup_preferences_action = QAction("Setup Preferences...", self)
-        setup_preferences_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-        setup_preferences_action.triggered.connect(self._show_annotation_preferences)
-        annotations_menu.addAction(setup_preferences_action)
+    def _sync_player_stats_activity_heatmap_menu_from_settings(self) -> None:
+        if hasattr(self, "_ps_ah_menu_controller"):
+            self._ps_ah_menu_controller.sync_from_settings()
 
-    def _setup_notes_menu(self, menu_bar: QMenuBar) -> None:
-        """Setup the Notes menu."""
-        notes_menu = menu_bar.addMenu("Notes")
-        clear_notes_action = QAction("Clear Notes for current game", self)
-        clear_notes_action.setShortcut(QKeySequence("Ctrl+Shift+E"))
-        clear_notes_action.triggered.connect(self._clear_notes_for_current_game)
-        notes_menu.addAction(clear_notes_action)
-        save_notes_action = QAction("Save Notes to current game", self)
-        save_notes_action.setShortcut(QKeySequence("Ctrl+Alt+N"))
-        save_notes_action.triggered.connect(self._save_notes_to_current_game)
-        notes_menu.addAction(save_notes_action)
-    
-    def _setup_engines_menu(self, menu_bar: QMenuBar) -> None:
-        """Setup the Engines menu."""
-        engines_menu = menu_bar.addMenu("Engines")
-        
-        # Add Engine action
-        add_engine_action = QAction("Add Engine...", self)
-        add_engine_action.setShortcut(QKeySequence("Ctrl+E"))
-        add_engine_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-        add_engine_action.triggered.connect(self._add_engine)
-        engines_menu.addAction(add_engine_action)
-        
-        engines_menu.addSeparator()
-        
-        # Engine list submenus (will be populated dynamically)
-        self.engine_submenus: Dict[str, QMenu] = {}
-        self.no_engines_action: Optional[QAction] = None
-        
-        # Connect to engine model signals
-        engine_model = self.controller.get_engine_controller().get_engine_model()
-        engine_model.engine_added.connect(self._on_engine_added)
-        engine_model.engine_removed.connect(self._on_engine_removed)
-        engine_model.engines_changed.connect(self._update_engines_menu)
-        engine_model.assignment_changed.connect(self._update_engines_menu)
-        
-        # Store menu reference for updates
-        self.engines_menu = engines_menu
-        self.engine_model = engine_model
-        
-        # Initialize menu with current engines
-        self._update_engines_menu()
-    
-    def _setup_ai_summary_menu(self, menu_bar: QMenuBar) -> None:
-        """Setup the AI Summary menu."""
-        ai_summary_menu = menu_bar.addMenu("AI Summary")
-        
-        # AI Model Settings action (top of menu)
-        ai_model_settings_action = QAction("AI Model Settings...", self)
-        ai_model_settings_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-        ai_model_settings_action.triggered.connect(self._show_ai_model_settings)
-        ai_summary_menu.addAction(ai_model_settings_action)
-        
-        ai_summary_menu.addSeparator()
-        
-        # Provider toggles (mutually exclusive)
-        self.ai_summary_use_openai_action = QAction("Use OpenAI Models", self)
-        self.ai_summary_use_openai_action.setCheckable(True)
-        self.ai_summary_use_openai_action.triggered.connect(lambda: self._on_ai_summary_provider_selected("openai"))
-        ai_summary_menu.addAction(self.ai_summary_use_openai_action)
-        
-        self.ai_summary_use_anthropic_action = QAction("Use Anthropic Models", self)
-        self.ai_summary_use_anthropic_action.setCheckable(True)
-        self.ai_summary_use_anthropic_action.triggered.connect(lambda: self._on_ai_summary_provider_selected("anthropic"))
-        ai_summary_menu.addAction(self.ai_summary_use_anthropic_action)
-        
-        self.ai_summary_use_custom_action = QAction("Use Custom Endpoint", self)
-        self.ai_summary_use_custom_action.setCheckable(True)
-        self.ai_summary_use_custom_action.triggered.connect(lambda: self._on_ai_summary_provider_selected("custom"))
-        ai_summary_menu.addAction(self.ai_summary_use_custom_action)
-        
-        ai_summary_menu.addSeparator()
-        
-        # Include Analysis Data in Pre-Prompt toggle
-        self.ai_summary_include_analysis_action = QAction("Include Game Analysis Data in Pre-Prompt", self)
-        self.ai_summary_include_analysis_action.setCheckable(True)
-        self.ai_summary_include_analysis_action.triggered.connect(self._on_ai_summary_include_analysis_toggled)
-        ai_summary_menu.addAction(self.ai_summary_include_analysis_action)
-        
-        self.ai_summary_include_metadata_action = QAction("Include PGN Metadata tags in Pre-Prompt", self)
-        self.ai_summary_include_metadata_action.setCheckable(True)
-        self.ai_summary_include_metadata_action.triggered.connect(self._on_ai_summary_include_metadata_toggled)
-        ai_summary_menu.addAction(self.ai_summary_include_metadata_action)
-    
-    def _setup_view_menu(self, menu_bar: QMenuBar) -> None:
-        """Setup the View menu."""
-        view_menu = menu_bar.addMenu("View")
-        
-        # Moves List action
-        self.view_moves_list_action = QAction("Moves List", self)
-        self.view_moves_list_action.setShortcut(QKeySequence("F1"))
-        self.view_moves_list_action.setCheckable(True)
-        self.view_moves_list_action.triggered.connect(lambda: self._switch_detail_tab(0))
-        view_menu.addAction(self.view_moves_list_action)
-        
-        # Metadata action
-        self.view_metadata_action = QAction("Metadata", self)
-        self.view_metadata_action.setShortcut(QKeySequence("F2"))
-        self.view_metadata_action.setCheckable(True)
-        self.view_metadata_action.triggered.connect(lambda: self._switch_detail_tab(1))
-        view_menu.addAction(self.view_metadata_action)
-        
-        # Manual Analysis action
-        self.view_manual_analysis_action = QAction("Manual Analysis", self)
-        self.view_manual_analysis_action.setShortcut(QKeySequence("F3"))
-        self.view_manual_analysis_action.setCheckable(True)
-        self.view_manual_analysis_action.triggered.connect(lambda: self._switch_detail_tab(2))
-        view_menu.addAction(self.view_manual_analysis_action)
-        
-        # Game Summary action
-        self.view_game_summary_action = QAction("Game Summary", self)
-        self.view_game_summary_action.setShortcut(QKeySequence("F4"))
-        self.view_game_summary_action.setCheckable(True)
-        self.view_game_summary_action.triggered.connect(lambda: self._switch_detail_tab(3))
-        view_menu.addAction(self.view_game_summary_action)
-        
-        # Player Stats action
-        self.view_player_stats_action = QAction("Player Stats", self)
-        self.view_player_stats_action.setShortcut(QKeySequence("F5"))
-        self.view_player_stats_action.setCheckable(True)
-        self.view_player_stats_action.triggered.connect(lambda: self._switch_detail_tab(4))
-        view_menu.addAction(self.view_player_stats_action)
-        
-        # Annotations action
-        self.view_annotations_action = QAction("Annotations", self)
-        self.view_annotations_action.setShortcut(QKeySequence("F6"))
-        self.view_annotations_action.setCheckable(True)
-        self.view_annotations_action.triggered.connect(lambda: self._switch_detail_tab(5))
-        view_menu.addAction(self.view_annotations_action)
-        
-        # AI Summary action
-        self.view_ai_summary_action = QAction("AI Summary", self)
-        self.view_ai_summary_action.setShortcut(QKeySequence("F7"))
-        self.view_ai_summary_action.setCheckable(True)
-        self.view_ai_summary_action.triggered.connect(lambda: self._switch_detail_tab(6))
-        view_menu.addAction(self.view_ai_summary_action)
-        
-        # Notes action
-        self.view_notes_action = QAction("Notes", self)
-        self.view_notes_action.setShortcut(QKeySequence("F8"))
-        self.view_notes_action.setCheckable(True)
-        self.view_notes_action.triggered.connect(lambda: self._switch_detail_tab(7))
-        view_menu.addAction(self.view_notes_action)
-        
-        # Separator
-        view_menu.addSeparator()
-        
-        # Hide Database Panel action
-        self.view_hide_database_panel_action = QAction("Hide Database Panel", self)
-        self.view_hide_database_panel_action.setCheckable(True)
-        self.view_hide_database_panel_action.setChecked(False)  # Initial state (panel is visible)
-        self.view_hide_database_panel_action.triggered.connect(self._toggle_database_panel)
-        view_menu.addAction(self.view_hide_database_panel_action)
-        
-        # Store view menu actions for later connection (order must match detail panel tab order)
-        self.view_menu_actions = [
-            self.view_moves_list_action,
-            self.view_metadata_action,
-            self.view_manual_analysis_action,
-            self.view_game_summary_action,
-            self.view_player_stats_action,
-            self.view_annotations_action,
-            self.view_ai_summary_action,
-            self.view_notes_action
-        ]
-    
-    def _setup_help_menu(self, menu_bar: QMenuBar) -> None:
-        """Setup the Help menu."""
-        help_menu = menu_bar.addMenu("Help")
-        
-        # Open Manual action
-        open_manual_action = QAction("Open Manual", self)
-        open_manual_action.triggered.connect(self._open_manual)
-        help_menu.addAction(open_manual_action)
-        
-        # Watch Video Tutorials action
-        watch_video_tutorials_action = QAction("Watch Video Tutorials", self)
-        watch_video_tutorials_action.triggered.connect(self._open_video_tutorials)
-        help_menu.addAction(watch_video_tutorials_action)
-        
-        # Visit GitHub Repository action
-        visit_github_action = QAction("Visit GitHub Repository", self)
-        visit_github_action.triggered.connect(self._open_github_repository)
-        help_menu.addAction(visit_github_action)
-        
-        help_menu.addSeparator()
-        
-        # Release Notes action
-        release_notes_action = QAction("View Release Notes", self)
-        release_notes_action.triggered.connect(self._show_release_notes_dialog)
-        help_menu.addAction(release_notes_action)
-        
-        # License action
-        license_action = QAction("View License", self)
-        license_action.triggered.connect(self._show_license_dialog)
-        help_menu.addAction(license_action)
-        
-        # Third Party Licenses action
-        third_party_licenses_action = QAction("View Third Party Licenses", self)
-        third_party_licenses_action.triggered.connect(self._show_third_party_licenses_dialog)
-        help_menu.addAction(third_party_licenses_action)
-        
-        help_menu.addSeparator()
-        
-        # Open user data directory action
-        open_user_data_dir_action = QAction("Open user data directory", self)
-        open_user_data_dir_action.triggered.connect(self._open_user_data_directory)
-        help_menu.addAction(open_user_data_dir_action)
-        
-        help_menu.addSeparator()
-        
-        # Check for Updates action
-        check_updates_action = QAction("Check for Updates...", self)
-        check_updates_action.triggered.connect(self._check_for_updates)
-        help_menu.addAction(check_updates_action)
-        
-        help_menu.addSeparator()
-        
-        # About action
-        about_action = QAction("About...", self)
-        # Set menu role to NoRole to prevent macOS from moving it to the application menu
-        about_action.setMenuRole(QAction.MenuRole.NoRole)
-        about_action.triggered.connect(self._show_about_dialog)
-        help_menu.addAction(about_action)
-    
-    def _setup_debug_menu(self, menu_bar: QMenuBar) -> None:
-        """Setup the Debug menu (only if enabled in config)."""
-        debug_config = self.config.get('debug', {})
-        show_debug_menu = debug_config.get('show_debug_menu', False)
-        if show_debug_menu:
-            debug_menu = menu_bar.addMenu("Debug")
-            
-            # Copy PGN HTML action
-            debug_copy_pgn_html_action = QAction("Copy PGN HTML", self)
-            debug_copy_pgn_html_action.triggered.connect(self._debug_copy_pgn_html)
-            debug_menu.addAction(debug_copy_pgn_html_action)
-            
-            # Copy Deserialize Analysis Tag action
-            debug_copy_deserialize_analysis_action = QAction("Copy Deserialize Analysis Tag", self)
-            debug_copy_deserialize_analysis_action.triggered.connect(self._debug_copy_deserialize_analysis_tag)
-            debug_menu.addAction(debug_copy_deserialize_analysis_action)
-            
-            # Copy Deserialize Annotation Tag action
-            debug_copy_deserialize_annotation_action = QAction("Copy Deserialize Annotation Tag", self)
-            debug_copy_deserialize_annotation_action.triggered.connect(self._debug_copy_deserialize_annotation_tag)
-            debug_menu.addAction(debug_copy_deserialize_annotation_action)
-            
-            # Copy Game Highlights HTML action
-            debug_copy_highlights_html_action = QAction("Copy Game Highlights HTML", self)
-            debug_copy_highlights_html_action.triggered.connect(self._debug_copy_game_highlights_html)
-            debug_menu.addAction(debug_copy_highlights_html_action)
-            
-            # Copy Game Highlights JSON action
-            debug_copy_highlights_json_action = QAction("Copy Game Highlights JSON", self)
-            debug_copy_highlights_json_action.triggered.connect(self._debug_copy_game_highlights_json)
-            debug_menu.addAction(debug_copy_highlights_json_action)
-            
-            debug_menu.addSeparator()
-            
-            # Create Highlight Rule Test Data action
-            debug_create_highlight_test_data_action = QAction("Create Highlight Rule Test Data", self)
-            debug_create_highlight_test_data_action.triggered.connect(self._debug_create_highlight_rule_test_data)
-            debug_menu.addAction(debug_create_highlight_test_data_action)
-            
-            # Separator
-            debug_menu.addSeparator()
-            
-            # Debug UCI Lifecycle toggle
-            self.debug_uci_lifecycle_action = QAction("Debug UCI Lifecycle", self)
-            self.debug_uci_lifecycle_action.setCheckable(True)
-            self.debug_uci_lifecycle_action.setChecked(self._uci_debug_lifecycle)
-            self.debug_uci_lifecycle_action.triggered.connect(self._toggle_uci_debug_lifecycle)
-            debug_menu.addAction(self.debug_uci_lifecycle_action)
-            
-            # Debug UCI Outbound toggle
-            self.debug_uci_outbound_action = QAction("Debug UCI Outbound", self)
-            self.debug_uci_outbound_action.setCheckable(True)
-            self.debug_uci_outbound_action.setChecked(self._uci_debug_outbound)
-            self.debug_uci_outbound_action.triggered.connect(self._toggle_uci_debug_outbound)
-            debug_menu.addAction(self.debug_uci_outbound_action)
-            
-            # Debug UCI Inbound toggle
-            self.debug_uci_inbound_action = QAction("Debug UCI Inbound", self)
-            self.debug_uci_inbound_action.setCheckable(True)
-            self.debug_uci_inbound_action.setChecked(self._uci_debug_inbound)
-            self.debug_uci_inbound_action.triggered.connect(self._toggle_uci_debug_inbound)
-            debug_menu.addAction(self.debug_uci_inbound_action)
-            
-            # Separator
-            debug_menu.addSeparator()
-            
-            # Debug AI Outbound toggle
-            self.debug_ai_outbound_action = QAction("Debug AI Outbound", self)
-            self.debug_ai_outbound_action.setCheckable(True)
-            self.debug_ai_outbound_action.setChecked(self._ai_debug_outbound)
-            self.debug_ai_outbound_action.triggered.connect(self._toggle_ai_debug_outbound)
-            debug_menu.addAction(self.debug_ai_outbound_action)
-            
-            # Debug AI Inbound toggle
-            self.debug_ai_inbound_action = QAction("Debug AI Inbound", self)
-            self.debug_ai_inbound_action.setCheckable(True)
-            self.debug_ai_inbound_action.setChecked(self._ai_debug_inbound)
-            self.debug_ai_inbound_action.triggered.connect(self._toggle_ai_debug_inbound)
-            debug_menu.addAction(self.debug_ai_inbound_action)
-            
-            # Separator
-            debug_menu.addSeparator()
-            
-            # Toggle Game Analysis State (for debugging)
-            self.debug_toggle_game_analysis_action = QAction("Toggle Game Analysis State", self)
-            self.debug_toggle_game_analysis_action.setCheckable(True)
-            # Get initial state from game model
-            game_model = self.controller.get_game_controller().get_game_model()
-            self.debug_toggle_game_analysis_action.setChecked(game_model.is_game_analyzed)
-            self.debug_toggle_game_analysis_action.triggered.connect(self._toggle_game_analysis_state)
-            debug_menu.addAction(self.debug_toggle_game_analysis_action)
-            
-            # Connect to game model signal to update menu toggle state
-            game_model.is_game_analyzed_changed.connect(self._on_game_analysis_state_changed)
-    
+    def _sync_player_stats_accuracy_distribution_menu_from_settings(self) -> None:
+        if hasattr(self, "_ps_ad_menu_controller"):
+            self._ps_ad_menu_controller.sync_from_settings()
+
     def _apply_menu_bar_styling(self, menu_bar: QMenuBar) -> None:
         """Apply styling to the menu bar based on configuration.
         
         Args:
             menu_bar: The QMenuBar instance to style.
         """
-        ui_config = self.config.get('ui', {})
-        menu_config = ui_config.get('menu', {})
-        
-        # Get font settings
-        font_family = resolve_font_family(menu_config.get('font_family', 'Helvetica Neue'))
-        font_size = scale_font_size(menu_config.get('font_size', 10))
-        
-        # Get color settings
-        colors_config = menu_config.get('colors', {})
-        normal = colors_config.get('normal', {})
-        hover = colors_config.get('hover', {})
-        
-        # Normal state colors
-        norm_bg = normal.get('background', [45, 45, 50])
-        norm_text = normal.get('text', [200, 200, 200])
-        
-        # Hover state colors
-        hover_bg = hover.get('background', [55, 55, 60])
-        hover_text = hover.get('text', [230, 230, 230])
-        
-        # Get spacing and padding from config
-        menu_spacing = menu_config.get('spacing', 4)
-        menu_bar_config = menu_config.get('menu_bar', {})
-        menu_bar_item_padding = menu_bar_config.get('item_padding', [4, 8])
-        
-        menu_config_obj = menu_config.get('menu', {})
-        menu_border_width = menu_config_obj.get('border_width', 1)
-        menu_border_color = menu_config_obj.get('border_color', [60, 60, 65])
-        menu_item_padding = menu_config_obj.get('item_padding', [4, 20, 4, 8])
-        
-        separator_config = menu_config.get('separator', {})
-        separator_height = separator_config.get('height', 1)
-        separator_bg_color = separator_config.get('background_color', [60, 60, 65])
-        separator_margin = separator_config.get('margin', [2, 4])
-        
-        # Create stylesheet
-        stylesheet = f"""
-            QMenuBar {{
-                background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
-                color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
-                font-family: "{font_family}";
-                font-size: {font_size}pt;
-                spacing: {menu_spacing}px;
-            }}
-            
-            QMenuBar::item {{
-                background-color: transparent;
-                padding: {menu_bar_item_padding[0]}px {menu_bar_item_padding[1]}px;
-            }}
-            
-            QMenuBar::item:selected {{
-                background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});
-                color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});
-            }}
-            
-            QMenuBar::item:pressed {{
-                background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});
-            }}
-            
-            QMenu {{
-                background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
-                color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
-                border: {menu_border_width}px solid rgb({menu_border_color[0]}, {menu_border_color[1]}, {menu_border_color[2]});
-                font-family: "{font_family}";
-                font-size: {font_size}pt;
-            }}
-            
-            QMenu::item {{
-                padding: {menu_item_padding[0]}px {menu_item_padding[1]}px {menu_item_padding[2]}px {menu_item_padding[3]}px;
-            }}
-            
-            QMenu::item:selected {{
-                background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});
-                color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});
-            }}
-            
-            QMenu::separator {{
-                height: {separator_height}px;
-                background-color: rgb({separator_bg_color[0]}, {separator_bg_color[1]}, {separator_bg_color[2]});
-                margin: {separator_margin[0]}px {separator_margin[1]}px;
-            }}
-        """
-        
-        menu_bar.setStyleSheet(stylesheet)
+        from app.views.style.menu_bar import apply_menu_bar_styling
+
+        apply_menu_bar_styling(menu_bar, self.config)
     
     def _apply_menu_styling(self, menu: QMenu) -> None:
         """Apply styling to a QMenu (used for submenus).
@@ -1529,60 +244,9 @@ class MainWindow(QMainWindow):
         Args:
             menu: The QMenu instance to style.
         """
-        ui_config = self.config.get('ui', {})
-        menu_config = ui_config.get('menu', {})
-        
-        # Get font settings
-        font_family = resolve_font_family(menu_config.get('font_family', 'Helvetica Neue'))
-        font_size = scale_font_size(menu_config.get('font_size', 10))
-        
-        # Get color settings
-        colors_config = menu_config.get('colors', {})
-        normal = colors_config.get('normal', {})
-        hover = colors_config.get('hover', {})
-        
-        # Normal state colors
-        norm_bg = normal.get('background', [45, 45, 50])
-        norm_text = normal.get('text', [200, 200, 200])
-        
-        # Hover state colors
-        hover_bg = hover.get('background', [55, 55, 60])
-        hover_text = hover.get('text', [230, 230, 230])
-        
-        menu_config_obj = menu_config.get('menu', {})
-        menu_border_width = menu_config_obj.get('border_width', 1)
-        menu_border_color = menu_config_obj.get('border_color', [60, 60, 65])
-        menu_item_padding = menu_config_obj.get('item_padding', [4, 20, 4, 8])
-        
-        separator_config = menu_config.get('separator', {})
-        separator_height = separator_config.get('height', 1)
-        separator_bg_color = separator_config.get('background_color', [60, 60, 65])
-        separator_margin = separator_config.get('margin', [2, 4])
-        
-        # Create stylesheet for QMenu (same as in menu bar styling)
-        stylesheet = f"""
-            QMenu {{
-                background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
-                color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
-                border: {menu_border_width}px solid rgb({menu_border_color[0]}, {menu_border_color[1]}, {menu_border_color[2]});
-                font-family: "{font_family}";
-                font-size: {font_size}pt;
-            }}
-            QMenu::item {{
-                padding: {menu_item_padding[0]}px {menu_item_padding[1]}px {menu_item_padding[2]}px {menu_item_padding[3]}px;
-            }}
-            QMenu::item:selected {{
-                background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});
-                color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});
-            }}
-            QMenu::separator {{
-                height: {separator_height}px;
-                background-color: rgb({separator_bg_color[0]}, {separator_bg_color[1]}, {separator_bg_color[2]});
-                margin: {separator_margin[0]}px {separator_margin[1]}px;
-            }}
-        """
-        
-        menu.setStyleSheet(stylesheet)
+        from app.views.style.menu_bar import apply_menu_styling
+
+        apply_menu_styling(menu, self.config)
     
     def _require_active_database(self) -> Optional[DatabaseModel]:
         """Helper method to validate and return active database.
@@ -1590,7 +254,7 @@ class MainWindow(QMainWindow):
         Shows error dialog if no active database is available.
         
         Returns:
-            DatabaseModel if active database exists, None otherwise.Kjjjjjlllllkllljlkjlljlkjljlllkjllkjklkkljllljkkl
+            DatabaseModel if active database exists, None otherwise.
         """
         database_controller = self.controller.get_database_controller()
         active_database = database_controller.get_active_database()
@@ -1874,7 +538,7 @@ class MainWindow(QMainWindow):
         bulk_replace_controller = self.controller.get_bulk_replace_controller()
         
         # Import and show dialog
-        from app.views.bulk_replace_dialog import BulkReplaceDialog
+        from app.views.dialogs.bulk_replace_dialog import BulkReplaceDialog
         dialog = BulkReplaceDialog(
             self.config,
             bulk_replace_controller,
@@ -1903,7 +567,7 @@ class MainWindow(QMainWindow):
         bulk_tag_controller = self.controller.get_bulk_tag_controller()
         
         # Import and show dialog
-        from app.views.bulk_tag_dialog import BulkTagDialog
+        from app.views.dialogs.bulk_tag_dialog import BulkTagDialog
         dialog = BulkTagDialog(
             self.config,
             bulk_tag_controller,
@@ -1923,7 +587,7 @@ class MainWindow(QMainWindow):
         active_database = database_controller.get_active_database()
         
         # Import and show dialog
-        from app.views.import_games_dialog import ImportGamesDialog
+        from app.views.dialogs.import_games_dialog import ImportGamesDialog
         
         dialog = ImportGamesDialog(
             self.config,
@@ -1951,7 +615,7 @@ class MainWindow(QMainWindow):
             all_databases.append(db_info.model)
         
         # Import and show dialog
-        from app.views.search_dialog import SearchDialog
+        from app.views.dialogs.search_dialog import SearchDialog
         
         dialog = SearchDialog(
             self.config,
@@ -2190,7 +854,7 @@ class MainWindow(QMainWindow):
         bulk_clean_pgn_controller = self.controller.get_bulk_clean_pgn_controller()
         
         # Import and show dialog
-        from app.views.bulk_clean_pgn_dialog import BulkCleanPgnDialog
+        from app.views.dialogs.bulk_clean_pgn_dialog import BulkCleanPgnDialog
         dialog = BulkCleanPgnDialog(
             self.config,
             bulk_clean_pgn_controller,
@@ -2557,7 +1221,7 @@ class MainWindow(QMainWindow):
 
     def _show_ai_model_settings(self) -> None:
         """Show the AI model settings dialog."""
-        from app.views.ai_model_settings_dialog import AIModelSettingsDialog
+        from app.views.dialogs.ai_model_settings_dialog import AIModelSettingsDialog
         from app.services.user_settings_service import UserSettingsService
         
         settings_service = UserSettingsService.get_instance()
@@ -2568,7 +1232,7 @@ class MainWindow(QMainWindow):
     
     def _show_annotation_preferences(self) -> None:
         """Show annotation preferences dialog."""
-        from app.views.annotation_preferences_dialog import AnnotationPreferencesDialog
+        from app.views.dialogs.annotation_preferences_dialog import AnnotationPreferencesDialog
         dialog = AnnotationPreferencesDialog(self.config, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             # Reload colors in annotation view if it exists
@@ -3147,27 +1811,6 @@ class MainWindow(QMainWindow):
             # Install event filter to detect double-clicks
             handle.installEventFilter(self)
     
-    def _fix_splitter_cursors(self) -> None:
-        """Fix cursor on all splitter handles for macOS compatibility.
-        
-        On macOS, child widgets can reset the cursor, causing the resize cursor
-        to only show briefly. This function explicitly sets the cursor on all
-        splitter handles to ensure it persists.
-        """
-        # Fix cursor on top_splitter (horizontal splitter needs vertical resize cursor)
-        top_splitter = self.middle_splitter.widget(0)
-        if isinstance(top_splitter, QSplitter):
-            for i in range(top_splitter.count() - 1):
-                handle = top_splitter.handle(i)
-                if handle:
-                    handle.setCursor(Qt.CursorShape.SizeHorCursor)
-        
-        # Fix cursor on middle_splitter (vertical splitter needs horizontal resize cursor)
-        for i in range(self.middle_splitter.count() - 1):
-            handle = self.middle_splitter.handle(i)
-            if handle:
-                handle.setCursor(Qt.CursorShape.SizeVerCursor)
-    
     def eventFilter(self, obj, event) -> bool:
         """Filter events to detect double-clicks on splitter handle."""
         # Check if this is a double-click on the database panel splitter handle
@@ -3376,263 +2019,39 @@ class MainWindow(QMainWindow):
     
     def _debug_copy_pgn_html(self) -> None:
         """DEBUG: Copy PGN HTML and current visibility settings to clipboard."""
-        from PyQt6.QtWidgets import QApplication
-        
-        # Get PGN view from detail panel
-        pgn_view = self.detail_panel.pgn_view
-        
-        # Get HTML and settings
-        html, settings = pgn_view.get_debug_info()
-        
-        # Format debug info
-        debug_text = f"""=== PGN VIEW DEBUG INFO ===
-
-Visibility Settings:
-- Show Metadata: {settings['show_metadata']}
-- Show Comments: {settings['show_comments']}
-- Show Variations: {settings['show_variations']}
-- Show Annotations: {settings['show_annotations']}
-- Show Results: {settings['show_results']}
-
-=== HTML OUTPUT ===
-
-{html}
-
-=== END DEBUG INFO ===
-"""
-        
-        # Copy to clipboard
-        clipboard = QApplication.clipboard()
-        clipboard.setText(debug_text)
-        
-        self.controller.set_status("DEBUG: PGN HTML and settings copied to clipboard")
+        pgn_view = getattr(self.detail_panel, "pgn_view", None) if hasattr(self, "detail_panel") else None
+        self.controller.get_debug_controller().copy_pgn_view_debug_to_clipboard(pgn_view)
     
     def _debug_copy_game_highlights_html(self) -> None:
         """DEBUG: Copy game highlights section from the summary controller as HTML."""
-        from PyQt6.QtWidgets import QApplication
-        
-        summary_controller = self.controller.get_game_summary_controller()
-        highlights_html = summary_controller.get_highlights_html() if summary_controller else ""
-        if not highlights_html:
-            self.controller.set_status("DEBUG: No game highlights available to copy")
-            return
-        
-        clipboard = QApplication.clipboard()
-        clipboard.setText(highlights_html)
-        self.controller.set_status("DEBUG: Game highlights HTML copied to clipboard")
+        self.controller.get_debug_controller().copy_game_highlights_html_to_clipboard()
     
     def _debug_copy_game_highlights_json(self) -> None:
         """DEBUG: Copy game highlights data as JSON."""
-        from PyQt6.QtWidgets import QApplication
-        import json
-        
-        summary_controller = self.controller.get_game_summary_controller()
-        highlights_data = summary_controller.get_highlights_json() if summary_controller else []
-        if not highlights_data:
-            self.controller.set_status("DEBUG: No game highlights available to copy")
-            return
-        
-        clipboard = QApplication.clipboard()
-        clipboard.setText(json.dumps(highlights_data, indent=2, ensure_ascii=False))
-        self.controller.set_status("DEBUG: Game highlights JSON copied to clipboard")
+        self.controller.get_debug_controller().copy_game_highlights_json_to_clipboard()
     
     def _debug_create_highlight_rule_test_data(self) -> None:
         """DEBUG: Prompt for filename and save analysis JSON for highlight rule tests."""
-        from pathlib import Path
-        import json
-        from app.services.analysis_data_storage_service import AnalysisDataStorageService
-        from app.views.input_dialog import InputDialog
-        
-        try:
-            # Ensure we have an active analyzed game with CARAAnalysisData
-            game_controller = self.controller.get_game_controller()
-            game_model = game_controller.get_game_model()
-            active_game = game_model.active_game
-            
-            if not active_game:
-                self.controller.set_status("DEBUG: No active game")
-                return
-            
-            if not AnalysisDataStorageService.has_analysis_data(active_game):
-                self.controller.set_status("DEBUG: Game does not have CARAAnalysisData tag")
-                return
-            
-            raw_json = AnalysisDataStorageService.get_raw_analysis_data(active_game)
-            if raw_json is None:
-                self.controller.set_status("DEBUG: Failed to deserialize CARAAnalysisData tag")
-                return
-            
-            # Prompt for filename
-            filename, ok = InputDialog.get_text(
-                self.config,
-                "Create Highlight Rule Test Data",
-                "Enter filename (e.g., my_rule_case.json):",
-                "",
-                self
-            )
-            
-            if not ok or not filename:
-                return
-            
-            filename = filename.strip()
-            if not filename.lower().endswith(".json"):
-                filename += ".json"
-            
-            project_root = Path(__file__).resolve().parent.parent
-            games_dir = project_root / "tests" / "highlight_rules" / "games"
-            games_dir.mkdir(parents=True, exist_ok=True)
-            target_path = games_dir / filename
-            
-            if target_path.exists():
-                self.controller.set_status(f"DEBUG: File already exists: {target_path.name}")
-                return
-            
-            data = json.loads(raw_json)
-            
-            with open(target_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            
-            self.controller.set_status(f"DEBUG: Highlight test data saved to {target_path.name}")
-        except json.JSONDecodeError:
-            self.controller.set_status("DEBUG: Analysis data is not valid JSON")
-        except Exception as exc:
-            self.controller.set_status(f"DEBUG: Error creating highlight test data: {exc}")
+        from app.views.dialogs.input_dialog import InputDialog
+
+        filename, ok = InputDialog.get_text(
+            self.config,
+            "Create Highlight Rule Test Data",
+            "Enter filename (e.g., my_rule_case.json):",
+            "",
+            self,
+        )
+        if not ok or not filename:
+            return
+
+        self.controller.get_debug_controller().create_highlight_rule_test_data_file(filename)
     
     
     def _update_moves_list_menu(self) -> None:
         """Update the Moves List menu with current profiles and columns."""
-        menu = self.moves_list_menu
-        menu.clear()
-        
-        # Clear action dictionaries
-        self.profile_actions.clear()
-        self.column_actions.clear()
-        
-        # Get current profile names and active profile
-        # get_profile_names() returns Default first, followed by profiles in creation order
-        profile_names = self.profile_model.get_profile_names()
-        active_profile_name = self.profile_model.get_active_profile_name()
-        
-        # Add profile toggle actions (at top)
-        # Assign keyboard shortcuts 1-9 to the first 9 profiles
-        for index, profile_name in enumerate(profile_names):
-            profile_action = QAction(profile_name, self)
-            profile_action.setCheckable(True)
-            profile_action.setChecked(profile_name == active_profile_name)
-            profile_action.triggered.connect(lambda checked, name=profile_name: self._on_profile_selected(name))
-            
-            # Assign keyboard shortcut 1-9 to first 9 profiles
-            if index < 9:
-                shortcut = QKeySequence(str(index + 1))
-                profile_action.setShortcut(shortcut)
-            
-            menu.addAction(profile_action)
-            self.profile_actions[profile_name] = profile_action
-        
-        # Add separator
-        if profile_names:
-            menu.addSeparator()
-        
-        # Save Profile action (overwrites current profile, not available for default)
-        if active_profile_name != DEFAULT_PROFILE_NAME:
-            save_profile_action = QAction("Save Profile", self)
-            save_profile_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-            save_profile_action.setShortcut(QKeySequence("Ctrl+Shift+P"))
-            save_profile_action.triggered.connect(self._save_current_profile)
-            menu.addAction(save_profile_action)
-        
-        # Save Profile as... action (creates new profile)
-        save_profile_as_action = QAction("Save Profile as...", self)
-        save_profile_as_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-        save_profile_as_action.setShortcut(QKeySequence("Ctrl+Alt+P"))
-        save_profile_as_action.triggered.connect(self._save_profile_as)
-        menu.addAction(save_profile_as_action)
-        
-        # Remove Profile action (only if not default profile)
-        if active_profile_name != DEFAULT_PROFILE_NAME:
-            remove_profile_action = QAction("Remove Profile", self)
-            remove_profile_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-            remove_profile_action.setShortcut(QKeySequence("Ctrl+Shift+Delete"))
-            remove_profile_action.triggered.connect(self._remove_profile)
-            menu.addAction(remove_profile_action)
-        
-        # Add separator
-        menu.addSeparator()
-        
-        # Setup Profile... action (opens dialog)
-        setup_profile_action = QAction("Setup Profile...", self)
-        setup_profile_action.setMenuRole(QAction.MenuRole.NoRole)  # Prevent macOS from hiding/moving this action
-        setup_profile_action.triggered.connect(self._on_setup_profile)
-        menu.addAction(setup_profile_action)
-        
-        # Add separator
-        menu.addSeparator()
-        
-        # Add column visibility toggle actions organized into categories
-        column_names = self.profile_model.get_column_names()
-        column_visibility = self.profile_model.get_current_column_visibility()
-        
-        # Define column categories
-        from app.models.column_profile_model import (
-            COL_NUM, COL_WHITE, COL_BLACK, COL_COMMENT,
-            COL_EVAL_WHITE, COL_EVAL_BLACK, COL_CPL_WHITE, COL_CPL_BLACK,
-            COL_CPL_WHITE_2, COL_CPL_WHITE_3, COL_CPL_BLACK_2, COL_CPL_BLACK_3,
-            COL_BEST_WHITE, COL_BEST_BLACK, COL_BEST_WHITE_2, COL_BEST_WHITE_3,
-            COL_BEST_BLACK_2, COL_BEST_BLACK_3, COL_WHITE_IS_TOP3, COL_BLACK_IS_TOP3,
-            COL_ASSESS_WHITE, COL_ASSESS_BLACK, COL_WHITE_DEPTH, COL_BLACK_DEPTH,
-            COL_WHITE_SELDEPTH, COL_BLACK_SELDEPTH,
-            COL_WHITE_CAPTURE, COL_BLACK_CAPTURE, COL_WHITE_MATERIAL, COL_BLACK_MATERIAL,
-            COL_ECO, COL_OPENING, COL_FEN_WHITE, COL_FEN_BLACK
-        )
-        
-        column_categories = {
-            "Basic Columns": [COL_NUM, COL_WHITE, COL_BLACK, COL_COMMENT],
-            "Evaluation Columns": [COL_EVAL_WHITE, COL_EVAL_BLACK, COL_CPL_WHITE, COL_CPL_BLACK,
-                                  COL_CPL_WHITE_2, COL_CPL_WHITE_3, COL_CPL_BLACK_2, COL_CPL_BLACK_3],
-            "Best Moves Columns": [
-                COL_BEST_WHITE, COL_BEST_BLACK, COL_BEST_WHITE_2, COL_BEST_WHITE_3,
-                COL_BEST_BLACK_2, COL_BEST_BLACK_3, COL_WHITE_IS_TOP3, COL_BLACK_IS_TOP3
-            ],
-            "Analysis Columns": [COL_ASSESS_WHITE, COL_ASSESS_BLACK, COL_WHITE_DEPTH, COL_BLACK_DEPTH, COL_WHITE_SELDEPTH, COL_BLACK_SELDEPTH],
-            "Material Columns": [COL_WHITE_CAPTURE, COL_BLACK_CAPTURE, COL_WHITE_MATERIAL, COL_BLACK_MATERIAL],
-            "Position Columns": [COL_ECO, COL_OPENING, COL_FEN_WHITE, COL_FEN_BLACK]
-        }
-        
-        # Create submenus for each category
-        categorized_columns = set()
-        for category_name, category_columns in column_categories.items():
-            category_menu = menu.addMenu(category_name)
-            
-            for column_name in category_columns:
-                if column_name in column_names:
-                    categorized_columns.add(column_name)
-                    display_name = self.profile_model.get_column_display_name(column_name)
-                    visible = column_visibility.get(column_name, True)
-                    
-                    column_action = QAction(display_name, self)
-                    column_action.setCheckable(True)
-                    column_action.setChecked(visible)
-                    column_action.triggered.connect(lambda checked, name=column_name: self._on_column_toggled(name))
-                    category_menu.addAction(column_action)
-                    self.column_actions[column_name] = column_action
-        
-        # Handle any columns not in categories (for future extensibility)
-        uncategorized_columns = [col for col in column_names if col not in categorized_columns]
-        if uncategorized_columns:
-            other_menu = menu.addMenu("Other")
-            for column_name in uncategorized_columns:
-                display_name = self.profile_model.get_column_display_name(column_name)
-                visible = column_visibility.get(column_name, True)
-                
-                column_action = QAction(display_name, self)
-                column_action.setCheckable(True)
-                column_action.setChecked(visible)
-                column_action.triggered.connect(lambda checked, name=column_name: self._on_column_toggled(name))
-                other_menu.addAction(column_action)
-                self.column_actions[column_name] = column_action
-        
-        # Add separator
-        menu.addSeparator()
+        from app.views.menus.moves_list_menu import rebuild_moves_list_menu
+
+        rebuild_moves_list_menu(self)
     
     def _on_profile_selected(self, profile_name: str) -> None:
         """Handle profile selection.
@@ -3698,7 +2117,7 @@ Visibility Settings:
     
     def _on_setup_profile(self) -> None:
         """Open the profile setup dialog."""
-        from app.views.moveslist_profile_setup_dialog import MovesListProfileSetupDialog
+        from app.views.dialogs.moveslist_profile_setup_dialog import MovesListProfileSetupDialog
         
         dialog = MovesListProfileSetupDialog(self.config, self.profile_controller, self)
         dialog.exec()
@@ -3865,73 +2284,11 @@ Visibility Settings:
     
     def _debug_copy_deserialize_analysis_tag(self) -> None:
         """DEBUG: Copy deserialized and decompressed CARAAnalysisData tag to clipboard."""
-        from PyQt6.QtWidgets import QApplication
-        from app.services.analysis_data_storage_service import AnalysisDataStorageService
-        
-        try:
-            # Get current active game
-            game_controller = self.controller.get_game_controller()
-            game_model = game_controller.get_game_model()
-            active_game = game_model.active_game
-            
-            if not active_game:
-                self.controller.set_status("DEBUG: No active game")
-                return
-            
-            # Check if game has CARAAnalysisData tag
-            if not AnalysisDataStorageService.has_analysis_data(active_game):
-                self.controller.set_status("DEBUG: Game does not have CARAAnalysisData tag")
-                return
-            
-            # Get raw decompressed JSON
-            json_str = AnalysisDataStorageService.get_raw_analysis_data(active_game)
-            
-            if json_str is None:
-                self.controller.set_status("DEBUG: Failed to deserialize CARAAnalysisData tag")
-                return
-            
-            # Copy to clipboard
-            clipboard = QApplication.clipboard()
-            clipboard.setText(json_str)
-            
-            self.controller.set_status("DEBUG: Deserialized CARAAnalysisData copied to clipboard")
-        except Exception as e:
-            self.controller.set_status(f"DEBUG: Error copying analysis data: {e}")
+        self.controller.get_debug_controller().copy_deserialized_analysis_tag_to_clipboard()
     
     def _debug_copy_deserialize_annotation_tag(self) -> None:
         """DEBUG: Copy deserialized and decompressed CARAAnnotations tag to clipboard."""
-        from PyQt6.QtWidgets import QApplication
-        from app.services.annotation_storage_service import AnnotationStorageService
-        
-        try:
-            # Get current active game
-            game_controller = self.controller.get_game_controller()
-            game_model = game_controller.get_game_model()
-            active_game = game_model.active_game
-            
-            if not active_game:
-                self.controller.set_status("DEBUG: No active game")
-                return
-            
-            # Check if game has CARAAnnotations tag
-            if not AnnotationStorageService.has_annotations(active_game):
-                self.controller.set_status("DEBUG: Game does not have CARAAnnotations tag")
-                return
-            
-            # Get raw decompressed JSON
-            json_str = AnnotationStorageService.get_raw_annotations_data(active_game)
-            
-            if json_str is None:
-                self.controller.set_status("DEBUG: Failed to deserialize CARAAnnotations tag")
-                return
-            
-            # Copy to clipboard
-            clipboard = QApplication.clipboard()
-            clipboard.setText(json_str)
-            
-            self.controller.set_status("DEBUG: Deserialized CARAAnnotations copied to clipboard")
-        except Exception as e:
-            self.controller.set_status(f"DEBUG: Error copying annotation data: {e}")
+        self.controller.get_debug_controller().copy_deserialized_annotation_tag_to_clipboard()
     
     def _save_current_profile(self) -> None:
         """Save current column configuration to the active profile (overwrites)."""
@@ -3959,7 +2316,7 @@ Visibility Settings:
     def _save_profile_as(self) -> None:
         """Save current column configuration as a new profile."""
         # Ask user for profile name using custom styled dialog
-        from app.views.input_dialog import InputDialog
+        from app.views.dialogs.input_dialog import InputDialog
         profile_name, ok = InputDialog.get_text(
             self.config,
             "Save Profile as...",
@@ -4781,93 +3138,9 @@ Visibility Settings:
     
     def _update_engines_menu(self) -> None:
         """Update the Engines menu with current engines and assignments."""
-        menu = self.engines_menu
-        # Clear existing engine submenus (keep "Add Engine..." and separator)
-        for submenu in list(self.engine_submenus.values()):
-            menu.removeAction(submenu.menuAction())
-        self.engine_submenus.clear()
-        
-        # Remove "no engines" placeholder if it exists
-        if self.no_engines_action is not None:
-            menu.removeAction(self.no_engines_action)
-            self.no_engines_action = None
-        
-        # Get current engines
-        engines = self.engine_model.get_engines()
-        
-        if not engines:
-            # No engines, add placeholder (only one)
-            if self.no_engines_action is None:
-                self.no_engines_action = QAction("(No engines configured)", self)
-                self.no_engines_action.setEnabled(False)
-                menu.addAction(self.no_engines_action)
-            return
-        
-        # Get current assignments
-        engine_controller = self.controller.get_engine_controller()
-        game_analysis_id = engine_controller.get_engine_assignment(TASK_GAME_ANALYSIS)
-        evaluation_id = engine_controller.get_engine_assignment(TASK_EVALUATION)
-        manual_analysis_id = engine_controller.get_engine_assignment(TASK_MANUAL_ANALYSIS)
-        brilliancy_detection_id = engine_controller.get_engine_assignment(TASK_BRILLIANCY_DETECTION)
-        
-        # Add engine submenus with assignment options
-        for engine in engines:
-            # Create submenu for this engine
-            engine_submenu = QMenu(engine.name, self)
-            
-            # Apply menu styling to submenu (same as menu bar styling)
-            self._apply_menu_styling(engine_submenu)
-            
-            # Remove Engine action
-            remove_action = QAction("Remove Engine", self)
-            remove_action.triggered.connect(lambda checked, eid=engine.id: self._remove_engine(eid))
-            engine_submenu.addAction(remove_action)
-            
-            # Engine Configuration action
-            config_action = QAction("Engine Configuration", self)
-            config_action.triggered.connect(lambda checked, eid=engine.id: self._open_engine_configuration(eid))
-            engine_submenu.addAction(config_action)
-            
-            engine_submenu.addSeparator()
-            
-            # Set for all tasks
-            set_all_action = QAction("Set for all tasks", self)
-            set_all_action.setToolTip("Assign this engine to Game Analysis, Evaluation, Manual Analysis, and Brilliancy Detection")
-            set_all_action.triggered.connect(lambda checked, eid=engine.id: self._set_engine_for_all_tasks(eid))
-            engine_submenu.addAction(set_all_action)
-            engine_submenu.addSeparator()
-            
-            # Set as Game Analysis Engine
-            game_analysis_action = QAction("Set as Game Analysis Engine", self)
-            game_analysis_action.setCheckable(True)
-            game_analysis_action.setChecked(game_analysis_id == engine.id)
-            game_analysis_action.triggered.connect(lambda checked, eid=engine.id: self._set_engine_assignment(TASK_GAME_ANALYSIS, eid))
-            engine_submenu.addAction(game_analysis_action)
-            
-            # Set as Evaluation Engine
-            evaluation_action = QAction("Set as Evaluation Engine", self)
-            evaluation_action.setCheckable(True)
-            evaluation_action.setChecked(evaluation_id == engine.id)
-            evaluation_action.triggered.connect(lambda checked, eid=engine.id: self._set_engine_assignment(TASK_EVALUATION, eid))
-            engine_submenu.addAction(evaluation_action)
-            
-            # Set as Manual Analysis Engine
-            manual_analysis_action = QAction("Set as Manual Analysis Engine", self)
-            manual_analysis_action.setCheckable(True)
-            manual_analysis_action.setChecked(manual_analysis_id == engine.id)
-            manual_analysis_action.triggered.connect(lambda checked, eid=engine.id: self._set_engine_assignment(TASK_MANUAL_ANALYSIS, eid))
-            engine_submenu.addAction(manual_analysis_action)
-            
-            # Set as Brilliancy Detection Engine
-            brilliancy_detection_action = QAction("Set as Brilliancy Detection Engine", self)
-            brilliancy_detection_action.setCheckable(True)
-            brilliancy_detection_action.setChecked(brilliancy_detection_id == engine.id)
-            brilliancy_detection_action.triggered.connect(lambda checked, eid=engine.id: self._set_engine_assignment(TASK_BRILLIANCY_DETECTION, eid))
-            engine_submenu.addAction(brilliancy_detection_action)
-            
-            # Add submenu to main menu and store reference
-            menu.addMenu(engine_submenu)
-            self.engine_submenus[engine.id] = engine_submenu
+        from app.views.menus.engines_menu import rebuild_engines_menu
+
+        rebuild_engines_menu(self)
     
     def _on_engine_added(self, engine_id: str) -> None:
         """Handle engine addition.
@@ -4920,7 +3193,7 @@ Visibility Settings:
         Returns:
             True if user confirmed (Yes), False if cancelled (No).
         """
-        from app.views.confirmation_dialog import ConfirmationDialog
+        from app.views.dialogs.confirmation_dialog import ConfirmationDialog
         return ConfirmationDialog.show_confirmation(self.config, title, message, self)
     
     def _open_engine_configuration(self, engine_id: str) -> None:
@@ -5409,7 +3682,7 @@ Visibility Settings:
     
     def _on_bulk_analyze_database(self) -> None:
         """Handle bulk analyze database from menu."""
-        from app.views.bulk_analysis_dialog import BulkAnalysisDialog
+        from app.views.dialogs.bulk_analysis_dialog import BulkAnalysisDialog
         
         # Get active database
         database_panel = self.database_panel

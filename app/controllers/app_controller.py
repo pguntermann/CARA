@@ -29,6 +29,7 @@ from app.controllers.metadata_controller import MetadataController
 from app.controllers.search_controller import SearchController
 from app.controllers.notes_controller import NotesController
 from app.services.version_check_service import VersionCheckService
+from app.controllers.debug_controller import DebugController
 
 
 class AppController:
@@ -188,6 +189,9 @@ class AppController:
             config,
             self.database_controller
         )
+
+        # Debug controller (development/diagnostics actions)
+        self.debug_controller = DebugController(config, self)
         
         # Connect evaluation to board position changes
         self._connect_evaluation_to_board()
@@ -947,6 +951,14 @@ class AppController:
             The SearchController instance.
         """
         return self.search_controller
+
+    def get_debug_controller(self) -> DebugController:
+        """Get the debug controller.
+
+        Returns:
+            The DebugController instance.
+        """
+        return self.debug_controller
     
     def set_moves_list_model(self, moves_list_model) -> None:
         """Set the moves list model for game analysis controller.
@@ -1058,7 +1070,7 @@ class AppController:
             if not is_configured:
                 # Don't toggle - show warning message instead
                 from PyQt6.QtWidgets import QApplication
-                from app.views.message_dialog import MessageDialog
+                from app.views.dialogs.message_dialog import MessageDialog
                 parent = QApplication.activeWindow()
                 
                 title, message = self.get_engine_validation_message(error_type, TASK_EVALUATION)

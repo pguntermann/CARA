@@ -1429,7 +1429,7 @@ class GameAnalysisController(QObject):
             logging_service.warning("Brilliant move detection: No engine assigned to brilliancy detection task")
             progress_service.set_status("Brilliant move detection: assign an engine in Engines menu")
             from PyQt6.QtWidgets import QApplication
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             main_window = QApplication.activeWindow()
             MessageDialog.show_information(
                 self.config,
@@ -1453,7 +1453,7 @@ class GameAnalysisController(QObject):
             
             # Show message dialog
             from PyQt6.QtWidgets import QApplication
-            from app.views.message_dialog import MessageDialog
+            from app.views.dialogs.message_dialog import MessageDialog
             
             main_window = QApplication.activeWindow()
             MessageDialog.show_information(
