@@ -9,7 +9,21 @@ from PyQt6.QtWidgets import (
     QGridLayout, QSizePolicy, QComboBox, QPushButton, QApplication,
     QGraphicsOpacityEffect, QMenu, QTreeWidget, QTreeWidgetItem, QToolButton, QToolTip
 )
-from PyQt6.QtCore import Qt, QRect, QRectF, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QAbstractAnimation, QTimer, QSize, QPoint, QPointF
+from PyQt6.QtCore import (
+    Qt,
+    QRect,
+    QRectF,
+    QEvent,
+    QPropertyAnimation,
+    QEasingCurve,
+    QParallelAnimationGroup,
+    QAbstractAnimation,
+    QTimer,
+    QSize,
+    QPoint,
+    QPointF,
+    QVariantAnimation,
+)
 from PyQt6.QtGui import (
     QPainter,
     QPainterPath,
@@ -94,123 +108,276 @@ def _player_stats_section_title_label(title: str, header_font: QFont, header_tex
     return h
 
 
+PHASE_BAR_PHASE_ORDER: Tuple[str, ...] = ("Opening", "Middlegame", "Endgame")
+
+
 class PhaseBarChartWidget(QWidget):
-    """Widget for displaying a horizontal bar chart comparing phase performance."""
-    
-    def __init__(self, config: Dict[str, Any], text_color: QColor, label_font: QFont, value_font: QFont, parent: Optional[QWidget] = None) -> None:
-        """Initialize the phase bar chart widget.
-        
-        Args:
-            config: Configuration dictionary.
-            text_color: Text color for labels.
-            label_font: Font for labels.
-            value_font: Font for values.
-            parent: Parent widget.
-        """
+    """Horizontal bar chart for phase accuracy; hover shows animated opponent comparison overlay."""
+
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        text_color: QColor,
+        label_font: QFont,
+        value_font: QFont,
+        parent: Optional[QWidget] = None,
+    ) -> None:
         super().__init__(parent)
         self.config = config
         self.text_color = text_color
         self.label_font = label_font
         self.value_font = value_font
-        
-        # Get colors from config
-        ui_config = config.get('ui', {})
-        panel_config = ui_config.get('panels', {}).get('detail', {})
-        player_stats_config = panel_config.get('player_stats', {})
-        colors_config = player_stats_config.get('colors', {})
-        phase_bar_chart_config = player_stats_config.get('phase_bar_chart', {})
-        
-        # Phase colors (use distinct colors for each phase)
+
+        ui_config = config.get("ui", {})
+        panel_config = ui_config.get("panels", {}).get("detail", {})
+        player_stats_config = panel_config.get("player_stats", {})
+        colors_config = player_stats_config.get("colors", {})
+        pbc = player_stats_config.get("phase_bar_chart", {})
+
         self.phase_colors = {
-            'Opening': QColor(*colors_config.get('phase_opening_color', [100, 150, 255])),
-            'Middlegame': QColor(*colors_config.get('phase_middlegame_color', [150, 255, 100])),
-            'Endgame': QColor(*colors_config.get('phase_endgame_color', [255, 200, 100])),
+            "Opening": QColor(*colors_config.get("phase_opening_color", [100, 150, 255])),
+            "Middlegame": QColor(*colors_config.get("phase_middlegame_color", [150, 255, 100])),
+            "Endgame": QColor(*colors_config.get("phase_endgame_color", [255, 200, 100])),
         }
-        
-        # Chart configuration from config
-        self.bar_height = phase_bar_chart_config.get('bar_height', 30)
-        self.bar_spacing = phase_bar_chart_config.get('bar_spacing', 10)
-        self.bar_padding = phase_bar_chart_config.get('bar_padding', 10)
-        self.label_width = phase_bar_chart_config.get('label_width', 100)
-        self.value_width = phase_bar_chart_config.get('value_width', 60)
-        self.min_chart_width = phase_bar_chart_config.get('min_chart_width', 200)
-        self.bar_border_radius = phase_bar_chart_config.get('bar_border_radius', 3)
-        self.bar_pen_width = phase_bar_chart_config.get('bar_pen_width', 1)
-        self.bar_value_spacing = phase_bar_chart_config.get('bar_value_spacing', 5)
-        
-        # Data: {phase_name: accuracy_percentage}
+
+        self.bar_height = int(pbc.get("bar_height", 30))
+        self.bar_spacing = int(pbc.get("bar_spacing", 10))
+        self.bar_padding = int(pbc.get("bar_padding", 10))
+        self.label_width = int(pbc.get("label_width", 100))
+        self.value_width = int(pbc.get("value_width", 60))
+        self.min_chart_width = int(pbc.get("min_chart_width", 200))
+        self.bar_border_radius = int(pbc.get("bar_border_radius", 3))
+        self.bar_pen_width = int(pbc.get("bar_pen_width", 1))
+        self.bar_value_spacing = int(pbc.get("bar_value_spacing", 5))
+
+        self._show_opp_hover = bool(pbc.get("show_opponent_hover_overlay", True))
+        self._hover_anim_ms = int(pbc.get("hover_overlay_animation_ms", 150))
+        self._hover_anim_ms = max(0, min(600, self._hover_anim_ms))
+        self._player_label = str(pbc.get("player_legend_label", "Player"))
+        self._opponent_label = str(pbc.get("opponent_legend_label", "Opponents"))
+        self._opp_overlay_alpha = float(pbc.get("opponent_overlay_alpha", 0.55))
+        self._opp_overlay_alpha = max(0.15, min(1.0, self._opp_overlay_alpha))
+        self._opp_value_factor = float(pbc.get("opponent_overlay_value_factor", 0.58))
+        self._opp_value_factor = max(0.2, min(1.0, self._opp_value_factor))
+        self._opp_darken = int(pbc.get("opponent_overlay_darken", 135))
+        self._opp_darken = max(100, min(250, self._opp_darken))
+        self._min_width_for_hover = int(pbc.get("min_width_for_hover_overlay", 180))
+
         self.data: Dict[str, float] = {}
-        
-        # Calculate minimum height: (bar_height * 3) + (bar_spacing * 2) + (bar_padding * 2)
-        min_height = (self.bar_height * 3) + (self.bar_spacing * 2) + (self.bar_padding * 2)
-        # Only set minimum height, allow width to shrink
+        self._opponent_data: Optional[Dict[str, float]] = None
+
+        self._hover_phase: Optional[str] = None
+        self._opp_paint_phase: Optional[str] = None
+        self._hover_opp_acc_anim: float = 0.0
+        self._ring_span_anim = QVariantAnimation(self)
+        self._ring_span_anim.setDuration(self._hover_anim_ms)
+        self._ring_span_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._ring_span_anim.valueChanged.connect(self._on_opp_bar_anim_value)
+        self._ring_span_anim.finished.connect(self._on_opp_bar_anim_finished)
+
+        n = len(PHASE_BAR_PHASE_ORDER)
+        min_height = self.bar_padding + (self.bar_height * n) + (self.bar_spacing * max(0, n - 1))
         self.setMinimumHeight(min_height)
         self.setMinimumWidth(0)
-    
-    def set_data(self, data: Dict[str, float]) -> None:
-        """Set bar chart data.
-        
-        Args:
-            data: Dictionary mapping phase names to accuracy percentages.
-        """
-        self.data = data
+        self.setMouseTracking(False)
+        self._sync_mouse_tracking()
+
+    def _on_opp_bar_anim_value(self, value: object) -> None:
+        try:
+            self._hover_opp_acc_anim = float(value)
+        except (TypeError, ValueError):
+            self._hover_opp_acc_anim = 0.0
         self.update()
-    
+
+    def _on_opp_bar_anim_finished(self) -> None:
+        try:
+            end = float(self._ring_span_anim.endValue())
+        except (TypeError, ValueError):
+            end = 0.0
+        if end <= 0.001:
+            self._opp_paint_phase = None
+        self.update()
+
+    def _interaction_active(self) -> bool:
+        return self._show_opp_hover and self._opponent_data is not None
+
+    def _sync_mouse_tracking(self) -> None:
+        self.setMouseTracking(self._interaction_active())
+
+    def set_data(self, data: Dict[str, float]) -> None:
+        self.data = dict(data)
+        self.update()
+
+    def set_opponent_data(self, data: Optional[Dict[str, float]]) -> None:
+        if data:
+            self._opponent_data = {k: float(v) for k, v in data.items()}
+        else:
+            self._opponent_data = None
+        self._sync_mouse_tracking()
+        self.update()
+
+    def _opponent_target_accuracy(self, phase: str) -> float:
+        if not self._opponent_data:
+            return 0.0
+        return max(0.0, min(100.0, float(self._opponent_data.get(phase, 0.0))))
+
+    def _opp_overlay_color(self, phase: str) -> QColor:
+        base = self.phase_colors.get(phase, self.text_color)
+        c = QColor(base)
+        h, s, v, _a = c.getHsv()
+        v = int(v * self._opp_value_factor)
+        c.setHsv(h, s, min(255, max(25, v)))
+        c = c.darker(self._opp_darken)
+        c.setAlpha(int(round(255 * self._opp_overlay_alpha)))
+        return c
+
+    def _layout_rows(self, width: int) -> Tuple[float, List[Dict[str, Any]]]:
+        available_width = float(width - self.label_width - self.value_width - (self.bar_padding * 2))
+        bar_x = float(self.bar_padding + self.label_width)
+        rows: List[Dict[str, Any]] = []
+        y_pos = float(self.bar_padding)
+        for phase in PHASE_BAR_PHASE_ORDER:
+            if phase not in self.data:
+                continue
+            rows.append(
+                {
+                    "phase": phase,
+                    "y": y_pos,
+                    "bar_x": bar_x,
+                    "accuracy": float(self.data[phase]),
+                }
+            )
+            y_pos += self.bar_height + self.bar_spacing
+        return max(0.0, available_width), rows
+
+    def _phase_at_point(self, px: float, py: float) -> Optional[str]:
+        if not self._interaction_active() or self.width() < self._min_width_for_hover:
+            return None
+        aw, rows = self._layout_rows(self.width())
+        if aw <= 0:
+            return None
+        for row in rows:
+            y0 = row["y"]
+            if y0 <= py <= y0 + self.bar_height and self.bar_padding <= px < self.width() - self.bar_padding:
+                return str(row["phase"])
+        return None
+
+    def _hover_tooltip_text(self, phase: str) -> str:
+        pa = float(self.data.get(phase, 0.0))
+        oa = self._opponent_target_accuracy(phase)
+        return f"{phase}\n{self._player_label}: {pa:.1f}%\n{self._opponent_label}: {oa:.1f}%"
+
+    def _start_opp_bar_anim(self, target_acc: float) -> None:
+        t = max(0.0, min(100.0, float(target_acc)))
+        if self._hover_anim_ms <= 0:
+            self._hover_opp_acc_anim = t
+            if t <= 0.001:
+                self._opp_paint_phase = None
+            self.update()
+            return
+        self._ring_span_anim.stop()
+        self._ring_span_anim.setStartValue(self._hover_opp_acc_anim)
+        self._ring_span_anim.setEndValue(t)
+        self._ring_span_anim.start()
+
+    def _update_hover_from_pos(self, px: float, py: float) -> None:
+        if not self._interaction_active() or self.width() < self._min_width_for_hover:
+            self.setToolTip("")
+            if self._hover_phase is not None:
+                self._hover_phase = None
+                self._start_opp_bar_anim(0.0)
+            return
+        ph = self._phase_at_point(px, py)
+        if ph != self._hover_phase:
+            self._hover_phase = ph
+            if ph:
+                self._opp_paint_phase = ph
+                self.setToolTip(self._hover_tooltip_text(ph))
+                self._start_opp_bar_anim(self._opponent_target_accuracy(ph))
+            else:
+                self.setToolTip("")
+                self._start_opp_bar_anim(0.0)
+        elif ph:
+            self.setToolTip(self._hover_tooltip_text(ph))
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if self._interaction_active():
+            self._update_hover_from_pos(event.position().x(), event.position().y())
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event: QEvent) -> None:
+        self._hover_phase = None
+        self._start_opp_bar_anim(0.0)
+        self.setToolTip("")
+        super().leaveEvent(event)
+
     def paintEvent(self, event) -> None:
-        """Paint the bar chart."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
+
         width = self.width()
         height = self.height()
-        
+
         if not self.data:
-            # No data - draw placeholder
             painter.setPen(self.text_color)
             painter.setFont(self.label_font)
             painter.drawText(QRectF(0, 0, width, height), Qt.AlignmentFlag.AlignCenter, "No data")
             return
-        
-        # Calculate max accuracy for scaling (use 100% as max)
+
         max_accuracy = 100.0
-        
-        # Calculate available width for bars (excluding labels and values)
-        available_width = width - self.label_width - self.value_width - (self.bar_padding * 2)
-        
-        # Draw bars for each phase
-        y_pos = self.bar_padding
-        phases = ['Opening', 'Middlegame', 'Endgame']
-        
-        for phase in phases:
-            if phase not in self.data:
-                continue
-            
-            accuracy = self.data[phase]
-            
-            # Draw phase label
+        available_width, rows = self._layout_rows(width)
+        if available_width <= 0:
+            return
+
+        for row in rows:
+            phase = str(row["phase"])
+            y_pos = row["y"]
+            accuracy = row["accuracy"]
+            bar_x = row["bar_x"]
+
             painter.setPen(self.text_color)
             painter.setFont(self.label_font)
             label_rect = QRectF(self.bar_padding, y_pos, self.label_width, self.bar_height)
-            painter.drawText(label_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, phase)
-            
-            # Calculate bar width
-            bar_width = (accuracy / max_accuracy) * available_width if max_accuracy > 0 else 0
-            bar_x = self.bar_padding + self.label_width
-            bar_rect = QRectF(bar_x, y_pos, bar_width, self.bar_height)
-            
-            # Draw bar
+            painter.drawText(
+                label_rect,
+                int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter),
+                phase,
+            )
+
+            bar_w = (accuracy / max_accuracy) * available_width if max_accuracy > 0 else 0.0
+            bar_rect = QRectF(bar_x, y_pos, bar_w, self.bar_height)
             color = self.phase_colors.get(phase, self.text_color)
             painter.setBrush(QBrush(color))
             painter.setPen(QPen(color, self.bar_pen_width))
             painter.drawRoundedRect(bar_rect, self.bar_border_radius, self.bar_border_radius)
-            
-            # Draw value label
+
+            if (
+                self._interaction_active()
+                and self._opp_paint_phase == phase
+                and self._hover_opp_acc_anim > 0.05
+                and width >= self._min_width_for_hover
+            ):
+                ow = (self._hover_opp_acc_anim / max_accuracy) * available_width
+                if ow > 0.5:
+                    opp_rect = QRectF(bar_x, y_pos, ow, self.bar_height)
+                    oc = self._opp_overlay_color(phase)
+                    painter.setBrush(QBrush(oc))
+                    painter.setPen(QPen(oc, self.bar_pen_width))
+                    painter.drawRoundedRect(opp_rect, self.bar_border_radius, self.bar_border_radius)
+
             painter.setPen(self.text_color)
             painter.setFont(self.value_font)
-            value_rect = QRectF(bar_x + available_width + self.bar_value_spacing, y_pos, self.value_width, self.bar_height)
-            painter.drawText(value_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{accuracy:.1f}%")
-            
-            y_pos += self.bar_height + self.bar_spacing
+            value_rect = QRectF(
+                bar_x + available_width + self.bar_value_spacing,
+                y_pos,
+                self.value_width,
+                self.bar_height,
+            )
+            painter.drawText(
+                value_rect,
+                int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter),
+                f"{accuracy:.1f}%",
+            )
 
 
 class AccuracyVsProgressChartWidget(QWidget):
@@ -4801,9 +4968,18 @@ class DetailPlayerStatsView(QWidget):
                 'Miss': player_stats.misses if player_stats.misses else 0,
                 'Blunder': player_stats.blunders if player_stats.blunders else 0,
             }
-            
-            pie_chart = PieChartWidget(self.config)
+
+            ui_config = self.config.get('ui', {})
+            panel_config = ui_config.get('panels', {}).get('detail', {})
+            player_stats_config = panel_config.get('player_stats', {})
+            mcp_opts = player_stats_config.get('move_classification_pie')
+
+            pie_chart = PieChartWidget(
+                self.config,
+                classification_pie_options=mcp_opts if isinstance(mcp_opts, dict) else None,
+            )
             pie_chart.set_data(pie_data)
+            pie_chart.set_opponent_data(getattr(stats, 'opponent_move_classification', None))
             # Allow pie chart to expand when legend is hidden
             pie_chart.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             # Store reference for responsive width handling
@@ -4813,9 +4989,6 @@ class DetailPlayerStatsView(QWidget):
             # Statistics grid on the right
             grid = QGridLayout()
             grid.setSpacing(grid_spacing)
-            ui_config = self.config.get('ui', {})
-            panel_config = ui_config.get('panels', {}).get('detail', {})
-            player_stats_config = panel_config.get('player_stats', {})
             summary_config = panel_config.get('summary', {})
             grid_config = player_stats_config.get('grid', {})
             
@@ -4950,8 +5123,9 @@ class DetailPlayerStatsView(QWidget):
             'Endgame': stats.endgame_stats.accuracy,
         }
         phase_bar_chart.set_data(phase_data)
+        phase_bar_chart.set_opponent_data(getattr(stats, "opponent_phase_accuracy", None))
         phase_bar_chart.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        content_layout.addWidget(phase_bar_chart, 1)  # Stretch factor for chart
+        content_layout.addWidget(phase_bar_chart, 1, Qt.AlignmentFlag.AlignTop)
         
         # Phase statistics grid on the right
         grid = QGridLayout()
@@ -4983,7 +5157,6 @@ class DetailPlayerStatsView(QWidget):
         content_layout.addWidget(grid_widget)
         
         layout.addLayout(content_layout)
-        layout.addStretch()
         
         return widget
     

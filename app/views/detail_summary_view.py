@@ -4,8 +4,17 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
     QGridLayout, QSizePolicy, QSplitter, QMenu, QApplication
 )
-from PyQt6.QtCore import Qt, QRect, QPointF, QPoint
-from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QFontMetrics, QMouseEvent, QContextMenuEvent
+from PyQt6.QtCore import Qt, QEvent, QRect, QRectF, QPointF, QPoint, QVariantAnimation, QEasingCurve
+from PyQt6.QtGui import (
+    QPainter,
+    QColor,
+    QPen,
+    QFont,
+    QFontMetrics,
+    QMouseEvent,
+    QContextMenuEvent,
+    QPainterPath,
+)
 from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING, Callable
 import math
 
@@ -547,100 +556,424 @@ class EvaluationGraphWidget(QWidget):
             painter.drawLine(int(x), int(top), int(x), int(bottom))
 
 
+PIE_CLASSIFICATION_CATEGORY_ORDER: Tuple[str, ...] = (
+    "Book Move",
+    "Brilliant",
+    "Best Move",
+    "Good Move",
+    "Inaccuracy",
+    "Mistake",
+    "Miss",
+    "Blunder",
+)
+
+
 class PieChartWidget(QWidget):
     """Widget for displaying a pie chart."""
-    
-    def __init__(self, config: Dict[str, Any], parent: Optional[QWidget] = None) -> None:
+
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        parent: Optional[QWidget] = None,
+        *,
+        classification_pie_options: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """Initialize the pie chart widget.
-        
+
         Args:
             config: Configuration dictionary.
             parent: Parent widget.
+            classification_pie_options: Optional ``player_stats.move_classification_pie`` block
+                (Player Stats only). When unset, behavior matches the legacy single pie.
         """
         super().__init__(parent)
         self.config = config
-        
-        # Get colors from config
-        ui_config = config.get('ui', {})
-        panel_config = ui_config.get('panels', {}).get('detail', {})
-        summary_config = panel_config.get('summary', {})
-        colors_config = summary_config.get('colors', {})
-        pie_chart_config = summary_config.get('pie_chart', {})
-        
+
+        ui_config = config.get("ui", {})
+        panel_config = ui_config.get("panels", {}).get("detail", {})
+        summary_config = panel_config.get("summary", {})
+        colors_config = summary_config.get("colors", {})
+        pie_chart_config = dict(summary_config.get("pie_chart", {}))
+
+        mcp = classification_pie_options if classification_pie_options is not None else {}
+        if "margin" in mcp:
+            pie_chart_config["margin"] = mcp["margin"]
+        if "minimum_size" in mcp:
+            pie_chart_config["minimum_size"] = mcp["minimum_size"]
+
         self.colors = {
-            'book_move': QColor(*colors_config.get('book_move', [150, 150, 150])),
-            'brilliant': QColor(*colors_config.get('brilliant', [255, 215, 0])),
-            'best_move': QColor(*colors_config.get('best_move', [100, 255, 100])),
-            'good_move': QColor(*colors_config.get('good_move', [150, 255, 150])),
-            'inaccuracy': QColor(*colors_config.get('inaccuracy', [255, 255, 100])),
-            'mistake': QColor(*colors_config.get('mistake', [255, 200, 100])),
-            'miss': QColor(*colors_config.get('miss', [200, 100, 255])),
-            'blunder': QColor(*colors_config.get('blunder', [255, 100, 100])),
+            "book_move": QColor(*colors_config.get("book_move", [150, 150, 150])),
+            "brilliant": QColor(*colors_config.get("brilliant", [255, 215, 0])),
+            "best_move": QColor(*colors_config.get("best_move", [100, 255, 100])),
+            "good_move": QColor(*colors_config.get("good_move", [150, 255, 150])),
+            "inaccuracy": QColor(*colors_config.get("inaccuracy", [255, 255, 100])),
+            "mistake": QColor(*colors_config.get("mistake", [255, 200, 100])),
+            "miss": QColor(*colors_config.get("miss", [200, 100, 255])),
+            "blunder": QColor(*colors_config.get("blunder", [255, 100, 100])),
         }
-        
-        self.text_color = QColor(*colors_config.get('text_color', [220, 220, 220]))
-        self.font_family = resolve_font_family(summary_config.get('fonts', {}).get('label_font_family', 'Helvetica Neue'))
-        self.font_size = int(scale_font_size(summary_config.get('fonts', {}).get('label_font_size', 11)))
-        
-        # Pie chart configuration
-        minimum_size = pie_chart_config.get('minimum_size', [200, 200])
-        self.margin = pie_chart_config.get('margin', 20)
-        
-        # Data
-        self.data: Dict[str, int] = {}  # {category: count}
+
+        self.text_color = QColor(*colors_config.get("text_color", [220, 220, 220]))
+        self.font_family = resolve_font_family(
+            summary_config.get("fonts", {}).get("label_font_family", "Helvetica Neue")
+        )
+        self.font_size = int(scale_font_size(summary_config.get("fonts", {}).get("label_font_size", 11)))
+
+        minimum_size = pie_chart_config.get("minimum_size", [200, 200])
+        self.margin = pie_chart_config.get("margin", 20)
+
+        self.data: Dict[str, int] = {}
         self.total: int = 0
-        
-        # Set minimum size
+        self._opponent_data: Optional[Dict[str, int]] = None
+
+        self._is_player_stats_pie = classification_pie_options is not None
+        self._mcp_enabled = bool(mcp.get("enabled", True))
+        self._show_opponent_overlay = bool(mcp.get("show_opponent_overlay", True)) and self._mcp_enabled
+        self._ring_fraction = float(mcp.get("opponent_ring_width_fraction", 0.22))
+        self._ring_fraction = max(0.06, min(0.45, self._ring_fraction))
+        self._opp_alpha = float(mcp.get("opponent_overlay_alpha", 0.55))
+        self._opp_alpha = max(0.15, min(1.0, self._opp_alpha))
+        self._opp_saturation = float(mcp.get("opponent_overlay_saturation", 0.72))
+        self._opp_saturation = max(0.0, min(1.0, self._opp_saturation))
+        self._min_size_for_overlay = int(mcp.get("min_size_for_overlay", 130))
+        self._player_label = str(mcp.get("player_legend_label", "Player"))
+        self._opponent_label = str(mcp.get("opponent_legend_label", "Opponents"))
+        self._hover_anim_ms = int(mcp.get("hover_overlay_animation_ms", 150))
+        self._hover_anim_ms = max(0, min(600, self._hover_anim_ms))
+        self._opp_value_factor = float(mcp.get("opponent_overlay_value_factor", 0.58))
+        self._opp_value_factor = max(0.2, min(1.0, self._opp_value_factor))
+        self._opp_darken = int(mcp.get("opponent_ring_darken", 135))
+        self._opp_darken = max(100, min(250, self._opp_darken))
+
+        self._hover_category: Optional[str] = None
+        # Category used to draw the opponent ring (kept during shrink-out animation after hover ends).
+        self._opponent_ring_category: Optional[str] = None
+        self._hover_ring_span_deg: float = 0.0
+        self._ring_span_anim = QVariantAnimation(self)
+        self._ring_span_anim.setDuration(self._hover_anim_ms)
+        self._ring_span_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._ring_span_anim.valueChanged.connect(self._on_ring_span_anim_value)
+        self._ring_span_anim.finished.connect(self._on_ring_span_anim_finished)
+
         self.setMinimumSize(minimum_size[0], minimum_size[1])
-    
+        self.setMouseTracking(False)
+        self._sync_mouse_tracking()
+
+    def _on_ring_span_anim_value(self, value: object) -> None:
+        try:
+            self._hover_ring_span_deg = float(value)
+        except (TypeError, ValueError):
+            self._hover_ring_span_deg = 0.0
+        self.update()
+
+    def _on_ring_span_anim_finished(self) -> None:
+        ev = self._ring_span_anim.endValue()
+        try:
+            end = float(ev)
+        except (TypeError, ValueError):
+            end = 0.0
+        if end <= 0.001:
+            self._opponent_ring_category = None
+        self.update()
+
+    def _opp_total(self) -> int:
+        if not self._opponent_data:
+            return 0
+        return int(sum(self._opponent_data.values()))
+
+    def _interaction_active(self) -> bool:
+        return (
+            self._is_player_stats_pie
+            and self._mcp_enabled
+            and self._show_opponent_overlay
+            and self._opponent_data is not None
+            and self._opp_total() > 0
+        )
+
+    def _sync_mouse_tracking(self) -> None:
+        self.setMouseTracking(self._interaction_active())
+
+    def _pie_layout(self) -> Tuple[float, float, float, float, float]:
+        w, h = self.width(), self.height()
+        size = float(min(w, h) - self.margin)
+        x = (w - size) / 2.0
+        y = (h - size) / 2.0
+        cx = x + size / 2.0
+        cy = y + size / 2.0
+        return x, y, size, cx, cy
+
+    def _can_hover_slice(self) -> bool:
+        _, _, size, _, _ = self._pie_layout()
+        return self._interaction_active() and size >= float(self._min_size_for_overlay)
+
     def set_data(self, data: Dict[str, int]) -> None:
-        """Set pie chart data.
-        
-        Args:
-            data: Dictionary mapping category names to counts.
-        """
-        self.data = data
+        self.data = dict(data)
         self.total = sum(data.values())
         self.update()
-    
+
+    def set_opponent_data(self, data: Optional[Dict[str, int]]) -> None:
+        """Opponent move-classification counts (Player Stats hover overlay). Pass None to clear."""
+        if data:
+            self._opponent_data = {k: int(v) for k, v in data.items()}
+        else:
+            self._opponent_data = None
+        self._sync_mouse_tracking()
+        self.update()
+
+    def _category_color(self, category: str) -> QColor:
+        key = category.lower().replace(" ", "_")
+        return self.colors.get(key, self.text_color)
+
+    def _opponent_tint(self, base: QColor) -> QColor:
+        c = QColor(base)
+        h, s, v, _a = c.getHsv()
+        s = int(s * self._opp_saturation)
+        v = int(v * self._opp_value_factor)
+        c.setHsv(h, min(255, s), min(255, max(25, v)))
+        c = c.darker(self._opp_darken)
+        c.setAlpha(int(round(255 * self._opp_alpha)))
+        return c
+
+    def _hover_tooltip_text(self, cat: str) -> str:
+        pc = int(self.data.get(cat, 0))
+        oc = int(self._opponent_data.get(cat, 0)) if self._opponent_data else 0
+        pt = self.total
+        ot = self._opp_total()
+        pp = (pc / pt * 100.0) if pt else 0.0
+        op = (oc / ot * 100.0) if ot else 0.0
+        return f"{cat}\n{self._player_label}: {pp:.1f}%\n{self._opponent_label}: {op:.1f}%"
+
+    def _player_slice_mid_deg(self, category: str) -> Optional[float]:
+        sp = self._player_slice_span_16(category)
+        if not sp:
+            return None
+        start_16, span_16 = sp
+        return (start_16 + span_16 / 2.0) / 16.0
+
+    def _opponent_span_deg_for_category(self, cat: str) -> float:
+        ot = self._opp_total()
+        if ot <= 0 or not self._opponent_data:
+            return 0.0
+        oc = int(self._opponent_data.get(cat, 0))
+        return (oc / float(ot)) * 360.0
+
+    def _player_slice_span_16(self, category: str) -> Optional[Tuple[int, int]]:
+        if self.total <= 0:
+            return None
+        pos = 0
+        for cat in PIE_CLASSIFICATION_CATEGORY_ORDER:
+            c = int(self.data.get(cat, 0))
+            if c == 0:
+                continue
+            span = int(round((c / self.total) * 360 * 16))
+            if cat == category:
+                return (pos, span)
+            pos += span
+        return None
+
+    def _category_at_point(self, px: float, py: float) -> Optional[str]:
+        if self.total <= 0 or not self._can_hover_slice():
+            return None
+        _, _, size, cx, cy = self._pie_layout()
+        if size < 1:
+            return None
+        dx = px - cx
+        dy = py - cy
+        r = math.hypot(dx, dy)
+        if r > size / 2.0 + 1.5:
+            return None
+        t16 = (math.degrees(math.atan2(-dy, dx)) % 360.0) * 16.0
+        t16 = min(t16, 5760.0 - 1e-6)
+        spans: List[Tuple[float, float, str]] = []
+        pos = 0.0
+        for cat in PIE_CLASSIFICATION_CATEGORY_ORDER:
+            c = int(self.data.get(cat, 0))
+            if c == 0:
+                continue
+            span = (c / self.total) * 360 * 16
+            spans.append((pos, pos + span, cat))
+            pos += span
+        for i, (a, b, cat) in enumerate(spans):
+            last = i == len(spans) - 1
+            if last:
+                if t16 >= a:
+                    return cat
+            elif a <= t16 < b:
+                return cat
+        return None
+
+    @staticmethod
+    def _annulus_wedge_path(
+        cx: float, cy: float, r_in: float, r_out: float, start_deg: float, span_deg: float
+    ) -> QPainterPath:
+        rect_out = QRectF(cx - r_out, cy - r_out, 2 * r_out, 2 * r_out)
+        rect_in = QRectF(cx - r_in, cy - r_in, 2 * r_in, 2 * r_in)
+        path = QPainterPath()
+        path.arcMoveTo(rect_out, start_deg)
+        path.arcTo(rect_out, start_deg, span_deg)
+        path.arcTo(rect_in, start_deg + span_deg, -span_deg)
+        path.closeSubpath()
+        return path
+
+    def _draw_opponent_hover_ring(
+        self,
+        painter: QPainter,
+        cx: float,
+        cy: float,
+        r_in: float,
+        r_out: float,
+        mid_deg: float,
+        span_deg: float,
+        category: str,
+    ) -> None:
+        if span_deg <= 0.05:
+            return
+        base = self._category_color(category)
+        fill = self._opponent_tint(base)
+        painter.setBrush(fill)
+        edge = QColor(fill)
+        edge.setAlpha(min(255, int(fill.alpha() * 1.1)))
+        painter.setPen(QPen(edge, 1))
+
+        if span_deg >= 359.5:
+            outer = QPainterPath()
+            outer.addEllipse(QRectF(cx - r_out, cy - r_out, 2 * r_out, 2 * r_out))
+            inner = QPainterPath()
+            inner.addEllipse(QRectF(cx - r_in, cy - r_in, 2 * r_in, 2 * r_in))
+            painter.drawPath(outer.subtracted(inner))
+            return
+
+        s = (mid_deg - span_deg / 2.0) % 360.0
+        e = s + span_deg
+        if e <= 360.0 + 1e-6:
+            painter.drawPath(self._annulus_wedge_path(cx, cy, r_in, r_out, s, span_deg))
+        else:
+            p1 = 360.0 - s
+            p2 = span_deg - p1
+            painter.drawPath(self._annulus_wedge_path(cx, cy, r_in, r_out, s, p1))
+            painter.drawPath(self._annulus_wedge_path(cx, cy, r_in, r_out, 0.0, p2))
+
+    def _start_ring_span_anim(self, target_deg: float) -> None:
+        t = max(0.0, min(360.0, float(target_deg)))
+        if self._hover_anim_ms <= 0:
+            self._hover_ring_span_deg = t
+            if t <= 0.001:
+                self._opponent_ring_category = None
+            self.update()
+            return
+        self._ring_span_anim.stop()
+        self._ring_span_anim.setStartValue(self._hover_ring_span_deg)
+        self._ring_span_anim.setEndValue(t)
+        self._ring_span_anim.start()
+
+    def _update_hover_from_pos(self, px: float, py: float) -> None:
+        if not self._can_hover_slice():
+            self.setToolTip("")
+            self.unsetCursor()
+            return
+        cat = self._category_at_point(px, py)
+        if cat != self._hover_category:
+            prev = self._hover_category
+            self._hover_category = cat
+            oc = int(self._opponent_data.get(cat, 0)) if cat and self._opponent_data else 0
+            if cat:
+                self._opponent_ring_category = cat
+                self.setToolTip(self._hover_tooltip_text(cat))
+                target = self._opponent_span_deg_for_category(cat) if oc > 0 else 0.0
+                self._start_ring_span_anim(target)
+            else:
+                self.setToolTip("")
+                self.unsetCursor()
+                self._start_ring_span_anim(0.0)
+        elif cat:
+            self.setToolTip(self._hover_tooltip_text(cat))
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if self._interaction_active():
+            p = event.position()
+            self._update_hover_from_pos(p.x(), p.y())
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event: QEvent) -> None:
+        self._hover_category = None
+        self._start_ring_span_anim(0.0)
+        self.setToolTip("")
+        self.unsetCursor()
+        super().leaveEvent(event)
+
     def paintEvent(self, event) -> None:
-        """Paint the pie chart."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
+
         width = self.width()
         height = self.height()
         size = min(width, height) - self.margin
+        if size < 1:
+            return
+
         x = (width - size) / 2
         y = (height - size) / 2
-        rect = QRect(int(x), int(y), int(size), int(size))
-        
+        outer_rect = QRect(int(x), int(y), int(size), int(size))
+        cx = x + size / 2.0
+        cy = y + size / 2.0
+        r_out = size / 2.0
+
         if self.total == 0:
-            # No data - draw placeholder
             painter.setPen(self.text_color)
             font = QFont(self.font_family, self.font_size)
             painter.setFont(font)
-            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "No data")
+            painter.drawText(outer_rect, Qt.AlignmentFlag.AlignCenter, "No data")
             return
-        
-        # Draw pie slices
-        start_angle = 0
-        for category, count in self.data.items():
-            if count == 0:
-                continue
-            
-            # Calculate angle for this slice
-            angle = (count / self.total) * 360 * 16  # Qt uses 1/16th degree units
-            
-            # Get color for category
-            color = self.colors.get(category.lower().replace(' ', '_'), self.text_color)
-            
-            # Draw slice
-            painter.setBrush(color)
-            painter.setPen(QPen(color, 1))
-            painter.drawPie(rect, int(start_angle), int(angle))
-            
-            start_angle += angle
+
+        use_player_order = self._is_player_stats_pie
+
+        def draw_player_pie_full() -> None:
+            start_angle = 0
+            order = PIE_CLASSIFICATION_CATEGORY_ORDER if use_player_order else tuple(self.data.keys())
+            if use_player_order:
+                for category in order:
+                    count = int(self.data.get(category, 0))
+                    if count == 0:
+                        continue
+                    angle = int(round((count / self.total) * 360 * 16))
+                    color = self._category_color(category)
+                    painter.setBrush(color)
+                    painter.setPen(QPen(color.darker(120), 1))
+                    painter.drawPie(outer_rect, int(start_angle), int(angle))
+                    start_angle += angle
+            else:
+                for category, count in self.data.items():
+                    if count == 0:
+                        continue
+                    angle = int(round((count / self.total) * 360 * 16))
+                    color = self._category_color(category)
+                    painter.setBrush(color)
+                    painter.setPen(QPen(color.darker(120), 1))
+                    painter.drawPie(outer_rect, int(start_angle), int(angle))
+                    start_angle += angle
+
+        draw_player_pie_full()
+
+        if (
+            self._interaction_active()
+            and self._opponent_ring_category
+            and self._hover_ring_span_deg > 0.05
+            and size >= self._min_size_for_overlay
+        ):
+            cat = self._opponent_ring_category
+            mid = self._player_slice_mid_deg(cat)
+            if mid is not None:
+                band = max(3.0, r_out * self._ring_fraction)
+                r_in_ring = max(r_out - band, r_out * 0.55)
+                self._draw_opponent_hover_ring(
+                    painter,
+                    cx,
+                    cy,
+                    r_in_ring,
+                    r_out,
+                    mid,
+                    self._hover_ring_span_deg,
+                    cat,
+                )
 
 
 class DetailSummaryView(QWidget):

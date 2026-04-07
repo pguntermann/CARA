@@ -1094,6 +1094,10 @@ class AggregatedPlayerStats:
     activity_heatmap_per_game_ordinals: List[Tuple[Optional[int], Optional[int]]]
     # Parallel to ``activity_heatmap_per_game_ordinals``: index into the analyzed-games list for that row.
     activity_heatmap_source_game_indices: List[int]
+    # Sum of opponent move-quality counts across analyzed games (same keys as move-classification pie).
+    opponent_move_classification: Dict[str, int]
+    # Per-game average of opponents' phase accuracy (Opening / Middlegame / Endgame), same method as player phases.
+    opponent_phase_accuracy: Dict[str, float]
 
 
 class PlayerStatsService:
@@ -1293,6 +1297,19 @@ class PlayerStatsService:
         middlegame_cpl_count = 0
         endgame_cpl_count = 0
         
+        opponent_opening_accuracy_values: List[float] = []
+        opponent_middlegame_accuracy_values: List[float] = []
+        opponent_endgame_accuracy_values: List[float] = []
+
+        opp_book_moves = 0
+        opp_brilliant_moves = 0
+        opp_best_moves = 0
+        opp_good_moves = 0
+        opp_inaccuracies = 0
+        opp_mistakes = 0
+        opp_misses = 0
+        opp_blunders = 0
+
         opening_book_moves = 0
         opening_brilliant_moves = 0
         opening_best_moves = 0
@@ -1420,6 +1437,31 @@ class PlayerStatsService:
             endgame_misses += game_endgame.misses
             endgame_blunders += game_endgame.blunders
             
+            # Opponent move-classification totals and per-game phase accuracies (same games as the focal player).
+            gs_sum = result.get("game_summary")
+            if gs_sum:
+                if is_white_game:
+                    ost = gs_sum.black_stats
+                    oop = gs_sum.black_opening
+                    omid = gs_sum.black_middlegame
+                    oend = gs_sum.black_endgame
+                else:
+                    ost = gs_sum.white_stats
+                    oop = gs_sum.white_opening
+                    omid = gs_sum.white_middlegame
+                    oend = gs_sum.white_endgame
+                opp_book_moves += ost.book_moves
+                opp_brilliant_moves += ost.brilliant_moves
+                opp_best_moves += ost.best_moves
+                opp_good_moves += ost.good_moves
+                opp_inaccuracies += ost.inaccuracies
+                opp_mistakes += ost.mistakes
+                opp_misses += ost.misses
+                opp_blunders += ost.blunders
+                opponent_opening_accuracy_values.append(oop.accuracy)
+                opponent_middlegame_accuracy_values.append(omid.accuracy)
+                opponent_endgame_accuracy_values.append(oend.accuracy)
+
             # Collect accuracy by endgame type (for games that have a classified endgame type),
             # storing both endgame-phase accuracy and overall game accuracy, plus color.
             game_summary = result.get('game_summary')
@@ -1665,6 +1707,26 @@ class PlayerStatsService:
         detail_agg = ui_agg.get("panels", {}).get("detail", {})
         ps_agg = detail_agg.get("player_stats", {})
 
+        opponent_move_classification = {
+            "Book Move": opp_book_moves,
+            "Brilliant": opp_brilliant_moves,
+            "Best Move": opp_best_moves,
+            "Good Move": opp_good_moves,
+            "Inaccuracy": opp_inaccuracies,
+            "Mistake": opp_mistakes,
+            "Miss": opp_misses,
+            "Blunder": opp_blunders,
+        }
+
+        def _avg_phase(xs: List[float]) -> float:
+            return sum(xs) / len(xs) if xs else 0.0
+
+        opponent_phase_accuracy = {
+            "Opening": _avg_phase(opponent_opening_accuracy_values),
+            "Middlegame": _avg_phase(opponent_middlegame_accuracy_values),
+            "Endgame": _avg_phase(opponent_endgame_accuracy_values),
+        }
+
         activity_pairs: List[Tuple[Optional[int], Optional[int]]] = []
         activity_indices: List[int] = []
         for result in game_results:
@@ -1754,6 +1816,8 @@ class PlayerStatsService:
             acpl_phase_calendar_mode="",
             activity_heatmap_per_game_ordinals=activity_pairs,
             activity_heatmap_source_game_indices=activity_indices,
+            opponent_move_classification=opponent_move_classification,
+            opponent_phase_accuracy=opponent_phase_accuracy,
         )
 
         apply_player_stats_time_series_binning(

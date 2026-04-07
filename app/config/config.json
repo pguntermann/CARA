@@ -1663,6 +1663,19 @@
             "label_column_minimum_width": 150,
             "value_column_minimum_width": 100
           },
+          "move_classification_pie": {
+            "enabled": true,
+            "show_opponent_overlay": true,
+            "opponent_ring_width_fraction": 0.18,
+            "opponent_overlay_alpha": 0.65,
+            "opponent_overlay_saturation": 0.72,
+            "opponent_overlay_value_factor": 0.58,
+            "opponent_ring_darken": 135,
+            "min_size_for_overlay": 130,
+            "hover_overlay_animation_ms": 1200,
+            "player_legend_label": "Player",
+            "opponent_legend_label": "Opponents"
+          },
           "phase_bar_chart": {
             "bar_height": 30,
             "bar_spacing": 10,
@@ -1672,7 +1685,15 @@
             "min_chart_width": 200,
             "bar_border_radius": 3,
             "bar_pen_width": 1,
-            "bar_value_spacing": 5
+            "bar_value_spacing": 5,
+            "show_opponent_hover_overlay": true,
+            "hover_overlay_animation_ms": 1200,
+            "player_legend_label": "Player",
+            "opponent_legend_label": "Opponents",
+            "opponent_overlay_alpha": 0.65,
+            "opponent_overlay_value_factor": 0.58,
+            "opponent_overlay_darken": 135,
+            "min_width_for_hover_overlay": 180
           },
           "opening_tree": {
             "max_depth": 12,
