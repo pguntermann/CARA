@@ -708,32 +708,17 @@ class BulkAnalysisController(QObject):
             else:
                 error_type = "no_assignment"
             
-            # Get validation message from config
-            messages_config = self.config.get('ui', {}).get('dialogs', {}).get('engine_validation_messages', {})
-            error_config = messages_config.get(error_type, {})
-            title = error_config.get('title', 'Error')
-            message_template = error_config.get('message_template', '')
-            
-            if message_template:
-                # Use bulk_analysis action
-                actions = messages_config.get('actions', {})
-                tasks = messages_config.get('tasks', {})
-                action = actions.get('bulk_analysis', 'starting bulk analysis')
-                task_display = tasks.get('game_analysis', 'Game Analysis')
-                
-                # Format message
-                message = message_template.format(action=action, task=task_display)
-            else:
-                # Fallback message
-                if not engines:
-                    title = "No Engine Configured"
-                    message = "Please add at least one UCI chess engine before starting bulk analysis.<br><br>Go to Engines → Add Engine... to configure an engine."
-                    message += '<br><br><a href="manual://adding-first-engine">Learn how to add an engine</a>'
-                else:
-                    title = "No Engine Assigned"
-                    message = "Please assign an engine to the Game Analysis task before starting bulk analysis.<br><br>Go to Engines → [Engine Name] → Assign to Game Analysis."
-                    message += '<br><br><a href="manual://adding-additional-engines">Learn how to assign engines to tasks</a>'
-            
+            # Validation copy from ui.dialogs.engine_validation_messages (config is authoritative)
+            messages_config = self.config["ui"]["dialogs"]["engine_validation_messages"]
+            error_config = messages_config[error_type]
+            title = error_config["title"]
+            message_template = error_config["message_template"]
+            action = messages_config["actions"]["bulk_analysis"]
+            task_display = messages_config["tasks"]["game_analysis"]
+            message = message_template.format(action=action, task=task_display) + error_config[
+                "manual_link_html"
+            ]
+
             return (False, title, message)
         
         return (True, None, None)
