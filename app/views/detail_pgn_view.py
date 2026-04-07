@@ -142,8 +142,16 @@ class ClickablePgnTextEdit(QTextEdit):
         Args:
             event: Context menu event.
         """
-        # Create standard context menu
+        # Create standard context menu (copy/paste/select actions etc.)
         menu = self.createStandardContextMenu()
+
+        # Apply context menu styling (font/size/bg from ui.styles.context_menu).
+        parent_view = self.parent()
+        cfg = getattr(parent_view, "config", None) if parent_view else None
+        if isinstance(cfg, dict):
+            from app.views.style import StyleManager
+
+            StyleManager.style_context_menu(menu, cfg)
         
         # Find and replace the copy action to use our custom copy method
         copy_action = None
@@ -164,6 +172,15 @@ class ClickablePgnTextEdit(QTextEdit):
             # Connect to our custom copy method
             copy_action.triggered.connect(self.copy)
         
+        # Append the PGN menubar menu items to the context menu (mirrors layout).
+        from PyQt6.QtWidgets import QApplication
+        from app.views.menus.pgn_context_menu import append_pgn_menu_items_to_context_menu
+
+        mw = QApplication.activeWindow()
+        if mw is not None and isinstance(cfg, dict):
+            menu.addSeparator()
+            append_pgn_menu_items_to_context_menu(menu, mw, config=cfg)
+
         # Show the menu
         menu.exec(event.globalPos())
     

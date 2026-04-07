@@ -30,12 +30,16 @@ def setup_player_stats_menu(mw, menu_bar: QMenuBar) -> None:
 
     enable_all_ps = QAction("Enable all", mw)
     enable_all_ps.setMenuRole(QAction.MenuRole.NoRole)
-    enable_all_ps.triggered.connect(mw._on_player_stats_menu_enable_all)
+    enable_all_ps.triggered.connect(
+        lambda checked=False: mw.controller.get_menu_options_sync_controller().set_all_player_stats_sections_visible(True)
+    )
     ps_menu.addAction(enable_all_ps)
 
     disable_all_ps = QAction("Disable all", mw)
     disable_all_ps.setMenuRole(QAction.MenuRole.NoRole)
-    disable_all_ps.triggered.connect(mw._on_player_stats_menu_disable_all)
+    disable_all_ps.triggered.connect(
+        lambda checked=False: mw.controller.get_menu_options_sync_controller().set_all_player_stats_sections_visible(False)
+    )
     ps_menu.addAction(disable_all_ps)
     ps_menu.addSeparator()
 
@@ -54,9 +58,6 @@ def setup_player_stats_menu(mw, menu_bar: QMenuBar) -> None:
             act.setCheckable(True)
             act.setMenuRole(QAction.MenuRole.NoRole)
             act.setChecked(bool(vis.get(section_id, True)))
-            act.triggered.connect(
-                lambda checked, sid=section_id: mw._on_player_stats_section_menu_toggled(sid, checked)
-            )
             ps_menu.addAction(act)
             mw._player_stats_section_actions[section_id] = act
             if section_id == "endgame_tree":
@@ -74,6 +75,17 @@ def setup_player_stats_menu(mw, menu_bar: QMenuBar) -> None:
     _setup_player_stats_time_series_submenu(mw, ps_menu)
     ps_menu.addSeparator()
     _add_player_stats_section_visibility_actions(sections[idx_acpl + 1 :])
+
+    # Bind action syncing to the controller (keeps view from mutating MainWindow QActions).
+    try:
+        psv = getattr(getattr(mw, "detail_panel", None), "player_stats_view", None)
+        if psv:
+            mw.controller.get_menu_options_sync_controller().bind_player_stats(
+                view=psv,
+                section_actions=mw._player_stats_section_actions,
+            )
+    except Exception:
+        pass
 
 
 def _setup_player_stats_time_series_submenu(mw, ps_menu: QMenu) -> None:

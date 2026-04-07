@@ -1,8 +1,20 @@
 """Chess board widget displaying an 8x8 grid with coordinates."""
 
-from PyQt6.QtWidgets import QWidget, QGridLayout, QLabel, QToolTip
+from PyQt6.QtWidgets import QApplication, QWidget, QGridLayout, QLabel, QToolTip
 from app.utils.rule_explanation_formatter import RuleExplanationFormatter
-from PyQt6.QtGui import QPainter, QColor, QFont, QPen, QBrush, QPolygon, QPolygonF, QMouseEvent, QFontMetrics, QPainterPath
+from PyQt6.QtGui import (
+    QContextMenuEvent,
+    QPainter,
+    QColor,
+    QFont,
+    QPen,
+    QBrush,
+    QPolygon,
+    QPolygonF,
+    QMouseEvent,
+    QFontMetrics,
+    QPainterPath,
+)
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtCore import Qt, QRect, QRectF, QPointF, QTimer, QPoint, QByteArray
 from pathlib import Path
@@ -2785,6 +2797,24 @@ class ChessBoardWidget(QWidget):
         
         # Call parent for normal handling
         super().mousePressEvent(event)
+
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        """Right-click context menu: mirror the main Board menu options."""
+        try:
+            from app.views.menus.board_context_menu import build_board_context_menu
+        except Exception:
+            return
+
+        # Use active window as the menu source (it owns the QActions).
+        mw = QApplication.activeWindow()
+        if mw is None:
+            return
+
+        try:
+            menu = build_board_context_menu(mw, parent=self)
+            menu.exec(event.globalPos())
+        except Exception:
+            return
     
     def _handle_single_click(self) -> None:
         """Handle single-click on text annotation (after timer delay)."""

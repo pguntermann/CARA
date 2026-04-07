@@ -30,6 +30,7 @@ from app.controllers.search_controller import SearchController
 from app.controllers.notes_controller import NotesController
 from app.services.version_check_service import VersionCheckService
 from app.controllers.debug_controller import DebugController
+from app.controllers.menu_options_sync_controller import MenuOptionsSyncController
 
 
 class AppController:
@@ -192,6 +193,12 @@ class AppController:
 
         # Debug controller (development/diagnostics actions)
         self.debug_controller = DebugController(config, self)
+
+        # Menu options sync controller (menubar/context menu state sync)
+        self.menu_options_sync_controller = MenuOptionsSyncController(
+            config,
+            self.user_settings_service.get_model(),
+        )
         
         # Connect evaluation to board position changes
         self._connect_evaluation_to_board()
@@ -959,6 +966,14 @@ class AppController:
             The DebugController instance.
         """
         return self.debug_controller
+
+    def get_menu_options_sync_controller(self) -> MenuOptionsSyncController:
+        """Get the menu options sync controller.
+
+        Returns:
+            The MenuOptionsSyncController instance.
+        """
+        return self.menu_options_sync_controller
     
     def set_moves_list_model(self, moves_list_model) -> None:
         """Set the moves list model for game analysis controller.

@@ -78,7 +78,6 @@ class MainWindow(QMainWindow):
         self._setup_tooltip_styling()
         self._setup_menu_bar()
         self._setup_ui()
-        self._register_player_stats_menu_with_view()
         self._setup_shortcuts()
         
         # First-run welcome dialog (deferred until the window is shown).
@@ -179,43 +178,14 @@ class MainWindow(QMainWindow):
             )
             return
         progress.set_status(status_success)
-        vis = svc.get_model().get_player_stats_section_visibility()
-        for sid, act in getattr(self, "_player_stats_section_actions", {}).items():
-            try:
-                act.blockSignals(True)
-                act.setChecked(bool(vis.get(sid, True)))
-                act.blockSignals(False)
-            except (RuntimeError, TypeError, AttributeError):
-                pass
+        try:
+            self.controller.get_menu_options_sync_controller().sync_player_stats_from_settings()
+        except Exception:
+            pass
         self._sync_player_stats_time_series_menu_from_settings()
         self._sync_player_stats_activity_heatmap_menu_from_settings()
         self._sync_player_stats_accuracy_distribution_menu_from_settings()
-        psv = getattr(getattr(self, "detail_panel", None), "player_stats_view", None)
-        if psv:
-            psv.reload_player_stats_section_prefs_from_settings()
-            psv._sync_player_stats_menu_actions()
 
-    def _on_player_stats_section_menu_toggled(self, section_id: str, checked: bool) -> None:
-        view = getattr(getattr(self, "detail_panel", None), "player_stats_view", None)
-        if view:
-            view.set_player_stats_section_visible_from_menu(section_id, checked)
-
-    def _on_player_stats_menu_enable_all(self) -> None:
-        view = getattr(getattr(self, "detail_panel", None), "player_stats_view", None)
-        if view:
-            view.set_all_player_stats_sections_visible_from_menu(True)
-
-    def _on_player_stats_menu_disable_all(self) -> None:
-        view = getattr(getattr(self, "detail_panel", None), "player_stats_view", None)
-        if view:
-            view.set_all_player_stats_sections_visible_from_menu(False)
-
-    def _register_player_stats_menu_with_view(self) -> None:
-        if hasattr(self, "_player_stats_section_actions") and hasattr(self, "detail_panel"):
-            psv = getattr(self.detail_panel, "player_stats_view", None)
-            if psv:
-                psv.set_player_stats_section_menu_actions(self._player_stats_section_actions)
-    
     def _sync_player_stats_time_series_menu_from_settings(self) -> None:
         if hasattr(self, "_ps_ts_menu_controller"):
             self._ps_ts_menu_controller.sync_from_settings()

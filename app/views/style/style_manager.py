@@ -589,7 +589,7 @@ class StyleManager:
     def style_context_menu(
         menu: QMenu,
         config: Dict[str, Any],
-        bg_color: List[int],
+        bg_color: Optional[List[int]] = None,
         text_color: List[int] = None,
         font_family: str = None,
         font_size: float = None,
@@ -608,7 +608,7 @@ class StyleManager:
         Args:
             menu: The QMenu instance to style.
             config: Configuration dictionary.
-            bg_color: Base background color as [R, G, B] (from view/dialog config).
+            bg_color: Background color as [R, G, B]. If None, reads from centralized config.
             text_color: Text color as [R, G, B]. If None, reads from centralized config.
             font_family: Font family name. If None, reads from centralized config.
             font_size: Font size in points. If None, reads from centralized config (with DPI scaling).

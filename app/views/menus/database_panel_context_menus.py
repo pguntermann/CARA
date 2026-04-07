@@ -28,12 +28,9 @@ def build_database_tab_context_menu(panel, *, include_close_all_but: bool) -> Da
     if include_close_all_but:
         close_all_but_action = menu.addAction("Close all but this")
 
-    ui_config = panel.config.get("ui", {})
-    panel_config = ui_config.get("panels", {}).get("database", {})
-    bg_color = panel_config.get("background_color", [35, 35, 40])
     from app.views.style import StyleManager
 
-    StyleManager.style_context_menu(menu, panel.config, bg_color)
+    StyleManager.style_context_menu(menu, panel.config)
     return DatabaseTabContextMenu(menu=menu, close_action=close_action, close_all_but_action=close_all_but_action)
 
 
@@ -105,14 +102,11 @@ def build_database_table_context_menu(
     act_cut_selected_games = menu.addAction("Cut selected Games") if enable_cut_selected_games else None
     act_paste_games = menu.addAction("Paste Game(s)") if enable_paste_games else None
 
-    ui_config = panel.config.get("ui", {})
-    panel_config = ui_config.get("panels", {}).get("database", {})
-    bg_color = panel_config.get("background_color", [35, 35, 40])
     from app.views.style import StyleManager
 
-    StyleManager.style_context_menu(menu, panel.config, bg_color)
-    StyleManager.style_context_menu(select_rows_menu, panel.config, bg_color)
-    StyleManager.style_context_menu(select_mode_menu, panel.config, bg_color)
+    StyleManager.style_context_menu(menu, panel.config)
+    StyleManager.style_context_menu(select_rows_menu, panel.config)
+    StyleManager.style_context_menu(select_mode_menu, panel.config)
 
     return DatabaseTableContextMenu(
         menu=menu,

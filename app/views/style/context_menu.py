@@ -1,6 +1,6 @@
 """Context menu styling utilities."""
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from PyQt6.QtWidgets import QMenu
 from app.utils.font_utils import resolve_font_family, scale_font_size
 
@@ -8,7 +8,7 @@ from app.utils.font_utils import resolve_font_family, scale_font_size
 def apply_context_menu_styling(
     menu: QMenu,
     config: Dict[str, Any],
-    bg_color: List[int],
+    bg_color: Optional[List[int]] = None,
     text_color: List[int] = None,
     font_family: str = None,
     font_size: float = None,
@@ -27,7 +27,7 @@ def apply_context_menu_styling(
     Args:
         menu: The QMenu instance to style.
         config: Configuration dictionary.
-        bg_color: Base background color as [R, G, B] (from view/dialog config).
+        bg_color: Background color as [R, G, B]. If None, reads from centralized config.
         text_color: Text color as [R, G, B]. If None, reads from centralized config.
         font_family: Font family name. If None, reads from centralized config.
         font_size: Font size in points. If None, reads from centralized config (with DPI scaling).
@@ -44,6 +44,9 @@ def apply_context_menu_styling(
     # Get unified config values if parameters are not provided
     styles_config = config.get('ui', {}).get('styles', {})
     context_menu_config = styles_config.get('context_menu', {})
+
+    if bg_color is None:
+        bg_color = context_menu_config.get('background_color', [45, 45, 50])
     
     if text_color is None:
         text_color = context_menu_config.get('text_color', [200, 200, 200])

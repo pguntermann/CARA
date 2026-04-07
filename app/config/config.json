@@ -187,6 +187,11 @@
         ]
       },
       "context_menu": {
+        "background_color": [
+          45,
+          45,
+          50
+        ],
         "text_color": [
           200,
           200,
