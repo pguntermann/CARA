@@ -1628,14 +1628,14 @@ class PlayerStatsController(QObject):
         panel_model.database_removed.connect(self._on_database_removed)
     
     def _connect_to_database_changes(self) -> None:
-        """Connect to DatabaseModel dataChanged signals to detect game updates."""
+        """Connect to DatabaseModel stats_relevant_data_change (not generic dataChanged)."""
         if not self._database_controller:
             return
         
         # Disconnect from all previously connected databases
         for database in self._connected_databases:
             try:
-                database.dataChanged.disconnect(self._on_database_data_changed)
+                database.stats_relevant_data_change.disconnect(self._on_stats_relevant_data_change)
             except (RuntimeError, TypeError):
                 pass
         
@@ -1646,7 +1646,7 @@ class PlayerStatsController(QObject):
         if panel_model:
             databases = panel_model.get_all_database_models()
             for database in databases:
-                database.dataChanged.connect(self._on_database_data_changed)
+                database.stats_relevant_data_change.connect(self._on_stats_relevant_data_change)
                 self._connected_databases.append(database)
     
     def _on_active_database_changed(self, database) -> None:
@@ -1675,7 +1675,7 @@ class PlayerStatsController(QObject):
     def _on_database_added(self, identifier: str, info) -> None:
         """Handle database added - connect to its signals."""
         if info and info.model:
-            info.model.dataChanged.connect(self._on_database_data_changed)
+            info.model.stats_relevant_data_change.connect(self._on_stats_relevant_data_change)
             if info.model not in self._connected_databases:
                 self._connected_databases.append(info.model)
             # Always trigger dropdown update when database is added
@@ -1695,9 +1695,8 @@ class PlayerStatsController(QObject):
             self._database_update_timer.stop()
             self._database_update_timer.start(self._database_update_debounce_ms)
     
-    def _on_database_data_changed(self, top_left, bottom_right, roles=None) -> None:
-        """Handle database data changed signal - debounce and update."""
-        # Debounce the update to avoid excessive recalculations
+    def _on_stats_relevant_data_change(self) -> None:
+        """Handle stats-relevant database mutations (not sort/unsaved-only). Debounce and update."""
         self._database_update_timer.stop()
         self._database_update_timer.start(self._database_update_debounce_ms)
     

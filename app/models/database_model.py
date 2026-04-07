@@ -1,6 +1,6 @@
 """Database model for holding game data."""
 
-from PyQt6.QtCore import QAbstractTableModel, Qt, QModelIndex, QRect
+from PyQt6.QtCore import QAbstractTableModel, Qt, QModelIndex, QRect, pyqtSignal
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QBrush, QColor
 from typing import Optional, List, Dict, Any, Set, Tuple
 from datetime import datetime
@@ -102,6 +102,11 @@ class DatabaseModel(QAbstractTableModel):
     the UI automatically.
     """
     
+    #: Emitted when game rows or stored game content relevant to aggregates
+    #: (e.g. player statistics) changes. Not emitted for sort/reorder or
+    #: unsaved-indicator-only updates.
+    stats_relevant_data_change = pyqtSignal()
+    
     # Column indices
     COL_NUM = 0
     COL_FILE_NUM = 1
@@ -144,6 +149,10 @@ class DatabaseModel(QAbstractTableModel):
         ui_cfg = (self._config.get("ui") or {})
         db_panel_cfg = ui_cfg.get("panels", {}).get("database", {})
         self._pgn_preview_max_len: int = db_panel_cfg.get("pgn_col_max_chars", 250)
+    
+    def _emit_stats_relevant_data_change(self) -> None:
+        """Notify listeners that stats-relevant game data or membership changed."""
+        self.stats_relevant_data_change.emit()
     
     def rowCount(self, parent=None) -> int:
         """Get number of rows in the model.
@@ -363,6 +372,7 @@ class DatabaseModel(QAbstractTableModel):
             unsaved_index = self.index(row, self.COL_UNSAVED, parent)
             self.dataChanged.emit(unsaved_index, unsaved_index,
                                  [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole])
+        self._emit_stats_relevant_data_change()
     
     def add_games_batch(self, games: List[GameData], mark_unsaved: bool = True, tags_list: List[List[str]] = None) -> None:
         """Add multiple games to the model in a single batch operation.
@@ -425,6 +435,7 @@ class DatabaseModel(QAbstractTableModel):
             bottom_right = self.index(last_row, self.COL_UNSAVED, parent)
             self.dataChanged.emit(top_left, bottom_right,
                                  [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole])
+        self._emit_stats_relevant_data_change()
     
     def clear(self) -> None:
         """Clear all games from the model."""
@@ -434,6 +445,7 @@ class DatabaseModel(QAbstractTableModel):
             self._unsaved_games.clear()
             self._unique_tags.clear()
             self.endRemoveRows()
+            self._emit_stats_relevant_data_change()
     
     def remove_games(self, games_to_remove: List['GameData']) -> None:
         """Remove multiple games from the model.
@@ -468,6 +480,7 @@ class DatabaseModel(QAbstractTableModel):
                 self.beginRemoveRows(parent, row, row)
                 self._games.pop(row)
                 self.endRemoveRows()
+        self._emit_stats_relevant_data_change()
     
     def sort_games_to_top(self, games_to_top: List['GameData']) -> None:
         """Sort games to bring specified games to the top.
@@ -780,7 +793,7 @@ class DatabaseModel(QAbstractTableModel):
         # Note: We need to emit with roles parameter to ensure Qt processes the signal correctly
         self.dataChanged.emit(left_index, right_index, 
                              [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole])
-        
+        self._emit_stats_relevant_data_change()
         return True
     
     def batch_update_games(self, games: List['GameData']) -> None:
@@ -820,6 +833,7 @@ class DatabaseModel(QAbstractTableModel):
         right_index = self.index(max_row, self.columnCount(parent) - 1, parent)
         self.dataChanged.emit(left_index, right_index,
                              [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole])
+        self._emit_stats_relevant_data_change()
     
     def _create_unsaved_icon(self) -> QIcon:
         """Create icon for unsaved changes indicator.
