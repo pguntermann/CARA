@@ -116,10 +116,12 @@ class PlayerStatsAccuracyDistributionMenuController:
         self._style(mb)
         for k in ("auto", "fewer", "more"):
             mb.addAction(self._bins[k])
+        root.addSeparator()
         mc = root.addMenu("Colors")
         self._style(mc)
         for k in ("github_green", "ocean_blue", "amber"):
             mc.addAction(self._preset[k])
+        root.addSeparator()
         mcrv = root.addMenu("Distribution line curve")
         self._style(mcrv)
         assert self._curve_smooth and self._curve_straight

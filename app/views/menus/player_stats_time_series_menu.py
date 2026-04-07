@@ -121,6 +121,8 @@ class PlayerStatsTimeSeriesMenuController:
         m_mode.addAction(self._ps_ts_mode_quantile)
         m_mode.addAction(self._ps_ts_mode_equal)
 
+        ts_menu.addSeparator()
+
         m_x = ts_menu.addMenu("X axis layout")
         self._style(m_x)
         assert self._ps_ts_x_uniform and self._ps_ts_x_gap and self._ps_ts_x_cal
@@ -132,6 +134,8 @@ class PlayerStatsTimeSeriesMenuController:
         self._style(m_gap)
         for n in CHOICES_COMPRESS_GAP_MAX_SEGMENT_DAYS:
             m_gap.addAction(self._ps_ts_gap_seg_actions[int(n)])
+
+        ts_menu.addSeparator()
 
         m_line = ts_menu.addMenu("Progression line style")
         self._style(m_line)
