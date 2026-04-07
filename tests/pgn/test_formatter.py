@@ -10,7 +10,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import unittest
-from app.services.pgn_formatter_service import PgnFormatterService
+from app.services.pgn_formatter_service import PgnFormatterService, PGN_MOVE_RESULT_RE
 from app.config.config_loader import ConfigLoader
 
 
@@ -51,8 +51,7 @@ def _validate_formatter_output(pgn_text: str, formatted_html: str, move_info: li
             if 'color: rgb(180, 180, 180)' not in formatted_html:
                 errors.append("Move numbers not found with expected formatting (white/bold for main line)")
 
-    result_pattern = re.compile(r'\b(1-0|0-1|1/2-1/2|\*)\b')
-    has_result_in_moves = bool(result_pattern.search(move_notation_text))
+    has_result_in_moves = bool(PGN_MOVE_RESULT_RE.search(move_notation_text))
 
     if has_result_in_moves:
         if 'color: rgb(255, 255, 100)' not in formatted_html or 'font-weight: bold' not in formatted_html:
@@ -64,7 +63,7 @@ def _validate_formatter_output(pgn_text: str, formatted_html: str, move_info: li
     )
     for match in variation_span_pattern.finditer(formatted_html):
         variation_content = match.group(1)
-        if result_pattern.search(variation_content):
+        if PGN_MOVE_RESULT_RE.search(variation_content):
             full_variation_span = match.group(0)
             if 'color: rgb(255, 255, 100)' in full_variation_span:
                 errors.append("Result in variation is incorrectly formatted as result (should use variation formatting)")
@@ -115,7 +114,7 @@ def _validate_formatter_output(pgn_text: str, formatted_html: str, move_info: li
             if re.search(r'\d+\.\s*', header_content):
                 errors.append("Move number formatting found inside header (should not happen)")
         if 'color: rgb(255, 255, 100)' in header_content and 'Result' not in match.group(0):
-            if re.search(r'\b(1-0|0-1|1/2-1/2|\*)\b', header_content):
+            if PGN_MOVE_RESULT_RE.search(header_content):
                 errors.append("Result formatting found inside non-Result header (should not happen)")
 
     if has_moves:
@@ -145,6 +144,13 @@ def _validate_formatter_output(pgn_text: str, formatted_html: str, move_info: li
         has_move_color = bool(move_color_pattern.search(formatted_html))
         if not has_move_color:
             pass  # Move color formatting might be disabled in config
+
+    # * inside comment or variation must not be wrapped as game result (yellow bold only on *)
+    if "asterisk inside comment not a result" in test_name or "asterisk inside variation not a result" in test_name:
+        if re.search(r'font-weight:\s*bold">\*</span>', formatted_html):
+            errors.append(
+                "Standalone * in comment or variation must not use result (yellow/bold) formatting"
+            )
 
     return errors
 
@@ -231,6 +237,17 @@ class TestPgnFormatter(unittest.TestCase):
 [Result "1-0"]
 
 1. e4 e5 2. Nf3 Nc6 3. Bb5 1-0"""
+        },
+        
+        # Headers with empty quoted value (e.g. [Site ""]) must match header regex and render as headers
+        {
+            "name": "Headers with empty tag value (Site)",
+            "pgn": """[Event "Mephisto Phoenix Game"] [Site ""]
+[White "W"]
+[Black "B"]
+[Result "1-0"]
+
+1. e4 e5 1-0"""
         },
         
         # Test 6: PGN with comments in variations
@@ -350,6 +367,45 @@ class TestPgnFormatter(unittest.TestCase):
 [Black "Player2"]
 
 1. e4 e5 2. Nf3 Nc6 3. Bb5 1/2-1/2"""
+        },
+        
+        # Undecided / unfinished game (*) in move text must use result styling (not \b*\b)
+        {
+            "name": "PGN with undecided result (*) in moves",
+            "pgn": """[Event "Test Game"]
+[Site "Test"]
+[Date "2025.01.01"]
+[White "Player1"]
+[Black "Player2"]
+[Result "*"]
+
+1. e4 e5 2. Nf3 *"""
+        },
+        
+        # * inside a main-line comment is not a game result — must not get result styling
+        {
+            "name": "asterisk inside comment not a result",
+            "pgn": """[Event "Test Game"]
+[Site "Test"]
+[Date "2025.01.01"]
+[White "Player1"]
+[Black "Player2"]
+[Result "1-0"]
+
+1. e4 {See * marker in comment} 2. Nf3 Nc6 3. Bb5 1-0"""
+        },
+        
+        # * inside a variation line is not the game's termination — must not get result styling
+        {
+            "name": "asterisk inside variation not a result",
+            "pgn": """[Event "Test Game"]
+[Site "Test"]
+[Date "2025.01.01"]
+[White "Player1"]
+[Black "Player2"]
+[Result "1-0"]
+
+1. e4 e5 (1. d4 d5 *) 2. Nf3 Nc6 3. Bb5 1-0"""
         },
         
         # Test 14: PGN with result in variation (should NOT be formatted as result)

@@ -12,6 +12,7 @@ from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from app.services.logging_service import LoggingService, init_worker_logging
+from app.services.pgn_formatter_service import PGN_MOVE_RESULT_RE
 from app.utils.concurrency_utils import get_process_pool_max_workers
 
 
@@ -241,9 +242,8 @@ class PgnService:
         # Must not be inside a comment or variation
         move_pattern = re.compile(r'\b([1-9]\d{0,2}|0)\.(?:\.\.| |\w)')
         
-        # Game termination markers: 1-0, 0-1, 1/2-1/2, or *
-        # These must appear at the end of move notation (not in comments/variations)
-        termination_pattern = re.compile(r'\b(1-0|0-1|1/2-1/2|\*)\b')
+        # Game termination markers: 1-0, 0-1, 1/2-1/2, or * (see PGN_MOVE_RESULT_RE)
+        termination_pattern = PGN_MOVE_RESULT_RE
         
         # State tracking
         game_start_line = None

@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 import re
 import unittest
-from app.services.pgn_formatter_service import PgnFormatterService
+from app.services.pgn_formatter_service import PgnFormatterService, PGN_MOVE_RESULT_RE
 
 
 class TestPgnFiltering(unittest.TestCase):
@@ -78,7 +78,7 @@ class TestPgnFiltering(unittest.TestCase):
         self.assertNotIn('e4!', move_notation, "All hidden: No annotations in moves")
         self.assertNotIn('c5?', move_notation, "All hidden: No annotations in moves")
         self.assertNotIn('(', filtered, "All hidden: No variations")
-        result_in_moves = re.search(r'\b(1-0|0-1|1/2-1/2|\*)\b', move_notation)
+        result_in_moves = PGN_MOVE_RESULT_RE.search(move_notation)
         self.assertIsNone(result_in_moves, "All hidden: No results in move notation")
         self.assertIn('1. e4', filtered, "All hidden: Moves preserved")
 
@@ -164,7 +164,7 @@ class TestPgnFiltering(unittest.TestCase):
         move_notation = filtered
         for match in list(metadata_pattern.finditer(move_notation))[::-1]:
             move_notation = move_notation[:match.start()] + move_notation[match.end():]
-        result_in_moves = re.search(r'\b(1-0|0-1|1/2-1/2|\*)\b', move_notation)
+        result_in_moves = PGN_MOVE_RESULT_RE.search(move_notation)
         self.assertIsNone(result_in_moves, "Results hidden: No results in move notation")
         self._assert_metadata_preserved(filtered, self.TEST_PGN, "Results hidden")
 
@@ -291,7 +291,7 @@ class TestPgnFiltering(unittest.TestCase):
                     move_notation = filtered
                     for match in list(metadata_pattern.finditer(move_notation))[::-1]:
                         move_notation = move_notation[:match.start()] + move_notation[match.end():]
-                    result_in_moves = re.search(r'\b(1-0|0-1|1/2-1/2|\*)\b', move_notation)
+                    result_in_moves = PGN_MOVE_RESULT_RE.search(move_notation)
                     self.assertIsNone(result_in_moves, f"Systematic: {description} - Results hidden from moves")
 
 

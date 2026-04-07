@@ -30,6 +30,12 @@ def make_comment_sentinel(ply: int) -> str:
     return PGN_COMMENT_SENTINEL_PREFIX + (_PLY_SENTINEL_ZERO_WIDTH * ply) + PGN_COMMENT_SENTINEL_SUFFIX
 
 
+# Game outcomes in move text: 1-0 / 0-1 / 1/2-1/2 use word boundaries. "*" is not a word character,
+# so patterns like \b*\b never match a lone asterisk (unfinished / undecided game per PGN spec).
+PGN_MOVE_RESULT_RE = re.compile(
+    r"(?:\b(?:1-0|0-1|1/2-1/2)\b|(?<!\S)\*(?=[\s<]|$))"
+)
+
 # Same SAN pattern as main-line move formatting (must stay in sync).
 PGN_MAINLINE_SAN_PATTERN = re.compile(
     r"\b("
@@ -1093,11 +1099,9 @@ class PgnFormatterService:
             
             if in_move_notation:
                 # Only remove results from move notation (excluding metadata tags)
-                # Pattern to match results: 1-0, 0-1, 1/2-1/2, *
-                # Use word boundaries to avoid matching within tags
-                result_pattern = re.compile(r'\b(1-0|0-1|1/2-1/2|\*)\b')
+                # Pattern to match results: 1-0, 0-1, 1/2-1/2, * (see PGN_MOVE_RESULT_RE)
                 filtered_line = PgnFormatterService._apply_regex_excluding_metadata(
-                    line, result_pattern, ''
+                    line, PGN_MOVE_RESULT_RE, ''
                 )
                 result_lines.append(filtered_line)
             else:
@@ -1275,7 +1279,7 @@ class PgnFormatterService:
             if formatted[i] == '[':
                 # Check if this is the start of a header [Key "Value"]
                 # Headers are in format [Key "Value"] where Key starts with a letter
-                header_match = re.match(r'\[([A-Za-z][A-Za-z0-9]*)\s+"([^"]+)"\]', formatted[i:])
+                header_match = re.match(r'\[([A-Za-z][A-Za-z0-9]*)\s+"([^"]*)"\]', formatted[i:])
                 if header_match:
                     # Found a header - copy it as-is without processing NAGs
                     header_end = i + header_match.end()
@@ -1337,7 +1341,7 @@ class PgnFormatterService:
         # Process headers - find them and wrap entire header in span
         # Headers must match the pattern: [Key "Value"] (with quotes around the value)
         # This excludes Lichess-style annotations like [%eval 21,29] or [%wdl 31,964,5]
-        header_pattern = re.compile(r'\[([A-Za-z][A-Za-z0-9]*)\s+"([^"]+)"\]')
+        header_pattern = re.compile(r'\[([A-Za-z][A-Za-z0-9]*)\s+"([^"]*)"\]')
         result_parts = []
         i = 0
         while i < len(formatted):
@@ -1899,7 +1903,6 @@ class PgnFormatterService:
         result_color = results_config.get('color', [255, 255, 100])
         result_bold = results_config.get('bold', True)
         
-        result_pattern = re.compile(r'\b(1-0|0-1|1/2-1/2|\*)\b')
         result_parts = []
         i = 0
         in_tag = False
@@ -1958,7 +1961,7 @@ class PgnFormatterService:
                 i += 1
             elif not in_tag and not in_header_span and not (True in span_stack):
                 # Only format results if we're not in a variation context (check stack)
-                match = result_pattern.match(formatted, i)
+                match = PGN_MOVE_RESULT_RE.match(formatted, i)
                 if match:
                     result_formatted = span(match.group(0), result_color, result_bold)
                     result_parts.append(result_formatted)
@@ -2345,6 +2348,14 @@ class PgnFormatterService:
                         result_parts.append(trailing_whitespace)
                     
                     i = match.end()
+                    continue
+                
+                # Undecided-game marker * in variation must stay variation-styled so the result pass
+                # (which runs after moves are wrapped in spans) does not see bare * between spans.
+                mres = PGN_MOVE_RESULT_RE.match(text, i)
+                if mres and mres.group(0) == '*':
+                    result_parts.append(span_func('*', variation_color, italic=variation_italic))
+                    i = mres.end()
                     continue
                 
                 # Not a match - preserve the character (could be NAG text, punctuation, etc.)
