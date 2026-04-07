@@ -1403,6 +1403,10 @@ class DatabaseController:
             
             # Get application version from config
             app_version = self.config.get("version", "2.4.0")
+            chesscom_import_config = self.config.get("online_import", {}).get("chesscom", {})
+            chesscom_request_delay_seconds = float(chesscom_import_config.get("request_delay_seconds", 0.0))
+            chesscom_request_delay_onerror_seconds = float(chesscom_import_config.get("request_delay_onerror_seconds", 0.0))
+            chesscom_request_retry_limit = int(chesscom_import_config.get("request_retry_limit", 0))
             
             # Log online import started
             logging_service = LoggingService.get_instance()
@@ -1430,7 +1434,10 @@ class DatabaseController:
                     since_date=since_date,
                     until_date=until_date,
                     progress_callback=progress_callback,
-                    version=app_version
+                    version=app_version,
+                    request_delay_seconds=chesscom_request_delay_seconds,
+                    request_delay_onerror_seconds=chesscom_request_delay_onerror_seconds,
+                    request_retry_limit=chesscom_request_retry_limit
                 )
             else:
                 progress_service.hide_progress()

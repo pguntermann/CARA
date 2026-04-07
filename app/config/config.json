@@ -5770,6 +5770,13 @@
       "reserved_cores": 2
     }
   },
+  "online_import": {
+    "chesscom": {
+      "request_delay_seconds": 0.25,
+      "request_delay_onerror_seconds": 1.5,
+      "request_retry_limit": 3
+    }
+  },
   "logging": {
     "console": {
       "enabled": true,

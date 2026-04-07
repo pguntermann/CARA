@@ -5,6 +5,7 @@ from typing import Optional, List, Dict, Any, Tuple, Callable
 from datetime import datetime, timedelta
 from io import StringIO
 import json
+import time
 from app.services.logging_service import LoggingService
 
 
@@ -40,6 +41,116 @@ class OnlineImportService:
             "User-Agent": f"CARA/{version}",
             "Accept": "application/json, application/x-ndjson"
         }
+
+    @staticmethod
+    def _sleep_with_progress(
+        seconds: float,
+        progress_callback: Optional[Callable[[str, int], None]],
+        status_message: str,
+        progress_percent: int
+    ) -> None:
+        """Sleep while keeping the UI responsive via progress_callback."""
+        if seconds <= 0:
+            return
+        try:
+            LoggingService.get_instance().debug(f"Online import: waiting {seconds:.3f}s ({status_message})")
+        except Exception:
+            pass
+        end_time = time.monotonic() + seconds
+        # Sleep in small chunks so the callback can pump the Qt event loop.
+        while True:
+            remaining = end_time - time.monotonic()
+            if remaining <= 0:
+                break
+            if progress_callback:
+                progress_callback(status_message, progress_percent)
+            time.sleep(min(0.1, remaining))
+
+    @staticmethod
+    def _is_retryable_chesscom_error(exc: requests.exceptions.RequestException) -> bool:
+        """Return True if we should retry this Chess.com request."""
+        response = getattr(exc, "response", None)
+        if response is not None:
+            status = getattr(response, "status_code", None)
+            if status == 429:
+                return True
+            if isinstance(status, int) and status >= 500:
+                return True
+            return False
+        # Network-level issues where retry is reasonable
+        return isinstance(exc, (requests.exceptions.Timeout, requests.exceptions.ConnectionError))
+
+    @staticmethod
+    def _chesscom_get_with_retry(
+        url: str,
+        *,
+        headers: Dict[str, str],
+        timeout: int,
+        progress_callback: Optional[Callable[[str, int], None]],
+        progress_percent: int,
+        status_message: str,
+        request_delay_seconds: float,
+        request_delay_onerror_seconds: float,
+        request_retry_limit: int
+    ) -> requests.Response:
+        """GET a Chess.com URL with configurable delay and retry-on-error."""
+        if request_retry_limit < 0:
+            request_retry_limit = 0
+
+        logging_service = LoggingService.get_instance()
+        last_exc: Optional[requests.exceptions.RequestException] = None
+        max_attempts = 1 + request_retry_limit
+        for attempt in range(1, max_attempts + 1):
+            logging_service.debug(
+                f"Chess.com API call: GET {url} "
+                f"(attempt {attempt}/{max_attempts}), "
+                f"base_delay={request_delay_seconds:.3f}s, timeout={timeout}s"
+            )
+            OnlineImportService._sleep_with_progress(
+                request_delay_seconds,
+                progress_callback,
+                status_message=status_message,
+                progress_percent=progress_percent
+            )
+            try:
+                response = requests.get(url, headers=headers, timeout=timeout)
+                logging_service.debug(f"Chess.com API response: GET {url} -> HTTP {response.status_code}")
+                response.raise_for_status()
+                return response
+            except requests.exceptions.RequestException as e:
+                last_exc = e
+                status_code = getattr(getattr(e, "response", None), "status_code", None)
+                logging_service.debug(
+                    f"Chess.com API error: GET {url} failed "
+                    f"(http_status={status_code}, retryable={OnlineImportService._is_retryable_chesscom_error(e)}): "
+                    f"{str(e)}"
+                )
+                if not OnlineImportService._is_retryable_chesscom_error(e):
+                    raise
+
+                # Retry if we still have attempts left.
+                if attempt >= max_attempts:
+                    break
+
+                status = None
+                if getattr(e, "response", None) is not None:
+                    status = getattr(e.response, "status_code", None)
+                status_str = f"HTTP {status}" if status else "network error"
+                logging_service.debug(
+                    f"Chess.com API retry wait: {status_str} before next attempt "
+                    f"(delay_onerror={request_delay_onerror_seconds:.3f}s, attempt={attempt}/{max_attempts})"
+                )
+                OnlineImportService._sleep_with_progress(
+                    request_delay_onerror_seconds,
+                    progress_callback,
+                    status_message=f"Chess.com request failed ({status_str}). Waiting to retry ({attempt}/{max_attempts - 1})...",
+                    progress_percent=progress_percent
+                )
+
+        # Exhausted retries
+        if last_exc is not None:
+            raise last_exc
+        raise requests.exceptions.RequestException("Chess.com request failed")
     
     @staticmethod
     def import_lichess_games(
@@ -103,6 +214,7 @@ class OnlineImportService:
             filter_str += f", perf_type={perf_type}" if perf_type else ""
             logging_service.info(f"Lichess API call: username={username}{filter_str}")
             
+            logging_service.debug(f"Lichess API call: GET {url} params={params}")
             response = requests.get(
                 url,
                 params=params,
@@ -110,6 +222,7 @@ class OnlineImportService:
                 stream=True,
                 timeout=30
             )
+            logging_service.debug(f"Lichess API response: GET {url} -> HTTP {response.status_code}")
             response.raise_for_status()
             
             # Read NDJSON response (newline-delimited JSON)
@@ -156,6 +269,14 @@ class OnlineImportService:
             return (True, f"Successfully imported {len(pgn_list)} game(s) from Lichess", pgn_list)
             
         except requests.exceptions.RequestException as e:
+            try:
+                status_code = getattr(getattr(e, "response", None), "status_code", None)
+                LoggingService.get_instance().debug(
+                    f"Lichess API error: GET {OnlineImportService.LICHESS_GAMES_ENDPOINT}/{username} failed "
+                    f"(http_status={status_code}): {str(e)}"
+                )
+            except Exception:
+                pass
             error_msg = f"Error connecting to Lichess API: {str(e)}"
             if hasattr(e, 'response') and e.response is not None:
                 status_code = e.response.status_code
@@ -182,7 +303,10 @@ class OnlineImportService:
         since_date: Optional[datetime] = None,
         until_date: Optional[datetime] = None,
         progress_callback: Optional[Callable[[str, int], None]] = None,
-        version: str = "2.4.0"
+        version: str = "2.4.0",
+        request_delay_seconds: float = 0.0,
+        request_delay_onerror_seconds: float = 0.0,
+        request_retry_limit: int = 0
     ) -> Tuple[bool, str, List[str]]:
         """Import games from Chess.com.
         
@@ -215,12 +339,24 @@ class OnlineImportService:
             filter_str += f", until={until_date}" if until_date else ""
             logging_service.info(f"Chess.com API call: username={username}{filter_str}")
             
-            archives_response = requests.get(
-                archives_url,
-                headers=OnlineImportService._get_headers(version),
-                timeout=30
-            )
-            archives_response.raise_for_status()
+            try:
+                archives_response = OnlineImportService._chesscom_get_with_retry(
+                    archives_url,
+                    headers=OnlineImportService._get_headers(version),
+                    timeout=30,
+                    progress_callback=progress_callback,
+                    progress_percent=5,
+                    status_message=f"Fetching archive list for user '{username}'...",
+                    request_delay_seconds=request_delay_seconds,
+                    request_delay_onerror_seconds=request_delay_onerror_seconds,
+                    request_retry_limit=request_retry_limit
+                )
+            except requests.exceptions.RequestException as e:
+                # Surface a clear error if we exceeded retries.
+                status_code = getattr(getattr(e, "response", None), "status_code", None)
+                if status_code == 429:
+                    return (False, f"Chess.com rate limit exceeded (HTTP 429). Retried {request_retry_limit} time(s); please try again later.", [])
+                return (False, f"Error connecting to Chess.com API: {str(e)}", [])
             
             archives_data = archives_response.json()
             if "archives" not in archives_data:
@@ -279,12 +415,17 @@ class OnlineImportService:
                     progress_callback(f"Fetching archive {idx + 1}/{total_archives} (found {games_imported} games so far)...", progress)
                 
                 try:
-                    archive_response = requests.get(
+                    archive_response = OnlineImportService._chesscom_get_with_retry(
                         archive_url,
                         headers=OnlineImportService._get_headers(version),
-                        timeout=60  # Increased timeout for large archives
+                        timeout=60,  # Increased timeout for large archives
+                        progress_callback=progress_callback,
+                        progress_percent=progress if progress_callback else 10,
+                        status_message=f"Fetching archive {idx + 1}/{total_archives} (found {games_imported} games so far)...",
+                        request_delay_seconds=request_delay_seconds,
+                        request_delay_onerror_seconds=request_delay_onerror_seconds,
+                        request_retry_limit=request_retry_limit
                     )
-                    archive_response.raise_for_status()
                     
                     # Process events after fetching archive to keep UI responsive
                     if progress_callback:
@@ -366,13 +507,11 @@ class OnlineImportService:
                                     progress_callback(f"Imported {games_imported} game(s) from archive {idx + 1}/{total_archives}...", progress)
                 
                 except requests.exceptions.RequestException as e:
-                    # Log but continue with other archives
-                    logging_service = LoggingService.get_instance()
-                    logging_service.warning(f"Error fetching archive {archive_url}: {e}", exc_info=e)
-                    if progress_callback:
-                        progress_callback(f"Warning: Error fetching archive {idx + 1}/{total_archives}, continuing...", 
-                                        min(90, 10 + int((idx / total_archives) * 70)))
-                    continue
+                    status_code = getattr(getattr(e, "response", None), "status_code", None)
+                    if status_code == 429:
+                        return (False, f"Chess.com rate limit exceeded (HTTP 429) while fetching archive {idx + 1}/{total_archives}. Retried {request_retry_limit} time(s); please try again later.", [])
+                    error_msg = f"Error fetching Chess.com archive {idx + 1}/{total_archives}: {e}"
+                    return (False, error_msg, [])
                 except Exception as e:
                     logging_service = LoggingService.get_instance()
                     logging_service.warning(f"Error processing archive {archive_url}: {e}", exc_info=e)
