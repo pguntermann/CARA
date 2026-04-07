@@ -10,7 +10,10 @@ from typing import Callable, Dict, Optional
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QMenu
 
-from app.services.player_stats_activity_heatmap_user import CHOICES_COLOR_SCALE_MAX_FIXED
+from app.services.player_stats_activity_heatmap_user import (
+    CHOICES_COLOR_SCALE_MAX_FIXED,
+    VALID_MONTH_DIVIDER_MODE,
+)
 from app.services.user_settings_service import UserSettingsService
 
 PLAYER_STATS_ACTIVITY_HEATMAP_CONTEXT_SECTIONS: frozenset[str] = frozenset({"Activity heatmap"})
@@ -29,6 +32,7 @@ class PlayerStatsActivityHeatmapMenuController:
         self._scale_fixed: Dict[int, QAction] = {}
         self._partial: Dict[str, QAction] = {}
         self._date_range: Dict[str, QAction] = {}
+        self._month_divider: Dict[str, QAction] = {}
 
     def attach_to_parent_menu(self, parent_menu: QMenu) -> QMenu:
         """Add "Activity heatmap settings" under ``parent_menu`` (menu bar); build once."""
@@ -98,6 +102,16 @@ class PlayerStatsActivityHeatmapMenuController:
             act.setMenuRole(QAction.MenuRole.NoRole)
             act.triggered.connect(lambda _c=False, k=key: self._on_date_range(k))
             self._date_range[key] = act
+        for key, label in (
+            ("week_anchor", "Week-aligned"),
+            ("calendar_mesh", "Calendar grid"),
+            ("off", "Off"),
+        ):
+            act = QAction(label, p)
+            act.setCheckable(True)
+            act.setMenuRole(QAction.MenuRole.NoRole)
+            act.triggered.connect(lambda _c=False, k=key: self._on_month_divider(k))
+            self._month_divider[key] = act
 
     def _populate_tree(self, root: QMenu) -> None:
         mw = root.addMenu("Week starts on")
@@ -126,6 +140,11 @@ class PlayerStatsActivityHeatmapMenuController:
         mr.addAction(self._date_range["trim_to_data"])
         mr.addAction(self._date_range["rolling_12_months"])
         mr.addAction(self._date_range["rolling_24_months"])
+        mm = root.addMenu("Dividers")
+        self._style(mm)
+        mm.addAction(self._month_divider["week_anchor"])
+        mm.addAction(self._month_divider["calendar_mesh"])
+        mm.addAction(self._month_divider["off"])
 
     def sync_from_settings(self) -> None:
         if not self._week_start:
@@ -160,6 +179,13 @@ class PlayerStatsActivityHeatmapMenuController:
         for k, a in self._date_range.items():
             a.blockSignals(True)
             a.setChecked(k == dr)
+            a.blockSignals(False)
+        md = str(s.get("month_divider_mode", "week_anchor"))
+        if md not in VALID_MONTH_DIVIDER_MODE:
+            md = "week_anchor"
+        for k, a in self._month_divider.items():
+            a.blockSignals(True)
+            a.setChecked(k == md)
             a.blockSignals(False)
 
     def _on_week_start(self, key: str) -> None:
@@ -203,4 +229,13 @@ class PlayerStatsActivityHeatmapMenuController:
             a.setChecked(k == key)
             a.blockSignals(False)
         UserSettingsService.get_instance().update_player_stats_activity_heatmap({"date_range": key})
+
+    def _on_month_divider(self, key: str) -> None:
+        for k, a in self._month_divider.items():
+            a.blockSignals(True)
+            a.setChecked(k == key)
+            a.blockSignals(False)
+        UserSettingsService.get_instance().update_player_stats_activity_heatmap(
+            {"month_divider_mode": key}
+        )
 

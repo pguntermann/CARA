@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
 
-from PyQt6.QtCore import QRect, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QPointF, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import QSizePolicy, QWidget
 
@@ -52,6 +52,13 @@ def _lerp_rgb(
         int(a[1] + (b[1] - a[1]) * t),
         int(a[2] + (b[2] - a[2]) * t),
     )
+
+
+def _month_key(o: int) -> Optional[Tuple[int, int]]:
+    if o < 0:
+        return None
+    d = date.fromordinal(int(o))
+    return (d.year, d.month)
 
 
 def _color_for_count(
@@ -302,14 +309,21 @@ class PlayerActivityHeatmapWidget(QWidget):
         y_top: int,
         y_bottom: int,
         cfg: Dict[str, Any],
+        *,
+        month_divider_mode: str,
     ) -> None:
         wcol = tuple(cfg.get("week_divider_color", [72, 72, 80]))
         wwid = max(0, int(cfg.get("week_divider_line_width", 1)))
         mcol = tuple(cfg.get("month_divider_color", [120, 120, 135]))
         mwid = max(wwid, int(cfg.get("month_divider_line_width", 2)))
-        month_set = frozenset(b.month_start_columns)
-        if wwid <= 0 and mwid <= 0:
-            return
+        use_week_anchor_month = month_divider_mode == "week_anchor"
+        month_set = frozenset(b.month_start_columns) if use_week_anchor_month else frozenset()
+        if use_week_anchor_month:
+            if wwid <= 0 and mwid <= 0:
+                return
+        else:
+            if wwid <= 0:
+                return
         for c in range(1, b.n_cols):
             x = grid_ox + c * (cs + gap) - gap / 2.0
             is_month = c in month_set
@@ -324,6 +338,81 @@ class PlayerActivityHeatmapWidget(QWidget):
             p.setPen(pen)
             p.drawLine(int(x), int(y_top), int(x), int(y_bottom))
 
+    def _paint_calendar_month_boundaries(
+        self,
+        p: QPainter,
+        b: ActivityHeatmapGridBand,
+        grid_ox: int,
+        cs: int,
+        gap: int,
+        row_cell_y: List[int],
+        heatmap_cfg: Dict[str, Any],
+    ) -> None:
+        raw = heatmap_cfg.get("month_calendar_boundary")
+        mcb: Dict[str, Any] = raw if isinstance(raw, dict) else {}
+        rgb = tuple(mcb.get("line_color", [120, 120, 135]))
+        lw = max(1, int(mcb.get("line_width", 2)))
+        op = float(mcb.get("opacity", 1.0))
+        op = max(0.0, min(1.0, op))
+        c = QColor(*rgb)
+        c.setAlpha(int(round(255 * op)))
+        pen = QPen(c)
+        pen.setWidth(lw)
+        # Square caps so segment extensions meet cleanly at corners (avoids tiny gaps).
+        pen.setCapStyle(Qt.PenCapStyle.SquareCap)
+        style = str(mcb.get("line_style", "solid")).strip().lower()
+        if style == "dash":
+            pen.setStyle(Qt.PenStyle.CustomDashLine)
+            dp = mcb.get("dash_pattern", [4, 3])
+            if isinstance(dp, (list, tuple)) and len(dp) >= 2:
+                pen.setDashPattern([float(x) for x in dp])
+            else:
+                pen.setStyle(Qt.PenStyle.DashLine)
+        else:
+            pen.setStyle(Qt.PenStyle.SolidLine)
+        p.setPen(pen)
+
+        co = b.cell_ordinals
+        if not co or len(co) != b.n_rows:
+            return
+
+        # Slight extension so orthogonal segments overlap at corners (no 1px holes).
+        ext = 0.75
+
+        for r in range(b.n_rows):
+            if r >= len(row_cell_y):
+                break
+            row_o = co[r]
+            y0 = float(row_cell_y[r])
+            y1 = y0 + float(cs)
+            for c in range(b.n_cols):
+                if c >= len(row_o):
+                    break
+                o0 = row_o[c]
+                m0 = _month_key(o0) if o0 >= 0 else None
+                # Vertical edge between (r,c) and (r,c+1)
+                if c + 1 < b.n_cols and c + 1 < len(row_o):
+                    o1 = row_o[c + 1]
+                    m1 = _month_key(o1) if o1 >= 0 else None
+                    if m0 and m1 and m0 != m1:
+                        vx = float(grid_ox + c * (cs + gap) + cs + gap / 2.0)
+                        p.drawLine(
+                            QPointF(vx, y0 - ext),
+                            QPointF(vx, y1 + ext),
+                        )
+                # Horizontal edge between (r,c) and (r+1,c)
+                if r + 1 < len(co) and c < len(co[r + 1]):
+                    o2 = co[r + 1][c]
+                    m2 = _month_key(o2) if o2 >= 0 else None
+                    if m0 and m2 and m0 != m2:
+                        hy = y0 + float(cs) + float(gap) / 2.0
+                        x0 = float(grid_ox + c * (cs + gap))
+                        x1 = x0 + float(cs)
+                        p.drawLine(
+                            QPointF(x0 - ext, hy),
+                            QPointF(x1 + ext, hy),
+                        )
+
     def paintEvent(self, event) -> None:
         del event
         cfg = self._heatmap_config()
@@ -335,6 +424,12 @@ class PlayerActivityHeatmapWidget(QWidget):
             .get_model()
             .get_player_stats_activity_heatmap()
         )
+        month_divider_mode = str(usr.get("month_divider_mode", "week_anchor")).strip().lower()
+        if month_divider_mode not in ("week_anchor", "calendar_mesh", "off"):
+            month_divider_mode = "week_anchor"
+        raw_mcb = cfg.get("month_calendar_boundary")
+        mcb_cfg: Dict[str, Any] = raw_mcb if isinstance(raw_mcb, dict) else {}
+        calendar_mesh_above_cells = bool(mcb_cfg.get("draw_above_cells", True))
         preset = str(usr.get("color_preset", "github_green"))
         date_range = str(usr.get("date_range", "trim_to_data"))
         show_day_numbers_in_cells = date_range == "trim_to_data"
@@ -395,6 +490,15 @@ class PlayerActivityHeatmapWidget(QWidget):
                         int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter),
                         text,
                     )
+
+            if (
+                month_divider_mode == "calendar_mesh"
+                and row_cell_y
+                and not calendar_mesh_above_cells
+            ):
+                self._paint_calendar_month_boundaries(
+                    p, gb, grid_ox, cs, gap, row_cell_y, cfg
+                )
 
             pen_empty = QPen(QColor(*border))
             pen_empty.setWidth(1)
@@ -458,7 +562,26 @@ class PlayerActivityHeatmapWidget(QWidget):
             if gb.n_cols > 1 and row_cell_y:
                 y0 = row_cell_y[0]
                 y1 = row_cell_y[-1] + cs
-                self._paint_week_dividers(p, gb, grid_ox, cs, gap, y0, y1, cfg)
+                self._paint_week_dividers(
+                    p,
+                    gb,
+                    grid_ox,
+                    cs,
+                    gap,
+                    y0,
+                    y1,
+                    cfg,
+                    month_divider_mode=month_divider_mode,
+                )
+
+            if (
+                month_divider_mode == "calendar_mesh"
+                and row_cell_y
+                and calendar_mesh_above_cells
+            ):
+                self._paint_calendar_month_boundaries(
+                    p, gb, grid_ox, cs, gap, row_cell_y, cfg
+                )
 
         p.end()
 

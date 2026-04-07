@@ -979,6 +979,7 @@
     "progression_line_smooth_strength": 1.0
   },
   "player_stats_activity_heatmap": {
+    "month_divider_mode": "week_anchor",
     "week_starts_on": "sunday",
     "color_preset": "github_green",
     "color_scale_max_mode": "auto",

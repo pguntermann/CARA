@@ -246,6 +246,14 @@ def build_activity_heatmap_paint_model(
     else:
         sub_parts.append("dates: partial stand-ins included")
 
+    md = str(usr.get("month_divider_mode", "week_anchor")).strip().lower()
+    if md == "calendar_mesh":
+        sub_parts.append("month lines: calendar grid")
+    elif md == "off":
+        sub_parts.append("month lines: off")
+    else:
+        sub_parts.append("month lines: week-aligned")
+
     bands_t: Tuple[ActivityHeatmapGridBand, ...]
     layout_style: str
 

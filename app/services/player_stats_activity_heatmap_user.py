@@ -11,6 +11,9 @@ DEFAULT_PLAYER_STATS_ACTIVITY_HEATMAP: Dict[str, Any] = {
     "color_scale_max_fixed": 5,
     "partial_dates": "include_stand_in",
     "date_range": "trim_to_data",
+    # month dividers: week_anchor = legacy verticals; calendar_mesh = edges along cell grid;
+    # off = no month emphasis (week dividers only).
+    "month_divider_mode": "week_anchor",
 }
 
 VALID_WEEK_START: frozenset = frozenset({"monday", "sunday"})
@@ -19,6 +22,9 @@ VALID_SCALE_MAX_MODE: frozenset = frozenset({"auto", "fixed"})
 VALID_PARTIAL_DATES: frozenset = frozenset({"exclude", "include_stand_in"})
 VALID_DATE_RANGE: frozenset = frozenset(
     {"trim_to_data", "rolling_12_months", "rolling_24_months"}
+)
+VALID_MONTH_DIVIDER_MODE: frozenset = frozenset(
+    {"week_anchor", "calendar_mesh", "off"}
 )
 
 CHOICES_COLOR_SCALE_MAX_FIXED: tuple = (3, 5, 8, 10, 15, 20)
@@ -55,4 +61,7 @@ def normalize_player_stats_activity_heatmap_settings(
     dr = str(raw.get("date_range", "")).strip().lower()
     if dr in VALID_DATE_RANGE:
         out["date_range"] = dr
+    md = str(raw.get("month_divider_mode", "")).strip().lower()
+    if md in VALID_MONTH_DIVIDER_MODE:
+        out["month_divider_mode"] = md
     return out

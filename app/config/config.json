@@ -1934,6 +1934,21 @@
               135
             ],
             "month_divider_line_width": 2,
+            "month_calendar_boundary": {
+              "line_color": [
+                120,
+                120,
+                135
+              ],
+              "line_width": 2,
+              "line_style": "solid",
+              "dash_pattern": [
+                4,
+                3
+              ],
+              "opacity": 1.0,
+              "draw_above_cells": true
+            },
             "day_number_min_cell_size": 10,
             "day_number_text_color": [
               130,
