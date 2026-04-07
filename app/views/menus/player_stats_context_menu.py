@@ -21,15 +21,9 @@ def build_player_stats_context_menu(
 ) -> QMenu:
     menu = QMenu(view)
 
-    ui_config = view.config.get("ui", {})
-    panel_config = ui_config.get("panels", {}).get("detail", {})
-    player_stats_config = panel_config.get("player_stats", {})
-    colors_config = player_stats_config.get("colors", {})
-    bg_color = colors_config.get("background", [40, 40, 45])
-
     from app.views.style import StyleManager
 
-    StyleManager.style_context_menu(menu, view.config, bg_color)
+    StyleManager.style_context_menu(menu, view.config)
 
     if section_name:
         copy_section_action = menu.addAction("Copy section to clipboard")

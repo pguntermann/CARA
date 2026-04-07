@@ -274,10 +274,7 @@ class DetailMetadataView(QWidget):
             return
 
         menu = QMenu(self)
-        ui_config = self.config.get("ui", {})
-        metadata_config = ui_config.get("panels", {}).get("detail", {}).get("metadata", {})
-        bg_color = metadata_config.get("background_color", [40, 40, 45])
-        StyleManager.style_context_menu(menu, self.config, bg_color)
+        StyleManager.style_context_menu(menu, self.config)
 
         copy_value_action = menu.addAction("Copy value")
         copy_value_action.triggered.connect(lambda: self._copy_metadata_cell_value(index))

@@ -43,8 +43,8 @@ class MessageLabel(QLabel):
         menu.addAction(copy_action)
         if self._parent_view and getattr(self._parent_view, "config", None) is not None:
             from app.views.style import StyleManager
-            bg_color = getattr(self._parent_view, "background_color", [40, 40, 45])
-            StyleManager.style_context_menu(menu, self._parent_view.config, bg_color)
+
+            StyleManager.style_context_menu(menu, self._parent_view.config)
         menu.exec(event.globalPosition().toPoint() if hasattr(event, "globalPosition") else event.globalPos())
         event.accept()
 

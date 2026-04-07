@@ -2145,17 +2145,10 @@ class DetailSummaryView(QWidget):
         
         # Create context menu
         menu = QMenu(self)
-        
-        # Get config for styling
-        ui_config = self.config.get('ui', {})
-        panel_config = ui_config.get('panels', {}).get('detail', {})
-        summary_config = panel_config.get('summary', {})
-        colors_config = summary_config.get('colors', {})
-        bg_color = colors_config.get('background', [40, 40, 45])
-        
-        # Style the menu
+
         from app.views.style import StyleManager
-        StyleManager.style_context_menu(menu, self.config, bg_color)
+
+        StyleManager.style_context_menu(menu, self.config)
         
         # Add actions
         if section_name:

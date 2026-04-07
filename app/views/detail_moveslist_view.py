@@ -443,10 +443,7 @@ class DetailMovesListView(QWidget):
             return
 
         menu = QMenu(self)
-        ui_config = self.config.get("ui", {})
-        tabs_config = ui_config.get("panels", {}).get("detail", {}).get("tabs", {})
-        bg_color = tabs_config.get("pane_background", [40, 40, 45])
-        StyleManager.style_context_menu(menu, self.config, bg_color)
+        StyleManager.style_context_menu(menu, self.config)
 
         copy_value_action = menu.addAction("Copy value")
         copy_value_action.triggered.connect(lambda: self._copy_cell_value(index))

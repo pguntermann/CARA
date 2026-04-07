@@ -2088,10 +2088,7 @@ class DetailManualAnalysisView(QWidget):
         can_copy_one = line_at_cursor is not None and bool(line_at_cursor.pv and line_at_cursor.pv.strip())
 
         menu = QMenu(self)
-        ui_config = self.config.get("ui", {})
-        tabs_config = ui_config.get("panels", {}).get("detail", {}).get("tabs", {})
-        pane_bg = tabs_config.get("pane_background", [40, 40, 45])
-        StyleManager.style_context_menu(menu, self.config, pane_bg)
+        StyleManager.style_context_menu(menu, self.config)
 
         copy_line_action = menu.addAction("Copy PV line")
         copy_line_action.setEnabled(can_copy_one)

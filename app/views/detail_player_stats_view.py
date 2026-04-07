@@ -6492,12 +6492,7 @@ class DetailPlayerStatsView(QWidget):
         from app.views.style import StyleManager
 
         def _style_ts_submenu(m: QMenu) -> None:
-            ui_config = self.config.get("ui", {})
-            panel_config = ui_config.get("panels", {}).get("detail", {})
-            ps_cfg = panel_config.get("player_stats", {})
-            colors_config = ps_cfg.get("colors", {})
-            bg_color = colors_config.get("background", [40, 40, 45])
-            StyleManager.style_context_menu(m, self.config, bg_color)
+            StyleManager.style_context_menu(m, self.config)
 
         self._ps_ts_context_menu_controller = PlayerStatsTimeSeriesMenuController(self, _style_ts_submenu)
 
@@ -6510,12 +6505,7 @@ class DetailPlayerStatsView(QWidget):
         from app.views.style import StyleManager
 
         def _style_ah_submenu(m: QMenu) -> None:
-            ui_config = self.config.get("ui", {})
-            panel_config = ui_config.get("panels", {}).get("detail", {})
-            ps_cfg = panel_config.get("player_stats", {})
-            colors_config = ps_cfg.get("colors", {})
-            bg_color = colors_config.get("background", [40, 40, 45])
-            StyleManager.style_context_menu(m, self.config, bg_color)
+            StyleManager.style_context_menu(m, self.config)
 
         self._ps_ah_context_menu_controller = PlayerStatsActivityHeatmapMenuController(
             self, _style_ah_submenu
@@ -6530,12 +6520,7 @@ class DetailPlayerStatsView(QWidget):
         from app.views.style import StyleManager
 
         def _style_ad_submenu(m: QMenu) -> None:
-            ui_config = self.config.get("ui", {})
-            panel_config = ui_config.get("panels", {}).get("detail", {})
-            ps_cfg = panel_config.get("player_stats", {})
-            colors_config = ps_cfg.get("colors", {})
-            bg_color = colors_config.get("background", [40, 40, 45])
-            StyleManager.style_context_menu(m, self.config, bg_color)
+            StyleManager.style_context_menu(m, self.config)
 
         self._ps_ad_context_menu_controller = PlayerStatsAccuracyDistributionMenuController(
             self, _style_ad_submenu
