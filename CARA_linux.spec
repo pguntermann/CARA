@@ -3,6 +3,8 @@
 # Build from repo root, e.g.: pyinstaller CARA_linux.spec
 # For a desktop icon, ship a .desktop file pointing at dist/CARA/CARA and a PNG.
 
+import os
+
 a = Analysis(
     ['cara.py'],
     pathex=[],
@@ -28,6 +30,23 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+
+# Do not ship libxkbcommon*: Qt/xcb loads the distro's libxcb-xkb and libxkbcommon-x11.
+# A PyInstaller-bundled libxkbcommon often mismatches them (SIGSEGV in
+# xkb_state_key_get_layout), seen e.g. on openSUSE Tumbleweed.
+def _linux_skip_bundled_xkb_libs(binaries_toc):
+    out = []
+    for entry in binaries_toc:
+        dest = entry[0]
+        base = os.path.basename(dest).lower()
+        if base.startswith(("libxkbcommon.so", "libxkbcommon-x11.so", "libxkbregistry.so")):
+            continue
+        out.append(entry)
+    return out
+
+
+a.binaries = _linux_skip_bundled_xkb_libs(a.binaries)
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
