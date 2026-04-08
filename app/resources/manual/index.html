@@ -65,8 +65,9 @@
                                 <li><a href="#game-information-display">4.3.2 Game Information Display</a></li>
                                 <li><a href="#evaluation-bar">4.3.3 Evaluation Bar</a></li>
                                 <li><a href="#material-widget">4.3.4 Material Widget</a></li>
-                                <li><a href="#turn-indicator">4.3.5 Turn Indicator</a></li>
-                                <li><a href="#positional-heatmap">4.3.6 Positional Heatmap</a></li>
+                                <li><a href="#game-tags-widget">4.3.5 Game Tags Widget</a></li>
+                                <li><a href="#turn-indicator">4.3.6 Turn Indicator</a></li>
+                                <li><a href="#positional-heatmap">4.3.7 Positional Heatmap</a></li>
                             </ul>
                         </li>
                         <li><a href="#database-panel">4.4 Database Panel</a>
@@ -112,10 +113,11 @@
                         <li><a href="#managing-databases">5.3 Managing Databases</a>
                             <ul>
                                 <li><a href="#basic-database-operations">5.3.1 Basic Database Operations</a></li>
-                                <li><a href="#bulk-replace-tags">5.3.2 Bulk Replace Tags</a></li>
-                                <li><a href="#bulk-add-remove-tags">5.3.3 Bulk Add/Remove Tags</a></li>
-                                <li><a href="#bulk-clean-pgn">5.3.4 Bulk Clean PGN</a></li>
-                                <li><a href="#deduplicate-games">5.3.5 Deduplicate Games</a></li>
+                                <li><a href="#game-tagging">5.3.2 Game Tags</a></li>
+                                <li><a href="#bulk-replace-tags">5.3.3 Bulk Replace Tags</a></li>
+                                <li><a href="#bulk-add-remove-tags">5.3.4 Bulk Add/Remove Tags</a></li>
+                                <li><a href="#bulk-clean-pgn">5.3.5 Bulk Clean PGN</a></li>
+                                <li><a href="#deduplicate-games">5.3.6 Deduplicate Games</a></li>
                             </ul>
                         </li>
                         <li><a href="#searching-games">5.4 Searching Games</a>
@@ -133,8 +135,9 @@
                                 <li><a href="#analysis-results">5.5.2 Understanding Analysis Results</a></li>
                                 <li><a href="#brilliant-move-detection">5.5.3 Brilliant Move Detection</a></li>
                                 <li><a href="#analysis-settings">5.5.4 Analysis Settings</a></li>
-                                <li><a href="#cancelling-analysis">5.5.5 Cancelling Analysis</a></li>
-                                <li><a href="#bulk-analysis">5.5.6 Bulk Analysis</a></li>
+                                <li><a href="#auto-tagging">5.5.5 Auto-tagging</a></li>
+                                <li><a href="#cancelling-analysis">5.5.6 Cancelling Analysis</a></li>
+                                <li><a href="#bulk-analysis">5.5.7 Bulk Analysis</a></li>
                             </ul>
                         </li>
                         <li><a href="#manual-analysis-task">5.6 Manual Analysis</a>
@@ -189,17 +192,18 @@
                         <li><a href="#file-menu">6.1 File Menu</a></li>
                         <li><a href="#edit-menu">6.2 Edit Menu</a></li>
                         <li><a href="#board-menu">6.3 Board Menu</a></li>
-                        <li><a href="#pgn-menu">6.4 PGN Menu</a></li>
-                        <li><a href="#moves-list-menu">6.5 Moves List Menu</a></li>
-                        <li><a href="#game-analysis-menu">6.6 Game Analysis Menu</a></li>
-                        <li><a href="#manual-analysis-menu">6.7 Manual Analysis Menu</a></li>
-                        <li><a href="#player-stats-menu">6.8 Player Stats Menu</a></li>
-                        <li><a href="#annotations-menu">6.9 Annotations Menu</a></li>
-                        <li><a href="#engines-menu">6.10 Engines Menu</a></li>
-                        <li><a href="#ai-summary-menu">6.11 AI Summary Menu</a></li>
-                        <li><a href="#notes-menu">6.12 Notes Menu</a></li>
-                        <li><a href="#help-menu">6.13 Help Menu</a></li>
-                        <li><a href="#complete-keyboard-shortcuts">6.14 Complete Keyboard Shortcuts</a></li>
+                        <li><a href="#tags-menu">6.4 Tags Menu</a></li>
+                        <li><a href="#pgn-menu">6.5 PGN Menu</a></li>
+                        <li><a href="#moves-list-menu">6.6 Moves List Menu</a></li>
+                        <li><a href="#game-analysis-menu">6.7 Game Analysis Menu</a></li>
+                        <li><a href="#manual-analysis-menu">6.8 Manual Analysis Menu</a></li>
+                        <li><a href="#player-stats-menu">6.9 Player Stats Menu</a></li>
+                        <li><a href="#annotations-menu">6.10 Annotations Menu</a></li>
+                        <li><a href="#engines-menu">6.11 Engines Menu</a></li>
+                        <li><a href="#ai-summary-menu">6.12 AI Summary Menu</a></li>
+                        <li><a href="#notes-menu">6.13 Notes Menu</a></li>
+                        <li><a href="#help-menu">6.14 Help Menu</a></li>
+                        <li><a href="#complete-keyboard-shortcuts">6.15 Complete Keyboard Shortcuts</a></li>
                     </ul>
                 </li>
                 <li><a href="#advanced-topics">7. Advanced Topics</a>
@@ -603,6 +607,8 @@
                 <img src="screenshots/chessboard.png" alt="CARA Chessboard - Main chessboard interface showing chess pieces, coordinate labels, visual move indicators, evaluation bar on the left side, and material widget in the upper right corner" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
                 <p>Rotate the board 180 degrees using the <code>X</code> key or <span class="menu-item">Board → Rotate Board</span>. Rotation is visual only and does not change the position—FEN notation always represents positions from White's perspective.</p>
+
+                <p><strong>Context menu:</strong> You can also <strong>right-click</strong> on the chessboard to open a context menu with quick access to common actions. These entries mirror the corresponding options from the menu bar.</p>
                 
                 <p>The following visual indicators can be toggled on or off:</p>
                 <ul>
@@ -613,6 +619,7 @@
                     <li><strong>PV2 and PV3 Arrows:</strong> Display alternative candidate moves from MultiPV analysis during manual analysis mode. Toggle with <code>Alt+2</code> / <code>⌥+2</code>, <code>Alt+3</code> / <code>⌥+3</code> or <span class="menu-item">Board → Show Next Best Move (PV2/PV3)</span>.</li>
                     <li><strong>Best Alternative Move Arrow:</strong> Highlights superior moves found after analyzing the game with the Game Analysis function. The arrow appears once analysis has been performed and indicates when the played move was not optimal. Toggle with <code>Alt+A</code> / <code>⌥+A</code> or <span class="menu-item">Board → Show Best Alternative Move</span>.</li>
                     <li><strong>Move Classification Icons:</strong> Small badges on the played move's destination square showing the move assessment (e.g. book move, best move, good move, brilliant, inaccuracy, mistake, miss, blunder). Available once the game has been analyzed. Toggle with <code>Alt+4</code> / <code>⌥+4</code> or <span class="menu-item">Board → Show Move Classification Icons</span>.</li>
+                    <li><strong>Game Tags:</strong> Shows or hides the <a href="#game-tagging">Game Tags widget</a> next to the chessboard. Toggle with <span class="menu-item">Board → Show Game Tags</span>.</li>
                     <li><strong>Positional Heatmap:</strong> Color-coded overlay showing positional factors (weak squares, passed pawns, outposts, piece activity, king safety). Toggle with <code>Alt+H</code> / <code>⌥+H</code> or <span class="menu-item">Board → Show Positional Heat-map</span>.</li>
                 </ul>
                 
@@ -647,10 +654,15 @@
                 </ul>
                 <p>Pieces are displayed using standard chess notation letters: <strong>P</strong> for Pawn, <strong>N</strong> for Knight, <strong>B</strong> for Bishop, <strong>R</strong> for Rook, and <strong>Q</strong> for Queen.</p>
                 
-                <h5 id="turn-indicator">4.3.5 Turn Indicator</h5>
+                <h5 id="game-tags-widget">4.3.5 Game Tags Widget</h5>
+                <p>The <strong>Game Tags widget</strong> is shown next to the chessboard and displays the tags assigned to the active game.</p>
+                <p>To show or hide the widget, use <span class="menu-item">Board → Show Game Tags</span> (see <a href="#board-menu">section 6.3</a>).</p>
+                <img src="screenshots/game_tags_widget.png" alt="CARA Game Tags widget - Board-attached widget showing tags for the active game as bubbles" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="turn-indicator">4.3.6 Turn Indicator</h5>
                 <p>The turn indicator shows which side is to move in the current position. Toggle with <code>Alt+T</code> / <code>⌥+T</code> or <span class="menu-item">Board → Show Turn Indicator</span>.</p>
                 
-                <h5 id="positional-heatmap">4.3.6 Positional Heatmap</h5>
+                <h5 id="positional-heatmap">4.3.7 Positional Heatmap</h5>
                 <p>The positional heatmap is a color-coded overlay that visualizes positional factors for each piece on the chessboard. It helps you quickly identify positional strengths and weaknesses by displaying colored gradients on squares containing pieces.<br>Toggle with <code>Alt+H</code> / <code>⌥+H</code> or <span class="menu-item">Board → Show Positional Heat-map</span>.</p>
                 
                 <img src="screenshots/positional_heatmap.png" alt="CARA Positional Heatmap - Color-coded overlay showing positional factors on the chessboard with green gradients for strong positions and red gradients for weak positions" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
@@ -746,6 +758,7 @@
                             <li><strong>Select all rows</strong> / <strong>Unselect all rows:</strong> Select every row in the table or clear the selection.</li>
                             <li><strong>Invert Selection:</strong> Selected rows become unselected; unselected rows become selected.</li>
                             <li><strong>By column value:</strong> Select rows based on column values, with different matching options.</li>
+                            <li><strong>With this tag / Without this tag:</strong> When you right-click a <a href="#game-tagging">game tag</a> chip in the table, the submenu also offers quick options to select rows that have (or don’t have) that same tag.</li>
                         </ul>
                     </li>
                     <li><strong>Copy table as CSV / Copy table as TSV:</strong> Copy the entire table to the clipboard in CSV or tab-separated format.</li>
@@ -796,6 +809,7 @@
                 
                 <p>As you navigate through the game using the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys, the active move is highlighted in the PGN notation. A <strong>single click</strong> on any main-line move jumps to that position. Single clicks on variation moves, comment text, or metadata tags do not change the current position.</p>
                 <p>With <span class="menu-item">PGN → Show Comments</span> enabled, <strong>double-click</strong> inside a <strong>main-line</strong> comment (text in curly braces on the main line) to open the move-comments editor for that full move. For what the dialog contains and how changes are saved, see <a href="#editing-move-comments">Editing move comments</a> in <a href="#moves-list">section 4.5.1</a>.</p>
+                <p><strong>Context menu:</strong> You can also <strong>right-click</strong> inside the PGN notation pane to open a context menu with quick access to common PGN actions. These entries mirror the corresponding options from the menu bar.</p>
                 
                 <img src="screenshots/detail_panel.png" alt="CARA Detail Panel - Right-side panel showing PGN notation pane at the top and tabbed views below (Moves List, Metadata, Manual Analysis, Game Summary, Player Stats, Annotations, AI Summary, Notes) for detailed game analysis" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
@@ -943,7 +957,7 @@
                 
                 <h5 id="ai-summary">4.5.7 AI Summary</h5>
                 <p>The AI Summary tab provides an interactive chat interface for discussing any position in a game with a Large Language Model (LLM). The AI model has access to extensive game data, including detailed engine analysis, move classifications, evaluation metrics, and positional information, enabling it to provide accurate assessments of the game, played moves, and current position. You can ask questions about the game, request explanations of moves, or generate summaries. Access this tab using <span class="menu-item">View → AI Summary</span> or press <code>F7</code>.</p>
-                <p>CARA supports OpenAI, Anthropic, and custom OpenAI-compatible endpoints. Configure your provider and API key through the AI Model Settings dialog; see <a href="#ai-summary-menu">section 6.11</a>. See <a href="#custom-ai-endpoint">section 7.9</a> for more information on setting up a custom endpoint.</p>
+                <p>CARA supports OpenAI, Anthropic, and custom OpenAI-compatible endpoints. Configure your provider and API key through the AI Model Settings dialog; see <a href="#ai-summary-menu">section 6.12</a>. See <a href="#custom-ai-endpoint">section 7.9</a> for more information on setting up a custom endpoint.</p>
                 
                 <img src="screenshots/ai_summary.png" alt="CARA AI Summary View - Interactive chat interface for discussing game positions with an AI model that has access to engine analysis and game data" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
@@ -976,7 +990,7 @@
             </div>
             <div class="outline-item">
                 <h4 id="keyboard-shortcuts">4.6 Keyboard Shortcuts</h4>
-                <p>Below you can find a list of the most common keyboard shortcuts, allowing you to work efficiently with the features described in this section. For a complete reference of all keyboard shortcuts organized by category, see <a href="#complete-keyboard-shortcuts">section 6.14</a>.</p>
+                <p>Below you can find a list of the most common keyboard shortcuts, allowing you to work efficiently with the features described in this section. For a complete reference of all keyboard shortcuts organized by category, see <a href="#complete-keyboard-shortcuts">section 6.15</a>.</p>
                 
                 <h5>4.6.1 Navigation</h5>
                 <ul>
@@ -1243,8 +1257,17 @@
                 
                 <h5 id="basic-database-operations">5.3.1 Basic Database Operations</h5>
                 <p>For opening, saving, and closing databases, see <a href="#common-database-actions">section 4.4.5</a>.</p>
-                
-                <h5 id="bulk-replace-tags">5.3.2 Bulk Replace Tags</h5>
+
+                <h5 id="game-tagging">5.3.2 Game Tags</h5>
+                <p><strong>Game tags</strong> are simple labels you can assign to a game so you can organize and recognize games quickly (for example <em>“Training”</em>, <em>“Tournament”</em>, <em>“Must review”</em>, <em>“Opening prep”</em>). They are separate from the PGN header tags (like <code>Event</code>, <code>Site</code>, <code>White</code>, etc.).</p>
+                <p>Game tags are shown as small <strong>chips</strong> in the database view and in the <a href="#game-tags-widget">Game Tags widget</a> next to the chessboard (when visible).</p>
+                <p>To assign tags to the active game, right-click inside the <strong>Game Tags widget</strong> and toggle tags in the list, or use the <span class="menu-item">Tags</span> menu on the menu bar.<br>
+                If you want to create your own custom tags (names and colors), use <span class="menu-item">Tags → Manage tags…</span>.</p>
+                <div class="tip-box">
+                    <strong>Quick Tip:</strong> CARA can also assign tags automatically after analysis (auto-tagging). If you want CARA to tag games based on analysis, see <a href="#auto-tagging">section 5.5.5 Auto-tagging</a>.
+                </div>
+
+                <h5 id="bulk-replace-tags">5.3.3 Bulk Replace Tags</h5>
                 <p>Use <span class="menu-item">File → Bulk Replace Tags...</span> (<code>Ctrl+Shift+R</code> / <code>⌘+Shift+R</code>) to find and replace text in metadata tags across multiple games. This is useful for correcting typos, standardizing player names, or updating event information.</p>
                 <img src="screenshots/bulk_replace_tags_dialog.png" alt="CARA Bulk Replace Tags Dialog - Dialog for finding and replacing text in metadata tags across multiple games with tag selection, find/replace fields, and matching options" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 <p>The dialog allows you to:</p>
@@ -1260,8 +1283,8 @@
                     <li><strong>Update Result based on last move evaluation:</strong> Analyzes the final position of each game using a chess engine to determine the game result. This option only updates games with indecisive results (empty, "*", or "?"), preserving games that already have decisive results (1-0, 0-1, 1/2-1/2). It can detect checkmate or stalemate directly, or use engine evaluation to determine the likely result for incomplete games. This is useful if you are for example importing games from a chess computer, which doesn't provide a resign function.</li>
                     <li><strong>Update ECO code with played opening ECO:</strong> Analyzes the opening moves of each game and updates the ECO (Encyclopaedia of Chess Openings) tag based on the opening that was actually played. This uses CARA's built-in opening database to identify the correct ECO code from the game's move sequence.</li>
                 </ul>
-                
-                <h5 id="bulk-add-remove-tags">5.3.3 Bulk Add/Remove Tags</h5>
+
+                <h5 id="bulk-add-remove-tags">5.3.4 Bulk Add/Remove Tags</h5>
                 <p>Use <span class="menu-item">File → Bulk Add/Remove Tags...</span> (<code>Ctrl+Alt+T</code> / <code>⌘+⌥+T</code>) to add or remove metadata tags across multiple games. This is useful for adding missing information or cleaning up tag sets.</p>
                 <p>The dialog allows you to:</p>
                 <ul>
@@ -1270,7 +1293,7 @@
                     <li>Process all games or only selected games in the database table</li>
                 </ul>
                 
-                <h5 id="bulk-clean-pgn">5.3.4 Bulk Clean PGN</h5>
+                <h5 id="bulk-clean-pgn">5.3.5 Bulk Clean PGN</h5>
                 <p>Use <span class="menu-item">File → Bulk Clean PGN...</span> (<code>Ctrl+Shift+L</code> / <code>⌘+Shift+L</code>) to remove unwanted elements from PGN notation across multiple games.</p>
                 <p>The dialog allows you to remove:</p>
                 <ul>
@@ -1282,7 +1305,7 @@
                 </ul>
                 <p>You can select any combination of these options and process all games or only selected games in the database table.</p>
                 
-                <h5 id="deduplicate-games">5.3.5 Deduplicate Games</h5>
+                <h5 id="deduplicate-games">5.3.6 Deduplicate Games</h5>
                 <p>Use <span class="menu-item">File → Deduplicate Games in Active Database...</span> (<code>Ctrl+Shift+U</code> / <code>⌘+Shift+U</code>) to identify and remove duplicate games from the active database.</p>
                 <p>The deduplication dialog allows you to choose how games are matched:</p>
                 <ul>
@@ -1367,7 +1390,7 @@
                     Make sure you have at least one UCI-compatible chess engine configured and assigned to the game analysis task. If you haven't configured an engine yet, see <a href="#adding-first-engine">section 5.1.1</a> for step-by-step instructions. For information about assigning engines to specific tasks, see <a href="#adding-additional-engines">section 5.1.2</a>.</li>
                     
                     <li><strong>Start the analysis:</strong><br>
-                    Use <span class="menu-item">Game Analysis → Start Game Analysis</span> (<code>Ctrl+G</code> / <code>⌘+G</code>) to begin analyzing the game. CARA will automatically switch to the Moves List tab if configured to do so (see <a href="#analysis-settings">section 5.5.3</a>).</li>
+                    Use <span class="menu-item">Game Analysis → Start Game Analysis</span> (<code>Ctrl+G</code> / <code>⌘+G</code>) to begin analyzing the game. CARA will automatically switch to the Moves List tab if configured to do so (see <a href="#analysis-settings">section 5.5.4</a>).</li>
                 </ol>
                 <p>During analysis, CARA processes each move sequentially, evaluating the position before and after each move, calculating Centipawn Loss (CPL), and classifying move quality. Progress is displayed in the status bar, showing the current move being analyzed, the engine name, search depth, and evaluation.</p>
                 
@@ -1440,11 +1463,53 @@
                     <li><strong>Store Analysis Results in PGN Tag:</strong> Saves analysis data (evaluations, CPL, classifications) in a PGN metadata tag for persistence across sessions.</li>
                 </ul>
                 <p>These settings can be toggled in the <span class="menu-item">Game Analysis</span> menu and are saved in your user settings.</p>
-                
-                <h5 id="cancelling-analysis">5.5.5 Cancelling Analysis</h5>
+
+                <h5 id="auto-tagging">5.5.5 Auto-tagging</h5>
+                <p><strong>Auto-tagging</strong> can assign <a href="#game-tagging">game tags</a> automatically based on information from game analysis. This is optional and can be enabled or disabled in the <span class="menu-item">Game Analysis</span> menu (see <a href="#game-analysis-menu">section 6.6</a>).</p>
+                <p>The tagging thresholds are configured in <code>config.json</code>.</p>
+                <p>The following auto-tag rules are currently implemented:</p>
+                <table class="column-table">
+                    <thead>
+                        <tr>
+                            <th class="column-name-header">Auto-tag</th>
+                            <th style="min-width: 200px;">When it applies (high level)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="column-name-cell">Blunder-decided</td>
+                            <td>After the first recorded blunder, the evaluation becomes decisive for the other side and never meaningfully recovers.</td>
+                        </tr>
+                        <tr>
+                            <td class="column-name-cell">Clean win</td>
+                            <td>The winner reaches a large advantage and keeps it stable with limited evaluation swings until the end.</td>
+                        </tr>
+                        <tr>
+                            <td class="column-name-cell">Missed win</td>
+                            <td>At some point a winning advantage is reached, but the final result is not a win for that side (or the game is not decisive).</td>
+                        </tr>
+                        <tr>
+                            <td class="column-name-cell">Opening disaster</td>
+                            <td>The evaluation at the end of the opening phase is already strongly favoring one side.</td>
+                        </tr>
+                        <tr>
+                            <td class="column-name-cell">Endgame grind</td>
+                            <td>A long endgame stays in a relatively stable evaluation band for an extended stretch before finally resolving decisively.</td>
+                        </tr>
+                        <tr>
+                            <td class="column-name-cell">Chaotic game</td>
+                            <td>Both sides reach large advantages during the game and the evaluation swings back and forth multiple times.</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="tip-box">
+                    <strong>Note:</strong> Game tags can be used without auto-tagging. Auto-tagging simply creates tags for you; you can still manage tags manually either way (see <a href="#game-tagging">section 5.3.2 Game Tags</a>).
+                </div>
+
+                <h5 id="cancelling-analysis">5.5.6 Cancelling Analysis</h5>
                 <p>You can cancel an ongoing analysis at any time using <span class="menu-item">Game Analysis → Cancel Game Analysis</span> or press <code>Escape</code>. When cancelled, analysis stops at the current move, and all moves analyzed up to that point retain their analysis data.</p>
                 
-                <h5 id="bulk-analysis">5.5.6 Bulk Analysis</h5>
+                <h5 id="bulk-analysis">5.5.7 Bulk Analysis</h5>
                 <p>To analyze multiple games at once, use <span class="menu-item">Game Analysis → Bulk Analyze Database...</span>.</p>
                 <img src="screenshots/bulk_analyze_dialog.png" alt="CARA Bulk Analysis Dialog - Dialog for analyzing multiple games with game selection options, analysis settings, and progress tracking" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 <p>CARA automatically optimizes available CPU cores to analyze multiple games in parallel, maximizing analysis speed. Progress and estimated time remaining are displayed in the status bar, and you can cancel and resume bulk analysis at any time.</p>
@@ -1571,6 +1636,7 @@
                 <p><strong>Interactions:</strong></p>
                 <ul>
                     <li>Right-click in the section for <span class="menu-item">Copy section to clipboard</span> (this block only) or <span class="menu-item">Copy stats to clipboard</span> (full Player Stats text).</li>
+                    <li>Hover the chart to compare the selected player’s share against the opponents’ share for the same move classes.</li>
                     <li>When the Player Stats detail area is narrow, the percentage list beside the pie may hide automatically so the chart keeps more width; widening the area brings the list back.</li>
                 </ul>
                 <p><strong>Settings:</strong> None specific to this section beyond showing or hiding it through the <span class="menu-item">Player Stats</span> menu.</p>
@@ -1578,7 +1644,7 @@
 
                 <h5 id="ps-performance-by-phase">5.7.7 Performance by phase</h5>
                 <p><strong>Purpose:</strong> Summarizes the selected player’s results in the three game phases—opening, middlegame, and endgame—across the games in the current computation. A horizontal bar chart shows average <strong>accuracy (%)</strong> per phase; beside it, a small table lists the same phases with average <strong>centipawn loss (CPL)</strong> so you can compare solid play vs typical cost of errors in each phase.</p>
-                <p><strong>Interactions:</strong> Right-click in the section for <span class="menu-item">Copy section to clipboard</span> (this block only) or <span class="menu-item">Copy stats to clipboard</span> (full Player Stats text).</p>
+                <p><strong>Interactions:</strong> Right-click in the section for <span class="menu-item">Copy section to clipboard</span> (this block only) or <span class="menu-item">Copy stats to clipboard</span> (full Player Stats text). Hover the bars to compare the selected player’s phase accuracy against opponents in the same phase.</p>
                 <p><strong>Settings:</strong> None specific to this section beyond showing or hiding it through the <span class="menu-item">Player Stats</span> menu.</p>
                 <img src="screenshots/player_stats_section_performance_by_phase.png" alt="CARA Player Stats — Performance by phase section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
 
@@ -1941,49 +2007,53 @@
                 
                 <h5>6.3.4 Show Turn Indicator</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+T</code> / <code>⌥+T</code></p>
-                <p>Toggles the display of the turn indicator showing which side is to move.<br>See <a href="#turn-indicator">section 4.3.5</a> for more information.</p>
+                <p>Toggles the display of the turn indicator showing which side is to move.<br>See <a href="#turn-indicator">section 4.3.6</a> for more information.</p>
                 
                 <h5>6.3.5 Show Material</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+U</code> / <code>⌥+U</code></p>
                 <p>Toggles the display of the material widget showing captured pieces and material difference.<br>See <a href="#material-widget">section 4.3.4</a> for more information.</p>
                 
-                <h5>6.3.6 Show Evaluation Bar</h5>
+                <h5>6.3.6 Show Game Tags</h5>
+                <p><strong>Shortcut:</strong> <code>Alt+G</code></p>
+                <p>Toggles the visibility of the <a href="#game-tagging">Game Tags widget</a> next to the chessboard.</p>
+                
+                <h5>6.3.7 Show Evaluation Bar</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+E</code> / <code>⌥+E</code></p>
                 <p>Toggles the display of the evaluation bar showing the engine's assessment of the current position.<br>See <a href="#evaluation-bar">section 4.3.3</a> for more information.</p>
                 
-                <h5>6.3.7 Show Positional Heat-map</h5>
+                <h5>6.3.8 Show Positional Heat-map</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+H</code> / <code>⌥+H</code></p>
-                <p>Toggles the display of the positional heatmap overlay showing positional factors through color-coded gradients.<br>See <a href="#positional-heatmap">section 4.3.6</a> for detailed information.</p>
+                <p>Toggles the display of the positional heatmap overlay showing positional factors through color-coded gradients.<br>See <a href="#positional-heatmap">section 4.3.7</a> for detailed information.</p>
                 
-                <h5>6.3.8 Show Played Move</h5>
+                <h5>6.3.9 Show Played Move</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+P</code> / <code>⌥+P</code></p>
                 <p>Toggles the display of an arrow on the chessboard indicating the last move played in the game.</p>
                 
-                <h5>6.3.9 Show Best Next Move</h5>
+                <h5>6.3.10 Show Best Next Move</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+B</code> / <code>⌥+B</code></p>
                 <p>Toggles the display of an arrow showing the engine's best recommended move (PV1) from manual analysis.</p>
                 
-                <h5>6.3.10 Show Next Best Move (PV2)</h5>
+                <h5>6.3.11 Show Next Best Move (PV2)</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+2</code> / <code>⌥+2</code></p>
                 <p>Toggles the display of an arrow showing the engine's second-best recommended move (PV2) from manual analysis.</p>
                 
-                <h5>6.3.11 Show Next Best Move (PV3)</h5>
+                <h5>6.3.12 Show Next Best Move (PV3)</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+3</code> / <code>⌥+3</code></p>
                 <p>Toggles the display of an arrow showing the engine's third-best recommended move (PV3) from manual analysis.</p>
                 
-                <h5>6.3.12 Show Best Alternative Move</h5>
+                <h5>6.3.13 Show Best Alternative Move</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+A</code> / <code>⌥+A</code></p>
                 <p>Toggles the display of an arrow showing the best alternative move found during game analysis (the move that should have been played instead of the actual move).</p>
 
-                <h5>6.3.13 Show Move Classification Icons</h5>
+                <h5>6.3.14 Show Move Classification Icons</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+4</code> / <code>⌥+4</code></p>
                 <p>Toggles small badges on the played move's destination square that show the move assessment (e.g. book move, best move, good move, brilliant, inaccuracy, mistake, miss, blunder). Available once the game has been analyzed.</p>
 
-                <h5>6.3.14 Show Annotations Layer</h5>
+                <h5>6.3.15 Show Annotations Layer</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+L</code> / <code>⌥+L</code></p>
                 <p>Toggles the visibility of the annotations layer on the chessboard, showing or hiding all custom annotations (text, arrows, circles, squares).<br>See <a href="#adding-annotations">section 5.8</a> for more information.</p>
 
-                <h5>6.3.15 Path trajectory style</h5>
+                <h5>6.3.16 Path trajectory style</h5>
                 <p>Selects the visual style for piece trajectory lines displayed during positional plan exploration:</p>
                 <ul>
                     <li><strong>Straight:</strong> Trajectory lines are drawn as straight segments between squares.</li>
@@ -1991,35 +2061,51 @@
                 </ul>
             </div>
 
+            <!-- Tags Menu -->
+            <div class="outline-item">
+                <h4 id="tags-menu">6.4 Tags Menu</h4>
+                <p>The <span class="menu-item">Tags</span> menu provides actions for working with <a href="#game-tagging">game tags</a> on the currently active game.</p>
+                
+                <h5>6.4.1 Manage tags…</h5>
+                <p>Opens the tag management dialog where you can create and delete custom tag definitions.</p>
+                
+                <h5>6.4.2 Clear all tags</h5>
+                <p>Removes all game tags from the currently active game.</p>
+                
+                <div class="tip-box">
+                    <strong>Quick Tip:</strong> You can also right-click inside the <a href="#game-tags-widget">Game Tags widget</a> to access these actions from a context menu.
+                </div>
+            </div>
+
             <!-- PGN Menu -->
             <div class="outline-item">
-                <h4 id="pgn-menu">6.4 PGN Menu</h4>
+                <h4 id="pgn-menu">6.5 PGN Menu</h4>
                 
-                <h5>6.4.1 Show Metadata</h5>
+                <h5>6.5.1 Show Metadata</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+M</code> / <code>⌘+M</code></p>
                 <p>Toggles the display of PGN header tags (Event, Site, Date, etc.) in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.2 Show Comments</h5>
+                <h5>6.5.2 Show Comments</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+M</code> / <code>⌘+Shift+M</code></p>
                 <p>Toggles the display of move comments in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.3 Show Variations</h5>
+                <h5>6.5.3 Show Variations</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+V</code> / <code>⌘+Shift+V</code></p>
                 <p>Toggles the display of move variations in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.4 Show Non-Standard Tags</h5>
+                <h5>6.5.4 Show Non-Standard Tags</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+T</code> / <code>⌘+Shift+T</code></p>
                 <p>Toggles the display of non-standard tags like [%evp] and [%mdl] within comments in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.5 Show Annotations</h5>
+                <h5>6.5.5 Show Annotations</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+A</code> / <code>⌘+Shift+A</code></p>
                 <p>Toggles the display of move annotations (symbols like !, ?, and NAGs) in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.6 Show Results</h5>
+                <h5>6.5.6 Show Results</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+R</code> / <code>⌘+R</code></p>
                 <p>Toggles the display of game results (1-0, 0-1, 1/2-1/2) in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.7 Display NAG move assessments as...</h5>
+                <h5>6.5.7 Display NAG move assessments as...</h5>
                 <p>This submenu allows you to choose how NAG (Numeric Annotation Glyph) move assessments are displayed in the PGN Notation Pane:</p>
                 <ul>
                     <li><span class="menu-item">Symbols (??, ?, ?! ..)</span>: Displays common NAGs as symbols (!, !!, ?, ??, !?, ?!) and other NAGs as numbers</li>
@@ -2027,43 +2113,43 @@
                 </ul>
                 <p>The selected option is saved in your user settings and persists between application sessions.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.8 Remove Comments</h5>
+                <h5>6.5.8 Remove Comments</h5>
                 <p>Permanently removes all comments from the active game's PGN notation. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.9 Remove Variations</h5>
+                <h5>6.5.9 Remove Variations</h5>
                 <p>Permanently removes all move variations from the active game's PGN notation. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.10 Remove Non-Standard Tags</h5>
+                <h5>6.5.10 Remove Non-Standard Tags</h5>
                 <p>Permanently removes non-standard tags (like [%evp] and [%mdl]) from comments in the active game's PGN. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.4.11 Remove Annotations</h5>
+                <h5>6.5.11 Remove Annotations</h5>
                 <p>Permanently removes all move annotations (symbols and NAGs) from the active game's PGN notation. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
             </div>
 
             <!-- Moves List Menu -->
             <div class="outline-item">
-                <h4 id="moves-list-menu">6.5 Moves List Menu</h4>
+                <h4 id="moves-list-menu">6.6 Moves List Menu</h4>
                 
-                <h5>6.5.1 Column Profiles</h5>
+                <h5>6.6.1 Column Profiles</h5>
                 <p>The Moves List menu displays all available column profiles at the top. Each profile is a named configuration that defines which columns are visible and their order. Switch between profiles by selecting them from the menu or using number keys <code>1</code> through <code>9</code> (assigned to the first nine profiles).<br>See <a href="#moves-list">section 4.5.1</a> for detailed information about column profiles and default profiles.</p>
                 
-                <h5>6.5.2 Save Profile</h5>
+                <h5>6.6.2 Save Profile</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+P</code> / <code>⌘+Shift+P</code></p>
                 <p>Saves the current column profile, overwriting the existing profile with the current column visibility, order, and width settings.<br>See <a href="#moves-list">section 4.5.1</a> for more information.</p>
                 
-                <h5>6.5.3 Save Profile as...</h5>
+                <h5>6.6.3 Save Profile as...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Alt+P</code> / <code>⌘+⌥+P</code></p>
                 <p>Creates a new column profile with a custom name, using the current column visibility, order, and width settings. The new profile is then accessible via the Moves List menu and is assigned a keyboard shortcut (1-9) based on its position in the profile list.<br>See <a href="#moves-list">section 4.5.1</a> for more information.</p>
                 
-                <h5>6.5.4 Remove Profile</h5>
+                <h5>6.6.4 Remove Profile</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+Delete</code> / <code>⌘+Shift+Delete</code></p>
                 <p>Permanently removes the currently active column profile.</p>
                 
-                <h5>6.5.5 Setup Profile...</h5>
+                <h5>6.6.5 Setup Profile...</h5>
                 <p>Opens a dialog for configuring all column settings at once, including column visibility, order, and widths. This provides a convenient way to manage multiple columns simultaneously rather than toggling them individually.<br>See <a href="#moves-list">section 4.5.1</a> for more information.</p>
                 <img src="screenshots/movelist_setup_profile_dialog.png" alt="CARA Moves List Setup Profile Dialog - Dialog for configuring column visibility, order, and widths for column profiles" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
-                <h5>6.5.6 Column Visibility</h5>
+                <h5>6.6.6 Column Visibility</h5>
                 <p>The Moves List menu includes submenus organized by column category for toggling individual column visibility:</p>
                 <ul>
                     <li><strong>Basic Columns:</strong> Move number, White moves, Black moves, Comments</li>
@@ -2078,123 +2164,126 @@
 
             <!-- Game Analysis Menu -->
             <div class="outline-item">
-                <h4 id="game-analysis-menu">6.6 Game Analysis Menu</h4>
+                <h4 id="game-analysis-menu">6.7 Game Analysis Menu</h4>
                 
-                <h5>6.6.1 Start Game Analysis</h5>
+                <h5>6.7.1 Start Game Analysis</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+G</code> / <code>⌘+G</code></p>
                 <p>Initiates automatic analysis of the currently active game using the engine assigned to the Game Analysis task. The engine analyzes each move in the game, providing evaluations, move classifications, and best move alternatives.<br>See <a href="#analyzing-game">section 5.5</a> for detailed instructions.</p>
                 
-                <h5>6.6.2 Cancel Game Analysis</h5>
+                <h5>6.7.2 Cancel Game Analysis</h5>
                 <p><strong>Shortcut:</strong> <code>Escape</code></p>
-                <p>Cancels an ongoing game analysis. This menu item is only enabled while analysis is in progress. When cancelled, analysis stops and any moves already analyzed remain in the Moves List. You can resume analysis later from where it left off.<br>See <a href="#cancelling-analysis">section 5.5.4</a> for more information.</p>
+                <p>Cancels an ongoing game analysis. This menu item is only enabled while analysis is in progress. When cancelled, analysis stops and any moves already analyzed remain in the Moves List. You can resume analysis later from where it left off.<br>See <a href="#cancelling-analysis">section 5.5.6</a> for more information.</p>
                 
-                <h5>6.6.3 Bulk Analyze Database...</h5>
-                <p>Opens a dialog to analyze multiple games at once. CARA automatically optimizes available CPU cores to analyze multiple games in parallel, maximizing analysis speed. Progress and estimated time remaining are displayed in the status bar, and you can cancel and resume bulk analysis at any time.<br>See <a href="#bulk-analysis">section 5.5.5</a> for detailed instructions.</p>
+                <h5>6.7.3 Bulk Analyze Database...</h5>
+                <p>Opens a dialog to analyze multiple games at once. CARA automatically optimizes available CPU cores to analyze multiple games in parallel, maximizing analysis speed. Progress and estimated time remaining are displayed in the status bar, and you can cancel and resume bulk analysis at any time.<br>See <a href="#bulk-analysis">section 5.5.7</a> for detailed instructions.</p>
                 
-                <h5 id="classification-settings">6.6.4 Configure Classification Settings...</h5>
+                <h5 id="classification-settings">6.7.4 Configure Classification Settings...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+K</code> / <code>⌘+Shift+K</code></p>
                 <p>Opens a dialog to customize the thresholds used for move classification (Brilliant, Best Move, Good Move, Inaccuracy, Mistake, Blunder). These thresholds determine how moves are categorized based on Centipawn Loss (CPL) values. The dialog also includes settings for brilliancy detection, including shallow depth ranges, minimum agreement requirements, and candidate move selection. See <a href="#analysis-results">section 5.5.2</a> for more information about move classifications and <a href="#brilliant-move-detection">section 5.5.3</a> for details on brilliancy detection.</p>
                 
-                <h5>6.6.5 Normalized Evaluation Graph</h5>
+                <h5>6.7.5 Normalized Evaluation Graph</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+N</code> / <code>⌘+Shift+N</code></p>
                 <p>Toggles the normalized evaluation graph display mode in the Moves List. When enabled, evaluation values are normalized to a scale that better highlights relative evaluation changes throughout the game, making it easier to identify critical moments and evaluation swings.</p>
                 
-                <h5>6.6.6 Brilliant Move Detection</h5>
+                <h5>6.7.6 Brilliant Move Detection</h5>
                 <p>Toggles whether CARA performs brilliancy detection after initial game analysis. When enabled, CARA analyzes candidate moves at shallow engine depths to identify exceptional moves that appear suboptimal at shallow depths but are actually strong when analyzed more deeply. This detection step runs automatically after the main analysis completes. See <a href="#brilliant-move-detection">section 5.5.3</a> for a detailed explanation of how brilliancy detection works.</p>
+
+                <h5>6.7.7 Auto Tag Games</h5>
+                <p>Toggles whether CARA performs <a href="#auto-tagging">auto-tagging</a> as part of the game analysis workflow. When enabled, CARA may assign <a href="#game-tagging">game tags</a> automatically based on analysis, using thresholds from <code>config.json</code>.</p>
                 
-                <h5>6.6.7 Return to PLY 0 after analysis completes</h5>
+                <h5>6.7.8 Return to PLY 0 after analysis completes</h5>
                 <p>Toggles whether CARA automatically navigates to the starting position (PLY 0) when analysis completes. When enabled, the board and Moves List automatically return to PLY 0 after analysis finishes.</p>
                 
-                <h5>6.6.8 Switch to Moves List at the start of Analysis</h5>
+                <h5>6.7.9 Switch to Moves List at the start of Analysis</h5>
                 <p>Toggles whether CARA automatically switches to the Moves List tab when analysis begins. This is enabled by default, ensuring you can immediately see analysis results as they are generated.</p>
                 
-                <h5>6.6.9 Switch to Game Summary after Analysis</h5>
+                <h5>6.7.10 Switch to Game Summary after Analysis</h5>
                 <p>Toggles whether CARA automatically switches to the Game Summary tab when analysis completes. When enabled, you are taken directly to the condensed overview of key game moments and statistics after analysis finishes.</p>
                 
-                <h5>6.6.10 Store Analysis results in PGN Tag</h5>
+                <h5>6.7.11 Store Analysis results in PGN Tag</h5>
                 <p>Toggles whether analysis results (evaluations, CPL values, move classifications) are saved in a PGN metadata tag for persistence across sessions. When enabled, analysis data is serialized and stored in the game's PGN, allowing you to preserve analysis results even after closing and reopening the database.</p>
             </div>
 
             <!-- Manual Analysis Menu -->
             <div class="outline-item">
-                <h4 id="manual-analysis-menu">6.7 Manual Analysis Menu</h4>
-                <h5>6.7.1 Start Manual Analysis</h5>
+                <h4 id="manual-analysis-menu">6.8 Manual Analysis Menu</h4>
+                <h5>6.8.1 Start Manual Analysis</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+M</code> / <code>⌥+M</code></p>
                 <p>Starts or stops continuous engine analysis of the current position. When enabled, the engine analyzes the current position and displays principal variation lines with evaluations, depths, and move sequences. Analysis continues automatically as you navigate to different positions. Use the same menu item or shortcut again to stop analysis.<br>See <a href="#starting-manual-analysis">section 5.6.1</a> for detailed instructions.</p>
                 
-                <h5>6.7.2 Add PV Line</h5>
+                <h5>6.8.2 Add PV Line</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+N</code> / <code>⌥+N</code></p>
                 <p>Adds an additional principal variation line to the MultiPV analysis display. This allows you to compare multiple candidate moves simultaneously. You can add as many lines as needed.<br>See <a href="#multipv-analysis">section 5.6.2</a> for more information.</p>
                 
-                <h5>6.7.3 Remove PV Line</h5>
+                <h5>6.8.3 Remove PV Line</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+R</code> / <code>⌥+R</code></p>
                 <p>Removes the last added principal variation line from the MultiPV analysis display.<br>See <a href="#multipv-analysis">section 5.6.2</a> for more information.</p>
                 
-                <h5>6.7.4 Enable miniature preview</h5>
+                <h5>6.8.4 Enable miniature preview</h5>
                 <p>Toggles the miniature board preview feature. When enabled, hovering over moves in any PV line displays a small chessboard preview showing the position after that move. This helps you quickly visualize the resulting position.<br>See <a href="#exploring-variations">section 5.6.3</a> for more information.</p>
                 
-                <h5>6.7.5 Explore PV1 Positional Plans</h5>
+                <h5>6.8.5 Explore PV1 Positional Plans</h5>
                 <p>Toggles positional plan exploration for the first principal variation line. When enabled, the chessboard displays colored trajectory lines showing how pieces move through the engine's recommended sequence. Only one plan can be active at a time.<br>See <a href="#positional-plan-exploration">section 5.6.4</a> for detailed instructions.</p>
                 
-                <h5>6.7.6 Explore PV2 Positional Plans</h5>
+                <h5>6.8.6 Explore PV2 Positional Plans</h5>
                 <p>Toggles positional plan exploration for the second principal variation line. When enabled, the chessboard displays colored trajectory lines showing how pieces move through the engine's recommended sequence. Only one plan can be active at a time.<br>See <a href="#positional-plan-exploration">section 5.6.4</a> for detailed instructions.</p>
                 
-                <h5>6.7.7 Explore PV3 Positional Plans</h5>
+                <h5>6.8.7 Explore PV3 Positional Plans</h5>
                 <p>Toggles positional plan exploration for the third principal variation line. When enabled, the chessboard displays colored trajectory lines showing how pieces move through the engine's recommended sequence. Only one plan can be active at a time.<br>See <a href="#positional-plan-exploration">section 5.6.4</a> for detailed instructions.</p>
                 
-                <h5>6.7.8 Max number of pieces to explore</h5>
+                <h5>6.8.8 Max number of pieces to explore</h5>
                 <p>Sets how many pieces to track in the positional plan exploration visualization. Options are 1, 2, or 3 pieces. The system automatically selects the pieces that move most frequently in the active PV line up to this limit. Each tracked piece is assigned a distinct color and displayed with trajectory lines on the chessboard.<br>See <a href="#positional-plan-exploration">section 5.6.4</a> for more information.</p>
                 
-                <h5>6.7.9 Max Exploration depth</h5>
+                <h5>6.8.9 Max Exploration depth</h5>
                 <p>Sets the exploration depth for piece trajectories in positional plan exploration. Options are 2, 3, or 4 moves ahead. This determines how many moves into the future the trajectory visualization extends, showing the complete path each piece takes through the engine's recommended sequence.<br>See <a href="#positional-plan-exploration">section 5.6.4</a> for more information.</p>
                 
-                <h5>6.7.10 Hide other arrows during plan exploration</h5>
+                <h5>6.8.10 Hide other arrows during plan exploration</h5>
                 <p>Toggles whether other board arrows (played move, best alternative move, PV arrows) are hidden when positional plan exploration is active. When enabled, only the piece trajectory lines are displayed, providing a cleaner view focused on the positional plan visualization.</p>
             </div>
 
             <!-- Player Stats Menu -->
             <div class="outline-item">
-                <h4 id="player-stats-menu">6.8 Player Stats Menu</h4>
+                <h4 id="player-stats-menu">6.9 Player Stats Menu</h4>
                 <p>The <span class="menu-item">Player Stats</span> menu on the menu bar controls the <strong>Player Stats</strong> tab in the detail panel: which sections are visible and several chart-specific options. The same nested settings also appear when you right-click inside the matching section on the tab. For what each block shows and how to use it, see <a href="#viewing-player-statistics">section 5.7 Viewing Player Statistics</a>.</p>
 
-                <h5>6.8.1 Reset to defaults</h5>
+                <h5>6.9.1 Reset to defaults</h5>
                 <p>Restores Player Stats options to the application template values after confirmation: section visibility, <span class="menu-item">Activity heatmap settings</span>, <span class="menu-item">Accuracy distribution settings</span>, and <span class="menu-item">Time series settings</span> (bins, binning mode, axis layout, gap segments, line style, smoothing, and related choices).</p>
 
-                <h5>6.8.2 Enable all and Disable all</h5>
+                <h5>6.9.2 Enable all and Disable all</h5>
                 <p><span class="menu-item">Enable all</span> and <span class="menu-item">Disable all</span> turn <strong>every</strong> section’s visibility on or off <strong>together</strong>, so you can quickly show the full page or clear it and then turn individual sections back on—handy when you want a simpler layout without flipping each toggle option one by one. They only update those section visibility toggles; they do not change the saved options inside <span class="menu-item">Activity heatmap settings</span>, <span class="menu-item">Accuracy distribution settings</span>, or <span class="menu-item">Time series settings</span>.</p>
 
-                <h5>6.8.3 Per-section visibility and detail settings</h5>
+                <h5>6.9.3 Per-section visibility and detail settings</h5>
                 <p>The remaining entries are toggle options for each Player Stats section (on means the section is shown on the tab). Three submenus supply extra display options where they apply: <span class="menu-item">Activity heatmap settings</span>, <span class="menu-item">Accuracy distribution settings</span>, and <span class="menu-item">Time series settings</span> (for the date-based progression charts). What each section shows is described in <a href="#viewing-player-statistics">section 5.7 Viewing Player Statistics</a>.</p>
             </div>
 
             <!-- Annotations Menu -->
             <div class="outline-item">
-                <h4 id="annotations-menu">6.9 Annotations Menu</h4>
+                <h4 id="annotations-menu">6.10 Annotations Menu</h4>
                 
-                <h5>6.9.1 Clear all Annotations for current game</h5>
+                <h5>6.10.1 Clear all Annotations for current game</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code></p>
                 <p>Removes all annotations from the entire active game. This action affects all positions in the game and cannot be undone.<br>See <a href="#managing-annotations">section 5.8.3</a> for more information.</p>
                 
-                <h5>6.9.2 Clear all Annotations for current move</h5>
+                <h5>6.10.2 Clear all Annotations for current move</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Alt+D</code></p>
                 <p>Removes all annotations for the current position (move) in the game. Annotations for other positions remain unchanged.<br>See <a href="#managing-annotations">section 5.8.3</a> for more information.</p>
                 
-                <h5>6.9.3 Save Annotations to current game</h5>
+                <h5>6.10.3 Save Annotations to current game</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Alt+S</code></p>
                 <p>Saves all annotations to the active game by serializing them into a PGN metadata tag. Annotations are compressed and stored separately from the PGN move notation, keeping the PGN clean. This marks the game as modified, and annotations will be persisted when you save the database.<br>See <a href="#managing-annotations">section 5.8.3</a> for more information.</p>
                 
-                <h5>6.9.4 Highlight annotated moves in moves list</h5>
+                <h5>6.10.4 Highlight annotated moves in moves list</h5>
                 <p>When checked, moves that have annotations are highlighted in the Moves List: the White and Black move columns (algebraic notation) use the dominant color from the annotations for that move as a background, with contrasting text so the move remains readable. This makes it easy to see at a glance which moves in the game have annotations. The setting is saved in your user preferences.</p>
                 
-                <h5>6.9.5 Setup Preferences...</h5>
+                <h5>6.10.5 Setup Preferences...</h5>
                 <p>Opens the Annotation Preferences dialog for customizing the annotation color palette and text font settings. Changes are saved to your user settings and persist across sessions.<br>See <a href="#annotation-preferences">section 5.8.2</a> for detailed instructions.</p>
             </div>
 
             <!-- Engines Menu -->
             <div class="outline-item">
-                <h4 id="engines-menu">6.10 Engines Menu</h4>
+                <h4 id="engines-menu">6.11 Engines Menu</h4>
                 
-                <h5>6.10.1 Add Engine...</h5>
+                <h5>6.11.1 Add Engine...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+E</code></p>
                 <p>Opens a dialog to add a new UCI-compatible chess engine to CARA. You can browse for the engine executable file, and CARA will automatically validate that it supports the UCI protocol. The first engine you add is automatically assigned to all analysis tasks.<br>See <a href="#adding-first-engine">section 5.1.1</a> for detailed instructions.</p>
                 
@@ -2202,7 +2291,7 @@
                     <strong>Quick Tip:</strong> CARA works with any UCI-compatible chess engine. For a short list of recommended engines (free and commercial) with links and best use cases, see <a href="#recommended-engines">section 7.10</a>.
                 </div>
                 
-                <h5>6.10.2 Engine Submenus</h5>
+                <h5>6.11.2 Engine Submenus</h5>
                 <p>For each configured engine, a submenu is displayed with the engine's name. Each submenu provides the following options:</p>
                 <ul>
                     <li><strong>Remove Engine:</strong> Permanently removes the engine from CARA. If the engine is currently assigned to any tasks, those assignments are cleared. CARA automatically ensures that at least one engine is always assigned to each analysis task.</li>
@@ -2218,9 +2307,9 @@
 
             <!-- AI Summary Menu -->
             <div class="outline-item">
-                <h4 id="ai-summary-menu">6.11 AI Summary Menu</h4>
+                <h4 id="ai-summary-menu">6.12 AI Summary Menu</h4>
                 
-                <h5>6.11.1 AI Model Settings...</h5>
+                <h5>6.12.1 AI Model Settings...</h5>
                 <p>Opens a dialog for configuring AI model settings. CARA supports three options: <strong>OpenAI</strong>, <strong>Anthropic</strong>, and <strong>Custom endpoint</strong> (e.g. a local LLM). You must configure at least one provider and select a model before using the AI Summary feature. For custom endpoints, set the base URL (and optionally an API key) and choose a model; see <a href="#custom-ai-endpoint">section 7.9</a>.</p>
                 <p>To acquire API keys for cloud providers:</p>
                 <ul>
@@ -2229,65 +2318,65 @@
                 </ul>
                 <p>For a custom endpoint, an API key is optional (e.g. leave empty for local servers).</p>
                 
-                <h5>6.11.2 Use OpenAI Models</h5>
+                <h5>6.12.2 Use OpenAI Models</h5>
                 <p>Toggles whether to use OpenAI models for AI Summary. When enabled, OpenAI models are available for selection. This option is mutually exclusive with "Use Anthropic Models" and "Use Custom Endpoint"—only one provider can be active at a time.</p>
                 
-                <h5>6.11.3 Use Anthropic Models</h5>
+                <h5>6.12.3 Use Anthropic Models</h5>
                 <p>Toggles whether to use Anthropic models for AI Summary. When enabled, Anthropic models are available for selection. This option is mutually exclusive with "Use OpenAI Models" and "Use Custom Endpoint"—only one provider can be active at a time.</p>
                 
-                <h5>6.11.4 Use Custom Endpoint</h5>
+                <h5>6.12.4 Use Custom Endpoint</h5>
                 <p>Toggles whether to use the custom endpoint (e.g. local LLM) for AI Summary. When enabled, models from the configured custom base URL are available. This option is mutually exclusive with "Use OpenAI Models" and "Use Anthropic Models"—only one provider can be active at a time.</p>
                 
-                <h5>6.11.5 Include Game Analysis Data in Pre-Prompt</h5>
+                <h5>6.12.5 Include Game Analysis Data in Pre-Prompt</h5>
                 <p>Toggles whether game analysis data (evaluations, move classifications, CPL values, best move alternatives) is included in the pre-prompt sent to the AI model. When enabled, the AI has access to detailed engine analysis, enabling more accurate assessments of moves and positions.</p>
                 
-                <h5>6.11.6 Include PGN Metadata tags in Pre-Prompt</h5>
+                <h5>6.12.6 Include PGN Metadata tags in Pre-Prompt</h5>
                 <p>Toggles whether PGN metadata tags (player names, ELO ratings, event information, etc.) are included in the pre-prompt sent to the AI model. When enabled, the AI has access to game metadata, providing context for more informed responses.</p>
             </div>
 
             <!-- Notes Menu -->
             <div class="outline-item">
-                <h4 id="notes-menu">6.12 Notes Menu</h4>
+                <h4 id="notes-menu">6.13 Notes Menu</h4>
                 <p>The Notes menu provides actions for managing game notes stored in the current game's PGN (CARANotes tag).</p>
-                <h5>6.12.1 Clear Notes for current game</h5>
+                <h5>6.13.1 Clear Notes for current game</h5>
                 <p>Removes the notes from the current game in memory (clears the CARANotes tag). Shortcut: <code>Ctrl+Shift+E</code>.</p>
-                <h5>6.12.2 Save Notes to current game</h5>
+                <h5>6.13.2 Save Notes to current game</h5>
                 <p>Saves the text from the Notes tab into the current game's PGN as a CARANotes tag (in memory). The database is marked as having unsaved changes until you save the database. Shortcut: <code>Ctrl+Alt+N</code>.</p>
             </div>
 
             <!-- Help Menu -->
             <div class="outline-item">
-                <h4 id="help-menu">6.13 Help Menu</h4>
+                <h4 id="help-menu">6.14 Help Menu</h4>
                 
-                <h5>6.13.1 Open Manual</h5>
+                <h5>6.14.1 Open Manual</h5>
                 <p>Opens the application manual in your default web browser, providing comprehensive documentation and instructions for using CARA.</p>
                 
-                <h5>6.13.2 Watch Video Tutorials</h5>
+                <h5>6.14.2 Watch Video Tutorials</h5>
                 <p>Opens the CARA Chess YouTube channel in your default web browser, where you can watch video tutorials for using CARA.</p>
                 
-                <h5>6.13.3 Visit GitHub Repository</h5>
+                <h5>6.14.3 Visit GitHub Repository</h5>
                 <p>Opens the CARA project repository on GitHub in your default web browser, where you can view the source code, report issues, or contribute to the project.</p>
                 
-                <h5>6.13.4 Check for Updates...</h5>
+                <h5>6.14.4 Check for Updates...</h5>
                 <p>Checks if a newer version of CARA is available.</p>
                 
-                <h5>6.13.5 About...</h5>
+                <h5>6.14.5 About...</h5>
                 <p>Opens the About dialog displaying application information, including the application name, version number, description, and copyright information. The dialog provides a quick reference for identifying the CARA version you are using.</p>
             </div>
 
             <!-- Keyboard Shortcuts Reference -->
             <div class="outline-item">
-                <h4 id="complete-keyboard-shortcuts">6.14 Complete Keyboard Shortcuts</h4>
+                <h4 id="complete-keyboard-shortcuts">6.15 Complete Keyboard Shortcuts</h4>
                 <p>This section provides a comprehensive reference of all keyboard shortcuts in CARA.</p>
                 
-                <h5>6.14.1 Game Navigation</h5>
+                <h5>6.15.1 Game Navigation</h5>
                 <p>Essential shortcuts for navigating through games:</p>
                 <ul>
                     <li><code>Right Arrow</code>: Navigate to next move</li>
                     <li><code>Left Arrow</code>: Navigate to previous move</li>
                 </ul>
                 
-                <h5>6.14.2 Detail Panel Tabs</h5>
+                <h5>6.15.2 Detail Panel Tabs</h5>
                 <p>Quick access to different analysis views:</p>
                 <ul>
                     <li><code>F1</code>: Switch to Moves List tab</li>
@@ -2300,7 +2389,7 @@
                     <li><code>F8</code>: Switch to Notes tab</li>
                 </ul>
                 
-                <h5>6.14.3 Game Analysis</h5>
+                <h5>6.15.3 Game Analysis</h5>
                 <p>Shortcuts for analyzing games:</p>
                 <ul>
                     <li><code>Ctrl+G</code> / <code>⌘+G</code>: Start game analysis for the current game</li>
@@ -2309,7 +2398,7 @@
                     <li><code>Ctrl+Shift+N</code> / <code>⌘+Shift+N</code>: Toggle normalized evaluation graph mode</li>
                 </ul>
                 
-                <h5>6.14.4 File Operations</h5>
+                <h5>6.15.4 File Operations</h5>
                 <p>Standard file management shortcuts:</p>
                 <ul>
                     <li><code>Ctrl+O</code> / <code>⌘+O</code>: Open PGN database</li>
@@ -2320,7 +2409,7 @@
                     <li><code>Ctrl+Q</code> / <code>⌘+Q</code>: Close application</li>
                 </ul>
                 
-                <h5>6.14.5 Importing and Opening Games</h5>
+                <h5>6.15.5 Importing and Opening Games</h5>
                 <p>Shortcuts for importing and opening games:</p>
                 <ul>
                     <li><code>Ctrl+V</code> / <code>⌘+V</code>: Paste PGN to Clipboard database</li>
@@ -2328,7 +2417,7 @@
                     <li><code>Ctrl+Shift+I</code> / <code>⌘+Shift+I</code>: Import games from online platforms</li>
                 </ul>
                 
-                <h5>6.14.6 Copy and Cut Operations</h5>
+                <h5>6.15.6 Copy and Cut Operations</h5>
                 <p>Shortcuts for copying and moving game data:</p>
                 <ul>
                     <li><code>Ctrl+P</code> / <code>⌘+P</code>: Copy active game PGN to clipboard</li>
@@ -2338,7 +2427,7 @@
                     <li><code>Ctrl+Shift+X</code>: Cut selected games to clipboard</li>
                 </ul>
                 
-                <h5>6.14.7 Moves List Column Profiles</h5>
+                <h5>6.15.7 Moves List Column Profiles</h5>
                 <p>Shortcuts for managing and switching column profiles:</p>
                 <ul>
                     <li><code>1</code> - <code>9</code>: Switch to column profile 1 through 9</li>
@@ -2347,7 +2436,7 @@
                     <li><code>Ctrl+Shift+Delete</code> / <code>⌘+Shift+Delete</code>: Remove current profile</li>
                 </ul>
                 
-                <h5>6.14.8 Board Display Options</h5>
+                <h5>6.15.8 Board Display Options</h5>
                 <p>Shortcuts for toggling board display elements:</p>
                 <ul>
                     <li><code>X</code>: Rotate board 180 degrees</li>
@@ -2356,6 +2445,7 @@
                     <li><code>Alt+I</code> / <code>⌥+I</code>: Toggle game information display</li>
                     <li><code>Alt+E</code> / <code>⌥+E</code>: Toggle evaluation bar</li>
                     <li><code>Alt+U</code> / <code>⌥+U</code>: Toggle material widget</li>
+                    <li><code>Alt+G</code>: Toggle Game Tags widget</li>
                     <li><code>Alt+H</code> / <code>⌥+H</code>: Toggle positional heatmap</li>
                     <li><code>Alt+P</code> / <code>⌥+P</code>: Toggle played move arrow</li>
                     <li><code>Alt+B</code> / <code>⌥+B</code>: Toggle best next move arrow (PV1)</li>
@@ -2366,7 +2456,7 @@
                     <li><code>Alt+L</code> / <code>⌥+L</code>: Toggle annotations layer</li>
                 </ul>
 
-                <h5>6.14.9 Manual Analysis</h5>
+                <h5>6.15.9 Manual Analysis</h5>
                 <p>Shortcuts for manual position analysis:</p>
                 <ul>
                     <li><code>Alt+M</code> / <code>⌥+M</code>: Start or stop continuous engine analysis</li>
@@ -2374,7 +2464,7 @@
                     <li><code>Alt+R</code> / <code>⌥+R</code>: Remove principal variation line</li>
                 </ul>
                 
-                <h5>6.14.10 Annotations</h5>
+                <h5>6.15.10 Annotations</h5>
                 <p>Shortcuts for managing annotations:</p>
                 <ul>
                     <li><code>Ctrl+Alt+S</code>: Save annotations to current game</li>
@@ -2382,13 +2472,13 @@
                     <li><code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>: Clear all annotations for current game</li>
                 </ul>
                 
-                <h5>6.14.11 Engine Management</h5>
+                <h5>6.15.11 Engine Management</h5>
                 <p>Shortcuts for managing chess engines:</p>
                 <ul>
                     <li><code>Ctrl+E</code>: Add engine</li>
                 </ul>
                 
-                <h5>6.14.12 Database Operations</h5>
+                <h5>6.15.12 Database Operations</h5>
                 <p>Shortcuts for database management and bulk operations:</p>
                 <ul>
                     <li><code>Ctrl+Shift+F</code> / <code>⌘+Shift+F</code>: Search games across databases</li>
@@ -2400,7 +2490,7 @@
                     <li><code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code>: Clear Clipboard database</li>
                 </ul>
                 
-                <h5>6.14.13 PGN Display Options</h5>
+                <h5>6.15.13 PGN Display Options</h5>
                 <p>Shortcuts for controlling PGN notation display:</p>
                 <ul>
                     <li><code>Ctrl+M</code> / <code>⌘+M</code>: Toggle metadata display</li>
@@ -2411,7 +2501,7 @@
                     <li><code>Ctrl+R</code> / <code>⌘+R</code>: Toggle results display</li>
                 </ul>
                 
-                <h5>6.14.14 Notes</h5>
+                <h5>6.15.14 Notes</h5>
                 <p>Shortcuts for game notes:</p>
                 <ul>
                     <li><code>Ctrl+Shift+E</code>: Clear notes for current game</li>
