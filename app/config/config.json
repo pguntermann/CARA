@@ -602,6 +602,41 @@
               105
             ]
           },
+          "game_tags_widget": {
+            "width": 170,
+            "max_height": 0,
+            "min_interactive_height": 200,
+            "padding": [
+              10,
+              10,
+              15,
+              10
+            ],
+            "spacing_below_material": 6,
+            "flow_spacing": 6,
+            "chip": {
+              "border_radius": 10,
+              "padding": [
+                2,
+                8
+              ],
+              "minimum_height": 22,
+              "unmanaged_background_color": [
+                95,
+                95,
+                100
+              ],
+              "font_family": "Helvetica Neue",
+              "font_size": 11,
+              "font_weight": "bold",
+              "hover_background_rgba": [
+                255,
+                255,
+                255,
+                18
+              ]
+            }
+          },
           "move_classification_badges": {
             "inset_ratio": 0.04,
             "colors": {
@@ -2807,6 +2842,7 @@
           "column_widths": {
             "col_num": 50,
             "col_file_num": 70,
+            "col_unsaved": 25,
             "col_white": 170,
             "col_black": 170,
             "col_white_elo": 80,
@@ -2821,7 +2857,14 @@
             "col_tc_type": 80,
             "col_analyzed": 70,
             "col_annotated": 70,
-            "col_source_db": 120
+            "col_notes": 70,
+            "col_source_db": 120,
+            "col_ref_ply": 70,
+            "col_tags": 260
+          },
+          "tags_column": {
+            "width": 260,
+            "cell_padding": [4, 2]
           },
           "header_background_color": [
             45,
@@ -3003,6 +3046,52 @@
       }
     },
     "dialogs": {
+        "manage_game_tags": {
+          "width": 600,
+          "height": 440,
+          "background_color": [40, 40, 45],
+          "border_color": [60, 60, 65],
+          "text_color": [200, 200, 200],
+          "font_family": "Helvetica Neue",
+          "font_size": 11,
+          "layout": {
+            "margins": [18, 18, 18, 18],
+            "spacing": 10
+          },
+          "groups": {
+            "contents_margins": [10, 14, 10, 10],
+            "spacing": 10,
+            "builtin_chip_container_min_height": 36,
+            "custom_chip_container_min_height": 36
+          },
+          "chips": {
+            "spacing_multiplier": 2,
+            "outer_padding_multiplier": 1
+          },
+          "plus_chip": {
+            "text": "+",
+            "bold": true
+          },
+          "add_custom_tag_dialog": {
+            "width": 420,
+            "height": 140,
+            "layout": {
+              "margins": [18, 18, 18, 18],
+              "spacing": 10,
+              "row_spacing": 10
+            },
+            "swatch": {
+              "min_size": 18,
+              "max_size": 22
+            }
+          },
+          "inputs": {
+            "font_family": "Cascadia Mono",
+            "font_size": 11,
+            "background_color": [30, 30, 35],
+            "border_color": [60, 60, 65]
+          }
+        },
       "classification_settings": {
         "width": 480,
         "height": 660,
@@ -4124,6 +4213,10 @@
             0,
             5
           ]
+        },
+        "tag_picker": {
+          "selected_border_color": [0, 200, 255],
+          "selected_border_width": 2
         }
       },
       "import_games": {
@@ -5598,6 +5691,38 @@
         }
       }
     }
+  },
+  "game_tags": {
+    "builtin": [
+      {
+        "name": "Favourite",
+        "color": [255, 255, 0]
+      },
+      {
+        "name": "Blunder-decided",
+        "color": [220, 80, 80]
+      },
+      {
+        "name": "Clean win",
+        "color": [70, 160, 110]
+      },
+      {
+        "name": "Missed win",
+        "color": [200, 100, 255]
+      },
+      {
+        "name": "Opening disaster",
+        "color": [200, 90, 160]
+      },
+      {
+        "name": "Engame grind",
+        "color": [110, 140, 220]
+      },
+      {
+        "name": "Chaotic game",
+        "color": [140, 140, 140]
+      }
+    ]
   },
   "ai": {
     "model_filters": {

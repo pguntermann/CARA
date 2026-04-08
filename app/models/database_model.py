@@ -26,6 +26,8 @@ class GameData:
                  white_elo: str = "",
                  black_elo: str = "",
                  time_control: str = "",
+                 game_tags_raw: str = "",
+                 game_tags: str = "",
                  analyzed: bool = False,
                  annotated: bool = False,
                  has_notes: bool = False,
@@ -72,6 +74,9 @@ class GameData:
         self.white_elo = white_elo
         self.black_elo = black_elo
         self.time_control = time_control
+        # CARA per-game tags (stored in PGN header [CARAGameTags "..."])
+        self.game_tags_raw = game_tags_raw
+        self.game_tags = game_tags
         self.analyzed = analyzed
         self.annotated = annotated
         self.has_notes = has_notes
@@ -128,7 +133,8 @@ class DatabaseModel(QAbstractTableModel):
     COL_NOTES = 17
     COL_SOURCE_DB = 18
     COL_REF_PLY = 19
-    COL_PGN = 20
+    COL_TAGS = 20
+    COL_PGN = 21
     
     def __init__(self, file_path: Optional[str] = None, config: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the database model.
@@ -172,9 +178,9 @@ class DatabaseModel(QAbstractTableModel):
             parent: Parent index (unused for table models).
             
         Returns:
-            Number of columns (21: includes TimeControl, TC Type, Notes, Ref Ply).
+            Number of columns (22: includes per-game Tags before PGN).
         """
-        return 21
+        return 22
     
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         """Get item flags for the given index.
@@ -272,6 +278,8 @@ class DatabaseModel(QAbstractTableModel):
         elif col == self.COL_REF_PLY:
             # 0 means "no specific reference ply" so display empty string
             return game.ref_ply if getattr(game, "ref_ply", 0) > 0 else ""
+        elif col == self.COL_TAGS:
+            return getattr(game, "game_tags", "") or ""
         elif col == self.COL_PGN:
             # Return a cached, single-line preview of the PGN for display.
             # The full PGN is still available on game.pgn and is used for exports.
@@ -324,6 +332,7 @@ class DatabaseModel(QAbstractTableModel):
                 "Notes",
                 "Source DB",
                 "Ref Ply",
+                "Tags",
                 "PGN",
             ]
             if 0 <= section < len(headers):
@@ -978,6 +987,8 @@ class DatabaseModel(QAbstractTableModel):
                 return game.source_database or ""
             elif column == self.COL_REF_PLY:
                 return getattr(game, "ref_ply", 0)
+            elif column == self.COL_TAGS:
+                return getattr(game, "game_tags", "") or ""
             elif column == self.COL_PGN:
                 return game.pgn or ""
             else:

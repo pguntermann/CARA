@@ -16,13 +16,228 @@ from PyQt6.QtWidgets import (
     QWidget,
     QScrollArea,
     QSpacerItem,
+    QFrame,
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal
-from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent
-from typing import Optional, Dict, Any, List
+from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent, QFontMetrics
+from typing import Optional, Dict, Any, List, Tuple, Callable
 
 from app.models.search_criteria import SearchCriteria, SearchField, SearchOperator, LogicOperator, SearchQuery
 from app.models.database_model import DatabaseModel
+
+from app.services.game_tags_service import GameTagsService
+from app.utils.font_utils import resolve_font_family, scale_font_size
+
+
+class _ChipWrapContainer(QWidget):
+    """Manual wrap layout container for chip buttons."""
+
+    def __init__(self, spacing: int, parent=None) -> None:
+        super().__init__(parent)
+        self._spacing = int(spacing)
+        self._chips: List[QPushButton] = []
+
+    def set_chips(self, chips: List[QPushButton]) -> None:
+        self._chips = chips
+        self._layout()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._layout()
+
+    def _layout(self) -> None:
+        if not self._chips:
+            self.setMinimumHeight(1)
+            return
+        w_total = max(1, int(self.width()))
+        x = 0
+        y = 0
+        line_h = 0
+        spacing = max(1, int(self._spacing))
+        for chip in self._chips:
+            try:
+                chip.ensurePolished()
+                chip.adjustSize()
+            except Exception:
+                pass
+            sh = chip.sizeHint()
+            cw = max(int(chip.minimumWidth()), int(sh.width()), 1)
+            ch = max(int(chip.minimumHeight()), int(sh.height()), 1)
+            if x > 0 and x + cw > w_total:
+                x = 0
+                y += line_h + spacing
+                line_h = 0
+            chip.setGeometry(int(x), int(y), int(min(cw, w_total)), int(ch))
+            chip.show()
+            x += min(cw, w_total) + spacing
+            line_h = max(line_h, ch)
+        self.setMinimumHeight(int(y + line_h))
+
+
+class _TagsChipPickerPopup(QFrame):
+    """Popup that shows tag chips for multi-select."""
+
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        selected_tags: List[str],
+        on_change: Callable[[List[str]], None],
+        parent=None,
+    ) -> None:
+        super().__init__(parent, Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+        self.config = config
+        self._selected = list(selected_tags or [])
+        self._on_change = on_change
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+        # Use the same chip config as the board tag widget for consistency.
+        board_cfg = (self.config.get("ui", {}) or {}).get("panels", {}).get("main", {}).get("board", {})
+        tags_cfg = board_cfg.get("game_tags_widget", {}) if isinstance(board_cfg, dict) else {}
+        self.flow_spacing = int(tags_cfg.get("flow_spacing", 6))
+        chip_cfg = tags_cfg.get("chip", {}) if isinstance(tags_cfg.get("chip", {}), dict) else {}
+        self.chip_border_radius = int(chip_cfg.get("border_radius", 10))
+        self.chip_padding = chip_cfg.get("padding", [2, 8])  # [v, h]
+        self.chip_min_height = int(chip_cfg.get("minimum_height", 22))
+        self.chip_unmanaged_bg = chip_cfg.get("unmanaged_background_color", [95, 95, 100])
+
+        font_family_raw = chip_cfg.get("font_family", "Helvetica Neue")
+        self.chip_font_family = resolve_font_family(font_family_raw)
+        self.chip_font_size = int(scale_font_size(chip_cfg.get("font_size", 11)))
+        self.chip_font_weight = str(chip_cfg.get("font_weight", "bold")).strip().lower()
+
+        dlg_cfg = (self.config.get("ui", {}) or {}).get("dialogs", {}).get("search", {})
+        bg = dlg_cfg.get("background_color", [40, 40, 45])
+        border = dlg_cfg.get("border_color", [60, 60, 65])
+        tag_picker_cfg = dlg_cfg.get("tag_picker", {}) if isinstance(dlg_cfg.get("tag_picker", {}), dict) else {}
+        self._selected_border_color = tag_picker_cfg.get("selected_border_color", [70, 90, 130])
+        self._selected_border_width = int(tag_picker_cfg.get("selected_border_width", 2))
+        self._bg = QColor(*bg) if isinstance(bg, list) else QColor(40, 40, 45)
+        self._border = QColor(*border) if isinstance(border, list) else QColor(60, 60, 65)
+
+        self.setStyleSheet(
+            "QFrame {"
+            f"  background-color: rgb({self._bg.red()},{self._bg.green()},{self._bg.blue()});"
+            f"  border: 1px solid rgb({self._border.red()},{self._border.green()},{self._border.blue()});"
+            "  border-radius: 6px;"
+            "}"
+            "QScrollArea { outline: none; border: none; background: transparent; }"
+            "QScrollArea QWidget { outline: none; border: none; background: transparent; }"
+            "QAbstractScrollArea:focus { outline: none; }"
+            "QWidget:focus { outline: none; }"
+            "QPushButton:focus { outline: none; }"
+        )
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._scroll.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        try:
+            self._scroll.viewport().setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        except Exception:
+            pass
+
+        self._root = QWidget()
+        self._root.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._root_layout = QVBoxLayout(self._root)
+        self._root_layout.setContentsMargins(0, 0, 0, 0)
+        self._root_layout.setSpacing(8)
+
+        # Single chip flow: built-in first, then custom (no captions).
+        self._wrap = _ChipWrapContainer(self.flow_spacing, self._root)
+        self._root_layout.addWidget(self._wrap)
+        self._root_layout.addStretch(1)
+
+        self._scroll.setWidget(self._root)
+        layout.addWidget(self._scroll, 1)
+
+        self._rebuild()
+
+        # Reasonable default size; follows parent width somewhat.
+        self.setFixedSize(360, 220)
+
+    def _rebuild(self) -> None:
+        defs = GameTagsService(self.config).get_definitions()
+        builtins = [d for d in defs if getattr(d, "builtin", False)]
+        customs = [d for d in defs if not getattr(d, "builtin", False)]
+
+        selected = {t.casefold() for t in self._selected}
+
+        def mk_chip(name: str, rgb: Tuple[int, int, int]) -> QPushButton:
+            btn = QPushButton(name, self._root)
+            btn.setCheckable(True)
+            btn.setChecked(name.casefold() in selected)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self._style_chip(btn, QColor(int(rgb[0]), int(rgb[1]), int(rgb[2])))
+            btn.toggled.connect(lambda checked, n=name: self._toggle(n, checked))
+            return btn
+
+        chips = [mk_chip(d.name, d.color) for d in builtins] + [mk_chip(d.name, d.color) for d in customs]
+
+        for w in self._wrap.findChildren(QPushButton):
+            w.setParent(None)
+            w.deleteLater()
+        for c in chips:
+            c.setParent(self._wrap)
+        self._wrap.set_chips(chips)
+
+    def _toggle(self, name: str, checked: bool) -> None:
+        cur = list(self._selected)
+        key = name.casefold()
+        if checked:
+            if all(t.casefold() != key for t in cur):
+                cur.append(name)
+        else:
+            cur = [t for t in cur if t.casefold() != key]
+        self._selected = cur
+        if callable(self._on_change):
+            self._on_change(list(self._selected))
+
+    def _style_chip(self, chip: QPushButton, color: QColor) -> None:
+        chip.setMinimumHeight(int(self.chip_min_height))
+        chip.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        chip.setFlat(True)
+
+        font = QFont(self.chip_font_family, self.chip_font_size)
+        if self.chip_font_weight in ("bold", "700", "800", "900"):
+            font.setBold(True)
+        chip.setFont(font)
+
+        bg = f"rgb({color.red()}, {color.green()}, {color.blue()})"
+        lum = 0.2126 * color.red() + 0.7152 * color.green() + 0.0722 * color.blue()
+        text = "rgb(15, 15, 18)" if lum > 150 else "rgb(245, 245, 245)"
+        pad_v = int(self.chip_padding[0]) if isinstance(self.chip_padding, list) and len(self.chip_padding) >= 1 else 2
+        pad_h = int(self.chip_padding[1]) if isinstance(self.chip_padding, list) and len(self.chip_padding) >= 2 else 8
+
+        fm = QFontMetrics(font)
+        chip.setMinimumWidth(int(fm.horizontalAdvance(chip.text()) + 2 * pad_h + 8))
+
+        # Checked state uses configurable blue outline.
+        sel = self._selected_border_color if isinstance(self._selected_border_color, list) else [70, 90, 130]
+        sel_w = max(1, int(self._selected_border_width))
+        sel_css = f"rgba({int(sel[0])}, {int(sel[1])}, {int(sel[2])}, 255)"
+        chip.setStyleSheet(
+            "QPushButton {"
+            f"  background-color: {bg};"
+            f"  color: {text};"
+            f"  border-radius: {int(self.chip_border_radius)}px;"
+            f"  padding: {pad_v}px {pad_h}px;"
+            "  border: 1px solid rgba(0,0,0,0);"
+            "}"
+            "QPushButton:hover {"
+            "  border: 1px solid rgba(255,255,255,0.30);"
+            "}"
+            "QPushButton:checked {"
+            f"  border: {sel_w}px solid {sel_css};"
+            "}"
+            "QPushButton:checked:hover {"
+            f"  border: {sel_w}px solid {sel_css};"
+            "}"
+        )
 
 
 
@@ -92,7 +307,7 @@ class CriteriaRowWidget(QWidget):
         self.field_combo = QComboBox()
         self.field_combo.addItems([
             "White", "Black", "WhiteElo", "BlackElo", "Result", "Date", 
-            "Event", "Site", "ECO", "TimeControl", "TC Type", "Analyzed", "Annotated", "Custom PGN Tag"
+            "Event", "Site", "ECO", "TimeControl", "TC Type", "Analyzed", "Annotated", "Tags", "Custom PGN Tag"
         ])
         self.field_combo.setFixedWidth(120)
         self.field_combo.currentTextChanged.connect(self._on_field_changed)
@@ -110,6 +325,15 @@ class CriteriaRowWidget(QWidget):
         self.value_input.setMinimumWidth(100)  # Reduced from 150
         self.value_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.value_input)
+
+        # Tags picker (hidden by default; used when field == "Tags")
+        self._selected_tags: List[str] = []
+        self.tags_picker_btn = QPushButton("Select tags…")
+        self.tags_picker_btn.setVisible(False)
+        self.tags_picker_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.tags_picker_btn.clicked.connect(self._open_tags_picker_popup)
+        layout.addWidget(self.tags_picker_btn)
+        self._tags_popup: Optional[_TagsChipPickerPopup] = None
         
         # Custom tag name input (hidden by default)
         self.custom_tag_input = QLineEdit()
@@ -130,6 +354,13 @@ class CriteriaRowWidget(QWidget):
         """Handle field selection change."""
         # Update operators based on field type
         self.operator_combo.clear()
+
+        # Close popup when switching fields
+        try:
+            if self._tags_popup is not None:
+                self._tags_popup.close()
+        except Exception:
+            pass
         
         if field_text in ["Analyzed", "Annotated"]:
             self.operator_combo.addItems(["is", "is not"])
@@ -172,6 +403,12 @@ class CriteriaRowWidget(QWidget):
             self.value_input.setEnabled(True)
             self.value_input.setPlaceholderText("Value...")
             self.custom_tag_input.setVisible(True)
+        elif field_text == "Tags":
+            self.operator_combo.addItems(["contains", "does not contain"])
+            self.value_input.setVisible(False)
+            self.tags_picker_btn.setVisible(True)
+            self._sync_tags_picker_label()
+            self.custom_tag_input.setVisible(False)
         else:
             # Text fields
             self.operator_combo.addItems([
@@ -181,6 +418,7 @@ class CriteriaRowWidget(QWidget):
             self.value_input.setPlaceholderText("Value...")
             self.value_input.setVisible(True)
             self.value_input.setEnabled(True)
+            self.tags_picker_btn.setVisible(False)
             self.custom_tag_input.setVisible(False)
     
     def _apply_styling(self) -> None:
@@ -207,7 +445,7 @@ class CriteriaRowWidget(QWidget):
         border_color = buttons_config.get("border_color", [60, 60, 65])
         # Use smaller padding (3px) for inline button
         StyleManager.style_buttons(
-            [self.remove_btn],
+            [self.remove_btn, self.tags_picker_btn],
             self.config,
             bg_color,
             border_color,
@@ -276,6 +514,7 @@ class CriteriaRowWidget(QWidget):
             text_height = fm.height()
             combo_height = text_height + (self.input_padding[1] * 2) + 2
         self.remove_btn.setFixedSize(self.small_button_width, combo_height)
+        self.tags_picker_btn.setFixedHeight(combo_height)
     
     def get_criterion(self) -> Optional[SearchCriteria]:
         """Get SearchCriteria from this row.
@@ -304,6 +543,7 @@ class CriteriaRowWidget(QWidget):
             "TC Type": SearchField.TC_TYPE,
             "Analyzed": SearchField.ANALYZED,
             "Annotated": SearchField.ANNOTATED,
+            "Tags": SearchField.TAGS,
             "Custom PGN Tag": SearchField.CUSTOM_TAG,
         }
         field = field_map.get(field_text)
@@ -315,6 +555,7 @@ class CriteriaRowWidget(QWidget):
             "contains": SearchOperator.CONTAINS,
             "equals": SearchOperator.EQUALS,
             "not equals": SearchOperator.NOT_EQUALS,
+            "does not contain": SearchOperator.DOES_NOT_CONTAIN,
             "starts with": SearchOperator.STARTS_WITH,
             "ends with": SearchOperator.ENDS_WITH,
             "is empty": SearchOperator.IS_EMPTY,
@@ -351,6 +592,10 @@ class CriteriaRowWidget(QWidget):
             value = True  # Value doesn't matter for boolean
         elif operator in [SearchOperator.IS_EMPTY, SearchOperator.IS_NOT_EMPTY]:
             value = None
+        elif field == SearchField.TAGS:
+            value = list(self._selected_tags)
+            if not value:
+                return None
         elif field == SearchField.TIMECONTROL and operator not in [SearchOperator.IS_EMPTY, SearchOperator.IS_NOT_EMPTY]:
             # Parse TimeControl value as integer (base seconds)
             try:
@@ -402,6 +647,7 @@ class CriteriaRowWidget(QWidget):
             SearchField.TC_TYPE: "TC Type",
             SearchField.ANALYZED: "Analyzed",
             SearchField.ANNOTATED: "Annotated",
+            SearchField.TAGS: "Tags",
             SearchField.CUSTOM_TAG: "Custom PGN Tag",
         }
         field_text = field_map.get(criterion.field)
@@ -415,6 +661,7 @@ class CriteriaRowWidget(QWidget):
             SearchOperator.CONTAINS: "contains",
             SearchOperator.EQUALS: "equals",
             SearchOperator.NOT_EQUALS: "not equals",
+            SearchOperator.DOES_NOT_CONTAIN: "does not contain",
             SearchOperator.STARTS_WITH: "starts with",
             SearchOperator.ENDS_WITH: "ends with",
             SearchOperator.IS_EMPTY: "is empty",
@@ -440,7 +687,11 @@ class CriteriaRowWidget(QWidget):
         # Set value (if applicable)
         if criterion.value is not None and criterion.operator not in [SearchOperator.IS_EMPTY, SearchOperator.IS_NOT_EMPTY]:
             if criterion.field not in [SearchField.ANALYZED, SearchField.ANNOTATED]:
-                self.value_input.setText(str(criterion.value))
+                if criterion.field == SearchField.TAGS and isinstance(criterion.value, list):
+                    self._selected_tags = [str(x) for x in criterion.value if str(x).strip()]
+                    self._sync_tags_picker_label()
+                else:
+                    self.value_input.setText(str(criterion.value))
         
         # Set custom tag if applicable
         if criterion.field == SearchField.CUSTOM_TAG and criterion.custom_tag_name:
@@ -450,6 +701,50 @@ class CriteriaRowWidget(QWidget):
         if criterion.logic_operator:
             logic_text = "AND" if criterion.logic_operator == LogicOperator.AND else "OR"
             self.logic_combo.setCurrentText(logic_text)
+
+    def _sync_tags_picker_label(self) -> None:
+        if not getattr(self, "_selected_tags", None):
+            self.tags_picker_btn.setText("Select tags…")
+        elif len(self._selected_tags) == 1:
+            self.tags_picker_btn.setText(self._selected_tags[0])
+        else:
+            self.tags_picker_btn.setText(f"{len(self._selected_tags)} tags")
+
+    def _open_tags_picker_popup(self) -> None:
+        """Open chip-based popup picker for tags."""
+        # Toggle behavior: if already open, close.
+        if self._tags_popup is not None and self._tags_popup.isVisible():
+            self._tags_popup.close()
+            return
+
+        def on_change(new_tags: List[str]) -> None:
+            self._selected_tags = new_tags
+            self._sync_tags_picker_label()
+
+        self._tags_popup = _TagsChipPickerPopup(
+            self.config,
+            selected_tags=list(self._selected_tags),
+            on_change=on_change,
+            parent=self,
+        )
+        # Position popup under the button.
+        p = self.tags_picker_btn.mapToGlobal(self.tags_picker_btn.rect().bottomLeft())
+        self._tags_popup.move(p)
+        self._tags_popup.show()
+
+    def _toggle_selected_tag(self, tag_name: str, checked: bool) -> None:
+        name = str(tag_name or "").strip()
+        if not name:
+            return
+        cur = list(self._selected_tags or [])
+        key = name.casefold()
+        if checked:
+            if all(t.casefold() != key for t in cur):
+                cur.append(name)
+        else:
+            cur = [t for t in cur if t.casefold() != key]
+        self._selected_tags = cur
+        self._sync_tags_picker_label()
     
     def set_group_end(self, is_end: bool) -> None:
         """Mark this row as a group end.

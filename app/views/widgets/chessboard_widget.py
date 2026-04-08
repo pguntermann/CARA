@@ -31,6 +31,7 @@ from app.models.evaluation_model import EvaluationModel
 from app.models.annotation_model import AnnotationModel, Annotation, AnnotationType
 from app.views.widgets.material_widget import MaterialWidget
 from app.views.widgets.evaluation_bar_widget import EvaluationBarWidget
+from app.views.widgets.game_tags_widget import GameTagsWidget
 from app.services.logging_service import LoggingService
 
 
@@ -67,6 +68,11 @@ class ChessBoardWidget(QWidget):
         self.material_widget = MaterialWidget(self.config, None)
         self.material_widget.setParent(self)
         self.material_widget.setVisible(False)
+
+        # Create game tags widget (attached to upper right of board, under material widget)
+        self.game_tags_widget = GameTagsWidget(self.config, self)
+        self.game_tags_widget.setParent(self)
+        self.game_tags_widget.setVisible(True)
         
         # Create positional heat-map overlay (will be set later via set_positional_heatmap_model)
         self.positional_heatmap_overlay = None
@@ -291,6 +297,7 @@ class ChessBoardWidget(QWidget):
         self._cached_widget_size = None
         self._cached_eval_bar_visible = None
         self._cached_material_widget_visible = None
+        self._cached_game_tags_widget_visible = None
         self._cached_coordinates_visible = None
         
         # Load piece SVGs
@@ -321,6 +328,7 @@ class ChessBoardWidget(QWidget):
         # Check if evaluation bar and material widget are visible
         eval_bar_visible = self.evaluation_bar and self.evaluation_bar.isVisible()
         material_widget_visible = self.material_widget and self.material_widget.isVisible()
+        game_tags_widget_visible = self.game_tags_widget and self.game_tags_widget.isVisible()
         coordinates_visible = self.show_coordinates
         
         # Check if cache is valid
@@ -328,6 +336,7 @@ class ChessBoardWidget(QWidget):
             self._cached_widget_size == widget_size and
             self._cached_eval_bar_visible == eval_bar_visible and
             self._cached_material_widget_visible == material_widget_visible and
+            self._cached_game_tags_widget_visible == game_tags_widget_visible and
             self._cached_coordinates_visible == coordinates_visible):
             return self._cached_dimensions
         
@@ -345,19 +354,28 @@ class ChessBoardWidget(QWidget):
         if eval_bar_visible:
             eval_bar_width = self.evaluation_bar.width + self.eval_bar_padding_left
         
-        # Account for material widget width when visible
-        material_widget_width = 0
-        if material_widget_visible:
-            material_widget_width = self.material_widget.width()
-            # Get material widget padding from config
-            board_config = self.config.get("ui", {}).get("panels", {}).get("main", {}).get("board", {})
+        # Account for right-side widgets (material + game tags) when visible.
+        # They share the same "slot" to the right of the board; reserve the maximum width.
+        right_widget_width = 0
+        board_config = self.config.get("ui", {}).get("panels", {}).get("main", {}).get("board", {})
+        if material_widget_visible and self.material_widget:
+            material_w = self.material_widget.width()
             material_config = board_config.get("material_widget", {})
             material_padding = material_config.get("padding", [10, 10, 15, 10])  # [top, right, bottom, left]
-            # Add left padding (space between board and widget) to material widget width
-            material_widget_width += material_padding[3]  # left padding
+            material_w += material_padding[3]  # left padding
+            right_widget_width = max(right_widget_width, material_w)
+        if game_tags_widget_visible and self.game_tags_widget:
+            tags_w = self.game_tags_widget.width()
+            tags_config = board_config.get("game_tags_widget", {})
+            tags_padding = tags_config.get("padding", [10, 10, 15, 10])
+            if isinstance(tags_padding, list) and len(tags_padding) == 4:
+                tags_w += int(tags_padding[3])
+            else:
+                tags_w += 10
+            right_widget_width = max(right_widget_width, tags_w)
         
         # Available space after padding, evaluation bar, and material widget
-        available_width_no_coord = width - padding_left - padding_right - eval_bar_width - material_widget_width
+        available_width_no_coord = width - padding_left - padding_right - eval_bar_width - right_widget_width
         available_height_no_coord = height - padding_top - padding_bottom
         
         # Board is square, use the smaller dimension (accounting for coordinate border)
@@ -402,13 +420,14 @@ class ChessBoardWidget(QWidget):
             'total_board_width': total_board_width,
             'total_board_height': total_board_height,
             'eval_bar_width': eval_bar_width,
-            'material_widget_width': material_widget_width,
+            'right_widget_width': right_widget_width,
             'available_width_no_coord': available_width_no_coord,
             'available_height_no_coord': available_height_no_coord
         }
         self._cached_widget_size = widget_size
         self._cached_eval_bar_visible = eval_bar_visible
         self._cached_material_widget_visible = material_widget_visible
+        self._cached_game_tags_widget_visible = game_tags_widget_visible
         self._cached_coordinates_visible = coordinates_visible
         
         return self._cached_dimensions
@@ -419,6 +438,7 @@ class ChessBoardWidget(QWidget):
         self._cached_widget_size = None
         self._cached_eval_bar_visible = None
         self._cached_material_widget_visible = None
+        self._cached_game_tags_widget_visible = None
         self._cached_coordinates_visible = None
     
     def paintEvent(self, event) -> None:
@@ -1427,6 +1447,8 @@ class ChessBoardWidget(QWidget):
         model.active_pv_plan_changed.connect(self._on_active_pv_plan_changed)
         model.hide_other_arrows_during_plan_exploration_changed.connect(self._on_hide_other_arrows_during_plan_exploration_changed)
         model.material_widget_visibility_changed.connect(self._on_material_widget_visibility_changed)
+        if hasattr(model, "game_tags_widget_visibility_changed"):
+            model.game_tags_widget_visibility_changed.connect(self._on_game_tags_widget_visibility_changed)
         if hasattr(model, 'turn_changed'):
             model.turn_changed.connect(self._on_turn_changed)
         
@@ -1458,6 +1480,10 @@ class ChessBoardWidget(QWidget):
             self.set_material_widget_visible(model.show_material_widget)
         if hasattr(model, 'is_flipped'):
             self.set_material_widget_flipped(model.is_flipped)
+
+        # Update game tags widget visibility if model has it
+        if hasattr(model, "show_game_tags_widget"):
+            self.set_game_tags_widget_visible(model.show_game_tags_widget)
         
         # Connect material widget to board model
         self.material_widget.set_board_model(model)
@@ -1845,6 +1871,8 @@ class ChessBoardWidget(QWidget):
             self.update()
             if visible:
                 self._update_material_widget_position()
+            # Tag widget may be positioned under material; always refresh its position.
+            self._update_game_tags_widget_position()
             # Update evaluation bar position if it's visible, since board dimensions changed
             if self.evaluation_bar and self.evaluation_bar.isVisible():
                 self._update_evaluation_bar_position()
@@ -1906,6 +1934,7 @@ class ChessBoardWidget(QWidget):
         # Use QTimer to ensure widget has final size
         QTimer.singleShot(0, self._update_evaluation_bar_position)
         QTimer.singleShot(0, self._update_material_widget_position)
+        QTimer.singleShot(0, self._update_game_tags_widget_position)
     
     def resizeEvent(self, event) -> None:
         """Handle widget resize event to reposition evaluation bar.
@@ -1918,6 +1947,7 @@ class ChessBoardWidget(QWidget):
         self._invalidate_cache()
         self._update_evaluation_bar_position()
         self._update_material_widget_position()
+        self._update_game_tags_widget_position()
         
         # Update overlay size
         if self.positional_heatmap_overlay:
@@ -1988,6 +2018,72 @@ class ChessBoardWidget(QWidget):
             material_widget_width,
             material_widget_height
         )
+
+    def _on_game_tags_widget_visibility_changed(self, show: bool) -> None:
+        """Handle game tags widget visibility change from model."""
+        self.set_game_tags_widget_visible(show)
+
+    def set_game_tags_widget_visible(self, visible: bool) -> None:
+        """Set game tags widget visibility and reflow board sizing."""
+        if not hasattr(self, "game_tags_widget") or not self.game_tags_widget:
+            return
+        self.game_tags_widget.setVisible(bool(visible))
+        self._invalidate_cache()
+        self._calculate_board_dimensions()
+        self.update()
+        # Right-side widgets share the same slot; when tags visibility changes,
+        # material widget must be repositioned too (otherwise it can drift into the board).
+        if hasattr(self, "material_widget") and self.material_widget and self.material_widget.isVisible():
+            self._update_material_widget_position()
+        if visible:
+            self._update_game_tags_widget_position()
+        # Tag widget affects available width (right slot) so evaluation bar might shift.
+        if self.evaluation_bar and self.evaluation_bar.isVisible():
+            self._update_evaluation_bar_position()
+
+    def _update_game_tags_widget_position(self) -> None:
+        """Update game tags widget position (upper right, under material widget)."""
+        if not hasattr(self, "game_tags_widget") or not self.game_tags_widget or not self.game_tags_widget.isVisible():
+            return
+
+        dims = self._calculate_board_dimensions()
+        start_x = dims["start_x"]
+        start_y = dims["start_y"]
+        board_size = dims["board_size"]
+
+        board_top_y = start_y - self.border_size
+        board_config = self.config.get("ui", {}).get("panels", {}).get("main", {}).get("board", {})
+        tags_config = board_config.get("game_tags_widget", {})
+        tags_padding = tags_config.get("padding", [10, 10, 15, 10])  # [top, right, bottom, left]
+        spacing_below_material = int(tags_config.get("spacing_below_material", 6))
+        # max_height: if <= 0, use all available height (no cap).
+        max_height = int(tags_config.get("max_height", 0))
+        min_interactive_height = int(tags_config.get("min_interactive_height", 0))
+
+        tags_widget_width = self.game_tags_widget.width()
+        tags_widget_height = self.game_tags_widget.height()
+
+        tags_widget_x = start_x + board_size + (int(tags_padding[3]) if isinstance(tags_padding, list) and len(tags_padding) == 4 else 10)
+
+        # If material widget is visible, place tags under it; otherwise use its slot.
+        y = board_top_y
+        if hasattr(self, "material_widget") and self.material_widget and self.material_widget.isVisible():
+            y = board_top_y + self.material_widget.height() + spacing_below_material
+
+        # Clamp height to available space (minus panel padding and widget padding).
+        panel_padding_bottom = int(self.padding[3]) if isinstance(self.padding, list) and len(self.padding) == 4 else 0
+        tags_pad_bottom = int(tags_padding[2]) if isinstance(tags_padding, list) and len(tags_padding) == 4 else 0
+        available_h = max(0, int(self.height() - panel_padding_bottom - tags_pad_bottom - y))
+        if max_height <= 0:
+            tags_h = int(available_h)
+        else:
+            tags_h = min(int(max_height), available_h)
+
+        if min_interactive_height > 0:
+            tags_h = max(int(min_interactive_height), int(tags_h))
+            tags_h = min(int(tags_h), int(available_h))
+
+        self.game_tags_widget.setGeometry(int(tags_widget_x), int(y), tags_widget_width, int(tags_h))
     
     def _draw_turn_indicator(self, painter: QPainter, board_start_x: int, board_start_y: int) -> None:
         """Draw turn indicator attached to bottom right of board.

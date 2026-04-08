@@ -1104,6 +1104,13 @@ class AppController:
         show_widget = self.board_controller.get_board_model().show_material_widget
         status = "Material widget shown" if show_widget else "Material widget hidden"
         self.set_status(status)
+
+    def toggle_game_tags_widget_visibility(self) -> None:
+        """Toggle the visibility of the game tags widget."""
+        self.board_controller.toggle_game_tags_widget_visibility()
+        show_widget = self.board_controller.get_board_model().show_game_tags_widget
+        status = "Game tags shown" if show_widget else "Game tags hidden"
+        self.set_status(status)
     
     def toggle_positional_heatmap_visibility(self) -> None:
         """Toggle the visibility of positional heat-map.
@@ -1307,7 +1314,8 @@ class AppController:
             "show_annotations_layer": self.annotation_controller.get_annotation_model().show_annotations if self.annotation_controller else True,
             "hide_other_arrows_during_plan_exploration": board_model.hide_other_arrows_during_plan_exploration,
             "show_evaluation_bar": board_model.show_evaluation_bar,
-            "show_material_widget": board_model.show_material_widget
+            "show_material_widget": board_model.show_material_widget,
+            "show_game_tags_widget": board_model.show_game_tags_widget,
         })
         
         # Update PGN visibility settings through UserSettingsService

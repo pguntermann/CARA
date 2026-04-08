@@ -8,6 +8,7 @@ from PyQt6.QtCore import Qt
 from app.models.game_model import GameModel
 from app.models.database_model import DatabaseModel, GameData
 from app.services.pgn_service import PgnService
+from app.utils.game_tags_utils import parse_game_tags, tags_display_text
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -255,6 +256,11 @@ class MetadataController:
             
             # STEP 7: Emit metadata_updated signal (for PGN view)
             # This tells PGN view that metadata changed, but NOT game structure
+            # Also store last-changed tag name so views can optimize refreshes.
+            try:
+                setattr(self._game_model, "_last_metadata_tag_changed", tag_name)
+            except Exception:
+                pass
             self._game_model.metadata_updated.emit()
             
             # STEP 8: Refresh active game ONLY if player names or result changed (for game info header)
@@ -292,6 +298,9 @@ class MetadataController:
             game.analyzed = bool(new_value) if new_value else False
         elif tag_name == "CARAAnnotations":
             game.annotated = bool(new_value) if new_value else False
+        elif tag_name == "CARAGameTags":
+            setattr(game, "game_tags_raw", new_value or "")
+            setattr(game, "game_tags", tags_display_text(parse_game_tags(new_value or "")))
         elif tag_name in tag_to_field_mapping:
             field_name = tag_to_field_mapping[tag_name]
             setattr(game, field_name, new_value)
@@ -321,6 +330,7 @@ class MetadataController:
             "BlackElo": DatabaseModel.COL_BLACK_ELO,
             "CARAAnalysisData": DatabaseModel.COL_ANALYZED,
             "CARAAnnotations": DatabaseModel.COL_ANNOTATED,
+            "CARAGameTags": getattr(DatabaseModel, "COL_TAGS", None),
         }
         return tag_to_column.get(tag_name)
     
@@ -403,6 +413,10 @@ class MetadataController:
                 database_model._add_tags_to_cache({tag_name})
             
             # Emit metadata_updated signal to notify views (e.g., PGN view) that metadata changed
+            try:
+                setattr(self._game_model, "_last_metadata_tag_changed", tag_name)
+            except Exception:
+                pass
             self._game_model.metadata_updated.emit()
             
             # Update metadata model (structural change requires re-extraction)
@@ -480,6 +494,9 @@ class MetadataController:
                 game.analyzed = False
             elif tag_name == "CARAAnnotations":
                 game.annotated = False
+            elif tag_name == "CARAGameTags":
+                setattr(game, "game_tags_raw", "")
+                setattr(game, "game_tags", "")
             elif tag_name in tag_to_field_mapping:
                 field_name = tag_to_field_mapping[tag_name]
                 # Clear the field when tag is removed
@@ -514,6 +531,10 @@ class MetadataController:
                     self._database_controller.mark_database_unsaved(database_model)
             
             # Emit metadata_updated signal to notify views (e.g., PGN view) that metadata changed
+            try:
+                setattr(self._game_model, "_last_metadata_tag_changed", tag_name)
+            except Exception:
+                pass
             self._game_model.metadata_updated.emit()
             
             # Update metadata model (structural change requires re-extraction)

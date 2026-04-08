@@ -48,6 +48,8 @@ class DatabaseTableContextMenu:
     act_with_not_this: Optional[Any]
     act_with_empty: Optional[Any]
     act_with_not_empty: Optional[Any]
+    act_with_tag: Optional[Any]
+    act_without_tag: Optional[Any]
     act_copy_csv: Any
     act_copy_tsv: Any
     act_copy_selected_csv: Any
@@ -67,6 +69,7 @@ def build_database_table_context_menu(
     enable_copy_selected_games: bool,
     enable_cut_selected_games: bool,
     enable_paste_games: bool,
+    clicked_tag: Optional[str] = None,
 ) -> DatabaseTableContextMenu:
     select_rows_menu = QMenu("Select rows", panel)
     select_mode_menu = QMenu("Select mode", panel)
@@ -82,12 +85,17 @@ def build_database_table_context_menu(
     act_unselect_all = select_rows_menu.addAction("Unselect all rows")
     act_invert_selection = select_rows_menu.addAction("Invert Selection")
     act_with_this = act_with_not_this = act_with_empty = act_with_not_empty = None
+    act_with_tag = act_without_tag = None
     if has_cell:
         select_rows_menu.addSeparator()
         act_with_this = select_rows_menu.addAction("With this value")
         act_with_not_this = select_rows_menu.addAction("With not this value")
         act_with_empty = select_rows_menu.addAction("With empty value")
         act_with_not_empty = select_rows_menu.addAction("With not empty value")
+        if clicked_tag:
+            select_rows_menu.addSeparator()
+            act_with_tag = select_rows_menu.addAction(f'With this tag: "{clicked_tag}"')
+            act_without_tag = select_rows_menu.addAction(f'Without this tag: "{clicked_tag}"')
 
     menu = QMenu(panel)
     menu.addMenu(select_rows_menu)
@@ -121,6 +129,8 @@ def build_database_table_context_menu(
         act_with_not_this=act_with_not_this,
         act_with_empty=act_with_empty,
         act_with_not_empty=act_with_not_empty,
+        act_with_tag=act_with_tag,
+        act_without_tag=act_without_tag,
         act_copy_csv=act_copy_csv,
         act_copy_tsv=act_copy_tsv,
         act_copy_selected_csv=act_copy_selected_csv,

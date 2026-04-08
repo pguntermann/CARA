@@ -7,6 +7,7 @@ import chess.pgn
 from app.models.database_model import GameData, DatabaseModel
 from app.models.search_criteria import SearchCriteria, SearchField, SearchOperator
 from app.services.date_matcher import DateMatcher
+from app.utils.game_tags_utils import parse_game_tags
 
 
 class DatabaseSearchService:
@@ -319,6 +320,21 @@ class DatabaseSearchService:
         # Evaluate based on operator
         operator = criterion.operator
         value = criterion.value
+
+        # Tags: only allow membership operators (whole-tag match, case-insensitive).
+        if criterion.field == SearchField.TAGS:
+            raw = getattr(game, "game_tags_raw", "") or ""
+            tags = [t.casefold() for t in parse_game_tags(raw)]
+            needles: List[str]
+            if isinstance(value, list):
+                needles = [str(v).strip().casefold() for v in value if str(v).strip()]
+            else:
+                needles = [str(value or "").strip().casefold()] if str(value or "").strip() else []
+            if operator == SearchOperator.CONTAINS:
+                return any(n in tags for n in needles)
+            if operator == SearchOperator.DOES_NOT_CONTAIN:
+                return all(n not in tags for n in needles)
+            return False
         
         if operator == SearchOperator.CONTAINS:
             if field_value is None:
@@ -483,6 +499,8 @@ class DatabaseSearchService:
             return game.analyzed
         elif field == SearchField.ANNOTATED:
             return getattr(game, "annotated", False)
+        elif field == SearchField.TAGS:
+            return getattr(game, "game_tags_raw", "") or ""
         elif field == SearchField.CUSTOM_TAG:
             # Extract custom PGN tag
             if not game.pgn or not criterion.custom_tag_name:
@@ -526,6 +544,7 @@ class DatabaseSearchService:
             SearchField.TC_TYPE: "TC Type",
             SearchField.ANALYZED: "Analyzed",
             SearchField.ANNOTATED: "Annotated",
+            SearchField.TAGS: "Tags",
             SearchField.CUSTOM_TAG: "Custom Tag",
         }
         
@@ -551,6 +570,7 @@ class DatabaseSearchService:
             SearchOperator.DATE_CONTAINS: "contains",
             SearchOperator.IS_TRUE: "is",
             SearchOperator.IS_FALSE: "is not",
+            SearchOperator.DOES_NOT_CONTAIN: "does not contain",
         }
         
         parts = []

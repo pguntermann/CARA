@@ -971,6 +971,15 @@ class PgnService:
             has_notes = "CARANotes" in headers
             if not has_notes:
                 has_notes = "[CARANotes" in game_pgn
+
+            # Per-game CARA tag bubbles (semicolon-separated)
+            game_tags_raw = headers.get("CARAGameTags", "") if headers else ""
+            try:
+                from app.utils.game_tags_utils import parse_game_tags, tags_display_text
+
+                game_tags_display = tags_display_text(parse_game_tags(game_tags_raw))
+            except Exception:
+                game_tags_display = ""
             
             # Validate that we have meaningful game data
             # If the PGN is empty or too short, skip it
@@ -1019,6 +1028,8 @@ class PgnService:
                 "analyzed": analyzed,
                 "annotated": annotated,
                 "has_notes": has_notes,
+                "game_tags_raw": game_tags_raw,
+                "game_tags": game_tags_display,
                 "tags": tag_names  # Tag names extracted during parsing
             }
             

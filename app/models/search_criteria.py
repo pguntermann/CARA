@@ -20,6 +20,7 @@ class SearchField(Enum):
     TC_TYPE = "tc_type"  # Derived category (Bullet, Blitz, Rapid, Classical, etc.)
     ANALYZED = "analyzed"
     ANNOTATED = "annotated"
+    TAGS = "tags"
     CUSTOM_TAG = "custom_tag"  # For PGN tags not in standard columns
 
 
@@ -52,6 +53,9 @@ class SearchOperator(Enum):
     # Boolean operators
     IS_TRUE = "is_true"
     IS_FALSE = "is_false"
+
+    # Tag-list operators
+    DOES_NOT_CONTAIN = "does_not_contain"
 
 
 class LogicOperator(Enum):

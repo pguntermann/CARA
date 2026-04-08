@@ -808,11 +808,16 @@
     "show_move_classification_icons": true,
     "show_evaluation_bar": false,
     "show_material_widget": true,
+    "show_game_tags_widget": true,
     "hide_other_arrows_during_plan_exploration": true,
     "use_straight_lines": true,
     "show_pv2_arrow": true,
     "show_pv3_arrow": true,
     "show_annotations_layer": true
+  },
+  "game_tags": {
+    "builtin_colors": {},
+    "custom": []
   },
   "pgn_visibility": {
     "show_metadata": true,

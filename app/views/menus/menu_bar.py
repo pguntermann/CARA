@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QMenuBar
 from app.views.menus.ai_summary_menu import setup_ai_summary_menu
 from app.views.menus.annotations_menu import setup_annotations_menu
 from app.views.menus.board_menu import setup_board_menu
+from app.views.menus.tag_menu import setup_tag_menu
 from app.views.menus.debug_menu import setup_debug_menu
 from app.views.menus.edit_menu import setup_edit_menu
 from app.views.menus.engines_menu import setup_engines_menu
@@ -26,6 +27,7 @@ def setup_menu_bar(mw, menu_bar: QMenuBar) -> None:
     setup_file_menu(mw, menu_bar)
     setup_edit_menu(mw, menu_bar)
     setup_board_menu(mw, menu_bar)
+    setup_tag_menu(mw, menu_bar)
     setup_pgn_menu(mw, menu_bar)
     setup_moves_list_menu(mw, menu_bar)
     setup_game_analysis_menu(mw, menu_bar)

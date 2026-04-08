@@ -111,6 +111,10 @@ class BoardController:
     def toggle_material_widget_visibility(self) -> None:
         """Toggle the visibility of material widget."""
         self.board_model.toggle_material_widget_visibility()
+
+    def toggle_game_tags_widget_visibility(self) -> None:
+        """Toggle the visibility of game tags widget."""
+        self.board_model.toggle_game_tags_widget_visibility()
     
     def set_fen_with_validation(self, fen: str, last_move: Optional[chess.Move] = None) -> bool:
         """Set board position from FEN string with validation.

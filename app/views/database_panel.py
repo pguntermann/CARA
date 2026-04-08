@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTabWidget, QTableView, QApplication
 )
 from PyQt6.QtCore import QItemSelectionModel, QPoint, QEvent, pyqtSignal
+from PyQt6.QtWidgets import QStyleOptionViewItem
 from PyQt6.QtGui import (
     QPalette,
     QColor,
@@ -334,6 +335,8 @@ class DatabasePanel(QWidget):
             widths_config.get('col_annotated', 70),
             widths_config.get('col_notes', 70),
             widths_config.get('col_source_db', 120),
+            widths_config.get('col_ref_ply', 70),
+            widths_config.get('col_tags', 260),
             # col_pgn stretches, no width needed
         ]
         
@@ -487,6 +490,16 @@ class DatabasePanel(QWidget):
         
         # Set model on table view
         tab_table.setModel(model)
+
+        # Render tag chips in the Tags column (single-line, display-only)
+        try:
+            from app.views.delegates.database_tags_chip_delegate import DatabaseTagsChipDelegate
+
+            if hasattr(model, "COL_TAGS"):
+                tab_table.setItemDelegateForColumn(model.COL_TAGS, DatabaseTagsChipDelegate(self.config, tab_table))
+        except Exception:
+            # Delegate is optional; fall back to plain text
+            pass
         
         # Enable sorting on the table view
         tab_table.setSortingEnabled(True)
@@ -972,6 +985,22 @@ class DatabasePanel(QWidget):
         if has_cell:
             cell_value = model.data(index, Qt.ItemDataRole.DisplayRole)
 
+        # Tags chip hit-test (delegate-painted chips, not real widgets)
+        clicked_tag = None
+        try:
+            if has_cell and hasattr(model, "COL_TAGS") and col_index == model.COL_TAGS:
+                delegate = table.itemDelegateForColumn(model.COL_TAGS)
+                from app.views.delegates.database_tags_chip_delegate import DatabaseTagsChipDelegate
+
+                if isinstance(delegate, DatabaseTagsChipDelegate):
+                    cell_rect = table.visualRect(index)
+                    opt = QStyleOptionViewItem()
+                    opt.rect = QRect(0, 0, cell_rect.width(), cell_rect.height())
+                    local_pos = pos - cell_rect.topLeft()
+                    clicked_tag = delegate.tag_at_pos(opt, index, local_pos)
+        except Exception:
+            clicked_tag = None
+
         from app.views.menus.database_panel_context_menus import (
             build_database_table_context_menu,
             dismiss_database_table_context_menus,
@@ -985,6 +1014,7 @@ class DatabasePanel(QWidget):
             enable_copy_selected_games=bool(self._on_copy_selected_games),
             enable_cut_selected_games=bool(self._on_cut_selected_games),
             enable_paste_games=bool(self._on_paste_games),
+            clicked_tag=clicked_tag,
         )
 
         action = ctx.menu.exec(table.viewport().mapToGlobal(pos))
@@ -1042,6 +1072,16 @@ class DatabasePanel(QWidget):
             self._set_table_selection_to_rows(table, model, row_indices, append=append)
             n = len(row_indices)
             progress_service.set_status(f"Selected {n} row{'s' if n != 1 else ''} with non-empty value")
+        elif clicked_tag and ctx.act_with_tag and action == ctx.act_with_tag:
+            row_indices = self._get_row_indices_with_tag(model, clicked_tag, include=True)
+            self._set_table_selection_to_rows(table, model, row_indices, append=append)
+            n = len(row_indices)
+            progress_service.set_status(f"Selected {n} row{'s' if n != 1 else ''} with tag \"{clicked_tag}\"")
+        elif clicked_tag and ctx.act_without_tag and action == ctx.act_without_tag:
+            row_indices = self._get_row_indices_with_tag(model, clicked_tag, include=False)
+            self._set_table_selection_to_rows(table, model, row_indices, append=append)
+            n = len(row_indices)
+            progress_service.set_status(f"Selected {n} row{'s' if n != 1 else ''} without tag \"{clicked_tag}\"")
         elif action in (ctx.act_copy_csv, ctx.act_copy_tsv):
             self._copy_database_table_as_delimited(table, model, action, ctx.act_copy_csv, ctx.act_copy_tsv, progress_service)
         elif action in (ctx.act_copy_selected_csv, ctx.act_copy_selected_tsv):
@@ -1122,6 +1162,23 @@ class DatabasePanel(QWidget):
             progress_service.set_status(f"Copied {n} row{'s' if n != 1 else ''} as {kind} to clipboard")
         else:
             progress_service.set_status(f"Copied table as {kind} to clipboard")
+
+    def _get_row_indices_with_tag(self, model: DatabaseModel, tag_name: str, *, include: bool) -> List[int]:
+        """Return row indices where tag is present/absent (case-insensitive)."""
+        from app.utils.game_tags_utils import parse_game_tags
+
+        needle = (tag_name or "").strip().casefold()
+        if not needle:
+            return []
+        matches: List[int] = []
+        for r in range(model.rowCount()):
+            game = model.get_game(r)
+            raw = getattr(game, "game_tags_raw", "") or ""
+            tags = {t.casefold() for t in parse_game_tags(raw)}
+            has = needle in tags
+            if (has and include) or ((not has) and (not include)):
+                matches.append(r)
+        return matches
 
     def highlight_row(self, database: DatabaseModel, row_index: int) -> None:
         """Highlight a specific row in a specific database's table.

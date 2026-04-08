@@ -31,6 +31,7 @@ class BoardModel(QObject):
     bestalternativemove_arrow_visibility_changed = pyqtSignal(bool)  # Emitted when best alternative move arrow visibility changes
     evaluation_bar_visibility_changed = pyqtSignal(bool)  # Emitted when evaluation bar visibility changes
     material_widget_visibility_changed = pyqtSignal(bool)  # Emitted when material widget visibility changes
+    game_tags_widget_visibility_changed = pyqtSignal(bool)  # Emitted when game tags widget visibility changes
     turn_changed = pyqtSignal(bool)  # Emitted when turn changes (True=White, False=Black)
     last_move_changed = pyqtSignal(object)  # Emitted when last move changes (chess.Move or None)
     best_next_move_changed = pyqtSignal(object)  # Emitted when best next move changes (chess.Move or None)
@@ -66,6 +67,7 @@ class BoardModel(QObject):
         self._show_move_classification_icons = False  # Track if move classification badges are visible
         self._show_evaluation_bar = False  # Track if evaluation bar is visible
         self._show_material_widget = False  # Track if material widget is visible
+        self._show_game_tags_widget = True  # Track if game tags widget is visible
         self._last_move: Optional[chess.Move] = None  # Track the last move made
         self._best_next_move: Optional[chess.Move] = None  # Track the best next move from manual analysis
         self._pv2_move: Optional[chess.Move] = None  # Track the PV2 move from manual analysis
@@ -544,6 +546,21 @@ class BoardModel(QObject):
         for views to update their display.
         """
         self.set_show_material_widget(not self._show_material_widget)
+
+    @property
+    def show_game_tags_widget(self) -> bool:
+        """Get whether game tags widget is visible."""
+        return self._show_game_tags_widget
+
+    def set_show_game_tags_widget(self, show: bool) -> None:
+        """Set the visibility of the game tags widget."""
+        if self._show_game_tags_widget != show:
+            self._show_game_tags_widget = show
+            self.game_tags_widget_visibility_changed.emit(self._show_game_tags_widget)
+
+    def toggle_game_tags_widget_visibility(self) -> None:
+        """Toggle the visibility of the game tags widget."""
+        self.set_show_game_tags_widget(not self._show_game_tags_widget)
     
     @property
     def last_move(self) -> Optional[chess.Move]:

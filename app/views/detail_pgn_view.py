@@ -328,7 +328,6 @@ class DetailPgnView(QWidget):
         # Set placeholder text
         placeholder = pgn_config.get('placeholder_text', 'PGN notation will appear here...')
         self.pgn_text.setPlaceholderText(placeholder)
-        
         layout.addWidget(self.pgn_text)
     
     
@@ -514,6 +513,12 @@ class DetailPgnView(QWidget):
         Also called when PGN is permanently modified (e.g., after removing elements).
         """
         if self._game_model and self._game_model.active_game:
+            try:
+                last_tag = getattr(self._game_model, "_last_metadata_tag_changed", None)
+            except Exception:
+                last_tag = None
+            if last_tag == "CARAGameTags":
+                return
             # Update PGN text (this will re-extract move info and format)
             # Note: set_pgn_text already calls _highlight_active_move via QTimer,
             # but we add an additional call with longer delay to ensure it works
@@ -769,3 +774,5 @@ class DetailPgnView(QWidget):
             search_cursor.setPosition(move_end)
         
         return 0
+
+

@@ -130,7 +130,8 @@ class MetadataModel(QAbstractTableModel):
             read_only_tags = {
                 "CARAAnalysisData", "CARAAnalysisInfo", "CARAAnalysisChecksum",
                 "CARAAnnotations", "CARAAnnotationsInfo", "CARAAnnotationsChecksum",
-                "CARANotes", "CARANotesInfo", "CARANotesChecksum"
+                "CARANotes", "CARANotesInfo", "CARANotesChecksum",
+                "CARAGameTags",
             }
             is_read_only = tag_name in read_only_tags
         
@@ -174,7 +175,8 @@ class MetadataModel(QAbstractTableModel):
         read_only_tags = {
             "CARAAnalysisData", "CARAAnalysisInfo", "CARAAnalysisChecksum",
             "CARAAnnotations", "CARAAnnotationsInfo", "CARAAnnotationsChecksum",
-            "CARANotes", "CARANotesInfo", "CARANotesChecksum"
+            "CARANotes", "CARANotesInfo", "CARANotesChecksum",
+            "CARAGameTags",
         }
         if name in read_only_tags:
             return False

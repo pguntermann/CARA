@@ -42,6 +42,12 @@ def setup_board_menu(mw, menu_bar: QMenuBar) -> None:
     mw.material_widget_action.triggered.connect(mw.controller.toggle_material_widget_visibility)
     board_menu.addAction(mw.material_widget_action)
 
+    mw.game_tags_widget_action = QAction("Show Game Tags", mw)
+    mw.game_tags_widget_action.setShortcut(QKeySequence("Alt+G"))
+    mw.game_tags_widget_action.setCheckable(True)
+    mw.game_tags_widget_action.triggered.connect(mw.controller.toggle_game_tags_widget_visibility)
+    board_menu.addAction(mw.game_tags_widget_action)
+
     board_menu.addSeparator()
 
     mw.evaluation_bar_action = QAction("Show Evaluation Bar", mw)
@@ -164,6 +170,9 @@ def setup_board_menu(mw, menu_bar: QMenuBar) -> None:
     board_model.material_widget_visibility_changed.connect(
         mw._on_material_widget_visibility_changed
     )
+    board_model.game_tags_widget_visibility_changed.connect(
+        mw._on_game_tags_widget_visibility_changed
+    )
 
     mw._update_rotate_action_state(board_model.is_flipped)
     mw._update_coordinates_action_state(board_model.show_coordinates)
@@ -177,6 +186,7 @@ def setup_board_menu(mw, menu_bar: QMenuBar) -> None:
     mw._update_move_classification_icons_action_state(board_model.show_move_classification_icons)
     mw._update_evaluation_bar_action_state(board_model.show_evaluation_bar)
     mw._update_material_widget_action_state(board_model.show_material_widget)
+    mw._update_game_tags_widget_action_state(board_model.show_game_tags_widget)
 
     positional_heatmap_model = mw.controller.get_positional_heatmap_controller().get_model()
     positional_heatmap_model.visibility_changed.connect(mw._on_positional_heatmap_visibility_changed)

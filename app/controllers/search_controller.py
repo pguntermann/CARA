@@ -184,6 +184,8 @@ class SearchController:
                 white_elo=game.white_elo,
                 black_elo=game.black_elo,
                 time_control=getattr(game, "time_control", ""),
+                game_tags_raw=getattr(game, "game_tags_raw", ""),
+                game_tags=getattr(game, "game_tags", ""),
                 analyzed=game.analyzed,
                 annotated=getattr(game, "annotated", False),
                 has_notes=getattr(game, "has_notes", False),

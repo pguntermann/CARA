@@ -1488,6 +1488,10 @@ class MainWindow(QMainWindow):
             show: True if material widget is visible, False otherwise.
         """
         self._update_material_widget_action_state(show)
+
+    def _on_game_tags_widget_visibility_changed(self, show: bool) -> None:
+        """Handle game tags widget visibility change to update menu toggle."""
+        self._update_game_tags_widget_action_state(show)
     
     def _update_evaluation_bar_action_state(self, show: bool) -> None:
         """Update the evaluation bar visibility menu action toggle state.
@@ -1506,6 +1510,11 @@ class MainWindow(QMainWindow):
         """
         if hasattr(self, 'material_widget_action'):
             self.material_widget_action.setChecked(show)
+
+    def _update_game_tags_widget_action_state(self, show: bool) -> None:
+        """Update the game tags widget visibility menu action toggle state."""
+        if hasattr(self, 'game_tags_widget_action'):
+            self.game_tags_widget_action.setChecked(show)
     
     def _update_positional_heatmap_action_state(self, show: bool) -> None:
         """Update the positional heat-map visibility menu action toggle state.
@@ -1590,6 +1599,10 @@ class MainWindow(QMainWindow):
                                         annotation_controller, board_widget, ai_chat_controller,
                                         game_summary_controller, player_stats_controller,
                                         metadata_controller)
+
+        # Wire per-game tag bubbles widget (board overlay) to models/controllers
+        if board_widget is not None and hasattr(board_widget, "game_tags_widget") and board_widget.game_tags_widget:
+            board_widget.game_tags_widget.set_context(game_model, metadata_controller)
         top_splitter.addWidget(self.detail_panel)
         
         # Connect column profile model to moves list view
@@ -3299,6 +3312,11 @@ class MainWindow(QMainWindow):
         show_material_widget = board_visibility.get("show_material_widget", False)
         board_model.set_show_material_widget(show_material_widget)
         self._update_material_widget_action_state(show_material_widget)
+
+        # Show Game Tags
+        show_game_tags_widget = board_visibility.get("show_game_tags_widget", True)
+        board_model.set_show_game_tags_widget(show_game_tags_widget)
+        self._update_game_tags_widget_action_state(show_game_tags_widget)
         
         # Show Evaluation Bar
         show_evaluation_bar = board_visibility.get("show_evaluation_bar", False)
