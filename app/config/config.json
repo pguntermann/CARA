@@ -610,9 +610,9 @@
               10,
               10,
               15,
-              10
+              14
             ],
-            "spacing_below_material": 6,
+            "spacing_below_material": 20,
             "flow_spacing": 6,
             "chip": {
               "border_radius": 10,
@@ -5715,7 +5715,7 @@
         "color": [200, 90, 160]
       },
       {
-        "name": "Engame grind",
+        "name": "Endgame grind",
         "color": [110, 140, 220]
       },
       {
@@ -5908,6 +5908,23 @@
         "lc0",
         "maia"
       ]
+    },
+    "auto_game_tagging": {
+      "win_eval_pawns": 2.0,
+      "opening_disaster_eval_pawns": 1.5,
+      "blunder_decided_decisive_eval_pawns": 3.0,
+      "blunder_decided_never_recovered_eval_pawns": 1.5,
+      "clean_win_large_advantage_pawns": 2.5,
+      "clean_win_allowed_dip_pawns": 0.5,
+      "clean_win_max_swing_pawns": 1.2,
+      "clean_win_min_plies_from_advantage": 10,
+      "endgame_grind_min_endgame_moves": 12,
+      "endgame_grind_stable_eval_pawns": 0.8,
+      "endgame_grind_min_stable_plies": 12,
+      "endgame_grind_resolution_eval_pawns": 2.0,
+      "chaotic_large_advantage_pawns": 2.0,
+      "chaotic_swing_pawns": 2.0,
+      "chaotic_min_swings": 6
     },
     "book_move_detection": {
       "use_eco_lookup": true,

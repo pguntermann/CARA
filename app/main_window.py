@@ -1684,6 +1684,12 @@ class MainWindow(QMainWindow):
                     self._on_bulk_analysis_finished_refresh_active_game
                 )
                 self._bulk_analysis_finished_connected = True
+            # If bulk analysis updates the active game's PGN (e.g., auto-tags), refresh UI immediately.
+            if not getattr(self, "_bulk_analysis_game_analyzed_connected", False):
+                self.controller.get_bulk_analysis_controller().game_analyzed.connect(
+                    self._on_bulk_analysis_game_analyzed_refresh_active_game_ui
+                )
+                self._bulk_analysis_game_analyzed_connected = True
         
         # Connect to game model to update best alternative move when position changes
         game_model = self.controller.get_game_controller().get_game_model()
@@ -2636,6 +2642,19 @@ class MainWindow(QMainWindow):
             self.controller.game_analysis_controller.set_brilliant_move_detection(checked)
         # Settings will be saved automatically on application exit
         # No immediate action needed - behavior is handled in _on_game_analysis_completed
+
+    def _on_auto_game_tagging_toggled(self, checked: bool) -> None:
+        """Handle Auto Tag Games toggle.
+
+        Args:
+            checked: True if auto game tagging is enabled, False otherwise.
+        """
+        # Update in-memory settings immediately
+        if hasattr(self, '_settings_service'):
+            self._settings_service.update_game_analysis({"auto_game_tagging": checked})
+        # Pass setting to game analysis controller (used by bulk analysis)
+        if hasattr(self.controller, 'game_analysis_controller'):
+            self.controller.game_analysis_controller.set_auto_game_tagging(checked)
     
     def _on_store_analysis_results_toggled(self, checked: bool) -> None:
         """Handle Store Analysis results in PGN Tag toggle.
@@ -3434,6 +3453,13 @@ class MainWindow(QMainWindow):
         # Pass setting to game analysis controller
         if hasattr(self.controller, 'game_analysis_controller'):
             self.controller.game_analysis_controller.set_brilliant_move_detection(brilliant_move_detection)
+
+        # Auto Tag Games (default ON)
+        auto_game_tagging = game_analysis_settings.get("auto_game_tagging", True)
+        if hasattr(self, "auto_game_tagging_action"):
+            self.auto_game_tagging_action.setChecked(auto_game_tagging)
+        if hasattr(self.controller, "game_analysis_controller"):
+            self.controller.game_analysis_controller.set_auto_game_tagging(auto_game_tagging)
         
         # Return to PLY 0 after analysis completes
         return_to_first_move = game_analysis_settings.get("return_to_first_move_after_analysis", False)
@@ -3577,6 +3603,7 @@ class MainWindow(QMainWindow):
                 "switch_to_summary_after_analysis": self.switch_to_summary_action.isChecked() if hasattr(self, 'switch_to_summary_action') else False,
                 "normalized_evaluation_graph": self.normalized_graph_action.isChecked() if hasattr(self, 'normalized_graph_action') else False,
                 "brilliant_move_detection": self.brilliant_move_detection_action.isChecked() if hasattr(self, 'brilliant_move_detection_action') else False,
+                "auto_game_tagging": self.auto_game_tagging_action.isChecked() if hasattr(self, "auto_game_tagging_action") else True,
                 "store_analysis_results_in_pgn_tag": self.store_analysis_results_action.isChecked() if hasattr(self, 'store_analysis_results_action') else False
             }
         
@@ -3769,6 +3796,42 @@ class MainWindow(QMainWindow):
                     if tab_widget.tabText(i) == "Game Summary":
                         tab_widget.setCurrentIndex(i)
                         break
+
+        # Auto-tagging pass (optional) — updates CARAGameTags in-memory, marks DB unsaved via metadata controller.
+        if hasattr(self, "auto_game_tagging_action") and self.auto_game_tagging_action.isChecked():
+            try:
+                game_controller = self.controller.get_game_controller()
+                game_model = game_controller.get_game_model() if game_controller else None
+                game = getattr(game_model, "active_game", None) if game_model else None
+                if game and hasattr(self, "detail_panel") and hasattr(self.detail_panel, "moveslist_model"):
+                    moves = self.detail_panel.moveslist_model.get_all_moves()
+                    if moves:
+                        from app.services.game_auto_tagging_service import GameAutoTaggingService
+                        from app.utils.game_tags_utils import PGN_TAG_NAME_GAME_TAGS, format_game_tags
+
+                        tagging_service = GameAutoTaggingService(self.config)
+                        result = tagging_service.detect_tags(moves, game_result=getattr(game, "result", None))
+                        merged = tagging_service.merge_with_existing_tags(
+                            getattr(game, "game_tags_raw", "") or "",
+                            result.detected_tags,
+                        )
+
+                        raw = format_game_tags(merged)
+                        metadata_controller = self.controller.get_metadata_controller()
+                        if raw:
+                            metadata_controller.update_metadata_tag(PGN_TAG_NAME_GAME_TAGS, raw)
+                        else:
+                            metadata_controller.remove_metadata_tag(PGN_TAG_NAME_GAME_TAGS)
+
+                        # Refresh board widget chips immediately (if present)
+                        if hasattr(self, "main_panel") and hasattr(self.main_panel, "chessboard_view"):
+                            board_widget = getattr(self.main_panel.chessboard_view, "chessboard", None)
+                            if board_widget is not None and hasattr(board_widget, "game_tags_widget") and board_widget.game_tags_widget:
+                                board_widget.game_tags_widget._refresh()
+            except Exception as e:
+                from app.services.logging_service import LoggingService
+
+                LoggingService.get_instance().warning(f"Auto-tagging after analysis failed: {e}", exc_info=e)
     
     def _on_game_analysis_cancelled(self) -> None:
         """Handle game analysis cancelled signal."""
@@ -3790,6 +3853,48 @@ class MainWindow(QMainWindow):
             return
         game_controller = self.controller.get_game_controller()
         game_controller.refresh_active_game_analysis_state(self.detail_panel.moveslist_model)
+
+    def _on_bulk_analysis_game_analyzed_refresh_active_game_ui(self, game) -> None:
+        """If the analyzed game is currently active, refresh UI elements that depend on PGN headers."""
+        try:
+            game_controller = self.controller.get_game_controller()
+            game_model = game_controller.get_game_model() if game_controller else None
+            active_game = getattr(game_model, "active_game", None) if game_model else None
+            if not active_game or not game:
+                return
+
+            same_game = False
+            if active_game is game:
+                same_game = True
+            else:
+                # Fallback: compare by game_number if available (stable across copies).
+                agn = getattr(active_game, "game_number", None)
+                ggn = getattr(game, "game_number", None)
+                if agn is not None and ggn is not None and agn == ggn:
+                    same_game = True
+
+            if not same_game:
+                return
+
+            # Signal metadata change so views can re-read header-derived fields.
+            try:
+                setattr(game_model, "_last_metadata_tag_changed", "CARAGameTags")
+            except Exception:
+                pass
+            if hasattr(game_model, "metadata_updated"):
+                game_model.metadata_updated.emit()
+
+            # Refresh board tags widget immediately (avoid needing a game switch).
+            if hasattr(self, "main_panel") and hasattr(self.main_panel, "chessboard_view"):
+                board_widget = getattr(self.main_panel.chessboard_view, "chessboard", None)
+                if board_widget is not None and hasattr(board_widget, "game_tags_widget") and board_widget.game_tags_widget:
+                    board_widget.game_tags_widget._refresh()
+        except Exception as e:
+            from app.services.logging_service import LoggingService
+
+            LoggingService.get_instance().warning(
+                f"Failed to refresh active game UI after bulk analysis update: {e}", exc_info=e
+            )
     
     def _on_game_analysis_progress(self, current_move: int, total_moves: int, depth: int,
                                    centipawns: float, engine_name: str, threads: int, elapsed_ms: int,

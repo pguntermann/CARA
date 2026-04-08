@@ -576,6 +576,10 @@ class BulkAnalysisThread(QThread):
                     self.analysis_controller.is_brilliant_move_detection_enabled()
                     if self.analysis_controller else False
                 )
+                auto_game_tagging = (
+                    self.analysis_controller.is_auto_game_tagging_enabled()
+                    if self.analysis_controller else True
+                )
                 service = BulkAnalysisService(
                     self.config,
                     self.engine_model,
@@ -585,6 +589,7 @@ class BulkAnalysisThread(QThread):
                     threads_override=threads_for_this_game,
                     movetime_override=self.movetime_override,
                     brilliant_move_detection=brilliant_move_detection,
+                    auto_game_tagging=auto_game_tagging,
                 )
                 self._analysis_services.append(service)
             

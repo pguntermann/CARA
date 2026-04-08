@@ -52,6 +52,11 @@ def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
     mw.brilliant_move_detection_action.triggered.connect(mw._on_brilliant_move_detection_toggled)
     game_analysis_menu.addAction(mw.brilliant_move_detection_action)
 
+    mw.auto_game_tagging_action = QAction("Auto Tag Games", mw)
+    mw.auto_game_tagging_action.setCheckable(True)
+    mw.auto_game_tagging_action.triggered.connect(mw._on_auto_game_tagging_toggled)
+    game_analysis_menu.addAction(mw.auto_game_tagging_action)
+
     mw.return_to_first_move_action = QAction("Return to PLY 0 after analysis completes", mw)
     mw.return_to_first_move_action.setCheckable(True)
     mw.return_to_first_move_action.setChecked(False)

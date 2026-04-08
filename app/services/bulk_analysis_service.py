@@ -37,7 +37,8 @@ class BulkAnalysisService(QObject):
                  classification_model: Optional[MoveClassificationModel] = None,
                  threads_override: Optional[int] = None,
                  movetime_override: Optional[int] = None,
-                 brilliant_move_detection: bool = False) -> None:
+                 brilliant_move_detection: bool = False,
+                 auto_game_tagging: bool = True) -> None:
         """Initialize bulk analysis service.
         
         Args:
@@ -61,6 +62,7 @@ class BulkAnalysisService(QObject):
         self._threads_override = threads_override
         self._movetime_override = movetime_override
         self._brilliant_move_detection = brilliant_move_detection
+        self._auto_game_tagging = bool(auto_game_tagging)
 
         # Note: Opening service should be loaded before creating BulkAnalysisService instances
         # to avoid blocking during analysis. We don't load it here to avoid blocking worker threads.
@@ -573,6 +575,22 @@ class BulkAnalysisService(QObject):
                 
                 if success:
                     game.analyzed = True
+                    # Auto game tagging (if enabled): derive tags from evaluation curve and phases.
+                    if self._auto_game_tagging and not self._cancelled:
+                        try:
+                            from app.services.game_auto_tagging_service import GameAutoTaggingService
+
+                            tagging_service = GameAutoTaggingService(self.config)
+                            result = tagging_service.detect_tags(analyzed_moves, game_result=getattr(game, "result", None))
+                            merged = tagging_service.merge_with_existing_tags(
+                                getattr(game, "game_tags_raw", "") or "",
+                                result.detected_tags,
+                            )
+                            tagging_service.apply_to_game_data(game, merged)
+                        except Exception as e:
+                            logging_service = LoggingService.get_instance()
+                            logging_service.warning(f"Auto-tagging skipped due to error: {e}", exc_info=e)
+
                     if progress_callback:
                         progress_callback(total_moves, total_moves, 0, True, f"Analysis complete: {total_moves} moves analyzed", None)
                     return True

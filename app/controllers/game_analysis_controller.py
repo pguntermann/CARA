@@ -114,6 +114,7 @@ class GameAnalysisController(QObject):
         self._move_seldepth = 0  # Store seldepth from position after analysis (0 if engine does not report)
         self._consecutive_errors = 0  # Track consecutive errors to detect engine failure
         self._brilliant_move_detection = False  # Brilliant move detection toggle
+        self._auto_game_tagging = True  # Auto-tagging toggle (post-analysis)
         
         # Progress tracking
         self._last_progress_depth = 0
@@ -1385,9 +1386,13 @@ class GameAnalysisController(QObject):
         """Return whether brilliant move detection is enabled (e.g. for bulk analysis)."""
         return self._brilliant_move_detection
 
-    def is_brilliant_move_detection_enabled(self) -> bool:
-        """Return whether brilliant move detection is enabled (e.g. for bulk analysis)."""
-        return self._brilliant_move_detection
+    def set_auto_game_tagging(self, enabled: bool) -> None:
+        """Set automatic game tagging toggle."""
+        self._auto_game_tagging = bool(enabled)
+
+    def is_auto_game_tagging_enabled(self) -> bool:
+        """Return whether automatic game tagging is enabled (e.g. for bulk analysis)."""
+        return bool(self._auto_game_tagging)
     
     def _calculate_material_sacrifice_with_lookahead(self, move_info: Dict[str, Any], lookahead_plies: int = 3) -> int:
         """Calculate material sacrifice using multi-ply look-ahead.
