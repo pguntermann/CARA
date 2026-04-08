@@ -1,5 +1,5 @@
 {
-  "version": "2.6.8",
+  "version": "2.6.9",
   "ui": {
     "welcome_dialog": {
       "title": "Welcome to CARA",
@@ -2864,7 +2864,10 @@
           },
           "tags_column": {
             "width": 260,
-            "cell_padding": [4, 2]
+            "cell_padding": [
+              4,
+              2
+            ]
           },
           "header_background_color": [
             45,
@@ -3046,52 +3049,87 @@
       }
     },
     "dialogs": {
-        "manage_game_tags": {
-          "width": 600,
-          "height": 440,
-          "background_color": [40, 40, 45],
-          "border_color": [60, 60, 65],
-          "text_color": [200, 200, 200],
-          "font_family": "Helvetica Neue",
-          "font_size": 11,
+      "manage_game_tags": {
+        "width": 600,
+        "height": 440,
+        "background_color": [
+          40,
+          40,
+          45
+        ],
+        "border_color": [
+          60,
+          60,
+          65
+        ],
+        "text_color": [
+          200,
+          200,
+          200
+        ],
+        "font_family": "Helvetica Neue",
+        "font_size": 11,
+        "layout": {
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ],
+          "spacing": 15
+        },
+        "groups": {
+          "contents_margins": [
+            10,
+            14,
+            10,
+            10
+          ],
+          "spacing": 10,
+          "builtin_chip_container_min_height": 36,
+          "custom_chip_container_min_height": 36
+        },
+        "chips": {
+          "spacing_multiplier": 2,
+          "outer_padding_multiplier": 1
+        },
+        "plus_chip": {
+          "text": "+",
+          "bold": true
+        },
+        "add_custom_tag_dialog": {
+          "width": 420,
+          "height": 140,
           "layout": {
-            "margins": [25, 25, 25, 25],
-            "spacing": 15
-          },
-          "groups": {
-            "contents_margins": [10, 14, 10, 10],
+            "margins": [
+              18,
+              18,
+              18,
+              18
+            ],
             "spacing": 10,
-            "builtin_chip_container_min_height": 36,
-            "custom_chip_container_min_height": 36
+            "row_spacing": 10
           },
-          "chips": {
-            "spacing_multiplier": 2,
-            "outer_padding_multiplier": 1
-          },
-          "plus_chip": {
-            "text": "+",
-            "bold": true
-          },
-          "add_custom_tag_dialog": {
-            "width": 420,
-            "height": 140,
-            "layout": {
-              "margins": [18, 18, 18, 18],
-              "spacing": 10,
-              "row_spacing": 10
-            },
-            "swatch": {
-              "min_size": 18,
-              "max_size": 22
-            }
-          },
-          "inputs": {
-            "font_family": "Cascadia Mono",
-            "font_size": 11,
-            "background_color": [30, 30, 35],
-            "border_color": [60, 60, 65]
+          "swatch": {
+            "min_size": 18,
+            "max_size": 22
           }
         },
+        "inputs": {
+          "font_family": "Cascadia Mono",
+          "font_size": 11,
+          "background_color": [
+            30,
+            30,
+            35
+          ],
+          "border_color": [
+            60,
+            60,
+            65
+          ]
+        }
+      },
       "classification_settings": {
         "width": 480,
         "height": 660,
@@ -4215,11 +4253,20 @@
           ]
         },
         "tag_picker": {
-          "selected_border_color": [0, 200, 255],
+          "selected_border_color": [
+            0,
+            200,
+            255
+          ],
           "selected_border_width": 2,
           "popup_width": 360,
           "popup_max_height": 260,
-          "popup_layout_margins": [10, 10, 10, 10],
+          "popup_layout_margins": [
+            10,
+            10,
+            10,
+            10
+          ],
           "popup_layout_spacing": 8,
           "popup_extra_height": 16,
           "popup_anchor_gap_y": 24,
@@ -5704,31 +5751,59 @@
     "builtin": [
       {
         "name": "Favourite",
-        "color": [255, 255, 0]
+        "color": [
+          255,
+          255,
+          0
+        ]
       },
       {
         "name": "Blunder-decided",
-        "color": [220, 80, 80]
+        "color": [
+          220,
+          80,
+          80
+        ]
       },
       {
         "name": "Clean win",
-        "color": [70, 160, 110]
+        "color": [
+          70,
+          160,
+          110
+        ]
       },
       {
         "name": "Missed win",
-        "color": [200, 100, 255]
+        "color": [
+          200,
+          100,
+          255
+        ]
       },
       {
         "name": "Opening disaster",
-        "color": [200, 90, 160]
+        "color": [
+          200,
+          90,
+          160
+        ]
       },
       {
         "name": "Endgame grind",
-        "color": [110, 140, 220]
+        "color": [
+          110,
+          140,
+          220
+        ]
       },
       {
         "name": "Chaotic game",
-        "color": [140, 140, 140]
+        "color": [
+          140,
+          140,
+          140
+        ]
       }
     ]
   },

@@ -1,5 +1,40 @@
 # Release Notes
 
+# CARA v2.6.9 - Game Tagging, Auto-Tagging, UI/UX refinements
+
+**Release Date:** 08.04.2026
+
+This is a big release. Notably, it introduces a **game tagging** system with a **board-attached Game Tags widget**, optional **auto-tagging** after analysis (with configurable thresholds), full integration with the search function and the database view, including a "Select rows with/out this tag" option- and the ability to create your own custom tags. 
+
+It adds **context menus** on the chessboard and PGN pane. **Player Stats** gains **interactive** comparison on the **move accuracy** pie chart and **performance by phase** bars (hover to compare the selected player with opponents), a more **configurable activity heatmap** (including layout and calendar-related options), and **restructured graph submenus**. 
+
+**Chess.com** online imports now use **proper rate limiting** and retry on failure. Improved **Player Stats** refresh behavior, **PGN** output formatting bug fixes.
+
+## New Features
+
+- **Game tags:** Assign **custom labels** to games (separate from PGN header tags), shown as **chips/bubbles** in the database view and in the optional **Game Tags widget** next to the chessboard. Create and color tags via **Tags → Manage tags…**, assign them from the **Tags** menu or by **right-clicking** the widget.
+- **Auto-tagging:** After **game analysis**, CARA can apply tags automatically using **analysis-derived rules** (for example **Blunder-decided**, **Clean win**, **Missed win**, **Opening disaster**, **Endgame grind**, **Chaotic game**). Toggle auto-tagging from the **Game Analysis** menu; thresholds are configured in `config.json`. Refer to the manual for details.
+- **Board and PGN context menus:** **Right-click** the chessboard or the **PGN** notation pane for quick access to actions that mirror the corresponding **menu bar** entries.
+
+## Enhancements
+
+- **Player Stats – chart interactivity:** On the **move accuracy** (pie) and **performance by phase** sections, **hover** the chart to compare the **selected player’s** share with **opponents’** for the same move classes or phases.
+- **Player Stats – activity heatmap:** **More display and behavior options** (date ranges, month dividers) and small **menu** refinements for Player Stats graphs.
+- **Import from Chess.com:** **Rate limiting** aligned with platform expectations for more reliable online imports, including better error handling and retry-logic.
+
+## Bug Fixes
+
+- **Player Stats:** Avoids **unnecessary recalculation** when the database view updates **without** meaningful content changes.
+- **PGN:** Fixed **minor formatting** issues in the PGN **formatter**.
+- **Bulk analysis:** The **no engine configured** message now **matches** the style of similar messages elsewhere.
+- **UI:** Reduced **ambiguity** in **context menu** background coloring.
+
+## Documentation
+
+- **User manual:** HTML manual updated for **game tags**, **auto-tagging**, **board/PGN context menus**, **Player Stats** (heatmap and interactive charts), and related **menus**.
+
+---
+
 # CARA v2.6.8 - Expanded Player Stats and Bug Fixes
 
 **Release Date:** 05.04.2026
@@ -295,7 +330,7 @@ This release fixes several bugs including an error pattern percentage calculatio
 
 - **Error Pattern Percentage Calculation**: Fixed bug where error pattern percentage values were incorrectly calculated, leading to displayed percentages that were too high. 
 - **macOS Application Crash**: Fixed a crash that could occur on macOS when closing the application with the evaluation bar or manual analysis active. The application now properly synchronizes cleanup of engine threads and processes before shutdown
-- **macOS Application Crash**: Fixed another macOS-specific crash which occured when using the macOS Application Bundle and then opening the AI Model Settings Dialog.
+- **macOS Application Crash**: Fixed another macOS-specific crash which occurred when using the macOS Application Bundle and then opening the AI Model Settings Dialog.
 
 ## Enhancements
 
