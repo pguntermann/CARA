@@ -1529,6 +1529,10 @@ class ChessBoardWidget(QWidget):
         self._calculate_board_dimensions()
         # Trigger repaint to update the board with new dimensions
         self.update()
+        # Reposition board-attached widgets (same as resizeEvent)
+        self._update_evaluation_bar_position()
+        self._update_material_widget_position()
+        self._update_game_tags_widget_position()
     
     def _on_turn_indicator_visibility_changed(self, show: bool) -> None:
         """Handle turn indicator visibility change from model.
@@ -1836,6 +1840,8 @@ class ChessBoardWidget(QWidget):
             # Update material widget position if it's visible, since board dimensions changed
             if self.material_widget and self.material_widget.isVisible():
                 self._update_material_widget_position()
+            # Game tags anchor to board geometry; eval bar toggles start_x/board_size like resize.
+            self._update_game_tags_widget_position()
     
     def set_evaluation_bar_flipped(self, is_flipped: bool) -> None:
         """Set evaluation bar flip state.
