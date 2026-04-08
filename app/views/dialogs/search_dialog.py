@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QSpacerItem,
     QFrame,
 )
-from PyQt6.QtCore import Qt, QSize, pyqtSignal
+from PyQt6.QtCore import Qt, QSize, pyqtSignal, QTimer
 from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent, QFontMetrics
 from typing import Optional, Dict, Any, List, Tuple, Callable
 
@@ -89,6 +89,11 @@ class _TagsChipPickerPopup(QFrame):
         self._selected = list(selected_tags or [])
         self._on_change = on_change
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        # Prevent macOS blue focus accent indicators on popup panels.
+        try:
+            self.setAttribute(Qt.WidgetAttribute.WA_MacShowFocusRect, False)
+        except Exception:
+            pass
 
         # Use the same chip config as the board tag widget for consistency.
         board_cfg = (self.config.get("ui", {}) or {}).get("panels", {}).get("main", {}).get("board", {})
@@ -114,51 +119,112 @@ class _TagsChipPickerPopup(QFrame):
         self._bg = QColor(*bg) if isinstance(bg, list) else QColor(40, 40, 45)
         self._border = QColor(*border) if isinstance(border, list) else QColor(60, 60, 65)
 
+        self._popup_width = int(tag_picker_cfg.get("popup_width", 360))
+        self._popup_max_height = int(tag_picker_cfg.get("popup_max_height", 260))
+        self._layout_margins = tag_picker_cfg.get("popup_layout_margins", [10, 10, 10, 10])
+        self._layout_spacing = int(tag_picker_cfg.get("popup_layout_spacing", 8))
+        self._extra_height = int(tag_picker_cfg.get("popup_extra_height", 16))
+
+        # Ensure the popup itself is opaque (macOS can otherwise render popups as translucent).
+        try:
+            self.setAutoFillBackground(True)
+            pal = self.palette()
+            pal.setColor(QPalette.ColorRole.Window, self._bg)
+            self.setPalette(pal)
+        except Exception:
+            pass
+
         self.setStyleSheet(
             "QFrame {"
             f"  background-color: rgb({self._bg.red()},{self._bg.green()},{self._bg.blue()});"
             f"  border: 1px solid rgb({self._border.red()},{self._border.green()},{self._border.blue()});"
             "  border-radius: 6px;"
             "}"
-            "QScrollArea { outline: none; border: none; background: transparent; }"
-            "QScrollArea QWidget { outline: none; border: none; background: transparent; }"
+            # Make the interior a single uniform panel (macOS overlay scrollbars can look like a blue line).
             "QAbstractScrollArea:focus { outline: none; }"
             "QWidget:focus { outline: none; }"
             "QPushButton:focus { outline: none; }"
         )
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(8)
-
-        self._scroll = QScrollArea()
-        self._scroll.setWidgetResizable(True)
-        self._scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._scroll.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         try:
-            self._scroll.viewport().setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            m = self._layout_margins
+            layout.setContentsMargins(int(m[0]), int(m[1]), int(m[2]), int(m[3]))
         except Exception:
-            pass
+            layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(int(self._layout_spacing))
 
         self._root = QWidget()
         self._root.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        # Ensure inner widgets do not paint a separate background (avoids "inner panel" shade).
+        try:
+            self._root.setAttribute(Qt.WidgetAttribute.WA_MacShowFocusRect, False)
+        except Exception:
+            pass
+        self._root.setAutoFillBackground(False)
+        self._root.setStyleSheet("background: transparent; border: none;")
         self._root_layout = QVBoxLayout(self._root)
         self._root_layout.setContentsMargins(0, 0, 0, 0)
         self._root_layout.setSpacing(8)
 
         # Single chip flow: built-in first, then custom (no captions).
         self._wrap = _ChipWrapContainer(self.flow_spacing, self._root)
+        try:
+            self._wrap.setAttribute(Qt.WidgetAttribute.WA_MacShowFocusRect, False)
+        except Exception:
+            pass
+        self._wrap.setAutoFillBackground(False)
+        self._wrap.setStyleSheet("background: transparent; border: none;")
         self._root_layout.addWidget(self._wrap)
-        self._root_layout.addStretch(1)
+        layout.addWidget(self._root, 1)
 
-        self._scroll.setWidget(self._root)
-        layout.addWidget(self._scroll, 1)
-
+        # Width/height are config-driven.
+        self.setFixedWidth(int(self._popup_width))
+        # Ensure the chip wrap container lays out using the correct width immediately.
+        try:
+            m = self.layout().contentsMargins()
+            inner_w = max(1, int(self._popup_width - m.left() - m.right()))
+            self._root.setFixedWidth(inner_w)
+            self._wrap.setFixedWidth(inner_w)
+            self._wrap.resize(inner_w, max(1, self._wrap.height()))
+        except Exception:
+            pass
         self._rebuild()
 
-        # Reasonable default size; follows parent width somewhat.
-        self.setFixedSize(360, 220)
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        # Reflow after the popup has a real size on screen, so height can shrink to content.
+        def _reflow() -> None:
+            try:
+                m = self.layout().contentsMargins()
+                inner_w = max(1, int(self.width() - m.left() - m.right()))
+                self._root.setFixedWidth(inner_w)
+                self._wrap.setFixedWidth(inner_w)
+                self._wrap.resize(inner_w, max(1, self._wrap.height()))
+            except Exception:
+                pass
+            self._sync_height()
+
+        QTimer.singleShot(0, _reflow)
+
+    def _sync_height(self, *, max_height: int | None = None) -> None:
+        """Fit popup height to chip content (no scroll view on macOS)."""
+        try:
+            # Ensure layout has run and _wrap updated its minimum height.
+            self._root.adjustSize()
+            self._wrap.adjustSize()
+        except Exception:
+            pass
+        contents_h = int(max(1, self._wrap.minimumHeight()))
+        margins = self.layout().contentsMargins() if self.layout() else None
+        mh = (int(margins.top()) + int(margins.bottom())) if margins else 20
+        # Add a little breathing room for layout spacing.
+        target = int(contents_h + mh + int(self._extra_height))
+        max_h = int(max_height) if max_height is not None else int(getattr(self, "_popup_max_height", 260))
+        if max_h > 0:
+            target = min(max_h, target)
+        target = max(1, target)
+        self.setFixedHeight(int(target))
 
     def _rebuild(self) -> None:
         defs = GameTagsService(self.config).get_definitions()
@@ -172,6 +238,10 @@ class _TagsChipPickerPopup(QFrame):
             btn.setCheckable(True)
             btn.setChecked(name.casefold() in selected)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            try:
+                btn.setAttribute(Qt.WidgetAttribute.WA_MacShowFocusRect, False)
+            except Exception:
+                pass
             self._style_chip(btn, QColor(int(rgb[0]), int(rgb[1]), int(rgb[2])))
             btn.toggled.connect(lambda checked, n=name: self._toggle(n, checked))
             return btn
@@ -184,6 +254,7 @@ class _TagsChipPickerPopup(QFrame):
         for c in chips:
             c.setParent(self._wrap)
         self._wrap.set_chips(chips)
+        self._sync_height()
 
     def _toggle(self, name: str, checked: bool) -> None:
         cur = list(self._selected)
@@ -727,9 +798,40 @@ class CriteriaRowWidget(QWidget):
             on_change=on_change,
             parent=self,
         )
-        # Position popup under the button.
-        p = self.tags_picker_btn.mapToGlobal(self.tags_picker_btn.rect().bottomLeft())
-        self._tags_popup.move(p)
+
+        dlg_cfg = (self.config.get("ui", {}) or {}).get("dialogs", {}).get("search", {})
+        tag_picker_cfg = dlg_cfg.get("tag_picker", {}) if isinstance(dlg_cfg.get("tag_picker", {}), dict) else {}
+        anchor_gap_y = int(tag_picker_cfg.get("popup_anchor_gap_y", 24))
+        flip_gap_y = int(tag_picker_cfg.get("popup_flip_gap_y", 12))
+        prefer_below_min_space = int(tag_picker_cfg.get("popup_min_bottom_space_to_prefer_below", 140))
+
+        # Position popup below the button (explicitly), and clamp to the current screen.
+        from PyQt6.QtCore import QPoint
+        p = self.tags_picker_btn.mapToGlobal(QPoint(0, self.tags_picker_btn.height()))
+        x = int(p.x())
+        # Leave plenty of room for the popup's border/shadow so it doesn't collide with the button (macOS).
+        y = int(p.y() + anchor_gap_y)
+        try:
+            scr = self.tags_picker_btn.screen()
+            geom = scr.availableGeometry() if scr is not None else None
+        except Exception:
+            geom = None
+        if geom is not None:
+            # Keep within horizontal bounds.
+            x = max(int(geom.left()), min(x, int(geom.right() - self._tags_popup.width())))
+            # Clamp height to available screen space and choose open direction.
+            bottom_space = int(geom.bottom() - y)
+            top = int(self.tags_picker_btn.mapToGlobal(QPoint(0, 0)).y())
+            top_space = int(top - int(geom.top()) - anchor_gap_y)
+            # Prefer opening below; if not enough space, open above.
+            if bottom_space < prefer_below_min_space and top_space > bottom_space:
+                # Open above the button.
+                self._tags_popup._sync_height(max_height=max(1, top_space))
+                y = int(top - self._tags_popup.height() - flip_gap_y)
+                y = max(int(geom.top()), y)
+            else:
+                self._tags_popup._sync_height(max_height=max(1, bottom_space))
+        self._tags_popup.move(int(x), int(y))
         self._tags_popup.show()
 
     def _toggle_selected_tag(self, tag_name: str, checked: bool) -> None:

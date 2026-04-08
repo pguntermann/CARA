@@ -140,13 +140,22 @@ class GameAutoTaggingService:
             before_cp = eval_by_ply.get(first_blunder_ply - 1, 0.0)
             if after_cp is not None:
                 after_pawns = after_cp / 100.0
+                before_pawns = before_cp / 100.0
                 # Determine if blunder created decisive advantage for the *other* side.
                 decisive_for_other = False
                 if first_blunder_side == "white" and after_pawns <= -decisive_pawns:
                     decisive_for_other = True
                 if first_blunder_side == "black" and after_pawns >= decisive_pawns:
                     decisive_for_other = True
-                if decisive_for_other:
+                # If the other side was already decisively winning before the blunder,
+                # don't treat the game as "blunder-decided" (the blunder only deepened an already lost position).
+                already_decisive_before = False
+                if first_blunder_side == "white" and before_pawns <= -decisive_pawns:
+                    already_decisive_before = True
+                if first_blunder_side == "black" and before_pawns >= decisive_pawns:
+                    already_decisive_before = True
+
+                if decisive_for_other and not already_decisive_before:
                     # Never recovered: evaluation never crosses back within a smaller band.
                     subsequent = [eval_by_ply[p] / 100.0 for p in plies_sorted if p >= first_blunder_ply]
                     if first_blunder_side == "white":

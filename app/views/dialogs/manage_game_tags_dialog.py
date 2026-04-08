@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtGui import QColor, QPalette, QPainter, QPen, QPixmap, QIcon, QFont
 from PyQt6.QtWidgets import (
     QDialog,
@@ -210,9 +210,6 @@ class ManageGameTagsDialog(QDialog):
         main_layout.setContentsMargins(*self.layout_margins)
         main_layout.setSpacing(self.layout_spacing)
 
-        title = QLabel("<b>Tags</b>")
-        main_layout.addWidget(title)
-
         # Built-in tags as chips
         builtin_group = QGroupBox("Built-in tags")
         builtin_layout = QVBoxLayout()
@@ -376,6 +373,12 @@ class ManageGameTagsDialog(QDialog):
         super().resizeEvent(event)
         self._rebuild_builtin_chips()
         self._rebuild_custom_chips()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        # On macOS, the scroll viewport width can be wrong until after the dialog is shown.
+        # Rebuild once on the next tick so chip geometry uses the final layout width.
+        QTimer.singleShot(0, lambda: (self._rebuild_builtin_chips(), self._rebuild_custom_chips()))
 
     def _rebuild_custom_chips(self) -> None:
         for child in self.custom_chip_container.findChildren(QPushButton):
@@ -625,6 +628,15 @@ class _AddCustomTagDialog(QDialog):
             dlg_cfg = (self.config.get("ui", {}) or {}).get("dialogs", {}).get("manage_game_tags", {})
             bg_color = list(dlg_cfg.get("background_color", bg_color))
             border_color = list(dlg_cfg.get("border_color", border_color))
+        except Exception:
+            pass
+
+        # Ensure the dialog draws its background (notably required on macOS).
+        try:
+            self.setAutoFillBackground(True)
+            pal = self.palette()
+            pal.setColor(self.backgroundRole(), QColor(int(bg_color[0]), int(bg_color[1]), int(bg_color[2])))
+            self.setPalette(pal)
         except Exception:
             pass
 

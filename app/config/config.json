@@ -3055,8 +3055,8 @@
           "font_family": "Helvetica Neue",
           "font_size": 11,
           "layout": {
-            "margins": [18, 18, 18, 18],
-            "spacing": 10
+            "margins": [25, 25, 25, 25],
+            "spacing": 15
           },
           "groups": {
             "contents_margins": [10, 14, 10, 10],
@@ -4216,7 +4216,15 @@
         },
         "tag_picker": {
           "selected_border_color": [0, 200, 255],
-          "selected_border_width": 2
+          "selected_border_width": 2,
+          "popup_width": 360,
+          "popup_max_height": 260,
+          "popup_layout_margins": [10, 10, 10, 10],
+          "popup_layout_spacing": 8,
+          "popup_extra_height": 16,
+          "popup_anchor_gap_y": 24,
+          "popup_flip_gap_y": 12,
+          "popup_min_bottom_space_to_prefer_below": 140
         }
       },
       "import_games": {
@@ -5911,7 +5919,7 @@
     },
     "auto_game_tagging": {
       "win_eval_pawns": 2.0,
-      "opening_disaster_eval_pawns": 1.5,
+      "opening_disaster_eval_pawns": 2.0,
       "blunder_decided_decisive_eval_pawns": 3.0,
       "blunder_decided_never_recovered_eval_pawns": 1.5,
       "clean_win_large_advantage_pawns": 2.5,
