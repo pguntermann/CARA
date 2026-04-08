@@ -201,5 +201,5 @@ class DatabaseTagsChipDelegate(QStyledItemDelegate):
         painter.drawRoundedRect(rect, self.chip_border_radius, self.chip_border_radius)
         painter.setPen(fg)
         text_rect = rect.adjusted(pad_h, 0, -pad_h, 0)
-        painter.drawText(text_rect, int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft), text)
+        painter.drawText(text_rect, int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter), text)
 
