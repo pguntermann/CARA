@@ -7,11 +7,20 @@ from pathlib import Path
 
 
 def _configure_linux_frozen_runtime() -> None:
-    """Mitigate GLib/GIO plugin mismatch and GNOME Wayland decoration issues when frozen.
+    """Mitigate GLib/GIO issues and Qt-on-Wayland problems when running a frozen Linux bundle.
 
     System GIO modules under /usr/lib/.../gio/modules expect the distro GLib; a bundled
-    older GLib causes undefined-symbol failures. GNOME on Wayland with some stacks (e.g.
-    certain VMs) can show missing window frames unless Qt uses the X11/XWayland plugin.
+    older GLib causes undefined-symbol failures.
+
+    On Wayland, bundled Qt's native Wayland client can misbehave on some distros (e.g.
+    segmentation faults on keyboard input on rolling releases). Defaulting to the xcb
+    plugin uses XWayland and matches the previous GNOME-only workaround, now applied to
+    all Wayland sessions unless the user opts out.
+
+    Override behaviour:
+    - Set ``QT_QPA_PLATFORM`` before launch (this function uses setdefault only).
+    - Set ``CARA_USE_QT_WAYLAND=1`` to keep native Qt Wayland when not setting
+      ``QT_QPA_PLATFORM``.
     """
     if not getattr(sys, "frozen", False):
         return
@@ -22,8 +31,12 @@ def _configure_linux_frozen_runtime() -> None:
     os.environ.setdefault("GIO_USE_VFS", "local")
 
     if os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland":
-        desktop = (os.environ.get("XDG_CURRENT_DESKTOP") or "").upper()
-        if "GNOME" in desktop:
+        use_native_wayland = (os.environ.get("CARA_USE_QT_WAYLAND") or "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        if not use_native_wayland:
             os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
 
 
