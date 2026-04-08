@@ -13,14 +13,14 @@ def _configure_linux_frozen_runtime() -> None:
     older GLib causes undefined-symbol failures.
 
     On Wayland, bundled Qt's native Wayland client can misbehave on some distros (e.g.
-    segmentation faults on keyboard input on rolling releases). Defaulting to the xcb
-    plugin uses XWayland and matches the previous GNOME-only workaround, now applied to
-    all Wayland sessions unless the user opts out.
+    segmentation faults on keyboard input on rolling releases). Forcing the xcb plugin
+    uses XWayland and avoids that path.
 
     Override behaviour:
-    - Set ``QT_QPA_PLATFORM`` before launch (this function uses setdefault only).
-    - Set ``CARA_USE_QT_WAYLAND=1`` to keep native Qt Wayland when not setting
-      ``QT_QPA_PLATFORM``.
+    - Set ``CARA_USE_QT_WAYLAND=1`` to skip forcing xcb (native Qt Wayland; may crash on
+      some setups).
+    - ``QT_QPA_PLATFORM`` is set to ``xcb`` here (not setdefault) so a user or distro
+      preset of ``wayland`` in the environment cannot disable this mitigation.
     """
     if not getattr(sys, "frozen", False):
         return
@@ -30,14 +30,25 @@ def _configure_linux_frozen_runtime() -> None:
     os.environ.pop("GIO_MODULE_DIR", None)
     os.environ.setdefault("GIO_USE_VFS", "local")
 
-    if os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland":
+    def _session_is_wayland() -> bool:
+        xdg = (os.environ.get("XDG_SESSION_TYPE") or "").lower()
+        if xdg == "wayland":
+            return True
+        if xdg == "x11":
+            return False
+        # tty/unset: infer from compositor (e.g. nested or minimal sessions)
+        return bool((os.environ.get("WAYLAND_DISPLAY") or "").strip())
+
+    if _session_is_wayland():
         use_native_wayland = (os.environ.get("CARA_USE_QT_WAYLAND") or "").strip().lower() in (
             "1",
             "true",
             "yes",
         )
         if not use_native_wayland:
-            os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
+            # Assignment, not setdefault: profiles often export QT_QPA_PLATFORM=wayland,
+            # which would leave the bug in place if we only setdefault("xcb").
+            os.environ["QT_QPA_PLATFORM"] = "xcb"
 
 
 _configure_linux_frozen_runtime()
