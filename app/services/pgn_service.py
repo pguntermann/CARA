@@ -823,7 +823,9 @@ class PgnService:
                                 if line_to_add:
                                     result_lines.append(line_to_add)
                                 current_line = current_line[last_safe_space + 1:]
-                                # Don't add the current space, continue processing
+                                # Preserve this space: it separates the last token on the
+                                # remainder (e.g. Ne7) from the upcoming move number (e.g. 9.).
+                                current_line += char
                                 i += 1
                                 continue
                             # If no safe space found, we have to break here anyway (better than exceeding)
