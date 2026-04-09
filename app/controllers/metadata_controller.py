@@ -254,14 +254,13 @@ class MetadataController:
                 # This is a no-op if value is already correct
                 self._metadata_model.update_tag_value(tag_name, new_value)
             
-            # STEP 7: Emit metadata_updated signal (for PGN view)
-            # This tells PGN view that metadata changed, but NOT game structure
-            # Also store last-changed tag name so views can optimize refreshes.
-            try:
-                setattr(self._game_model, "_last_metadata_tag_changed", tag_name)
-            except Exception:
-                pass
-            self._game_model.metadata_updated.emit()
+            # STEP 7: Notify views.
+            # CARAGameTags changes are handled separately (board tag bubbles + DB column) and
+            # should not trigger a full PGN view re-render.
+            if tag_name == "CARAGameTags":
+                self._game_model.game_tags_changed.emit()
+            else:
+                self._game_model.metadata_updated.emit()
             
             # STEP 8: Refresh active game ONLY if player names or result changed (for game info header)
             # This updates the game info header (player names and result above chessboard)
@@ -413,11 +412,10 @@ class MetadataController:
                 database_model._add_tags_to_cache({tag_name})
             
             # Emit metadata_updated signal to notify views (e.g., PGN view) that metadata changed
-            try:
-                setattr(self._game_model, "_last_metadata_tag_changed", tag_name)
-            except Exception:
-                pass
-            self._game_model.metadata_updated.emit()
+            if tag_name == "CARAGameTags":
+                self._game_model.game_tags_changed.emit()
+            else:
+                self._game_model.metadata_updated.emit()
             
             # Update metadata model (structural change requires re-extraction)
             if self._metadata_model:
@@ -531,11 +529,10 @@ class MetadataController:
                     self._database_controller.mark_database_unsaved(database_model)
             
             # Emit metadata_updated signal to notify views (e.g., PGN view) that metadata changed
-            try:
-                setattr(self._game_model, "_last_metadata_tag_changed", tag_name)
-            except Exception:
-                pass
-            self._game_model.metadata_updated.emit()
+            if tag_name == "CARAGameTags":
+                self._game_model.game_tags_changed.emit()
+            else:
+                self._game_model.metadata_updated.emit()
             
             # Update metadata model (structural change requires re-extraction)
             if self._metadata_model:

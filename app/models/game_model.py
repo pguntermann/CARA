@@ -19,6 +19,7 @@ class GameModel(QObject):
     active_move_changed = pyqtSignal(int)  # Emitted when active move changes (ply_index: 0 = start, 1 = after first move, etc.)
     is_game_analyzed_changed = pyqtSignal(bool)  # Emitted when game analysis completion status changes
     metadata_updated = pyqtSignal()  # Emitted when metadata tags are added/edited/removed
+    game_tags_changed = pyqtSignal()  # Emitted when CARAGameTags changed
     
     def __init__(self) -> None:
         """Initialize the game model."""
