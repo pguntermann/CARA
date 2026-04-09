@@ -1,5 +1,20 @@
 # Release Notes
 
+# CARA v2.6.10 - Maintenance / Bug Fix Release
+
+**Release Date:** 09.04.2026
+
+This is a small maintenance release containing only bug fixes for issues that slipped through with the last release.
+
+## Bug Fixes
+
+- **Moves List / PGN pane:** Fixed an issue where editing move comments via the Moves List didn't properly refresh the **PGN pane** rendering.
+- **Linux App Bundles:** Fixed a **segmentation fault on keyboard input** on some Linux distributions (e.g. openSUSE Tumbleweed) caused by a bundled `libxkbcommon` mismatch.
+- **Game Tags widget:** Fixed widget positioning when toggling the evaluation bar or coordinates.
+- **PGN export:** Fixed edge-case where the `fixed_width` PGN export could produce malformed output (missing spaces).
+
+---
+
 # CARA v2.6.9 - Game Tagging, Auto-Tagging, UI/UX refinements
 
 **Release Date:** 08.04.2026
