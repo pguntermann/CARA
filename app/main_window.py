@@ -3877,12 +3877,9 @@ class MainWindow(QMainWindow):
                 return
 
             # Signal metadata change so views can re-read header-derived fields.
-            try:
-                setattr(game_model, "_last_metadata_tag_changed", "CARAGameTags")
-            except Exception:
-                pass
             if hasattr(game_model, "metadata_updated"):
                 game_model.metadata_updated.emit()
+            game_model.game_tags_changed.emit()
 
             # Refresh board tags widget immediately (avoid needing a game switch).
             if hasattr(self, "main_panel") and hasattr(self.main_panel, "chessboard_view"):

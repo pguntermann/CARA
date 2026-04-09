@@ -69,7 +69,7 @@ class GameTagsWidget(QWidget):
             except Exception:
                 pass
             try:
-                self._game_model.metadata_updated.disconnect(self._on_metadata_updated)
+                self._game_model.game_tags_changed.disconnect(self._on_game_tags_changed)
             except Exception:
                 pass
 
@@ -77,9 +77,7 @@ class GameTagsWidget(QWidget):
         self._metadata_controller = metadata_controller
         if self._game_model is not None:
             self._game_model.active_game_changed.connect(self._on_active_game_changed)
-            # When other views edit metadata, keep bubbles in sync.
-            if hasattr(self._game_model, "metadata_updated"):
-                self._game_model.metadata_updated.connect(self._on_metadata_updated)
+            self._game_model.game_tags_changed.connect(self._on_game_tags_changed)
             self._active_game = getattr(self._game_model, "active_game", None)
         self._refresh()
 
@@ -113,7 +111,7 @@ class GameTagsWidget(QWidget):
         self._active_game = game
         self._refresh()
 
-    def _on_metadata_updated(self) -> None:
+    def _on_game_tags_changed(self) -> None:
         self._refresh()
 
     def _current_tags(self) -> List[str]:
