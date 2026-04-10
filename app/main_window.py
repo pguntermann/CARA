@@ -2956,6 +2956,30 @@ class MainWindow(QMainWindow):
                 chessboard._load_config()
                 chessboard.update()
     
+    def _sync_game_info_center_menu_actions(self, mode: str) -> None:
+        """Keep Board menu actions aligned with ``game_info_center_mode``."""
+        if not hasattr(self, "game_info_center_mode_group"):
+            return
+        if mode not in ("center_in_view", "center_over_board"):
+            mode = "center_in_view"
+        self.game_info_center_mode_group.blockSignals(True)
+        try:
+            self.game_info_center_in_view_action.setChecked(mode == "center_in_view")
+            self.game_info_center_over_board_action.setChecked(mode == "center_over_board")
+        finally:
+            self.game_info_center_mode_group.blockSignals(False)
+
+    def _on_game_info_center_mode_menu_triggered(self, mode: str) -> None:
+        """Apply game info horizontal alignment; persisted on app exit like other board prefs."""
+        if mode == "center_in_view" and not self.game_info_center_in_view_action.isChecked():
+            return
+        if mode == "center_over_board" and not self.game_info_center_over_board_action.isChecked():
+            return
+        if hasattr(self, "main_panel"):
+            self.main_panel.set_game_info_center_mode(mode)
+        from app.services.user_settings_service import UserSettingsService
+        UserSettingsService.get_instance().update_board_visibility({"game_info_center_mode": mode})
+    
     def _on_ai_summary_provider_selected(self, provider: str) -> None:
         """Handle AI Summary provider toggle selection."""
         use_openai = provider == "openai"
@@ -3444,6 +3468,13 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'trajectory_style_straight_action') and hasattr(self, 'trajectory_style_bezier_action'):
             self.trajectory_style_straight_action.setChecked(use_straight_lines)
             self.trajectory_style_bezier_action.setChecked(not use_straight_lines)
+        
+        game_info_center_mode = board_visibility.get("game_info_center_mode", "center_in_view")
+        if game_info_center_mode not in ("center_in_view", "center_over_board"):
+            game_info_center_mode = "center_in_view"
+        if hasattr(self, "main_panel"):
+            self.main_panel.set_game_info_center_mode(game_info_center_mode)
+        self._sync_game_info_center_menu_actions(game_info_center_mode)
         
         # ===== PGN MENU SETTINGS (in menu order) =====
         # Load PGN visibility settings

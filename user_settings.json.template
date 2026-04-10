@@ -813,7 +813,8 @@
     "use_straight_lines": true,
     "show_pv2_arrow": true,
     "show_pv3_arrow": true,
-    "show_annotations_layer": true
+    "show_annotations_layer": true,
+    "game_info_center_mode": "center_in_view"
   },
   "game_tags": {
     "builtin_colors": {},

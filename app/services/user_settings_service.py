@@ -434,11 +434,12 @@ class UserSettingsService:
         """
         return self.get_model().get_settings()
     
-    def update_board_visibility(self, visibility: Dict[str, bool]) -> None:
+    def update_board_visibility(self, visibility: Dict[str, Any]) -> None:
         """Update board visibility settings.
         
         Args:
-            visibility: Dictionary with board visibility settings.
+            visibility: Board visibility flags (booleans) and string keys such as
+                ``game_info_center_mode``.
         """
         model = self.get_model()
         current = model.get_board_visibility()

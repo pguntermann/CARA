@@ -307,7 +307,7 @@
     },
     "panels": {
       "main": {
-        "minimum_width": 200,
+        "minimum_width": 450,
         "minimum_height": 200,
         "background_color": [
           40,
