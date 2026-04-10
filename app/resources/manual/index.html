@@ -1278,6 +1278,38 @@
                     <li>Use regular expressions for advanced pattern matching</li>
                     <li>Process all games or only selected games in the database table</li>
                 </ul>
+                <p>If you enable <strong>Use regex</strong>, the <strong>Find</strong> field is treated as a regular expression. Here are a few practical examples you can try:</p>
+                <table class="column-table">
+                    <thead>
+                        <tr>
+                            <th style="min-width: 220px;">Goal</th>
+                            <th style="min-width: 220px;">Find (regex)</th>
+                            <th style="min-width: 220px;">Replace</th>
+                            <th style="min-width: 200px;">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Append a suffix to specific sites</td>
+                            <td><code>^(lichess\.org|chess\.com)$</code></td>
+                            <td><code>\1 (Live)</code></td>
+                            <td>Example for the <code>Site</code> tag: matches <em>only</em> values that are exactly <code>lichess.org</code> or <code>chess.com</code> and appends <code>(Live)</code>. Enable <strong>Case sensitive</strong>.</td>
+                        </tr>
+                        <tr>
+                            <td>Normalize whitespace</td>
+                            <td><code>\s+</code></td>
+                            <td>single space</td>
+                            <td>Replaces any whitespace run with a single space (names, events, etc.).</td>
+                        </tr>
+                        <tr>
+                            <td>Remove trailing engine/site annotations</td>
+                            <td><code>\s*[-–—]\s*(lichess|chess\.com|engine).*?$</code></td>
+                            <td>(empty)</td>
+                            <td>Deletes a suffix like “ - lichess” or “ — engine …”. Use with care.</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <br>
                 <p>The dialog also includes two smart update options:</p>
                 <ul>
                     <li><strong>Update Result based on last move evaluation:</strong> Analyzes the final position of each game using a chess engine to determine the game result. This option only updates games with indecisive results (empty, "*", or "?"), preserving games that already have decisive results (1-0, 0-1, 1/2-1/2). It can detect checkmate or stalemate directly, or use engine evaluation to determine the likely result for incomplete games. This is useful if you are for example importing games from a chess computer, which doesn't provide a resign function.</li>

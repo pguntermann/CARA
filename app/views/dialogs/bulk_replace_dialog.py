@@ -454,18 +454,25 @@ class BulkReplaceDialog(QDialog):
         # Add tags label and container to form layout
         replace_layout.addRow(self.tag_label, tags_container)
         
-        # Copy from another tag checkbox - ensure it's positioned below the tags container
-        # The tags_container already has bottom margin for spacing
+        # Overwrite + copy mode checkboxes on one row (layout-sensitive)
+        self.overwrite_all_check = QCheckBox("Overwrite values")
+        self.overwrite_all_check.setFont(QFont(self.label_font_family, self.label_font_size))
+        self.overwrite_all_check.toggled.connect(self._on_overwrite_all_toggled)
+
+        # Copy from another tag checkbox
         self.copy_from_tag_check = QCheckBox("Copy from another tag")
         self.copy_from_tag_check.setFont(QFont(self.label_font_family, self.label_font_size))
         self.copy_from_tag_check.toggled.connect(self._on_copy_mode_toggled)
+
         # Add to form layout with empty label to maintain alignment
-        copy_checkbox_widget = QWidget()
-        copy_checkbox_layout = QHBoxLayout(copy_checkbox_widget)
-        copy_checkbox_layout.setContentsMargins(0, 0, 0, 0)
-        copy_checkbox_layout.addWidget(self.copy_from_tag_check)
-        copy_checkbox_layout.addStretch()
-        replace_layout.addRow("", copy_checkbox_widget)
+        mode_checkbox_widget = QWidget()
+        mode_checkbox_layout = QHBoxLayout(mode_checkbox_widget)
+        mode_checkbox_layout.setContentsMargins(0, 0, 0, 0)
+        mode_checkbox_layout.setSpacing(self.options_spacing)
+        mode_checkbox_layout.addWidget(self.overwrite_all_check)
+        mode_checkbox_layout.addWidget(self.copy_from_tag_check)
+        mode_checkbox_layout.addStretch()
+        replace_layout.addRow("", mode_checkbox_widget)
         
         # Source tag selection (shown when copy mode is enabled)
         self.source_tag_combo = QComboBox()
@@ -513,12 +520,8 @@ class BulkReplaceDialog(QDialog):
         self.case_sensitive_check.setFont(QFont(self.label_font_family, self.label_font_size))
         self.regex_check = QCheckBox("Use regex")
         self.regex_check.setFont(QFont(self.label_font_family, self.label_font_size))
-        self.overwrite_all_check = QCheckBox("Overwrite all values")
-        self.overwrite_all_check.setFont(QFont(self.label_font_family, self.label_font_size))
-        self.overwrite_all_check.toggled.connect(self._on_overwrite_all_toggled)
         options_layout.addWidget(self.case_sensitive_check)
         options_layout.addWidget(self.regex_check)
-        options_layout.addWidget(self.overwrite_all_check)
         options_layout.addStretch()
         self.options_label = QLabel("Options:")
         self.options_label.setFont(QFont(self.label_font_family, self.label_font_size))
@@ -909,7 +912,14 @@ class BulkReplaceDialog(QDialog):
     
     def _on_overwrite_all_toggled(self, checked: bool) -> None:
         """Handle overwrite all checkbox toggle."""
-        # Disable Find field when overwrite all is checked
+        # Overwrite-values mode bypasses find/replace options entirely.
+        if checked:
+            try:
+                self.case_sensitive_check.setChecked(False)
+                self.regex_check.setChecked(False)
+            except Exception:
+                pass
+
         self.find_input.setEnabled(not checked)
         self.case_sensitive_check.setEnabled(not checked)
         self.regex_check.setEnabled(not checked)
