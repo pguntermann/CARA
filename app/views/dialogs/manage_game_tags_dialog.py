@@ -759,16 +759,20 @@ class ManageGameTagsDialog(QDialog):
         self.builtin_chip_container.updateGeometry()
         self.builtin_chip_container.update()
 
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
-        self._rebuild_builtin_chips()
-        self._rebuild_custom_chips()
-
     def showEvent(self, event) -> None:
         super().showEvent(event)
-        # On macOS, the scroll viewport width can be wrong until after the dialog is shown.
+        # On macOS/Linux, the scroll viewport width can be wrong until after the dialog is shown.
         # Rebuild once on the next tick so chip geometry uses the final layout width.
-        QTimer.singleShot(0, lambda: (self._rebuild_builtin_chips(), self._rebuild_custom_chips()))
+        # Use a bound slot (not a lambda) so Qt drops the timer if the dialog is destroyed first;
+        # avoid rebuilding from resizeEvent — fixed-size dialog + setFixedWidth on the chip
+        # container can trigger layout/resize feedback loops on some platforms (Ubuntu freeze).
+        QTimer.singleShot(0, self._deferred_post_show_chip_layout)
+
+    def _deferred_post_show_chip_layout(self) -> None:
+        if not self.isVisible():
+            return
+        self._rebuild_builtin_chips()
+        self._rebuild_custom_chips()
 
     def _rebuild_custom_chips(self) -> None:
         for child in self.custom_chip_container.findChildren(QPushButton):
