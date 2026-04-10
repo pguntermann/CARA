@@ -6,14 +6,17 @@ import multiprocessing
 from pathlib import Path
 
 
-def _configure_multiprocessing_for_macos_gui() -> None:
-    """Force multiprocessing 'spawn' on macOS before Qt/Cocoa load.
+def _configure_multiprocessing_for_qt_gui() -> None:
+    """Force multiprocessing ``spawn`` before Qt loads (non-Windows).
 
-    Forking after the Objective-C runtime (loaded by Qt) is unsafe and can
-    cause immediate SIGSEGV on startup or exit. Python may still pick a
-    non-spawn start method in edge cases; set it explicitly as early as possible.
+    On Linux and macOS the default start method is often ``fork``. Forking after
+    ``QApplication`` / Qt has initialized copies a fragile process (display
+    connections, locks, plugins). ``ProcessPoolExecutor`` workers then deadlock
+    or hang—commonly right after status text like "Prepared N game(s) for parsing...".
+
+    Windows already uses ``spawn`` only; no change needed there.
     """
-    if sys.platform != "darwin":
+    if sys.platform == "win32":
         return
     try:
         multiprocessing.set_start_method("spawn")
@@ -22,7 +25,7 @@ def _configure_multiprocessing_for_macos_gui() -> None:
         pass
 
 
-_configure_multiprocessing_for_macos_gui()
+_configure_multiprocessing_for_qt_gui()
 
 
 def _configure_linux_frozen_runtime() -> None:
