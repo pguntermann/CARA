@@ -7,6 +7,7 @@ duplicating assets per theme.
 
 from __future__ import annotations
 
+import sys
 from typing import Any, Dict, Sequence, Tuple
 
 from PyQt6.QtCore import QByteArray, QRectF, Qt
@@ -89,16 +90,25 @@ def menu_icon_dark_tint_rgb(config: Dict[str, Any]) -> Tuple[int, int, int]:
 
 
 def menu_icon_tint_rgb(config: Dict[str, Any]) -> Tuple[int, int, int]:
-    """Resolve [R, G, B] for menu icons from config and Qt color scheme.
+    """Resolve [R, G, B] for menubar menu icons from config and Qt color scheme.
 
-    When ``QStyleHints.colorScheme()`` is ``Light``, uses
-    ``ui.menu.icons.tint_color_light_scheme`` if set, otherwise a dark neutral default
-    so glyphs stay visible on light chrome (e.g. native macOS menu bar).
+    On **macOS**, when ``QStyleHints.colorScheme()`` is ``Light``, uses
+    ``ui.menu.icons.tint_color_light_scheme`` (or a dark neutral default) so glyphs
+    stay visible on a **native light** menu bar.
 
-    For ``Dark`` or ``Unknown``, uses ``ui.menu.icons.tint_color`` if set, otherwise
-    ``ui.menu.colors.normal.text``.
+    On **Linux and Windows**, Qt often reports ``Light`` while CARA still paints the
+    menu bar with the configured **dark** stylesheet (``ui.menu.colors``). Using the
+    light-scheme tint there makes icons nearly the same RGB as the bar (e.g. manage
+    tags vs. open folder perceived contrast). Those platforms always use the same tint
+    as :func:`menu_icon_dark_tint_rgb` for the menubar.
+
+    For ``Dark`` or ``Unknown`` on macOS, uses ``ui.menu.icons.tint_color`` if set,
+    otherwise ``ui.menu.colors.normal.text``.
     """
     dark_tint = menu_icon_dark_tint_rgb(config)
+
+    if sys.platform != "darwin":
+        return dark_tint
 
     ui = config.get("ui", {})
     menu = ui.get("menu", {})
