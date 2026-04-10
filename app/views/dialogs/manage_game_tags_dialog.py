@@ -12,7 +12,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from PyQt6.QtCore import Qt, QSize, QTimer
+from PyQt6.QtCore import Qt, QSize, QTimer, QRectF
+from PyQt6.QtCore import QByteArray
 from PyQt6.QtGui import QColor, QPalette, QPainter, QPen, QPixmap, QIcon, QFont
 from PyQt6.QtWidgets import (
     QDialog,
@@ -28,10 +29,13 @@ from PyQt6.QtWidgets import (
     QScrollArea,
 )
 
+from PyQt6.QtSvg import QSvgRenderer
+
 from app.services.game_tags_service import GameTagsService, GameTagDefinition
 from app.services.user_settings_service import UserSettingsService
 from app.views.style import StyleManager
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.path_resolver import get_app_root
 
 
 class ColorSwatchButton(QPushButton):
@@ -74,46 +78,180 @@ class _CustomRowState:
 
 
 class _RemovableChipButton(QPushButton):
-    def __init__(self, label: str, on_remove, parent=None) -> None:
+    def __init__(self, label: str, on_remove, on_edit=None, parent=None) -> None:
         super().__init__(label, parent)
         self._base_label = label
         self._on_remove = on_remove
+        self._on_edit = on_edit
         self._hovered = False
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.clicked.connect(self._handle_click)
-        # Avoid layout jitter: reserve space for the remove indicator.
-        try:
-            fm = self.fontMetrics()
-            self.setMinimumWidth(int(fm.horizontalAdvance(f"{label}  ✕") + 16))
-        except Exception:
-            pass
-        self._sync_text()
+        self._hover_icon: str | None = None  # "edit" | "remove" | None
+        self._chip_bg = QColor(95, 95, 100)
+        self._chip_text = QColor(245, 245, 245)
+        self._badge_bg = QColor(55, 55, 60)
+        self._badge_bg_hover = QColor(75, 75, 82)
+        self._badge_icon = QColor(235, 235, 235)
+        self._badge_icon_hover = QColor(255, 255, 255)
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        self.setMouseTracking(True)
+        self._sync_tooltip()
 
     def get_base_label(self) -> str:
         return self._base_label
 
+    def set_chip_background(self, bg: QColor) -> None:
+        self._chip_bg = bg if isinstance(bg, QColor) else QColor(95, 95, 100)
+
+    def set_chip_text_color(self, fg: QColor) -> None:
+        self._chip_text = fg if isinstance(fg, QColor) else QColor(245, 245, 245)
+
+    def set_badge_colors(
+        self,
+        *,
+        background: QColor,
+        background_hover: QColor,
+        icon: QColor,
+        icon_hover: QColor,
+    ) -> None:
+        self._badge_bg = background if isinstance(background, QColor) else QColor(55, 55, 60)
+        self._badge_bg_hover = background_hover if isinstance(background_hover, QColor) else QColor(75, 75, 82)
+        self._badge_icon = icon if isinstance(icon, QColor) else QColor(235, 235, 235)
+        self._badge_icon_hover = icon_hover if isinstance(icon_hover, QColor) else QColor(255, 255, 255)
+
     def enterEvent(self, event) -> None:
         self._hovered = True
-        self._sync_text()
+        self._sync_tooltip()
+        self.update()
         return super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:
         self._hovered = False
-        self._sync_text()
+        self._hover_icon = None
+        self._sync_tooltip()
+        self.update()
         return super().leaveEvent(event)
 
-    def _sync_text(self) -> None:
-        if self._hovered:
-            self.setText(f"{self._base_label}  ✕")
-            self.setToolTip("Click to remove game tag")
-        else:
-            self.setText(self._base_label)
+    def _sync_tooltip(self) -> None:
+        if not self._hovered:
             self.setToolTip("")
+            return
+        if self._hover_icon == "edit":
+            self.setToolTip("Edit game tag color")
+        elif self._hover_icon == "remove":
+            self.setToolTip("Remove game tag")
+        else:
+            self.setToolTip("Edit color or remove tag")
 
-    def _handle_click(self) -> None:
-        # Requirement: when hovered, clicking removes the tag definition.
-        if self._hovered and callable(self._on_remove):
+    def _icon_rects(self) -> tuple[QRectF, QRectF]:
+        # Draw two badge-style icons on the right, overlaid on top of the chip.
+        s = max(14, int(self.height() * 0.66))
+        pad = max(6, int(self.height() * 0.22))
+        gap = max(6, int(self.height() * 0.18))
+        y = (self.height() - s) / 2
+        remove_rect = QRectF(self.width() - pad - s, y, s, s)
+        edit_rect = QRectF(remove_rect.left() - gap - s, y, s, s)
+        return edit_rect, remove_rect
+
+    def _icon_hit_test(self, x: int, y: int) -> str | None:
+        if not self._hovered:
+            return None
+        edit_rect, remove_rect = self._icon_rects()
+        if remove_rect.contains(float(x), float(y)):
+            return "remove"
+        if edit_rect.contains(float(x), float(y)):
+            return "edit"
+        return None
+
+    # Badge/icon colors are configured in config.json (no dynamic inversion required).
+
+    # Icon badge palette is config-driven; no dynamic contrast math needed.
+
+    @classmethod
+    def _load_svg(cls, rel_path: str) -> bytes:
+        if not hasattr(cls, "_svg_cache"):
+            cls._svg_cache = {}  # type: ignore[attr-defined]
+        cache = cls._svg_cache  # type: ignore[attr-defined]
+        if rel_path in cache:
+            return cache[rel_path]
+        p = get_app_root() / rel_path
+        try:
+            data = p.read_bytes()
+        except Exception:
+            data = b""
+        cache[rel_path] = data
+        return data
+
+    def _render_svg_tinted(self, painter: QPainter, rect: QRectF, rel_path: str, color: QColor) -> None:
+        data = self._load_svg(rel_path)
+        if not data:
+            return
+        try:
+            svg_str = data.decode("utf-8")
+        except Exception:
+            return
+        hex_ = f"#{color.red():02x}{color.green():02x}{color.blue():02x}"
+        svg_str = svg_str.replace("#ffffff", hex_).replace("#FFFFFF", hex_)
+        r = QSvgRenderer(QByteArray(svg_str.encode("utf-8")))
+        if r.isValid():
+            r.render(painter, rect)
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        if not self._hovered:
+            return
+        edit_rect, remove_rect = self._icon_rects()
+        edit_bg = self._badge_bg_hover if self._hover_icon == "edit" else self._badge_bg
+        remove_bg = self._badge_bg_hover if self._hover_icon == "remove" else self._badge_bg
+        edit_col = self._badge_icon_hover if self._hover_icon == "edit" else self._badge_icon
+        remove_col = self._badge_icon_hover if self._hover_icon == "remove" else self._badge_icon
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        try:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(edit_bg)
+            painter.drawEllipse(edit_rect)
+            painter.setBrush(remove_bg)
+            painter.drawEllipse(remove_rect)
+
+            self._render_svg_tinted(painter, edit_rect, "app/resources/icons/color_picker.svg", edit_col)
+            self._render_svg_tinted(painter, remove_rect, "app/resources/icons/x.svg", remove_col)
+        finally:
+            painter.end()
+
+    def mousePressEvent(self, event) -> None:
+        try:
+            x = int(event.position().x())
+            y = int(event.position().y())
+        except Exception:
+            x = int(event.pos().x())
+            y = int(event.pos().y())
+
+        which = self._icon_hit_test(x, y)
+        if which == "remove" and callable(self._on_remove):
             self._on_remove()
+            event.accept()
+            return
+        if which == "edit" and callable(self._on_edit):
+            self._on_edit()
+            event.accept()
+            return
+        return super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        try:
+            x = int(event.position().x())
+            y = int(event.position().y())
+        except Exception:
+            x = int(event.pos().x())
+            y = int(event.pos().y())
+        which = self._icon_hit_test(x, y)
+        if which != self._hover_icon:
+            self._hover_icon = which
+            self._sync_tooltip()
+            self.update()
+        # Only show pointing hand when hovering a clickable icon.
+        self.setCursor(Qt.CursorShape.PointingHandCursor if which in ("edit", "remove") else Qt.CursorShape.ArrowCursor)
+        return super().mouseMoveEvent(event)
 
 
 class _AddChipButton(QPushButton):
@@ -188,6 +326,13 @@ class ManageGameTagsDialog(QDialog):
         self.input_border_color = inputs_cfg.get("border_color", [60, 60, 65])
         self.input_font_family = resolve_font_family(inputs_cfg.get("font_family", "Cascadia Mono"))
         self.input_font_size = scale_font_size(inputs_cfg.get("font_size", 11))
+
+        # Icon badges shown on custom tag chips (edit/remove)
+        icon_badges_cfg = dlg_cfg.get("icon_badges", {}) if isinstance(dlg_cfg.get("icon_badges", {}), dict) else {}
+        self.icon_badge_bg = icon_badges_cfg.get("background_color", [55, 55, 60])
+        self.icon_badge_bg_hover = icon_badges_cfg.get("background_hover_color", [75, 75, 82])
+        self.icon_badge_icon = icon_badges_cfg.get("icon_color", [235, 235, 235])
+        self.icon_badge_icon_hover = icon_badges_cfg.get("icon_hover_color", [255, 255, 255])
 
         # Chip styling should match the board `GameTagsWidget` exactly.
         board_cfg = (self.config.get("ui", {}) or {}).get("panels", {}).get("main", {}).get("board", {})
@@ -433,6 +578,7 @@ class ManageGameTagsDialog(QDialog):
             chip = _RemovableChipButton(
                 name,
                 on_remove=lambda n=name: self._remove_custom_by_name(n),
+                on_edit=lambda n=name: self._edit_custom_color_by_name(n),
                 parent=self.custom_chip_container,
             )
             self._style_chip(chip, QColor(*rgb), removable=True)
@@ -480,6 +626,32 @@ class ManageGameTagsDialog(QDialog):
         ]
         self._rebuild_custom_chips()
 
+    def _edit_custom_color_by_name(self, name: str) -> None:
+        key = self._sanitize_name(name).casefold()
+        idx = -1
+        rgb = (120, 120, 120)
+        for i, item in enumerate(self._working_custom):
+            existing = self._sanitize_name(str(item.get("name", ""))).casefold()
+            if existing == key:
+                idx = i
+                col = item.get("color", [120, 120, 120])
+                try:
+                    rgb = (
+                        int(col[0]),
+                        int(col[1]),
+                        int(col[2]),
+                    ) if isinstance(col, list) and len(col) == 3 else (120, 120, 120)
+                except Exception:
+                    rgb = (120, 120, 120)
+                break
+        if idx < 0:
+            return
+        chosen = QColorDialog.getColor(QColor(*rgb), self, "Select game tag color")
+        if not chosen.isValid():
+            return
+        self._working_custom[idx]["color"] = [int(chosen.red()), int(chosen.green()), int(chosen.blue())]
+        self._rebuild_custom_chips()
+
     def _upsert_custom(self, name: str, rgb: Tuple[int, int, int]) -> None:
         name = self._sanitize_name(name)
         if not name:
@@ -514,13 +686,28 @@ class ManageGameTagsDialog(QDialog):
         chip.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         chip.setFlat(True)
 
+        if removable and isinstance(chip, _RemovableChipButton):
+            chip.set_chip_background(color)
+
         font = QFont(self.chip_font_family, self.chip_font_size)
         if self.chip_font_weight in ("bold", "700", "800", "900"):
             font.setBold(True)
         chip.setFont(font)
 
         bg = f"rgb({color.red()}, {color.green()}, {color.blue()})"
-        text = "rgb(15, 15, 18)" if (0.2126 * color.red() + 0.7152 * color.green() + 0.0722 * color.blue()) > 150 else "rgb(245, 245, 245)"
+        is_light = (0.2126 * color.red() + 0.7152 * color.green() + 0.0722 * color.blue()) > 150
+        text = "rgb(15, 15, 18)" if is_light else "rgb(245, 245, 245)"
+        if removable and isinstance(chip, _RemovableChipButton):
+            chip.set_chip_text_color(QColor(15, 15, 18) if is_light else QColor(245, 245, 245))
+            try:
+                chip.set_badge_colors(
+                    background=QColor(*self.icon_badge_bg),
+                    background_hover=QColor(*self.icon_badge_bg_hover),
+                    icon=QColor(*self.icon_badge_icon),
+                    icon_hover=QColor(*self.icon_badge_icon_hover),
+                )
+            except Exception:
+                pass
         pad_v = int(self.chip_padding[0]) if isinstance(self.chip_padding, list) and len(self.chip_padding) >= 1 else 2
         pad_h = int(self.chip_padding[1]) if isinstance(self.chip_padding, list) and len(self.chip_padding) >= 2 else 8
         # Removable chips need a bit more room on the right for the hover ✕ indicator.
@@ -528,7 +715,8 @@ class ManageGameTagsDialog(QDialog):
             pad_h += 6
         try:
             if removable and isinstance(chip, _RemovableChipButton):
-                text_w = chip.fontMetrics().horizontalAdvance(f"{chip.get_base_label()}  ✕")
+                # Reserve room for hover icons (edit + remove).
+                text_w = int(chip.fontMetrics().horizontalAdvance(chip.get_base_label()))
             else:
                 text_w = chip.fontMetrics().horizontalAdvance(chip.text())
         except Exception:
@@ -574,6 +762,30 @@ class ManageGameTagsDialog(QDialog):
                 col = [120, 120, 120]
             cleaned.append({"name": name, "color": [int(col[0]), int(col[1]), int(col[2])]})
         self._set_custom_to_settings(cleaned)
+
+        # Refresh visible chips that depend on definitions (board widget + database tags column).
+        try:
+            from PyQt6.QtWidgets import QTableView
+        except Exception:
+            QTableView = None  # type: ignore
+
+        try:
+            w = self.parent()
+            # Refresh board widget if present.
+            if w is not None and hasattr(w, "main_panel") and hasattr(w.main_panel, "chessboard_view"):
+                board_widget = getattr(w.main_panel.chessboard_view, "chessboard", None)
+                if board_widget is not None and hasattr(board_widget, "game_tags_widget") and board_widget.game_tags_widget:
+                    board_widget.game_tags_widget._refresh()
+            # Force repaint on database tables so their delegate re-queries definitions.
+            if w is not None and QTableView is not None:
+                for tv in w.findChildren(QTableView):
+                    try:
+                        tv.viewport().update()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
         self.accept()
 
 

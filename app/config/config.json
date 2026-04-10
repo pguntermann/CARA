@@ -3128,6 +3128,12 @@
             60,
             65
           ]
+        },
+        "icon_badges": {
+          "background_color": [55, 55, 60],
+          "background_hover_color": [75, 75, 82],
+          "icon_color": [235, 235, 235],
+          "icon_hover_color": [255, 255, 255]
         }
       },
       "classification_settings": {
