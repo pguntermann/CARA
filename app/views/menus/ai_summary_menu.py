@@ -5,6 +5,8 @@ from __future__ import annotations
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QMenuBar
 
+from app.utils.themed_icon import SVG_MENU_GEAR, set_menubar_themable_action_icon
+
 
 def setup_ai_summary_menu(mw, menu_bar: QMenuBar) -> None:
     ai_summary_menu = menu_bar.addMenu("AI Summary")
@@ -12,6 +14,7 @@ def setup_ai_summary_menu(mw, menu_bar: QMenuBar) -> None:
 
     ai_model_settings_action = QAction("AI Model Settings...", mw)
     ai_model_settings_action.setMenuRole(QAction.MenuRole.NoRole)
+    set_menubar_themable_action_icon(mw, ai_model_settings_action, SVG_MENU_GEAR)
     ai_model_settings_action.triggered.connect(mw._show_ai_model_settings)
     ai_summary_menu.addAction(ai_model_settings_action)
 

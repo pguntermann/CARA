@@ -5,6 +5,8 @@ from __future__ import annotations
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenuBar
 
+from app.utils.themed_icon import set_menubar_themable_action_icon, SVG_SIMPLE_X
+
 
 def setup_pgn_menu(mw, menu_bar: QMenuBar) -> None:
     pgn_menu = menu_bar.addMenu("PGN")
@@ -72,18 +74,22 @@ def setup_pgn_menu(mw, menu_bar: QMenuBar) -> None:
     pgn_menu.addSeparator()
 
     mw.remove_comments_action = QAction("Remove Comments", mw)
+    set_menubar_themable_action_icon(mw, mw.remove_comments_action, SVG_SIMPLE_X)
     mw.remove_comments_action.triggered.connect(mw._on_remove_comments_clicked)
     pgn_menu.addAction(mw.remove_comments_action)
 
     mw.remove_variations_action = QAction("Remove Variations", mw)
+    set_menubar_themable_action_icon(mw, mw.remove_variations_action, SVG_SIMPLE_X)
     mw.remove_variations_action.triggered.connect(mw._on_remove_variations_clicked)
     pgn_menu.addAction(mw.remove_variations_action)
 
     mw.remove_non_standard_tags_action = QAction("Remove Non-Standard Tags", mw)
+    set_menubar_themable_action_icon(mw, mw.remove_non_standard_tags_action, SVG_SIMPLE_X)
     mw.remove_non_standard_tags_action.triggered.connect(mw._on_remove_non_standard_tags_clicked)
     pgn_menu.addAction(mw.remove_non_standard_tags_action)
 
     mw.remove_annotations_action = QAction("Remove Annotations", mw)
+    set_menubar_themable_action_icon(mw, mw.remove_annotations_action, SVG_SIMPLE_X)
     mw.remove_annotations_action.triggered.connect(mw._on_remove_annotations_clicked)
     pgn_menu.addAction(mw.remove_annotations_action)
 

@@ -2098,6 +2098,9 @@ class DetailManualAnalysisView(QWidget):
         copy_all_action.setEnabled(has_lines)
         copy_all_action.triggered.connect(self._copy_all_pv_lines)
 
+        from app.views.style.context_menu import try_wire_context_menu_shared_action_icons
+
+        try_wire_context_menu_shared_action_icons(menu)
         menu.exec(self.analysis_container.mapToGlobal(pos))
 
     def _format_pv_line_for_copy(self, line) -> str:

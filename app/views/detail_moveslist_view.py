@@ -468,6 +468,9 @@ class DetailMovesListView(QWidget):
         menu.addAction("Copy Table as TSV (Visual Columns)").triggered.connect(self._copy_table_tsv_visual)
         menu.addAction("Copy Table as TSV (All Columns)").triggered.connect(self._copy_table_tsv_all)
 
+        from app.views.style.context_menu import try_wire_context_menu_shared_action_icons
+
+        try_wire_context_menu_shared_action_icons(menu)
         menu.exec(self.moves_table.viewport().mapToGlobal(pos))
 
     def _copy_cell_value(self, index: QModelIndex) -> None:

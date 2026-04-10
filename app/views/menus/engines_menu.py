@@ -5,6 +5,13 @@ from __future__ import annotations
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenu, QMenuBar
 
+from app.utils.themed_icon import (
+    SVG_MENU_GEAR,
+    SVG_MENU_PLUS,
+    SVG_SIMPLE_X,
+    set_menubar_themable_action_icon,
+)
+
 
 def setup_engines_menu(mw, menu_bar: QMenuBar) -> None:
     engines_menu = menu_bar.addMenu("Engines")
@@ -13,6 +20,7 @@ def setup_engines_menu(mw, menu_bar: QMenuBar) -> None:
     add_engine_action = QAction("Add Engine...", mw)
     add_engine_action.setShortcut(QKeySequence("Ctrl+E"))
     add_engine_action.setMenuRole(QAction.MenuRole.NoRole)
+    set_menubar_themable_action_icon(mw, add_engine_action, SVG_MENU_PLUS)
     add_engine_action.triggered.connect(mw._add_engine)
     engines_menu.addAction(add_engine_action)
 
@@ -44,6 +52,12 @@ def rebuild_engines_menu(mw) -> None:
 
     menu = mw.engines_menu
 
+    reg = getattr(mw, "_menubar_action_icon_svgs", None)
+    if reg and mw.engine_submenus:
+        for submenu in list(mw.engine_submenus.values()):
+            for act in submenu.actions():
+                reg.pop(act, None)
+
     # Clear existing engine submenus (keep "Add Engine..." and separator)
     for submenu in list(mw.engine_submenus.values()):
         menu.removeAction(submenu.menuAction())
@@ -73,10 +87,12 @@ def rebuild_engines_menu(mw) -> None:
         mw._apply_menu_styling(engine_submenu)
 
         remove_action = QAction("Remove Engine", mw)
+        set_menubar_themable_action_icon(mw, remove_action, SVG_SIMPLE_X)
         remove_action.triggered.connect(lambda checked, eid=engine.id: mw._remove_engine(eid))
         engine_submenu.addAction(remove_action)
 
         config_action = QAction("Engine Configuration", mw)
+        set_menubar_themable_action_icon(mw, config_action, SVG_MENU_GEAR)
         config_action.triggered.connect(
             lambda checked, eid=engine.id: mw._open_engine_configuration(eid)
         )

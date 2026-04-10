@@ -57,7 +57,10 @@ class NotesTextEdit(QTextEdit):
         parent_view = self.parent()
         cfg = getattr(parent_view, "config", None) if parent_view else None
         if isinstance(cfg, dict):
+            from app.views.style.context_menu import apply_dark_standard_textedit_context_menu_icons
+
             StyleManager.style_context_menu(menu, cfg)
+            apply_dark_standard_textedit_context_menu_icons(menu, cfg)
 
         from PyQt6.QtWidgets import QApplication
 
@@ -68,6 +71,9 @@ class NotesTextEdit(QTextEdit):
             menu.addSeparator()
             append_notes_menu_items_to_context_menu(menu, mw)
 
+        from app.views.style.context_menu import try_wire_context_menu_shared_action_icons
+
+        try_wire_context_menu_shared_action_icons(menu)
         menu.exec(event.globalPos())
 
 

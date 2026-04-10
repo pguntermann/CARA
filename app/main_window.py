@@ -54,7 +54,8 @@ class MainWindow(QMainWindow):
         """
         super().__init__()
         self.config = config
-        
+        self._menubar_action_icon_svgs: Dict[Any, str] = {}
+
         # Debug log: MainWindow initialization started
         from app.services.logging_service import LoggingService
         logging_service = LoggingService.get_instance()
@@ -134,6 +135,22 @@ class MainWindow(QMainWindow):
         from app.views.menus.menu_bar import setup_menu_bar as _setup_menu_bar_definitions
 
         _setup_menu_bar_definitions(self, menu_bar)
+        self._connect_menu_icon_color_scheme_refresh()
+
+    def _connect_menu_icon_color_scheme_refresh(self) -> None:
+        """Rebuild themed menu icons when the system light/dark preference changes (Qt 6.5+)."""
+        app = QApplication.instance()
+        if app is None:
+            return
+        sh = app.styleHints()
+        if not hasattr(sh, "colorSchemeChanged"):
+            return
+        sh.colorSchemeChanged.connect(self._on_menu_icon_color_scheme_changed)
+
+    def _on_menu_icon_color_scheme_changed(self, _scheme) -> None:
+        from app.utils.themed_icon import refresh_all_menubar_themable_action_icons
+
+        refresh_all_menubar_themable_action_icons(self)
 
     def _on_player_stats_reset_to_template_defaults(self) -> None:
         """Restore Player Stats menu settings from ``user_settings.json.template``."""
@@ -2743,47 +2760,34 @@ class MainWindow(QMainWindow):
             if hasattr(summary_view, 'evaluation_graph'):
                 summary_view.evaluation_graph.set_normalized_mode(normalized)
     
-    def _on_start_manual_analysis_toggled(self, checked: bool) -> None:
-        """Handle start/stop manual analysis toggle from menu.
-        
-        Args:
-            checked: True if analysis should start, False if it should stop.
-        """
+    def _on_start_manual_analysis_toggled(self, _checked: bool = False) -> None:
+        """Handle start/stop manual analysis from menu (play/stop icon reflects state)."""
         manual_analysis_controller = self.controller.get_manual_analysis_controller()
-        
-        if checked:
-            # Check if engine is configured and assigned for manual analysis
-            is_configured, error_type = self.controller.is_engine_configured_for_task(TASK_MANUAL_ANALYSIS)
-            if not is_configured:
-                # Uncheck the button first (before showing dialog) to prevent UI state issues
-                if hasattr(self, 'start_manual_analysis_action'):
-                    self.start_manual_analysis_action.blockSignals(True)
-                    self.start_manual_analysis_action.setChecked(False)
-                    self.start_manual_analysis_action.blockSignals(False)
-                
-                # Show warning message from config
-                title, message = self.controller.get_engine_validation_message(error_type, TASK_MANUAL_ANALYSIS)
-                MessageDialog.show_warning(self.config, title, message, self)
-                return
-            
-            # Switch to Manual Analysis tab FIRST for immediate visual feedback
-            # Do this before calling start_analysis() to ensure tab switches immediately
-            if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'tab_widget'):
-                # Find the index of the Manual Analysis tab
-                tab_widget = self.detail_panel.tab_widget
-                for i in range(tab_widget.count()):
-                    if tab_widget.tabText(i) == "Manual Analysis":
-                        tab_widget.setCurrentIndex(i)
-                        # Force immediate UI update by processing events
-                        from PyQt6.QtWidgets import QApplication
-                        QApplication.processEvents()
-                        break
-            
-            # Start analysis (this will update UI immediately, then do background work)
-            manual_analysis_controller.start_analysis()
-        else:
-            # Stop analysis
+        manual_analysis_model = manual_analysis_controller.get_analysis_model()
+
+        if manual_analysis_model.is_analyzing:
             manual_analysis_controller.stop_analysis()
+            return
+
+        # Check if engine is configured and assigned for manual analysis
+        is_configured, error_type = self.controller.is_engine_configured_for_task(TASK_MANUAL_ANALYSIS)
+        if not is_configured:
+            title, message = self.controller.get_engine_validation_message(error_type, TASK_MANUAL_ANALYSIS)
+            MessageDialog.show_warning(self.config, title, message, self)
+            return
+
+        # Switch to Manual Analysis tab FIRST for immediate visual feedback
+        if hasattr(self, "detail_panel") and hasattr(self.detail_panel, "tab_widget"):
+            tab_widget = self.detail_panel.tab_widget
+            for i in range(tab_widget.count()):
+                if tab_widget.tabText(i) == "Manual Analysis":
+                    tab_widget.setCurrentIndex(i)
+                    from PyQt6.QtWidgets import QApplication
+
+                    QApplication.processEvents()
+                    break
+
+        manual_analysis_controller.start_analysis()
     
     def _on_add_pv_line(self) -> None:
         """Handle add PV line from menu."""
@@ -3078,14 +3082,19 @@ class MainWindow(QMainWindow):
             is_analyzing: True if analysis is running, False otherwise.
             multipv: Current number of PV lines (optional, will be retrieved if None).
         """
-        if hasattr(self, 'start_manual_analysis_action'):
-            # Update start/stop action text and checked state
+        if hasattr(self, "start_manual_analysis_action"):
+            from app.utils.themed_icon import SVG_MENU_PLAY, SVG_MENU_STOP, set_menubar_themable_action_icon
+
             if is_analyzing:
                 self.start_manual_analysis_action.setText("Stop Manual Analysis")
-                self.start_manual_analysis_action.setChecked(True)
+                set_menubar_themable_action_icon(
+                    self, self.start_manual_analysis_action, SVG_MENU_STOP
+                )
             else:
                 self.start_manual_analysis_action.setText("Start Manual Analysis")
-                self.start_manual_analysis_action.setChecked(False)
+                set_menubar_themable_action_icon(
+                    self, self.start_manual_analysis_action, SVG_MENU_PLAY
+                )
         
         # Get multipv if not provided
         if multipv is None:

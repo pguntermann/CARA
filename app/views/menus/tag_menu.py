@@ -9,6 +9,11 @@ from PyQt6.QtWidgets import QMenuBar, QMenu
 
 from app.services.game_tags_service import GameTagsService
 from app.utils.game_tags_utils import parse_game_tags, format_game_tags, PGN_TAG_NAME_GAME_TAGS
+from app.utils.themed_icon import (
+    set_menubar_themable_action_icon,
+    SVG_MENU_CLEAR_ALL_GAME_TAGS,
+    SVG_MENU_TAG_BUBBLE,
+)
 from app.views.dialogs.manage_game_tags_dialog import ManageGameTagsDialog
 
 
@@ -17,11 +22,13 @@ def setup_tag_menu(mw: Any, menu_bar: QMenuBar) -> None:
     mw._apply_menu_styling(tag_menu)
 
     mw.manage_tags_action = QAction("Manage game tags…", mw)
+    set_menubar_themable_action_icon(mw, mw.manage_tags_action, SVG_MENU_TAG_BUBBLE)
     mw.manage_tags_action.triggered.connect(lambda: _open_manage_tags_dialog(mw))
     tag_menu.addAction(mw.manage_tags_action)
 
     tag_menu.addSeparator()
     mw.clear_all_tags_action = QAction("Clear all game tags", mw)
+    set_menubar_themable_action_icon(mw, mw.clear_all_tags_action, SVG_MENU_CLEAR_ALL_GAME_TAGS)
     mw.clear_all_tags_action.triggered.connect(lambda: _set_active_game_tags(mw, []))
     tag_menu.addAction(mw.clear_all_tags_action)
     tag_menu.addSeparator()

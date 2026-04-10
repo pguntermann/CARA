@@ -84,5 +84,8 @@ def build_player_stats_context_menu(
             lambda checked=False: view._endgame_tree_widget.collapseAll()
         )
 
+    from app.views.style.context_menu import try_wire_context_menu_shared_action_icons
+
+    try_wire_context_menu_shared_action_icons(menu)
     return menu
 

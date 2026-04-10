@@ -2490,8 +2490,10 @@ class DetailSummaryView(QWidget):
         
         copy_full_action = menu.addAction("Copy summary to clipboard")
         copy_full_action.triggered.connect(self._copy_full_summary_to_clipboard)
-        
-        # Show menu
+
+        from app.views.style.context_menu import try_wire_context_menu_shared_action_icons
+
+        try_wire_context_menu_shared_action_icons(menu)
         menu.exec(event.globalPos())
     
     def _copy_section_to_clipboard(self, section_name: str) -> None:

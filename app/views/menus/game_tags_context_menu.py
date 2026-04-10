@@ -20,26 +20,17 @@ def build_game_tags_context_menu(mw: Any, *, parent: Optional[Any] = None) -> QM
     """
     menu = QMenu(parent if parent is not None else mw)
 
+    from app.views.dialogs.manage_game_tags_dialog import ManageGameTagsDialog
     from app.views.style import StyleManager
+    from app.views.style.context_menu import wire_context_menu_icon_retheming
+    from app.utils.themed_icon import (
+        menu_icon_dark_tint_rgb,
+        themed_icon_from_svg,
+        SVG_MENU_CLEAR_ALL_GAME_TAGS,
+        SVG_MENU_TAG_BUBBLE,
+    )
 
     StyleManager.style_context_menu(menu, mw.config)
-
-    manage_act = getattr(mw, "manage_tags_action", None)
-    if manage_act is not None:
-        menu.addAction(manage_act)
-    else:
-        # Fallback: create action if Tag menu isn't initialized for some reason.
-        from app.views.dialogs.manage_game_tags_dialog import ManageGameTagsDialog
-
-        act = QAction("Manage game tags…", mw)
-        act.triggered.connect(lambda: ManageGameTagsDialog(mw.config, mw).exec())
-        menu.addAction(act)
-
-    clear_act = getattr(mw, "clear_all_tags_action", None)
-    if clear_act is not None:
-        menu.addAction(clear_act)
-
-    menu.addSeparator()
 
     svc = GameTagsService(mw.config)
     defs = svc.get_definitions()
@@ -47,6 +38,22 @@ def build_game_tags_context_menu(mw: Any, *, parent: Optional[Any] = None) -> QM
     game_model = mw.controller.get_game_controller().get_game_model()
     has_active_game = bool(getattr(game_model, "active_game", None))
     current = {t.casefold() for t in _get_active_game_tags(mw) if t.casefold() not in hidden} if has_active_game else set()
+
+    _dark_tint = menu_icon_dark_tint_rgb(mw.config)
+
+    # Dedicated QActions: reusing menubar QActions would apply light-OS icon tints on this dark menu.
+    manage_act = QAction("Manage game tags…", mw)
+    manage_act.setIcon(themed_icon_from_svg(SVG_MENU_TAG_BUBBLE, _dark_tint))
+    manage_act.triggered.connect(lambda: ManageGameTagsDialog(mw.config, mw).exec())
+    menu.addAction(manage_act)
+
+    clear_act = QAction("Clear all game tags", mw)
+    clear_act.setIcon(themed_icon_from_svg(SVG_MENU_CLEAR_ALL_GAME_TAGS, _dark_tint))
+    clear_act.setEnabled(bool(has_active_game and current))
+    clear_act.triggered.connect(lambda: _set_active_game_tags(mw, []))
+    menu.addAction(clear_act)
+
+    menu.addSeparator()
 
     builtins = [d for d in defs if d.builtin]
     customs = [d for d in defs if not d.builtin]
@@ -84,6 +91,7 @@ def build_game_tags_context_menu(mw: Any, *, parent: Optional[Any] = None) -> QM
             act.triggered.connect(lambda checked=False, name=n: _toggle_tag_for_active_game(mw, name))
             menu.addAction(act)
 
+    wire_context_menu_icon_retheming(menu, mw)
     return menu
 
 

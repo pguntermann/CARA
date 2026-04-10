@@ -6,6 +6,25 @@ import multiprocessing
 from pathlib import Path
 
 
+def _configure_multiprocessing_for_macos_gui() -> None:
+    """Force multiprocessing 'spawn' on macOS before Qt/Cocoa load.
+
+    Forking after the Objective-C runtime (loaded by Qt) is unsafe and can
+    cause immediate SIGSEGV on startup or exit. Python may still pick a
+    non-spawn start method in edge cases; set it explicitly as early as possible.
+    """
+    if sys.platform != "darwin":
+        return
+    try:
+        multiprocessing.set_start_method("spawn")
+    except RuntimeError:
+        # Already set (e.g. by tests or embedding)
+        pass
+
+
+_configure_multiprocessing_for_macos_gui()
+
+
 def _configure_linux_frozen_runtime() -> None:
     """Mitigate GLib/GIO plugin mismatch and GNOME Wayland decoration issues when frozen.
 

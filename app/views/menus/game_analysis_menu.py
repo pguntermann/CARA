@@ -6,6 +6,13 @@ from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenuBar, QMenu
 
 from app.services.game_auto_tagging_service import AUTO_TAGS
+from app.utils.themed_icon import (
+    SVG_MENU_GEAR,
+    SVG_MENU_LAYERS,
+    SVG_MENU_PLAY,
+    SVG_MENU_STOP,
+    set_menubar_themable_action_icon,
+)
 
 
 def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
@@ -14,11 +21,13 @@ def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
 
     mw.start_game_analysis_action = QAction("Start Game Analysis", mw)
     mw.start_game_analysis_action.setShortcut(QKeySequence("Ctrl+G"))
+    set_menubar_themable_action_icon(mw, mw.start_game_analysis_action, SVG_MENU_PLAY)
     mw.start_game_analysis_action.triggered.connect(mw._start_game_analysis)
     game_analysis_menu.addAction(mw.start_game_analysis_action)
 
     mw.cancel_game_analysis_action = QAction("Cancel Game Analysis", mw)
     mw.cancel_game_analysis_action.setShortcut(QKeySequence("Escape"))
+    set_menubar_themable_action_icon(mw, mw.cancel_game_analysis_action, SVG_MENU_STOP)
     mw.cancel_game_analysis_action.triggered.connect(mw._cancel_game_analysis)
     mw.cancel_game_analysis_action.setEnabled(False)
     game_analysis_menu.addAction(mw.cancel_game_analysis_action)
@@ -27,6 +36,7 @@ def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
 
     mw.bulk_analyze_database_action = QAction("Bulk Analyze Database...", mw)
     mw.bulk_analyze_database_action.setMenuRole(QAction.MenuRole.NoRole)
+    set_menubar_themable_action_icon(mw, mw.bulk_analyze_database_action, SVG_MENU_LAYERS)
     mw.bulk_analyze_database_action.triggered.connect(mw._on_bulk_analyze_database)
     game_analysis_menu.addAction(mw.bulk_analyze_database_action)
 
@@ -35,6 +45,7 @@ def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
     mw.configure_classification_action = QAction("Configure Classification Settings...", mw)
     mw.configure_classification_action.setShortcut(QKeySequence("Ctrl+Shift+K"))
     mw.configure_classification_action.setMenuRole(QAction.MenuRole.NoRole)
+    set_menubar_themable_action_icon(mw, mw.configure_classification_action, SVG_MENU_GEAR)
     mw.configure_classification_action.triggered.connect(mw._open_classification_settings)
     game_analysis_menu.addAction(mw.configure_classification_action)
 

@@ -284,6 +284,9 @@ class DetailMetadataView(QWidget):
         menu.addAction("Copy Table as CSV").triggered.connect(self._copy_metadata_table_csv)
         menu.addAction("Copy Table as TSV").triggered.connect(self._copy_metadata_table_tsv)
 
+        from app.views.style.context_menu import try_wire_context_menu_shared_action_icons
+
+        try_wire_context_menu_shared_action_icons(menu)
         menu.exec(self.metadata_table.viewport().mapToGlobal(pos))
 
     def _copy_metadata_cell_value(self, index: QModelIndex) -> None:
