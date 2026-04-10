@@ -1260,9 +1260,15 @@
 
                 <h5 id="game-tagging">5.3.2 Game Tags</h5>
                 <p><strong>Game tags</strong> are simple labels you can assign to a game so you can organize and recognize games quickly (for example <em>“Training”</em>, <em>“Tournament”</em>, <em>“Must review”</em>, <em>“Opening prep”</em>). They are separate from the PGN header tags (like <code>Event</code>, <code>Site</code>, <code>White</code>, etc.).</p>
+                <p>CARA distinguishes two kinds of game tag definitions:</p>
+                <ul>
+                    <li><strong>Built-in game tags</strong> — A fixed set of tag names and default colors supplied with the application (including tags that <a href="#auto-tagging">auto-tagging</a> can assign). You cannot rename or delete them, but in <span class="menu-item">Game tags → Manage game tags…</span> you can <strong>change their color</strong> and <strong>hide or show</strong> each built-in tag. Your overrides are saved in your user settings.</li>
+                    <li><strong>Custom game tags</strong> — Tags you add yourself (name and color). You can remove a custom tag definition from the same dialog.</li>
+                </ul>
+                <p>If you <strong>hide</strong> a built-in tag, it no longer appears in the tag picker: not in the <a href="#game-tags-widget">Game Tags widget</a>, not in the <strong>Game tags</strong> column of the database table, and not in the checkable entries under <span class="menu-item">Game tags</span> on the menu bar (or the widget’s context menu). Hidden tags can still be listed in <span class="menu-item">Game tags → Manage game tags…</span> so you can turn them back on or adjust their color.</p>
                 <p>Game tags are shown as small <strong>chips</strong> in the database view and in the <a href="#game-tags-widget">Game Tags widget</a> next to the chessboard (when visible).</p>
-                <p>To assign tags to the active game, right-click inside the <strong>Game Tags widget</strong> and toggle tags in the list, or use the <span class="menu-item">Game tags</span> menu on the menu bar.<br>
-                If you want to create your own custom tags (names and colors), use <span class="menu-item">Game tags → Manage game tags…</span>.</p>
+                <img src="screenshots/database_view_gametags_column.png" alt="CARA database view — Game tags column showing games with colored tag chips in the table" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+                <p>To assign tags to the active game, right-click inside the <strong>Game Tags widget</strong> and toggle tags in the list, or use the <span class="menu-item">Game tags</span> menu on the menu bar. In <span class="menu-item">Game tags → Manage game tags…</span>, hover a <strong>custom</strong> tag chip to reveal a <strong>color</strong> control and a <strong>remove</strong> control; built-in chips use <strong>color</strong> and <strong>visibility</strong> (eye) controls instead.</p>
                 <div class="tip-box">
                     <strong>Quick Tip:</strong> CARA can also assign tags automatically after analysis (auto-tagging). If you want CARA to tag games based on analysis, see <a href="#auto-tagging">section 5.5.5 Auto-tagging</a>.
                 </div>
@@ -1476,7 +1482,7 @@
                     <li><strong>Move Candidate:</strong> Which moves to check - "Best Move only" or "Best or Good Move" (default: Best Move only)</li>
                 </ul>
                 
-                <p>See <a href="#classification-settings">section 6.6.4</a> for more information about configuring brilliancy detection settings.</p>
+                <p>See <a href="#classification-settings">section 6.7.4</a> for more information about configuring brilliancy detection settings.</p>
                 
                 <div class="tip-box">
                     <strong>Advanced Configuration:</strong><br><br>
@@ -1497,9 +1503,10 @@
                 <p>These settings can be toggled in the <span class="menu-item">Game Analysis</span> menu and are saved in your user settings.</p>
 
                 <h5 id="auto-tagging">5.5.5 Auto-tagging</h5>
-                <p><strong>Auto-tagging</strong> can assign <a href="#game-tagging">game tags</a> automatically based on information from game analysis. This is optional and can be enabled or disabled in the <span class="menu-item">Game Analysis</span> menu (see <a href="#game-analysis-menu">section 6.6</a>).</p>
-                <p>The tagging thresholds are configured in <code>config.json</code>.</p>
-                <p>The following auto-tag rules are currently implemented:</p>
+                <p><strong>Auto-tagging</strong> can assign <a href="#game-tagging">game tags</a> automatically after game analysis (single-game and bulk). Turn it on or off with <span class="menu-item">Game Analysis → Auto Tag Games</span> (see <a href="#game-analysis-menu">section 6.7</a>).</p>
+                <p>When auto-tagging is on, you can still choose <strong>which</strong> rules may apply: use <span class="menu-item">Game Analysis → Select Tags for Auto-Tagging</span> and check or uncheck each tag name. Your choices are saved with your user preferences. If every tag is unchecked, analysis will not add any of these automatic tags (existing manual tags on the game are unchanged). The submenu is available only while <span class="menu-item">Auto Tag Games</span> is enabled.</p>
+                <p>Numeric thresholds for the evaluation-based rules below are defined in <code>config.json</code> (under <code>game_analysis.auto_game_tagging</code>). The <strong>Brilliant Move</strong> auto-tag depends on moves being classified as <strong>Brilliant</strong> in the moves list, which requires <span class="menu-item">Game Analysis → Brilliant Move Detection</span> to be on and a compatible engine assignment; see <a href="#brilliant-move-detection">section 5.5.3</a>.</p>
+                <p>The following auto-tag rules are available:</p>
                 <table class="column-table">
                     <thead>
                         <tr>
@@ -1511,6 +1518,10 @@
                         <tr>
                             <td class="column-name-cell">Blunder-decided</td>
                             <td>After the first recorded blunder, the evaluation becomes decisive for the other side and never meaningfully recovers.</td>
+                        </tr>
+                        <tr>
+                            <td class="column-name-cell">Brilliant Move</td>
+                            <td>At least one move in the game was classified as <strong>Brilliant</strong> after analysis (including the optional brilliancy-detection pass).</td>
                         </tr>
                         <tr>
                             <td class="column-name-cell">Clean win</td>
@@ -2097,12 +2108,24 @@
             <div class="outline-item">
                 <h4 id="tags-menu">6.4 Game tags menu</h4>
                 <p>The <span class="menu-item">Game tags</span> menu provides actions for working with <a href="#game-tagging">game tags</a> on the currently active game.</p>
+                <p>After the top items (<span class="menu-item">Manage game tags…</span> and <span class="menu-item">Clear all game tags</span>), the menu lists your <strong>predefined</strong> tags (only those you have left <strong>visible</strong>) and your <strong>custom</strong> tags as checkable entries so you can turn each one on or off for the active game (see <a href="#game-tags-menu-toggles">section 6.4.3</a>). The same choices appear when you right-click the <a href="#game-tags-widget">Game Tags widget</a>.</p>
                 
                 <h5>6.4.1 Manage game tags…</h5>
-                <p>Opens the game tags management dialog where you can create and delete custom game tag definitions.</p>
+                <p>Opens the <strong>Manage game tags</strong> dialog. The dialog has two areas:</p>
+                <ul>
+                    <li><strong>Built-in game tags</strong> — Shows every predefined tag (names and colors come from the application configuration). You cannot rename or remove these tags. Hover a chip to show a <strong>color</strong> control (change how the tag appears wherever game tags are shown) and a <strong>visibility</strong> control (eye / eye-off) to <strong>hide</strong> or <strong>show</strong> that tag in the tag picker. Hidden built-ins still appear in this dialog so you can turn them back on.</li>
+                    <li><strong>Custom game tags</strong> — Lists tags you have defined yourself. Use the <strong>+</strong> chip to add a tag (name and color). Hover an existing custom chip for <strong>color</strong> and <strong>remove</strong>.</li>
+                </ul>
+                <p>At the bottom, <strong>Reset to Defaults</strong> clears your overrides for <em>built-in</em> tags only (colors and hide/show state); it does not delete custom tag definitions. <strong>OK</strong> saves changes; <strong>Cancel</strong> discards changes made in this session. Built-in and custom choices you save are stored with your user preferences.</p>
+                <img src="screenshots/game_tags_dialog.png" alt="CARA Manage game tags dialog — built-in and custom tag chips, Reset to Defaults, OK and Cancel" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
                 <h5>6.4.2 Clear all game tags</h5>
-                <p>Removes all game tags from the currently active game.</p>
+                <p>Removes <strong>all</strong> game tags from the currently active game in one step (the full tag list stored on that game). This still applies if some assigned tags no longer appear in the menu because their built-in definition is hidden—you may use this to clean up those assignments even though you cannot toggle them individually from the menu until you show the tag again in <span class="menu-item">Game tags → Manage game tags…</span>.</p>
+                
+                <h5 id="game-tags-menu-toggles">6.4.3 Tag toggles in the menu and widget</h5>
+                <p>After <span class="menu-item">Manage game tags…</span>, a separator, and <span class="menu-item">Clear all game tags</span>, the menu lists every <strong>visible</strong> tag definition: built-in tags first, then a separator and your custom tags (if any). Each entry is checkable and turns the corresponding tag on or off for the <strong>active game only</strong>.</p>
+                <p>Built-in tag definitions you have marked <strong>hidden</strong> in <span class="menu-item">Manage game tags…</span> are <strong>not</strong> listed here (and not in the widget’s context menu), so you cannot assign or remove them from the pick list until you show them again. They may still be stored on the game from earlier; use <span class="menu-item">Clear all game tags</span> if you want to remove every tag at once.</p>
+                <p>If the active game contains a tag name that is not part of your current definitions (for example text imported from elsewhere), those names appear under <strong>Unmanaged game tags (this game)</strong> so you can still toggle them off.</p>
                 
                 <div class="tip-box">
                     <strong>Quick Tip:</strong> You can also right-click inside the <a href="#game-tags-widget">Game Tags widget</a> to access these actions from a context menu.
@@ -2221,18 +2244,21 @@
                 <p>Toggles whether CARA performs brilliancy detection after initial game analysis. When enabled, CARA analyzes candidate moves at shallow engine depths to identify exceptional moves that appear suboptimal at shallow depths but are actually strong when analyzed more deeply. This detection step runs automatically after the main analysis completes. See <a href="#brilliant-move-detection">section 5.5.3</a> for a detailed explanation of how brilliancy detection works.</p>
 
                 <h5>6.7.7 Auto Tag Games</h5>
-                <p>Toggles whether CARA performs <a href="#auto-tagging">auto-tagging</a> as part of the game analysis workflow. When enabled, CARA may assign <a href="#game-tagging">game tags</a> automatically based on analysis, using thresholds from <code>config.json</code>.</p>
+                <p>Toggles whether CARA performs <a href="#auto-tagging">auto-tagging</a> after analysis completes. When enabled, CARA may assign <a href="#game-tagging">game tags</a> according to the rules described in <a href="#auto-tagging">section 5.5.5</a> and the tags you allow under <span class="menu-item">Select Tags for Auto-Tagging</span> (see <a href="#select-tags-auto-tagging">section 6.7.8</a>). When disabled, no automatic game tags are applied by this feature.</p>
                 
-                <h5>6.7.8 Return to PLY 0 after analysis completes</h5>
+                <h5 id="select-tags-auto-tagging">6.7.8 Select Tags for Auto-Tagging</h5>
+                <p>Opens a submenu with a checkable entry for each supported auto-tag (see the table in <a href="#auto-tagging">section 5.5.5</a>). Only checked tags can be added or refreshed by auto-tagging; unchecked rules are skipped. Your selection is saved with your user preferences. This submenu is disabled while <span class="menu-item">Auto Tag Games</span> is turned off.</p>
+                
+                <h5>6.7.9 Return to PLY 0 after analysis completes</h5>
                 <p>Toggles whether CARA automatically navigates to the starting position (PLY 0) when analysis completes. When enabled, the board and Moves List automatically return to PLY 0 after analysis finishes.</p>
                 
-                <h5>6.7.9 Switch to Moves List at the start of Analysis</h5>
+                <h5>6.7.10 Switch to Moves List at the start of Analysis</h5>
                 <p>Toggles whether CARA automatically switches to the Moves List tab when analysis begins. This is enabled by default, ensuring you can immediately see analysis results as they are generated.</p>
                 
-                <h5>6.7.10 Switch to Game Summary after Analysis</h5>
+                <h5>6.7.11 Switch to Game Summary after Analysis</h5>
                 <p>Toggles whether CARA automatically switches to the Game Summary tab when analysis completes. When enabled, you are taken directly to the condensed overview of key game moments and statistics after analysis finishes.</p>
                 
-                <h5>6.7.11 Store Analysis results in PGN Tag</h5>
+                <h5>6.7.12 Store Analysis results in PGN Tag</h5>
                 <p>Toggles whether analysis results (evaluations, CPL values, move classifications) are saved in a PGN metadata tag for persistence across sessions. When enabled, analysis data is serialized and stored in the game's PGN, allowing you to preserve analysis results even after closing and reopening the database.</p>
             </div>
 
@@ -3435,6 +3461,9 @@
             <p>For questions or inquiries, contact: <a href="mailto:pguntermann@me.com" style="color: rgb(100, 150, 255);">pguntermann@me.com</a></p>
         </footer>
     </div>
+    <button type="button" id="toc-back-btn" class="toc-back-btn" title="Back to table of contents" aria-label="Back to table of contents" aria-hidden="true" tabindex="-1">
+        <svg class="toc-back-btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z"/></svg>
+    </button>
     <script>
         (function() {
             var STORAGE_KEY = 'cara-manual-toc-sub-hidden';
@@ -3461,6 +3490,27 @@
                 applyState(hidden);
                 try { localStorage.setItem(STORAGE_KEY, hidden ? '1' : '0'); } catch (e) {}
             });
+        })();
+        (function() {
+            var tocNav = document.getElementById('toc-nav');
+            var backBtn = document.getElementById('toc-back-btn');
+            if (!tocNav || !backBtn) return;
+            var reduceMotion = false;
+            try {
+                reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            } catch (e) {}
+            function syncVisibility() {
+                var show = tocNav.getBoundingClientRect().bottom < 0;
+                backBtn.classList.toggle('toc-back-btn--visible', show);
+                backBtn.setAttribute('aria-hidden', show ? 'false' : 'true');
+                backBtn.tabIndex = show ? 0 : -1;
+            }
+            backBtn.addEventListener('click', function() {
+                tocNav.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+            });
+            window.addEventListener('scroll', syncVisibility, { passive: true });
+            window.addEventListener('resize', syncVisibility);
+            syncVisibility();
         })();
     </script>
 </body>

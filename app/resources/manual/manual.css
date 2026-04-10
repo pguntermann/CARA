@@ -179,6 +179,66 @@
             color: rgb(240, 240, 240);
         }
         
+        /* Fixed control: return to table of contents after scrolling past the TOC */
+        .toc-back-btn {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            z-index: 1000;
+            width: 46px;
+            height: 46px;
+            padding: 0;
+            border: 1px solid rgb(80, 80, 90);
+            border-radius: 50%;
+            background-color: rgb(55, 55, 60);
+            color: rgb(220, 220, 220);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transform: translateY(8px);
+            transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease,
+                background-color 0.15s, border-color 0.15s, color 0.15s;
+        }
+        
+        .toc-back-btn.toc-back-btn--visible {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+        
+        .toc-back-btn:hover {
+            background-color: rgb(65, 65, 70);
+            border-color: rgb(100, 100, 110);
+            color: rgb(240, 240, 240);
+        }
+        
+        .toc-back-btn:focus-visible {
+            outline: 2px solid rgb(100, 150, 255);
+            outline-offset: 2px;
+        }
+        
+        .toc-back-btn-icon {
+            display: block;
+            width: 22px;
+            height: 22px;
+        }
+        
+        @media (prefers-reduced-motion: reduce) {
+            .toc-back-btn {
+                transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+            }
+            
+            .toc-back-btn.toc-back-btn--visible {
+                transform: none;
+            }
+        }
+        
         nav.sub-subsections-hidden ul ul ul {
             display: none;
         }
@@ -670,5 +730,17 @@
             /* Single column on small screens */
             nav > ul {
                 column-count: 1;
+            }
+            
+            .toc-back-btn {
+                bottom: 18px;
+                right: 18px;
+                width: 42px;
+                height: 42px;
+            }
+            
+            .toc-back-btn-icon {
+                width: 20px;
+                height: 20px;
             }
         }
