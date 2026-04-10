@@ -8,7 +8,12 @@ from PyQt6.QtCore import Qt
 from app.models.game_model import GameModel
 from app.models.database_model import DatabaseModel, GameData
 from app.services.pgn_service import PgnService
-from app.utils.game_tags_utils import parse_game_tags, tags_display_text
+from app.utils.game_tags_utils import (
+    PGN_TAG_NAME_GAME_TAGS,
+    apply_cara_game_tags_to_game_data,
+    parse_game_tags,
+    tags_display_text,
+)
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -565,7 +570,55 @@ class MetadataController:
         """Clear the metadata model."""
         if self._metadata_model:
             self._metadata_model.clear()
-    
+
+    def clear_cara_game_tags_for_database_rows(
+        self, database_model: DatabaseModel, row_indices: List[int]
+    ) -> int:
+        """Clear CARA per-game tags for games at the given table rows.
+
+        Uses the same PGN/header sync as the Game tags menu (not bulk PGN header tag tools).
+
+        Returns:
+            Number of games that were updated.
+        """
+        if not database_model or not row_indices:
+            return 0
+
+        n_rows = database_model.rowCount()
+        unique_rows = sorted({i for i in row_indices if 0 <= i < n_rows})
+        updated_games: List[GameData] = []
+
+        for row in unique_rows:
+            game = database_model.get_game(row)
+            if game is None:
+                continue
+            had_cached = bool(parse_game_tags(getattr(game, "game_tags_raw", "") or ""))
+            had_header = False
+            if not had_cached:
+                pgn_io = StringIO(getattr(game, "pgn", "") or "")
+                cg = chess.pgn.read_game(pgn_io)
+                had_header = bool(cg and PGN_TAG_NAME_GAME_TAGS in cg.headers)
+            if not had_cached and not had_header:
+                continue
+            if apply_cara_game_tags_to_game_data(game, []):
+                updated_games.append(game)
+
+        if not updated_games:
+            return 0
+
+        database_model.batch_update_games(updated_games)
+        if self._database_controller:
+            self._database_controller.mark_database_unsaved(database_model)
+
+        active = self._game_model.active_game if self._game_model else None
+        if active is not None and active in updated_games:
+            self._game_model.game_tags_changed.emit()
+            if self._metadata_model:
+                metadata = self.extract_metadata_from_game(active)
+                self._metadata_model.set_metadata(metadata)
+
+        return len(updated_games)
+
     def set_database_controller(self, database_controller: Optional['DatabaseController']) -> None:
         """Set the database controller for database operations.
         

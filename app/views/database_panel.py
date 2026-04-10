@@ -44,7 +44,8 @@ class DatabasePanel(QWidget):
                  on_copy_game: Optional[Callable[[Any], None]] = None,
                  on_copy_selected_games: Optional[Callable[[DatabaseModel, List[int]], None]] = None,
                  on_cut_selected_games: Optional[Callable[[DatabaseModel, List[int]], None]] = None,
-                 on_paste_games: Optional[Callable[[DatabaseModel], None]] = None) -> None:
+                 on_paste_games: Optional[Callable[[DatabaseModel], None]] = None,
+                 on_clear_game_tags_selected: Optional[Callable[[DatabaseModel, List[int]], None]] = None) -> None:
         """Initialize the database panel.
 
         Args:
@@ -64,6 +65,7 @@ class DatabasePanel(QWidget):
             on_copy_selected_games: Optional callback(model, selected_indices) for Copy selected Games.
             on_cut_selected_games: Optional callback(model, selected_indices) for Cut selected Games.
             on_paste_games: Optional callback(model) for Paste Game(s) into this database.
+            on_clear_game_tags_selected: Optional callback(model, selected_indices) to clear CARA game tags.
         """
         super().__init__()
         self.config = config
@@ -78,6 +80,7 @@ class DatabasePanel(QWidget):
         self._on_copy_selected_games = on_copy_selected_games
         self._on_cut_selected_games = on_cut_selected_games
         self._on_paste_games = on_paste_games
+        self._on_clear_game_tags_selected = on_clear_game_tags_selected
         # Map DatabaseModel instances to tab indices: {DatabaseModel: tab_index}
         self._model_to_tab: Dict[DatabaseModel, int] = {}
         # Track tabs and their models: {tab_index: {'model': DatabaseModel, 'file_path': str, 'table': QTableView, 'identifier': str}}
@@ -1014,6 +1017,7 @@ class DatabasePanel(QWidget):
             enable_copy_selected_games=bool(self._on_copy_selected_games),
             enable_cut_selected_games=bool(self._on_cut_selected_games),
             enable_paste_games=bool(self._on_paste_games),
+            enable_clear_game_tags_selected=bool(self._on_clear_game_tags_selected),
             clicked_tag=clicked_tag,
         )
 
@@ -1103,6 +1107,13 @@ class DatabasePanel(QWidget):
             self._on_cut_selected_games(model, selected)
         elif ctx.act_paste_games and action == ctx.act_paste_games and self._on_paste_games:
             self._on_paste_games(model)
+        elif (
+            ctx.act_clear_game_tags_selected
+            and action == ctx.act_clear_game_tags_selected
+            and self._on_clear_game_tags_selected
+        ):
+            selected = sorted(set(idx.row() for idx in table.selectionModel().selectedRows()))
+            self._on_clear_game_tags_selected(model, selected)
 
     def _copy_database_table_as_delimited(
         self,

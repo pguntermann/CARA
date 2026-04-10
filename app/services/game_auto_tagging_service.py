@@ -9,15 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-import io
-import chess.pgn
-
 from app.models.moveslist_model import MoveData
 from app.services.game_summary_service import GameSummaryService
-from app.services.pgn_service import PgnService
 from app.services.logging_service import LoggingService
 from app.utils.game_tags_utils import (
-    PGN_TAG_NAME_GAME_TAGS,
+    apply_cara_game_tags_to_game_data,
     format_game_tags,
     parse_game_tags,
 )
@@ -275,25 +271,8 @@ class GameAutoTaggingService:
 
     def apply_to_game_data(self, game: Any, tags: Sequence[str]) -> bool:
         """Apply CARAGameTags to a GameData-like object (updates game.pgn + tag fields)."""
-        try:
-            raw = format_game_tags(tags)
-            pgn_io = io.StringIO(getattr(game, "pgn", "") or "")
-            chess_game = chess.pgn.read_game(pgn_io)
-            if not chess_game:
-                return False
-            if raw:
-                chess_game.headers[PGN_TAG_NAME_GAME_TAGS] = raw
-            else:
-                if PGN_TAG_NAME_GAME_TAGS in chess_game.headers:
-                    del chess_game.headers[PGN_TAG_NAME_GAME_TAGS]
-            game.pgn = PgnService.export_game_to_pgn(chess_game)
-            # Update cached fields on GameData (metadata_controller does this for active game)
-            setattr(game, "game_tags_raw", raw)
-            from app.utils.game_tags_utils import tags_display_text
-
-            setattr(game, "game_tags", tags_display_text(parse_game_tags(raw)))
-            return True
-        except Exception as e:
-            LoggingService.get_instance().warning(f"Auto-tagging: failed to apply tags: {e}", exc_info=e)
-            return False
+        ok = apply_cara_game_tags_to_game_data(game, tags)
+        if not ok:
+            LoggingService.get_instance().warning("Auto-tagging: failed to apply tags to game PGN")
+        return ok
 

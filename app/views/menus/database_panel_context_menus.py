@@ -58,6 +58,7 @@ class DatabaseTableContextMenu:
     act_copy_selected_games: Optional[Any]
     act_cut_selected_games: Optional[Any]
     act_paste_games: Optional[Any]
+    act_clear_game_tags_selected: Optional[Any]
 
 
 def build_database_table_context_menu(
@@ -69,6 +70,7 @@ def build_database_table_context_menu(
     enable_copy_selected_games: bool,
     enable_cut_selected_games: bool,
     enable_paste_games: bool,
+    enable_clear_game_tags_selected: bool = False,
     clicked_tag: Optional[str] = None,
 ) -> DatabaseTableContextMenu:
     select_rows_menu = QMenu("Select rows", panel)
@@ -104,6 +106,10 @@ def build_database_table_context_menu(
     act_copy_tsv = menu.addAction("Copy table as TSV")
     act_copy_selected_csv = menu.addAction("Copy selected rows as CSV")
     act_copy_selected_tsv = menu.addAction("Copy selected rows as TSV")
+    act_clear_game_tags_selected = None
+    if enable_clear_game_tags_selected:
+        menu.addSeparator()
+        act_clear_game_tags_selected = menu.addAction("Clear game tags from selected games")
     menu.addSeparator()
     act_copy_game = menu.addAction("Copy Game") if enable_copy_game and has_cell else None
     act_copy_selected_games = menu.addAction("Copy selected Games") if enable_copy_selected_games else None
@@ -139,6 +145,7 @@ def build_database_table_context_menu(
         act_copy_selected_games=act_copy_selected_games,
         act_cut_selected_games=act_cut_selected_games,
         act_paste_games=act_paste_games,
+        act_clear_game_tags_selected=act_clear_game_tags_selected,
     )
 
 

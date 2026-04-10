@@ -1642,6 +1642,7 @@ class MainWindow(QMainWindow):
             on_copy_selected_games=self._on_context_copy_selected_games,
             on_cut_selected_games=self._on_context_cut_selected_games,
             on_paste_games=self._on_context_paste_games,
+            on_clear_game_tags_selected=self._on_context_clear_game_tags_selected,
         )
         
         
@@ -2000,7 +2001,22 @@ class MainWindow(QMainWindow):
             pasted_indices = list(range(first_game_index, first_game_index + games_added))
             self.database_panel.highlight_rows(database_model, pasted_indices)
         self.controller.set_status(message)
-    
+
+    def _on_context_clear_game_tags_selected(self, database_model: Any, selected_indices: List[int]) -> None:
+        """Context menu: clear CARA per-game tags on selected rows (not bulk PGN header tools)."""
+        if not selected_indices:
+            self.controller.set_status("No rows selected")
+            return
+        n = self.controller.get_metadata_controller().clear_cara_game_tags_for_database_rows(
+            database_model, selected_indices
+        )
+        if n <= 0:
+            self.controller.set_status("Selected games have no game tags")
+        elif n == 1:
+            self.controller.set_status("Cleared game tags from 1 game")
+        else:
+            self.controller.set_status(f"Cleared game tags from {n} games")
+
     def _paste_fen_to_board(self) -> None:
         """Paste FEN from clipboard and update board position."""
         success, status_message = self.controller.paste_fen_from_clipboard()
