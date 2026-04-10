@@ -3339,7 +3339,15 @@ class MainWindow(QMainWindow):
         if hasattr(self, "detail_panel"):
             psv = getattr(self.detail_panel, "player_stats_view", None)
             if psv:
-                psv.reload_player_stats_section_prefs_from_settings()
+                # Menubar is built before detail_panel; wire Player Stats toggles once the view exists.
+                actions = getattr(self, "_player_stats_section_actions", None)
+                if actions:
+                    self.controller.get_menu_options_sync_controller().bind_player_stats(
+                        view=psv,
+                        section_actions=actions,
+                    )
+                else:
+                    psv.reload_player_stats_section_prefs_from_settings()
 
         if hasattr(self, "_sync_player_stats_time_series_menu_from_settings"):
             self._sync_player_stats_time_series_menu_from_settings()

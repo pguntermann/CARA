@@ -85,17 +85,6 @@ def setup_player_stats_menu(mw, menu_bar: QMenuBar) -> None:
     ps_menu.addSeparator()
     _add_player_stats_section_visibility_actions(sections[idx_acpl + 1 :])
 
-    # Bind action syncing to the controller (keeps view from mutating MainWindow QActions).
-    try:
-        psv = getattr(getattr(mw, "detail_panel", None), "player_stats_view", None)
-        if psv:
-            mw.controller.get_menu_options_sync_controller().bind_player_stats(
-                view=psv,
-                section_actions=mw._player_stats_section_actions,
-            )
-    except Exception:
-        pass
-
 
 def _setup_player_stats_time_series_submenu(mw, ps_menu: QMenu) -> None:
     from app.services.user_settings_service import UserSettingsService
