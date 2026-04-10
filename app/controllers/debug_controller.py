@@ -48,7 +48,7 @@ class DebugController:
             debug_text = f"""=== PGN VIEW DEBUG INFO ===
 
 Visibility Settings:
-- Show Metadata: {settings['show_metadata']}
+- Show PGN header tags: {settings['show_metadata']}
 - Show Comments: {settings['show_comments']}
 - Show Variations: {settings['show_variations']}
 - Show Annotations: {settings['show_annotations']}

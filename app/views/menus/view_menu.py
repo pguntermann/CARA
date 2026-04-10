@@ -16,7 +16,7 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
     mw.view_moves_list_action.triggered.connect(lambda: mw._switch_detail_tab(0))
     view_menu.addAction(mw.view_moves_list_action)
 
-    mw.view_metadata_action = QAction("Metadata", mw)
+    mw.view_metadata_action = QAction("PGN header tags", mw)
     mw.view_metadata_action.setShortcut(QKeySequence("F2"))
     mw.view_metadata_action.setCheckable(True)
     mw.view_metadata_action.triggered.connect(lambda: mw._switch_detail_tab(1))

@@ -13,15 +13,15 @@ from app.views.dialogs.manage_game_tags_dialog import ManageGameTagsDialog
 
 
 def setup_tag_menu(mw: Any, menu_bar: QMenuBar) -> None:
-    tag_menu = menu_bar.addMenu("Tag")
+    tag_menu = menu_bar.addMenu("Game tags")
     mw._apply_menu_styling(tag_menu)
 
-    mw.manage_tags_action = QAction("Manage tags…", mw)
+    mw.manage_tags_action = QAction("Manage game tags…", mw)
     mw.manage_tags_action.triggered.connect(lambda: _open_manage_tags_dialog(mw))
     tag_menu.addAction(mw.manage_tags_action)
 
     tag_menu.addSeparator()
-    mw.clear_all_tags_action = QAction("Clear all tags", mw)
+    mw.clear_all_tags_action = QAction("Clear all game tags", mw)
     mw.clear_all_tags_action.triggered.connect(lambda: _set_active_game_tags(mw, []))
     tag_menu.addAction(mw.clear_all_tags_action)
     tag_menu.addSeparator()
@@ -69,7 +69,7 @@ def _toggle_tag_for_active_game(mw: Any, tag_name: str) -> None:
 
 
 def _rebuild_tag_menu(mw: Any, menu: QMenu) -> None:
-    # Keep the first four items intact: Manage tags… + separator + Clear all + separator.
+    # Keep the first four items intact: Manage game tags… + separator + Clear all + separator.
     actions = menu.actions()
     for act in actions[4:]:
         menu.removeAction(act)
@@ -109,7 +109,7 @@ def _rebuild_tag_menu(mw: Any, menu: QMenu) -> None:
     unmanaged = [t for t in _get_active_game_tags(mw) if t.casefold() not in defined_names] if has_active_game else []
     if unmanaged:
         menu.addSeparator()
-        unmanaged_header = QAction("Unmanaged (this game)", mw)
+        unmanaged_header = QAction("Unmanaged game tags (this game)", mw)
         unmanaged_header.setEnabled(False)
         menu.addAction(unmanaged_header)
         for n in unmanaged:

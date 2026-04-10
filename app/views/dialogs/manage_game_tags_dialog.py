@@ -105,7 +105,7 @@ class _RemovableChipButton(QPushButton):
     def _sync_text(self) -> None:
         if self._hovered:
             self.setText(f"{self._base_label}  ✕")
-            self.setToolTip("Click to remove tag")
+            self.setToolTip("Click to remove game tag")
         else:
             self.setText(self._base_label)
             self.setToolTip("")
@@ -147,7 +147,7 @@ class ManageGameTagsDialog(QDialog):
         self._apply_styling()
         self._rebuild_builtin_chips()
         self._rebuild_custom_chips()
-        self.setWindowTitle("Manage Tags")
+        self.setWindowTitle("Manage game tags")
 
     def _load_config(self) -> None:
         dlg_cfg = (self.config.get("ui", {}) or {}).get("dialogs", {}).get("manage_game_tags", {})
@@ -211,7 +211,7 @@ class ManageGameTagsDialog(QDialog):
         main_layout.setSpacing(self.layout_spacing)
 
         # Built-in tags as chips
-        builtin_group = QGroupBox("Built-in tags")
+        builtin_group = QGroupBox("Built-in game tags")
         builtin_layout = QVBoxLayout()
         builtin_layout.setContentsMargins(*self.group_contents_margins)
         builtin_layout.setSpacing(self.group_spacing)
@@ -223,7 +223,7 @@ class ManageGameTagsDialog(QDialog):
         main_layout.addWidget(builtin_group)
 
         # Custom tags (chips with + button)
-        custom_group = QGroupBox("Custom tags")
+        custom_group = QGroupBox("Custom game tags")
         custom_layout = QVBoxLayout()
         custom_layout.setContentsMargins(*self.group_contents_margins)
         custom_layout.setSpacing(self.group_spacing)
@@ -308,12 +308,12 @@ class ManageGameTagsDialog(QDialog):
         model.update_from_dict(updated)
 
     def _pick_color_for_swatch(self, swatch: ColorSwatchButton) -> None:
-        chosen = QColorDialog.getColor(swatch.get_color(), self, "Select tag color")
+        chosen = QColorDialog.getColor(swatch.get_color(), self, "Select game tag color")
         if chosen.isValid():
             swatch.set_color(chosen)
 
     def _pick_color_for_custom_index(self, idx: int, swatch: ColorSwatchButton) -> None:
-        chosen = QColorDialog.getColor(swatch.get_color(), self, "Select tag color")
+        chosen = QColorDialog.getColor(swatch.get_color(), self, "Select game tag color")
         if not chosen.isValid():
             return
         swatch.set_color(chosen)
@@ -440,7 +440,7 @@ class ManageGameTagsDialog(QDialog):
 
         plus = _AddChipButton(self._open_add_custom_dialog, self.custom_chip_container)
         plus.setText(self.plus_chip_text)
-        plus.setToolTip("Add a new tag")
+        plus.setToolTip("Add a new game tag")
         plus.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         # Render "+" using the same chip styling as everywhere else (crisp + consistent).
         plus.setMinimumHeight(int(self.chip_min_height))
@@ -583,7 +583,7 @@ class _AddCustomTagDialog(QDialog):
         self.config = config
         self._color = initial_color or QColor(120, 120, 120)
 
-        self.setWindowTitle("Add Tag")
+        self.setWindowTitle("Add game tag")
         self.setModal(True)
 
         styles_button_cfg = (self.config.get("ui", {}) or {}).get("styles", {}).get("button", {})
@@ -597,7 +597,7 @@ class _AddCustomTagDialog(QDialog):
         row = QHBoxLayout()
         row.setSpacing(int(getattr(parent, "add_dialog_row_spacing", 10)))
         self.name_edit = QLineEdit()
-        self.name_edit.setPlaceholderText("Tag name…")
+        self.name_edit.setPlaceholderText("Game tag name…")
         # Slightly larger swatch, but never taller than the input.
         input_h = max(18, int(self.name_edit.sizeHint().height()))
         sw_min = int(getattr(parent, "add_swatch_min", 18))
@@ -655,7 +655,7 @@ class _AddCustomTagDialog(QDialog):
         self.setFixedSize(w, h)
 
     def _pick_color(self) -> None:
-        chosen = QColorDialog.getColor(self._color, self, "Select tag color")
+        chosen = QColorDialog.getColor(self._color, self, "Select game tag color")
         if chosen.isValid():
             self._color = chosen
             self.swatch.set_color(chosen)

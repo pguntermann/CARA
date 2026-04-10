@@ -10,7 +10,7 @@ def setup_pgn_menu(mw, menu_bar: QMenuBar) -> None:
     pgn_menu = menu_bar.addMenu("PGN")
     mw._apply_menu_styling(pgn_menu)
 
-    mw.show_metadata_action = QAction("Show Metadata", mw)
+    mw.show_metadata_action = QAction("Show PGN header tags", mw)
     mw.show_metadata_action.setShortcut(QKeySequence("Ctrl+M"))
     mw.show_metadata_action.setCheckable(True)
     mw.show_metadata_action.setChecked(True)

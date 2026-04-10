@@ -82,7 +82,7 @@
                         <li><a href="#detail-panel">4.5 Detail Panel</a>
                             <ul>
                                 <li><a href="#moves-list">4.5.1 Moves List</a></li>
-                                <li><a href="#metadata">4.5.2 Metadata</a></li>
+                                <li><a href="#metadata">4.5.2 PGN header tags</a></li>
                                 <li><a href="#manual-analysis">4.5.3 Manual Analysis</a></li>
                                 <li><a href="#game-summary">4.5.4 Game Summary</a></li>
                                 <li><a href="#player-stats">4.5.5 Player Stats</a></li>
@@ -114,8 +114,8 @@
                             <ul>
                                 <li><a href="#basic-database-operations">5.3.1 Basic Database Operations</a></li>
                                 <li><a href="#game-tagging">5.3.2 Game Tags</a></li>
-                                <li><a href="#bulk-replace-tags">5.3.3 Bulk Replace Tags</a></li>
-                                <li><a href="#bulk-add-remove-tags">5.3.4 Bulk Add/Remove Tags</a></li>
+                                <li><a href="#bulk-replace-tags">5.3.3 Bulk replace PGN header tags</a></li>
+                                <li><a href="#bulk-add-remove-tags">5.3.4 Bulk add/remove PGN header tags</a></li>
                                 <li><a href="#bulk-clean-pgn">5.3.5 Bulk Clean PGN</a></li>
                                 <li><a href="#deduplicate-games">5.3.6 Deduplicate Games</a></li>
                             </ul>
@@ -192,7 +192,7 @@
                         <li><a href="#file-menu">6.1 File Menu</a></li>
                         <li><a href="#edit-menu">6.2 Edit Menu</a></li>
                         <li><a href="#board-menu">6.3 Board Menu</a></li>
-                        <li><a href="#tags-menu">6.4 Tags Menu</a></li>
+                        <li><a href="#tags-menu">6.4 Game tags menu</a></li>
                         <li><a href="#pgn-menu">6.5 PGN Menu</a></li>
                         <li><a href="#moves-list-menu">6.6 Moves List Menu</a></li>
                         <li><a href="#game-analysis-menu">6.7 Game Analysis Menu</a></li>
@@ -591,7 +591,7 @@
                 
                 <ul>
                     <li><strong>Main Panel</strong> (left): Displays the chessboard along with game information, evaluation bar, material widget, turn indicator, and other board-related widgets. This is the primary visual interface for reviewing games and positions.</li>
-                    <li><strong>Detail Panel</strong> (right): Contains the PGN notation pane at the top, displaying the game's move notation, and tabbed views below for detailed analysis, including the Moves List, Metadata, Manual Analysis, Game Summary, Player Stats, Annotations, AI Summary, and Notes. This panel provides in-depth information and analysis tools.</li>
+                    <li><strong>Detail Panel</strong> (right): Contains the PGN notation pane at the top, displaying the game's move notation, and tabbed views below for detailed analysis, including the Moves List, PGN header tags, Manual Analysis, Game Summary, Player Stats, Annotations, AI Summary, and Notes. This panel provides in-depth information and analysis tools.</li>
                     <li><strong>Database Panel</strong> (bottom): Manages your game collections with tabs for multiple PGN databases, searchable game tables, and column customization. This panel can be collapsed to maximize space for the main and detail panels.</li>
                 </ul>
                 
@@ -815,7 +815,7 @@
                 
                 <p>You can control what elements are displayed in the PGN Notation Pane using the PGN menu. The following options are available:</p>
                 <ul>
-                    <li><span class="menu-item">PGN → Show Metadata</span> (<code>Ctrl+M</code> / <code>⌘+M</code>): Toggle display of PGN header tags (Event, Site, Date, etc.)</li>
+                    <li><span class="menu-item">PGN → Show PGN header tags</span> (<code>Ctrl+M</code> / <code>⌘+M</code>): Toggle display of PGN header tags (Event, Site, Date, etc.)</li>
                     <li><span class="menu-item">PGN → Show Comments</span> (<code>Ctrl+Shift+M</code> / <code>⌘+Shift+M</code>): Toggle display of move comments</li>
                     <li><span class="menu-item">PGN → Show Variations</span> (<code>Ctrl+Shift+V</code> / <code>⌘+Shift+V</code>): Toggle display of move variations</li>
                     <li><span class="menu-item">PGN → Show Non-Standard Tags</span> (<code>Ctrl+Shift+T</code> / <code>⌘+Shift+T</code>): Toggle display of non-standard tags like [%evp] and [%mdl] within comments</li>
@@ -855,10 +855,10 @@
                 
                 <p>For a complete reference of all available columns and their descriptions, see <a href="#moves-list-columns-reference">section 7.7 "Moves List Columns Reference"</a>.</p>
                 
-                <h5 id="metadata">4.5.2 Metadata</h5>
-                <p>The Metadata tab displays all PGN header tags (metadata) for the current game in an editable table format. You can view, edit, add, and remove tags. Common tags include Event, Site, Date, Round, White, Black, Result, ECO, WhiteElo, and BlackElo. Changes to metadata are applied to the game's PGN data in memory. The database is marked as having unsaved changes, and your modifications will be persisted to the database file when you save it. Access this tab using <span class="menu-item">View → Metadata</span> or press <code>F2</code>.</p>
+                <h5 id="metadata">4.5.2 PGN header tags</h5>
+                <p>The PGN header tags tab displays all PGN header tags for the current game in an editable table format. You can view, edit, add, and remove PGN header tags. Common tags include Event, Site, Date, Round, White, Black, Result, ECO, WhiteElo, and BlackElo. Changes are applied to the game's PGN data in memory. The database is marked as having unsaved changes, and your modifications will be persisted to the database file when you save it. Access this tab using <span class="menu-item">View → PGN header tags</span> or press <code>F2</code>.</p>
                 
-                <img src="screenshots/metadata.png" alt="CARA Metadata View - Editable table showing PGN header tags with Add and Remove buttons" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+                <img src="screenshots/metadata.png" alt="CARA PGN header tags view - Editable table showing PGN header tags with Add and Remove buttons" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
                 <p>To edit a tag value, double-click on the value cell in the table and type the new value. Tag names cannot be edited, but you can remove a tag and add a new one with a different name if needed. To add a new tag, click the <strong>Add</strong> button at the top of the metadata view, enter the tag name and value in the dialog, then click OK. To remove a tag, select the tag row in the table and click the <strong>Remove</strong> button. You will be asked to confirm the removal. Note that some tags (such as CARA analysis and annotation tags) are read-only and cannot be edited or removed.</p>
                 
@@ -1029,7 +1029,7 @@
                 <h5>4.6.4 Detail Panel Tabs</h5>
                 <ul>
                     <li><code>F1</code>: Switch to Moves List tab</li>
-                    <li><code>F2</code>: Switch to Metadata tab</li>
+                    <li><code>F2</code>: Switch to PGN header tags tab</li>
                     <li><code>F3</code>: Switch to Manual Analysis tab</li>
                     <li><code>F4</code>: Switch to Game Summary tab</li>
                     <li><code>F5</code>: Switch to Player Stats tab</li>
@@ -1261,15 +1261,15 @@
                 <h5 id="game-tagging">5.3.2 Game Tags</h5>
                 <p><strong>Game tags</strong> are simple labels you can assign to a game so you can organize and recognize games quickly (for example <em>“Training”</em>, <em>“Tournament”</em>, <em>“Must review”</em>, <em>“Opening prep”</em>). They are separate from the PGN header tags (like <code>Event</code>, <code>Site</code>, <code>White</code>, etc.).</p>
                 <p>Game tags are shown as small <strong>chips</strong> in the database view and in the <a href="#game-tags-widget">Game Tags widget</a> next to the chessboard (when visible).</p>
-                <p>To assign tags to the active game, right-click inside the <strong>Game Tags widget</strong> and toggle tags in the list, or use the <span class="menu-item">Tags</span> menu on the menu bar.<br>
-                If you want to create your own custom tags (names and colors), use <span class="menu-item">Tags → Manage tags…</span>.</p>
+                <p>To assign tags to the active game, right-click inside the <strong>Game Tags widget</strong> and toggle tags in the list, or use the <span class="menu-item">Game tags</span> menu on the menu bar.<br>
+                If you want to create your own custom tags (names and colors), use <span class="menu-item">Game tags → Manage game tags…</span>.</p>
                 <div class="tip-box">
                     <strong>Quick Tip:</strong> CARA can also assign tags automatically after analysis (auto-tagging). If you want CARA to tag games based on analysis, see <a href="#auto-tagging">section 5.5.5 Auto-tagging</a>.
                 </div>
 
-                <h5 id="bulk-replace-tags">5.3.3 Bulk Replace Tags</h5>
-                <p>Use <span class="menu-item">File → Bulk Replace Tags...</span> (<code>Ctrl+Shift+R</code> / <code>⌘+Shift+R</code>) to find and replace text in metadata tags across multiple games. This is useful for correcting typos, standardizing player names, or updating event information.</p>
-                <img src="screenshots/bulk_replace_tags_dialog.png" alt="CARA Bulk Replace Tags Dialog - Dialog for finding and replacing text in metadata tags across multiple games with tag selection, find/replace fields, and matching options" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+                <h5 id="bulk-replace-tags">5.3.3 Bulk replace PGN header tags</h5>
+                <p>Use <span class="menu-item">File → Bulk Replace PGN header tags...</span> (<code>Ctrl+Shift+R</code> / <code>⌘+Shift+R</code>) to find and replace text in PGN header tags across multiple games. This is useful for correcting typos, standardizing player names, or updating event information.</p>
+                <img src="screenshots/bulk_replace_tags_dialog.png" alt="CARA Bulk replace PGN header tags dialog - Dialog for finding and replacing text in PGN header tags across multiple games with tag selection, find/replace fields, and matching options" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 <p>The dialog allows you to:</p>
                 <ul>
                     <li>Select a tag to modify (e.g., White, Black, Event, Site)</li>
@@ -1284,8 +1284,8 @@
                     <li><strong>Update ECO code with played opening ECO:</strong> Analyzes the opening moves of each game and updates the ECO (Encyclopaedia of Chess Openings) tag based on the opening that was actually played. This uses CARA's built-in opening database to identify the correct ECO code from the game's move sequence.</li>
                 </ul>
 
-                <h5 id="bulk-add-remove-tags">5.3.4 Bulk Add/Remove Tags</h5>
-                <p>Use <span class="menu-item">File → Bulk Add/Remove Tags...</span> (<code>Ctrl+Alt+T</code> / <code>⌘+⌥+T</code>) to add or remove metadata tags across multiple games. This is useful for adding missing information or cleaning up tag sets.</p>
+                <h5 id="bulk-add-remove-tags">5.3.4 Bulk add/remove PGN header tags</h5>
+                <p>Use <span class="menu-item">File → Bulk Add/Remove PGN header tags...</span> (<code>Ctrl+Alt+T</code> / <code>⌘+⌥+T</code>) to add or remove PGN header tags across multiple games. This is useful for adding missing information or cleaning up tag sets.</p>
                 <p>The dialog allows you to:</p>
                 <ul>
                     <li>Add a new tag with a fixed value or copy from another tag</li>
@@ -1927,11 +1927,11 @@
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+I</code> / <code>⌘+Shift+I</code></p>
                 <p>Opens a dialog to import games from Lichess or Chess.com.<br>See <a href="#import-from-online">section 5.2.3</a> for detailed instructions.</p>
                 
-                <h5>6.1.8 Bulk Replace Tags...</h5>
+                <h5>6.1.8 Bulk Replace PGN header tags...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+R</code> / <code>⌘+Shift+R</code></p>
                 <p>Opens a dialog to find and replace text in metadata tags across multiple games.<br>See <a href="#bulk-replace-tags">section 5.3.2</a> for detailed instructions.</p>
                 
-                <h5>6.1.9 Bulk Add/Remove Tags...</h5>
+                <h5>6.1.9 Bulk Add/Remove PGN header tags...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Alt+T</code> / <code>⌘+⌥+T</code></p>
                 <p>Opens a dialog to add or remove metadata tags across multiple games.<br>See <a href="#bulk-add-remove-tags">section 5.3.3</a> for detailed instructions.</p>
                 
@@ -2061,15 +2061,15 @@
                 </ul>
             </div>
 
-            <!-- Tags Menu -->
+            <!-- Game tags menu -->
             <div class="outline-item">
-                <h4 id="tags-menu">6.4 Tags Menu</h4>
-                <p>The <span class="menu-item">Tags</span> menu provides actions for working with <a href="#game-tagging">game tags</a> on the currently active game.</p>
+                <h4 id="tags-menu">6.4 Game tags menu</h4>
+                <p>The <span class="menu-item">Game tags</span> menu provides actions for working with <a href="#game-tagging">game tags</a> on the currently active game.</p>
                 
-                <h5>6.4.1 Manage tags…</h5>
-                <p>Opens the tag management dialog where you can create and delete custom tag definitions.</p>
+                <h5>6.4.1 Manage game tags…</h5>
+                <p>Opens the game tags management dialog where you can create and delete custom game tag definitions.</p>
                 
-                <h5>6.4.2 Clear all tags</h5>
+                <h5>6.4.2 Clear all game tags</h5>
                 <p>Removes all game tags from the currently active game.</p>
                 
                 <div class="tip-box">
@@ -2081,7 +2081,7 @@
             <div class="outline-item">
                 <h4 id="pgn-menu">6.5 PGN Menu</h4>
                 
-                <h5>6.5.1 Show Metadata</h5>
+                <h5>6.5.1 Show PGN header tags</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+M</code> / <code>⌘+M</code></p>
                 <p>Toggles the display of PGN header tags (Event, Site, Date, etc.) in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
@@ -2330,8 +2330,8 @@
                 <h5>6.12.5 Include Game Analysis Data in Pre-Prompt</h5>
                 <p>Toggles whether game analysis data (evaluations, move classifications, CPL values, best move alternatives) is included in the pre-prompt sent to the AI model. When enabled, the AI has access to detailed engine analysis, enabling more accurate assessments of moves and positions.</p>
                 
-                <h5>6.12.6 Include PGN Metadata tags in Pre-Prompt</h5>
-                <p>Toggles whether PGN metadata tags (player names, ELO ratings, event information, etc.) are included in the pre-prompt sent to the AI model. When enabled, the AI has access to game metadata, providing context for more informed responses.</p>
+                <h5>6.12.6 Include PGN header tags in pre-prompt</h5>
+                <p>Toggles whether PGN header tags (player names, ELO ratings, event information, etc.) are included in the pre-prompt sent to the AI model. When enabled, the AI has access to this PGN header context, providing more informed responses.</p>
             </div>
 
             <!-- Notes Menu -->
@@ -2380,7 +2380,7 @@
                 <p>Quick access to different analysis views:</p>
                 <ul>
                     <li><code>F1</code>: Switch to Moves List tab</li>
-                    <li><code>F2</code>: Switch to Metadata tab</li>
+                    <li><code>F2</code>: Switch to PGN header tags tab</li>
                     <li><code>F3</code>: Switch to Manual Analysis tab</li>
                     <li><code>F4</code>: Switch to Game Summary tab</li>
                     <li><code>F5</code>: Switch to Player Stats tab</li>
@@ -3354,7 +3354,7 @@
                     <li><strong>Server not responding:</strong> Ensure the local server is running and a model is loaded before sending requests.</li>
                     <li><strong>Wrong or unreachable URL:</strong> Verify the Base URL matches the server (e.g. <code>http://localhost:1234/v1</code> for LM Studio’s default).</li>
                     <li><strong>Requests fail or time out:</strong> Increase the request timeout in AI Model Settings and confirm a model is loaded.</li>
-                    <li><strong>API error 400 – context length:</strong> The prompt exceeds the model’s context window. Configure and reload the model with a larger context length in your server (e.g. LM Studio), or reduce the amount of data sent in the prompt by disabling <span class="menu-item">AI Summary → Include Game Analysis Data in Pre-Prompt</span> and <span class="menu-item">AI Summary → Include PGN Metadata tags in Pre-Prompt</span>.</li>
+                    <li><strong>API error 400 – context length:</strong> The prompt exceeds the model’s context window. Configure and reload the model with a larger context length in your server (e.g. LM Studio), or reduce the amount of data sent in the prompt by disabling <span class="menu-item">AI Summary → Include Game Analysis Data in Pre-Prompt</span> and <span class="menu-item">AI Summary → Include PGN header tags in pre-prompt</span>.</li>
                     <li><strong>Output used only for reasoning:</strong> The model might use the full output context only for reasoning, leaving no room for the actual answer. Disable reasoning/thinking in your server. In LM Studio you can do this by adding <code>{%- set enable_thinking = false %}</code> to the prompt template (Jinja) in AI Model Settings.</li>
                 </ul>
             </div>

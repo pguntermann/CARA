@@ -45,7 +45,7 @@ def setup_ai_summary_menu(mw, menu_bar: QMenuBar) -> None:
     mw.ai_summary_include_analysis_action.triggered.connect(mw._on_ai_summary_include_analysis_toggled)
     ai_summary_menu.addAction(mw.ai_summary_include_analysis_action)
 
-    mw.ai_summary_include_metadata_action = QAction("Include PGN Metadata tags in Pre-Prompt", mw)
+    mw.ai_summary_include_metadata_action = QAction("Include PGN header tags in pre-prompt", mw)
     mw.ai_summary_include_metadata_action.setCheckable(True)
     mw.ai_summary_include_metadata_action.triggered.connect(mw._on_ai_summary_include_metadata_toggled)
     ai_summary_menu.addAction(mw.ai_summary_include_metadata_action)

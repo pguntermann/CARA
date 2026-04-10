@@ -31,7 +31,7 @@ def build_game_tags_context_menu(mw: Any, *, parent: Optional[Any] = None) -> QM
         # Fallback: create action if Tag menu isn't initialized for some reason.
         from app.views.dialogs.manage_game_tags_dialog import ManageGameTagsDialog
 
-        act = QAction("Manage tags…", mw)
+        act = QAction("Manage game tags…", mw)
         act.triggered.connect(lambda: ManageGameTagsDialog(mw.config, mw).exec())
         menu.addAction(act)
 
@@ -71,7 +71,7 @@ def build_game_tags_context_menu(mw: Any, *, parent: Optional[Any] = None) -> QM
     unmanaged = [t for t in _get_active_game_tags(mw) if t.casefold() not in defined_names] if has_active_game else []
     if unmanaged:
         menu.addSeparator()
-        header = QAction("Unmanaged (this game)", mw)
+        header = QAction("Unmanaged game tags (this game)", mw)
         header.setEnabled(False)
         menu.addAction(header)
         for n in unmanaged:

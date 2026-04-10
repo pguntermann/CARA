@@ -2356,7 +2356,7 @@ class MainWindow(QMainWindow):
             self.controller.set_status(message)
     
     def _on_show_metadata_toggled(self, checked: bool) -> None:
-        """Handle Show Metadata toggle.
+        """Handle Show PGN header tags toggle.
         
         Args:
             checked: True if metadata should be shown, False otherwise.

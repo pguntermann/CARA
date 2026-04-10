@@ -313,8 +313,8 @@ class BulkReplaceDialog(QDialog):
         
         main_layout.addSpacing(self.section_spacing)
         
-        # Metadata Tag Replacement group
-        replace_group = QGroupBox("Metadata Tag Replacement")
+        # PGN header tag replacement group
+        replace_group = QGroupBox("PGN header tag replacement")
         replace_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         replace_layout = QFormLayout()
         replace_layout.setSpacing(self.form_spacing)

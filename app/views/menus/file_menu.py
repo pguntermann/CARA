@@ -56,13 +56,13 @@ def setup_file_menu(mw, menu_bar: QMenuBar) -> None:
 
     file_menu.addSeparator()
 
-    bulk_replace_action = QAction("Bulk Replace Tags...", mw)
+    bulk_replace_action = QAction("Bulk Replace PGN header tags...", mw)
     bulk_replace_action.setShortcut(QKeySequence("Ctrl+Shift+R"))
     bulk_replace_action.setMenuRole(QAction.MenuRole.NoRole)
     bulk_replace_action.triggered.connect(mw._bulk_replace)
     file_menu.addAction(bulk_replace_action)
 
-    bulk_tag_action = QAction("Bulk Add/Remove Tags...", mw)
+    bulk_tag_action = QAction("Bulk Add/Remove PGN header tags...", mw)
     bulk_tag_action.setShortcut(QKeySequence("Ctrl+Alt+T"))
     bulk_tag_action.setMenuRole(QAction.MenuRole.NoRole)
     bulk_tag_action.triggered.connect(mw._bulk_tag)

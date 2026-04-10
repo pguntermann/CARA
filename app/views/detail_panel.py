@@ -296,7 +296,7 @@ class DetailPanel(QWidget):
         self.metadata_model = MetadataModel(self.config)
         self.metadata_view = DetailMetadataView(self.config, self.metadata_model,
                                                  metadata_controller=self._metadata_controller)
-        self.tab_widget.addTab(self.metadata_view, "Metadata")
+        self.tab_widget.addTab(self.metadata_view, "PGN header tags")
         
         # Manual Analysis tab
         self.manual_analysis_view = DetailManualAnalysisView(

@@ -332,7 +332,7 @@ class DatabaseModel(QAbstractTableModel):
                 "Notes",
                 "Source DB",
                 "Ref Ply",
-                "Tags",
+                "Game tags",
                 "PGN",
             ]
             if 0 <= section < len(headers):

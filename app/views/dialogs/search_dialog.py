@@ -378,7 +378,7 @@ class CriteriaRowWidget(QWidget):
         self.field_combo = QComboBox()
         self.field_combo.addItems([
             "White", "Black", "WhiteElo", "BlackElo", "Result", "Date", 
-            "Event", "Site", "ECO", "TimeControl", "TC Type", "Analyzed", "Annotated", "Tags", "Custom PGN Tag"
+            "Event", "Site", "ECO", "TimeControl", "TC Type", "Analyzed", "Annotated", "Game tags", "Custom PGN header tag"
         ])
         self.field_combo.setFixedWidth(120)
         self.field_combo.currentTextChanged.connect(self._on_field_changed)
@@ -397,9 +397,9 @@ class CriteriaRowWidget(QWidget):
         self.value_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.value_input)
 
-        # Tags picker (hidden by default; used when field == "Tags")
+        # Game tags picker (hidden by default; used when field == "Game tags")
         self._selected_tags: List[str] = []
-        self.tags_picker_btn = QPushButton("Select tags…")
+        self.tags_picker_btn = QPushButton("Select game tags…")
         self.tags_picker_btn.setVisible(False)
         self.tags_picker_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.tags_picker_btn.clicked.connect(self._open_tags_picker_popup)
@@ -408,7 +408,7 @@ class CriteriaRowWidget(QWidget):
         
         # Custom tag name input (hidden by default)
         self.custom_tag_input = QLineEdit()
-        self.custom_tag_input.setPlaceholderText("Tag name...")
+        self.custom_tag_input.setPlaceholderText("PGN header tag name...")
         self.custom_tag_input.setFixedWidth(120)
         self.custom_tag_input.setVisible(False)
         layout.addWidget(self.custom_tag_input)
@@ -468,13 +468,13 @@ class CriteriaRowWidget(QWidget):
             self.value_input.setVisible(True)
             self.value_input.setEnabled(True)
             self.custom_tag_input.setVisible(False)
-        elif field_text == "Custom PGN Tag":
+        elif field_text == "Custom PGN header tag":
             self.operator_combo.addItems(["contains", "equals", "not equals", "starts with", "ends with"])
             self.value_input.setVisible(True)
             self.value_input.setEnabled(True)
             self.value_input.setPlaceholderText("Value...")
             self.custom_tag_input.setVisible(True)
-        elif field_text == "Tags":
+        elif field_text == "Game tags":
             self.operator_combo.addItems(["contains", "does not contain"])
             self.value_input.setVisible(False)
             self.tags_picker_btn.setVisible(True)
@@ -614,8 +614,8 @@ class CriteriaRowWidget(QWidget):
             "TC Type": SearchField.TC_TYPE,
             "Analyzed": SearchField.ANALYZED,
             "Annotated": SearchField.ANNOTATED,
-            "Tags": SearchField.TAGS,
-            "Custom PGN Tag": SearchField.CUSTOM_TAG,
+            "Game tags": SearchField.TAGS,
+            "Custom PGN header tag": SearchField.CUSTOM_TAG,
         }
         field = field_map.get(field_text)
         if field is None:
@@ -718,8 +718,8 @@ class CriteriaRowWidget(QWidget):
             SearchField.TC_TYPE: "TC Type",
             SearchField.ANALYZED: "Analyzed",
             SearchField.ANNOTATED: "Annotated",
-            SearchField.TAGS: "Tags",
-            SearchField.CUSTOM_TAG: "Custom PGN Tag",
+            SearchField.TAGS: "Game tags",
+            SearchField.CUSTOM_TAG: "Custom PGN header tag",
         }
         field_text = field_map.get(criterion.field)
         if field_text:
@@ -775,11 +775,11 @@ class CriteriaRowWidget(QWidget):
 
     def _sync_tags_picker_label(self) -> None:
         if not getattr(self, "_selected_tags", None):
-            self.tags_picker_btn.setText("Select tags…")
+            self.tags_picker_btn.setText("Select game tags…")
         elif len(self._selected_tags) == 1:
             self.tags_picker_btn.setText(self._selected_tags[0])
         else:
-            self.tags_picker_btn.setText(f"{len(self._selected_tags)} tags")
+            self.tags_picker_btn.setText(f"{len(self._selected_tags)} game tags")
 
     def _open_tags_picker_popup(self) -> None:
         """Open chip-based popup picker for tags."""
