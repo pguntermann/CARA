@@ -73,6 +73,8 @@ def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
     mw.select_auto_tags_menu.setEnabled(True)
     game_analysis_menu.addMenu(mw.select_auto_tags_menu)
 
+    game_analysis_menu.addSeparator()
+
     mw.return_to_first_move_action = QAction("Return to PLY 0 after analysis completes", mw)
     mw.return_to_first_move_action.setCheckable(True)
     mw.return_to_first_move_action.setChecked(False)
