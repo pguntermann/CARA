@@ -507,6 +507,7 @@ class ManageGameTagsDialog(QDialog):
         self.chip_min_height = int(chip_cfg.get("minimum_height", 22))
         self.chip_unmanaged_bg = chip_cfg.get("unmanaged_background_color", [95, 95, 100])
         self.chip_hover_bg = chip_cfg.get("hover_background_rgba", [255, 255, 255, 18])
+        self.chip_hover_text_color = chip_cfg.get("hover_text_color", [68, 68, 74])
 
         font_family_raw = chip_cfg.get("font_family", "Helvetica Neue")
         self.chip_font_family = resolve_font_family(font_family_raw)
@@ -968,9 +969,16 @@ class ManageGameTagsDialog(QDialog):
         chip.setMinimumWidth(int(text_w + 2 * pad_h + 8))
 
         hover_rgba = self.chip_hover_bg if isinstance(self.chip_hover_bg, list) and len(self.chip_hover_bg) == 4 else [255, 255, 255, 18]
+        htc = (
+            self.chip_hover_text_color
+            if isinstance(self.chip_hover_text_color, list) and len(self.chip_hover_text_color) >= 3
+            else [68, 68, 74]
+        )
+        hover_text = f"rgb({int(htc[0])}, {int(htc[1])}, {int(htc[2])})"
         hover = (
             "QPushButton:hover {"
             f"  background-color: rgba({int(hover_rgba[0])}, {int(hover_rgba[1])}, {int(hover_rgba[2])}, {int(hover_rgba[3])});"
+            f"  color: {hover_text};"
             "}"
             if removable
             else ""
