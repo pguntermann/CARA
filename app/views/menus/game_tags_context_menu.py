@@ -41,10 +41,12 @@ def build_game_tags_context_menu(mw: Any, *, parent: Optional[Any] = None) -> QM
 
     menu.addSeparator()
 
-    defs = GameTagsService(mw.config).get_definitions()
+    svc = GameTagsService(mw.config)
+    defs = svc.get_definitions()
+    hidden = svc.get_hidden_builtin_names()
     game_model = mw.controller.get_game_controller().get_game_model()
     has_active_game = bool(getattr(game_model, "active_game", None))
-    current = {t.casefold() for t in _get_active_game_tags(mw)} if has_active_game else set()
+    current = {t.casefold() for t in _get_active_game_tags(mw) if t.casefold() not in hidden} if has_active_game else set()
 
     builtins = [d for d in defs if d.builtin]
     customs = [d for d in defs if not d.builtin]
@@ -68,7 +70,7 @@ def build_game_tags_context_menu(mw: Any, *, parent: Optional[Any] = None) -> QM
             menu.addAction(act)
 
     defined_names = {d.name.casefold() for d in defs}
-    unmanaged = [t for t in _get_active_game_tags(mw) if t.casefold() not in defined_names] if has_active_game else []
+    unmanaged = [t for t in _get_active_game_tags(mw) if t.casefold() not in hidden and t.casefold() not in defined_names] if has_active_game else []
     if unmanaged:
         menu.addSeparator()
         header = QAction("Unmanaged game tags (this game)", mw)

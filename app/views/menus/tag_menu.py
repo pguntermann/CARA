@@ -74,10 +74,12 @@ def _rebuild_tag_menu(mw: Any, menu: QMenu) -> None:
     for act in actions[4:]:
         menu.removeAction(act)
 
-    defs = GameTagsService(mw.config).get_definitions()
+    svc = GameTagsService(mw.config)
+    defs = svc.get_definitions()
+    hidden = svc.get_hidden_builtin_names()
     game_model = mw.controller.get_game_controller().get_game_model()
     has_active_game = bool(getattr(game_model, "active_game", None))
-    current = {t.casefold() for t in _get_active_game_tags(mw)} if has_active_game else set()
+    current = {t.casefold() for t in _get_active_game_tags(mw) if t.casefold() not in hidden} if has_active_game else set()
 
     if hasattr(mw, "clear_all_tags_action") and mw.clear_all_tags_action:
         mw.clear_all_tags_action.setEnabled(bool(has_active_game and current))
@@ -106,7 +108,7 @@ def _rebuild_tag_menu(mw: Any, menu: QMenu) -> None:
 
     # Unmanaged tags currently present in this game
     defined_names = {d.name.casefold() for d in defs}
-    unmanaged = [t for t in _get_active_game_tags(mw) if t.casefold() not in defined_names] if has_active_game else []
+    unmanaged = [t for t in _get_active_game_tags(mw) if t.casefold() not in hidden and t.casefold() not in defined_names] if has_active_game else []
     if unmanaged:
         menu.addSeparator()
         unmanaged_header = QAction("Unmanaged game tags (this game)", mw)

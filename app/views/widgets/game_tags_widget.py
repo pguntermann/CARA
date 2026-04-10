@@ -153,6 +153,8 @@ class GameTagsWidget(QWidget):
         self._chips = []
 
         tags = self._current_tags()
+        hidden = self._svc.get_hidden_builtin_names()
+        tags = [t for t in tags if t.casefold() not in hidden]
         defs_map = self._svc.get_definition_map()
 
         for name in tags:

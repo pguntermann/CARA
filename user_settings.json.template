@@ -817,6 +817,7 @@
   },
   "game_tags": {
     "builtin_colors": {},
+    "builtin_overrides": {},
     "custom": []
   },
   "pgn_visibility": {

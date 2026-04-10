@@ -3134,7 +3134,8 @@
           "background_hover_color": [75, 75, 82],
           "icon_color": [235, 235, 235],
           "icon_hover_color": [255, 255, 255]
-        }
+        },
+        "builtin_hidden_chip_color": [75, 75, 82]
       },
       "classification_settings": {
         "width": 480,

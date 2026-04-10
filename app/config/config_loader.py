@@ -203,6 +203,7 @@ class ConfigLoader:
             'ui.dialogs.manage_game_tags.icon_badges.background_hover_color',
             'ui.dialogs.manage_game_tags.icon_badges.icon_color',
             'ui.dialogs.manage_game_tags.icon_badges.icon_hover_color',
+            'ui.dialogs.manage_game_tags.builtin_hidden_chip_color',
             'ui.panels.detail.minimum_width',
             'ui.panels.detail.minimum_height',
             'ui.panels.detail.background_color',

@@ -254,6 +254,164 @@ class _RemovableChipButton(QPushButton):
         return super().mouseMoveEvent(event)
 
 
+class _BuiltinChipButton(QPushButton):
+    def __init__(self, label: str, *, on_toggle_hidden, on_edit=None, hidden: bool = False, parent=None) -> None:
+        super().__init__(label, parent)
+        self._base_label = label
+        self._on_toggle_hidden = on_toggle_hidden
+        self._on_edit = on_edit
+        self._hidden = bool(hidden)
+        self._hovered = False
+        self._hover_icon: str | None = None  # "edit" | "visibility" | None
+        self._chip_bg = QColor(95, 95, 100)
+        self._chip_text = QColor(245, 245, 245)
+        self._badge_bg = QColor(55, 55, 60)
+        self._badge_bg_hover = QColor(75, 75, 82)
+        self._badge_icon = QColor(235, 235, 235)
+        self._badge_icon_hover = QColor(255, 255, 255)
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        self.setMouseTracking(True)
+        self._sync_tooltip()
+
+    def set_hidden_state(self, hidden: bool) -> None:
+        self._hidden = bool(hidden)
+        self.update()
+
+    def get_base_label(self) -> str:
+        return self._base_label
+
+    def set_chip_background(self, bg: QColor) -> None:
+        self._chip_bg = bg if isinstance(bg, QColor) else QColor(95, 95, 100)
+
+    def set_chip_text_color(self, fg: QColor) -> None:
+        self._chip_text = fg if isinstance(fg, QColor) else QColor(245, 245, 245)
+
+    def set_badge_colors(
+        self,
+        *,
+        background: QColor,
+        background_hover: QColor,
+        icon: QColor,
+        icon_hover: QColor,
+    ) -> None:
+        self._badge_bg = background if isinstance(background, QColor) else QColor(55, 55, 60)
+        self._badge_bg_hover = background_hover if isinstance(background_hover, QColor) else QColor(75, 75, 82)
+        self._badge_icon = icon if isinstance(icon, QColor) else QColor(235, 235, 235)
+        self._badge_icon_hover = icon_hover if isinstance(icon_hover, QColor) else QColor(255, 255, 255)
+
+    def enterEvent(self, event) -> None:
+        self._hovered = True
+        self._sync_tooltip()
+        self.update()
+        return super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self._hovered = False
+        self._hover_icon = None
+        self._sync_tooltip()
+        self.update()
+        return super().leaveEvent(event)
+
+    def _sync_tooltip(self) -> None:
+        if not self._hovered:
+            self.setToolTip("")
+            return
+        if self._hover_icon == "edit":
+            self.setToolTip("Edit built-in game tag color")
+        elif self._hover_icon == "visibility":
+            self.setToolTip("Show tag" if self._hidden else "Hide tag")
+        else:
+            self.setToolTip("Edit color or toggle visibility")
+
+    def _icon_rects(self) -> tuple[QRectF, QRectF]:
+        # Draw two badge-style icons on the right, overlaid on top of the chip.
+        s = max(14, int(self.height() * 0.66))
+        pad = max(6, int(self.height() * 0.22))
+        gap = max(6, int(self.height() * 0.18))
+        y = (self.height() - s) / 2
+        visibility_rect = QRectF(self.width() - pad - s, y, s, s)
+        edit_rect = QRectF(visibility_rect.left() - gap - s, y, s, s)
+        return edit_rect, visibility_rect
+
+    def _icon_hit_test(self, x: int, y: int) -> str | None:
+        if not self._hovered:
+            return None
+        edit_rect, vis_rect = self._icon_rects()
+        if vis_rect.contains(float(x), float(y)):
+            return "visibility"
+        if edit_rect.contains(float(x), float(y)):
+            return "edit"
+        return None
+
+    @classmethod
+    def _load_svg(cls, rel_path: str) -> bytes:
+        # Share the cache with _RemovableChipButton for consistency.
+        return _RemovableChipButton._load_svg(rel_path)
+
+    def _render_svg_tinted(self, painter: QPainter, rect: QRectF, rel_path: str, color: QColor) -> None:
+        # Reuse the same tinting logic as the removable chip button.
+        return _RemovableChipButton._render_svg_tinted(self, painter, rect, rel_path, color)  # type: ignore[misc]
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        if not self._hovered:
+            return
+        edit_rect, vis_rect = self._icon_rects()
+        edit_bg = self._badge_bg_hover if self._hover_icon == "edit" else self._badge_bg
+        vis_bg = self._badge_bg_hover if self._hover_icon == "visibility" else self._badge_bg
+        edit_col = self._badge_icon_hover if self._hover_icon == "edit" else self._badge_icon
+        vis_col = self._badge_icon_hover if self._hover_icon == "visibility" else self._badge_icon
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        try:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(edit_bg)
+            painter.drawEllipse(edit_rect)
+            painter.setBrush(vis_bg)
+            painter.drawEllipse(vis_rect)
+
+            self._render_svg_tinted(painter, edit_rect, "app/resources/icons/color_picker.svg", edit_col)
+            icon_path = "app/resources/icons/eye_off.svg" if self._hidden else "app/resources/icons/eye.svg"
+            self._render_svg_tinted(painter, vis_rect, icon_path, vis_col)
+        finally:
+            painter.end()
+
+    def mousePressEvent(self, event) -> None:
+        try:
+            x = int(event.position().x())
+            y = int(event.position().y())
+        except Exception:
+            x = int(event.pos().x())
+            y = int(event.pos().y())
+
+        which = self._icon_hit_test(x, y)
+        if which == "visibility" and callable(self._on_toggle_hidden):
+            self._on_toggle_hidden()
+            event.accept()
+            return
+        if which == "edit" and callable(self._on_edit):
+            self._on_edit()
+            event.accept()
+            return
+        return super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        try:
+            x = int(event.position().x())
+            y = int(event.position().y())
+        except Exception:
+            x = int(event.pos().x())
+            y = int(event.pos().y())
+        which = self._icon_hit_test(x, y)
+        if which != self._hover_icon:
+            self._hover_icon = which
+            self._sync_tooltip()
+            self.update()
+        self.setCursor(Qt.CursorShape.PointingHandCursor if which in ("edit", "visibility") else Qt.CursorShape.ArrowCursor)
+        return super().mouseMoveEvent(event)
+
+
 class _AddChipButton(QPushButton):
     def __init__(self, on_add, parent=None) -> None:
         super().__init__("+", parent)
@@ -280,6 +438,8 @@ class ManageGameTagsDialog(QDialog):
 
         self._original_custom = self._get_custom_from_settings()
         self._working_custom = [c.copy() for c in self._original_custom]
+        self._original_builtin_overrides = self._get_builtin_overrides_from_settings()
+        self._working_builtin_overrides = {k: v.copy() for k, v in self._original_builtin_overrides.items()}
 
         self._setup_ui()
         self._apply_styling()
@@ -333,6 +493,9 @@ class ManageGameTagsDialog(QDialog):
         self.icon_badge_bg_hover = icon_badges_cfg.get("background_hover_color", [75, 75, 82])
         self.icon_badge_icon = icon_badges_cfg.get("icon_color", [235, 235, 235])
         self.icon_badge_icon_hover = icon_badges_cfg.get("icon_hover_color", [255, 255, 255])
+
+        # Hidden built-in tags should look "disabled" but remain interactive.
+        self.builtin_hidden_chip_color = dlg_cfg.get("builtin_hidden_chip_color", [75, 75, 82])
 
         # Chip styling should match the board `GameTagsWidget` exactly.
         board_cfg = (self.config.get("ui", {}) or {}).get("panels", {}).get("main", {}).get("board", {})
@@ -389,6 +552,9 @@ class ManageGameTagsDialog(QDialog):
 
         # Bottom buttons
         btn_row = QHBoxLayout()
+        self.reset_builtin_btn = QPushButton("Reset to Defaults")
+        self.reset_builtin_btn.clicked.connect(self._reset_builtin_to_defaults)
+        btn_row.addWidget(self.reset_builtin_btn)
         btn_row.addStretch(1)
         self.cancel_btn = QPushButton("Cancel")
         self.ok_btn = QPushButton("OK")
@@ -441,16 +607,30 @@ class ManageGameTagsDialog(QDialog):
         custom = section.get("custom", []) if isinstance(section, dict) else []
         return [c for c in custom if isinstance(c, dict)]
 
-    def _set_custom_to_settings(self, custom: List[dict]) -> None:
+    def _get_builtin_overrides_from_settings(self) -> dict:
+        settings = self._settings_service.get_settings()
+        section = settings.get("game_tags", {}) if isinstance(settings, dict) else {}
+        overrides = section.get("builtin_overrides", {}) if isinstance(section, dict) else {}
+        return overrides if isinstance(overrides, dict) else {}
+
+    def _save_game_tags_to_settings(self, *, custom: List[dict], builtin_overrides: dict) -> None:
         model = self._settings_service.get_model()
         settings = model.get_settings()
         section = settings.get("game_tags", {})
         if not isinstance(section, dict):
             section = {}
         section["custom"] = custom
+        section["builtin_overrides"] = builtin_overrides if isinstance(builtin_overrides, dict) else {}
+        # Migrate away from the legacy key to avoid it taking precedence over "defaults".
+        section["builtin_colors"] = {}
         updated = settings.copy()
         updated["game_tags"] = section
         model.update_from_dict(updated)
+
+    def _reset_builtin_to_defaults(self) -> None:
+        """Clear user overrides for built-in tags (color + visibility)."""
+        self._working_builtin_overrides = {}
+        self._rebuild_builtin_chips()
 
     def _pick_color_for_swatch(self, swatch: ColorSwatchButton) -> None:
         chosen = QColorDialog.getColor(swatch.get_color(), self, "Select game tag color")
@@ -471,8 +651,25 @@ class ManageGameTagsDialog(QDialog):
             child.setParent(None)
             child.deleteLater()
 
-        defs = self._svc.get_definitions()
-        builtins = [d for d in defs if d.builtin]
+        # Built-ins come from config.json, but can have per-user overrides (color + hidden).
+        builtins_cfg = (self.config.get("game_tags") or {}).get("builtin", [])
+        builtins = []
+        if isinstance(builtins_cfg, list):
+            for item in builtins_cfg:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name", "")).strip()
+                if not name:
+                    continue
+                col = item.get("color")
+                if isinstance(col, list) and len(col) == 3:
+                    try:
+                        color = (int(col[0]), int(col[1]), int(col[2]))
+                    except Exception:
+                        color = (120, 120, 120)
+                else:
+                    color = (120, 120, 120)
+                builtins.append({"name": name, "color": color})
 
         # Simple manual wrap layout inside container
         gap = max(0, int(self.flow_spacing))
@@ -492,11 +689,44 @@ class ManageGameTagsDialog(QDialog):
             max_w = int(self.dialog_width - 60)
         max_w = max(1, int(max_w - outer_pad))
         for d in builtins:
-            chip = QPushButton(d.name, self.builtin_chip_container)
-            chip.setEnabled(False)
-            chip.setCursor(Qt.CursorShape.ArrowCursor)
+            name = str(d.get("name", "")).strip()
+            base_color = d.get("color", (120, 120, 120))
+            ov = self._working_builtin_overrides.get(name, {})
+            if not isinstance(ov, dict):
+                ov = {}
+            hidden = bool(ov.get("hidden", False))
+            ov_col = ov.get("color")
+            if isinstance(ov_col, list) and len(ov_col) == 3:
+                try:
+                    base_color = (int(ov_col[0]), int(ov_col[1]), int(ov_col[2]))
+                except Exception:
+                    pass
+
+            def _toggle_hidden(n=name) -> None:
+                cur = self._working_builtin_overrides.get(n, {})
+                if not isinstance(cur, dict):
+                    cur = {}
+                new_hidden = not bool(cur.get("hidden", False))
+                cur["hidden"] = new_hidden
+                self._working_builtin_overrides[n] = cur
+                self._rebuild_builtin_chips()
+
+            def _edit_color(n=name, current_color=base_color) -> None:
+                chosen = QColorDialog.getColor(QColor(*current_color), self, "Select built-in game tag color")
+                if not chosen.isValid():
+                    return
+                cur = self._working_builtin_overrides.get(n, {})
+                if not isinstance(cur, dict):
+                    cur = {}
+                cur["color"] = [int(chosen.red()), int(chosen.green()), int(chosen.blue())]
+                self._working_builtin_overrides[n] = cur
+                self._rebuild_builtin_chips()
+
+            chip = _BuiltinChipButton(name, on_toggle_hidden=_toggle_hidden, on_edit=_edit_color, hidden=hidden, parent=self.builtin_chip_container)
             chip.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-            self._style_chip(chip, QColor(*d.color), removable=False)
+            display_color = QColor(*self.builtin_hidden_chip_color) if hidden else QColor(*base_color)
+            self._style_chip(chip, display_color, removable=True)
+            chip.set_hidden_state(hidden)
             chip.adjustSize()
             w = max(chip.sizeHint().width(), 40)
             h = max(chip.sizeHint().height(), 22)
@@ -686,7 +916,7 @@ class ManageGameTagsDialog(QDialog):
         chip.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         chip.setFlat(True)
 
-        if removable and isinstance(chip, _RemovableChipButton):
+        if removable and isinstance(chip, (_RemovableChipButton, _BuiltinChipButton)):
             chip.set_chip_background(color)
 
         font = QFont(self.chip_font_family, self.chip_font_size)
@@ -697,7 +927,7 @@ class ManageGameTagsDialog(QDialog):
         bg = f"rgb({color.red()}, {color.green()}, {color.blue()})"
         is_light = (0.2126 * color.red() + 0.7152 * color.green() + 0.0722 * color.blue()) > 150
         text = "rgb(15, 15, 18)" if is_light else "rgb(245, 245, 245)"
-        if removable and isinstance(chip, _RemovableChipButton):
+        if removable and isinstance(chip, (_RemovableChipButton, _BuiltinChipButton)):
             chip.set_chip_text_color(QColor(15, 15, 18) if is_light else QColor(245, 245, 245))
             try:
                 chip.set_badge_colors(
@@ -714,7 +944,7 @@ class ManageGameTagsDialog(QDialog):
         if removable:
             pad_h += 6
         try:
-            if removable and isinstance(chip, _RemovableChipButton):
+            if removable and isinstance(chip, (_RemovableChipButton, _BuiltinChipButton)):
                 # Reserve room for hover icons (edit + remove).
                 text_w = int(chip.fontMetrics().horizontalAdvance(chip.get_base_label()))
             else:
@@ -761,7 +991,25 @@ class ManageGameTagsDialog(QDialog):
             if not (isinstance(col, list) and len(col) == 3):
                 col = [120, 120, 120]
             cleaned.append({"name": name, "color": [int(col[0]), int(col[1]), int(col[2])]})
-        self._set_custom_to_settings(cleaned)
+        # Clean builtin overrides (keep only dict entries with supported keys).
+        cleaned_builtin: dict = {}
+        for k, v in (self._working_builtin_overrides or {}).items():
+            name = str(k or "").strip()
+            if not name or not isinstance(v, dict):
+                continue
+            entry: dict = {}
+            col = v.get("color")
+            if isinstance(col, list) and len(col) == 3:
+                try:
+                    entry["color"] = [int(col[0]), int(col[1]), int(col[2])]
+                except Exception:
+                    pass
+            if "hidden" in v:
+                entry["hidden"] = bool(v.get("hidden", False))
+            if entry:
+                cleaned_builtin[name] = entry
+
+        self._save_game_tags_to_settings(custom=cleaned, builtin_overrides=cleaned_builtin)
 
         # Refresh visible chips that depend on definitions (board widget + database tags column).
         try:

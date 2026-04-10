@@ -65,6 +65,9 @@ class DatabaseTagsChipDelegate(QStyledItemDelegate):
                 raw = ""
 
         tags = parse_game_tags(raw)
+        hidden = self._svc.get_hidden_builtin_names()
+        if hidden:
+            tags = [t for t in tags if t.casefold() not in hidden]
         if not tags:
             return
 
@@ -151,6 +154,9 @@ class DatabaseTagsChipDelegate(QStyledItemDelegate):
                 raw = ""
 
         tags = parse_game_tags(raw)
+        hidden = self._svc.get_hidden_builtin_names()
+        if hidden:
+            tags = [t for t in tags if t.casefold() not in hidden]
         if not tags:
             return None
 
