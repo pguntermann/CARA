@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtGui import QAction, QKeySequence
+from PyQt6.QtGui import QAction, QActionGroup, QKeySequence
 from PyQt6.QtWidgets import QMenuBar
 
 
@@ -192,3 +192,29 @@ def setup_board_menu(mw, menu_bar: QMenuBar) -> None:
     positional_heatmap_model.visibility_changed.connect(mw._on_positional_heatmap_visibility_changed)
     mw._update_positional_heatmap_action_state(positional_heatmap_model.is_visible)
 
+    board_menu.addSeparator()
+    game_info_center_menu = board_menu.addMenu("Game Info center behaviour")
+    mw._apply_menu_styling(game_info_center_menu)
+    mw.game_info_center_mode_group = QActionGroup(mw)
+    mw.game_info_center_mode_group.setExclusive(True)
+    mw.game_info_center_in_view_action = QAction("Center in view", mw)
+    mw.game_info_center_in_view_action.setCheckable(True)
+    mw.game_info_center_in_view_action.triggered.connect(
+        lambda: mw._on_game_info_center_mode_menu_triggered("center_in_view")
+    )
+    game_info_center_menu.addAction(mw.game_info_center_in_view_action)
+    mw.game_info_center_mode_group.addAction(mw.game_info_center_in_view_action)
+
+    mw.game_info_center_over_board_action = QAction("Center over board", mw)
+    mw.game_info_center_over_board_action.setCheckable(True)
+    mw.game_info_center_over_board_action.triggered.connect(
+        lambda: mw._on_game_info_center_mode_menu_triggered("center_over_board")
+    )
+    game_info_center_menu.addAction(mw.game_info_center_over_board_action)
+    mw.game_info_center_mode_group.addAction(mw.game_info_center_over_board_action)
+
+    gic_mode = board_visibility.get("game_info_center_mode", "center_in_view")
+    if gic_mode not in ("center_in_view", "center_over_board"):
+        gic_mode = "center_in_view"
+    mw.game_info_center_in_view_action.setChecked(gic_mode == "center_in_view")
+    mw.game_info_center_over_board_action.setChecked(gic_mode == "center_over_board")

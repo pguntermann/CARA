@@ -54,7 +54,8 @@ class MainWindow(QMainWindow):
         """
         super().__init__()
         self.config = config
-        
+        self._menubar_action_icon_svgs: Dict[Any, str] = {}
+
         # Debug log: MainWindow initialization started
         from app.services.logging_service import LoggingService
         logging_service = LoggingService.get_instance()
@@ -134,6 +135,22 @@ class MainWindow(QMainWindow):
         from app.views.menus.menu_bar import setup_menu_bar as _setup_menu_bar_definitions
 
         _setup_menu_bar_definitions(self, menu_bar)
+        self._connect_menu_icon_color_scheme_refresh()
+
+    def _connect_menu_icon_color_scheme_refresh(self) -> None:
+        """Rebuild themed menu icons when the system light/dark preference changes (Qt 6.5+)."""
+        app = QApplication.instance()
+        if app is None:
+            return
+        sh = app.styleHints()
+        if not hasattr(sh, "colorSchemeChanged"):
+            return
+        sh.colorSchemeChanged.connect(self._on_menu_icon_color_scheme_changed)
+
+    def _on_menu_icon_color_scheme_changed(self, _scheme) -> None:
+        from app.utils.themed_icon import refresh_all_menubar_themable_action_icons
+
+        refresh_all_menubar_themable_action_icons(self)
 
     def _on_player_stats_reset_to_template_defaults(self) -> None:
         """Restore Player Stats menu settings from ``user_settings.json.template``."""
@@ -1642,6 +1659,7 @@ class MainWindow(QMainWindow):
             on_copy_selected_games=self._on_context_copy_selected_games,
             on_cut_selected_games=self._on_context_cut_selected_games,
             on_paste_games=self._on_context_paste_games,
+            on_clear_game_tags_selected=self._on_context_clear_game_tags_selected,
         )
         
         
@@ -2000,7 +2018,22 @@ class MainWindow(QMainWindow):
             pasted_indices = list(range(first_game_index, first_game_index + games_added))
             self.database_panel.highlight_rows(database_model, pasted_indices)
         self.controller.set_status(message)
-    
+
+    def _on_context_clear_game_tags_selected(self, database_model: Any, selected_indices: List[int]) -> None:
+        """Context menu: clear CARA per-game tags on selected rows (not bulk PGN header tools)."""
+        if not selected_indices:
+            self.controller.set_status("No rows selected")
+            return
+        n = self.controller.get_metadata_controller().clear_cara_game_tags_for_database_rows(
+            database_model, selected_indices
+        )
+        if n <= 0:
+            self.controller.set_status("Selected games have no game tags")
+        elif n == 1:
+            self.controller.set_status("Cleared game tags from 1 game")
+        else:
+            self.controller.set_status(f"Cleared game tags from {n} games")
+
     def _paste_fen_to_board(self) -> None:
         """Paste FEN from clipboard and update board position."""
         success, status_message = self.controller.paste_fen_from_clipboard()
@@ -2356,7 +2389,7 @@ class MainWindow(QMainWindow):
             self.controller.set_status(message)
     
     def _on_show_metadata_toggled(self, checked: bool) -> None:
-        """Handle Show Metadata toggle.
+        """Handle Show PGN header tags toggle.
         
         Args:
             checked: True if metadata should be shown, False otherwise.
@@ -2655,6 +2688,45 @@ class MainWindow(QMainWindow):
         # Pass setting to game analysis controller (used by bulk analysis)
         if hasattr(self.controller, 'game_analysis_controller'):
             self.controller.game_analysis_controller.set_auto_game_tagging(checked)
+        # Enable/disable the tag selection submenu
+        try:
+            if hasattr(self, "select_auto_tags_menu") and self.select_auto_tags_menu:
+                self.select_auto_tags_menu.setEnabled(bool(checked))
+        except Exception:
+            pass
+
+    def _on_auto_game_tagging_tag_toggled(self, tag_name: str, checked: bool) -> None:
+        """Handle per-tag enable/disable for Auto Tag Games."""
+        tag_name = str(tag_name or "").strip()
+        if not tag_name:
+            return
+        try:
+            from app.services.game_auto_tagging_service import AUTO_TAGS
+        except Exception:
+            AUTO_TAGS = ()  # type: ignore
+
+        # Read current selection from settings (fallback: all enabled)
+        enabled = None
+        try:
+            settings = self._settings_service.get_settings() if hasattr(self, "_settings_service") else {}
+            ga = settings.get("game_analysis", {}) if isinstance(settings, dict) else {}
+            enabled = ga.get("auto_game_tagging_enabled_tags", None) if isinstance(ga, dict) else None
+        except Exception:
+            enabled = None
+        enabled_src = list(AUTO_TAGS) if enabled is None else enabled
+        enabled_list = [t for t in (enabled_src or []) if isinstance(t, str) and t.strip()]
+        enabled_cf = {t.casefold() for t in enabled_list}
+        if checked:
+            enabled_cf.add(tag_name.casefold())
+        else:
+            enabled_cf.discard(tag_name.casefold())
+
+        # Preserve original casing from AUTO_TAGS order when saving
+        saved = [t for t in list(AUTO_TAGS) if t.casefold() in enabled_cf]
+        if hasattr(self, "_settings_service"):
+            self._settings_service.update_game_analysis({"auto_game_tagging_enabled_tags": saved})
+        if hasattr(self.controller, "game_analysis_controller"):
+            self.controller.game_analysis_controller.set_auto_game_tagging_enabled_tags(saved)
     
     def _on_store_analysis_results_toggled(self, checked: bool) -> None:
         """Handle Store Analysis results in PGN Tag toggle.
@@ -2688,47 +2760,34 @@ class MainWindow(QMainWindow):
             if hasattr(summary_view, 'evaluation_graph'):
                 summary_view.evaluation_graph.set_normalized_mode(normalized)
     
-    def _on_start_manual_analysis_toggled(self, checked: bool) -> None:
-        """Handle start/stop manual analysis toggle from menu.
-        
-        Args:
-            checked: True if analysis should start, False if it should stop.
-        """
+    def _on_start_manual_analysis_toggled(self, _checked: bool = False) -> None:
+        """Handle start/stop manual analysis from menu (play/stop icon reflects state)."""
         manual_analysis_controller = self.controller.get_manual_analysis_controller()
-        
-        if checked:
-            # Check if engine is configured and assigned for manual analysis
-            is_configured, error_type = self.controller.is_engine_configured_for_task(TASK_MANUAL_ANALYSIS)
-            if not is_configured:
-                # Uncheck the button first (before showing dialog) to prevent UI state issues
-                if hasattr(self, 'start_manual_analysis_action'):
-                    self.start_manual_analysis_action.blockSignals(True)
-                    self.start_manual_analysis_action.setChecked(False)
-                    self.start_manual_analysis_action.blockSignals(False)
-                
-                # Show warning message from config
-                title, message = self.controller.get_engine_validation_message(error_type, TASK_MANUAL_ANALYSIS)
-                MessageDialog.show_warning(self.config, title, message, self)
-                return
-            
-            # Switch to Manual Analysis tab FIRST for immediate visual feedback
-            # Do this before calling start_analysis() to ensure tab switches immediately
-            if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'tab_widget'):
-                # Find the index of the Manual Analysis tab
-                tab_widget = self.detail_panel.tab_widget
-                for i in range(tab_widget.count()):
-                    if tab_widget.tabText(i) == "Manual Analysis":
-                        tab_widget.setCurrentIndex(i)
-                        # Force immediate UI update by processing events
-                        from PyQt6.QtWidgets import QApplication
-                        QApplication.processEvents()
-                        break
-            
-            # Start analysis (this will update UI immediately, then do background work)
-            manual_analysis_controller.start_analysis()
-        else:
-            # Stop analysis
+        manual_analysis_model = manual_analysis_controller.get_analysis_model()
+
+        if manual_analysis_model.is_analyzing:
             manual_analysis_controller.stop_analysis()
+            return
+
+        # Check if engine is configured and assigned for manual analysis
+        is_configured, error_type = self.controller.is_engine_configured_for_task(TASK_MANUAL_ANALYSIS)
+        if not is_configured:
+            title, message = self.controller.get_engine_validation_message(error_type, TASK_MANUAL_ANALYSIS)
+            MessageDialog.show_warning(self.config, title, message, self)
+            return
+
+        # Switch to Manual Analysis tab FIRST for immediate visual feedback
+        if hasattr(self, "detail_panel") and hasattr(self.detail_panel, "tab_widget"):
+            tab_widget = self.detail_panel.tab_widget
+            for i in range(tab_widget.count()):
+                if tab_widget.tabText(i) == "Manual Analysis":
+                    tab_widget.setCurrentIndex(i)
+                    from PyQt6.QtWidgets import QApplication
+
+                    QApplication.processEvents()
+                    break
+
+        manual_analysis_controller.start_analysis()
     
     def _on_add_pv_line(self) -> None:
         """Handle add PV line from menu."""
@@ -2901,6 +2960,30 @@ class MainWindow(QMainWindow):
                 chessboard._load_config()
                 chessboard.update()
     
+    def _sync_game_info_center_menu_actions(self, mode: str) -> None:
+        """Keep Board menu actions aligned with ``game_info_center_mode``."""
+        if not hasattr(self, "game_info_center_mode_group"):
+            return
+        if mode not in ("center_in_view", "center_over_board"):
+            mode = "center_in_view"
+        self.game_info_center_mode_group.blockSignals(True)
+        try:
+            self.game_info_center_in_view_action.setChecked(mode == "center_in_view")
+            self.game_info_center_over_board_action.setChecked(mode == "center_over_board")
+        finally:
+            self.game_info_center_mode_group.blockSignals(False)
+
+    def _on_game_info_center_mode_menu_triggered(self, mode: str) -> None:
+        """Apply game info horizontal alignment; persisted on app exit like other board prefs."""
+        if mode == "center_in_view" and not self.game_info_center_in_view_action.isChecked():
+            return
+        if mode == "center_over_board" and not self.game_info_center_over_board_action.isChecked():
+            return
+        if hasattr(self, "main_panel"):
+            self.main_panel.set_game_info_center_mode(mode)
+        from app.services.user_settings_service import UserSettingsService
+        UserSettingsService.get_instance().update_board_visibility({"game_info_center_mode": mode})
+    
     def _on_ai_summary_provider_selected(self, provider: str) -> None:
         """Handle AI Summary provider toggle selection."""
         use_openai = provider == "openai"
@@ -2999,14 +3082,19 @@ class MainWindow(QMainWindow):
             is_analyzing: True if analysis is running, False otherwise.
             multipv: Current number of PV lines (optional, will be retrieved if None).
         """
-        if hasattr(self, 'start_manual_analysis_action'):
-            # Update start/stop action text and checked state
+        if hasattr(self, "start_manual_analysis_action"):
+            from app.utils.themed_icon import SVG_MENU_PLAY, SVG_MENU_STOP, set_menubar_themable_action_icon
+
             if is_analyzing:
                 self.start_manual_analysis_action.setText("Stop Manual Analysis")
-                self.start_manual_analysis_action.setChecked(True)
+                set_menubar_themable_action_icon(
+                    self, self.start_manual_analysis_action, SVG_MENU_STOP
+                )
             else:
                 self.start_manual_analysis_action.setText("Start Manual Analysis")
-                self.start_manual_analysis_action.setChecked(False)
+                set_menubar_themable_action_icon(
+                    self, self.start_manual_analysis_action, SVG_MENU_PLAY
+                )
         
         # Get multipv if not provided
         if multipv is None:
@@ -3390,6 +3478,13 @@ class MainWindow(QMainWindow):
             self.trajectory_style_straight_action.setChecked(use_straight_lines)
             self.trajectory_style_bezier_action.setChecked(not use_straight_lines)
         
+        game_info_center_mode = board_visibility.get("game_info_center_mode", "center_in_view")
+        if game_info_center_mode not in ("center_in_view", "center_over_board"):
+            game_info_center_mode = "center_in_view"
+        if hasattr(self, "main_panel"):
+            self.main_panel.set_game_info_center_mode(game_info_center_mode)
+        self._sync_game_info_center_menu_actions(game_info_center_mode)
+        
         # ===== PGN MENU SETTINGS (in menu order) =====
         # Load PGN visibility settings
         pgn_visibility = settings.get("pgn_visibility", {})
@@ -3460,6 +3555,37 @@ class MainWindow(QMainWindow):
             self.auto_game_tagging_action.setChecked(auto_game_tagging)
         if hasattr(self.controller, "game_analysis_controller"):
             self.controller.game_analysis_controller.set_auto_game_tagging(auto_game_tagging)
+
+        # Enabled auto-tags (default: all)
+        enabled_auto_tags = game_analysis_settings.get("auto_game_tagging_enabled_tags", None)
+        try:
+            from app.services.game_auto_tagging_service import AUTO_TAGS
+        except Exception:
+            AUTO_TAGS = ()  # type: ignore
+        if enabled_auto_tags is None or not isinstance(enabled_auto_tags, list):
+            enabled_auto_tags = list(AUTO_TAGS)
+        enabled_cf = {str(t).casefold() for t in enabled_auto_tags if str(t).strip()}
+        # Sync menu checks if present
+        try:
+            if hasattr(self, "auto_game_tagging_tag_actions") and isinstance(self.auto_game_tagging_tag_actions, dict):
+                for t, act in self.auto_game_tagging_tag_actions.items():
+                    try:
+                        act.blockSignals(True)
+                        act.setChecked(str(t).casefold() in enabled_cf)
+                    finally:
+                        act.blockSignals(False)
+        except Exception:
+            pass
+        # Enable submenu only if auto-tagging enabled
+        try:
+            if hasattr(self, "select_auto_tags_menu") and self.select_auto_tags_menu:
+                self.select_auto_tags_menu.setEnabled(bool(auto_game_tagging))
+        except Exception:
+            pass
+        if hasattr(self.controller, "game_analysis_controller"):
+            self.controller.game_analysis_controller.set_auto_game_tagging_enabled_tags(
+                [t for t in list(AUTO_TAGS) if str(t).casefold() in enabled_cf]
+            )
         
         # Return to PLY 0 after analysis completes
         return_to_first_move = game_analysis_settings.get("return_to_first_move_after_analysis", False)
@@ -3810,7 +3936,18 @@ class MainWindow(QMainWindow):
                         from app.utils.game_tags_utils import PGN_TAG_NAME_GAME_TAGS, format_game_tags
 
                         tagging_service = GameAutoTaggingService(self.config)
-                        result = tagging_service.detect_tags(moves, game_result=getattr(game, "result", None))
+                        enabled_tags = []
+                        try:
+                            settings = self._settings_service.get_settings() if hasattr(self, "_settings_service") else {}
+                            ga = settings.get("game_analysis", {}) if isinstance(settings, dict) else {}
+                            enabled_tags = ga.get("auto_game_tagging_enabled_tags", []) if isinstance(ga, dict) else []
+                        except Exception:
+                            enabled_tags = []
+                        result = tagging_service.detect_tags(
+                            moves,
+                            game_result=getattr(game, "result", None),
+                            enabled_tags=enabled_tags,
+                        )
                         merged = tagging_service.merge_with_existing_tags(
                             getattr(game, "game_tags_raw", "") or "",
                             result.detected_tags,

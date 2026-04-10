@@ -5,15 +5,22 @@ from __future__ import annotations
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenuBar
 
+from app.utils.themed_icon import set_menubar_themable_action_icon
+
+_FOLDER_OPEN_SVG = "app/resources/icons/folder_open.svg"
+_SAVE_DATABASE_SVG = "app/resources/icons/save_database.svg"
+_EXIT_APPLICATION_SVG = "app/resources/icons/exit_application.svg"
+
 
 def setup_file_menu(mw, menu_bar: QMenuBar) -> None:
     file_menu = menu_bar.addMenu("File")
     mw._apply_menu_styling(file_menu)
 
-    open_pgn_database_action = QAction("Open PGN Database", mw)
-    open_pgn_database_action.setShortcut(QKeySequence("Ctrl+O"))
-    open_pgn_database_action.triggered.connect(mw._open_pgn_database)
-    file_menu.addAction(open_pgn_database_action)
+    mw.open_pgn_database_action = QAction("Open PGN Database", mw)
+    mw.open_pgn_database_action.setShortcut(QKeySequence("Ctrl+O"))
+    set_menubar_themable_action_icon(mw, mw.open_pgn_database_action, _FOLDER_OPEN_SVG)
+    mw.open_pgn_database_action.triggered.connect(mw._open_pgn_database)
+    file_menu.addAction(mw.open_pgn_database_action)
 
     file_menu.addSeparator()
 
@@ -36,15 +43,17 @@ def setup_file_menu(mw, menu_bar: QMenuBar) -> None:
 
     mw.save_pgn_database_action = QAction("Save PGN Database", mw)
     mw.save_pgn_database_action.setShortcut(QKeySequence("Ctrl+S"))
+    set_menubar_themable_action_icon(mw, mw.save_pgn_database_action, _SAVE_DATABASE_SVG)
     mw.save_pgn_database_action.triggered.connect(mw._save_pgn_database)
     mw.save_pgn_database_action.setEnabled(False)
     file_menu.addAction(mw.save_pgn_database_action)
 
-    save_pgn_database_as_action = QAction("Save PGN Database as...", mw)
-    save_pgn_database_as_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
-    save_pgn_database_as_action.setMenuRole(QAction.MenuRole.NoRole)
-    save_pgn_database_as_action.triggered.connect(mw._save_pgn_database_as)
-    file_menu.addAction(save_pgn_database_as_action)
+    mw.save_pgn_database_as_action = QAction("Save PGN Database as...", mw)
+    mw.save_pgn_database_as_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
+    set_menubar_themable_action_icon(mw, mw.save_pgn_database_as_action, _SAVE_DATABASE_SVG)
+    mw.save_pgn_database_as_action.setMenuRole(QAction.MenuRole.NoRole)
+    mw.save_pgn_database_as_action.triggered.connect(mw._save_pgn_database_as)
+    file_menu.addAction(mw.save_pgn_database_as_action)
 
     file_menu.addSeparator()
 
@@ -56,13 +65,13 @@ def setup_file_menu(mw, menu_bar: QMenuBar) -> None:
 
     file_menu.addSeparator()
 
-    bulk_replace_action = QAction("Bulk Replace Tags...", mw)
+    bulk_replace_action = QAction("Bulk Replace PGN header tags...", mw)
     bulk_replace_action.setShortcut(QKeySequence("Ctrl+Shift+R"))
     bulk_replace_action.setMenuRole(QAction.MenuRole.NoRole)
     bulk_replace_action.triggered.connect(mw._bulk_replace)
     file_menu.addAction(bulk_replace_action)
 
-    bulk_tag_action = QAction("Bulk Add/Remove Tags...", mw)
+    bulk_tag_action = QAction("Bulk Add/Remove PGN header tags...", mw)
     bulk_tag_action.setShortcut(QKeySequence("Ctrl+Alt+T"))
     bulk_tag_action.setMenuRole(QAction.MenuRole.NoRole)
     bulk_tag_action.triggered.connect(mw._bulk_tag)
@@ -98,8 +107,9 @@ def setup_file_menu(mw, menu_bar: QMenuBar) -> None:
 
     file_menu.addSeparator()
 
-    close_action = QAction("Close Application", mw)
-    close_action.setShortcut("Ctrl+Q")
-    close_action.triggered.connect(mw._close_application)
-    file_menu.addAction(close_action)
+    mw.close_application_action = QAction("Close Application", mw)
+    mw.close_application_action.setShortcut("Ctrl+Q")
+    set_menubar_themable_action_icon(mw, mw.close_application_action, _EXIT_APPLICATION_SVG)
+    mw.close_application_action.triggered.connect(mw._close_application)
+    file_menu.addAction(mw.close_application_action)
 

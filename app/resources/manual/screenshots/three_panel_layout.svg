@@ -34,10 +34,10 @@
   <!-- Tab representation -->
   <rect x="530" y="180" width="65" height="25" fill="rgb(45, 45, 50)" stroke="rgb(60, 60, 65)" stroke-width="1" rx="2"/>
   <text x="562" y="197" fill="rgb(220, 220, 220)" font-family="Arial, sans-serif" font-size="10" text-anchor="middle">Moves List</text>
-  <rect x="600" y="180" width="65" height="25" fill="rgb(45, 45, 50)" stroke="rgb(60, 60, 65)" stroke-width="1" rx="2"/>
-  <text x="632" y="197" fill="rgb(220, 220, 220)" font-family="Arial, sans-serif" font-size="10" text-anchor="middle">Metadata</text>
-  <rect x="670" y="180" width="50" height="25" fill="rgb(45, 45, 50)" stroke="rgb(60, 60, 65)" stroke-width="1" rx="2"/>
-  <text x="695" y="197" fill="rgb(150, 150, 150)" font-family="Arial, sans-serif" font-size="12" text-anchor="middle">...</text>
+  <rect x="600" y="180" width="110" height="25" fill="rgb(45, 45, 50)" stroke="rgb(60, 60, 65)" stroke-width="1" rx="2"/>
+  <text x="655" y="197" fill="rgb(220, 220, 220)" font-family="Arial, sans-serif" font-size="10" text-anchor="middle">PGN header tags</text>
+  <rect x="715" y="180" width="50" height="25" fill="rgb(45, 45, 50)" stroke="rgb(60, 60, 65)" stroke-width="1" rx="2"/>
+  <text x="740" y="197" fill="rgb(150, 150, 150)" font-family="Arial, sans-serif" font-size="12" text-anchor="middle">...</text>
   
   <!-- Content area -->
   <rect x="530" y="215" width="240" height="145" fill="rgb(40, 40, 45)" stroke="rgb(60, 60, 65)" stroke-width="1" rx="2"/>

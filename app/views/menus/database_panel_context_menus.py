@@ -28,9 +28,24 @@ def build_database_tab_context_menu(panel, *, include_close_all_but: bool) -> Da
     if include_close_all_but:
         close_all_but_action = menu.addAction("Close all but this")
 
+    from app.utils.themed_icon import (
+        SVG_MENU_LAYERS,
+        SVG_SIMPLE_X,
+        menu_icon_dark_tint_rgb,
+        themed_icon_from_svg,
+    )
+
+    _ctx_tint = menu_icon_dark_tint_rgb(panel.config)
+    close_action.setIcon(themed_icon_from_svg(SVG_SIMPLE_X, _ctx_tint))
+    if close_all_but_action is not None:
+        close_all_but_action.setIcon(themed_icon_from_svg(SVG_MENU_LAYERS, _ctx_tint))
+
     from app.views.style import StyleManager
 
     StyleManager.style_context_menu(menu, panel.config)
+    from app.views.style.context_menu import try_wire_context_menu_shared_action_icons
+
+    try_wire_context_menu_shared_action_icons(menu)
     return DatabaseTabContextMenu(menu=menu, close_action=close_action, close_all_but_action=close_all_but_action)
 
 
@@ -58,6 +73,7 @@ class DatabaseTableContextMenu:
     act_copy_selected_games: Optional[Any]
     act_cut_selected_games: Optional[Any]
     act_paste_games: Optional[Any]
+    act_clear_game_tags_selected: Optional[Any]
 
 
 def build_database_table_context_menu(
@@ -69,6 +85,7 @@ def build_database_table_context_menu(
     enable_copy_selected_games: bool,
     enable_cut_selected_games: bool,
     enable_paste_games: bool,
+    enable_clear_game_tags_selected: bool = False,
     clicked_tag: Optional[str] = None,
 ) -> DatabaseTableContextMenu:
     select_rows_menu = QMenu("Select rows", panel)
@@ -104,17 +121,41 @@ def build_database_table_context_menu(
     act_copy_tsv = menu.addAction("Copy table as TSV")
     act_copy_selected_csv = menu.addAction("Copy selected rows as CSV")
     act_copy_selected_tsv = menu.addAction("Copy selected rows as TSV")
+    act_clear_game_tags_selected = None
+    if enable_clear_game_tags_selected:
+        menu.addSeparator()
+        act_clear_game_tags_selected = menu.addAction("Clear game tags from selected games")
     menu.addSeparator()
     act_copy_game = menu.addAction("Copy Game") if enable_copy_game and has_cell else None
     act_copy_selected_games = menu.addAction("Copy selected Games") if enable_copy_selected_games else None
     act_cut_selected_games = menu.addAction("Cut selected Games") if enable_cut_selected_games else None
     act_paste_games = menu.addAction("Paste Game(s)") if enable_paste_games else None
 
+    from app.utils.themed_icon import (
+        menu_icon_dark_tint_rgb,
+        themed_icon_from_svg,
+        SVG_MENU_COPY,
+        SVG_MENU_CUT,
+        SVG_MENU_PASTE_ACTIVE_DB,
+    )
+
+    _ctx_tint = menu_icon_dark_tint_rgb(panel.config)
+    if act_copy_selected_games is not None:
+        act_copy_selected_games.setIcon(themed_icon_from_svg(SVG_MENU_COPY, _ctx_tint))
+    if act_cut_selected_games is not None:
+        act_cut_selected_games.setIcon(themed_icon_from_svg(SVG_MENU_CUT, _ctx_tint))
+    if act_paste_games is not None:
+        act_paste_games.setIcon(themed_icon_from_svg(SVG_MENU_PASTE_ACTIVE_DB, _ctx_tint))
+
     from app.views.style import StyleManager
 
     StyleManager.style_context_menu(menu, panel.config)
     StyleManager.style_context_menu(select_rows_menu, panel.config)
     StyleManager.style_context_menu(select_mode_menu, panel.config)
+
+    from app.views.style.context_menu import try_wire_context_menu_shared_action_icons
+
+    try_wire_context_menu_shared_action_icons(menu)
 
     return DatabaseTableContextMenu(
         menu=menu,
@@ -139,6 +180,7 @@ def build_database_table_context_menu(
         act_copy_selected_games=act_copy_selected_games,
         act_cut_selected_games=act_cut_selected_games,
         act_paste_games=act_paste_games,
+        act_clear_game_tags_selected=act_clear_game_tags_selected,
     )
 
 

@@ -1,4 +1,4 @@
-"""Metadata view for detail panel."""
+"""PGN header tags view for detail panel."""
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTableView, 
                              QPushButton, QDialog, QLabel, QLineEdit, QDialogButtonBox,
@@ -14,7 +14,7 @@ from app.utils.table_export import table_to_delimited, get_copy_table_config
 
 
 class DetailMetadataView(QWidget):
-    """Metadata view displaying game headers in a table."""
+    """PGN header tags view displaying game headers in a table."""
     
     def __init__(self, config: Dict[str, Any], metadata_model: Optional[MetadataModel] = None,
                  game_model: Optional[GameModel] = None,
@@ -94,7 +94,7 @@ class DetailMetadataView(QWidget):
         self._configure_table_styling()
     
     def _create_button_bar(self) -> QWidget:
-        """Create the button bar with Add Tag button.
+        """Create the button bar with Add button.
         
         Returns:
             QWidget containing the button bar.
@@ -284,6 +284,9 @@ class DetailMetadataView(QWidget):
         menu.addAction("Copy Table as CSV").triggered.connect(self._copy_metadata_table_csv)
         menu.addAction("Copy Table as TSV").triggered.connect(self._copy_metadata_table_tsv)
 
+        from app.views.style.context_menu import try_wire_context_menu_shared_action_icons
+
+        try_wire_context_menu_shared_action_icons(menu)
         menu.exec(self.metadata_table.viewport().mapToGlobal(pos))
 
     def _copy_metadata_cell_value(self, index: QModelIndex) -> None:
@@ -301,7 +304,7 @@ class DetailMetadataView(QWidget):
             delimiter=cfg["delimiter"],
             use_csv_escaping=cfg["use_escaping"],
             always_quote_values=cfg["always_quote_values"],
-            status_message="Copied metadata table as CSV to clipboard",
+            status_message="Copied PGN header tags table as CSV to clipboard",
         )
 
     def _copy_metadata_table_tsv(self) -> None:
@@ -310,7 +313,7 @@ class DetailMetadataView(QWidget):
             delimiter=cfg["delimiter"],
             use_csv_escaping=cfg["use_escaping"],
             always_quote_values=cfg["always_quote_values"],
-            status_message="Copied metadata table as TSV to clipboard",
+            status_message="Copied PGN header tags table as TSV to clipboard",
         )
 
     def _copy_metadata_table_delimited(
@@ -480,7 +483,7 @@ class DetailMetadataView(QWidget):
         # 3. It could cause editor conflicts if called while editing
     
     def _on_add_tag_clicked(self) -> None:
-        """Handle Add Tag button click."""
+        """Handle Add button click (adds a PGN header tag)."""
         if not self._game_model or not self._game_model.active_game:
             from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_warning(self.config, "No Game", "Please select a game first.", self)
@@ -497,8 +500,12 @@ class DetailMetadataView(QWidget):
                     pass
                 else:
                     from app.views.dialogs.message_dialog import MessageDialog
-                    MessageDialog.show_warning(self.config, "Add Tag Failed", 
-                                      f"Tag '{tag_name}' already exists or validation failed.", self)
+                    MessageDialog.show_warning(
+                        self.config,
+                        "Add PGN header tag failed",
+                        f"PGN header tag '{tag_name}' already exists or validation failed.",
+                        self,
+                    )
     
     def _on_remove_tag_clicked(self) -> None:
         """Handle Remove button click."""
@@ -516,7 +523,7 @@ class DetailMetadataView(QWidget):
         
         if not selected_indexes:
             from app.views.dialogs.message_dialog import MessageDialog
-            MessageDialog.show_warning(self.config, "No Selection", "Please select a tag to remove.", self)
+            MessageDialog.show_warning(self.config, "No selection", "Please select a PGN header tag to remove.", self)
             return
         
         # Get the first selected row
@@ -538,14 +545,18 @@ class DetailMetadataView(QWidget):
         }
         if tag_name in read_only_tags:
             from app.views.dialogs.message_dialog import MessageDialog
-            MessageDialog.show_warning(self.config, "Cannot Remove Tag", 
-                              f"The tag '{tag_name}' is read-only and cannot be removed.", self)
+            MessageDialog.show_warning(
+                self.config,
+                "Cannot remove PGN header tag",
+                f"The PGN header tag '{tag_name}' is read-only and cannot be removed.",
+                self,
+            )
             return
         
         # Ask for confirmation using custom styled dialog
         confirmed = self._show_confirmation_dialog(
-            "Remove Tag",
-            f"Are you sure you want to remove the tag '{tag_name}'?"
+            "Remove PGN header tag",
+            f"Are you sure you want to remove the PGN header tag '{tag_name}'?"
         )
         
         if confirmed:
@@ -555,8 +566,12 @@ class DetailMetadataView(QWidget):
                 pass
             else:
                 from app.views.dialogs.message_dialog import MessageDialog
-                MessageDialog.show_warning(self.config, "Remove Tag Failed", 
-                                  f"Tag '{tag_name}' was not found.", self)
+                MessageDialog.show_warning(
+                    self.config,
+                    "Remove PGN header tag failed",
+                    f"PGN header tag '{tag_name}' was not found.",
+                    self,
+                )
     
     def _show_confirmation_dialog(self, title: str, message: str) -> bool:
         """Show a styled confirmation dialog.
@@ -623,7 +638,7 @@ class DetailMetadataView(QWidget):
 
 
 class AddTagDialog(QDialog):
-    """Dialog for adding a new metadata tag."""
+    """Dialog for adding a new PGN header tag."""
     
     def __init__(self, config: Dict[str, Any], parent=None) -> None:
         """Initialize the add tag dialog.
@@ -640,7 +655,7 @@ class AddTagDialog(QDialog):
         self._load_config()
         self._setup_ui()
         self._apply_styling()
-        self.setWindowTitle("Add Tag")
+        self.setWindowTitle("Add PGN header tag")
     
     def _load_config(self) -> None:
         """Load configuration values from config dictionary."""
@@ -720,7 +735,7 @@ class AddTagDialog(QDialog):
         form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         
         # Tag name input
-        tag_name_label = QLabel("Tag Name:")
+        tag_name_label = QLabel("Tag name:")
         self.tag_name_input = QLineEdit()
         self.tag_name_input.setMinimumWidth(self.input_min_width)
         self.tag_name_input.setMinimumHeight(self.input_min_height)
@@ -728,7 +743,7 @@ class AddTagDialog(QDialog):
         form_layout.addRow(tag_name_label, self.tag_name_input)
         
         # Tag value input
-        tag_value_label = QLabel("Tag Value:")
+        tag_value_label = QLabel("Value:")
         self.tag_value_input = QLineEdit()
         self.tag_value_input.setMinimumWidth(self.input_min_width)
         self.tag_value_input.setMinimumHeight(self.input_min_height)
@@ -822,7 +837,7 @@ class AddTagDialog(QDialog):
         
         if not tag_name:
             from app.views.dialogs.message_dialog import MessageDialog
-            MessageDialog.show_warning(self.config, "Invalid Input", "Tag name cannot be empty.", self)
+            MessageDialog.show_warning(self.config, "Invalid input", "PGN header tag name cannot be empty.", self)
             return
         
         self.tag_name = tag_name

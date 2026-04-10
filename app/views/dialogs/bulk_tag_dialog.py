@@ -72,7 +72,7 @@ class BulkTagDialog(QDialog):
         self._load_config()
         self._setup_ui()
         self._apply_styling()
-        self.setWindowTitle("Bulk Add/Remove Tags")
+        self.setWindowTitle("Bulk Add/Remove PGN header tags")
     
     def _load_config(self) -> None:
         """Load configuration values from config.json."""

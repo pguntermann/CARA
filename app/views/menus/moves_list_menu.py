@@ -5,6 +5,10 @@ from __future__ import annotations
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenuBar
 
+from app.utils.themed_icon import SVG_MENU_GEAR, SVG_SIMPLE_X, set_menubar_themable_action_icon
+
+_SAVE_PROFILE_SVG = "app/resources/icons/save_database.svg"
+
 
 def setup_moves_list_menu(mw, menu_bar: QMenuBar) -> None:
     moves_list_menu = menu_bar.addMenu("Moves List")
@@ -31,6 +35,10 @@ def setup_moves_list_menu(mw, menu_bar: QMenuBar) -> None:
 def rebuild_moves_list_menu(mw) -> None:
     """Rebuild the Moves List menu with current profiles and columns."""
     menu = mw.moves_list_menu
+    reg = getattr(mw, "_menubar_action_icon_svgs", None)
+    if reg:
+        for act in menu.actions():
+            reg.pop(act, None)
     menu.clear()
 
     # Clear action dictionaries
@@ -65,12 +73,14 @@ def rebuild_moves_list_menu(mw) -> None:
         save_profile_action = QAction("Save Profile", mw)
         save_profile_action.setMenuRole(QAction.MenuRole.NoRole)
         save_profile_action.setShortcut(QKeySequence("Ctrl+Shift+P"))
+        set_menubar_themable_action_icon(mw, save_profile_action, _SAVE_PROFILE_SVG)
         save_profile_action.triggered.connect(mw._save_current_profile)
         menu.addAction(save_profile_action)
 
     save_profile_as_action = QAction("Save Profile as...", mw)
     save_profile_as_action.setMenuRole(QAction.MenuRole.NoRole)
     save_profile_as_action.setShortcut(QKeySequence("Ctrl+Alt+P"))
+    set_menubar_themable_action_icon(mw, save_profile_as_action, _SAVE_PROFILE_SVG)
     save_profile_as_action.triggered.connect(mw._save_profile_as)
     menu.addAction(save_profile_as_action)
 
@@ -78,6 +88,7 @@ def rebuild_moves_list_menu(mw) -> None:
         remove_profile_action = QAction("Remove Profile", mw)
         remove_profile_action.setMenuRole(QAction.MenuRole.NoRole)
         remove_profile_action.setShortcut(QKeySequence("Ctrl+Shift+Delete"))
+        set_menubar_themable_action_icon(mw, remove_profile_action, SVG_SIMPLE_X)
         remove_profile_action.triggered.connect(mw._remove_profile)
         menu.addAction(remove_profile_action)
 
@@ -85,6 +96,7 @@ def rebuild_moves_list_menu(mw) -> None:
 
     setup_profile_action = QAction("Setup Profile...", mw)
     setup_profile_action.setMenuRole(QAction.MenuRole.NoRole)
+    set_menubar_themable_action_icon(mw, setup_profile_action, SVG_MENU_GEAR)
     setup_profile_action.triggered.connect(mw._on_setup_profile)
     menu.addAction(setup_profile_action)
 

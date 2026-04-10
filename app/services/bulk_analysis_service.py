@@ -38,7 +38,8 @@ class BulkAnalysisService(QObject):
                  threads_override: Optional[int] = None,
                  movetime_override: Optional[int] = None,
                  brilliant_move_detection: bool = False,
-                 auto_game_tagging: bool = True) -> None:
+                 auto_game_tagging: bool = True,
+                 auto_game_tagging_enabled_tags: Optional[List[str]] = None) -> None:
         """Initialize bulk analysis service.
         
         Args:
@@ -63,6 +64,7 @@ class BulkAnalysisService(QObject):
         self._movetime_override = movetime_override
         self._brilliant_move_detection = brilliant_move_detection
         self._auto_game_tagging = bool(auto_game_tagging)
+        self._auto_game_tagging_enabled_tags = list(auto_game_tagging_enabled_tags or [])
 
         # Note: Opening service should be loaded before creating BulkAnalysisService instances
         # to avoid blocking during analysis. We don't load it here to avoid blocking worker threads.
@@ -581,7 +583,11 @@ class BulkAnalysisService(QObject):
                             from app.services.game_auto_tagging_service import GameAutoTaggingService
 
                             tagging_service = GameAutoTaggingService(self.config)
-                            result = tagging_service.detect_tags(analyzed_moves, game_result=getattr(game, "result", None))
+                            result = tagging_service.detect_tags(
+                                analyzed_moves,
+                                game_result=getattr(game, "result", None),
+                                enabled_tags=self._auto_game_tagging_enabled_tags,
+                            )
                             merged = tagging_service.merge_with_existing_tags(
                                 getattr(game, "game_tags_raw", "") or "",
                                 result.detected_tags,

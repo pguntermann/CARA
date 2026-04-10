@@ -9,15 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-import io
-import chess.pgn
-
 from app.models.moveslist_model import MoveData
 from app.services.game_summary_service import GameSummaryService
-from app.services.pgn_service import PgnService
 from app.services.logging_service import LoggingService
 from app.utils.game_tags_utils import (
-    PGN_TAG_NAME_GAME_TAGS,
+    apply_cara_game_tags_to_game_data,
     format_game_tags,
     parse_game_tags,
 )
@@ -25,6 +21,7 @@ from app.utils.game_tags_utils import (
 
 AUTO_TAGS: Tuple[str, ...] = (
     "Blunder-decided",
+    "Brilliant Move",
     "Clean win",
     "Missed win",
     "Opening disaster",
@@ -46,10 +43,21 @@ class GameAutoTaggingService:
         self.config = config
         self._cfg = (config.get("game_analysis", {}) or {}).get("auto_game_tagging", {}) or {}
 
-    def detect_tags(self, moves: Sequence[MoveData], *, game_result: Optional[str]) -> AutoTaggingResult:
+    def detect_tags(
+        self,
+        moves: Sequence[MoveData],
+        *,
+        game_result: Optional[str],
+        enabled_tags: Optional[Sequence[str]] = None,
+    ) -> AutoTaggingResult:
         """Return detected auto-tags based on evaluated move list."""
         if not moves:
             return AutoTaggingResult(detected_tags=[], reasons={})
+
+        if enabled_tags is None:
+            enabled_set = {t.casefold() for t in AUTO_TAGS}
+        else:
+            enabled_set = {str(t).casefold() for t in enabled_tags if str(t).strip()}
 
         summary_service = GameSummaryService(self.config)
         total_moves = len(moves)
@@ -98,9 +106,18 @@ class GameAutoTaggingService:
         min_eval_pawns = min(evals_cp) / 100.0
 
         def add(tag: str, reason: str) -> None:
+            if tag.casefold() not in enabled_set:
+                return
             if tag not in detected:
                 detected.append(tag)
                 reasons[tag] = reason
+
+        # Brilliant Move: at least one move was classified as "Brilliant".
+        if any(
+            (getattr(m, "assess_white", "") == "Brilliant") or (getattr(m, "assess_black", "") == "Brilliant")
+            for m in moves
+        ):
+            add("Brilliant Move", "At least one move was assessed as Brilliant")
 
         # Missed win: someone had a winning advantage at any point but did not win.
         if game_result not in ("1-0", "0-1"):
@@ -254,25 +271,8 @@ class GameAutoTaggingService:
 
     def apply_to_game_data(self, game: Any, tags: Sequence[str]) -> bool:
         """Apply CARAGameTags to a GameData-like object (updates game.pgn + tag fields)."""
-        try:
-            raw = format_game_tags(tags)
-            pgn_io = io.StringIO(getattr(game, "pgn", "") or "")
-            chess_game = chess.pgn.read_game(pgn_io)
-            if not chess_game:
-                return False
-            if raw:
-                chess_game.headers[PGN_TAG_NAME_GAME_TAGS] = raw
-            else:
-                if PGN_TAG_NAME_GAME_TAGS in chess_game.headers:
-                    del chess_game.headers[PGN_TAG_NAME_GAME_TAGS]
-            game.pgn = PgnService.export_game_to_pgn(chess_game)
-            # Update cached fields on GameData (metadata_controller does this for active game)
-            setattr(game, "game_tags_raw", raw)
-            from app.utils.game_tags_utils import tags_display_text
-
-            setattr(game, "game_tags", tags_display_text(parse_game_tags(raw)))
-            return True
-        except Exception as e:
-            LoggingService.get_instance().warning(f"Auto-tagging: failed to apply tags: {e}", exc_info=e)
-            return False
+        ok = apply_cara_game_tags_to_game_data(game, tags)
+        if not ok:
+            LoggingService.get_instance().warning("Auto-tagging: failed to apply tags to game PGN")
+        return ok
 

@@ -5,6 +5,12 @@ from __future__ import annotations
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QMenu, QMenuBar
 
+from app.utils.themed_icon import (
+    SVG_MENU_CHECKMARK,
+    SVG_MENU_EYE_OFF,
+    SVG_MENU_RESET,
+    set_menubar_themable_action_icon,
+)
 from app.views.menus.player_stats_accuracy_distribution_menu import (
     PlayerStatsAccuracyDistributionMenuController,
 )
@@ -24,12 +30,14 @@ def setup_player_stats_menu(mw, menu_bar: QMenuBar) -> None:
 
     reset_ps_defaults = QAction("Reset to defaults", mw)
     reset_ps_defaults.setMenuRole(QAction.MenuRole.NoRole)
+    set_menubar_themable_action_icon(mw, reset_ps_defaults, SVG_MENU_RESET)
     reset_ps_defaults.triggered.connect(mw._on_player_stats_reset_to_template_defaults)
     ps_menu.addAction(reset_ps_defaults)
     ps_menu.addSeparator()
 
     enable_all_ps = QAction("Enable all", mw)
     enable_all_ps.setMenuRole(QAction.MenuRole.NoRole)
+    set_menubar_themable_action_icon(mw, enable_all_ps, SVG_MENU_CHECKMARK)
     enable_all_ps.triggered.connect(
         lambda checked=False: mw.controller.get_menu_options_sync_controller().set_all_player_stats_sections_visible(True)
     )
@@ -37,6 +45,7 @@ def setup_player_stats_menu(mw, menu_bar: QMenuBar) -> None:
 
     disable_all_ps = QAction("Disable all", mw)
     disable_all_ps.setMenuRole(QAction.MenuRole.NoRole)
+    set_menubar_themable_action_icon(mw, disable_all_ps, SVG_MENU_EYE_OFF)
     disable_all_ps.triggered.connect(
         lambda checked=False: mw.controller.get_menu_options_sync_controller().set_all_player_stats_sections_visible(False)
     )

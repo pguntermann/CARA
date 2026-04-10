@@ -813,10 +813,12 @@
     "use_straight_lines": true,
     "show_pv2_arrow": true,
     "show_pv3_arrow": true,
-    "show_annotations_layer": true
+    "show_annotations_layer": true,
+    "game_info_center_mode": "center_in_view"
   },
   "game_tags": {
     "builtin_colors": {},
+    "builtin_overrides": {},
     "custom": []
   },
   "pgn_visibility": {
@@ -850,6 +852,15 @@
     "normalized_evaluation_graph": true,
     "brilliant_move_detection": true,
     "auto_game_tagging": true,
+    "auto_game_tagging_enabled_tags": [
+      "Blunder-decided",
+      "Brilliant Move",
+      "Clean win",
+      "Missed win",
+      "Opening disaster",
+      "Endgame grind",
+      "Chaotic game"
+    ],
     "store_analysis_results_in_pgn_tag": true,
     "switch_to_moves_list_at_start_of_analysis": true
   },

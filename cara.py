@@ -6,6 +6,28 @@ import multiprocessing
 from pathlib import Path
 
 
+def _configure_multiprocessing_for_qt_gui() -> None:
+    """Force multiprocessing ``spawn`` before Qt loads (non-Windows).
+
+    On Linux and macOS the default start method is often ``fork``. Forking after
+    ``QApplication`` / Qt has initialized copies a fragile process (display
+    connections, locks, plugins). ``ProcessPoolExecutor`` workers then deadlock
+    or hang—commonly right after status text like "Prepared N game(s) for parsing...".
+
+    Windows already uses ``spawn`` only; no change needed there.
+    """
+    if sys.platform == "win32":
+        return
+    try:
+        multiprocessing.set_start_method("spawn")
+    except RuntimeError:
+        # Already set (e.g. by tests or embedding)
+        pass
+
+
+_configure_multiprocessing_for_qt_gui()
+
+
 def _configure_linux_frozen_runtime() -> None:
     """Mitigate GLib/GIO plugin mismatch and GNOME Wayland decoration issues when frozen.
 

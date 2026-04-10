@@ -220,8 +220,9 @@
           4,
           20,
           4,
-          8
+          14
         ],
+        "menu_horizontal_padding": 4,
         "separator_height": 1,
         "separator_color": [
           60,
@@ -307,7 +308,7 @@
     },
     "panels": {
       "main": {
-        "minimum_width": 200,
+        "minimum_width": 450,
         "minimum_height": 200,
         "background_color": [
           40,
@@ -634,6 +635,11 @@
                 255,
                 255,
                 18
+              ],
+              "hover_text_color": [
+                68,
+                68,
+                74
               ]
             }
           },
@@ -2989,6 +2995,18 @@
       "font_family": "Helvetica Neue",
       "font_size": 10,
       "spacing": 4,
+      "icons": {
+        "tint_color": [
+          200,
+          200,
+          200
+        ],
+        "tint_color_light_scheme": [
+          52,
+          52,
+          58
+        ]
+      },
       "colors": {
         "normal": {
           "background": [
@@ -3128,7 +3146,14 @@
             60,
             65
           ]
-        }
+        },
+        "icon_badges": {
+          "background_color": [55, 55, 60],
+          "background_hover_color": [75, 75, 82],
+          "icon_color": [235, 235, 235],
+          "icon_hover_color": [255, 255, 255]
+        },
+        "builtin_hidden_chip_color": [75, 75, 82]
       },
       "classification_settings": {
         "width": 480,
@@ -5763,6 +5788,14 @@
           220,
           80,
           80
+        ]
+      },
+      {
+        "name": "Brilliant Move",
+        "color": [
+          255,
+          200,
+          60
         ]
       },
       {

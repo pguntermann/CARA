@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Iterable, List
+import io
+from typing import Any, Iterable, List
+
+import chess.pgn
+
+from app.services.pgn_service import PgnService
 
 
 PGN_TAG_NAME_GAME_TAGS = "CARAGameTags"
@@ -61,4 +66,31 @@ def tags_display_text(tags: Iterable[str]) -> str:
     """Human-readable display value for database column / UI labels."""
     items = [str(t).strip() for t in (tags or []) if str(t).strip()]
     return ", ".join(items)
+
+
+def apply_cara_game_tags_to_game_data(game: Any, tags: Iterable[str]) -> bool:
+    """Sync CARA per-game tags to ``game.pgn`` and ``GameData`` fields.
+
+    Updates or removes the ``[CARAGameTags "..."]`` header and sets ``game_tags_raw`` /
+    ``game_tags`` to match. This is the single path used for CARA game tags (not bulk PGN
+    header tag operations).
+    """
+    try:
+        raw = format_game_tags(tags)
+        pgn_io = io.StringIO(getattr(game, "pgn", "") or "")
+        chess_game = chess.pgn.read_game(pgn_io)
+        if not chess_game:
+            return False
+        if raw:
+            chess_game.headers[PGN_TAG_NAME_GAME_TAGS] = raw
+        elif PGN_TAG_NAME_GAME_TAGS in chess_game.headers:
+            del chess_game.headers[PGN_TAG_NAME_GAME_TAGS]
+        game.pgn = PgnService.export_game_to_pgn(chess_game)
+        setattr(game, "game_tags_raw", raw)
+        setattr(game, "game_tags", tags_display_text(parse_game_tags(raw)))
+        if hasattr(game, "_pgn_preview"):
+            setattr(game, "_pgn_preview", None)
+        return True
+    except Exception:
+        return False
 

@@ -31,7 +31,9 @@ class MainGameInfoView(QWidget):
         
         # Padding: left, top, right, bottom (Qt setContentsMargins order)
         padding = gameinfo_config.get('padding', [10, 18, 10, 10])
-        layout.setContentsMargins(padding[0], padding[1], padding[2], padding[3])
+        self._margin_base_ltrb = (int(padding[0]), int(padding[1]), int(padding[2]), int(padding[3]))
+        layout.setContentsMargins(*self._margin_base_ltrb)
+        self._outer_layout = layout
         spacing = gameinfo_config.get('spacing', 8)
         layout.setSpacing(spacing)
         
@@ -105,6 +107,13 @@ class MainGameInfoView(QWidget):
         
         # Center align layout
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+    def set_centering_margin_extras(self, extra_left: int, extra_right: int) -> None:
+        """Add horizontal margin so content can align with the board column (extras >= 0)."""
+        l0, t0, r0, b0 = self._margin_base_ltrb
+        el = max(0, int(extra_left))
+        er = max(0, int(extra_right))
+        self._outer_layout.setContentsMargins(l0 + el, t0, r0 + er, b0)
     
     def set_white_player(self, name: str, elo: int) -> None:
         """Set white player name and ELO.

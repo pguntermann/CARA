@@ -150,9 +150,11 @@ class ClickablePgnTextEdit(QTextEdit):
         cfg = getattr(parent_view, "config", None) if parent_view else None
         if isinstance(cfg, dict):
             from app.views.style import StyleManager
+            from app.views.style.context_menu import apply_dark_standard_textedit_context_menu_icons
 
             StyleManager.style_context_menu(menu, cfg)
-        
+            apply_dark_standard_textedit_context_menu_icons(menu, cfg)
+
         # Find and replace the copy action to use our custom copy method
         copy_action = None
         for action in menu.actions():
@@ -181,7 +183,9 @@ class ClickablePgnTextEdit(QTextEdit):
             menu.addSeparator()
             append_pgn_menu_items_to_context_menu(menu, mw, config=cfg)
 
-        # Show the menu
+        from app.views.style.context_menu import try_wire_context_menu_shared_action_icons
+
+        try_wire_context_menu_shared_action_icons(menu)
         menu.exec(event.globalPos())
     
     def copy(self) -> None:

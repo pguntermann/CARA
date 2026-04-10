@@ -16,6 +16,7 @@ def build_board_context_menu(mw: Any, *, parent: Optional[Any] = None) -> QMenu:
 
     # Style using context menu conventions (font/size/bg from ui.styles.context_menu).
     from app.views.style import StyleManager
+    from app.views.style.context_menu import wire_context_menu_icon_retheming
 
     StyleManager.style_context_menu(menu, mw.config)
 
@@ -57,5 +58,14 @@ def build_board_context_menu(mw: Any, *, parent: Optional[Any] = None) -> QMenu:
         if act is not None:
             traj_menu.addAction(act)
 
+    menu.addSeparator()
+    gi_center_menu = menu.addMenu("Game Info center behaviour")
+    StyleManager.style_context_menu(gi_center_menu, mw.config)
+    for attr in ("game_info_center_in_view_action", "game_info_center_over_board_action"):
+        act = getattr(mw, attr, None)
+        if act is not None:
+            gi_center_menu.addAction(act)
+
+    wire_context_menu_icon_retheming(menu, mw)
     return menu
 

@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Set
 
 from app.services.user_settings_service import UserSettingsService
 
@@ -23,15 +23,62 @@ class GameTagsService:
     """Read tag definitions from config + user settings."""
 
     SETTINGS_KEY = "game_tags"
+    _BUILTIN_OVERRIDES_KEY = "builtin_overrides"
+    _BUILTIN_COLORS_LEGACY_KEY = "builtin_colors"
 
     def __init__(self, config: Dict[str, Any]) -> None:
         self._config = config
         self._settings_service = UserSettingsService.get_instance()
 
-    def get_definitions(self) -> List[GameTagDefinition]:
+    def _get_builtin_overrides(self) -> Dict[str, dict]:
+        """Return casefold-keyed overrides for builtin tags.
+
+        Supported formats:
+        - builtin_overrides: { "<name>": { "color": [r,g,b], "hidden": bool } }
+        - legacy builtin_colors: { "<name>": [r,g,b] }
+        """
+        settings = self._settings_service.get_settings()
+        section = settings.get(self.SETTINGS_KEY, {}) if isinstance(settings, dict) else {}
+        if not isinstance(section, dict):
+            section = {}
+
+        overrides_raw = section.get(self._BUILTIN_OVERRIDES_KEY, {})
+        overrides: Dict[str, dict] = {}
+        if isinstance(overrides_raw, dict):
+            for name, cfg in overrides_raw.items():
+                key = str(name or "").strip()
+                if not key:
+                    continue
+                if isinstance(cfg, dict):
+                    overrides[key.casefold()] = cfg
+
+        legacy_colors = section.get(self._BUILTIN_COLORS_LEGACY_KEY, {})
+        if isinstance(legacy_colors, dict):
+            for name, col in legacy_colors.items():
+                key = str(name or "").strip()
+                if not key or key.casefold() in overrides:
+                    continue
+                if isinstance(col, list) and len(col) == 3:
+                    overrides[key.casefold()] = {"color": col, "hidden": False}
+
+        return overrides
+
+    def get_hidden_builtin_names(self) -> Set[str]:
+        """Return a casefold-keyed set of hidden builtin tag names."""
+        hidden: Set[str] = set()
+        for k, cfg in self._get_builtin_overrides().items():
+            try:
+                if isinstance(cfg, dict) and bool(cfg.get("hidden", False)):
+                    hidden.add(k)
+            except Exception:
+                continue
+        return hidden
+
+    def get_definitions(self, *, include_hidden: bool = False) -> List[GameTagDefinition]:
         settings = self._settings_service.get_settings()
         section = settings.get(self.SETTINGS_KEY, {}) if isinstance(settings, dict) else {}
         custom = section.get("custom", []) if isinstance(section, dict) else []
+        builtin_overrides = self._get_builtin_overrides()
 
         # Built-in tags come from config.json
         builtins: List[GameTagDefinition] = []
@@ -43,6 +90,10 @@ class GameTagsService:
                 name = str(item.get("name", "")).strip()
                 if not name:
                     continue
+                ov = builtin_overrides.get(name.casefold(), {}) if isinstance(builtin_overrides, dict) else {}
+                hidden = bool(ov.get("hidden", False)) if isinstance(ov, dict) else False
+                if hidden and not include_hidden:
+                    continue
                 col = item.get("color")
                 if isinstance(col, list) and len(col) == 3:
                     try:
@@ -51,6 +102,13 @@ class GameTagsService:
                         color = (120, 120, 120)
                 else:
                     color = (120, 120, 120)
+                if isinstance(ov, dict):
+                    ov_col = ov.get("color")
+                    if isinstance(ov_col, list) and len(ov_col) == 3:
+                        try:
+                            color = (int(ov_col[0]), int(ov_col[1]), int(ov_col[2]))
+                        except Exception:
+                            pass
                 builtins.append(GameTagDefinition(name, color, builtin=True))
 
         customs: List[GameTagDefinition] = []
@@ -87,9 +145,9 @@ class GameTagsService:
             result.append(d)
         return result
 
-    def get_definition_map(self) -> Dict[str, GameTagDefinition]:
+    def get_definition_map(self, *, include_hidden: bool = False) -> Dict[str, GameTagDefinition]:
         """Return a casefold-keyed map for quick lookup."""
-        defs = self.get_definitions()
+        defs = self.get_definitions(include_hidden=include_hidden)
         return {d.name.casefold(): d for d in defs}
 
     def upsert_custom_definition(self, name: str, color: Tuple[int, int, int]) -> None:

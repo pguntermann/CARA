@@ -51,6 +51,31 @@ class NotesTextEdit(QTextEdit):
                     return
         super().mousePressEvent(event)
 
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        """Standard editor menu, then Notes menubar actions; styled like other context menus."""
+        menu = self.createStandardContextMenu()
+        parent_view = self.parent()
+        cfg = getattr(parent_view, "config", None) if parent_view else None
+        if isinstance(cfg, dict):
+            from app.views.style.context_menu import apply_dark_standard_textedit_context_menu_icons
+
+            StyleManager.style_context_menu(menu, cfg)
+            apply_dark_standard_textedit_context_menu_icons(menu, cfg)
+
+        from PyQt6.QtWidgets import QApplication
+
+        from app.views.menus.notes_context_menu import append_notes_menu_items_to_context_menu
+
+        mw = QApplication.activeWindow()
+        if mw is not None and isinstance(cfg, dict):
+            menu.addSeparator()
+            append_notes_menu_items_to_context_menu(menu, mw)
+
+        from app.views.style.context_menu import try_wire_context_menu_shared_action_icons
+
+        try_wire_context_menu_shared_action_icons(menu)
+        menu.exec(event.globalPos())
+
 
 class DetailNotesView(QWidget):
     """Detail view: scrollable notes with monospace font and move linking."""
@@ -380,10 +405,6 @@ class DetailNotesView(QWidget):
         new_cursor.setPosition(start)
         new_cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
         self._notes_edit.setTextCursor(new_cursor)
-
-    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
-        menu = self._notes_edit.createStandardContextMenu()
-        menu.exec(event.globalPos())
 
     def _on_active_game_changed(self, game) -> None:
         """Handle active game change: clear when game is None, otherwise load notes (same pattern as metadata/moves list)."""

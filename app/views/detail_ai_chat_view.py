@@ -45,6 +45,9 @@ class MessageLabel(QLabel):
             from app.views.style import StyleManager
 
             StyleManager.style_context_menu(menu, self._parent_view.config)
+        from app.views.style.context_menu import try_wire_context_menu_shared_action_icons
+
+        try_wire_context_menu_shared_action_icons(menu)
         menu.exec(event.globalPosition().toPoint() if hasattr(event, "globalPosition") else event.globalPos())
         event.accept()
 

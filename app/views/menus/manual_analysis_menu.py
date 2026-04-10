@@ -5,6 +5,13 @@ from __future__ import annotations
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenuBar
 
+from app.utils.themed_icon import (
+    SVG_MENU_MINUS,
+    SVG_MENU_PLAY,
+    SVG_MENU_PLUS,
+    set_menubar_themable_action_icon,
+)
+
 
 def setup_manual_analysis_menu(mw, menu_bar: QMenuBar) -> None:
     manual_analysis_menu = menu_bar.addMenu("Manual Analysis")
@@ -12,8 +19,7 @@ def setup_manual_analysis_menu(mw, menu_bar: QMenuBar) -> None:
 
     mw.start_manual_analysis_action = QAction("Start Manual Analysis", mw)
     mw.start_manual_analysis_action.setShortcut(QKeySequence("Alt+M"))
-    mw.start_manual_analysis_action.setCheckable(True)
-    mw.start_manual_analysis_action.setChecked(False)
+    set_menubar_themable_action_icon(mw, mw.start_manual_analysis_action, SVG_MENU_PLAY)
     mw.start_manual_analysis_action.triggered.connect(mw._on_start_manual_analysis_toggled)
     manual_analysis_menu.addAction(mw.start_manual_analysis_action)
 
@@ -21,11 +27,13 @@ def setup_manual_analysis_menu(mw, menu_bar: QMenuBar) -> None:
 
     mw.add_pv_line_action = QAction("Add PV Line", mw)
     mw.add_pv_line_action.setShortcut(QKeySequence("Alt+N"))
+    set_menubar_themable_action_icon(mw, mw.add_pv_line_action, SVG_MENU_PLUS)
     mw.add_pv_line_action.triggered.connect(mw._on_add_pv_line)
     manual_analysis_menu.addAction(mw.add_pv_line_action)
 
     mw.remove_pv_line_action = QAction("Remove PV Line", mw)
     mw.remove_pv_line_action.setShortcut(QKeySequence("Alt+R"))
+    set_menubar_themable_action_icon(mw, mw.remove_pv_line_action, SVG_MENU_MINUS)
     mw.remove_pv_line_action.triggered.connect(mw._on_remove_pv_line)
     manual_analysis_menu.addAction(mw.remove_pv_line_action)
 

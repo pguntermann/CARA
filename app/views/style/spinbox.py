@@ -1,7 +1,7 @@
 """Spinbox styling utilities."""
 
 from typing import Dict, Any, List, Optional
-from PyQt6.QtWidgets import QSpinBox, QDoubleSpinBox
+from PyQt6.QtWidgets import QAbstractSpinBox, QDoubleSpinBox, QSpinBox
 
 
 def generate_spinbox_stylesheet(
@@ -16,10 +16,12 @@ def generate_spinbox_stylesheet(
     border_radius: int = 3,
     padding: List[int] = None,
     disabled_brightness_factor: float = 0.5,
-    hide_buttons: bool = True
 ) -> str:
     """Generate QSS stylesheet for QSpinBox and QDoubleSpinBox widgets.
-    
+
+    Button visibility is handled in ``apply_spinbox_styling`` via ``setButtonSymbols``,
+    not zero-width QSS (which can break keyboard input on some platforms).
+
     Args:
         config: Configuration dictionary.
         text_color: Text color as [R, G, B].
@@ -32,8 +34,7 @@ def generate_spinbox_stylesheet(
         border_radius: Border radius in pixels (default: 3).
         padding: Padding as [horizontal, vertical] or [left, top, right, bottom] (default: [8, 6]).
         disabled_brightness_factor: Brightness factor for disabled state (default: 0.5).
-        hide_buttons: Whether to hide up/down buttons (default: True).
-        
+
     Returns:
         QSS stylesheet string.
     """
@@ -79,16 +80,22 @@ def generate_spinbox_stylesheet(
         f"color: rgb({disabled_text[0]}, {disabled_text[1]}, {disabled_text[2]});"
         f"}}"
     )
-    
-    # Hide up/down buttons if requested
-    if hide_buttons:
-        stylesheet += (
-            f"QSpinBox::up-button, QSpinBox::down-button, "
-            f"QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{"
-            f"width: 0px;"
-            f"}}"
-        )
-    
+
+    # Inner QLineEdit must be styled explicitly when the spin box uses QSS; otherwise
+    # some platforms accept the wheel but ignore keyboard input. Transparent fill lets
+    # the outer spin box background show through.
+    stylesheet += (
+        f"QSpinBox QLineEdit, QDoubleSpinBox QLineEdit {{"
+        f"background-color: transparent;"
+        f"border: none;"
+        f"padding: 0px;"
+        f"margin: 0px;"
+        f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
+        f"font-family: \"{font_family}\";"
+        f"font-size: {font_size}pt;"
+        f"}}"
+    )
+
     return stylesheet
 
 
@@ -129,11 +136,18 @@ def apply_spinbox_styling(
     stylesheet = generate_spinbox_stylesheet(
         config, text_color, font_family, font_size, bg_color, border_color,
         focus_border_color, border_width, border_radius, padding,
-        disabled_brightness_factor, hide_buttons
+        disabled_brightness_factor,
     )
     
     for spinbox in spinboxes:
+        if hide_buttons:
+            spinbox.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+        else:
+            spinbox.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.UpDownArrows)
         spinbox.setStyleSheet(stylesheet)
         if minimum_height > 0:
             spinbox.setMinimumHeight(minimum_height)
+        le = spinbox.lineEdit()
+        if le is not None:
+            le.setReadOnly(False)
 
