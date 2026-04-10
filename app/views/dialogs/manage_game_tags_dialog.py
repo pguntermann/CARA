@@ -632,6 +632,24 @@ class ManageGameTagsDialog(QDialog):
         self._working_builtin_overrides = {}
         self._rebuild_builtin_chips()
 
+    def _builtin_chip_container_content_width(self) -> int:
+        """Width available for laying out built-in chips (avoids parent QGroupBox being wider than the layout cell)."""
+        cw = int(self.builtin_chip_container.width())
+        if cw > 1:
+            return max(1, cw)
+        parent = self.builtin_chip_container.parentWidget()
+        if parent is None:
+            return max(1, int(self.dialog_width - 60))
+        try:
+            w = int(parent.contentsRect().width())
+            lay = parent.layout()
+            if lay is not None:
+                m = lay.contentsMargins()
+                w -= int(m.left() + m.right())
+            return max(1, w)
+        except Exception:
+            return max(1, int(self.dialog_width - 60))
+
     def _pick_color_for_swatch(self, swatch: ColorSwatchButton) -> None:
         chosen = QColorDialog.getColor(swatch.get_color(), self, "Select game tag color")
         if chosen.isValid():
@@ -678,16 +696,10 @@ class ManageGameTagsDialog(QDialog):
         x = outer_pad
         y = outer_pad
         line_h = 0
-        # Use actual available width (avoid clipping/truncation on first show).
-        try:
-            max_w = int(self.builtin_chip_container.parentWidget().contentsRect().width())
-        except Exception:
-            max_w = 0
-        if max_w <= 1:
-            max_w = int(self.builtin_chip_container.width())
-        if max_w <= 1:
-            max_w = int(self.dialog_width - 60)
-        max_w = max(1, int(max_w - outer_pad))
+        content_w = self._builtin_chip_container_content_width()
+        # Rightmost pixel allowed for chip geometry: x + w <= content_w - outer_pad
+        right_edge = max(outer_pad + 1, int(content_w - outer_pad))
+        max_row_inner = max(1, int(content_w - 2 * outer_pad))
         for d in builtins:
             name = str(d.get("name", "")).strip()
             base_color = d.get("color", (120, 120, 120))
@@ -730,11 +742,13 @@ class ManageGameTagsDialog(QDialog):
             chip.adjustSize()
             w = max(chip.sizeHint().width(), 40)
             h = max(chip.sizeHint().height(), 22)
-            w = min(w, max_w)
-            if x > outer_pad and x + w > max_w + outer_pad:
+            w = min(w, max_row_inner)
+            if x > outer_pad and x + w > right_edge:
                 x = outer_pad
                 y += line_h + spacing
                 line_h = 0
+            if x + w > right_edge:
+                w = max(1, int(right_edge - x))
             chip.setGeometry(int(x), int(y), int(w), int(h))
             chip.show()
             x += w + spacing

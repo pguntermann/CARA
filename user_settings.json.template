@@ -853,6 +853,7 @@
     "auto_game_tagging": true,
     "auto_game_tagging_enabled_tags": [
       "Blunder-decided",
+      "Brilliant Move",
       "Clean win",
       "Missed win",
       "Opening disaster",

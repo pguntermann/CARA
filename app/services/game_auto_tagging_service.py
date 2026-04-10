@@ -25,6 +25,7 @@ from app.utils.game_tags_utils import (
 
 AUTO_TAGS: Tuple[str, ...] = (
     "Blunder-decided",
+    "Brilliant Move",
     "Clean win",
     "Missed win",
     "Opening disaster",
@@ -114,6 +115,13 @@ class GameAutoTaggingService:
             if tag not in detected:
                 detected.append(tag)
                 reasons[tag] = reason
+
+        # Brilliant Move: at least one move was classified as "Brilliant".
+        if any(
+            (getattr(m, "assess_white", "") == "Brilliant") or (getattr(m, "assess_black", "") == "Brilliant")
+            for m in moves
+        ):
+            add("Brilliant Move", "At least one move was assessed as Brilliant")
 
         # Missed win: someone had a winning advantage at any point but did not win.
         if game_result not in ("1-0", "0-1"):

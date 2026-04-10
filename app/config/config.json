@@ -5773,6 +5773,14 @@
         ]
       },
       {
+        "name": "Brilliant Move",
+        "color": [
+          255,
+          200,
+          60
+        ]
+      },
+      {
         "name": "Clean win",
         "color": [
           70,
