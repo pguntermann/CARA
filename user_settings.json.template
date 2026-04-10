@@ -851,6 +851,14 @@
     "normalized_evaluation_graph": true,
     "brilliant_move_detection": true,
     "auto_game_tagging": true,
+    "auto_game_tagging_enabled_tags": [
+      "Blunder-decided",
+      "Clean win",
+      "Missed win",
+      "Opening disaster",
+      "Endgame grind",
+      "Chaotic game"
+    ],
     "store_analysis_results_in_pgn_tag": true,
     "switch_to_moves_list_at_start_of_analysis": true
   },

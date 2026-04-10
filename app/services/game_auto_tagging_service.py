@@ -46,10 +46,21 @@ class GameAutoTaggingService:
         self.config = config
         self._cfg = (config.get("game_analysis", {}) or {}).get("auto_game_tagging", {}) or {}
 
-    def detect_tags(self, moves: Sequence[MoveData], *, game_result: Optional[str]) -> AutoTaggingResult:
+    def detect_tags(
+        self,
+        moves: Sequence[MoveData],
+        *,
+        game_result: Optional[str],
+        enabled_tags: Optional[Sequence[str]] = None,
+    ) -> AutoTaggingResult:
         """Return detected auto-tags based on evaluated move list."""
         if not moves:
             return AutoTaggingResult(detected_tags=[], reasons={})
+
+        if enabled_tags is None:
+            enabled_set = {t.casefold() for t in AUTO_TAGS}
+        else:
+            enabled_set = {str(t).casefold() for t in enabled_tags if str(t).strip()}
 
         summary_service = GameSummaryService(self.config)
         total_moves = len(moves)
@@ -98,6 +109,8 @@ class GameAutoTaggingService:
         min_eval_pawns = min(evals_cp) / 100.0
 
         def add(tag: str, reason: str) -> None:
+            if tag.casefold() not in enabled_set:
+                return
             if tag not in detected:
                 detected.append(tag)
                 reasons[tag] = reason

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from PyQt6.QtGui import QAction, QKeySequence
-from PyQt6.QtWidgets import QMenuBar
+from PyQt6.QtWidgets import QMenuBar, QMenu
+
+from app.services.game_auto_tagging_service import AUTO_TAGS
 
 
 def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
@@ -56,6 +58,20 @@ def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
     mw.auto_game_tagging_action.setCheckable(True)
     mw.auto_game_tagging_action.triggered.connect(mw._on_auto_game_tagging_toggled)
     game_analysis_menu.addAction(mw.auto_game_tagging_action)
+
+    # Select which auto-tags/rules are applied
+    mw.select_auto_tags_menu = QMenu("Select Tags for Auto-Tagging", game_analysis_menu)
+    mw._apply_menu_styling(mw.select_auto_tags_menu)
+    mw.auto_game_tagging_tag_actions = {}
+    for tag in AUTO_TAGS:
+        act = QAction(tag, mw)
+        act.setCheckable(True)
+        act.setChecked(True)
+        act.triggered.connect(lambda checked=False, t=tag: mw._on_auto_game_tagging_tag_toggled(t, checked))
+        mw.select_auto_tags_menu.addAction(act)
+        mw.auto_game_tagging_tag_actions[tag] = act
+    mw.select_auto_tags_menu.setEnabled(True)
+    game_analysis_menu.addMenu(mw.select_auto_tags_menu)
 
     mw.return_to_first_move_action = QAction("Return to PLY 0 after analysis completes", mw)
     mw.return_to_first_move_action.setCheckable(True)

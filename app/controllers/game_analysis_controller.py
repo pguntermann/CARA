@@ -1393,6 +1393,20 @@ class GameAnalysisController(QObject):
     def is_auto_game_tagging_enabled(self) -> bool:
         """Return whether automatic game tagging is enabled (e.g. for bulk analysis)."""
         return bool(self._auto_game_tagging)
+
+    def set_auto_game_tagging_enabled_tags(self, tags: list[str]) -> None:
+        """Set which auto-tags are enabled (used by bulk analysis)."""
+        try:
+            self._auto_game_tagging_enabled_tags = [str(t) for t in (tags or []) if str(t).strip()]
+        except Exception:
+            self._auto_game_tagging_enabled_tags = []
+
+    def get_auto_game_tagging_enabled_tags(self) -> list[str]:
+        """Return enabled auto-tags list (empty means 'all')."""
+        try:
+            return list(getattr(self, "_auto_game_tagging_enabled_tags", []) or [])
+        except Exception:
+            return []
     
     def _calculate_material_sacrifice_with_lookahead(self, move_info: Dict[str, Any], lookahead_plies: int = 3) -> int:
         """Calculate material sacrifice using multi-ply look-ahead.

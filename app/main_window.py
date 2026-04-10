@@ -2655,6 +2655,45 @@ class MainWindow(QMainWindow):
         # Pass setting to game analysis controller (used by bulk analysis)
         if hasattr(self.controller, 'game_analysis_controller'):
             self.controller.game_analysis_controller.set_auto_game_tagging(checked)
+        # Enable/disable the tag selection submenu
+        try:
+            if hasattr(self, "select_auto_tags_menu") and self.select_auto_tags_menu:
+                self.select_auto_tags_menu.setEnabled(bool(checked))
+        except Exception:
+            pass
+
+    def _on_auto_game_tagging_tag_toggled(self, tag_name: str, checked: bool) -> None:
+        """Handle per-tag enable/disable for Auto Tag Games."""
+        tag_name = str(tag_name or "").strip()
+        if not tag_name:
+            return
+        try:
+            from app.services.game_auto_tagging_service import AUTO_TAGS
+        except Exception:
+            AUTO_TAGS = ()  # type: ignore
+
+        # Read current selection from settings (fallback: all enabled)
+        enabled = None
+        try:
+            settings = self._settings_service.get_settings() if hasattr(self, "_settings_service") else {}
+            ga = settings.get("game_analysis", {}) if isinstance(settings, dict) else {}
+            enabled = ga.get("auto_game_tagging_enabled_tags", None) if isinstance(ga, dict) else None
+        except Exception:
+            enabled = None
+        enabled_src = list(AUTO_TAGS) if enabled is None else enabled
+        enabled_list = [t for t in (enabled_src or []) if isinstance(t, str) and t.strip()]
+        enabled_cf = {t.casefold() for t in enabled_list}
+        if checked:
+            enabled_cf.add(tag_name.casefold())
+        else:
+            enabled_cf.discard(tag_name.casefold())
+
+        # Preserve original casing from AUTO_TAGS order when saving
+        saved = [t for t in list(AUTO_TAGS) if t.casefold() in enabled_cf]
+        if hasattr(self, "_settings_service"):
+            self._settings_service.update_game_analysis({"auto_game_tagging_enabled_tags": saved})
+        if hasattr(self.controller, "game_analysis_controller"):
+            self.controller.game_analysis_controller.set_auto_game_tagging_enabled_tags(saved)
     
     def _on_store_analysis_results_toggled(self, checked: bool) -> None:
         """Handle Store Analysis results in PGN Tag toggle.
@@ -3460,6 +3499,37 @@ class MainWindow(QMainWindow):
             self.auto_game_tagging_action.setChecked(auto_game_tagging)
         if hasattr(self.controller, "game_analysis_controller"):
             self.controller.game_analysis_controller.set_auto_game_tagging(auto_game_tagging)
+
+        # Enabled auto-tags (default: all)
+        enabled_auto_tags = game_analysis_settings.get("auto_game_tagging_enabled_tags", None)
+        try:
+            from app.services.game_auto_tagging_service import AUTO_TAGS
+        except Exception:
+            AUTO_TAGS = ()  # type: ignore
+        if enabled_auto_tags is None or not isinstance(enabled_auto_tags, list):
+            enabled_auto_tags = list(AUTO_TAGS)
+        enabled_cf = {str(t).casefold() for t in enabled_auto_tags if str(t).strip()}
+        # Sync menu checks if present
+        try:
+            if hasattr(self, "auto_game_tagging_tag_actions") and isinstance(self.auto_game_tagging_tag_actions, dict):
+                for t, act in self.auto_game_tagging_tag_actions.items():
+                    try:
+                        act.blockSignals(True)
+                        act.setChecked(str(t).casefold() in enabled_cf)
+                    finally:
+                        act.blockSignals(False)
+        except Exception:
+            pass
+        # Enable submenu only if auto-tagging enabled
+        try:
+            if hasattr(self, "select_auto_tags_menu") and self.select_auto_tags_menu:
+                self.select_auto_tags_menu.setEnabled(bool(auto_game_tagging))
+        except Exception:
+            pass
+        if hasattr(self.controller, "game_analysis_controller"):
+            self.controller.game_analysis_controller.set_auto_game_tagging_enabled_tags(
+                [t for t in list(AUTO_TAGS) if str(t).casefold() in enabled_cf]
+            )
         
         # Return to PLY 0 after analysis completes
         return_to_first_move = game_analysis_settings.get("return_to_first_move_after_analysis", False)
@@ -3810,7 +3880,18 @@ class MainWindow(QMainWindow):
                         from app.utils.game_tags_utils import PGN_TAG_NAME_GAME_TAGS, format_game_tags
 
                         tagging_service = GameAutoTaggingService(self.config)
-                        result = tagging_service.detect_tags(moves, game_result=getattr(game, "result", None))
+                        enabled_tags = []
+                        try:
+                            settings = self._settings_service.get_settings() if hasattr(self, "_settings_service") else {}
+                            ga = settings.get("game_analysis", {}) if isinstance(settings, dict) else {}
+                            enabled_tags = ga.get("auto_game_tagging_enabled_tags", []) if isinstance(ga, dict) else []
+                        except Exception:
+                            enabled_tags = []
+                        result = tagging_service.detect_tags(
+                            moves,
+                            game_result=getattr(game, "result", None),
+                            enabled_tags=enabled_tags,
+                        )
                         merged = tagging_service.merge_with_existing_tags(
                             getattr(game, "game_tags_raw", "") or "",
                             result.detected_tags,
