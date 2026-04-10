@@ -1,5 +1,5 @@
 {
-  "version": "2.6.10",
+  "version": "2.7.0",
   "ui": {
     "welcome_dialog": {
       "title": "Welcome to CARA",
@@ -3148,12 +3148,32 @@
           ]
         },
         "icon_badges": {
-          "background_color": [55, 55, 60],
-          "background_hover_color": [75, 75, 82],
-          "icon_color": [235, 235, 235],
-          "icon_hover_color": [255, 255, 255]
+          "background_color": [
+            55,
+            55,
+            60
+          ],
+          "background_hover_color": [
+            75,
+            75,
+            82
+          ],
+          "icon_color": [
+            235,
+            235,
+            235
+          ],
+          "icon_hover_color": [
+            255,
+            255,
+            255
+          ]
         },
-        "builtin_hidden_chip_color": [75, 75, 82]
+        "builtin_hidden_chip_color": [
+          75,
+          75,
+          82
+        ]
       },
       "classification_settings": {
         "width": 480,

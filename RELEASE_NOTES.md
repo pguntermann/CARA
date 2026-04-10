@@ -1,5 +1,39 @@
 # Release Notes
 
+# CARA v2.7.0 - Game tags polish, Selective Auto-Tagging and menu icons
+
+**Release Date:** 10.04.2026
+
+This release extends **Game tags** functionality by allowing users to **show/hide** and **re-color** the built-in tags, as well as changing the colors of custom tags without having to delete and re-add them. It provides **selective auto-tagging**, allowing users to choose which tags are applied through **Game Analysis** by (de-)selecting them under **Game Analysis → Select Tags for Auto-Tagging**. **Brilliant Move** has been added as an additional Auto-Tag, and will apply to games where at least one brilliant move was detected.
+
+It implements a clearer naming convention to **differentiate** between **PGN header tags** and **Game tags** throughout the application. Menus and submenus now include **icons**.
+
+## New Features
+
+- **Brilliant move auto-tag:** New **auto-tagging** rule for games tagged as **Brilliant move** (alongside existing analysis-derived rules).
+- **Per-tag auto-tagging:** Enable or disable **auto-tagging** per tag via the **Game Analysis** menu (check/uncheck individual tags).
+- **Menu and context menu icons:** Themed icons across the **menu bar** and **context menus**.
+
+## Enhancements
+
+- **Naming clarity:** Distinct naming for **PGN header tags** versus **Game tags** across the UI.
+- **Improved Game Tag management:** Visibility of pre-defined tags can be toggled on/off via the **Manage Game tags** dialog. Colors of custom tags can be changed without having to remove and re-add the tag.
+- **Bulk replace PGN header tags:** Dialog refinements; **HTML manual** expanded with **regex** usage examples.
+- **Bulk analysis:** Spin boxes support **direct keyboard entry** while keeping **mouse-wheel** support.
+- **Manage game tags:** Clearer **hover** styling for tags.
+- **Notes view:** Context menu brought in line with other **context menus** (styling and behaviour).
+- **Game Info centering:** Through the **Board** menu, users can chose if the Game Info section should be centered on the view or centered on the chessboard.
+
+## Bug Fixes
+
+- **Linux:** Mitigated a **crash or freeze** tied to multithreading behaviour on some systems.
+
+## Documentation
+
+- **User manual:** **HTML** manual and **screenshots** updated for **game tags**, **metadata**, **bulk replace**, and other small changes.
+
+---
+
 # CARA v2.6.10 - Maintenance / Bug Fix Release
 
 **Release Date:** 09.04.2026
