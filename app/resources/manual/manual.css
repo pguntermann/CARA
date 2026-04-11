@@ -593,6 +593,51 @@
             color: rgb(240, 240, 240);
             font-weight: bold;
         }
+
+        /* Section 5.3.3: regex examples — table on wide view, stacked cards on narrow screens */
+        .regex-examples-desktop {
+            display: block;
+        }
+        .regex-examples-mobile {
+            display: none;
+        }
+        .regex-example-card {
+            border: 1px solid rgb(60, 60, 65);
+            border-radius: 6px;
+            background-color: rgb(35, 35, 40);
+            margin: 14px 0;
+            padding: 12px 14px;
+        }
+        .regex-example-field {
+            margin: 10px 0;
+        }
+        .regex-example-field:first-child {
+            margin-top: 0;
+        }
+        .regex-example-field:last-child {
+            margin-bottom: 0;
+        }
+        .regex-example-label {
+            display: block;
+            font-weight: bold;
+            color: rgb(200, 200, 210);
+            font-size: 0.82em;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            margin-bottom: 4px;
+        }
+        .regex-example-value {
+            display: block;
+            color: rgb(220, 220, 220);
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        .regex-example-value code {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
         
         /* Responsive container padding for small screens */
         @media (max-width: 768px) {
@@ -665,6 +710,15 @@
             /* Two columns on medium screens */
             nav > ul {
                 column-count: 2;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .regex-examples-desktop {
+                display: none !important;
+            }
+            .regex-examples-mobile {
+                display: block;
             }
         }
         

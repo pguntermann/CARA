@@ -5,6 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CARA - Chess Analysis and Review Application - User Manual</title>
     <link rel="stylesheet" href="manual.css">
+    <style>
+        /* Narrow viewports: section 5.5.5 auto-tag rules — table vs. stacked cards (class pair is not .regex-examples-*) */
+        .autotag-rules-desktop { display: block; }
+        .autotag-rules-mobile { display: none; }
+        @media (max-width: 640px) {
+            .autotag-rules-desktop { display: none !important; }
+            .autotag-rules-mobile { display: block; }
+        }
+        /* Section 7.7: wide two-column reference — relax fixed min-widths so the existing scroll wrapper is rarely needed */
+        @media (max-width: 640px) {
+            .moves-col-ref-wrap .column-table { min-width: 0; width: 100%; }
+            .moves-col-ref-wrap .column-name-cell,
+            .moves-col-ref-wrap th.column-name-header {
+                white-space: normal !important;
+                min-width: 0 !important;
+                width: 38%;
+                max-width: 45%;
+                word-break: break-word;
+            }
+            .moves-col-ref-wrap .column-table td:not(.column-name-cell):not(.column-category-cell),
+            .moves-col-ref-wrap .column-table th:not(.column-name-header) {
+                min-width: 0 !important;
+            }
+            .moves-col-ref-wrap td.column-category-cell {
+                white-space: normal;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -1285,13 +1313,14 @@
                     <li>Process all games or only selected games in the database table</li>
                 </ul>
                 <p>If you enable <strong>Use regex</strong>, the <strong>Find</strong> field is treated as a regular expression. Here are a few practical examples you can try:</p>
+                <div class="regex-examples-desktop column-table-wrapper">
                 <table class="column-table">
                     <thead>
                         <tr>
-                            <th style="min-width: 220px;">Goal</th>
-                            <th style="min-width: 220px;">Find (regex)</th>
-                            <th style="min-width: 220px;">Replace</th>
-                            <th style="min-width: 200px;">Notes</th>
+                            <th>Goal</th>
+                            <th>Find (regex)</th>
+                            <th>Replace</th>
+                            <th>Notes</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1315,6 +1344,27 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
+                <div class="regex-examples-mobile" role="region" aria-label="Regex examples">
+                    <div class="regex-example-card">
+                        <div class="regex-example-field"><span class="regex-example-label">Goal</span><span class="regex-example-value">Append a suffix to specific sites</span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">Find (regex)</span><span class="regex-example-value"><code>^(lichess\.org|chess\.com)$</code></span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">Replace</span><span class="regex-example-value"><code>\1 (Live)</code></span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">Notes</span><span class="regex-example-value">Example for the <code>Site</code> tag: matches <em>only</em> values that are exactly <code>lichess.org</code> or <code>chess.com</code> and appends <code>(Live)</code>. Enable <strong>Case sensitive</strong>.</span></div>
+                    </div>
+                    <div class="regex-example-card">
+                        <div class="regex-example-field"><span class="regex-example-label">Goal</span><span class="regex-example-value">Normalize whitespace</span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">Find (regex)</span><span class="regex-example-value"><code>\s+</code></span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">Replace</span><span class="regex-example-value">single space</span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">Notes</span><span class="regex-example-value">Replaces any whitespace run with a single space (names, events, etc.).</span></div>
+                    </div>
+                    <div class="regex-example-card">
+                        <div class="regex-example-field"><span class="regex-example-label">Goal</span><span class="regex-example-value">Remove trailing engine/site annotations</span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">Find (regex)</span><span class="regex-example-value"><code>\s*[-–—]\s*(lichess|chess\.com|engine).*?$</code></span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">Replace</span><span class="regex-example-value">(empty)</span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">Notes</span><span class="regex-example-value">Deletes a suffix like “ - lichess” or “ — engine …”. Use with care.</span></div>
+                    </div>
+                </div>
                 <br>
                 <p>The dialog also includes two smart update options:</p>
                 <ul>
@@ -1507,11 +1557,12 @@
                 <p>When auto-tagging is on, you can still choose <strong>which</strong> rules may apply: use <span class="menu-item">Game Analysis → Select Tags for Auto-Tagging</span> and check or uncheck each tag name. Your choices are saved with your user preferences. If every tag is unchecked, analysis will not add any of these automatic tags (existing manual tags on the game are unchanged). The submenu is available only while <span class="menu-item">Auto Tag Games</span> is enabled.</p>
                 <p>Numeric thresholds for the evaluation-based rules below are defined in <code>config.json</code> (under <code>game_analysis.auto_game_tagging</code>). The <strong>Brilliant Move</strong> auto-tag depends on moves being classified as <strong>Brilliant</strong> in the moves list, which requires <span class="menu-item">Game Analysis → Brilliant Move Detection</span> to be on and a compatible engine assignment; see <a href="#brilliant-move-detection">section 5.5.3</a>.</p>
                 <p>The following auto-tag rules are available:</p>
+                <div class="autotag-rules-desktop column-table-wrapper">
                 <table class="column-table">
                     <thead>
                         <tr>
                             <th class="column-name-header">Auto-tag</th>
-                            <th style="min-width: 200px;">When it applies (high level)</th>
+                            <th>When it applies (high level)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1545,6 +1596,37 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
+                <div class="autotag-rules-mobile" role="region" aria-label="Auto-tag rules">
+                    <div class="regex-example-card">
+                        <div class="regex-example-field"><span class="regex-example-label">Auto-tag</span><span class="regex-example-value">Blunder-decided</span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">When it applies (high level)</span><span class="regex-example-value">After the first recorded blunder, the evaluation becomes decisive for the other side and never meaningfully recovers.</span></div>
+                    </div>
+                    <div class="regex-example-card">
+                        <div class="regex-example-field"><span class="regex-example-label">Auto-tag</span><span class="regex-example-value">Brilliant Move</span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">When it applies (high level)</span><span class="regex-example-value">At least one move in the game was classified as <strong>Brilliant</strong> after analysis (including the optional brilliancy-detection pass).</span></div>
+                    </div>
+                    <div class="regex-example-card">
+                        <div class="regex-example-field"><span class="regex-example-label">Auto-tag</span><span class="regex-example-value">Clean win</span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">When it applies (high level)</span><span class="regex-example-value">The winner reaches a large advantage and keeps it stable with limited evaluation swings until the end.</span></div>
+                    </div>
+                    <div class="regex-example-card">
+                        <div class="regex-example-field"><span class="regex-example-label">Auto-tag</span><span class="regex-example-value">Missed win</span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">When it applies (high level)</span><span class="regex-example-value">At some point a winning advantage is reached, but the final result is not a win for that side (or the game is not decisive).</span></div>
+                    </div>
+                    <div class="regex-example-card">
+                        <div class="regex-example-field"><span class="regex-example-label">Auto-tag</span><span class="regex-example-value">Opening disaster</span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">When it applies (high level)</span><span class="regex-example-value">The evaluation at the end of the opening phase is already strongly favoring one side.</span></div>
+                    </div>
+                    <div class="regex-example-card">
+                        <div class="regex-example-field"><span class="regex-example-label">Auto-tag</span><span class="regex-example-value">Endgame grind</span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">When it applies (high level)</span><span class="regex-example-value">A long endgame stays in a relatively stable evaluation band for an extended stretch before finally resolving decisively.</span></div>
+                    </div>
+                    <div class="regex-example-card">
+                        <div class="regex-example-field"><span class="regex-example-label">Auto-tag</span><span class="regex-example-value">Chaotic game</span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">When it applies (high level)</span><span class="regex-example-value">Both sides reach large advantages during the game and the evaluation swings back and forth multiple times.</span></div>
+                    </div>
+                </div>
                 <div class="tip-box">
                     <strong>Note:</strong> Game tags can be used without auto-tagging. Auto-tagging simply creates tags for you; you can still manage tags manually either way (see <a href="#game-tagging">section 5.3.2 Game Tags</a>).
                 </div>
@@ -3027,12 +3109,12 @@
                 <h4 id="moves-list-columns-reference">7.7 Moves List Columns Reference</h4>
                 <p>The following table describes all available columns:</p>
                 
-                <div class="column-table-wrapper">
+                <div class="column-table-wrapper moves-col-ref-wrap">
                     <table class="column-table">
                         <thead>
                             <tr>
                                 <th class="column-name-header">Column Name</th>
-                                <th style="min-width: 200px;">Description</th>
+                                <th>Description</th>
                             </tr>
                         </thead>
                         <tbody>
