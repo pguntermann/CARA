@@ -5893,7 +5893,8 @@
           "search-api",
           "-instruct",
           "-16k",
-          "-tts"
+          "-tts",
+          "-pro"
         ],
         "exclude_exact": [
           "o3",
