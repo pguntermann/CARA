@@ -27,6 +27,7 @@ AUTO_TAGS: Tuple[str, ...] = (
     "Opening disaster",
     "Endgame grind",
     "Chaotic game",
+    "Sharp",
 )
 
 
@@ -42,6 +43,28 @@ class GameAutoTaggingService:
     def __init__(self, config: Dict[str, Any]) -> None:
         self.config = config
         self._cfg = (config.get("game_analysis", {}) or {}).get("auto_game_tagging", {}) or {}
+
+    @staticmethod
+    def _median_engine_depth_non_book(moves: Sequence[MoveData]) -> Optional[float]:
+        """Median engine depth over halfmoves that are not book and have depth > 0."""
+        depths: List[int] = []
+        for m in moves:
+            if getattr(m, "white_move", "") and getattr(m, "assess_white", "") != "Book Move":
+                d = int(getattr(m, "white_depth", 0) or 0)
+                if d > 0:
+                    depths.append(d)
+            if getattr(m, "black_move", "") and getattr(m, "assess_black", "") != "Book Move":
+                d = int(getattr(m, "black_depth", 0) or 0)
+                if d > 0:
+                    depths.append(d)
+        if not depths:
+            return None
+        s = sorted(depths)
+        n = len(s)
+        mid = n // 2
+        if n % 2 == 1:
+            return float(s[mid])
+        return (s[mid - 1] + s[mid]) / 2.0
 
     def detect_tags(
         self,
@@ -100,6 +123,11 @@ class GameAutoTaggingService:
         reasons: Dict[str, str] = {}
         detected: List[str] = []
 
+        # Structural patterns used for Sharp vetoes (independent of enabled_tags).
+        opening_disaster_match = False
+        blunder_decided_match = False
+        chaotic_match = False
+
         # Helpers
         evals_cp = [eval_by_ply[p] for p in plies_sorted]
         max_eval_pawns = max(evals_cp) / 100.0
@@ -138,6 +166,7 @@ class GameAutoTaggingService:
             if boundary_eval_cp is not None:
                 boundary_eval_pawns = boundary_eval_cp / 100.0
                 if abs(boundary_eval_pawns) >= opening_disaster_pawns:
+                    opening_disaster_match = True
                     add("Opening disaster", f"Eval at opening end (move {opening_end_move}) is {boundary_eval_pawns:+.1f}")
 
         # Blunder-decided: first blunder flips to decisive advantage and never recovers meaningfully.
@@ -180,6 +209,7 @@ class GameAutoTaggingService:
                     else:
                         recovered = any(v < never_recovered_pawns for v in subsequent)
                     if not recovered:
+                        blunder_decided_match = True
                         add(
                             "Blunder-decided",
                             f"First blunder at ply {first_blunder_ply} caused decisive eval and was never recovered",
@@ -255,7 +285,49 @@ class GameAutoTaggingService:
                 if new_state != 0:
                     state = new_state
             if swings_count >= chaotic_min_swings:
+                chaotic_match = True
                 add("Chaotic game", f"{swings_count} large swings across threshold")
+
+        # Sharp: both sides low average CPL, enough depth/book quality, no structural mess tags.
+        sharp_max_cpl = float(self._cfg.get("sharp_max_average_cpl", 28.0))
+        sharp_min_full_moves = int(self._cfg.get("sharp_min_full_moves", 18))
+        dq = self._cfg.get("sharp_data_quality", {}) or {}
+        if not isinstance(dq, dict):
+            dq = {}
+        sharp_min_median_depth = int(dq.get("min_median_depth", 10))
+        sharp_max_book_fraction = float(dq.get("max_book_move_fraction", 0.45))
+
+        ws = summary.white_stats
+        bs = summary.black_stats
+        total_player_moves = max(1, ws.total_moves + bs.total_moves)
+        book_fraction = (ws.book_moves + bs.book_moves) / float(total_player_moves)
+        median_depth = self._median_engine_depth_non_book(moves)
+        blunders_total = ws.blunders + bs.blunders
+        sloppy_total = ws.mistakes + bs.mistakes + ws.misses + bs.misses
+
+        sharp_ok = (
+            len(moves) >= sharp_min_full_moves
+            and ws.analyzed_moves > 0
+            and bs.analyzed_moves > 0
+            and ws.average_cpl <= sharp_max_cpl
+            and bs.average_cpl <= sharp_max_cpl
+            and median_depth is not None
+            and median_depth >= float(sharp_min_median_depth)
+            and book_fraction <= sharp_max_book_fraction
+            and blunders_total == 0
+            and sloppy_total <= 4
+            and not opening_disaster_match
+            and not blunder_decided_match
+            and not chaotic_match
+        )
+        if sharp_ok:
+            add(
+                "Sharp",
+                (
+                    f"Both sides avg CPL ≤{sharp_max_cpl:.0f}, median depth {median_depth:.0f}, "
+                    f"book moves {book_fraction:.0%} ≤ {sharp_max_book_fraction:.0%}"
+                ),
+            )
 
         return AutoTaggingResult(detected_tags=sorted(detected), reasons=reasons)
 

@@ -5857,6 +5857,14 @@
           140,
           140
         ]
+      },
+      {
+        "name": "Sharp",
+        "color": [
+          90,
+          160,
+          200
+        ]
       }
     ]
   },
@@ -6061,7 +6069,13 @@
       "endgame_grind_resolution_eval_pawns": 2.0,
       "chaotic_large_advantage_pawns": 2.0,
       "chaotic_swing_pawns": 2.0,
-      "chaotic_min_swings": 6
+      "chaotic_min_swings": 6,
+      "sharp_max_average_cpl": 18,
+      "sharp_min_full_moves": 20,
+      "sharp_data_quality": {
+        "min_median_depth": 10,
+        "max_book_move_fraction": 0.45
+      }
     },
     "book_move_detection": {
       "use_eco_lookup": true,

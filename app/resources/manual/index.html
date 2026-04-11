@@ -1555,7 +1555,7 @@
                 <h5 id="auto-tagging">5.5.5 Auto-tagging</h5>
                 <p><strong>Auto-tagging</strong> can assign <a href="#game-tagging">game tags</a> automatically after game analysis (single-game and bulk). Turn it on or off with <span class="menu-item">Game Analysis → Auto Tag Games</span> (see <a href="#game-analysis-menu">section 6.7</a>).</p>
                 <p>When auto-tagging is on, you can still choose <strong>which</strong> rules may apply: use <span class="menu-item">Game Analysis → Select Tags for Auto-Tagging</span> and check or uncheck each tag name. Your choices are saved with your user preferences. If every tag is unchecked, analysis will not add any of these automatic tags (existing manual tags on the game are unchanged). The submenu is available only while <span class="menu-item">Auto Tag Games</span> is enabled.</p>
-                <p>Numeric thresholds for the evaluation-based rules below are defined in <code>config.json</code> (under <code>game_analysis.auto_game_tagging</code>). The <strong>Brilliant Move</strong> auto-tag depends on moves being classified as <strong>Brilliant</strong> in the moves list, which requires <span class="menu-item">Game Analysis → Brilliant Move Detection</span> to be on and a compatible engine assignment; see <a href="#brilliant-move-detection">section 5.5.3</a>.</p>
+                <p>Numeric thresholds for the evaluation-based rules below are defined in <code>config.json</code> (under <code>game_analysis.auto_game_tagging</code>). The <strong>Sharp</strong> rule uses average CPL (both sides), minimum full-move rows, median engine depth and book-move share (<code>sharp_data_quality</code>), and is suppressed when the opening disaster, blunder-decided, or chaotic patterns would apply. The <strong>Brilliant Move</strong> auto-tag depends on moves being classified as <strong>Brilliant</strong> in the moves list, which requires <span class="menu-item">Game Analysis → Brilliant Move Detection</span> to be on and a compatible engine assignment; see <a href="#brilliant-move-detection">section 5.5.3</a>.</p>
                 <p>The following auto-tag rules are available:</p>
                 <div class="autotag-rules-desktop column-table-wrapper">
                 <table class="column-table">
@@ -1594,6 +1594,10 @@
                             <td class="column-name-cell">Chaotic game</td>
                             <td>Both sides reach large advantages during the game and the evaluation swings back and forth multiple times.</td>
                         </tr>
+                        <tr>
+                            <td class="column-name-cell">Sharp</td>
+                            <td>Both sides show low average centipawn loss, enough engine depth, and a bounded share of book moves; no blunders, few mistakes/misses, and none of the opening disaster, blunder-decided, or chaotic patterns.</td>
+                        </tr>
                     </tbody>
                 </table>
                 </div>
@@ -1625,6 +1629,10 @@
                     <div class="regex-example-card">
                         <div class="regex-example-field"><span class="regex-example-label">Auto-tag</span><span class="regex-example-value">Chaotic game</span></div>
                         <div class="regex-example-field"><span class="regex-example-label">When it applies (high level)</span><span class="regex-example-value">Both sides reach large advantages during the game and the evaluation swings back and forth multiple times.</span></div>
+                    </div>
+                    <div class="regex-example-card">
+                        <div class="regex-example-field"><span class="regex-example-label">Auto-tag</span><span class="regex-example-value">Sharp</span></div>
+                        <div class="regex-example-field"><span class="regex-example-label">When it applies (high level)</span><span class="regex-example-value">Both sides show low average centipawn loss, enough engine depth, and a bounded share of book moves; no blunders, few mistakes/misses, and none of the opening disaster, blunder-decided, or chaotic patterns.</span></div>
                     </div>
                 </div>
                 <div class="tip-box">
