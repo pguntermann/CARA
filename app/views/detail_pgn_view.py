@@ -460,10 +460,6 @@ class DetailPgnView(QWidget):
         Reloads settings and refreshes PGN display.
         """
         self._load_pgn_notation_settings()
-        # Refresh PGN display with new settings
-        if self._current_pgn_text:
-            self.set_pgn_text(self._current_pgn_text)
-        # Refresh PGN display to apply filtering
         if self._current_pgn_text:
             self.set_pgn_text(self._current_pgn_text)
     

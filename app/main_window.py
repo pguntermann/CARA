@@ -1041,7 +1041,8 @@ class MainWindow(QMainWindow):
     
     def _close_application(self) -> None:
         """Close the application."""
-        self._save_user_settings()
+        # Settings are persisted in closeEvent after quit(); saving here would duplicate that work.
+        # self._save_user_settings()
         QApplication.instance().quit()
     
     def closeEvent(self, event: QCloseEvent) -> None:
@@ -2321,13 +2322,9 @@ class MainWindow(QMainWindow):
             self.controller.set_status("Cannot save default profile")
             return
         
-        # Get current column widths and order from view and save to profile model
+        # Push current header widths and column order into the active profile (in memory)
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moves_view'):
-            moves_view = self.detail_panel.moves_view
-            if hasattr(moves_view, '_save_column_widths'):
-                moves_view._save_column_widths()
-            if hasattr(moves_view, '_save_column_order'):
-                moves_view._save_column_order()
+            self.detail_panel.moves_view.sync_moves_list_column_layout_to_active_profile()
         
         # Update the active profile with current column configuration and persist
         success, message = self.profile_controller.update_current_profile()
@@ -2350,13 +2347,9 @@ class MainWindow(QMainWindow):
         if not ok or not profile_name:
             return
         
-        # Get current column widths and order from view before creating new profile
+        # Push current header widths and column order into the active profile before snapshot
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moves_view'):
-            moves_view = self.detail_panel.moves_view
-            if hasattr(moves_view, '_save_column_widths'):
-                moves_view._save_column_widths()
-            if hasattr(moves_view, '_save_column_order'):
-                moves_view._save_column_order()
+            self.detail_panel.moves_view.sync_moves_list_column_layout_to_active_profile()
         
         # Save profile
         success, message = self.profile_controller.add_profile(profile_name)
@@ -3117,12 +3110,12 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moves_view'):
             moves_view = self.detail_panel.moves_view
             # Set column profile model on the view
-            moves_view.set_column_profile_model(self.profile_model)
+            moves_view.set_column_profile_controller(self.controller.get_column_profile_controller())
         
         # Also update moves list model column visibility
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
             moveslist_model = self.detail_panel.moveslist_model
-            column_visibility = self.profile_model.get_current_column_visibility()
+            column_visibility = self.controller.get_column_profile_controller().get_column_visibility()
             moveslist_model.set_column_visibility(column_visibility)
         
         # Ensure column visibility, order and widths are applied on startup
@@ -3176,7 +3169,7 @@ class MainWindow(QMainWindow):
         # Get moves list model from detail panel
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
             moveslist_model = self.detail_panel.moveslist_model
-            column_visibility = self.profile_model.get_current_column_visibility()
+            column_visibility = self.controller.get_column_profile_controller().get_column_visibility()
             moveslist_model.set_column_visibility(column_visibility)
     
     def _navigate_to_next_move(self) -> None:

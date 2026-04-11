@@ -96,14 +96,30 @@ def find_mainline_comment_ply_at_plaintext_position(text: str, position: int) ->
     return None
 
 
+def _normalize_pgn_header_tags_one_per_line(text: str, tag_pattern: re.Pattern[str]) -> str:
+    """Rejoin consecutive standard PGN tags with newlines (one tag per line).
+
+    The detail PGN view may concatenate tags on a single line for display; other
+    chess software expects each ``[Tag "value"]`` on its own line when pasting.
+    """
+    matches = list(tag_pattern.finditer(text))
+    if not matches:
+        return text
+    start = matches[0].start()
+    end = matches[-1].end()
+    rebuilt = "\n".join(m.group(0).strip() for m in matches)
+    return text[:start] + rebuilt + text[end:]
+
+
 def clean_pgn_text(text: str) -> str:
     """Clean and format PGN text for copying to clipboard.
     
     This function:
-    1. Separates metadata tags from move notation (adds CRLF between them)
-    2. Applies fixed-width formatting using export config settings
-    3. Removes invisible sentinel characters used for move identification/highlighting and main-line comments
-    4. Normalizes line endings to CRLF
+    1. Removes invisible sentinel characters used for move identification/highlighting and main-line comments
+    2. Puts each metadata tag on its own line when they were concatenated on one line
+    3. Separates metadata tags from move notation (adds CRLF between them)
+    4. Applies fixed-width formatting using export config settings
+    5. Normalizes line endings to CRLF
     
     Args:
         text: PGN text that may contain invisible sentinel characters.
@@ -130,6 +146,7 @@ def clean_pgn_text(text: str) -> str:
     # Step 2: Separate metadata tags from move notation and ensure blank line between them
     # Pattern to match metadata tags: [Key "Value"]
     metadata_tag_pattern = re.compile(r'\[([A-Za-z0-9][A-Za-z0-9_]*)\s+"([^"]*)"\]')
+    text = _normalize_pgn_header_tags_one_per_line(text, metadata_tag_pattern)
     # Pattern to match move notation start: number followed by dot and space or move notation
     # More specific: must be after all metadata tags, and match actual move format
     move_pattern = re.compile(r'\b([1-9]\d{0,2}|0)\.(?:\.\.| |[a-hNBRQKO][a-h1-8x=+#]?[a-h1-8]?)')
@@ -1224,6 +1241,15 @@ class PgnFormatterService:
         panel_config = ui_config.get('panels', {}).get('detail', {})
         pgn_config = panel_config.get('pgn_notation', {})
         formatting = pgn_config.get('formatting', {})
+        nags_config = formatting.get('nags', {})
+        annotations_config = formatting.get('annotations', {})
+        # PGN menu: "Text" = show descriptions; "Symbols" = glyphs for NAGs 1–6 only ($n has no glyph → still show text).
+        if pgn_notation_settings is not None:
+            show_nag_text = bool(pgn_notation_settings.get('show_nag_text', True))
+            use_symbols_for_common_nags = bool(pgn_notation_settings.get('use_symbols_for_nags', True))
+        else:
+            show_nag_text = bool(nags_config.get('show_text', True))
+            use_symbols_for_common_nags = bool(annotations_config.get('use_symbols', True))
         
         # Get default text color
         default_color = pgn_config.get('text_color', [220, 220, 220])
@@ -1253,18 +1279,7 @@ class PgnFormatterService:
         # This ensures NAGs are converted even when they're in variations or comments
         # Common NAGs (1-6) can be converted to symbols (!, !!, ?, ??, !?, ?!) for annotation color formatting
         # or to readable text, depending on user preference
-        # Other NAGs are converted to readable text
-        nags_config = formatting.get('nags', {})
-        annotations_config = formatting.get('annotations', {})
-        
-        # Use user settings if provided, otherwise fall back to config.json
-        if pgn_notation_settings:
-            show_nag_text = pgn_notation_settings.get('show_nag_text', True)
-            use_symbols_for_common_nags = pgn_notation_settings.get('use_symbols_for_nags', True)
-        else:
-            show_nag_text = nags_config.get('show_text', True)  # Whether to show text or just symbol for non-symbol NAGs
-            use_symbols_for_common_nags = annotations_config.get('use_symbols', True)  # Whether to convert common NAGs to symbols
-        
+        # NAGs without a standard glyph always become parenthetical text (never raw $n in the pane).
         # Pattern to match NAGs: $ followed by one or more digits
         # But NOT in metadata tags - we need to skip headers
         nag_pattern = re.compile(r'\$(\d+)')
@@ -1298,29 +1313,13 @@ class PgnFormatterService:
                     
                     # Check if this NAG has a symbol equivalent (common annotations)
                     if nag_number in NAG_TO_SYMBOL:
-                        # Check if user wants symbols or text for common NAGs
                         if use_symbols_for_common_nags:
-                            # Convert to symbol (e.g., "$1" becomes "!", "$2" becomes "?")
-                            # These symbols will be colored by the annotation formatting step
+                            # Convert to symbol (e.g., "$1" → "!"); styled in the annotation pass
                             nag_display = NAG_TO_SYMBOL[nag_number]
                         else:
-                            # Convert to text format like other NAGs
-                            nag_text = get_nag_text(nag_number)
-                            
-                            if show_nag_text:
-                                nag_display = f" ({nag_text})"
-                            else:
-                                nag_display = match.group(0)
+                            nag_display = f" ({get_nag_text(nag_number)})"
                     else:
-                        # NAG doesn't have a symbol equivalent - convert to text
-                        nag_text = get_nag_text(nag_number)
-                        
-                        if show_nag_text:
-                            # Replace NAG with readable text (e.g., "$10" becomes " (drawish position)" or "$146" becomes " (unknown NAG 146)")
-                            nag_display = f" ({nag_text})"
-                        else:
-                            # Keep the NAG symbol
-                            nag_display = match.group(0)
+                        nag_display = f" ({get_nag_text(nag_number)})"
                     
                     result_parts.append(nag_display)
                     i = i + match.end()
@@ -1444,124 +1443,122 @@ class PgnFormatterService:
         # This ensures NAG text is in its own span so move formatter will skip it
         # Common NAGs (1-6) were converted to symbols (!, !!, ?, ??, !?, ?!) and will be styled later
         # Other NAGs were converted from $10 to " (drawish position)" in the early step
-        nags_config = formatting.get('nags', {})
         nag_color = nags_config.get('color', [200, 200, 255])
         nag_bold = nags_config.get('bold', False)
         nag_italic = nags_config.get('italic', True)
-        show_nag_text = nags_config.get('show_text', True)
         
-        if show_nag_text:
-            # NAGs were converted to text like " (poor move)", " (good move)", etc.
-            # We need to style these converted NAG texts
-            # Since NAGs were converted earlier, we can match them by looking for the pattern
-            # " (text)" where text is a known NAG meaning
+        # Always wrap known parenthetical NAG meanings (symbols mode still emits text for $7+).
+        # NAGs were converted to text like " (poor move)", " (good move)", etc.
+        # We need to style these converted NAG texts
+        # Since NAGs were converted earlier, we can match them by looking for the pattern
+        # " (text)" where text is a known NAG meaning
+        
+        # Build a pattern that matches any NAG meaning text in parentheses
+        # We'll match patterns like " (text)" where text is one of the NAG meanings
+        # OR " (unknown NAG \d+)" for unknown NAGs
+        nag_meanings_list = list(set(NAG_MEANINGS.values()))
+        # Sort by length (longest first) to match more specific patterns first
+        nag_meanings_list.sort(key=len, reverse=True)
+        
+        # Escape special regex characters in NAG meanings
+        # Some meanings contain parentheses (like "Black should resign"), so we need to escape them
+        # But we need to handle nested parentheses correctly
+        escaped_meanings = []
+        for meaning in nag_meanings_list:
+            # Escape the meaning, but we need to handle parentheses specially
+            # Meanings with nested parens like "White has a crushing advantage (Black should resign)"
+            # need to be matched as a whole, so we escape everything including the nested parens
+            escaped = re.escape(meaning)
+            escaped_meanings.append(escaped)
+        
+        # Also add pattern for unknown NAGs: "unknown NAG \d+"
+        # This matches patterns like "unknown NAG 146", "unknown NAG 200", etc.
+        unknown_nag_pattern = r'unknown NAG \d+'
+        
+        # Combine known meanings and unknown NAG pattern
+        all_patterns = escaped_meanings + [unknown_nag_pattern]
+        
+        # Only build pattern if we have patterns to match
+        # This prevents issues with empty patterns that could match incorrectly
+        if all_patterns:
+            nag_meanings_pattern = '|'.join(all_patterns)
             
-            # Build a pattern that matches any NAG meaning text in parentheses
-            # We'll match patterns like " (text)" where text is one of the NAG meanings
-            # OR " (unknown NAG \d+)" for unknown NAGs
-            nag_meanings_list = list(set(NAG_MEANINGS.values()))
-            # Sort by length (longest first) to match more specific patterns first
-            nag_meanings_list.sort(key=len, reverse=True)
-            
-            # Escape special regex characters in NAG meanings
-            # Some meanings contain parentheses (like "Black should resign"), so we need to escape them
-            # But we need to handle nested parentheses correctly
-            escaped_meanings = []
-            for meaning in nag_meanings_list:
-                # Escape the meaning, but we need to handle parentheses specially
-                # Meanings with nested parens like "White has a crushing advantage (Black should resign)"
-                # need to be matched as a whole, so we escape everything including the nested parens
-                escaped = re.escape(meaning)
-                escaped_meanings.append(escaped)
-            
-            # Also add pattern for unknown NAGs: "unknown NAG \d+"
-            # This matches patterns like "unknown NAG 146", "unknown NAG 200", etc.
-            unknown_nag_pattern = r'unknown NAG \d+'
-            
-            # Combine known meanings and unknown NAG pattern
-            all_patterns = escaped_meanings + [unknown_nag_pattern]
-            
-            # Only build pattern if we have patterns to match
-            # This prevents issues with empty patterns that could match incorrectly
-            if all_patterns:
-                nag_meanings_pattern = '|'.join(all_patterns)
+            # Pattern: one or more spaces, opening paren, NAG meaning (captured), closing paren
+            # The space before the paren is important - NAGs are inserted as " (text)"
+            # Note: We capture the entire meaning (group 1) which may contain nested parentheses
+            # The pattern needs to match the full escaped meaning exactly
+            # IMPORTANT: The pattern requires at least one non-whitespace character in the captured group
+            # This prevents matching empty parentheses like " ()"
+            nag_text_pattern = re.compile(r'\s+\((' + nag_meanings_pattern + r')\)')
+        else:
+            # No patterns to match - create a pattern that matches nothing
+            nag_text_pattern = re.compile(r'(?!)')  # Negative lookahead that never matches
+        
+        result_parts = []
+        i = 0
+        in_tag = False
+        in_header_span = False
+        
+        while i < len(formatted):
+            if formatted[i] == '<':
+                in_tag = True
+                # Check if this is a header span opening tag
+                if i + 5 < len(formatted) and formatted[i:i+5] == '<span':
+                    tag_end = formatted.find('>', i)
+                    if tag_end != -1:
+                        tag_content = formatted[i:tag_end+1]
+                        # Check if this is a header span (blue color)
+                        if 'color: rgb(100, 150, 255)' in tag_content:
+                            in_header_span = True
+                # Check if this is a closing span tag (</span>)
+                elif i + 7 < len(formatted) and formatted[i:i+7] == '</span>':
+                    # Found closing span tag - if we're in a header span, close it
+                    if in_header_span:
+                        in_header_span = False
                 
-                # Pattern: one or more spaces, opening paren, NAG meaning (captured), closing paren
-                # The space before the paren is important - NAGs are inserted as " (text)"
-                # Note: We capture the entire meaning (group 1) which may contain nested parentheses
-                # The pattern needs to match the full escaped meaning exactly
-                # IMPORTANT: The pattern requires at least one non-whitespace character in the captured group
-                # This prevents matching empty parentheses like " ()"
-                nag_text_pattern = re.compile(r'\s+\((' + nag_meanings_pattern + r')\)')
+                result_parts.append(formatted[i])
+                i += 1
+            elif formatted[i] == '>':
+                in_tag = False
+                result_parts.append(formatted[i])
+                i += 1
+            elif not in_tag and not in_header_span:
+                # Check if we're at a NAG text pattern
+                # We want to style NAGs everywhere except inside HTML tags and headers
+                # Look for NAG text pattern starting at position i
+                remaining_text = formatted[i:]
+                match = nag_text_pattern.search(remaining_text)
+                if match and match.start() == 0:
+                    # Found potential NAG text - verify it captured the text correctly
+                    captured_text = match.group(1)  # The NAG meaning text (group 1)
+                    full_match = match.group(0)  # Full match including " (text)"
+                    
+                    # Verify we actually captured text (not empty)
+                    # This prevents matching empty parentheses like " ()"
+                    # Also verify the full match contains the parentheses and text
+                    # Additional check: ensure the captured text is not just whitespace
+                    if (captured_text and 
+                        captured_text.strip() and 
+                        len(captured_text.strip()) > 0 and
+                        '(' in full_match and 
+                        ')' in full_match and
+                        full_match.count('(') == 1 and  # Ensure only one opening paren
+                        full_match.count(')') == 1):   # Ensure only one closing paren
+                        # This is a valid NAG text - style it
+                        # The full_match should be like " (poor move)" or " (very poor move)"
+                        nag_formatted = span(full_match, nag_color, nag_bold, nag_italic)
+                        result_parts.append(nag_formatted)
+                        i = i + match.end()
+                        continue
+                    # If captured_text is empty or invalid, it's not a NAG, continue normal processing
+                
+                result_parts.append(formatted[i])
+                i += 1
             else:
-                # No patterns to match - create a pattern that matches nothing
-                nag_text_pattern = re.compile(r'(?!)')  # Negative lookahead that never matches
-            
-            result_parts = []
-            i = 0
-            in_tag = False
-            in_header_span = False
-            
-            while i < len(formatted):
-                if formatted[i] == '<':
-                    in_tag = True
-                    # Check if this is a header span opening tag
-                    if i + 5 < len(formatted) and formatted[i:i+5] == '<span':
-                        tag_end = formatted.find('>', i)
-                        if tag_end != -1:
-                            tag_content = formatted[i:tag_end+1]
-                            # Check if this is a header span (blue color)
-                            if 'color: rgb(100, 150, 255)' in tag_content:
-                                in_header_span = True
-                    # Check if this is a closing span tag (</span>)
-                    elif i + 7 < len(formatted) and formatted[i:i+7] == '</span>':
-                        # Found closing span tag - if we're in a header span, close it
-                        if in_header_span:
-                            in_header_span = False
-                    
-                    result_parts.append(formatted[i])
-                    i += 1
-                elif formatted[i] == '>':
-                    in_tag = False
-                    result_parts.append(formatted[i])
-                    i += 1
-                elif not in_tag and not in_header_span:
-                    # Check if we're at a NAG text pattern
-                    # We want to style NAGs everywhere except inside HTML tags and headers
-                    # Look for NAG text pattern starting at position i
-                    remaining_text = formatted[i:]
-                    match = nag_text_pattern.search(remaining_text)
-                    if match and match.start() == 0:
-                        # Found potential NAG text - verify it captured the text correctly
-                        captured_text = match.group(1)  # The NAG meaning text (group 1)
-                        full_match = match.group(0)  # Full match including " (text)"
-                        
-                        # Verify we actually captured text (not empty)
-                        # This prevents matching empty parentheses like " ()"
-                        # Also verify the full match contains the parentheses and text
-                        # Additional check: ensure the captured text is not just whitespace
-                        if (captured_text and 
-                            captured_text.strip() and 
-                            len(captured_text.strip()) > 0 and
-                            '(' in full_match and 
-                            ')' in full_match and
-                            full_match.count('(') == 1 and  # Ensure only one opening paren
-                            full_match.count(')') == 1):   # Ensure only one closing paren
-                            # This is a valid NAG text - style it
-                            # The full_match should be like " (poor move)" or " (very poor move)"
-                            nag_formatted = span(full_match, nag_color, nag_bold, nag_italic)
-                            result_parts.append(nag_formatted)
-                            i = i + match.end()
-                            continue
-                        # If captured_text is empty or invalid, it's not a NAG, continue normal processing
-                    
-                    result_parts.append(formatted[i])
-                    i += 1
-                else:
-                    result_parts.append(formatted[i])
-                    i += 1
-            
-            formatted = ''.join(result_parts)
+                result_parts.append(formatted[i])
+                i += 1
+        
+        formatted = ''.join(result_parts)
         
         # Format variations: wrap parentheses and format moves within them
         # NAG text is already styled above, so variation formatter will skip it
@@ -1769,8 +1766,6 @@ class PgnFormatterService:
         formatted = ''.join(result_parts)
         
         # Format annotations (!, !!, ?, ??) - but skip if inside HTML tags or headers
-        annotations_config = formatting.get('annotations', {})
-        
         # Good moves (!, !!)
         good_config = annotations_config.get('good', {})
         good_color = good_config.get('color', [100, 255, 100])
@@ -1794,14 +1789,16 @@ class PgnFormatterService:
         # Process annotations outside HTML tags and header spans
         # Order matters: process more specific patterns first to avoid partial matches
         # For example, !? and ?! must be processed before ! and ? to avoid matching parts
+        # Each pattern maps to the NAG id used for "Text" mode (PGN menu) descriptions.
         annotation_patterns = [
-            (r'(!\?)', interesting_color, interesting_bold),  # !? first (most specific, 2 chars)
-            (r'(\?!)', dubious_color, dubious_bold),  # ?! second (most specific, 2 chars)
-            (r'(\!{2})', good_color, good_bold),  # !! third (2 chars)
-            (r'(\?{2})', bad_color, bad_bold),  # ?? fourth (2 chars)
-            (r'(!)', good_color, good_bold),  # ! last (single char, after !! and !?)
-            (r'(\?)', bad_color, bad_bold),  # ? last (single char, after ?? and ?!)
+            (r'(!\?)', interesting_color, interesting_bold, 5),
+            (r'(\?!)', dubious_color, dubious_bold, 6),
+            (r'(\!{2})', good_color, good_bold, 3),
+            (r'(\?{2})', bad_color, bad_bold, 4),
+            (r'(!)', good_color, good_bold, 1),
+            (r'(\?)', bad_color, bad_bold, 2),
         ]
+        annotate_move_assessments_as_text = show_nag_text and not use_symbols_for_common_nags
         
         # Process all patterns in a single pass to avoid re-processing already formatted annotations
         result_parts = []
@@ -1821,7 +1818,10 @@ class PgnFormatterService:
             in_annotation_span = any(span == 'annotation' for span in span_stack)
         
         # Compile all patterns
-        compiled_patterns = [(re.compile(pattern), color, is_bold) for pattern, color, is_bold in annotation_patterns]
+        compiled_patterns = [
+            (re.compile(pattern), color, is_bold, nag_id)
+            for pattern, color, is_bold, nag_id in annotation_patterns
+        ]
         
         while i < len(formatted):
             if formatted[i] == '<':
@@ -1878,10 +1878,15 @@ class PgnFormatterService:
                 # Only format annotations outside of all HTML tags and special spans
                 # Try patterns in order (most specific first) - stop at first match
                 matched = False
-                for compiled_pattern, color, is_bold in compiled_patterns:
+                for compiled_pattern, color, is_bold, nag_glyph_id in compiled_patterns:
                     match = compiled_pattern.match(formatted, i)
                     if match:
-                        annotation_formatted = span(match.group(0), color, is_bold)
+                        if annotate_move_assessments_as_text:
+                            nag_txt = get_nag_text(nag_glyph_id)
+                            text_out = f" ({nag_txt})"
+                            annotation_formatted = span(text_out, nag_color, nag_bold, nag_italic)
+                        else:
+                            annotation_formatted = span(match.group(0), color, is_bold)
                         result_parts.append(annotation_formatted)
                         i = match.end()
                         matched = True

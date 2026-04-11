@@ -152,7 +152,8 @@ class PlayerDropdownWorker(QThread):
 class PlayerStatsCalculationWorker(QThread):
     """Worker thread for calculating player statistics asynchronously."""
     
-    stats_ready = pyqtSignal(object, list, list)  # AggregatedPlayerStats, List[ErrorPattern], List[GameSummary]
+    # Last list: parallel to analyzed games, Optional[List[MoveData]] per game (UI reuses without re-loading).
+    stats_ready = pyqtSignal(object, list, list, list)
     stats_unavailable = pyqtSignal(str)  # Reason key
     progress_update = pyqtSignal(int, str)  # progress_percent, status_message
     
@@ -320,7 +321,7 @@ class PlayerStatsCalculationWorker(QThread):
             if not self._is_cancelled():
                 try:
                     self.progress_update.emit(100, f"Statistics calculated for {self.player_name}")
-                    self.stats_ready.emit(aggregated_stats, error_patterns, game_summaries)
+                    self.stats_ready.emit(aggregated_stats, error_patterns, game_summaries, precomputed_moves)
                     result_emitted = True
                 except RuntimeError:
                     # Receiver might be deleted, ignore
@@ -388,6 +389,8 @@ class PlayerStatsController(QObject):
         # Keep the analyzed games used for the current stats so we can rank individual games.
         self._current_analyzed_games: List["GameData"] = []
         self._last_analyzed_games: List["GameData"] = []
+        # Move lists from last successful worker run, index-aligned with _current_analyzed_games (see stats_ready).
+        self._session_precomputed_moves: List[Optional[List[MoveData]]] = []
         self._last_unavailable_reason: str = "no_player"
         self._current_player: Optional[str] = None
         self._use_all_databases: bool = False
@@ -629,8 +632,6 @@ class PlayerStatsController(QObject):
         match_startswith: If True, match assessment.startswith(assessment_match); else exact match.
         sort_cpl_ascending: True for brilliant (best first), False for miss/blunder (worst first).
         """
-        from app.services.analysis_data_storage_service import AnalysisDataStorageService
-
         if not self._current_player or max_moves <= 0:
             return []
 
@@ -640,14 +641,11 @@ class PlayerStatsController(QObject):
 
         records: List[Tuple[float, "GameData", int]] = []
 
-        for game in analyzed_games:
+        for gi, game in enumerate(analyzed_games):
             if not getattr(game, "analyzed", False):
                 continue
             is_white_game = (game.white == self._current_player)
-            try:
-                moves = AnalysisDataStorageService.load_analysis_data(game)
-            except Exception:
-                moves = None
+            moves = self._analysis_moves_for_session_game(gi, game)
             if not moves:
                 continue
 
@@ -714,6 +712,22 @@ class PlayerStatsController(QObject):
             "Blunder", match_startswith=False, max_moves=max_moves, sort_cpl_ascending=False
         )
 
+    def _analysis_moves_for_session_game(
+        self, game_index: int, game: "GameData"
+    ) -> Optional[List[MoveData]]:
+        """Return per-game move list from the current stats session if present; else load from storage."""
+        from app.services.analysis_data_storage_service import AnalysisDataStorageService
+
+        session = getattr(self, "_session_precomputed_moves", None)
+        if session and 0 <= game_index < len(session):
+            cached = session[game_index]
+            if cached is not None:
+                return cached
+        try:
+            return AnalysisDataStorageService.load_analysis_data(game)
+        except Exception:
+            return None
+
     def get_opening_tree(
         self,
         max_depth: int = 12,
@@ -744,8 +758,6 @@ class PlayerStatsController(QObject):
 
         Only sequences that appear in at least min_games games are kept.
         """
-        from app.services.analysis_data_storage_service import AnalysisDataStorageService
-
         tree: Dict[str, Any] = {
             "games": 0,
             "white_games": 0,
@@ -763,13 +775,10 @@ class PlayerStatsController(QObject):
 
         total_games_used = 0
 
-        for game, summary in zip(analyzed_games, summaries):
+        for gi, (game, summary) in enumerate(zip(analyzed_games, summaries)):
             if not getattr(game, "analyzed", False):
                 continue
-            try:
-                moves = AnalysisDataStorageService.load_analysis_data(game)
-            except Exception:
-                moves = None
+            moves = self._analysis_moves_for_session_game(gi, game)
             if not moves:
                 continue
 
@@ -918,8 +927,6 @@ class PlayerStatsController(QObject):
         ref_ply is set to the ply index of the last move in the SAN path so the
         Search Results tab can jump directly to the defining move of that opening.
         """
-        from app.services.analysis_data_storage_service import AnalysisDataStorageService
-        
         matches: List[Tuple["GameData", int]] = []
         if not san_path or not self._current_player:
             return []
@@ -930,13 +937,10 @@ class PlayerStatsController(QObject):
         
         max_plies = min(max_depth, len(san_path))
         
-        for game in analyzed_games:
+        for gi, game in enumerate(analyzed_games):
             if not getattr(game, "analyzed", False):
                 continue
-            try:
-                moves = AnalysisDataStorageService.load_analysis_data(game)
-            except Exception:
-                moves = None
+            moves = self._analysis_moves_for_session_game(gi, game)
             if not moves:
                 continue
             
@@ -1270,6 +1274,7 @@ class PlayerStatsController(QObject):
         self.current_game_summaries = []
         self._current_analyzed_games = []
         self._last_analyzed_games = []
+        self._session_precomputed_moves = []
         self.stats_unavailable.emit(reason)
     
     # Source and player selection management
@@ -1290,6 +1295,7 @@ class PlayerStatsController(QObject):
             self._use_all_databases = False
             self._cancel_stats_worker()
             self._current_player = None
+            self._session_precomputed_moves = []
             self.player_selection_cleared.emit()
         else:
             # 1=Active, 2=All DBs, 3=Selected (Active), 4=Selected (All)
@@ -1324,6 +1330,7 @@ class PlayerStatsController(QObject):
             # Clear selection
             self._cancel_stats_worker()
             self._current_player = None
+            self._session_precomputed_moves = []
             self.player_selection_cleared.emit()
         else:
             self._current_player = player_name
@@ -1457,13 +1464,24 @@ class PlayerStatsController(QObject):
         self.stats_recalculation_started.emit()
         self._stats_worker.start()
     
-    def _on_stats_worker_ready(self, stats: AggregatedPlayerStats, patterns: List[ErrorPattern], summaries: List[GameSummary]) -> None:
+    def _on_stats_worker_ready(
+        self,
+        stats: AggregatedPlayerStats,
+        patterns: List[ErrorPattern],
+        summaries: List[GameSummary],
+        session_moves: Optional[List[Optional[List[MoveData]]]] = None,
+    ) -> None:
         """Handle stats worker ready signal."""
         self.current_stats = stats
         self.current_patterns = patterns
         self.current_game_summaries = summaries
         # Use the same analyzed games that were used for this calculation
         self._current_analyzed_games = getattr(self, "_last_analyzed_games", [])
+        games = self._current_analyzed_games
+        if session_moves and len(session_moves) == len(games):
+            self._session_precomputed_moves = list(session_moves)
+        else:
+            self._session_precomputed_moves = []
         self.stats_updated.emit(stats, patterns, summaries)
     
     def _on_stats_worker_unavailable(self, reason: str) -> None:
