@@ -96,14 +96,30 @@ def find_mainline_comment_ply_at_plaintext_position(text: str, position: int) ->
     return None
 
 
+def _normalize_pgn_header_tags_one_per_line(text: str, tag_pattern: re.Pattern[str]) -> str:
+    """Rejoin consecutive standard PGN tags with newlines (one tag per line).
+
+    The detail PGN view may concatenate tags on a single line for display; other
+    chess software expects each ``[Tag "value"]`` on its own line when pasting.
+    """
+    matches = list(tag_pattern.finditer(text))
+    if not matches:
+        return text
+    start = matches[0].start()
+    end = matches[-1].end()
+    rebuilt = "\n".join(m.group(0).strip() for m in matches)
+    return text[:start] + rebuilt + text[end:]
+
+
 def clean_pgn_text(text: str) -> str:
     """Clean and format PGN text for copying to clipboard.
     
     This function:
-    1. Separates metadata tags from move notation (adds CRLF between them)
-    2. Applies fixed-width formatting using export config settings
-    3. Removes invisible sentinel characters used for move identification/highlighting and main-line comments
-    4. Normalizes line endings to CRLF
+    1. Removes invisible sentinel characters used for move identification/highlighting and main-line comments
+    2. Puts each metadata tag on its own line when they were concatenated on one line
+    3. Separates metadata tags from move notation (adds CRLF between them)
+    4. Applies fixed-width formatting using export config settings
+    5. Normalizes line endings to CRLF
     
     Args:
         text: PGN text that may contain invisible sentinel characters.
@@ -130,6 +146,7 @@ def clean_pgn_text(text: str) -> str:
     # Step 2: Separate metadata tags from move notation and ensure blank line between them
     # Pattern to match metadata tags: [Key "Value"]
     metadata_tag_pattern = re.compile(r'\[([A-Za-z0-9][A-Za-z0-9_]*)\s+"([^"]*)"\]')
+    text = _normalize_pgn_header_tags_one_per_line(text, metadata_tag_pattern)
     # Pattern to match move notation start: number followed by dot and space or move notation
     # More specific: must be after all metadata tags, and match actual move format
     move_pattern = re.compile(r'\b([1-9]\d{0,2}|0)\.(?:\.\.| |[a-hNBRQKO][a-h1-8x=+#]?[a-h1-8]?)')
