@@ -1041,7 +1041,8 @@ class MainWindow(QMainWindow):
     
     def _close_application(self) -> None:
         """Close the application."""
-        self._save_user_settings()
+        # Settings are persisted in closeEvent after quit(); saving here would duplicate that work.
+        # self._save_user_settings()
         QApplication.instance().quit()
     
     def closeEvent(self, event: QCloseEvent) -> None:
