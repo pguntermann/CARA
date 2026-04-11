@@ -628,15 +628,16 @@ class UserSettingsService:
         model.set_ai_summary(current)
     
     def update_moves_list_profiles(self, profiles: Dict[str, Any]) -> None:
-        """Update moves list profiles.
-        
+        """Persist the full moves list profile map (replaces the stored dict).
+
+        Callers pass a complete snapshot from ``ColumnProfileModel`` (e.g. ``to_dict()``).
+        Merging with ``dict.update()`` was incorrect: removed profile keys would never
+        be deleted, so switching profiles later reloaded ghost profiles from settings.
+
         Args:
-            profiles: Dictionary of profile data.
+            profiles: Full mapping of profile name -> profile data.
         """
-        model = self.get_model()
-        current = model.get_moves_list_profiles()
-        current.update(profiles)
-        model.set_moves_list_profiles(current)
+        self.get_model().set_moves_list_profiles(profiles)
     
     def update_active_profile(self, profile_name: str) -> None:
         """Update active profile name.

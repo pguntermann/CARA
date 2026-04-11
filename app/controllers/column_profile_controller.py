@@ -1,6 +1,6 @@
 """Column profile controller for managing column visibility profiles."""
 
-from typing import Dict, Any, Optional, List
+from typing import Any, Callable, Dict, List, Optional
 
 from app.models.column_profile_model import ColumnProfileModel, DEFAULT_PROFILE_NAME
 from app.services.user_settings_service import UserSettingsService
@@ -83,7 +83,47 @@ class ColumnProfileController:
             The ColumnProfileModel instance for observing profile state.
         """
         return self.profile_model
-    
+
+    def get_profile_names(self) -> List[str]:
+        return self.profile_model.get_profile_names()
+
+    def get_active_profile_name(self) -> str:
+        return self.profile_model.get_active_profile_name()
+
+    def get_column_names(self) -> List[str]:
+        return self.profile_model.get_column_names()
+
+    def get_active_profile_column_order(self) -> List[str]:
+        """Resolved column order for the active profile (canonical column ids)."""
+        default_order = self.profile_model.get_column_names()
+        active_name = self.profile_model.get_active_profile_name()
+        active_profile = self.profile_model._profiles.get(active_name)
+        if active_profile is None:
+            return list(default_order)
+        return list(active_profile.get_column_order(default_order))
+
+    def attach_moves_list_view_profile_signals(
+        self,
+        on_column_visibility_changed: Callable[[str, bool], None],
+        on_active_profile_changed: Callable[[str], None],
+    ) -> None:
+        self.profile_model.column_visibility_changed.connect(on_column_visibility_changed)
+        self.profile_model.active_profile_changed.connect(on_active_profile_changed)
+
+    def detach_moves_list_view_profile_signals(
+        self,
+        on_column_visibility_changed: Callable[[str, bool], None],
+        on_active_profile_changed: Callable[[str], None],
+    ) -> None:
+        try:
+            self.profile_model.column_visibility_changed.disconnect(on_column_visibility_changed)
+        except TypeError:
+            pass
+        try:
+            self.profile_model.active_profile_changed.disconnect(on_active_profile_changed)
+        except TypeError:
+            pass
+
     def set_active_profile(self, profile_name: str) -> bool:
         """Set the active profile.
         
@@ -280,6 +320,33 @@ class ColumnProfileController:
             widths: Dictionary mapping column names to widths.
         """
         self.profile_model.update_current_profile_column_widths(widths)
+
+    def set_active_profile_column_order(self, column_order: List[str]) -> None:
+        """Set column display order on the active profile (in memory only).
+
+        ``column_order`` may omit or duplicate ids; the result is normalized to a single
+        permutation of all known column names (unknown entries dropped, missing appended
+        in canonical order).
+
+        Args:
+            column_order: Preferred order; visible left-to-right order from the header,
+                optionally followed by hidden columns.
+        """
+        canonical = self.profile_model.get_column_names()
+        canonical_set = set(canonical)
+        seen: set[str] = set()
+        normalized: List[str] = []
+        for name in column_order:
+            if name in seen or name not in canonical_set:
+                continue
+            normalized.append(name)
+            seen.add(name)
+        for name in canonical:
+            if name not in seen:
+                normalized.append(name)
+        active = self.profile_model._profiles.get(self.profile_model.get_active_profile_name())
+        if active:
+            active.set_column_order(normalized)
     
     def get_current_profile_state(self) -> Dict[str, Any]:
         """Get current in-memory state of active profile (not persisted to disk).
