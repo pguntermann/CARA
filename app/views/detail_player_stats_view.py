@@ -3748,8 +3748,13 @@ class DetailPlayerStatsView(QWidget):
             opening_tree = self._stats_controller.get_opening_tree(max_depth=max_depth, min_games=min_games)
             if opening_tree.get("children"):
                 opening_tree_widget = self._create_opening_tree_section_widget(
-                    text_color, label_font, value_font,
-                    section_bg_color, border_color, widgets_config
+                    text_color,
+                    label_font,
+                    value_font,
+                    section_bg_color,
+                    border_color,
+                    widgets_config,
+                    opening_tree_data=opening_tree,
                 )
                 if opening_tree_widget:
                     opening_tree_widget.setProperty("section_name", "Opening tree")
@@ -4874,37 +4879,22 @@ class DetailPlayerStatsView(QWidget):
             layout.addWidget(item)
             layout.addSpacing(2)
 
-        # Brilliant
+        # Brilliant — use aggregated counts for the row label; full scan runs only when the user clicks View.
         stats_brilliant = (stats.player_stats.brilliant_moves or 0) if stats and getattr(stats, "player_stats", None) else 0
         max_brilliant = int(brilliant_config.get("max_moves", 999))
-        list_brilliant = 0
-        if self._stats_controller:
-            try:
-                list_brilliant = len(self._stats_controller.get_top_brilliant_moves_with_sources_and_ply(max_brilliant))
-            except Exception:
-                pass
+        list_brilliant = min(stats_brilliant, max_brilliant) if max_brilliant > 0 else 0
         add_row("Brilliant Moves", stats_brilliant, list_brilliant, "brilliant", [255, 215, 0], self._on_open_brilliant_moves_in_search_results)
 
         # Misses
         stats_misses = (stats.player_stats.misses or 0) if stats and getattr(stats, "player_stats", None) else 0
         max_misses = int(misses_config.get("max_moves", 999))
-        list_misses = 0
-        if self._stats_controller:
-            try:
-                list_misses = len(self._stats_controller.get_top_misses_with_sources_and_ply(max_misses))
-            except Exception:
-                pass
+        list_misses = min(stats_misses, max_misses) if max_misses > 0 else 0
         add_row("Misses", stats_misses, list_misses, "miss", [200, 100, 255], self._on_open_misses_in_search_results)
 
         # Blunders
         stats_blunders = (stats.player_stats.blunders or 0) if stats and getattr(stats, "player_stats", None) else 0
         max_blunders = int(blunders_config.get("max_moves", 999))
-        list_blunders = 0
-        if self._stats_controller:
-            try:
-                list_blunders = len(self._stats_controller.get_top_blunders_with_sources_and_ply(max_blunders))
-            except Exception:
-                pass
+        list_blunders = min(stats_blunders, max_blunders) if max_blunders > 0 else 0
         add_row("Blunders", stats_blunders, list_blunders, "blunder", [255, 100, 100], self._on_open_blunders_in_search_results)
 
         return widget
@@ -5322,9 +5312,16 @@ class DetailPlayerStatsView(QWidget):
         self._update_endgame_tree_height_buttons()
         return widget
 
-    def _create_opening_tree_section_widget(self, text_color: QColor, label_font: QFont, value_font: QFont,
-                                            bg_color: QColor, border_color: QColor,
-                                            widgets_config: Dict[str, Any]) -> Optional[QWidget]:
+    def _create_opening_tree_section_widget(
+        self,
+        text_color: QColor,
+        label_font: QFont,
+        value_font: QFont,
+        bg_color: QColor,
+        border_color: QColor,
+        widgets_config: Dict[str, Any],
+        opening_tree_data: Optional[Dict[str, Any]] = None,
+    ) -> Optional[QWidget]:
         """Create standalone Opening tree section (tree + height controls), same style as endgame tree section."""
         if not self._stats_controller:
             return None
@@ -5336,7 +5333,10 @@ class DetailPlayerStatsView(QWidget):
         tree_config = player_stats_config.get('opening_tree', {})
         max_depth = int(tree_config.get('max_depth', 12))
         min_games = int(tree_config.get('min_games', 1))
-        opening_tree = self._stats_controller.get_opening_tree(max_depth=max_depth, min_games=min_games)
+        if opening_tree_data is not None:
+            opening_tree = opening_tree_data
+        else:
+            opening_tree = self._stats_controller.get_opening_tree(max_depth=max_depth, min_games=min_games)
         if not opening_tree.get("children"):
             return None
         border_radius = widgets_config.get('border_radius', 5)
