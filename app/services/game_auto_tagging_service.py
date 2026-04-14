@@ -142,7 +142,8 @@ class GameAutoTaggingService:
 
         # Brilliant Move: at least one move was classified as "Brilliant".
         if any(
-            (getattr(m, "assess_white", "") == "Brilliant") or (getattr(m, "assess_black", "") == "Brilliant")
+            str(getattr(m, "assess_white", "") or "").startswith("Brilliant")
+            or str(getattr(m, "assess_black", "") or "").startswith("Brilliant")
             for m in moves
         ):
             add("Brilliant Move", "At least one move was assessed as Brilliant")

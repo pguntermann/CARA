@@ -645,6 +645,18 @@ class ChessBoardWidget(QWidget):
         "Miss": "miss",
         "Blunder": "blunder",
     }
+
+    @staticmethod
+    def _normalize_assessment_label(assessment: str) -> str:
+        """Normalize assessment labels for stable mapping to badge assets.
+
+        Some features append extra info to the base assessment (e.g. "Brilliant (3,4,5)").
+        For badge rendering we only care about the base classification token.
+        """
+        s = str(assessment or "").strip()
+        if " (" in s and s.endswith(")"):
+            s = s.split(" (", 1)[0].strip()
+        return s
     
     @staticmethod
     def _contrast_color_for_badge(rgb: List[int]) -> List[int]:
@@ -680,7 +692,8 @@ class ChessBoardWidget(QWidget):
         assessment = self._moveslist_model.get_assessment_for_ply(active_ply)
         if not assessment:
             return
-        config_key = self._ASSESSMENT_TO_CONFIG_KEY.get(assessment)
+        assessment_base = self._normalize_assessment_label(assessment)
+        config_key = self._ASSESSMENT_TO_CONFIG_KEY.get(assessment_base)
         if not config_key:
             return
         badges_config = (self.config.get("ui", {}) or {}).get("panels", {}).get("main", {}).get("board", {}).get("move_classification_badges", {})

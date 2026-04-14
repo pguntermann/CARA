@@ -185,6 +185,7 @@ def run_brilliant_move_detection(
 
             depths_show_error = 0
             brilliant_depths: List[int] = []
+            brilliant_depth_bestmoves: List[Tuple[int, str]] = []
             previous_depth = None
             for depth in range(shallow_depth_min, shallow_depth_max + 1):
                 if _is_cancelled():
@@ -311,6 +312,8 @@ def run_brilliant_move_detection(
                     if counted:
                         depths_show_error += 1
                         brilliant_depths.append(depth)
+                        if append_depthlevels and shallow_best_move_san:
+                            brilliant_depth_bestmoves.append((depth, shallow_best_move_san))
                     logging_service.debug(
                         f"  depth {depth}: best={shallow_best_move_san} (eval={eval_after_best_shallow:.0f}), "
                         f"played={played_move_san} (eval={eval_after_shallow:.0f}), "
@@ -334,7 +337,13 @@ def run_brilliant_move_detection(
                 current_assessment = move_data.assess_white if is_white_move else move_data.assess_black
                 if not current_assessment.startswith("Brilliant"):
                     if append_depthlevels and brilliant_depths:
-                        assessment_text = f"Brilliant ({','.join(map(str, sorted(brilliant_depths)))})"
+                        if brilliant_depth_bestmoves:
+                            parts = [
+                                f"{d} {bm}" for d, bm in sorted(brilliant_depth_bestmoves, key=lambda x: x[0])
+                            ]
+                            assessment_text = f"Brilliant ({', '.join(parts)})"
+                        else:
+                            assessment_text = f"Brilliant ({','.join(map(str, sorted(brilliant_depths)))})"
                     else:
                         assessment_text = "Brilliant"
                     if is_white_move:
