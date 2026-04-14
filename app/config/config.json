@@ -8,7 +8,11 @@
     "$_FONT_SIZE_BASE_MEDIUM": 11,
     "$_FONT_SIZE_BASE_MEDIUM_2": 12,
     "$_FONT_SIZE_BASE_LARGE": 14,
-    "$_COLOR_TEXT_PRIMARY": [240, 240, 240],
+    "$_COLOR_NEAR_WHITE": [240, 240, 240],
+    "$_COLOR_NEAR_BLACK": [30, 30, 30],
+    "$_COLOR_TEXT_PRIMARY": {
+      "$ref": "$_COLOR_NEAR_WHITE"
+    },
     "$_COLOR_TEXT_SECONDARY": [200, 200, 200],
     "$_COLOR_TEXT_3": [220, 220, 220],
     "$_COLOR_TEXT_4": [150, 150, 150],
@@ -19,7 +23,16 @@
     "$_COLOR_BACKGROUND_SECONDARY": [30, 30, 35],
     "$_COLOR_BACKGROUND_3": [45, 45, 50],
     "$_COLOR_BACKGROUND_4": [35, 35, 40],
-    "$_COLOR_BACKGROUND_5": [50, 50, 55]
+    "$_COLOR_BACKGROUND_5": [50, 50, 55],
+    "$_COLOR_BACKGROUND_6": [55, 55, 60],
+    "$_COLOR_BACKGROUND_ACTIVE": [70, 90, 130],
+    "$_COLOR_BORDER": [60, 60, 65],
+    "$_COLOR_GRIDLINE": [60, 60, 65],
+    "$_COLOR_BUTTON_BORDER": {
+      "$ref": "$_COLOR_BORDER"
+    },
+    "$_COLOR_WHITE": [255, 255, 255],
+    "$_COLOR_BLACK": [0, 0, 0]
   },
   "ui": {
     "welcome_dialog": {
@@ -39,7 +52,9 @@
         "indicator_width": 16,
         "indicator_height": 16,
         "indicator_border_radius": 3,
-        "checked_background_color": [70, 90, 130],
+        "checked_background_color": {
+          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+        },
         "checked_border_color": [100, 120, 160],
         "hover_border_offset": 20,
         "margin_top": 2,
@@ -95,8 +110,12 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_3"
         },
-        "border_color": [60, 60, 65],
-        "focus_border_color": [70, 90, 130],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+        "focus_border_color": {
+          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+        },
         "border_width": 1,
         "border_radius": 3,
         "padding": [
@@ -119,8 +138,12 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_3"
         },
-        "border_color": [60, 60, 65],
-        "focus_border_color": [70, 90, 130],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+        "focus_border_color": {
+          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+        },
         "border_width": 1,
         "border_radius": 3,
         "padding": [
@@ -144,8 +167,12 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_3"
         },
-        "border_color": [60, 60, 65],
-        "focus_border_color": [70, 90, 130],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+        "focus_border_color": {
+          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+        },
         "border_width": 1,
         "border_radius": 3,
         "padding": [
@@ -155,7 +182,9 @@
         "disabled_brightness_factor": 0.5
       },
       "group_box": {
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "border_width": 1,
         "border_radius": 5,
         "background_color": null,
@@ -168,7 +197,9 @@
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
         },
         "title_font_weight": null,
-        "title_color": [240, 240, 240],
+        "title_color": {
+          "$ref": "$_COLOR_TEXT_PRIMARY"
+        },
         "title_left": 10,
         "title_padding": [
           0,
@@ -188,10 +219,14 @@
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "border_width": 1,
         "border_radius": 3,
-        "hover_background_color": [55, 55, 60],
+        "hover_background_color": {
+          "$ref": "$_COLOR_BACKGROUND_6"
+        },
         "hover_text_color": {
           "$ref": "$_COLOR_TEXT_7"
         },
@@ -230,7 +265,9 @@
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
         "grid_color": [60, 60, 65],
-        "selection_background_color": [70, 90, 130],
+        "selection_background_color": {
+          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+        },
         "selection_text_color": {
           "$ref": "$_COLOR_TEXT_PRIMARY"
         },
@@ -243,7 +280,9 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_3"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "border_width": 1,
         "border_radius": 5,
         "padding": 10,
@@ -286,7 +325,9 @@
           "padding": [20, 20, 20, 20],
           "border": {
             "size": 4,
-            "color": [60, 60, 65]
+            "color": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            }
           },
           "coordinates": {
             "show": true,
@@ -297,7 +338,9 @@
             "font_size": {
               "$ref": "$_FONT_SIZE_BASE_SMALL"
             },
-            "color": [200, 200, 200],
+            "color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            },
             "font_style": "normal"
           },
           "squares": {
@@ -311,8 +354,12 @@
           "turn_indicator": {
             "size": 16,
             "padding": [0, 0, 10, 10],
-            "white_color": [250, 250, 250],
-            "black_color": [0, 0, 0]
+            "white_color": {
+              "$ref": "$_COLOR_WHITE"
+            },
+            "black_color": {
+              "$ref": "$_COLOR_BLACK"
+            }
           },
           "playedmove_arrow": {
             "color": [255, 255, 0]
@@ -409,8 +456,12 @@
               "formula": "max(1, min(4, (cpu_count - reserved_cores) // 2))"
             },
             "colors": {
-              "white": [255, 255, 255],
-              "black": [0, 0, 0]
+              "white": {
+                "$ref": "$_COLOR_WHITE"
+              },
+              "black": {
+                "$ref": "$_COLOR_BLACK"
+              }
             },
             "scale_max": 10.0,
             "divisions": [
@@ -429,7 +480,9 @@
             "background_color": {
               "$ref": "$_COLOR_BACKGROUND_SECONDARY"
             },
-            "border_color": [60, 60, 65],
+            "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
             "border_radius": 5,
             "font_family": {
               "$ref": "$_FONT_FAMILY_MONO"
@@ -606,9 +659,15 @@
             "header_text_color": {
               "$ref": "$_COLOR_TEXT_SECONDARY"
             },
-            "header_border_color": [60, 60, 65],
-            "gridline_color": [60, 60, 65],
-            "selection_background_color": [70, 90, 130],
+            "header_border_color": {
+            "$ref": "$_COLOR_BORDER"
+          },
+            "gridline_color": {
+              "$ref": "$_COLOR_GRIDLINE"
+            },
+            "selection_background_color": {
+              "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            },
             "selection_text_color": {
               "$ref": "$_COLOR_TEXT_PRIMARY"
             }
@@ -655,12 +714,16 @@
             "background_color": {
               "$ref": "$_COLOR_BACKGROUND_5"
             },
-            "border_color": [60, 60, 65],
+            "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
             "hover_background_color": [60, 60, 65],
             "hover_text_color": {
               "$ref": "$_COLOR_TEXT_PRIMARY"
             },
-            "active_background_color": [70, 90, 130],
+            "active_background_color": {
+              "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            },
             "active_text_color": {
               "$ref": "$_COLOR_TEXT_PRIMARY"
             },
@@ -688,8 +751,12 @@
               "$ref": "$_COLOR_BACKGROUND_SECONDARY"
             },
             "grid_color": [60, 60, 65],
-            "white_line_color": [255, 255, 255],
-            "black_line_color": [0, 0, 0],
+            "white_line_color": {
+              "$ref": "$_COLOR_WHITE"
+            },
+            "black_line_color": {
+              "$ref": "$_COLOR_BLACK"
+            },
             "current_move_line_color": [255, 255, 0],
             "current_move_line_width": 2,
             "line_width": 2,
@@ -735,13 +802,21 @@
             "mistake": [255, 200, 100],
             "miss": [200, 100, 255],
             "blunder": [255, 100, 100],
-            "text": [220, 220, 220],
-            "header_text": [240, 240, 240],
-            "background": [40, 40, 45],
+            "text": {
+              "$ref": "$_COLOR_TEXT_3"
+            },
+            "header_text": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            },
+            "background": {
+              "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+            },
             "section_background": {
               "$ref": "$_COLOR_BACKGROUND_4"
             },
-            "border": [60, 60, 65]
+            "border": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            }
           },
           "fonts": {
             "header_font_family": {
@@ -794,14 +869,20 @@
             "phase_spacing": 1,
             "player_name_label": {
               "white": {
-                "background_color": [240, 240, 240],
-                "text_color": [30, 30, 30],
+                "background_color": {
+                  "$ref": "$_COLOR_NEAR_WHITE"
+                },
+                "text_color": {
+                  "$ref": "$_COLOR_NEAR_BLACK"
+                },
                 "border_radius": 3,
                 "padding": [6, 4, 6, 4],
                 "font_weight": "bold"
               },
               "black": {
-                "background_color": [30, 30, 30],
+                "background_color": {
+                  "$ref": "$_COLOR_NEAR_BLACK"
+                },
                 "text_color": {
                   "$ref": "$_COLOR_TEXT_PRIMARY"
                 },
@@ -862,12 +943,18 @@
             "text_color": {
               "$ref": "$_COLOR_TEXT_3"
             },
-            "header_text": [240, 240, 240],
-            "background": [40, 40, 45],
+            "header_text": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            },
+            "background": {
+              "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+            },
             "section_background": {
               "$ref": "$_COLOR_BACKGROUND_4"
             },
-            "border": [60, 60, 65],
+            "border": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
             "phase_opening_color": [100, 150, 255],
             "phase_middlegame_color": [150, 255, 100],
             "phase_endgame_color": [255, 200, 100]
@@ -922,7 +1009,9 @@
             "background_color": {
               "$ref": "$_COLOR_BACKGROUND_5"
             },
-            "border_color": [60, 60, 65],
+            "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
             "hover_background_color": [60, 60, 65],
             "hover_text_color": {
               "$ref": "$_COLOR_TEXT_PRIMARY"
@@ -937,9 +1026,15 @@
             "background_color": {
               "$ref": "$_COLOR_BACKGROUND_SECONDARY"
             },
-            "border_color": [60, 60, 65],
-            "focus_border_color": [70, 90, 130],
-            "selection_background_color": [70, 90, 130],
+            "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+            "focus_border_color": {
+              "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            },
+            "selection_background_color": {
+              "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            },
             "selection_text_color": {
               "$ref": "$_COLOR_TEXT_PRIMARY"
             }
@@ -958,7 +1053,9 @@
             "banner_background_color": {
               "$ref": "$_COLOR_BACKGROUND_3"
             },
-            "banner_border_color": [60, 60, 65],
+            "banner_border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
             "banner_text_color": {
               "$ref": "$_COLOR_TEXT_SECONDARY"
             },
@@ -1660,7 +1757,9 @@
             "text_color": {
               "$ref": "$_COLOR_TEXT_SECONDARY"
             },
-            "border_color": [60, 60, 65],
+            "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
             "border_width": 1,
             "border_radius": 3,
             "focus_border_color": [0, 120, 212]
@@ -1669,7 +1768,9 @@
             "width": 80,
             "height": 30,
             "border_width": 1,
-            "border_color": [60, 60, 65]
+            "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
           },
           "messages": {
             "padding": 10,
@@ -1724,7 +1825,9 @@
             "background_color": {
               "$ref": "$_COLOR_BACKGROUND_3"
             },
-            "border_color": [60, 60, 65],
+            "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
             "border_width": 1,
             "border_radius": 3,
             "focus_border_color": [0, 120, 212],
@@ -1764,19 +1867,29 @@
           "scroll_button_color": [30, 30, 30],
           "colors": {
             "normal": {
-              "background": [30, 30, 35],
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+              },
               "text": {
                 "$ref": "$_COLOR_TEXT_SECONDARY"
               },
-              "border": [60, 60, 65]
+              "border": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
             },
             "hover": {
-              "background": [55, 55, 60],
-              "text": [230, 230, 230],
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_6"
+              },
+              "text": {
+                "$ref": "$_COLOR_TEXT_7"
+              },
               "border": [80, 80, 85]
             },
             "active": {
-              "background": [70, 90, 130],
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+              },
               "text": {
                 "$ref": "$_COLOR_TEXT_PRIMARY"
               },
@@ -1833,7 +1946,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM_2"
           },
-          "color": [220, 220, 220]
+          "color": {
+            "$ref": "$_COLOR_TEXT_3"
+          }
         },
         "tabs": {
           "font_family": {
@@ -1849,19 +1964,29 @@
           "scroll_button_color": [30, 30, 30],
           "colors": {
             "normal": {
-              "background": [45, 45, 50],
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_3"
+              },
               "text": {
                 "$ref": "$_COLOR_TEXT_SECONDARY"
               },
-              "border": [60, 60, 65]
+              "border": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
             },
             "hover": {
-              "background": [55, 55, 60],
-              "text": [230, 230, 230],
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_6"
+              },
+              "text": {
+                "$ref": "$_COLOR_TEXT_7"
+              },
               "border": [80, 80, 85]
             },
             "active": {
-              "background": [70, 90, 130],
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+              },
               "text": {
                 "$ref": "$_COLOR_TEXT_PRIMARY"
               },
@@ -1938,9 +2063,15 @@
           "header_text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
           },
-          "header_border_color": [60, 60, 65],
-          "gridline_color": [60, 60, 65],
-          "selection_background_color": [70, 90, 130],
+          "header_border_color": {
+            "$ref": "$_COLOR_BORDER"
+          },
+          "gridline_color": {
+            "$ref": "$_COLOR_GRIDLINE"
+          },
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
           "selection_text_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           }
@@ -1964,7 +2095,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
-          "color": [180, 180, 180],
+          "color": {
+            "$ref": "$_COLOR_TEXT_6"
+          },
           "width": 80
         },
         "message": {
@@ -1974,7 +2107,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "color": [220, 220, 220]
+          "color": {
+            "$ref": "$_COLOR_TEXT_3"
+          }
         },
         "resize_grip": {
           "width": 20,
@@ -2023,12 +2158,20 @@
       },
       "colors": {
         "normal": {
-          "background": [45, 45, 50],
-          "text": [200, 200, 200]
+          "background": {
+            "$ref": "$_COLOR_BACKGROUND_3"
+          },
+          "text": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          }
         },
         "hover": {
-          "background": [55, 55, 60],
-          "text": [230, 230, 230]
+          "background": {
+            "$ref": "$_COLOR_BACKGROUND_6"
+          },
+          "text": {
+            "$ref": "$_COLOR_TEXT_7"
+          }
         }
       },
       "menu_bar": {
@@ -2039,7 +2182,9 @@
       },
       "menu": {
         "border_width": 1,
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "item_padding": [4, 20, 4, 8]
       },
       "separator": {
@@ -2058,7 +2203,9 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
@@ -2109,10 +2256,14 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
-          "border_color": [60, 60, 65]
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
         },
         "icon_badges": {
-          "background_color": [55, 55, 60],
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_6"
+          },
           "background_hover_color": [75, 75, 82],
           "icon_color": [235, 235, 235],
           "icon_hover_color": [255, 255, 255]
@@ -2122,6 +2273,12 @@
       "classification_settings": {
         "width": 480,
         "height": 660,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "layout": {
           "spacing": 5,
           "margins": [25, 25, 25, 25],
@@ -2134,7 +2291,9 @@
           "title_font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "title_color": [240, 240, 240],
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
@@ -2195,7 +2354,10 @@
         "buttons": {
           "spacing": 10,
           "width": 120,
-          "height": 30
+          "height": 30,
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
         }
       },
       "ai_model_settings": {
@@ -2210,7 +2372,9 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
@@ -2231,7 +2395,9 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_font_weight": "bold",
-          "title_color": [240, 240, 240],
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
           "margin_top": 10,
           "padding_top": 20,
           "title_left": 10,
@@ -2258,7 +2424,9 @@
           "text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_width": 1,
           "border_radius": 3,
           "padding": 3,
@@ -2269,7 +2437,9 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "focus_border_color": [0, 120, 212],
-          "selection_background_color": [70, 90, 130],
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
           "selection_text_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           }
@@ -2277,7 +2447,10 @@
         "buttons": {
           "spacing": 10,
           "width": 120,
-          "height": 30
+          "height": 30,
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
         }
       },
       "engine_configuration": {
@@ -2304,7 +2477,9 @@
           "text_color": {
             "$ref": "$_COLOR_TEXT_3"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_width": 1,
           "border_radius": 5,
           "padding": [10, 10, 10, 10],
@@ -2330,19 +2505,29 @@
           "scroll_button_color": [30, 30, 30],
           "colors": {
             "normal": {
-              "background": [45, 45, 50],
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_3"
+              },
               "text": {
                 "$ref": "$_COLOR_TEXT_SECONDARY"
               },
-              "border": [60, 60, 65]
+              "border": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
             },
             "hover": {
-              "background": [55, 55, 60],
-              "text": [230, 230, 230],
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_6"
+              },
+              "text": {
+                "$ref": "$_COLOR_TEXT_7"
+              },
               "border": [80, 80, 85]
             },
             "active": {
-              "background": [70, 90, 130],
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+              },
               "text": {
                 "$ref": "$_COLOR_TEXT_PRIMARY"
               },
@@ -2359,7 +2544,9 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_font_weight": "bold",
-          "title_color": [220, 220, 220],
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_3"
+          },
           "spacing": 10,
           "margin_top": 8,
           "padding_top": 12,
@@ -2373,7 +2560,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
-          "border_color": [60, 60, 65]
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
         },
         "scroll_area": {
           "min_height": 200,
@@ -2415,7 +2604,9 @@
           "text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_width": 1,
           "border_radius": 3,
           "padding": [2, 6, 2, 6],
@@ -2425,11 +2616,15 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "selection_background_color": [70, 90, 130],
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
           "selection_text_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           },
-          "focus_border_color": [70, 90, 130]
+          "focus_border_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          }
         },
         "validation_dialog": {
           "width": 600,
@@ -2529,7 +2724,9 @@
           "text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_width": 1,
           "border_radius": 3,
           "padding": [2, 6, 2, 6],
@@ -2539,11 +2736,15 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "selection_background_color": [70, 90, 130],
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
           "selection_text_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           },
-          "focus_border_color": [70, 90, 130],
+          "focus_border_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
           "hover_border_offset": 20,
           "disabled_brightness_factor": 0.5,
           "browse_button_height": 28
@@ -2554,10 +2755,14 @@
           "height": 30
         },
         "group_box": {
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_width": 1,
           "border_radius": 5,
-          "title_color": [240, 240, 240],
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
           "title_font_family": {
             "$ref": "$_FONT_FAMILY_PRIMARY"
           },
@@ -2582,7 +2787,9 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
@@ -2636,7 +2843,9 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_radius": 3,
           "padding": [
             8,
@@ -2644,7 +2853,9 @@
           ],
           "minimum_width": 200,
           "minimum_height": 30,
-          "selection_background_color": [70, 90, 130],
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
           "selection_text_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           }
@@ -2656,7 +2867,9 @@
           "title_font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "title_color": [240, 240, 240],
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
           "content_margins": [10, 14, 10, 10],
           "margin_top": 10,
           "padding_top": 5,
@@ -2686,7 +2899,9 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
@@ -2743,7 +2958,9 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_radius": 3,
           "padding": [
             8,
@@ -2751,7 +2968,9 @@
           ],
           "minimum_width": 200,
           "minimum_height": 30,
-          "selection_background_color": [70, 90, 130],
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
           "selection_text_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           }
@@ -2763,7 +2982,9 @@
           "title_font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "title_color": [240, 240, 240],
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
           "content_margins": [10, 14, 10, 10],
           "margin_top": 10,
           "padding_top": 5,
@@ -2782,7 +3003,9 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
@@ -2831,7 +3054,9 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_radius": 3,
           "padding": [
             8,
@@ -2840,7 +3065,9 @@
           "minimum_width": 200,
           "minimum_height": 30,
           "focus_border_color": [0, 120, 212],
-          "selection_background_color": [70, 90, 130],
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
           "selection_text_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           }
@@ -2858,7 +3085,9 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
@@ -2905,13 +3134,17 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_radius": 3,
           "padding": [
             8,
             6
           ],
-          "selection_background_color": [70, 90, 130],
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
           "selection_text_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           }
@@ -2923,7 +3156,9 @@
           "title_font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "title_color": [240, 240, 240],
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
           "content_margins": [10, 20, 10, 15],
           "margin_top": 10,
           "padding_top": 5,
@@ -2952,7 +3187,9 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
@@ -3000,7 +3237,9 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_radius": 3,
           "padding": [
             8,
@@ -3008,7 +3247,9 @@
           ],
           "minimum_width": 250,
           "minimum_height": 30,
-          "selection_background_color": [70, 90, 130],
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
           "selection_text_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           }
@@ -3020,7 +3261,9 @@
           "title_font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "title_color": [240, 240, 240],
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
           "content_margins": [10, 20, 10, 15],
           "margin_top": 10,
           "padding_top": 5,
@@ -3037,7 +3280,9 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
@@ -3087,7 +3332,9 @@
           "title_font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "title_color": [240, 240, 240],
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
           "content_margins": [10, 12, 10, 15],
           "margin_top": 6,
           "padding_top": 3,
@@ -3115,9 +3362,13 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_radius": 3,
-          "chunk_background_color": [70, 90, 130],
+          "chunk_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
           "chunk_border_radius": 2
         },
         "max_threads_spinbox": {
@@ -3167,7 +3418,9 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
@@ -3213,7 +3466,9 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_radius": 3,
           "padding": [
             8,
@@ -3221,7 +3476,9 @@
           ],
           "minimum_width": 200,
           "minimum_height": 30,
-          "selection_background_color": [70, 90, 130],
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
           "selection_text_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           }
@@ -3233,7 +3490,9 @@
           "title_font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "title_color": [240, 240, 240],
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
           "content_margins": [10, 20, 10, 15],
           "margin_top": 10,
           "padding_top": 5,
@@ -3287,7 +3546,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
-          "border_color": [60, 60, 65]
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
         }
       },
       "message_dialog": {
@@ -3329,7 +3590,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
-          "border_color": [60, 60, 65]
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
         }
       },
       "engine_validation_messages": {
@@ -3398,7 +3661,9 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_radius": 3,
           "padding": [2, 6, 2, 5],
           "minimum_width": 200,
@@ -3411,7 +3676,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
-          "border_color": [60, 60, 65]
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
         }
       },
       "add_tag_dialog": {
@@ -3450,7 +3717,9 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_radius": 3,
           "padding": [
             8,
@@ -3466,7 +3735,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
-          "border_color": [60, 60, 65]
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
         }
       },
       "annotation_preferences": {
@@ -3477,7 +3748,9 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
@@ -3518,13 +3791,17 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_radius": 3,
           "padding": [
             8,
             6
           ],
-          "selection_background_color": [70, 90, 130],
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
           "selection_text_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           }
@@ -3536,7 +3813,9 @@
           "title_font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "title_color": [240, 240, 240],
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
           "content_margins": [10, 10, 10, 10],
           "margin_top": 10,
           "padding_top": 5,
@@ -3559,7 +3838,9 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
@@ -3612,13 +3893,17 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_radius": 3,
           "padding": [
             8,
             6
           ],
-          "selection_background_color": [70, 90, 130],
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
           "selection_text_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           }
@@ -3630,7 +3915,9 @@
           "title_font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "title_color": [240, 240, 240],
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
           "content_margins": [10, 15, 10, 10],
           "margin_top": 10,
           "padding_top": 5
@@ -3701,7 +3988,9 @@
           },
           "font_size": 26,
           "font_weight": "bold",
-          "color": [240, 240, 240],
+          "color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
           "margin_bottom": 6
         },
         "full_name": {
@@ -3709,7 +3998,9 @@
             "$ref": "$_FONT_FAMILY_PRIMARY"
           },
           "font_size": 13,
-          "color": [200, 200, 200],
+          "color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
           "margin_bottom": 12
         },
         "version": {
@@ -3719,7 +4010,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "color": [180, 180, 180],
+          "color": {
+            "$ref": "$_COLOR_TEXT_6"
+          },
           "label": "Version",
           "margin_bottom": 12
         },
@@ -3730,7 +4023,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "color": [200, 200, 200],
+          "color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
           "line_height": 1.5,
           "text": "A comprehensive chess analysis and review application for studying games and improving your play.",
           "margin_bottom": 6,
@@ -3743,7 +4038,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
-          "color": [150, 150, 150],
+          "color": {
+            "$ref": "$_COLOR_TEXT_4"
+          },
           "text1": "Copyright (C) 2025 Philipp Guntermann",
           "text2": ""
         },
@@ -3754,7 +4051,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
-          "color": [150, 150, 150],
+          "color": {
+            "$ref": "$_COLOR_TEXT_4"
+          },
           "text": "Licensed under:\nthe GNU General Public License v3.0 (GPL-3.0)",
           "margin_top": 8
         },
@@ -3765,7 +4064,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
-          "color": [150, 150, 150],
+          "color": {
+            "$ref": "$_COLOR_TEXT_4"
+          },
           "link_color": [100, 150, 255],
           "label": "Contact:",
           "email": "pguntermann@me.com",
@@ -3778,7 +4079,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "alignment": "right"
         }
       },
@@ -3790,7 +4093,9 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "layout": {
           "spacing": 15,
           "margins": [20, 20, 20, 20],
@@ -3877,7 +4182,9 @@
           "spacing": 10,
           "width": 120,
           "height": 30,
-          "border_color": [60, 60, 65]
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
         }
       },
       "moveslist_profile_setup": {
@@ -3888,7 +4195,9 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
@@ -3918,7 +4227,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
-          "border_color": [60, 60, 65]
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
         },
         "labels": {
           "font_family": {
@@ -3938,7 +4249,9 @@
           "text_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_radius": 3,
           "header_background_color": {
             "$ref": "$_COLOR_BACKGROUND_3"
@@ -3963,7 +4276,9 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
-          "border_color": [60, 60, 65],
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_radius": 3,
           "padding": [
             8,
@@ -3982,7 +4297,9 @@
           "title_font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "title_color": [240, 240, 240],
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
           "content_margins": [10, 15, 10, 10],
           "layout_spacing": 8,
           "margin_top": 10,
@@ -4044,24 +4361,32 @@
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_3"
         },
-        "border_color": [60, 60, 65],
+        "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
         "border_width": 1,
         "border_radius": 5,
         "text_color": {
           "$ref": "$_COLOR_TEXT_3"
         },
         "title_font_size": 13,
-        "title_color": [255, 255, 255],
+        "title_color": {
+          "$ref": "$_COLOR_TEXT_5"
+        },
         "title_font_weight": "bold",
         "header_font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM_2"
         },
-        "header_color": [240, 240, 240],
+        "header_color": {
+          "$ref": "$_COLOR_TEXT_PRIMARY"
+        },
         "positive_color": [100, 255, 100],
         "negative_color": [255, 200, 100],
         "bullet_indent": 15,
         "calculation_indent": 12,
-        "calculation_background": [35, 35, 40],
+        "calculation_background": {
+          "$ref": "$_COLOR_BACKGROUND_4"
+        },
         "calculation_padding": 6
       },
       "rules": {
@@ -4439,6 +4764,7 @@
   },
   "debug": {
     "show_debug_menu": false,
+    "enable_debug_rand_colors": false,
     "enable_debug_backgrounds": false,
     "background_color_debug_mainpanel": [255, 200, 200],
     "background_color_debug_detailpanel": [200, 255, 200],

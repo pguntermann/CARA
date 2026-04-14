@@ -792,26 +792,36 @@ class AIModelSettingsDialog(QDialog):
         """Apply styling from config."""
         # Dialog background using QPalette
         palette = self.palette()
-        palette.setColor(QPalette.ColorRole.Window, QColor(self.bg_color[0], self.bg_color[1], self.bg_color[2]))
+        bg_q = QColor(self.bg_color[0], self.bg_color[1], self.bg_color[2])
+        palette.setColor(self.backgroundRole(), bg_q)
+        palette.setColor(QPalette.ColorRole.Window, bg_q)
         self.setPalette(palette)
         self.setAutoFillBackground(True)
         
         # Apply scrollbar styling to scroll area
         if hasattr(self, 'scroll_area'):
             from app.views.style import StyleManager
-            border_color = self.groups_config.get('border_color', [60, 60, 65])
+            scroll_border = (
+                self.groups_config.get('border_color', self.border_color)
+                if 'border_color' in self.groups_config
+                else self.border_color
+            )
             border_radius = self.groups_config.get('border_radius', 5)
             StyleManager.style_scroll_area(
                 self.scroll_area,
                 self.config,
                 self.bg_color,
-                border_color,
+                scroll_border,
                 border_radius
             )
         
         # Group boxes
         group_bg_color = self.groups_config.get('background_color')  # None = use unified default
-        border_color = self.groups_config.get('border_color', [60, 60, 65])
+        group_border_color = (
+            self.groups_config.get('border_color', self.border_color)
+            if 'border_color' in self.groups_config
+            else self.border_color
+        )
         border_radius = self.groups_config.get('border_radius', 5)
         title_color = self.groups_config.get('title_color', [240, 240, 240])
         title_font_family = self.groups_config.get('title_font_family', 'Helvetica Neue')
@@ -837,7 +847,7 @@ class AIModelSettingsDialog(QDialog):
             StyleManager.style_group_boxes(
                 group_boxes,
                 self.config,
-                border_color=border_color,
+                border_color=group_border_color,
                 border_width=border_width,
                 border_radius=border_radius,
                 bg_color=group_bg_color,
@@ -993,7 +1003,8 @@ class AIModelSettingsDialog(QDialog):
         button_width = self.buttons_config.get('width', 120)
         button_height = self.buttons_config.get('height', 30)
         bg_color_list = [self.bg_color[0], self.bg_color[1], self.bg_color[2]]
-        border_color_list = [self.border_color[0], self.border_color[1], self.border_color[2]]
+        button_border = self.buttons_config.get('border_color', self.border_color)
+        border_color_list = [button_border[0], button_border[1], button_border[2]]
         
         from app.views.style import StyleManager
         all_buttons = self.findChildren(QPushButton)

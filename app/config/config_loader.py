@@ -1,9 +1,10 @@
 """Loads and validates configuration with strict validation."""
 
 import json
+import random
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Optional, Set, Tuple
 
 # Import logging service - may not be initialized during config loading
 try:
@@ -77,6 +78,51 @@ def _expand_config_refs(config: Any) -> Any:
     return _expand_node(config)
 
 
+def _apply_debug_random_placeholder_colors(config: Any) -> None:
+    """Optionally override placeholder color constants with random RGB values.
+
+    When enabled via config["debug"]["enable_debug_rand_colors"] == True,
+    every constant key that looks like a color placeholder (e.g. "$_COLOR_*")
+    is replaced with one random RGB triplet for that key (not per occurrence).
+    This runs *before* $ref expansion so the randomized colors propagate
+    everywhere the placeholder is referenced.
+    """
+    if not isinstance(config, dict):
+        return
+
+    debug_section = config.get("debug")
+    if not isinstance(debug_section, dict):
+        return
+
+    if not debug_section.get("enable_debug_rand_colors", False):
+        return
+
+    constants = config.get("constants")
+    if not isinstance(constants, dict):
+        return
+
+    # One random color per placeholder key, stable within this load() call.
+    per_key_color: Dict[str, Tuple[int, int, int]] = {}
+    rng = random.Random()
+
+    for key, value in list(constants.items()):
+        if not isinstance(key, str):
+            continue
+        if not key.startswith("$_COLOR_"):
+            continue
+
+        # Only override "color-like" constants (RGB triplets).
+        if not (isinstance(value, list) and len(value) == 3):
+            continue
+        if not all(isinstance(v, int) for v in value):
+            continue
+
+        if key not in per_key_color:
+            per_key_color[key] = (rng.randint(0, 255), rng.randint(0, 255), rng.randint(0, 255))
+        r, g, b = per_key_color[key]
+        constants[key] = [r, g, b]
+
+
 class ConfigLoader:
     """Strict configuration loader that fails fast on validation errors."""
     
@@ -116,6 +162,10 @@ class ConfigLoader:
                 self._config = json.load(f)
         except json.JSONDecodeError as e:
             self._fail(f"Invalid JSON in configuration file: {e}")
+
+        # Debug: optionally replace placeholder colors with random colors
+        # before $ref expansion so every placeholder key becomes distinct.
+        _apply_debug_random_placeholder_colors(self._config)
 
         # Expand placeholder constants before strict validation
         try:
@@ -1603,6 +1653,7 @@ class ConfigLoader:
             'ui.dialogs.ai_model_settings.buttons.spacing',
             'ui.dialogs.ai_model_settings.buttons.width',
             'ui.dialogs.ai_model_settings.buttons.height',
+            'ui.dialogs.ai_model_settings.buttons.border_color',
             'ai.model_filters.openai.exclude_prefixes',
             'ai.model_filters.openai.exclude_contains',
             'ai.model_filters.openai.exclude_exact',
