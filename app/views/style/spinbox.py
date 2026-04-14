@@ -67,7 +67,9 @@ def generate_spinbox_stylesheet(
         f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
         f"border: {border_width}px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
         f"border-radius: {border_radius}px;"
-        f"padding: {padding_str};"
+        # Padding is applied on the inner QLineEdit to prevent vertical text clipping
+        # that can occur when QSpinBox padding reduces the available text rect.
+        f"padding: 0px;"
         f"font-family: \"{font_family}\";"
         f"font-size: {font_size}pt;"
         f"margin: 0px;"
@@ -88,7 +90,7 @@ def generate_spinbox_stylesheet(
         f"QSpinBox QLineEdit, QDoubleSpinBox QLineEdit {{"
         f"background-color: transparent;"
         f"border: none;"
-        f"padding: 0px;"
+        f"padding: {padding_str};"
         f"margin: 0px;"
         f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
         f"font-family: \"{font_family}\";"

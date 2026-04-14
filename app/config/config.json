@@ -27,6 +27,22 @@
     "$_COLOR_BACKGROUND_6": [55, 55, 60],
     "$_COLOR_BACKGROUND_ACTIVE": [70, 90, 130],
     "$_COLOR_BORDER": [60, 60, 65],
+    "$_COLOR_CHART_AXIS": [150, 150, 150],
+    "$_COLOR_CHART_GRIDLINE": [60, 60, 65],
+    "$_COLOR_CHART_LINE_MAIN": [255, 255, 255],
+    "$_COLOR_CHART_MAIN_2": [238, 236, 230],
+    "$_COLOR_CHART_LINE_2": [120, 190, 255],
+    "$_COLOR_CHART_LINE_3": [100, 150, 255],
+    "$_COLOR_BUTTON_HOVER_BACKGROUND": [60, 60, 65],
+    "$_COLOR_ACTIVE_MOVE_BACKGROUND": [100, 120, 180],
+    "$_COLOR_INPUT_FOCUS_BORDER": [0, 120, 212],
+    "$_COLOR_SCROLLBAR_BACKGROUND": {
+      "$ref": "$_COLOR_BACKGROUND_3"
+    },
+    "$_COLOR_SCROLLBAR_HANDLE": {
+      "$ref": "$_COLOR_BORDER"
+    },
+    "$_COLOR_SCROLLBAR_HANDLE_HOVER": [90, 90, 95],
     "$_COLOR_GRIDLINE": [60, 60, 65],
     "$_COLOR_BUTTON_BORDER": {
       "$ref": "$_COLOR_BORDER"
@@ -42,9 +58,17 @@
     "styles": {
       "scrollbar": {
         "width": 6,
+        "background_color": {
+          "$ref": "$_COLOR_SCROLLBAR_BACKGROUND"
+        },
+        "handle_color": {
+          "$ref": "$_COLOR_SCROLLBAR_HANDLE"
+        },
+        "handle_hover_color": {
+          "$ref": "$_COLOR_SCROLLBAR_HANDLE_HOVER"
+        },
         "border_radius": 3,
         "min_height": 20,
-        "hover_offset": 20,
         "add_line_height": 0
       },
       "checkbox": {
@@ -264,7 +288,9 @@
         "alternate_background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
-        "grid_color": [60, 60, 65],
+        "grid_color": {
+          "$ref": "$_COLOR_CHART_GRIDLINE"
+        },
         "selection_background_color": {
           "$ref": "$_COLOR_BACKGROUND_ACTIVE"
         },
@@ -613,7 +639,9 @@
               "bold": true
             },
             "active_move": {
-              "background_color": [100, 120, 180],
+              "background_color": {
+                "$ref": "$_COLOR_ACTIVE_MOVE_BACKGROUND"
+              },
               "text_color": {
                 "$ref": "$_COLOR_TEXT_5"
               },
@@ -648,7 +676,9 @@
               "$ref": "$_FONT_SIZE_BASE_SMALL"
             },
             "active_move": {
-              "background_color": [100, 120, 180],
+              "background_color": {
+                "$ref": "$_COLOR_ACTIVE_MOVE_BACKGROUND"
+              },
               "text_color": {
                 "$ref": "$_COLOR_TEXT_5"
               }
@@ -717,7 +747,9 @@
             "border_color": {
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
-            "hover_background_color": [60, 60, 65],
+            "hover_background_color": {
+              "$ref": "$_COLOR_BUTTON_HOVER_BACKGROUND"
+            },
             "hover_text_color": {
               "$ref": "$_COLOR_TEXT_PRIMARY"
             },
@@ -750,9 +782,11 @@
             "background_color": {
               "$ref": "$_COLOR_BACKGROUND_SECONDARY"
             },
-            "grid_color": [60, 60, 65],
+            "grid_color": {
+              "$ref": "$_COLOR_CHART_GRIDLINE"
+            },
             "white_line_color": {
-              "$ref": "$_COLOR_WHITE"
+              "$ref": "$_COLOR_CHART_LINE_MAIN"
             },
             "black_line_color": {
               "$ref": "$_COLOR_BLACK"
@@ -769,7 +803,9 @@
             "text_color": {
               "$ref": "$_COLOR_TEXT_SECONDARY"
             },
-            "axis_color": [150, 150, 150],
+            "axis_color": {
+              "$ref": "$_COLOR_CHART_AXIS"
+            },
             "padding": [40, 20, 20, 40],
             "scale_cap_cp": 1000.0,
             "normalized_mode_small_range_threshold": 50,
@@ -785,7 +821,9 @@
             "min_label_spacing": 40,
             "min_move_labels": 3,
             "x_axis_label_spacing": 5,
-            "phase_transition_line_color": [100, 150, 255],
+            "phase_transition_line_color": {
+              "$ref": "$_COLOR_CHART_LINE_3"
+            },
             "phase_transition_line_width": 2,
             "phase_transition_line_style": "dashed",
             "critical_moment_worst_line_color": [255, 0, 0],
@@ -1012,7 +1050,9 @@
             "border_color": {
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
-            "hover_background_color": [60, 60, 65],
+            "hover_background_color": {
+              "$ref": "$_COLOR_BUTTON_HOVER_BACKGROUND"
+            },
             "hover_text_color": {
               "$ref": "$_COLOR_TEXT_PRIMARY"
             },
@@ -1106,7 +1146,9 @@
             "font_size_calculation_divisor": 20,
             "y_axis_label_spacing": 5,
             "x_axis_label_spacing": 5,
-            "distribution_line_color": [120, 190, 255],
+            "distribution_line_color": {
+              "$ref": "$_COLOR_CHART_LINE_2"
+            },
             "distribution_line_width": 2,
             "distribution_line_pen_style": "solid",
             "distribution_line_curve": "smooth",
@@ -1318,8 +1360,12 @@
             "background_color": {
               "$ref": "$_COLOR_BACKGROUND_SECONDARY"
             },
-            "grid_color": [60, 60, 65],
-            "line_color": [120, 190, 255],
+            "grid_color": {
+              "$ref": "$_COLOR_CHART_GRIDLINE"
+            },
+            "line_color": {
+              "$ref": "$_COLOR_CHART_LINE_2"
+            },
             "opponent_line_color": [200, 130, 130],
             "line_style": "solid",
             "opponent_line_style": "dashed",
@@ -1333,7 +1379,9 @@
             "text_color": {
               "$ref": "$_COLOR_TEXT_SECONDARY"
             },
-            "axis_color": [150, 150, 150],
+            "axis_color": {
+              "$ref": "$_COLOR_CHART_AXIS"
+            },
             "padding": [40, 20, 20, 40],
             "min_grid_spacing": 30,
             "min_grid_lines": 3,
@@ -1364,7 +1412,9 @@
             "background_color": {
               "$ref": "$_COLOR_BACKGROUND_SECONDARY"
             },
-            "grid_color": [60, 60, 65],
+            "grid_color": {
+              "$ref": "$_COLOR_CHART_GRIDLINE"
+            },
             "font_family": {
               "$ref": "$_FONT_FAMILY_PRIMARY"
             },
@@ -1374,7 +1424,9 @@
             "text_color": {
               "$ref": "$_COLOR_TEXT_SECONDARY"
             },
-            "axis_color": [150, 150, 150],
+            "axis_color": {
+              "$ref": "$_COLOR_CHART_AXIS"
+            },
             "padding": [40, 20, 8, 40],
             "min_grid_spacing": 30,
             "min_font_size": 8,
@@ -1455,9 +1507,13 @@
             "height": 220,
             "min_grid_lines": 3,
             "subcaption_template": "Based on {dated} dated games (of {analyzed} analyzed).",
-            "line_color": [120, 190, 255],
+            "line_color": {
+              "$ref": "$_COLOR_CHART_LINE_2"
+            },
             "show_accuracy_by_color_lines": true,
-            "white_line_color": [238, 236, 230],
+            "white_line_color": {
+              "$ref": "$_COLOR_CHART_MAIN_2"
+            },
             "black_line_color": [72, 82, 98],
             "combined_series_label": "Combined",
             "white_series_label": "As White",
@@ -1762,7 +1818,9 @@
           },
             "border_width": 1,
             "border_radius": 3,
-            "focus_border_color": [0, 120, 212]
+            "focus_border_color": {
+              "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
+            }
           },
           "button": {
             "width": 80,
@@ -1830,7 +1888,9 @@
           },
             "border_width": 1,
             "border_radius": 3,
-            "focus_border_color": [0, 120, 212],
+            "focus_border_color": {
+              "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
+            },
             "padding": [
               3,
               3
@@ -2436,7 +2496,9 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "focus_border_color": [0, 120, 212],
+          "focus_border_color": {
+            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
+          },
           "selection_background_color": {
             "$ref": "$_COLOR_BACKGROUND_ACTIVE"
           },
@@ -2456,6 +2518,12 @@
       "engine_configuration": {
         "width": 600,
         "height": 680,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
         "layout": {
           "spacing": 10,
           "margins": [10, 10, 10, 10]
@@ -2566,7 +2634,9 @@
         },
         "scroll_area": {
           "min_height": 200,
-          "background_color": [30, 30, 30],
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_3"
+          },
           "height_calculation": {
             "header_height": 60,
             "button_area_height": 50,
@@ -3064,7 +3134,9 @@
           ],
           "minimum_width": 200,
           "minimum_height": 30,
-          "focus_border_color": [0, 120, 212],
+          "focus_border_color": {
+            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
+          },
           "selection_background_color": {
             "$ref": "$_COLOR_BACKGROUND_ACTIVE"
           },

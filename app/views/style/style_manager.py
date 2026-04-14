@@ -133,37 +133,82 @@ class StyleManager:
     def style_comboboxes(
         comboboxes: List[QComboBox],
         config: Dict[str, Any],
-        text_color: List[int],
-        font_family: str,
-        font_size: float,
-        bg_color: List[int],
-        border_color: List[int],
-        focus_border_color: List[int],
-        selection_bg_color: List[int],
-        selection_text_color: List[int],
+        text_color: List[int] = None,
+        font_family: str = None,
+        font_size: float = None,
+        bg_color: List[int] = None,
+        border_color: List[int] = None,
+        focus_border_color: List[int] = None,
+        selection_bg_color: List[int] = None,
+        selection_text_color: List[int] = None,
         border_width: int = 1,
         border_radius: int = 3,
         padding: List[int] = None,
-        editable: bool = False
+        editable: bool = False,
+        use_unified_defaults: bool = True,
     ) -> None:
         """Apply combobox styling to a list of comboboxes.
         
         Args:
             comboboxes: List of QComboBox widgets to style.
             config: Configuration dictionary.
-            text_color: Text color as [R, G, B].
-            font_family: Font family name.
-            font_size: Font size in points.
-            bg_color: Background color as [R, G, B].
-            border_color: Border color as [R, G, B].
-            focus_border_color: Focus border color as [R, G, B].
-            selection_bg_color: Selection background color as [R, G, B].
-            selection_text_color: Selection text color as [R, G, B].
+            text_color: Text color as [R, G, B]. If None, reads from centralized config.
+            font_family: Font family name. If None, reads from centralized config (with DPI scaling).
+            font_size: Font size in points. If None, reads from centralized config (with DPI scaling).
+            bg_color: Background color as [R, G, B]. If None, reads from centralized config.
+            border_color: Border color as [R, G, B]. If None, reads from centralized config.
+            focus_border_color: Focus border color as [R, G, B]. If None, reads from centralized config.
+            selection_bg_color: Selection background color as [R, G, B]. If None, reads from centralized config.
+            selection_text_color: Selection text color as [R, G, B]. If None, reads from centralized config.
             border_width: Border width in pixels (default: 1).
             border_radius: Border radius in pixels (default: 3).
             padding: Padding as [horizontal, vertical] (default: [8, 6]).
             editable: Whether comboboxes should be editable (default: False).
+            use_unified_defaults: If True (default), ignore per-dialog overrides and use unified config values
+                from ``ui.styles`` for a consistent look across the app.
         """
+        from app.utils.font_utils import resolve_font_family, scale_font_size
+
+        if use_unified_defaults:
+            # Force unified styling across dialogs even if overrides were provided.
+            text_color = None
+            font_family = None
+            font_size = None
+            bg_color = None
+            border_color = None
+            focus_border_color = None
+            selection_bg_color = None
+            selection_text_color = None
+
+        styles_config = config.get('ui', {}).get('styles', {})
+
+        # Unify combobox look with line_edit defaults unless combobox overrides are explicitly provided via ui.styles.combobox.
+        line_edit_config = styles_config.get('line_edit', {})
+        combobox_config = styles_config.get('combobox', {})
+
+        if text_color is None:
+            text_color = line_edit_config.get('text_color', [200, 200, 200])
+        if font_family is None:
+            font_family_raw = line_edit_config.get('font_family', 'Helvetica Neue')
+            font_family = resolve_font_family(font_family_raw)
+        if font_size is None:
+            font_size_raw = line_edit_config.get('font_size', 11)
+            font_size = scale_font_size(font_size_raw)
+        if bg_color is None:
+            bg_color = line_edit_config.get('background_color', [45, 45, 50])
+        if border_color is None:
+            border_color = line_edit_config.get('border_color', [60, 60, 65])
+        if focus_border_color is None:
+            focus_border_color = line_edit_config.get('focus_border_color', [70, 90, 130])
+        if selection_bg_color is None:
+            selection_bg_color = line_edit_config.get('selection_background_color', [70, 90, 130])
+        if selection_text_color is None:
+            selection_text_color = line_edit_config.get('selection_text_color', [240, 240, 240])
+
+        # Allow combobox-only padding overrides from ui.styles.combobox, but keep unified by default.
+        if padding is None and isinstance(combobox_config, dict):
+            padding = combobox_config.get('padding', None)
+
         apply_combobox_styling(
             comboboxes, config, text_color, font_family, font_size,
             bg_color, border_color, focus_border_color, selection_bg_color,
@@ -295,7 +340,8 @@ class StyleManager:
         border_radius: int = None,
         padding: List[int] = None,
         hover_border_offset: int = None,
-        disabled_brightness_factor: float = None
+        disabled_brightness_factor: float = None,
+        use_unified_defaults: bool = True,
     ) -> None:
         """Apply line edit styling to a list of QLineEdit widgets.
         
@@ -316,6 +362,20 @@ class StyleManager:
         """
         from app.utils.font_utils import resolve_font_family, scale_font_size
         
+        if use_unified_defaults:
+            # Force unified styling across dialogs even if overrides were provided.
+            text_color = None
+            font_family = None
+            font_size = None
+            bg_color = None
+            border_color = None
+            focus_border_color = None
+            border_width = None
+            border_radius = None
+            padding = None
+            hover_border_offset = None
+            disabled_brightness_factor = None
+
         # Get unified config values if parameters are not provided
         styles_config = config.get('ui', {}).get('styles', {})
         line_edit_config = styles_config.get('line_edit', {})
@@ -367,6 +427,7 @@ class StyleManager:
         disabled_brightness_factor: float = None,
         hide_buttons: bool = None,
         minimum_height: Optional[int] = None,
+        use_unified_defaults: bool = True,
     ) -> None:
         """Apply spinbox styling to a list of QSpinBox and QDoubleSpinBox widgets.
         
@@ -389,6 +450,20 @@ class StyleManager:
         """
         from app.utils.font_utils import resolve_font_family, scale_font_size
         
+        if use_unified_defaults:
+            text_color = None
+            font_family = None
+            font_size = None
+            bg_color = None
+            border_color = None
+            focus_border_color = None
+            border_width = None
+            border_radius = None
+            padding = None
+            disabled_brightness_factor = None
+            hide_buttons = None
+            minimum_height = None
+
         # Get unified config values if parameters are not provided
         styles_config = config.get('ui', {}).get('styles', {})
         spinbox_config = styles_config.get('spinbox', {})
@@ -442,7 +517,8 @@ class StyleManager:
         border_width: int = None,
         border_radius: int = None,
         padding: List[int] = None,
-        disabled_brightness_factor: float = None
+        disabled_brightness_factor: float = None,
+        use_unified_defaults: bool = True,
     ) -> None:
         """Apply date edit styling to a list of QDateEdit, QTimeEdit, and QDateTimeEdit widgets.
         
@@ -462,6 +538,18 @@ class StyleManager:
         """
         from app.utils.font_utils import resolve_font_family, scale_font_size
         
+        if use_unified_defaults:
+            text_color = None
+            font_family = None
+            font_size = None
+            bg_color = None
+            border_color = None
+            focus_border_color = None
+            border_width = None
+            border_radius = None
+            padding = None
+            disabled_brightness_factor = None
+
         # Get unified config values if parameters are not provided
         styles_config = config.get('ui', {}).get('styles', {})
         date_edit_config = styles_config.get('date_edit', {})
