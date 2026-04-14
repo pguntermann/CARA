@@ -4,13 +4,14 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTableView,
                              QPushButton, QDialog, QLabel, QLineEdit, QDialogButtonBox,
                              QFormLayout, QSizePolicy, QMenu, QApplication)
 from PyQt6.QtCore import Qt, QTimer, QSize, QPoint, QModelIndex
-from PyQt6.QtGui import QPalette, QColor
+from PyQt6.QtGui import QPalette, QColor, QFont
 from typing import Dict, Any, Optional, List, Tuple
 
 from app.models.metadata_model import MetadataModel
 from app.models.game_model import GameModel
 from app.controllers.metadata_controller import MetadataController
 from app.utils.table_export import table_to_delimited, get_copy_table_config
+from app.utils.font_utils import resolve_font_family, scale_font_size
 
 
 class DetailMetadataView(QWidget):
@@ -207,6 +208,24 @@ class DetailMetadataView(QWidget):
         gridline_color = table_config.get('gridline_color', [60, 60, 65])
         selection_bg = table_config.get('selection_background_color', [70, 90, 130])
         selection_text = table_config.get('selection_text_color', [240, 240, 240])
+
+        # Fonts: read from metadata.table (not moveslist.table)
+        metadata_config = panel_config.get('metadata', {})
+        metadata_table_config = metadata_config.get('table', {})
+        table_font_family_raw = metadata_table_config.get("font_family", "Helvetica Neue")
+        table_font_size_raw = metadata_table_config.get("font_size", 10)
+        header_font_family_raw = metadata_table_config.get("header_font_family", table_font_family_raw)
+        header_font_size_raw = metadata_table_config.get("header_font_size", table_font_size_raw)
+
+        self._table_font = QFont(
+            resolve_font_family(table_font_family_raw),
+            int(scale_font_size(table_font_size_raw)),
+        )
+        self._header_font = QFont(
+            resolve_font_family(header_font_family_raw),
+            int(scale_font_size(header_font_size_raw)),
+        )
+        self.metadata_table.setFont(self._table_font)
         
         header_bg_color = QColor(header_bg[0], header_bg[1], header_bg[2])
         header_text_color = QColor(header_text[0], header_text[1], header_text[2])
@@ -249,6 +268,7 @@ class DetailMetadataView(QWidget):
         # Also set palette on header views to prevent macOS override
         horizontal_header = self.metadata_table.horizontalHeader()
         if horizontal_header:
+            horizontal_header.setFont(self._header_font)
             header_palette = horizontal_header.palette()
             header_palette.setColor(horizontal_header.backgroundRole(), header_bg_color)
             header_palette.setColor(horizontal_header.foregroundRole(), header_text_color)
@@ -258,6 +278,7 @@ class DetailMetadataView(QWidget):
         # Set palette on vertical header to prevent macOS override
         vertical_header = self.metadata_table.verticalHeader()
         if vertical_header:
+            vertical_header.setFont(self._header_font)
             vertical_header_palette = vertical_header.palette()
             vertical_header_palette.setColor(vertical_header.backgroundRole(), header_bg_color)
             vertical_header_palette.setColor(vertical_header.foregroundRole(), header_text_color)
@@ -368,6 +389,18 @@ class DetailMetadataView(QWidget):
         
         # Set model on table view
         self.metadata_table.setModel(model)
+
+        # Some Qt styles reset view/header fonts when a model is attached.
+        # Re-apply after setting the model so config-driven fonts always win.
+        if hasattr(self, "_table_font"):
+            self.metadata_table.setFont(self._table_font)
+        if hasattr(self, "_header_font"):
+            header = self.metadata_table.horizontalHeader()
+            if header:
+                header.setFont(self._header_font)
+            vheader = self.metadata_table.verticalHeader()
+            if vheader:
+                vheader.setFont(self._header_font)
         
         # Configure column widths and resize modes
         header = self.metadata_table.horizontalHeader()

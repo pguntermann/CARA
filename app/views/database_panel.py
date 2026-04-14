@@ -12,6 +12,7 @@ from PyQt6.QtGui import (
     QPainter,
     QIcon,
     QBrush,
+    QFont,
     QDragEnterEvent,
     QDragMoveEvent,
     QDropEvent,
@@ -1454,12 +1455,23 @@ class DatabasePanel(QWidget):
         
         # Get table styling from config
         table_config = ui_config.get('panels', {}).get('database', {}).get('table', {})
+        table_font_family_raw = table_config.get("font_family", "Helvetica Neue")
+        table_font_size_raw = table_config.get("font_size", 10)
+        header_font_family_raw = table_config.get("header_font_family", table_font_family_raw)
+        header_font_size_raw = table_config.get("header_font_size", table_font_size_raw)
         header_bg = table_config.get('header_background_color', [45, 45, 50])
         header_text = table_config.get('header_text_color', [200, 200, 200])
         header_border = table_config.get('header_border_color', [60, 60, 65])
         gridline_color = table_config.get('gridline_color', [60, 60, 65])
         selection_bg = table_config.get('selection_background_color', [70, 90, 130])
         selection_text = table_config.get('selection_text_color', [240, 240, 240])
+
+        # Fonts (apply explicitly so tables don't inherit OS defaults)
+        table_font_family = resolve_font_family(table_font_family_raw)
+        table_font_size = scale_font_size(table_font_size_raw)
+        header_font_family = resolve_font_family(header_font_family_raw)
+        header_font_size = scale_font_size(header_font_size_raw)
+        table.setFont(QFont(table_font_family, int(table_font_size)))
         
         header_bg_color = QColor(header_bg[0], header_bg[1], header_bg[2])
         header_text_color = QColor(header_text[0], header_text[1], header_text[2])
@@ -1510,6 +1522,7 @@ class DatabasePanel(QWidget):
         # Also set palette on header views to prevent macOS override
         horizontal_header = table.horizontalHeader()
         if horizontal_header:
+            horizontal_header.setFont(QFont(header_font_family, int(header_font_size)))
             header_palette = horizontal_header.palette()
             header_palette.setColor(horizontal_header.backgroundRole(), header_bg_color)
             header_palette.setColor(horizontal_header.foregroundRole(), header_text_color)
@@ -1519,6 +1532,7 @@ class DatabasePanel(QWidget):
         # Set palette on vertical header to prevent macOS override
         vertical_header = table.verticalHeader()
         if vertical_header:
+            vertical_header.setFont(QFont(header_font_family, int(header_font_size)))
             vertical_header_palette = vertical_header.palette()
             vertical_header_palette.setColor(vertical_header.backgroundRole(), header_bg_color)
             vertical_header_palette.setColor(vertical_header.foregroundRole(), header_text_color)
