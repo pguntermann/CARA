@@ -1760,6 +1760,14 @@
             "default": 100,
             "tick_interval": 25
           },
+          "scroll_area": {
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            },
+            "border_color": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            }
+          },
           "annotations_list": {
             "minimum_height": 100,
             "text_color": {
@@ -2103,9 +2111,9 @@
             "col_eco": 65,
             "col_time_control": 85,
             "col_tc_type": 80,
-            "col_analyzed": 70,
-            "col_annotated": 70,
-            "col_notes": 70,
+            "col_analyzed": 80,
+            "col_annotated": 80,
+            "col_notes": 80,
             "col_source_db": 120,
             "col_ref_ply": 70,
             "col_tags": 260
