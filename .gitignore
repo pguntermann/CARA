@@ -163,3 +163,5 @@ update_version.py
 # Video script folder
 .VideoScript/
 
+/.tools/
+
