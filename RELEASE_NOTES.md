@@ -1,5 +1,34 @@
 # Release Notes
 
+# CARA v2.7.1 - Bug Fixes and Performance Optimizations
+
+**Release Date:** 11.04.2026
+
+This is mainly a **bug fix** and **performance optimization** release, with a few small **enhancements**. It adds a new **Sharp** built-in **game tag** (with **auto-tagging**, triggered when both players demonstrate god-like precision throughout the game) and **profile switching** from the **Moves List** context menu. 
+
+## New Features
+
+- **Sharp game tag:** New pre-defined tag and **auto-tagging** rule for games where **both players** demonstrated very high precision. **Note:** If you are using an existing user_settings file from the previous release, likely if you use the macOS version, you need to toggle it on first through the **Game Analysis → Select Tags for Auto-Tagging** menu.
+- **Moves list profiles:** Switch **column profiles** from the **Moves List** context menu.
+
+## Enhancements
+
+- **Player Stats:** Noticeably faster refresh when updating the view.
+- **AI model discovery:** Added **OpenAI “-pro”** models (for example **gpt-5.4-pro**) to the exclude list in config.json, after experimental support for the v1 response API showed they are practically unusable for this use-case (taking too much time to provide a response, even with low-reasoning setting).
+
+## Bug Fixes
+
+- **Player Stats:** Restored correct behaviour for **section visibility** toggles and persistence
+- **PGN:** Minor **formatter** fixes related to **NAGs**
+- **Moves list profiles:** Fixed a bug preventing actual removal of profiles and non-persisting column width changes.
+- **Application shutdown:** Fixed a bug where user settings were persisted twice during the application shutdown procedure.
+
+## Documentation
+
+- **HTML user manual:** Improved **mobile** layout and readability on narrow viewports.
+
+---
+
 # CARA v2.7.0 - Game tags polish, Selective Auto-Tagging and menu icons
 
 **Release Date:** 10.04.2026
