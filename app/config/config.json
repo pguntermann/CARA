@@ -2454,7 +2454,7 @@
       },
       "ai_model_settings": {
         "width": 600,
-        "height": 640,
+        "height": 645,
         "default_custom_base_url": "http://localhost:1234/v1",
         "form_label_min_width": 180,
         "custom_endpoint_disclaimer": {
