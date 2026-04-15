@@ -495,18 +495,19 @@ class DetailAnnotationView(QWidget):
         self.annotation_scroll.setMinimumHeight(0)
         self.annotation_scroll.setFrameShape(QFrame.Shape.NoFrame)
         
-        # Get background color for scroll area - use pane_background from tabs config
-        tabs_config = panel_config.get('tabs', {})
-        pane_bg = tabs_config.get('pane_background', [40, 40, 45])
-        # Fix white background on macOS
-        # Apply scrollbar styling using StyleManager
+        # Get background color for scroll area from annotations config (separate from pane background)
+        annotations_config = ui_config.get('panels', {}).get('detail', {}).get('annotations', {})
+        scroll_area_config = annotations_config.get('scroll_area', {})
+        scroll_bg = scroll_area_config.get('background_color', [30, 30, 35])
+        scroll_border = scroll_area_config.get('border_color', [60, 60, 65])
+
+        # Fix white background on macOS by applying unified scrollbar styling
         from app.views.style import StyleManager
-        border_color = [min(255, pane_bg[0] + 20), min(255, pane_bg[1] + 20), min(255, pane_bg[2] + 20)]
         StyleManager.style_scroll_area(
             self.annotation_scroll,
             self.config,
-            pane_bg,
-            border_color,
+            scroll_bg,
+            scroll_border,
             0  # No border radius
         )
         

@@ -949,7 +949,8 @@ class MainWindow(QMainWindow):
             self.config,
             window_title="License",
             content_path=Path("LICENSE"),
-            content_format="plain",
+            content_format="markdown",
+            wrap_plain_text_in_code_block=True,
             fallback_message="License file not found. Please see the project repository for license information.",
             parent=self,
         )

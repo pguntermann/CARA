@@ -612,7 +612,9 @@ class PieChartWidget(QWidget):
             "blunder": QColor(*colors_config.get("blunder", [255, 100, 100])),
         }
 
-        self.text_color = QColor(*colors_config.get("text_color", [220, 220, 220]))
+        # Config uses ui.panels.detail.summary.colors.text. Keep backward compatibility
+        # with older configs that used "text_color".
+        self.text_color = QColor(*colors_config.get("text", colors_config.get("text_color", [220, 220, 220])))
         self.font_family = resolve_font_family(
             summary_config.get("fonts", {}).get("label_font_family", "Helvetica Neue")
         )
@@ -1331,7 +1333,9 @@ class DetailSummaryView(QWidget):
         layout_config = summary_config.get('layout', {})
         widgets_config = summary_config.get('widgets', {})
         
-        text_color = QColor(*colors_config.get('text_color', [220, 220, 220]))
+        # Config uses ui.panels.detail.summary.colors.text. Keep backward compatibility
+        # with older configs that used "text_color".
+        text_color = QColor(*colors_config.get('text', colors_config.get('text_color', [220, 220, 220])))
         header_text_color = QColor(*colors_config.get('header_text', [240, 240, 240]))
         background_color = QColor(*colors_config.get('background', [40, 40, 45]))
         section_bg_color = QColor(*colors_config.get('section_background', [35, 35, 40]))

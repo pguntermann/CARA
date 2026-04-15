@@ -475,7 +475,7 @@ class EngineConfigurationDialog(QDialog):
             # Create scroll area for engine parameters (in case there are many)
             scroll_area_config = dialog_config.get('scroll_area', {})
             min_height = scroll_area_config.get('min_height', 200)
-            scroll_bg = scroll_area_config.get('background_color', [30, 30, 30])
+            scroll_bg = scroll_area_config.get('background_color', [45, 45, 50])
             
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
@@ -843,7 +843,7 @@ class EngineConfigurationDialog(QDialog):
         scroll_min_height = validation_scroll_config.get('min_height', 250)
         # Fix white background - use scroll_area background_color from main dialog config
         scroll_area_config = dialog_config.get('scroll_area', {})
-        scroll_bg = scroll_area_config.get('background_color', [30, 30, 30])
+        scroll_bg = scroll_area_config.get('background_color', [45, 45, 50])
         # Get border color from dialog config (use a default if not available)
         scroll_border = scroll_area_config.get('border_color', [60, 60, 65])
         
@@ -920,10 +920,11 @@ class EngineConfigurationDialog(QDialog):
         button_width = buttons_config.get('width', 120)
         button_height = buttons_config.get('height', 30)
         
-        # Get colors for button styling
-        groups_config = dialog_config.get('groups', {})
-        bg_color = groups_config.get('background_color', [40, 40, 45])
-        border_color = buttons_config.get('border_color', groups_config.get('border_color', [60, 60, 65]))
+        # Get colors for button styling (match other dialogs: base on dialog bg/border)
+        tabs_config = dialog_config.get('tabs', {})
+        pane_bg = tabs_config.get('pane_background', [40, 40, 45])
+        bg_color = dialog_config.get('background_color', pane_bg)
+        border_color = dialog_config.get('border_color', buttons_config.get('border_color', [60, 60, 65]))
         bg_color_list = [bg_color[0], bg_color[1], bg_color[2]]
         border_color_list = [border_color[0], border_color[1], border_color[2]]
         
@@ -1385,10 +1386,11 @@ class EngineConfigurationDialog(QDialog):
         button_width = buttons_config.get('width', 120)
         button_height = buttons_config.get('height', 30)
         
-        # Get background color for button offset calculation
-        groups_config = dialog_config.get('groups', {})
-        bg_color = groups_config.get('background_color', [40, 40, 45])
-        border_color = buttons_config.get('border_color', groups_config.get('border_color', [60, 60, 65]))
+        # Get background color for button offset calculation (match other dialogs)
+        tabs_config = dialog_config.get('tabs', {})
+        pane_bg = tabs_config.get('pane_background', [40, 40, 45])
+        bg_color = dialog_config.get('background_color', pane_bg)
+        border_color = dialog_config.get('border_color', buttons_config.get('border_color', [60, 60, 65]))
         bg_color_list = [bg_color[0], bg_color[1], bg_color[2]]
         border_color_list = [border_color[0], border_color[1], border_color[2]]
         

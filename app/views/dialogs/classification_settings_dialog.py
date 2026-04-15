@@ -657,15 +657,25 @@ class ClassificationSettingsDialog(QDialog):
         fields_config = dialog_config.get('fields', {})
         buttons_config = dialog_config.get('buttons', {})
         
-        # Dialog background
+        # Dialog chrome (same pattern as bulk_replace / import_games)
         dialog_bg_color = dialog_config.get('background_color', [40, 40, 45])
+        dialog_border_color = dialog_config.get('border_color', [60, 60, 65])
+        group_border_color = (
+            groups_config.get('border_color', dialog_border_color)
+            if 'border_color' in groups_config
+            else dialog_border_color
+        )
+        widget_border_color = fields_config.get('border_color', dialog_border_color)
+        
         self.setAutoFillBackground(True)
         palette = self.palette()
-        palette.setColor(QPalette.ColorRole.Window, QColor(dialog_bg_color[0], dialog_bg_color[1], dialog_bg_color[2]))
+        bg_q = QColor(dialog_bg_color[0], dialog_bg_color[1], dialog_bg_color[2])
+        palette.setColor(self.backgroundRole(), bg_q)
+        palette.setColor(QPalette.ColorRole.Window, bg_q)
         self.setPalette(palette)
         
         # Group boxes - use transparent background to match dialog background - use StyleManager
-        border_color = groups_config.get('border_color', [60, 60, 65])
+        border_color = group_border_color
         border_width = groups_config.get('border_width', 1)
         border_radius = groups_config.get('border_radius', 5)
         title_color = groups_config.get('title_color', [240, 240, 240])
@@ -758,7 +768,7 @@ class ClassificationSettingsDialog(QDialog):
                 font_family=font_family,
                 font_size=font_size,
                 bg_color=spinbox_bg_color,
-                border_color=border_color,
+                border_color=widget_border_color,
                 focus_border_color=focus_border_color,
                 border_width=input_border_width,
                 border_radius=input_border_radius,
@@ -778,7 +788,7 @@ class ClassificationSettingsDialog(QDialog):
         checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
         
         # Use input border and background colors for checkbox indicator
-        input_border_color = border_color
+        input_border_color = widget_border_color
         input_bg_color = [dialog_bg_color[0] + input_background_offset, dialog_bg_color[1] + input_background_offset, dialog_bg_color[2] + input_background_offset]
         
         # Get font family from fields config
@@ -811,7 +821,7 @@ class ClassificationSettingsDialog(QDialog):
                 font_family=font_family,
                 font_size=font_size,
                 bg_color=spinbox_bg_color,
-                border_color=border_color,
+                border_color=widget_border_color,
                 focus_border_color=focus_border_color,
                 selection_bg_color=selection_bg_color,
                 selection_text_color=selection_text_color,
@@ -829,7 +839,8 @@ class ClassificationSettingsDialog(QDialog):
         button_width = buttons_config.get('width', 120)
         button_height = buttons_config.get('height', 30)
         bg_color_list = [dialog_bg_color[0], dialog_bg_color[1], dialog_bg_color[2]]
-        border_color_list = [border_color[0], border_color[1], border_color[2]]
+        button_border_color = buttons_config.get('border_color', dialog_border_color)
+        border_color_list = [button_border_color[0], button_border_color[1], button_border_color[2]]
         
         from app.views.style import StyleManager
         all_buttons = self.findChildren(QPushButton)

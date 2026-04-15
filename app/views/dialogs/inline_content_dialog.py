@@ -27,6 +27,7 @@ class InlineContentDialog(QDialog):
         window_title: str,
         content_path: Path,
         content_format: Literal["markdown", "plain"] = "markdown",
+        wrap_plain_text_in_code_block: bool = False,
         fallback_message: str = "Content not found.",
         parent=None,
     ) -> None:
@@ -37,6 +38,8 @@ class InlineContentDialog(QDialog):
             window_title: Dialog window title.
             content_path: Path to the file to display (absolute or relative to app root).
             content_format: "markdown" to render as markdown, "plain" for plain text.
+            wrap_plain_text_in_code_block: If True, wraps the loaded file content in a fenced code
+                block before rendering (only applies when content_format == "markdown").
             fallback_message: Message shown when the file is missing or unreadable.
             parent: Parent widget.
         """
@@ -109,6 +112,17 @@ class InlineContentDialog(QDialog):
             try:
                 raw_text = path.read_text(encoding="utf-8")
                 if content_format == "markdown":
+                    if wrap_plain_text_in_code_block:
+                        max_run = 0
+                        run = 0
+                        for ch in raw_text:
+                            if ch == "`":
+                                run += 1
+                                max_run = max(max_run, run)
+                            else:
+                                run = 0
+                        fence = "`" * max(3, max_run + 1)
+                        raw_text = f"{fence}\n{raw_text}\n{fence}"
                     doc = text_browser.document()
                     doc.setDefaultStyleSheet(
                         self._markdown_document_stylesheet(bg_color=bg_color, content_config=content_config)

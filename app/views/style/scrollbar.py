@@ -27,59 +27,61 @@ def generate_scrollbar_stylesheet(
     scrollbar_config = styles_config.get('scrollbar', {})
     
     scrollbar_width = scrollbar_config.get('width', 8)
+    scrollbar_bg_color = scrollbar_config.get('background_color', bg_color)
+    scrollbar_handle_color = scrollbar_config.get('handle_color', border_color)
+    scrollbar_handle_hover_color = scrollbar_config.get('handle_hover_color', scrollbar_handle_color)
     scrollbar_border_radius = scrollbar_config.get('border_radius', 4)
     scrollbar_min_height = scrollbar_config.get('min_height', 20)
-    scrollbar_hover_offset = scrollbar_config.get('hover_offset', 20)
     scrollbar_add_line_height = scrollbar_config.get('add_line_height', 0)
     
     stylesheet = (
         f"{widget_selector}:vertical {{"
-        f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
+        f"background-color: rgb({scrollbar_bg_color[0]}, {scrollbar_bg_color[1]}, {scrollbar_bg_color[2]});"
         f"width: {scrollbar_width}px !important;"
         f"max-width: {scrollbar_width}px !important;"
         f"min-width: {scrollbar_width}px !important;"
         f"border: none;"
         f"}}"
         f"{widget_selector}::add-line:vertical, {widget_selector}::sub-line:vertical {{"
-        f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
+        f"background-color: rgb({scrollbar_bg_color[0]}, {scrollbar_bg_color[1]}, {scrollbar_bg_color[2]});"
         f"border: none;"
         f"height: {scrollbar_add_line_height}px;"
         f"}}"
         f"{widget_selector}::add-page:vertical, {widget_selector}::sub-page:vertical {{"
-        f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
+        f"background-color: rgb({scrollbar_bg_color[0]}, {scrollbar_bg_color[1]}, {scrollbar_bg_color[2]});"
         f"}}"
         f"{widget_selector}::handle:vertical {{"
-        f"background-color: rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
+        f"background-color: rgb({scrollbar_handle_color[0]}, {scrollbar_handle_color[1]}, {scrollbar_handle_color[2]});"
         f"border-radius: {scrollbar_border_radius}px;"
         f"min-height: {scrollbar_min_height}px;"
         f"border: none;"
         f"}}"
         f"{widget_selector}::handle:vertical:hover {{"
-        f"background-color: rgb({min(255, border_color[0] + scrollbar_hover_offset)}, {min(255, border_color[1] + scrollbar_hover_offset)}, {min(255, border_color[2] + scrollbar_hover_offset)});"
+        f"background-color: rgb({scrollbar_handle_hover_color[0]}, {scrollbar_handle_hover_color[1]}, {scrollbar_handle_hover_color[2]});"
         f"}}"
         f"{widget_selector}:horizontal {{"
-        f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
+        f"background-color: rgb({scrollbar_bg_color[0]}, {scrollbar_bg_color[1]}, {scrollbar_bg_color[2]});"
         f"height: {scrollbar_width}px !important;"
         f"max-height: {scrollbar_width}px !important;"
         f"min-height: {scrollbar_width}px !important;"
         f"border: none;"
         f"}}"
         f"{widget_selector}::add-line:horizontal, {widget_selector}::sub-line:horizontal {{"
-        f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
+        f"background-color: rgb({scrollbar_bg_color[0]}, {scrollbar_bg_color[1]}, {scrollbar_bg_color[2]});"
         f"border: none;"
         f"width: {scrollbar_add_line_height}px;"
         f"}}"
         f"{widget_selector}::add-page:horizontal, {widget_selector}::sub-page:horizontal {{"
-        f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
+        f"background-color: rgb({scrollbar_bg_color[0]}, {scrollbar_bg_color[1]}, {scrollbar_bg_color[2]});"
         f"}}"
         f"{widget_selector}::handle:horizontal {{"
-        f"background-color: rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
+        f"background-color: rgb({scrollbar_handle_color[0]}, {scrollbar_handle_color[1]}, {scrollbar_handle_color[2]});"
         f"border-radius: {scrollbar_border_radius}px;"
         f"min-width: {scrollbar_min_height}px;"
         f"border: none;"
         f"}}"
         f"{widget_selector}::handle:horizontal:hover {{"
-        f"background-color: rgb({min(255, border_color[0] + scrollbar_hover_offset)}, {min(255, border_color[1] + scrollbar_hover_offset)}, {min(255, border_color[2] + scrollbar_hover_offset)});"
+        f"background-color: rgb({scrollbar_handle_hover_color[0]}, {scrollbar_handle_hover_color[1]}, {scrollbar_handle_hover_color[2]});"
         f"}}"
     )
     
@@ -156,12 +158,14 @@ def apply_scrollbar_styling(
     # Apply scrollbar stylesheet directly to scrollbar widget to prevent macOS override
     scrollbar = scroll_area.verticalScrollBar()
     if scrollbar:
+        styles_config = config.get('ui', {}).get('styles', {})
+        scrollbar_config = styles_config.get('scrollbar', {})
+        scrollbar_bg_color = scrollbar_config.get('background_color', bg_color)
+
         scrollbar_stylesheet = generate_scrollbar_stylesheet(config, bg_color, border_color)
         scrollbar.setStyleSheet(scrollbar_stylesheet)
         
         # Get scrollbar width from config
-        styles_config = config.get('ui', {}).get('styles', {})
-        scrollbar_config = styles_config.get('scrollbar', {})
         scrollbar_width = scrollbar_config.get('width', 8)
         
         # Set fixed width programmatically to override macOS native styling
@@ -169,9 +173,9 @@ def apply_scrollbar_styling(
         
         # Set palette to prevent macOS override
         scrollbar_palette = scrollbar.palette()
-        scrollbar_palette.setColor(scrollbar.backgroundRole(), QColor(*bg_color))
-        scrollbar_palette.setColor(scrollbar_palette.ColorRole.Base, QColor(*bg_color))
-        scrollbar_palette.setColor(scrollbar_palette.ColorRole.Window, QColor(*bg_color))
+        scrollbar_palette.setColor(scrollbar.backgroundRole(), QColor(*scrollbar_bg_color))
+        scrollbar_palette.setColor(scrollbar_palette.ColorRole.Base, QColor(*scrollbar_bg_color))
+        scrollbar_palette.setColor(scrollbar_palette.ColorRole.Window, QColor(*scrollbar_bg_color))
         scrollbar.setPalette(scrollbar_palette)
         scrollbar.setAutoFillBackground(True)
 
@@ -205,12 +209,14 @@ def apply_table_scrollbar_styling(
     # Style vertical scrollbar
     vertical_scrollbar = table_widget.verticalScrollBar()
     if vertical_scrollbar:
+        styles_config = config.get('ui', {}).get('styles', {})
+        scrollbar_config = styles_config.get('scrollbar', {})
+        scrollbar_bg_color = scrollbar_config.get('background_color', bg_color)
+
         scrollbar_stylesheet = generate_scrollbar_stylesheet(config, bg_color, border_color)
         vertical_scrollbar.setStyleSheet(scrollbar_stylesheet)
         
         # Get scrollbar width from config
-        styles_config = config.get('ui', {}).get('styles', {})
-        scrollbar_config = styles_config.get('scrollbar', {})
         scrollbar_width = scrollbar_config.get('width', 6)
         
         # Set fixed width programmatically to override macOS native styling
@@ -218,21 +224,23 @@ def apply_table_scrollbar_styling(
         
         # Set palette to prevent macOS override (using input colors to match left side)
         vertical_scrollbar_palette = vertical_scrollbar.palette()
-        vertical_scrollbar_palette.setColor(vertical_scrollbar.backgroundRole(), QColor(*bg_color))
-        vertical_scrollbar_palette.setColor(vertical_scrollbar_palette.ColorRole.Base, QColor(*bg_color))
-        vertical_scrollbar_palette.setColor(vertical_scrollbar_palette.ColorRole.Window, QColor(*bg_color))
+        vertical_scrollbar_palette.setColor(vertical_scrollbar.backgroundRole(), QColor(*scrollbar_bg_color))
+        vertical_scrollbar_palette.setColor(vertical_scrollbar_palette.ColorRole.Base, QColor(*scrollbar_bg_color))
+        vertical_scrollbar_palette.setColor(vertical_scrollbar_palette.ColorRole.Window, QColor(*scrollbar_bg_color))
         vertical_scrollbar.setPalette(vertical_scrollbar_palette)
         vertical_scrollbar.setAutoFillBackground(True)
     
     # Style horizontal scrollbar
     horizontal_scrollbar = table_widget.horizontalScrollBar()
     if horizontal_scrollbar:
+        styles_config = config.get('ui', {}).get('styles', {})
+        scrollbar_config = styles_config.get('scrollbar', {})
+        scrollbar_bg_color = scrollbar_config.get('background_color', bg_color)
+
         scrollbar_stylesheet = generate_scrollbar_stylesheet(config, bg_color, border_color)
         horizontal_scrollbar.setStyleSheet(scrollbar_stylesheet)
         
         # Get scrollbar width from config (use same width for height of horizontal scrollbar)
-        styles_config = config.get('ui', {}).get('styles', {})
-        scrollbar_config = styles_config.get('scrollbar', {})
         scrollbar_width = scrollbar_config.get('width', 6)
         
         # Set fixed height programmatically to override macOS native styling
@@ -240,9 +248,9 @@ def apply_table_scrollbar_styling(
         
         # Set palette to prevent macOS override
         horizontal_scrollbar_palette = horizontal_scrollbar.palette()
-        horizontal_scrollbar_palette.setColor(horizontal_scrollbar.backgroundRole(), QColor(*bg_color))
-        horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Base, QColor(*bg_color))
-        horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Window, QColor(*bg_color))
+        horizontal_scrollbar_palette.setColor(horizontal_scrollbar.backgroundRole(), QColor(*scrollbar_bg_color))
+        horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Base, QColor(*scrollbar_bg_color))
+        horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Window, QColor(*scrollbar_bg_color))
         horizontal_scrollbar.setPalette(horizontal_scrollbar_palette)
         horizontal_scrollbar.setAutoFillBackground(True)
     
@@ -277,12 +285,14 @@ def apply_table_view_scrollbar_styling(
     # Style vertical scrollbar
     vertical_scrollbar = table_view.verticalScrollBar()
     if vertical_scrollbar:
+        styles_config = config.get('ui', {}).get('styles', {})
+        scrollbar_config = styles_config.get('scrollbar', {})
+        scrollbar_bg_color = scrollbar_config.get('background_color', bg_color)
+
         scrollbar_stylesheet = generate_scrollbar_stylesheet(config, bg_color, border_color)
         vertical_scrollbar.setStyleSheet(scrollbar_stylesheet)
         
         # Get scrollbar width from config
-        styles_config = config.get('ui', {}).get('styles', {})
-        scrollbar_config = styles_config.get('scrollbar', {})
         scrollbar_width = scrollbar_config.get('width', 6)
         
         # Set fixed width programmatically to override macOS native styling
@@ -290,21 +300,23 @@ def apply_table_view_scrollbar_styling(
         
         # Set palette to prevent macOS override
         vertical_scrollbar_palette = vertical_scrollbar.palette()
-        vertical_scrollbar_palette.setColor(vertical_scrollbar.backgroundRole(), QColor(*bg_color))
-        vertical_scrollbar_palette.setColor(vertical_scrollbar_palette.ColorRole.Base, QColor(*bg_color))
-        vertical_scrollbar_palette.setColor(vertical_scrollbar_palette.ColorRole.Window, QColor(*bg_color))
+        vertical_scrollbar_palette.setColor(vertical_scrollbar.backgroundRole(), QColor(*scrollbar_bg_color))
+        vertical_scrollbar_palette.setColor(vertical_scrollbar_palette.ColorRole.Base, QColor(*scrollbar_bg_color))
+        vertical_scrollbar_palette.setColor(vertical_scrollbar_palette.ColorRole.Window, QColor(*scrollbar_bg_color))
         vertical_scrollbar.setPalette(vertical_scrollbar_palette)
         vertical_scrollbar.setAutoFillBackground(True)
     
     # Style horizontal scrollbar
     horizontal_scrollbar = table_view.horizontalScrollBar()
     if horizontal_scrollbar:
+        styles_config = config.get('ui', {}).get('styles', {})
+        scrollbar_config = styles_config.get('scrollbar', {})
+        scrollbar_bg_color = scrollbar_config.get('background_color', bg_color)
+
         scrollbar_stylesheet = generate_scrollbar_stylesheet(config, bg_color, border_color)
         horizontal_scrollbar.setStyleSheet(scrollbar_stylesheet)
         
         # Get scrollbar width from config (use same width for height of horizontal scrollbar)
-        styles_config = config.get('ui', {}).get('styles', {})
-        scrollbar_config = styles_config.get('scrollbar', {})
         scrollbar_width = scrollbar_config.get('width', 6)
         
         # Set fixed height programmatically to override macOS native styling
@@ -312,9 +324,9 @@ def apply_table_view_scrollbar_styling(
         
         # Set palette to prevent macOS override
         horizontal_scrollbar_palette = horizontal_scrollbar.palette()
-        horizontal_scrollbar_palette.setColor(horizontal_scrollbar.backgroundRole(), QColor(*bg_color))
-        horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Base, QColor(*bg_color))
-        horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Window, QColor(*bg_color))
+        horizontal_scrollbar_palette.setColor(horizontal_scrollbar.backgroundRole(), QColor(*scrollbar_bg_color))
+        horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Base, QColor(*scrollbar_bg_color))
+        horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Window, QColor(*scrollbar_bg_color))
         horizontal_scrollbar.setPalette(horizontal_scrollbar_palette)
         horizontal_scrollbar.setAutoFillBackground(True)
 
@@ -348,12 +360,14 @@ def apply_text_edit_scrollbar_styling(
     # Style vertical scrollbar
     vertical_scrollbar = text_edit.verticalScrollBar()
     if vertical_scrollbar:
+        styles_config = config.get('ui', {}).get('styles', {})
+        scrollbar_config = styles_config.get('scrollbar', {})
+        scrollbar_bg_color = scrollbar_config.get('background_color', bg_color)
+
         scrollbar_stylesheet = generate_scrollbar_stylesheet(config, bg_color, border_color)
         vertical_scrollbar.setStyleSheet(scrollbar_stylesheet)
         
         # Get scrollbar width from config
-        styles_config = config.get('ui', {}).get('styles', {})
-        scrollbar_config = styles_config.get('scrollbar', {})
         scrollbar_width = scrollbar_config.get('width', 8)
         
         # Set fixed width programmatically to override macOS native styling
@@ -361,21 +375,23 @@ def apply_text_edit_scrollbar_styling(
         
         # Set palette to prevent macOS override
         vertical_scrollbar_palette = vertical_scrollbar.palette()
-        vertical_scrollbar_palette.setColor(vertical_scrollbar.backgroundRole(), QColor(*bg_color))
-        vertical_scrollbar_palette.setColor(vertical_scrollbar_palette.ColorRole.Base, QColor(*bg_color))
-        vertical_scrollbar_palette.setColor(vertical_scrollbar_palette.ColorRole.Window, QColor(*bg_color))
+        vertical_scrollbar_palette.setColor(vertical_scrollbar.backgroundRole(), QColor(*scrollbar_bg_color))
+        vertical_scrollbar_palette.setColor(vertical_scrollbar_palette.ColorRole.Base, QColor(*scrollbar_bg_color))
+        vertical_scrollbar_palette.setColor(vertical_scrollbar_palette.ColorRole.Window, QColor(*scrollbar_bg_color))
         vertical_scrollbar.setPalette(vertical_scrollbar_palette)
         vertical_scrollbar.setAutoFillBackground(True)
     
     # Style horizontal scrollbar
     horizontal_scrollbar = text_edit.horizontalScrollBar()
     if horizontal_scrollbar:
+        styles_config = config.get('ui', {}).get('styles', {})
+        scrollbar_config = styles_config.get('scrollbar', {})
+        scrollbar_bg_color = scrollbar_config.get('background_color', bg_color)
+
         scrollbar_stylesheet = generate_scrollbar_stylesheet(config, bg_color, border_color)
         horizontal_scrollbar.setStyleSheet(scrollbar_stylesheet)
         
         # Get scrollbar width from config (use same width for height of horizontal scrollbar)
-        styles_config = config.get('ui', {}).get('styles', {})
-        scrollbar_config = styles_config.get('scrollbar', {})
         scrollbar_width = scrollbar_config.get('width', 8)
         
         # Set fixed height programmatically to override macOS native styling
@@ -383,8 +399,8 @@ def apply_text_edit_scrollbar_styling(
         
         # Set palette to prevent macOS override
         horizontal_scrollbar_palette = horizontal_scrollbar.palette()
-        horizontal_scrollbar_palette.setColor(horizontal_scrollbar.backgroundRole(), QColor(*bg_color))
-        horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Base, QColor(*bg_color))
-        horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Window, QColor(*bg_color))
+        horizontal_scrollbar_palette.setColor(horizontal_scrollbar.backgroundRole(), QColor(*scrollbar_bg_color))
+        horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Base, QColor(*scrollbar_bg_color))
+        horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Window, QColor(*scrollbar_bg_color))
         horizontal_scrollbar.setPalette(horizontal_scrollbar_palette)
         horizontal_scrollbar.setAutoFillBackground(True)

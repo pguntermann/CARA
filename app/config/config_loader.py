@@ -1,9 +1,10 @@
 """Loads and validates configuration with strict validation."""
 
 import json
+import random
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set, Tuple
 
 # Import logging service - may not be initialized during config loading
 try:
@@ -11,6 +12,115 @@ try:
     _logging_available = True
 except ImportError:
     _logging_available = False
+
+
+def _expand_config_refs(config: Any) -> Any:
+    """Expand structured reference markers in a loaded config structure.
+
+    Supported syntax (must be valid JSON):
+        { "$ref": "<CONSTANT_KEY>" }
+
+    Constants are read from the top-level dict key "constants", e.g.:
+        { "constants": { "$_BACKGROUND_COLOR_1": [45, 45, 50] }, ... }
+
+    Notes:
+    - If no "constants" section exists, this is a no-op.
+    - Cycles and missing refs raise ValueError.
+    """
+    if not isinstance(config, dict):
+        return config
+
+    constants_raw = config.get("constants", {})
+    if constants_raw is None:
+        constants_raw = {}
+    if not isinstance(constants_raw, dict):
+        raise ValueError('"constants" must be a JSON object when present')
+
+    constants: Dict[str, Any] = constants_raw
+    resolving: Set[str] = set()
+    resolved_cache: Dict[str, Any] = {}
+
+    def _is_ref_marker(node: Any) -> Optional[str]:
+        if not isinstance(node, dict):
+            return None
+        # Only treat as marker if it is exactly {"$ref": "..."} (no extra keys)
+        if set(node.keys()) != {"$ref"}:
+            return None
+        ref_value = node.get("$ref")
+        return ref_value if isinstance(ref_value, str) else None
+
+    def _expand_node(node: Any) -> Any:
+        ref_name = _is_ref_marker(node)
+        if ref_name is not None:
+            return _resolve_constant(ref_name)
+
+        if isinstance(node, dict):
+            return {k: _expand_node(v) for k, v in node.items()}
+        if isinstance(node, list):
+            return [_expand_node(v) for v in node]
+        return node
+
+    def _resolve_constant(name: str) -> Any:
+        if name in resolved_cache:
+            return resolved_cache[name]
+        if name in resolving:
+            chain = " -> ".join(list(resolving) + [name])
+            raise ValueError(f"Cyclic constant reference detected: {chain}")
+        if name not in constants:
+            raise ValueError(f'Unknown constant reference: "{name}"')
+
+        resolving.add(name)
+        value = _expand_node(constants[name])
+        resolving.remove(name)
+        resolved_cache[name] = value
+        return value
+
+    return _expand_node(config)
+
+
+def _apply_debug_random_placeholder_colors(config: Any) -> None:
+    """Optionally override placeholder color constants with random RGB values.
+
+    When enabled via config["debug"]["enable_debug_rand_colors"] == True,
+    every constant key that looks like a color placeholder (e.g. "$_COLOR_*")
+    is replaced with one random RGB triplet for that key (not per occurrence).
+    This runs *before* $ref expansion so the randomized colors propagate
+    everywhere the placeholder is referenced.
+    """
+    if not isinstance(config, dict):
+        return
+
+    debug_section = config.get("debug")
+    if not isinstance(debug_section, dict):
+        return
+
+    if not debug_section.get("enable_debug_rand_colors", False):
+        return
+
+    constants = config.get("constants")
+    if not isinstance(constants, dict):
+        return
+
+    # One random color per placeholder key, stable within this load() call.
+    per_key_color: Dict[str, Tuple[int, int, int]] = {}
+    rng = random.Random()
+
+    for key, value in list(constants.items()):
+        if not isinstance(key, str):
+            continue
+        if not key.startswith("$_COLOR_"):
+            continue
+
+        # Only override "color-like" constants (RGB triplets).
+        if not (isinstance(value, list) and len(value) == 3):
+            continue
+        if not all(isinstance(v, int) for v in value):
+            continue
+
+        if key not in per_key_color:
+            per_key_color[key] = (rng.randint(0, 255), rng.randint(0, 255), rng.randint(0, 255))
+        r, g, b = per_key_color[key]
+        constants[key] = [r, g, b]
 
 
 class ConfigLoader:
@@ -52,6 +162,16 @@ class ConfigLoader:
                 self._config = json.load(f)
         except json.JSONDecodeError as e:
             self._fail(f"Invalid JSON in configuration file: {e}")
+
+        # Debug: optionally replace placeholder colors with random colors
+        # before $ref expansion so every placeholder key becomes distinct.
+        _apply_debug_random_placeholder_colors(self._config)
+
+        # Expand placeholder constants before strict validation
+        try:
+            self._config = _expand_config_refs(self._config)
+        except ValueError as e:
+            self._fail(str(e))
         
         # Validate required keys
         self._validate()
@@ -242,6 +362,10 @@ class ConfigLoader:
             'ui.panels.detail.notes.placeholder_text',
             'ui.panels.detail.moveslist.table.active_move.background_color',
             'ui.panels.detail.moveslist.table.active_move.text_color',
+            'ui.panels.detail.moveslist.table.font_family',
+            'ui.panels.detail.moveslist.table.font_size',
+            'ui.panels.detail.moveslist.table.header_font_family',
+            'ui.panels.detail.moveslist.table.header_font_size',
             'ui.panels.detail.moveslist.table.header_background_color',
             'ui.panels.detail.moveslist.table.header_text_color',
             'ui.panels.detail.moveslist.table.header_border_color',
@@ -250,6 +374,10 @@ class ConfigLoader:
             'ui.panels.detail.moveslist.table.selection_text_color',
             'ui.panels.detail.metadata.table.column_widths.col_name',
             'ui.panels.detail.metadata.table.column_widths.col_value',
+            'ui.panels.detail.metadata.table.font_family',
+            'ui.panels.detail.metadata.table.font_size',
+            'ui.panels.detail.metadata.table.header_font_family',
+            'ui.panels.detail.metadata.table.header_font_size',
             'ui.panels.detail.metadata.standard_tag.background_color',
             'ui.panels.detail.metadata.standard_tag.text_color',
             'ui.panels.detail.metadata.button.height',
@@ -779,6 +907,10 @@ class ConfigLoader:
             'ui.panels.database.table.gridline_color',
             'ui.panels.database.table.selection_background_color',
             'ui.panels.database.table.selection_text_color',
+            'ui.panels.database.table.font_family',
+            'ui.panels.database.table.font_size',
+            'ui.panels.database.table.header_font_family',
+            'ui.panels.database.table.header_font_size',
             'ui.panels.status.minimum_height',
             'ui.panels.status.background_color',
             'ui.panels.status.version.font_family',
@@ -1332,9 +1464,11 @@ class ConfigLoader:
             'ui.dialogs.moveslist_profile_setup.groups.title.padding_left',
             'ui.dialogs.moveslist_profile_setup.groups.title.padding_right',
             'ui.styles.scrollbar.width',
+            'ui.styles.scrollbar.background_color',
+            'ui.styles.scrollbar.handle_color',
+            'ui.styles.scrollbar.handle_hover_color',
             'ui.styles.scrollbar.border_radius',
             'ui.styles.scrollbar.min_height',
-            'ui.styles.scrollbar.hover_offset',
             'ui.styles.scrollbar.add_line_height',
             'ui.styles.checkbox.spacing',
             'ui.styles.checkbox.indicator_width',
@@ -1521,6 +1655,7 @@ class ConfigLoader:
             'ui.dialogs.ai_model_settings.buttons.spacing',
             'ui.dialogs.ai_model_settings.buttons.width',
             'ui.dialogs.ai_model_settings.buttons.height',
+            'ui.dialogs.ai_model_settings.buttons.border_color',
             'ai.model_filters.openai.exclude_prefixes',
             'ai.model_filters.openai.exclude_contains',
             'ai.model_filters.openai.exclude_exact',
@@ -1626,6 +1761,7 @@ def read_ui_dialog_section(
             return None
         with open(config_path, "r", encoding="utf-8") as f:
             data = json.load(f)
+        data = _expand_config_refs(data)
         section = data.get("ui", {}).get("dialogs", {}).get(dialog_key)
         return section if isinstance(section, dict) else None
     except (OSError, json.JSONDecodeError, TypeError):

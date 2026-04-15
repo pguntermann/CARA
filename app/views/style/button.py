@@ -16,6 +16,10 @@ def generate_button_stylesheet(
     pressed_background_offset: int,
     border_radius: int,
     padding: int,
+    background_color: Optional[List[int]] = None,
+    hover_background_color: Optional[List[int]] = None,
+    pressed_background_color: Optional[List[int]] = None,
+    active_background_color: Optional[List[int]] = None,
     min_width: Optional[int] = None,
     min_height: Optional[int] = None
 ) -> str:
@@ -39,23 +43,12 @@ def generate_button_stylesheet(
     Returns:
         A string containing the QSS stylesheet for buttons.
     """
-    # Calculate color values for different states
-    normal_bg = [
-        min(255, bg_color[0] + background_offset),
-        min(255, bg_color[1] + background_offset),
-        min(255, bg_color[2] + background_offset)
-    ]
-    hover_bg = [
-        min(255, bg_color[0] + hover_background_offset),
-        min(255, bg_color[1] + hover_background_offset),
-        min(255, bg_color[2] + hover_background_offset)
-    ]
-    pressed_bg = [
-        min(255, bg_color[0] + pressed_background_offset),
-        min(255, bg_color[1] + pressed_background_offset),
-        min(255, bg_color[2] + pressed_background_offset)
-    ]
-    disabled_bg = bg_color
+    # Unified state colors (no offset logic).
+    normal_bg = background_color or bg_color
+    hover_bg = hover_background_color or normal_bg
+    pressed_bg = pressed_background_color or normal_bg
+    checked_bg = active_background_color or normal_bg
+    disabled_bg = normal_bg
     disabled_text = [
         text_color[0] // 2,
         text_color[1] // 2,
@@ -91,6 +84,14 @@ def generate_button_stylesheet(
         f"background-color: rgb({pressed_bg[0]}, {pressed_bg[1]}, {pressed_bg[2]});"
         f"border-color: rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
         f"}}"
+        f"QPushButton:checked {{"
+        f"background-color: rgb({checked_bg[0]}, {checked_bg[1]}, {checked_bg[2]});"
+        f"border-color: rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
+        f"}}"
+        f"QPushButton:checked:hover {{"
+        f"background-color: rgb({checked_bg[0]}, {checked_bg[1]}, {checked_bg[2]});"
+        f"border-color: rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
+        f"}}"
         f"QPushButton:disabled {{"
         f"background-color: rgb({disabled_bg[0]}, {disabled_bg[1]}, {disabled_bg[2]});"
         f"color: rgb({disabled_text[0]}, {disabled_text[1]}, {disabled_text[2]});"
@@ -116,6 +117,10 @@ def apply_button_styling(
     pressed_background_offset: int,
     border_radius: int,
     padding: int,
+    background_color: Optional[List[int]] = None,
+    hover_background_color: Optional[List[int]] = None,
+    pressed_background_color: Optional[List[int]] = None,
+    active_background_color: Optional[List[int]] = None,
     min_width: Optional[int] = None,
     min_height: Optional[int] = None
 ) -> None:
@@ -149,7 +154,13 @@ def apply_button_styling(
         config, text_color, font_family, font_size,
         bg_color, border_color, background_offset,
         hover_background_offset, pressed_background_offset,
-        border_radius, padding, min_width, min_height
+        border_radius, padding,
+        background_color=background_color,
+        hover_background_color=hover_background_color,
+        pressed_background_color=pressed_background_color,
+        active_background_color=active_background_color,
+        min_width=min_width,
+        min_height=min_height,
     )
     
     # Apply stylesheet to all buttons
