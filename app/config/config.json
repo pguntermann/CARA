@@ -34,7 +34,13 @@
     "$_COLOR_CHART_LINE_2": [120, 190, 255],
     "$_COLOR_CHART_LINE_3": [100, 150, 255],
     "$_COLOR_CHART_LINE_4": [150, 150, 150],
+    "$_COLOR_BUTTON_BACKGROUND": {
+      "$ref": "$_COLOR_BACKGROUND_5"
+    },
     "$_COLOR_BUTTON_HOVER_BACKGROUND": [60, 60, 65],
+    "$_COLOR_BUTTON_ACTIVE_BACKGROUND": {
+      "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+    },
     "$_COLOR_SEPERATOR_BACKGROUND": [60, 60, 65],
     "$_COLOR_ACTIVE_MOVE_BACKGROUND": [100, 120, 180],
     "$_COLOR_INPUT_FOCUS_BORDER": [0, 120, 212],
@@ -111,6 +117,15 @@
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
+        "background_color": {
+          "$ref": "$_COLOR_BUTTON_BACKGROUND"
+        },
+        "hover_background_color": {
+          "$ref": "$_COLOR_BUTTON_HOVER_BACKGROUND"
+        },
+        "active_background_color": {
+          "$ref": "$_COLOR_BUTTON_ACTIVE_BACKGROUND"
+        },
         "font_family": {
           "$ref": "$_FONT_FAMILY_PRIMARY"
         },
@@ -119,9 +134,6 @@
         },
         "border_radius": 3,
         "padding": 5,
-        "background_offset": 20,
-        "hover_background_offset": 30,
-        "pressed_background_offset": 10,
         "default_height": 30,
         "default_width": 120
       },

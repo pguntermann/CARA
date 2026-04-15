@@ -312,18 +312,35 @@ class StyleManager:
             border_radius = button_config.get('border_radius', 3)
         if padding is None:
             padding = button_config.get('padding', 5)
+
+        # Unified button colors (no offset logic).
+        # If any color is missing, fall back to the provided bg_color (not offsets).
+        background_color = button_config.get('background_color', None) or bg_color
+        hover_background_color = button_config.get('hover_background_color', None) or background_color
+        active_background_color = button_config.get('active_background_color', None) or background_color
+        pressed_background_color = (
+            button_config.get('pressed_background_color', None) or active_background_color
+        )
+
+        # Keep legacy parameters for call-site compatibility, but do not use offsets for colors.
         if background_offset is None:
-            background_offset = button_config.get('background_offset', 20)
+            background_offset = 0
         if hover_background_offset is None:
-            hover_background_offset = button_config.get('hover_background_offset', 30)
+            hover_background_offset = 0
         if pressed_background_offset is None:
-            pressed_background_offset = button_config.get('pressed_background_offset', 10)
+            pressed_background_offset = 0
         
         apply_button_styling(
             buttons, config, text_color, font_family, font_size,
             bg_color, border_color, background_offset,
             hover_background_offset, pressed_background_offset,
-            border_radius, padding, min_width, min_height
+            border_radius, padding,
+            background_color=background_color,
+            hover_background_color=hover_background_color,
+            pressed_background_color=pressed_background_color,
+            active_background_color=active_background_color,
+            min_width=min_width,
+            min_height=min_height,
         )
     
     @staticmethod
