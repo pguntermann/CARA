@@ -1,0 +1,4177 @@
+{
+  "constants": {
+    "$_FONT_FAMILY_PRIMARY": "Helvetica Neue",
+    "$_FONT_FAMILY_MONO": "Monaco, Menlo, \"Liberation Mono\", Consolas, monospace",
+    "$_FONT_FAMILY_MONO_2": "Courier New, monospace",
+    "$_FONT_SIZE_BASE_SMALL": 10,
+    "$_FONT_SIZE_BASE_MEDIUM": 11,
+    "$_FONT_SIZE_BASE_MEDIUM_2": 12,
+    "$_FONT_SIZE_BASE_LARGE": 14,
+    "$_COLOR_NEAR_WHITE": [240, 240, 240],
+    "$_COLOR_NEAR_BLACK": [30, 30, 30],
+    "$_COLOR_TEXT_PRIMARY": {
+      "$ref": "$_COLOR_NEAR_WHITE"
+    },
+    "$_COLOR_TEXT_SECONDARY": [200, 200, 200],
+    "$_COLOR_TEXT_3": [220, 220, 220],
+    "$_COLOR_TEXT_4": [150, 150, 150],
+    "$_COLOR_TEXT_5": [255, 255, 255],
+    "$_COLOR_TEXT_6": [180, 180, 180],
+    "$_COLOR_TEXT_7": [230, 230, 230],
+    "$_COLOR_BACKGROUND_PRIMARY": [40, 40, 45],
+    "$_COLOR_BACKGROUND_SECONDARY": [30, 30, 35],
+    "$_COLOR_BACKGROUND_3": [45, 45, 50],
+    "$_COLOR_BACKGROUND_4": [35, 35, 40],
+    "$_COLOR_BACKGROUND_5": [50, 50, 55],
+    "$_COLOR_BACKGROUND_6": [55, 55, 60],
+    "$_COLOR_BACKGROUND_ACTIVE": [70, 90, 130],
+    "$_COLOR_BORDER": [60, 60, 65],
+    "$_COLOR_CHART_AXIS": [150, 150, 150],
+    "$_COLOR_CHART_GRIDLINE": [60, 60, 65],
+    "$_COLOR_CHART_LINE_MAIN": [255, 255, 255],
+    "$_COLOR_CHART_MAIN_2": [238, 236, 230],
+    "$_COLOR_CHART_LINE_2": [120, 190, 255],
+    "$_COLOR_CHART_LINE_3": [100, 150, 255],
+    "$_COLOR_CHART_LINE_4": [150, 150, 150],
+    "$_COLOR_BUTTON_BACKGROUND": {
+      "$ref": "$_COLOR_BACKGROUND_5"
+    },
+    "$_COLOR_BUTTON_HOVER_BACKGROUND": [60, 60, 65],
+    "$_COLOR_BUTTON_ACTIVE_BACKGROUND": {
+      "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+    },
+    "$_COLOR_SEPERATOR_BACKGROUND": [60, 60, 65],
+    "$_COLOR_ACTIVE_MOVE_BACKGROUND": [100, 120, 180],
+    "$_COLOR_INPUT_FOCUS_BORDER": [0, 120, 212],
+    "$_COLOR_SCROLLBAR_BACKGROUND": {
+      "$ref": "$_COLOR_BACKGROUND_3"
+    },
+    "$_COLOR_SCROLLBAR_BUTTON_COLOR": [30, 30, 30],
+    "$_COLOR_SPLITTER_HANDLE": [30, 30, 30],
+    "$_COLOR_SCROLLBAR_HANDLE": {
+      "$ref": "$_COLOR_BORDER"
+    },
+    "$_COLOR_SCROLLBAR_HANDLE_HOVER": [90, 90, 95],
+    "$_COLOR_GRIDLINE": [60, 60, 65],
+    "$_COLOR_BUTTON_BORDER": {
+      "$ref": "$_COLOR_BORDER"
+    },
+    "$_COLOR_WHITE": [255, 255, 255],
+    "$_COLOR_BLACK": [0, 0, 0]
+  },
+  "game_tags": {
+    "builtin": [
+      {
+        "name": "Favourite",
+        "color": [255, 255, 0]
+      },
+      {
+        "name": "Blunder-decided",
+        "color": [220, 80, 80]
+      },
+      {
+        "name": "Brilliant Move",
+        "color": [255, 200, 60]
+      },
+      {
+        "name": "Clean win",
+        "color": [70, 160, 110]
+      },
+      {
+        "name": "Missed win",
+        "color": [200, 100, 255]
+      },
+      {
+        "name": "Opening disaster",
+        "color": [200, 90, 160]
+      },
+      {
+        "name": "Endgame grind",
+        "color": [110, 140, 220]
+      },
+      {
+        "name": "Chaotic game",
+        "color": [140, 140, 140]
+      },
+      {
+        "name": "Sharp",
+        "color": [90, 160, 200]
+      }
+    ]
+  },
+  "ui": {
+    "styles": {
+      "scrollbar": {
+        "width": 6,
+        "background_color": {
+          "$ref": "$_COLOR_SCROLLBAR_BACKGROUND"
+        },
+        "handle_color": {
+          "$ref": "$_COLOR_SCROLLBAR_HANDLE"
+        },
+        "handle_hover_color": {
+          "$ref": "$_COLOR_SCROLLBAR_HANDLE_HOVER"
+        },
+        "border_radius": 3,
+        "min_height": 20,
+        "add_line_height": 0
+      },
+      "checkbox": {
+        "spacing": 5,
+        "indicator_width": 16,
+        "indicator_height": 16,
+        "indicator_border_radius": 3,
+        "checked_background_color": {
+          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+        },
+        "checked_border_color": [100, 120, 160],
+        "hover_border_offset": 20,
+        "margin_top": 2,
+        "margin_bottom": 2
+      },
+      "combobox": {
+        "dropdown_border_radius": 3,
+        "padding": [
+          8,
+          6
+        ]
+      },
+      "radio_button": {
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "spacing": 5
+      },
+      "button": {
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "background_color": {
+          "$ref": "$_COLOR_BUTTON_BACKGROUND"
+        },
+        "hover_background_color": {
+          "$ref": "$_COLOR_BUTTON_HOVER_BACKGROUND"
+        },
+        "active_background_color": {
+          "$ref": "$_COLOR_BUTTON_ACTIVE_BACKGROUND"
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "border_radius": 3,
+        "padding": 5,
+        "default_height": 30,
+        "default_width": 120
+      },
+      "line_edit": {
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_3"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "focus_border_color": {
+          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+        },
+        "border_width": 1,
+        "border_radius": 3,
+        "padding": [
+          8,
+          6
+        ],
+        "hover_border_offset": 20,
+        "disabled_brightness_factor": 0.5
+      },
+      "spinbox": {
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_3"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "focus_border_color": {
+          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+        },
+        "border_width": 1,
+        "border_radius": 3,
+        "padding": [
+          8,
+          6
+        ],
+        "disabled_brightness_factor": 0.5,
+        "hide_buttons": true,
+        "minimum_height": 30
+      },
+      "date_edit": {
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_3"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "focus_border_color": {
+          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+        },
+        "border_width": 1,
+        "border_radius": 3,
+        "padding": [
+          8,
+          6
+        ],
+        "disabled_brightness_factor": 0.5
+      },
+      "group_box": {
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "border_width": 1,
+        "border_radius": 5,
+        "background_color": null,
+        "margin_top": 10,
+        "padding_top": 5,
+        "title_font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "title_font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "title_font_weight": null,
+        "title_color": {
+          "$ref": "$_COLOR_TEXT_PRIMARY"
+        },
+        "title_left": 10,
+        "title_padding": [
+          0,
+          5
+        ]
+      },
+      "context_menu": {
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_3"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "border_width": 1,
+        "border_radius": 3,
+        "hover_background_color": {
+          "$ref": "$_COLOR_BACKGROUND_6"
+        },
+        "hover_text_color": {
+          "$ref": "$_COLOR_TEXT_7"
+        },
+        "item_padding": [4, 20, 4, 14],
+        "menu_horizontal_padding": 4,
+        "separator_height": 1,
+        "separator_color": [60, 60, 65],
+        "separator_margin": [
+          2,
+          4
+        ]
+      },
+      "tree_view": {
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_3"
+        },
+        "header_text_color": {
+          "$ref": "$_COLOR_TEXT_7"
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "header_font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "header_font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_4"
+        },
+        "alternate_background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "grid_color": {
+          "$ref": "$_COLOR_CHART_GRIDLINE"
+        },
+        "selection_background_color": {
+          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+        },
+        "selection_text_color": {
+          "$ref": "$_COLOR_TEXT_PRIMARY"
+        },
+        "row_height": 20,
+        "header_min_height": 20,
+        "show_grid": false,
+        "show_focus_rect": true
+      },
+      "tooltip": {
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_3"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "border_width": 1,
+        "border_radius": 5,
+        "padding": 10,
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_3"
+        }
+      }
+    },
+    "positional_heatmap": {
+      "colors": {
+        "positive": [0, 255, 0],
+        "negative": [255, 0, 0],
+        "neutral": [255, 255, 0],
+        "neutral_threshold": -5.0,
+        "opacity": 0.9,
+        "gradient_radius_ratio": 0.85,
+        "gradient_center_ratio": 0.3
+      },
+      "tooltip": {
+        "max_width": 400,
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "line_height": 1.5,
+        "padding": 10,
+        "spacing": 4,
+        "section_spacing": 12,
+        "section_bottom_spacing": 8,
+        "item_spacing": 2,
+        "header_bottom_margin": 8,
+        "calculation_margin_bottom": 8,
+        "overall_section_spacing": 12,
+        "separator_enabled": true,
+        "separator_color": [70, 70, 75],
+        "separator_height": 1,
+        "separator_margin": [
+          8,
+          8
+        ],
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_3"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "border_width": 1,
+        "border_radius": 5,
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_3"
+        },
+        "title_font_size": 13,
+        "title_color": {
+          "$ref": "$_COLOR_TEXT_5"
+        },
+        "title_font_weight": "bold",
+        "header_font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM_2"
+        },
+        "header_color": {
+          "$ref": "$_COLOR_TEXT_PRIMARY"
+        },
+        "positive_color": [100, 255, 100],
+        "negative_color": [255, 200, 100],
+        "bullet_indent": 15,
+        "calculation_indent": 12,
+        "calculation_background": {
+          "$ref": "$_COLOR_BACKGROUND_4"
+        },
+        "calculation_padding": 6
+      }
+    },
+    "panels": {
+      "main": {
+        "minimum_width": 450,
+        "minimum_height": 200,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "gameinfo": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "player_name_size": 16,
+          "player_elo_size": 12,
+          "opening_size": 14,
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "padding": [10, 25, 10, 0],
+          "spacing": 8,
+          "separator": {
+            "text": " - ",
+            "font_size": 16
+          }
+        },
+        "board": {
+          "padding": [20, 20, 20, 20],
+          "border": {
+            "size": 4,
+            "color": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            }
+          },
+          "coordinates": {
+            "border_width": 25,
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            },
+            "font_style": "normal"
+          },
+          "squares": {
+            "light_color": [217, 217, 217],
+            "dark_color": [58, 117, 196]
+          },
+          "pieces": {
+            "svg_path": "app/resources/chesspieces/default",
+            "padding_ratio": 0.05
+          },
+          "turn_indicator": {
+            "size": 16,
+            "padding": [0, 0, 10, 10],
+            "white_color": {
+              "$ref": "$_COLOR_WHITE"
+            },
+            "black_color": {
+              "$ref": "$_COLOR_BLACK"
+            }
+          },
+          "playedmove_arrow": {
+            "color": [255, 255, 0]
+          },
+          "bestnextmove_arrow": {
+            "color": [0, 0, 255]
+          },
+          "pv2_arrow": {
+            "color": [100, 150, 255]
+          },
+          "pv3_arrow": {
+            "color": [150, 150, 150]
+          },
+          "bestalternativemove_arrow": {
+            "color": [200, 0, 100]
+          },
+          "positional_plans": {
+            "use_straight_lines": true,
+            "trajectory": {
+              "line_width_start": 2,
+              "line_width_end": 6,
+              "opacity_start": 0.4,
+              "opacity_end": 1.0,
+              "color_start": [100, 150, 255],
+              "color_end": [0, 100, 255],
+              "curve_factor": 0.3
+            },
+            "trajectory_2": {
+              "line_width_start": 2,
+              "line_width_end": 6,
+              "opacity_start": 0.4,
+              "opacity_end": 1.0,
+              "color_start": [100, 255, 150],
+              "color_end": [0, 200, 100],
+              "curve_factor": 0.3
+            },
+            "trajectory_3": {
+              "line_width_start": 2,
+              "line_width_end": 6,
+              "opacity_start": 0.4,
+              "opacity_end": 1.0,
+              "color_start": [255, 200, 100],
+              "color_end": [255, 150, 0],
+              "curve_factor": 0.3
+            },
+            "numbered_markers": {
+              "background_color": [0, 100, 255],
+              "background_radius": 8,
+              "size": 24
+            },
+            "numbered_markers_2": {
+              "background_color": [0, 200, 100],
+              "background_radius": 8,
+              "size": 24
+            },
+            "numbered_markers_3": {
+              "background_color": [255, 150, 0],
+              "background_radius": 8,
+              "size": 24
+            }
+          },
+          "evaluation_bar": {
+            "width": 30,
+            "padding_left": 40,
+            "colors": {
+              "white": {
+                "$ref": "$_COLOR_WHITE"
+              },
+              "black": {
+                "$ref": "$_COLOR_BLACK"
+              }
+            }
+          },
+          "material_widget": {
+            "width": 110,
+            "height": 130,
+            "padding": [12, 12, 10, 14],
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            },
+            "border_color": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            },
+            "border_radius": 5,
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_MONO"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "piece_size": 18,
+            "white_text_color": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            },
+            "black_text_color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            },
+            "difference_text_color": [255, 255, 100],
+            "separator_color": [100, 100, 105]
+          },
+          "game_tags_widget": {
+            "width": 170,
+            "max_height": 0,
+            "min_interactive_height": 200,
+            "padding": [10, 10, 15, 14],
+            "spacing_below_material": 20,
+            "flow_spacing": 6,
+            "chip": {
+              "border_radius": 10,
+              "padding": [
+                2,
+                8
+              ],
+              "minimum_height": 22,
+              "unmanaged_background_color": [95, 95, 100],
+              "font_family": {
+                "$ref": "$_FONT_FAMILY_PRIMARY"
+              },
+              "font_size": {
+                "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+              },
+              "font_weight": "bold",
+              "hover_background_rgba": [255, 255, 255, 18],
+              "hover_text_color": [68, 68, 74]
+            }
+          },
+          "move_classification_badges": {
+            "inset_ratio": 0.04,
+            "colors": {
+              "book_move": [150, 150, 150],
+              "brilliant": [255, 215, 0],
+              "best_move": [100, 255, 100],
+              "good_move": [150, 255, 150],
+              "inaccuracy": [255, 255, 100],
+              "mistake": [255, 200, 100],
+              "miss": [200, 100, 255],
+              "blunder": [255, 100, 100]
+            }
+          }
+        }
+      },
+      "detail": {
+        "minimum_width": 200,
+        "minimum_height": 200,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "pgn_notation": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO_2"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_3"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "formatting": {
+            "headers": {
+              "color": [100, 150, 255],
+              "bold": true
+            },
+            "move_numbers": {
+              "color": {
+                "$ref": "$_COLOR_TEXT_5"
+              },
+              "bold": true
+            },
+            "moves": {
+              "color": {
+                "$ref": "$_COLOR_TEXT_3"
+              },
+              "bold": false
+            },
+            "annotations": {
+              "good": {
+                "color": [100, 255, 100],
+                "bold": true
+              },
+              "bad": {
+                "color": [255, 100, 100],
+                "bold": true
+              },
+              "interesting": {
+                "color": [255, 255, 100],
+                "bold": true
+              },
+              "dubious": {
+                "color": [255, 200, 100],
+                "bold": true
+              }
+            },
+            "nags": {
+              "color": [200, 150, 255],
+              "bold": false,
+              "italic": true
+            },
+            "comments": {
+              "color": [180, 200, 255],
+              "italic": true
+            },
+            "variations": {
+              "color": {
+                "$ref": "$_COLOR_TEXT_6"
+              },
+              "italic": true
+            },
+            "results": {
+              "color": [255, 255, 100],
+              "bold": true
+            },
+            "active_move": {
+              "background_color": {
+                "$ref": "$_COLOR_ACTIVE_MOVE_BACKGROUND"
+              },
+              "text_color": {
+                "$ref": "$_COLOR_TEXT_5"
+              },
+              "bold": true
+            }
+          }
+        },
+        "moveslist": {
+          "table": {
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "header_font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "header_font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "active_move": {
+              "background_color": {
+                "$ref": "$_COLOR_ACTIVE_MOVE_BACKGROUND"
+              },
+              "text_color": {
+                "$ref": "$_COLOR_TEXT_5"
+              }
+            },
+            "header_background_color": {
+              "$ref": "$_COLOR_BACKGROUND_3"
+            },
+            "header_text_color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            },
+            "header_border_color": {
+              "$ref": "$_COLOR_BORDER"
+            },
+            "gridline_color": {
+              "$ref": "$_COLOR_GRIDLINE"
+            },
+            "selection_background_color": {
+              "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            },
+            "selection_text_color": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            }
+          }
+        },
+        "summary": {
+          "placeholder": {
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_4"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_LARGE"
+            },
+            "padding": 20
+          },
+          "evaluation_graph": {
+            "height": 200,
+            "minimum_height": 100,
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            },
+            "grid_color": {
+              "$ref": "$_COLOR_CHART_GRIDLINE"
+            },
+            "white_line_color": {
+              "$ref": "$_COLOR_CHART_LINE_MAIN"
+            },
+            "black_line_color": {
+              "$ref": "$_COLOR_BLACK"
+            },
+            "current_move_line_color": [255, 255, 0],
+            "current_move_line_width": 2,
+            "line_width": 2,
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            },
+            "axis_color": {
+              "$ref": "$_COLOR_CHART_AXIS"
+            },
+            "padding": [40, 20, 20, 40],
+            "normalized_mode_small_range_threshold": 50,
+            "zero_based_mode_small_range_threshold": 100,
+            "zero_based_mode_padding": 50,
+            "min_grid_spacing": 30,
+            "min_grid_lines": 3,
+            "show_all_labels_height_threshold": 150,
+            "min_font_size": 8,
+            "font_size_calculation_divisor": 20,
+            "label_skip_divisor": 3,
+            "y_axis_label_spacing": 5,
+            "min_label_spacing": 40,
+            "min_move_labels": 3,
+            "x_axis_label_spacing": 5,
+            "phase_transition_line_color": {
+              "$ref": "$_COLOR_CHART_LINE_3"
+            },
+            "phase_transition_line_width": 2,
+            "phase_transition_line_style": "dashed",
+            "critical_moment_worst_line_color": [255, 0, 0],
+            "critical_moment_best_line_color": [150, 255, 150],
+            "critical_moment_line_width": 1,
+            "critical_moment_line_style": "dotted"
+          },
+          "colors": {
+            "book_move": [150, 150, 150],
+            "brilliant": [255, 215, 0],
+            "best_move": [100, 255, 100],
+            "good_move": [150, 255, 150],
+            "inaccuracy": [255, 255, 100],
+            "mistake": [255, 200, 100],
+            "miss": [200, 100, 255],
+            "blunder": [255, 100, 100],
+            "text": {
+              "$ref": "$_COLOR_TEXT_3"
+            },
+            "header_text": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            },
+            "background": {
+              "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+            },
+            "section_background": {
+              "$ref": "$_COLOR_BACKGROUND_4"
+            },
+            "border": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            }
+          },
+          "fonts": {
+            "header_font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "header_font_size": {
+              "$ref": "$_FONT_SIZE_BASE_LARGE"
+            },
+            "header_font_weight": "bold",
+            "label_font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "label_font_size": {
+              "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+            },
+            "value_font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "value_font_size": {
+              "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+            }
+          },
+          "layout": {
+            "spacing": 15,
+            "section_spacing": 20,
+            "player_section_spacing": 10,
+            "margins": [10, 10, 10, 10]
+          },
+          "pie_chart": {
+            "minimum_size": [
+              200,
+              200
+            ],
+            "margin": 20
+          },
+          "widgets": {
+            "border_radius": 5,
+            "section_margins": [10, 10, 10, 10],
+            "section_spacing": 8,
+            "grid_spacing": 5,
+            "classification_widget_spacing": 10,
+            "counts_layout_spacing": 3,
+            "row_spacing": 5,
+            "color_indicator_size": [
+              12,
+              12
+            ],
+            "critical_moments_list_spacing": 3,
+            "critical_moments_section_spacing": 10,
+            "phase_spacing": 1,
+            "player_name_label": {
+              "white": {
+                "background_color": {
+                  "$ref": "$_COLOR_NEAR_WHITE"
+                },
+                "text_color": {
+                  "$ref": "$_COLOR_NEAR_BLACK"
+                },
+                "border_radius": 3,
+                "padding": [6, 4, 6, 4],
+                "font_weight": "bold"
+              },
+              "black": {
+                "background_color": {
+                  "$ref": "$_COLOR_NEAR_BLACK"
+                },
+                "text_color": {
+                  "$ref": "$_COLOR_TEXT_PRIMARY"
+                },
+                "border_radius": 3,
+                "padding": [6, 4, 6, 4],
+                "font_weight": "bold"
+              }
+            }
+          },
+          "splitter": {
+            "graph_height": 200,
+            "content_height": 400,
+            "graph_stretch_factor": 1,
+            "content_stretch_factor": 3
+          }
+        },
+        "player_stats": {
+          "section_visibility_hint": {
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": 9,
+            "text_color": [150, 150, 155]
+          },
+          "activity_status_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "colors": {
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_3"
+            },
+            "header_text": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            },
+            "background": {
+              "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+            },
+            "section_background": {
+              "$ref": "$_COLOR_BACKGROUND_4"
+            },
+            "border": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            },
+            "phase_opening_color": [100, 150, 255],
+            "phase_middlegame_color": [150, 255, 100],
+            "phase_endgame_color": [255, 200, 100]
+          },
+          "fonts": {
+            "header_font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "header_font_size": {
+              "$ref": "$_FONT_SIZE_BASE_LARGE"
+            },
+            "header_font_weight": "bold",
+            "label_font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "label_font_size": {
+              "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+            },
+            "value_font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "value_font_size": {
+              "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+            }
+          },
+          "layout": {
+            "spacing": 15,
+            "section_spacing": 20,
+            "margins": [10, 10, 10, 10]
+          },
+          "widgets": {
+            "border_radius": 5,
+            "section_margins": [10, 10, 10, 10],
+            "section_spacing": 8,
+            "grid_spacing": 5,
+            "row_spacing": 5
+          },
+          "player_selection": {
+            "combo_minimum_width": 200,
+            "button_width": 80,
+            "button_height": 28,
+            "row_spacing": 8,
+            "label_padding": 10
+          },
+          "button": {
+            "height": 28,
+            "border_radius": 4,
+            "padding": [
+              6,
+              4
+            ],
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_5"
+            },
+            "border_color": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            },
+            "hover_background_color": {
+              "$ref": "$_COLOR_BUTTON_HOVER_BACKGROUND"
+            },
+            "hover_text_color": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "border_width": 1,
+            "background_offset": 20
+          },
+          "input_widgets": {
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            },
+            "border_color": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            },
+            "focus_border_color": {
+              "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            },
+            "selection_background_color": {
+              "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            },
+            "selection_text_color": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            }
+          },
+          "scroll_area": {
+            "border_color_offset": 20
+          },
+          "openings": {
+            "label_column_width": 120,
+            "margins_width": 40,
+            "min_value_width": 150,
+            "min_eco_width": 100
+          },
+          "analysis_coverage": {
+            "banner_background_color": {
+              "$ref": "$_COLOR_BACKGROUND_3"
+            },
+            "banner_border_color": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            },
+            "banner_text_color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            },
+            "banner_font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "banner_margins": [10, 8, 10, 8],
+            "banner_spacing": 5,
+            "indicator_size": [
+              12,
+              12
+            ],
+            "colors": {
+              "good_coverage": [100, 200, 100],
+              "moderate_coverage": [255, 200, 100],
+              "low_coverage": [255, 150, 150]
+            }
+          },
+          "accuracy_distribution": {
+            "height": 200,
+            "padding": [16, 14, 16, 14],
+            "border_radius": 5,
+            "section_spacing": 6,
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            },
+            "plot_corner_radius": 4,
+            "bar_corner_radius": 2,
+            "bar_gap_px": 1,
+            "grid_major_horizontal_lines": 5,
+            "grid_major_color": [55, 55, 62],
+            "grid_minor_color": [45, 45, 50],
+            "x_axis_minor_grid": true,
+            "axis_color": [120, 120, 128],
+            "text_color": [200, 200, 205],
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "min_font_size": 8,
+            "font_size_calculation_divisor": 20,
+            "y_axis_label_spacing": 5,
+            "x_axis_label_spacing": 5,
+            "distribution_line_color": {
+              "$ref": "$_COLOR_CHART_LINE_2"
+            },
+            "distribution_line_width": 2,
+            "distribution_line_pen_style": "solid",
+            "distribution_line_curve": "smooth",
+            "distribution_line_smooth_strength": 1.0,
+            "hover_hit_threshold_px": 25,
+            "hover_circle_radius": 6,
+            "show_distribution_vertex_markers": true,
+            "distribution_vertex_marker_radius": 3,
+            "bar_color": [120, 190, 255],
+            "color_presets": {
+              "github_green": [
+                {
+                  "max_acc": 64,
+                  "color": [200, 90, 90]
+                },
+                {
+                  "max_acc": 85,
+                  "color": [220, 180, 80]
+                },
+                {
+                  "max_acc": 100,
+                  "color": [80, 180, 120]
+                }
+              ],
+              "ocean_blue": [
+                {
+                  "max_acc": 64,
+                  "color": [200, 100, 100]
+                },
+                {
+                  "max_acc": 85,
+                  "color": [120, 160, 220]
+                },
+                {
+                  "max_acc": 100,
+                  "color": [100, 180, 240]
+                }
+              ],
+              "amber": [
+                {
+                  "max_acc": 64,
+                  "color": [180, 80, 80]
+                },
+                {
+                  "max_acc": 85,
+                  "color": [200, 150, 60]
+                },
+                {
+                  "max_acc": 100,
+                  "color": [230, 190, 80]
+                }
+              ]
+            }
+          },
+          "error_patterns": {
+            "item_spacing": 8,
+            "item_margins": [8, 6, 8, 6],
+            "two_line_gap_factor": 0.15,
+            "button": {
+              "height": 28
+            },
+            "button_column_spacing": 8,
+            "truncation": {
+              "min_text_width": 50
+            },
+            "severity_indicator": {
+              "size": [
+                12,
+                12
+              ],
+              "border_radius": 6,
+              "colors": {
+                "critical": [255, 100, 100],
+                "high": [255, 150, 100],
+                "moderate": [255, 200, 100],
+                "low": [200, 200, 100],
+                "default": [150, 150, 150]
+              }
+            }
+          },
+          "placeholder": {
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_4"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_LARGE"
+            },
+            "padding": 20
+          },
+          "grid": {
+            "label_column_minimum_width": 150,
+            "value_column_minimum_width": 100
+          },
+          "move_classification_pie": {
+            "opponent_ring_width_fraction": 0.18,
+            "opponent_overlay_alpha": 0.65,
+            "opponent_overlay_saturation": 0.72,
+            "opponent_overlay_value_factor": 0.58,
+            "opponent_ring_darken": 135,
+            "min_size_for_overlay": 130
+          },
+          "phase_bar_chart": {
+            "bar_height": 30,
+            "bar_spacing": 10,
+            "bar_padding": 10,
+            "label_width": 100,
+            "value_width": 60,
+            "min_chart_width": 200,
+            "bar_border_radius": 3,
+            "bar_pen_width": 1,
+            "bar_value_spacing": 5,
+            "opponent_overlay_alpha": 0.65,
+            "opponent_overlay_value_factor": 0.58,
+            "opponent_overlay_darken": 135,
+            "min_width_for_hover_overlay": 180
+          },
+          "opening_tree": {
+            "height": 280,
+            "min_height": 120,
+            "max_height": 600,
+            "height_step": 80,
+            "show_root_decorations": true,
+            "alternating_row_colors": true,
+            "column_resize_modes": {
+              "move_opening": "Stretch",
+              "total": "ResizeToContents",
+              "white": "ResizeToContents",
+              "black": "ResizeToContents",
+              "accuracy": "ResizeToContents",
+              "game_accuracy": "ResizeToContents",
+              "opening_accuracy": "ResizeToContents"
+            }
+          },
+          "endgame_tree": {
+            "height": 240,
+            "min_height": 120,
+            "max_height": 600,
+            "height_step": 80,
+            "show_root_decorations": true,
+            "alternating_row_colors": true,
+            "column_resize_modes": {
+              "endgame_type": "Stretch",
+              "total": "ResizeToContents",
+              "white": "ResizeToContents",
+              "black": "ResizeToContents",
+              "accuracy": "ResizeToContents",
+              "game_accuracy": "ResizeToContents",
+              "endgame_accuracy": "ResizeToContents"
+            }
+          },
+          "accuracy_vs_progress_chart": {
+            "height": 220,
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            },
+            "grid_color": {
+              "$ref": "$_COLOR_CHART_GRIDLINE"
+            },
+            "line_color": {
+              "$ref": "$_COLOR_CHART_LINE_2"
+            },
+            "opponent_line_color": [200, 130, 130],
+            "line_style": "solid",
+            "opponent_line_style": "dashed",
+            "line_width": 2,
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            },
+            "axis_color": {
+              "$ref": "$_COLOR_CHART_AXIS"
+            },
+            "padding": [40, 20, 20, 40],
+            "min_grid_spacing": 30,
+            "min_grid_lines": 3,
+            "min_font_size": 8,
+            "font_size_calculation_divisor": 20,
+            "y_axis_label_spacing": 5,
+            "x_axis_label_spacing": 5,
+            "bin_data_marker_radius": 3
+          },
+          "time_series": {
+            "gap_compression_span_marker_color": [72, 72, 80],
+            "gap_compression_span_marker_line_width": 1,
+            "progression_line_style": "smooth",
+            "progression_line_smooth_strength": 1.0,
+            "subcaption_font_size": 9,
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            },
+            "grid_color": {
+              "$ref": "$_COLOR_CHART_GRIDLINE"
+            },
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            },
+            "axis_color": {
+              "$ref": "$_COLOR_CHART_AXIS"
+            },
+            "padding": [40, 20, 8, 40],
+            "min_grid_spacing": 30,
+            "min_font_size": 8,
+            "font_size_calculation_divisor": 20,
+            "y_axis_label_spacing": 5,
+            "x_axis_label_spacing": 5,
+            "hover_hit_threshold_px": 25,
+            "bin_data_marker_radius": 3,
+            "x_axis_major_line_color": [88, 88, 95],
+            "x_axis_minor_line_color": [55, 55, 62],
+            "x_axis_major_line_width": 1,
+            "x_axis_minor_line_width": 1,
+            "x_axis_label_min_spacing_px": 44,
+            "x_axis_max_labels": 12
+          },
+          "activity_heatmap": {
+            "cell_gap": 2,
+            "two_band_vertical_gap": 12,
+            "min_cell_size": 3,
+            "max_cell_size": 48,
+            "color_presets": {
+              "github_green": [
+                [22, 27, 34],
+                [0, 55, 40],
+                [38, 130, 80],
+                [120, 200, 120]
+              ],
+              "ocean_blue": [
+                [22, 27, 34],
+                [15, 45, 85],
+                [45, 100, 180],
+                [100, 180, 240]
+              ],
+              "amber": [
+                [22, 27, 34],
+                [70, 50, 10],
+                [140, 100, 30],
+                [230, 190, 80]
+              ]
+            },
+            "month_label_band_height": 14,
+            "month_label_font_size": 7,
+            "month_label_text_color": [150, 150, 158],
+            "week_divider_color": [72, 72, 80],
+            "week_divider_line_width": 1,
+            "month_divider_color": [120, 120, 135],
+            "month_divider_line_width": 2,
+            "month_calendar_boundary": {
+              "line_color": [120, 120, 135],
+              "line_width": 2,
+              "line_style": "solid",
+              "dash_pattern": [
+                4,
+                3
+              ],
+              "opacity": 1.0,
+              "draw_above_cells": true
+            },
+            "day_number_min_cell_size": 10,
+            "day_number_text_color": [130, 130, 138],
+            "cell_size_week": 11,
+            "cell_size_day": 10,
+            "cell_size_month": 14,
+            "corner_radius": 2,
+            "row_label_width": 28,
+            "label_font_size": 8,
+            "border_color": [55, 55, 62],
+            "empty_cell_color": [33, 38, 46]
+          },
+          "accuracy_over_time_chart": {
+            "height": 220,
+            "min_grid_lines": 3,
+            "line_color": {
+              "$ref": "$_COLOR_CHART_LINE_2"
+            },
+            "white_line_color": {
+              "$ref": "$_COLOR_CHART_MAIN_2"
+            },
+            "black_line_color": [72, 82, 98],
+            "legend_width": 112,
+            "legend_font_size": 9,
+            "line_style": "solid",
+            "line_width": 2,
+            "combined_line_width": 3,
+            "by_color_line_width": 1,
+            "hover_circle_radius": 6
+          },
+          "move_quality_over_time_chart": {
+            "height": 240,
+            "legend_width": 112,
+            "min_grid_lines": 5,
+            "legend_font_size": 8,
+            "series": [
+              {
+                "id": "best_move",
+                "label": "Best Move %",
+                "enabled": true,
+                "line_color": [100, 200, 140],
+                "line_style": "solid",
+                "line_width": 2
+              },
+              {
+                "id": "top3_move",
+                "label": "Top3-Move %",
+                "enabled": true,
+                "line_color": [100, 170, 255],
+                "line_style": "solid",
+                "line_width": 2
+              },
+              {
+                "id": "blunder_rate",
+                "label": "Blunder %",
+                "enabled": true,
+                "line_color": [255, 100, 100],
+                "line_style": "solid",
+                "line_width": 2
+              }
+            ]
+          },
+          "acpl_phase_over_time_chart": {
+            "height": 240,
+            "legend_width": 112,
+            "min_grid_lines": 5,
+            "y_axis_max_cap": 500,
+            "legend_font_size": 8,
+            "series": [
+              {
+                "id": "opening",
+                "label": "Opening",
+                "enabled": true,
+                "line_color": {
+                  "$ref": "$_COLOR_CHART_LINE_3"
+                },
+                "line_style": "solid",
+                "line_width": 2
+              },
+              {
+                "id": "middlegame",
+                "label": "Middlegame",
+                "enabled": true,
+                "line_color": [150, 255, 100],
+                "line_style": "solid",
+                "line_width": 2
+              },
+              {
+                "id": "endgame",
+                "label": "Endgame",
+                "enabled": true,
+                "line_color": [255, 200, 100],
+                "line_style": "solid",
+                "line_width": 2
+              }
+            ]
+          },
+          "responsive": {
+            "move_classification_collapse_threshold": 500,
+            "error_patterns_collapse_threshold": 500,
+            "openings_collapse_threshold": 600,
+            "animation_duration_ms": 200
+          }
+        },
+        "manual_analysis": {
+          "control_bar": {
+            "margins": [8, 8, 8, 8],
+            "spacing": 8,
+            "button_group_spacing": 16,
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+            }
+          },
+          "info_bar": {
+            "margins": [8, 4, 8, 4],
+            "spacing": 16
+          },
+          "buttons": {
+            "height": 28,
+            "padding": [
+              6,
+              4
+            ],
+            "border_radius": 4
+          },
+          "multipv_buttons": {
+            "width": 30
+          },
+          "labels": {
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "disabled_color_multiplier": 0.5,
+            "empty_label_color_multiplier": 0.7,
+            "line_highlight_style": {
+              "color": [255, 255, 255],
+              "font_weight": "bold"
+            }
+          },
+          "layout": {
+            "spacing": 0
+          },
+          "analysis_area": {
+            "container_margins": [0, 0, 0, 0],
+            "container_spacing": 8,
+            "line_spacing": 8,
+            "line_area_padding": [8, 8, 8, 0],
+            "empty_label_padding": 20
+          },
+          "multipv1_indicator": {
+            "width": 4
+          },
+          "multipv2_indicator": {
+            "width": 4
+          },
+          "multipv3_indicator": {
+            "width": 4
+          },
+          "statistics": {
+            "position": "top",
+            "font_size": 9,
+            "color": [180, 180, 180],
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_3"
+            },
+            "padding": [8, 4, 8, 4]
+          },
+          "evaluation_difference": {
+            "positive_color": [100, 255, 100],
+            "negative_color": [255, 100, 100]
+          },
+          "trajectory_highlight": {
+            "color": [100, 200, 255],
+            "font_weight": "bold",
+            "background_color": [50, 100, 150],
+            "background_alpha": 0.3
+          },
+          "pv_hover": {
+            "hover_delay_ms": 50,
+            "mini_board": {
+              "size": 160,
+              "offset_x": 20,
+              "offset_y": 20
+            }
+          }
+        },
+        "annotations": {
+          "placeholder": {
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_4"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_LARGE"
+            },
+            "padding": 20
+          },
+          "layout": {
+            "spacing": 8,
+            "controls_padding": 5,
+            "controls_spacing": 8,
+            "action_buttons_spacing": 3,
+            "toolbar_spacing": 8,
+            "toolbar_row_spacing": 3,
+            "color_palette_spacing": 8,
+            "color_row_spacing": 3,
+            "annotations_section_spacing": 5,
+            "annotations_header_spacing": 5,
+            "annotations_list_spacing": 3,
+            "annotations_list_margins": [5, 5, 5, 5]
+          },
+          "tool_buttons": {
+            "minimum_width": 50,
+            "compact_mode_threshold": 400,
+            "height": 32
+          },
+          "color_swatches": {
+            "size": 34,
+            "selected_border_color": [120, 150, 200],
+            "selected_border_width": 2,
+            "unselected_border_color": [180, 180, 180],
+            "unselected_border_width": 1
+          },
+          "preset_colors": [
+            [255, 100, 100],
+            [100, 220, 100],
+            [150, 200, 255],
+            [255, 200, 100],
+            [200, 100, 255],
+            [100, 220, 255],
+            [255, 150, 200],
+            [150, 150, 255],
+            [200, 200, 100],
+            [240, 240, 240]
+          ],
+          "default_color": [255, 100, 100],
+          "size_slider": {
+            "minimum": 100,
+            "maximum": 250,
+            "default": 100,
+            "tick_interval": 25
+          },
+          "scroll_area": {
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            },
+            "border_color": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            }
+          },
+          "annotations_list": {
+            "minimum_height": 100,
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            },
+            "wrapping": {
+              "color_buffer": 0,
+              "tool_buffer": 10,
+              "tool_verification_buffer": 6
+            }
+          },
+          "splitter": {
+            "controls_height": 150,
+            "annotations_height": 350,
+            "controls_stretch_factor": 0,
+            "annotations_stretch_factor": 1
+          },
+          "text_font_family": "Arial",
+          "text_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM_2"
+          }
+        },
+        "ai_chat": {
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "messages": {
+            "padding": 10,
+            "border_radius": 5,
+            "margin": 5,
+            "user": {
+              "background_color": [60, 80, 120],
+              "text_color": {
+                "$ref": "$_COLOR_TEXT_PRIMARY"
+              }
+            },
+            "ai": {
+              "background_color": {
+                "$ref": "$_COLOR_BACKGROUND_5"
+              },
+              "text_color": {
+                "$ref": "$_COLOR_TEXT_SECONDARY"
+              }
+            },
+            "typing_indicator": {
+              "opacity": 0.6,
+              "animation_interval_ms": 500
+            },
+            "system": {
+              "background_color": {
+                "$ref": "$_COLOR_BACKGROUND_3"
+              },
+              "text_color": {
+                "$ref": "$_COLOR_TEXT_4"
+              }
+            }
+          },
+          "separator": {
+            "line_color": {
+              "$ref": "$_COLOR_CHART_LINE_4"
+            },
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_6"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            }
+          },
+          "input": {
+            "height": 30,
+            "padding": 5,
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_3"
+            },
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            },
+            "border_color": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            },
+            "border_width": 1,
+            "border_radius": 3,
+            "focus_border_color": {
+              "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
+            }
+          },
+          "button": {
+            "width": 80,
+            "height": 30,
+            "border_width": 1,
+            "border_color": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            }
+          },
+          "tokens": {
+            "spacing_before": 12,
+            "width": 92,
+            "height": 30,
+            "collapse_width_threshold": 520,
+            "collapse_animation_duration_ms": 200,
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+            },
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            },
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_3"
+            },
+            "border_color": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            },
+            "border_width": 1,
+            "border_radius": 3,
+            "focus_border_color": {
+              "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
+            },
+            "padding": [
+              3,
+              3
+            ]
+          },
+          "timeout": {
+            "spacing_before": 12,
+            "width": 56,
+            "height": 30,
+            "padding": [
+              3,
+              3
+            ]
+          }
+        },
+        "splitter": {
+          "pgn_height": 200,
+          "tabs_height": 300,
+          "pgn_stretch_factor": 2,
+          "tabs_stretch_factor": 3
+        },
+        "tabs": {
+          "minimum_height": 200,
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "tab_height": 24,
+          "pane_background": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "scroll_button_color": {
+            "$ref": "$_COLOR_SCROLLBAR_BUTTON_COLOR"
+          },
+          "colors": {
+            "normal": {
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+              },
+              "text": {
+                "$ref": "$_COLOR_TEXT_SECONDARY"
+              },
+              "border": {
+                "$ref": "$_COLOR_BUTTON_BORDER"
+              }
+            },
+            "hover": {
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_6"
+              },
+              "text": {
+                "$ref": "$_COLOR_TEXT_7"
+              },
+              "border": [80, 80, 85]
+            },
+            "active": {
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+              },
+              "text": {
+                "$ref": "$_COLOR_TEXT_PRIMARY"
+              },
+              "border": [100, 120, 160]
+            }
+          }
+        },
+        "notes": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO_2"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_5"
+          },
+          "blockquote_text_color": [210, 190, 130],
+          "toolbar_separator_color": [60, 60, 65],
+          "inline_code_background_color": [90, 110, 160],
+          "inline_code_background_alpha": 170,
+          "inline_code_text_color": {
+            "$ref": "$_COLOR_TEXT_5"
+          },
+          "move_link_text_color": [100, 150, 255]
+        },
+        "metadata": {
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          },
+          "table": {
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "header_font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "header_font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "column_widths": {
+              "col_name": 150,
+              "col_value": 200
+            }
+          },
+          "standard_tag": {
+            "background_color": [50, 55, 60],
+            "text_color": [220, 220, 240]
+          },
+          "button_bar_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          },
+          "button": {
+            "height": 28,
+            "padding": [
+              6,
+              4
+            ],
+            "border_radius": 4,
+            "spacing": 8,
+            "margins": [8, 8, 8, 8],
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_5"
+            },
+            "border_color": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            },
+            "hover_background_color": {
+              "$ref": "$_COLOR_BUTTON_HOVER_BACKGROUND"
+            },
+            "hover_text_color": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            },
+            "active_background_color": {
+              "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            },
+            "active_text_color": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            }
+          }
+        }
+      },
+      "database": {
+        "minimum_width": 200,
+        "minimum_height": 40,
+        "default_height": 240,
+        "collapsed_height": 30,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_4"
+        },
+        "collapse_button": {
+          "maximum_width": 30,
+          "maximum_height": 30
+        },
+        "collapse_label": {
+          "text": "",
+          "font_family": "Arial",
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM_2"
+          },
+          "color": {
+            "$ref": "$_COLOR_TEXT_3"
+          }
+        },
+        "tabs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "tab_height": 24,
+          "pane_background": {
+            "$ref": "$_COLOR_BACKGROUND_4"
+          },
+          "scroll_button_color": {
+            "$ref": "$_COLOR_SCROLLBAR_BUTTON_COLOR"
+          },
+          "colors": {
+            "normal": {
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_3"
+              },
+              "text": {
+                "$ref": "$_COLOR_TEXT_SECONDARY"
+              },
+              "border": {
+                "$ref": "$_COLOR_BUTTON_BORDER"
+              }
+            },
+            "hover": {
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_6"
+              },
+              "text": {
+                "$ref": "$_COLOR_TEXT_7"
+              },
+              "border": [80, 80, 85]
+            },
+            "active": {
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+              },
+              "text": {
+                "$ref": "$_COLOR_TEXT_PRIMARY"
+              },
+              "border": [100, 120, 160]
+            }
+          }
+        },
+        "table": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "header_font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "header_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "column_widths": {
+            "col_num": 50,
+            "col_file_num": 70,
+            "col_unsaved": 25,
+            "col_white": 170,
+            "col_black": 170,
+            "col_white_elo": 80,
+            "col_black_elo": 80,
+            "col_result": 70,
+            "col_date": 110,
+            "col_event": 150,
+            "col_site": 150,
+            "col_moves": 65,
+            "col_eco": 65,
+            "col_time_control": 85,
+            "col_tc_type": 80,
+            "col_analyzed": 80,
+            "col_annotated": 80,
+            "col_notes": 80,
+            "col_source_db": 120,
+            "col_ref_ply": 70,
+            "col_tags": 260
+          },
+          "tags_column": {
+            "width": 260,
+            "cell_padding": [
+              4,
+              2
+            ]
+          },
+          "header_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_3"
+          },
+          "header_text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "header_border_color": {
+            "$ref": "$_COLOR_BORDER"
+          },
+          "gridline_color": {
+            "$ref": "$_COLOR_GRIDLINE"
+          },
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          }
+        }
+      },
+      "status": {
+        "minimum_height": 30,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_3"
+        },
+        "version": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "color": {
+            "$ref": "$_COLOR_TEXT_6"
+          },
+          "width": 80
+        },
+        "message": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "color": {
+            "$ref": "$_COLOR_TEXT_3"
+          }
+        },
+        "resize_grip": {
+          "width": 20,
+          "height": 20
+        }
+      }
+    },
+    "menu": {
+      "font_family": {
+        "$ref": "$_FONT_FAMILY_PRIMARY"
+      },
+      "font_size": {
+        "$ref": "$_FONT_SIZE_BASE_SMALL"
+      },
+      "spacing": 4,
+      "icons": {
+        "tint_color": [200, 200, 200],
+        "tint_color_light_scheme": [52, 52, 58]
+      },
+      "colors": {
+        "normal": {
+          "background": {
+            "$ref": "$_COLOR_BACKGROUND_3"
+          },
+          "text": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          }
+        },
+        "hover": {
+          "background": {
+            "$ref": "$_COLOR_BACKGROUND_6"
+          },
+          "text": {
+            "$ref": "$_COLOR_TEXT_7"
+          }
+        }
+      },
+      "menu_bar": {
+        "item_padding": [
+          4,
+          8
+        ]
+      },
+      "menu": {
+        "border_width": 1,
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "item_padding": [4, 20, 4, 8]
+      },
+      "separator": {
+        "height": 1,
+        "background_color": {
+          "$ref": "$_COLOR_SEPERATOR_BACKGROUND"
+        },
+        "margin": [
+          2,
+          4
+        ]
+      }
+    },
+    "splitter": {
+      "handle_color": {
+        "$ref": "$_COLOR_SPLITTER_HANDLE"
+      },
+      "top": {
+        "main_size": 600,
+        "detail_size": 400,
+        "main_stretch_factor": 3,
+        "detail_stretch_factor": 2
+      },
+      "middle": {
+        "top_size": 640,
+        "database_size": 240,
+        "top_stretch_factor": 4,
+        "database_stretch_factor": 1
+      }
+    },
+    "margins": {
+      "database_panel": [5, 5, 5, 5],
+      "status_panel": [5, 5, 5, 5],
+      "detail_panel": [0, 0, 0, 0]
+    },
+    "spacing": {
+      "database_panel": 5
+    },
+    "progress_bar": {
+      "maximum_width": 300,
+      "height": 20
+    },
+    "dialogs": {
+      "manage_game_tags": {
+        "width": 600,
+        "height": 440,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "layout": {
+          "margins": [25, 25, 25, 25],
+          "spacing": 15
+        },
+        "groups": {
+          "contents_margins": [10, 14, 10, 10],
+          "spacing": 10,
+          "builtin_chip_container_min_height": 36,
+          "custom_chip_container_min_height": 36
+        },
+        "chips": {
+          "spacing_multiplier": 2,
+          "outer_padding_multiplier": 1
+        },
+        "plus_chip": {
+          "text": "+",
+          "bold": true
+        },
+        "add_custom_tag_dialog": {
+          "width": 420,
+          "height": 140,
+          "layout": {
+            "margins": [18, 18, 18, 18],
+            "spacing": 10,
+            "row_spacing": 10
+          },
+          "swatch": {
+            "min_size": 18,
+            "max_size": 22
+          }
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
+        },
+        "icon_badges": {
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_6"
+          },
+          "background_hover_color": [75, 75, 82],
+          "icon_color": [235, 235, 235],
+          "icon_hover_color": [255, 255, 255]
+        },
+        "builtin_hidden_chip_color": [75, 75, 82]
+      },
+      "classification_settings": {
+        "width": 480,
+        "height": 660,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "layout": {
+          "spacing": 5,
+          "margins": [25, 25, 25, 25],
+          "section_spacing": 10
+        },
+        "groups": {
+          "title_font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "margin_top": 10,
+          "padding_top": 5,
+          "title_left": 10,
+          "title_padding": [
+            0,
+            5
+          ],
+          "content_margins": [10, 20, 10, 15]
+        },
+        "fields": {
+          "label_width": 200,
+          "input_width": 100,
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_3"
+          },
+          "spacing": 12,
+          "right_padding": 0,
+          "disabled_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_4"
+          },
+          "input_border_radius": 3,
+          "input_padding": 3,
+          "input_background_offset": 10
+        },
+        "cpl_scale": {
+          "height": 120,
+          "padding": [10, 10, 10, 10],
+          "scale_max": 500,
+          "blunder_compression_enabled": true,
+          "blunder_compression_factor": 0.4,
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "scale_line_color": {
+            "$ref": "$_COLOR_CHART_LINE_4"
+          },
+          "tick_color": [200, 200, 200],
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_3"
+          },
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": 9,
+          "best_move_color": [100, 255, 100],
+          "good_move_color": [150, 255, 150],
+          "inaccuracy_color": [255, 255, 100],
+          "mistake_color": [255, 200, 100],
+          "blunder_color": [255, 100, 100],
+          "number_height_offset": 4,
+          "section_height": 12,
+          "scale_line_offset": 8,
+          "label_row_spacing": 15,
+          "label_y_offset_row1": 20,
+          "marker_height": 8
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
+        }
+      },
+      "ai_model_settings": {
+        "width": 600,
+        "height": 645,
+        "form_label_min_width": 180,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "layout": {
+          "spacing": 15,
+          "margins": [20, 20, 20, 20],
+          "section_spacing": 20
+        },
+        "groups": {
+          "border_width": 1,
+          "title_font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "title_font_weight": "bold",
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "margin_top": 10,
+          "padding_top": 20,
+          "title_left": 10,
+          "title_padding": 5
+        },
+        "fields": {
+          "spacing": 8
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          }
+        },
+        "inputs": {
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_3"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_width": 1,
+          "border_radius": 3,
+          "padding": 3,
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "focus_border_color": {
+            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
+          },
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          }
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
+        }
+      },
+      "engine_configuration": {
+        "width": 600,
+        "height": 680,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "layout": {
+          "spacing": 10,
+          "margins": [10, 10, 10, 10]
+        },
+        "tabs_layout": {
+          "spacing": 10,
+          "margins": [15, 10, 15, 10],
+          "top_spacer": 5,
+          "copy_layout_spacing": 10,
+          "common_layout_spacing": 10,
+          "engine_params_layout_spacing": 10,
+          "scroll_layout_spacing": 10,
+          "scroll_layout_margins": [10, 5, 10, 10]
+        },
+        "header": {
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_3"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_3"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_width": 1,
+          "border_radius": 5,
+          "padding": [10, 10, 10, 10],
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "font_style": "normal"
+        },
+        "tabs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "tab_height": 24,
+          "pane_background": {
+            "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          },
+          "scroll_button_color": {
+            "$ref": "$_COLOR_SCROLLBAR_BUTTON_COLOR"
+          },
+          "colors": {
+            "normal": {
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_3"
+              },
+              "text": {
+                "$ref": "$_COLOR_TEXT_SECONDARY"
+              },
+              "border": {
+                "$ref": "$_COLOR_BUTTON_BORDER"
+              }
+            },
+            "hover": {
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_6"
+              },
+              "text": {
+                "$ref": "$_COLOR_TEXT_7"
+              },
+              "border": [80, 80, 85]
+            },
+            "active": {
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+              },
+              "text": {
+                "$ref": "$_COLOR_TEXT_PRIMARY"
+              },
+              "border": [100, 120, 160]
+            }
+          }
+        },
+        "groups": {
+          "border_width": 1,
+          "title_font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "title_font_weight": "bold",
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_3"
+          },
+          "spacing": 10,
+          "margin_top": 8,
+          "padding_top": 12,
+          "content_margins": [10, 15, 10, 10],
+          "engine_params_content_margin_top": 2
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
+        },
+        "scroll_area": {
+          "min_height": 200,
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_3"
+          },
+          "height_calculation": {
+            "header_height": 60,
+            "button_area_height": 50,
+            "common_group_height": 100,
+            "copy_group_height": 50,
+            "spacing_buffer": 30
+          }
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "disabled_color": [128, 128, 128],
+          "empty_label_color": [128, 128, 128],
+          "empty_label_font_style": "italic",
+          "empty_label_padding": [20, 20, 20, 20],
+          "form_label_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          }
+        },
+        "form_layout": {
+          "spacing": 10,
+          "label_minimum_width": 100
+        },
+        "input_widgets": {
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_3"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_width": 1,
+          "border_radius": 3,
+          "padding": [2, 6, 2, 6],
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "focus_border_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          }
+        },
+        "validation_dialog": {
+          "width": 600,
+          "height": 500,
+          "layout": {
+            "spacing": 15,
+            "margins": [15, 15, 15, 15]
+          },
+          "title": {
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_LARGE"
+            },
+            "padding": 5,
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            }
+          },
+          "description": {
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+            },
+            "padding": 5,
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            }
+          },
+          "task_header": {
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_MEDIUM_2"
+            },
+            "padding": 5,
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_3"
+            }
+          },
+          "scroll_area": {
+            "min_height": 250
+          },
+          "issue_widget": {
+            "margins": [10, 5, 10, 5],
+            "spacing": 10
+          },
+          "severity_labels": {
+            "width": 80,
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "padding": [
+              2,
+              8
+            ],
+            "border_radius": 3,
+            "colors": {
+              "error": [255, 100, 100],
+              "warning": [255, 200, 100],
+              "info": [150, 200, 255]
+            }
+          },
+          "issue_message": {
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+            },
+            "padding": 2,
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            }
+          }
+        }
+      },
+      "engine_dialog": {
+        "width": 550,
+        "height": 360,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "layout": {
+          "spacing": 10,
+          "margins": [10, 10, 10, 10],
+          "engine_info_section_spacing": 8
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "minimum_width": 100
+        },
+        "input_widgets": {
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_3"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_width": 1,
+          "border_radius": 3,
+          "padding": [2, 6, 2, 6],
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "focus_border_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "hover_border_offset": 20,
+          "disabled_brightness_factor": 0.5,
+          "browse_button_height": 28
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30
+        },
+        "group_box": {
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_width": 1,
+          "border_radius": 5,
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "title_font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "margin_top": 10,
+          "padding_top": 0,
+          "title_left": 10,
+          "title_padding": [
+            0,
+            5
+          ],
+          "content_margins": [10, 15, 10, 10],
+          "content_spacing": 8,
+          "path_layout_spacing": 8
+        }
+      },
+      "bulk_replace": {
+        "width": 600,
+        "height": 800,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "layout": {
+          "margins": [25, 25, 25, 25],
+          "spacing": 12
+        },
+        "spacing": {
+          "layout": 10,
+          "section": 8,
+          "form": 14,
+          "options": 22,
+          "result": 8
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "note_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "minimum_width": 90
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ],
+          "minimum_width": 200,
+          "minimum_height": 30,
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          }
+        },
+        "groups": {
+          "title_font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "content_margins": [10, 14, 10, 10],
+          "margin_top": 10,
+          "padding_top": 5,
+          "title_left": 10,
+          "title_padding": [
+            0,
+            5
+          ]
+        },
+        "tags_list": {
+          "height": 160,
+          "columns": 2,
+          "spacing": 8,
+          "row_spacing": 4,
+          "margins": [10, 6, 8, 10]
+        },
+        "quick_select_buttons": {
+          "enabled": true,
+          "spacing": 8,
+          "width": 100,
+          "height": 24
+        }
+      },
+      "bulk_tag": {
+        "width": 600,
+        "height": 500,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "layout": {
+          "margins": [25, 25, 25, 25],
+          "spacing": 12
+        },
+        "spacing": {
+          "layout": 10,
+          "section": 8,
+          "form": 14,
+          "options": 22,
+          "result": 8
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "note_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "minimum_width": 90
+        },
+        "radio_buttons": {
+          "first_button_minimum_width": 100
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ],
+          "minimum_width": 200,
+          "minimum_height": 30,
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          }
+        },
+        "groups": {
+          "title_font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "content_margins": [10, 14, 10, 10],
+          "margin_top": 10,
+          "padding_top": 5,
+          "title_left": 10,
+          "title_padding": [
+            0,
+            5
+          ]
+        }
+      },
+      "move_comment": {
+        "width": 500,
+        "height": 430,
+        "minimum_width": 440,
+        "minimum_height": 370,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "layout": {
+          "margins": [24, 22, 24, 22],
+          "spacing": 12
+        },
+        "spacing": {
+          "section": 12,
+          "form": 6,
+          "before_buttons": 20
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "minimum_width": 72
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ],
+          "minimum_width": 200,
+          "minimum_height": 30,
+          "focus_border_color": {
+            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
+          },
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          }
+        },
+        "text_edits": {
+          "minimum_height": 80,
+          "side_inset": 10
+        }
+      },
+      "search": {
+        "width": 800,
+        "height": 600,
+        "minimum_width": 700,
+        "minimum_height": 500,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "layout": {
+          "margins": [25, 25, 25, 25],
+          "spacing": 15
+        },
+        "spacing": {
+          "section": 15
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "small_width": 100
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          }
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ],
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          }
+        },
+        "groups": {
+          "title_font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "content_margins": [10, 20, 10, 15],
+          "margin_top": 10,
+          "padding_top": 5,
+          "title_left": 10,
+          "title_padding": [
+            0,
+            5
+          ]
+        },
+        "tag_picker": {
+          "selected_border_color": [0, 200, 255],
+          "selected_border_width": 2,
+          "popup_width": 360,
+          "popup_max_height": 260,
+          "popup_layout_margins": [10, 10, 10, 10],
+          "popup_layout_spacing": 8,
+          "popup_extra_height": 16,
+          "popup_anchor_gap_y": 24,
+          "popup_flip_gap_y": 12,
+          "popup_min_bottom_space_to_prefer_below": 140
+        }
+      },
+      "import_games": {
+        "width": 550,
+        "height": 600,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "layout": {
+          "margins": [25, 25, 25, 25],
+          "spacing": 15
+        },
+        "spacing": {
+          "section": 15,
+          "form": 10
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "minimum_width": 120
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ],
+          "minimum_width": 250,
+          "minimum_height": 30,
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          }
+        },
+        "groups": {
+          "title_font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "content_margins": [10, 20, 10, 15],
+          "margin_top": 10,
+          "padding_top": 5,
+          "title_left": 10,
+          "title_padding": [
+            0,
+            5
+          ]
+        }
+      },
+      "bulk_analysis_dialog": {
+        "width": 600,
+        "height": 500,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "layout": {
+          "margins": [25, 25, 25, 25],
+          "spacing": 15
+        },
+        "spacing": {
+          "section": 15,
+          "controls_row": 20,
+          "label_spinbox": 8,
+          "progress_bar": 8,
+          "options_grid_horizontal": 14,
+          "options_grid_vertical": 20,
+          "options_controls_left_margin": 0
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "fixed_width": 110
+        },
+        "radio_buttons": {
+          "first_button_minimum_width": 100
+        },
+        "groups": {
+          "title_font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "content_margins": [10, 12, 10, 15],
+          "margin_top": 6,
+          "padding_top": 3,
+          "title_left": 10,
+          "title_padding": [
+            0,
+            5
+          ]
+        },
+        "progress": {
+          "label_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "label_text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "status_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "status_text_color": {
+            "$ref": "$_COLOR_TEXT_4"
+          }
+        },
+        "progress_bar": {
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_radius": 3,
+          "chunk_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "chunk_border_radius": 2
+        },
+        "spinboxes": {
+          "parallel_movetime_width": 104,
+          "max_threads_min_width": 128
+        }
+      },
+      "bulk_clean_pgn": {
+        "width": 650,
+        "height": 350,
+        "minimum_width": 600,
+        "minimum_height": 300,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "layout": {
+          "margins": [25, 25, 25, 25],
+          "spacing": 15
+        },
+        "spacing": {
+          "section": 15
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          }
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ],
+          "minimum_width": 200,
+          "minimum_height": 30,
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          }
+        },
+        "groups": {
+          "title_font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "content_margins": [10, 20, 10, 15],
+          "margin_top": 10,
+          "padding_top": 5,
+          "title_left": 10,
+          "title_padding": [
+            0,
+            5
+          ]
+        },
+        "quick_select_buttons": {
+          "enabled": true,
+          "spacing": 8,
+          "width": 100,
+          "height": 24
+        }
+      },
+      "confirmation_dialog": {
+        "width": 400,
+        "height": 150,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "layout": {
+          "spacing": 15,
+          "margins": [15, 15, 15, 15]
+        },
+        "title": {
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_LARGE"
+          },
+          "padding": 5,
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          }
+        },
+        "message": {
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "padding": 5,
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "line_height": 20,
+          "base_height": 150
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
+        }
+      },
+      "message_dialog": {
+        "width": 400,
+        "max_width": 600,
+        "height": 150,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "layout": {
+          "spacing": 15,
+          "margins": [15, 15, 15, 15]
+        },
+        "title": {
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_LARGE"
+          },
+          "padding": 5,
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          }
+        },
+        "message": {
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "padding": 5,
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "link_color": [120, 200, 255],
+          "line_height": 20,
+          "base_height": 150
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
+        }
+      },
+      "input_dialog": {
+        "width": 400,
+        "height": 220,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "layout": {
+          "spacing": 12,
+          "margins": [15, 20, 15, 15]
+        },
+        "title": {
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_LARGE"
+          },
+          "padding": 5,
+          "spacing_after": 5,
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          }
+        },
+        "label": {
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "padding": 5,
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "spacing_after": 3
+        },
+        "input": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_radius": 3,
+          "padding": [2, 6, 2, 5],
+          "minimum_width": 200,
+          "minimum_height": 25
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
+        }
+      },
+      "add_tag_dialog": {
+        "width": 400,
+        "height": 180,
+        "minimum_width": 350,
+        "minimum_height": 150,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "layout": {
+          "spacing": 15,
+          "margins": [15, 15, 15, 15]
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          }
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ],
+          "minimum_width": 200,
+          "minimum_height": 30
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
+        }
+      },
+      "annotation_preferences": {
+        "width": 520,
+        "height": 400,
+        "minimum_width": 480,
+        "minimum_height": 350,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "layout": {
+          "spacing": 10,
+          "margins": [15, 15, 15, 15],
+          "section_spacing": 10
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          }
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ],
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          }
+        },
+        "groups": {
+          "title_font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "content_margins": [10, 10, 10, 10],
+          "margin_top": 10,
+          "padding_top": 5,
+          "font_group_spacing": 6
+        },
+        "color_swatches": {
+          "size": 40,
+          "spacing": 8,
+          "per_row": 5
+        },
+        "font_size_spinbox": {
+          "minimum": 8,
+          "maximum": 72,
+          "default": 12
+        }
+      },
+      "deduplication_criteria": {
+        "width": 600,
+        "height": 480,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "layout": {
+          "spacing": 10,
+          "margins": [15, 25, 15, 15],
+          "section_spacing": 15
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          }
+        },
+        "description": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_6"
+          },
+          "margin_top": 8
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ],
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          }
+        },
+        "groups": {
+          "title_font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "content_margins": [10, 15, 10, 10],
+          "margin_top": 10,
+          "padding_top": 5
+        }
+      },
+      "about_dialog": {
+        "width": 550,
+        "height": 360,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "layout": {
+          "spacing": 12,
+          "margins": [30, 30, 30, 20],
+          "icon_text_gap": 25,
+          "text_element_spacing": 10,
+          "button_section_top_margin": 12
+        },
+        "app_name": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": 26,
+          "font_weight": "bold",
+          "color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "margin_bottom": 6
+        },
+        "full_name": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": 13,
+          "color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "margin_bottom": 12
+        },
+        "version": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "color": {
+            "$ref": "$_COLOR_TEXT_6"
+          },
+          "margin_bottom": 12
+        },
+        "icon": {
+          "size": 120,
+          "margin_right": 0
+        },
+        "description": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "line_height": 1.5,
+          "margin_bottom": 6,
+          "max_width": 600
+        },
+        "copyright": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "color": {
+            "$ref": "$_COLOR_TEXT_4"
+          }
+        },
+        "license": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "color": {
+            "$ref": "$_COLOR_TEXT_4"
+          },
+          "margin_top": 8
+        },
+        "contact": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "color": {
+            "$ref": "$_COLOR_TEXT_4"
+          },
+          "link_color": [100, 150, 255],
+          "margin_top": 8
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "alignment": "right"
+        }
+      },
+      "inline_content_dialog": {
+        "width": 700,
+        "height": 500,
+        "minimum_width": 500,
+        "minimum_height": 400,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "layout": {
+          "spacing": 15,
+          "margins": [20, 20, 20, 20],
+          "button_section_top_margin": 15
+        },
+        "content": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "link_color": [100, 150, 255],
+          "pre_block": {
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_MONO"
+            },
+            "font_size_offset": -1,
+            "background_color_offset": [
+              -8,
+              -8,
+              5
+            ],
+            "border_color_offset": [
+              -15,
+              -15,
+              10
+            ],
+            "border_radius": 4,
+            "padding_em": [
+              0.75,
+              1
+            ],
+            "margin_top_em": 0.6,
+            "margin_bottom_em": 0.8
+          },
+          "headings": {
+            "h1": {
+              "margin_top_em": 0.75,
+              "margin_bottom_em": 0.5,
+              "font_size_em": 1.1
+            },
+            "h2": {
+              "margin_top_em": 1,
+              "margin_bottom_em": 0.4,
+              "font_size_em": 1.35
+            },
+            "h3": {
+              "margin_top_em": 0.85,
+              "margin_bottom_em": 0.35,
+              "font_size_em": 1.2
+            },
+            "h4": {
+              "margin_top_em": 0.75,
+              "margin_bottom_em": 0.3,
+              "font_size_em": 1.05
+            },
+            "h5": {
+              "margin_top_em": 0.65,
+              "margin_bottom_em": 0.25,
+              "font_size_em": 1
+            },
+            "h6": {
+              "margin_top_em": 0.55,
+              "margin_bottom_em": 0.2,
+              "font_size_em": 0.95
+            }
+          },
+          "paragraph": {
+            "margin_top_em": 0.4,
+            "margin_bottom_em": 0.6
+          },
+          "lists": {
+            "margin_top_em": 0.4,
+            "margin_bottom_em": 0.6,
+            "padding_left_em": 1.5,
+            "li_margin_bottom_em": 0.2
+          }
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
+        }
+      },
+      "moveslist_profile_setup": {
+        "width": 750,
+        "height": 600,
+        "minimum_width": 600,
+        "minimum_height": 400,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "layout": {
+          "spacing": 10,
+          "margins": [15, 15, 15, 15],
+          "scroll_area_margins": [10, 10, 10, 10],
+          "scroll_layout_spacing": 10,
+          "left_panel_width": 250,
+          "right_panel_label_left_padding": 10,
+          "left_panel": {
+            "margins": [0, 0, 0, 0],
+            "spacing": 5
+          },
+          "right_panel": {
+            "margins": [0, 0, 0, 0],
+            "spacing": 5
+          }
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          }
+        },
+        "table": {
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_radius": 3,
+          "header_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_3"
+          },
+          "header_text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "item_padding": 5,
+          "header_padding": 5,
+          "width_column_width": 80
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ],
+          "spinbox": {
+            "min_value": 10,
+            "max_value": 1000,
+            "minimum_height": 30
+          }
+        },
+        "groups": {
+          "title_font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "content_margins": [10, 15, 10, 10],
+          "layout_spacing": 8,
+          "margin_top": 10,
+          "padding_top": 5,
+          "border_radius": 3,
+          "title": {
+            "padding_left": 5,
+            "padding_right": 5
+          }
+        }
+      }
+    }
+  }
+}
