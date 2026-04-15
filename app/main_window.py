@@ -137,6 +137,185 @@ class MainWindow(QMainWindow):
         _setup_menu_bar_definitions(self, menu_bar)
         self._connect_menu_icon_color_scheme_refresh()
 
+    def _setup_theme_menu(self, parent_menu: QMenu) -> None:
+        """Add a View → Theme submenu.
+
+        Theme discovery/loading is handled via ThemeService; this method only wires UI actions.
+        """
+        from PyQt6.QtGui import QActionGroup
+        from app.services.theme_service import discover_style_configs
+
+        theme_menu = parent_menu.addMenu("Theme")
+        self._apply_menu_styling(theme_menu)
+
+        group = QActionGroup(self)
+        group.setExclusive(True)
+
+        # Discover themes next to config.json.
+        # Use ConfigLoader default path resolution (app/config/config.json).
+        from app.config.config_loader import ConfigLoader
+
+        opts = discover_style_configs(config_path=ConfigLoader().config_path)
+
+        # Determine currently active style ref (best-effort)
+        cur_style = ""
+        try:
+            cur_style = str(self.config.get("default_style_config", "") or "")
+        except Exception:
+            cur_style = ""
+
+        if not opts:
+            a = theme_menu.addAction("(no themes found)")
+            a.setEnabled(False)
+            return
+
+        for opt in opts:
+            act = theme_menu.addAction(opt.label)
+            act.setCheckable(True)
+            act.setActionGroup(group)
+            if cur_style and (cur_style == opt.style_ref or cur_style.endswith(opt.absolute_path.name)):
+                act.setChecked(True)
+            act.triggered.connect(lambda checked=False, sr=opt.style_ref: self.apply_theme(style_ref=sr))
+
+    def apply_theme(self, *, style_ref: str) -> None:
+        """Switch the active style config and rebuild UI for immediate effect."""
+        from app.config.config_loader import ConfigLoader
+        from app.services.theme_service import load_config_for_style
+        from app.utils.themed_icon import refresh_all_menubar_themable_action_icons
+
+        # Preserve a small amount of UI state.
+        detail_tab = -1
+        ps_current_player = None
+        ps_source_sel = None
+        try:
+            if hasattr(self, "detail_panel") and hasattr(self.detail_panel, "tab_widget"):
+                detail_tab = int(self.detail_panel.tab_widget.currentIndex())
+        except Exception:
+            detail_tab = -1
+
+        # Preserve Player Stats selection (fixes view needing manual reselect after rebuild).
+        try:
+            psc = self.controller.get_player_stats_controller() if hasattr(self, "controller") else None
+            if psc is not None and hasattr(psc, "get_current_player"):
+                ps_current_player = psc.get_current_player()
+            if psc is not None and hasattr(psc, "get_source_selection"):
+                ps_source_sel = psc.get_source_selection()
+        except Exception:
+            ps_current_player = None
+            ps_source_sel = None
+
+        db_collapsed = bool(getattr(self, "_database_panel_collapsed", False))
+        splitter_sizes = None
+        try:
+            splitter_sizes = self.middle_splitter.sizes() if hasattr(self, "middle_splitter") else None
+        except Exception:
+            splitter_sizes = None
+
+        # Load merged config with the selected style defaults (no disk mutation).
+        cfg_path = ConfigLoader().config_path
+        new_config = load_config_for_style(config_path=cfg_path, style_ref=style_ref)
+
+        # Update config references.
+        self.config = new_config
+        try:
+            self.controller.set_config(new_config)
+        except Exception:
+            pass
+
+        # Persist theme choice in user settings (save happens by existing shutdown flow).
+        try:
+            from app.services.user_settings_service import UserSettingsService
+
+            svc = UserSettingsService.get_instance()
+            model = svc.get_model()
+            cur = model.get_settings()
+            ui = cur.get("ui", {}) if isinstance(cur.get("ui"), dict) else {}
+            theme = ui.get("theme", {}) if isinstance(ui.get("theme"), dict) else {}
+            theme["default_style_config"] = str(style_ref)
+            ui["theme"] = theme
+            updated = dict(cur)
+            updated["ui"] = ui
+            model.update_from_dict(updated)
+        except Exception:
+            pass
+
+        # Re-apply global tooltip styling.
+        self._setup_tooltip_styling()
+
+        # Re-apply menu bar + menu styling (menubar is not rebuilt in _setup_ui()).
+        try:
+            mb = self.menuBar()
+            self._apply_menu_bar_styling(mb)
+            # Also restyle existing menus/submenus (recursive).
+            def _restyle_menu_recursive(menu: QMenu) -> None:
+                self._apply_menu_styling(menu)
+                for a in menu.actions():
+                    sm = a.menu()
+                    if sm is not None:
+                        _restyle_menu_recursive(sm)
+
+            for action in mb.actions():
+                m = action.menu()
+                if m is not None:
+                    _restyle_menu_recursive(m)
+        except Exception:
+            pass
+
+        # Rebuild themed menu icons for new tint colors.
+        try:
+            refresh_all_menubar_themable_action_icons(self)
+        except Exception:
+            pass
+
+        # Rebuild central UI to force widgets to reload styling from config.
+        try:
+            old = self.takeCentralWidget()
+            if old is not None:
+                old.deleteLater()
+        except Exception:
+            pass
+        self._setup_ui()
+
+        # Re-apply user settings to the newly created views (Player Stats visibility, etc.).
+        try:
+            self._load_user_settings()
+        except Exception:
+            pass
+
+        # Re-emit Player Stats selection to force a refresh (same effect as reselecting in dropdown).
+        try:
+            psc = self.controller.get_player_stats_controller() if hasattr(self, "controller") else None
+            if psc is not None and ps_source_sel is not None and hasattr(psc, "set_source_selection"):
+                psc.set_source_selection(int(ps_source_sel))
+            if psc is not None and ps_current_player and hasattr(psc, "set_player_selection"):
+                # Force refresh even if controller kept the same player across theme switch.
+                psc.set_player_selection(None)
+                from PyQt6.QtCore import QTimer
+
+                QTimer.singleShot(0, lambda p=str(ps_current_player): psc.set_player_selection(p))
+        except Exception:
+            pass
+
+        # Restore basic UI state.
+        try:
+            if detail_tab >= 0 and hasattr(self, "detail_panel") and hasattr(self.detail_panel, "tab_widget"):
+                self.detail_panel.tab_widget.setCurrentIndex(detail_tab)
+        except Exception:
+            pass
+
+        try:
+            if splitter_sizes and hasattr(self, "middle_splitter"):
+                self.middle_splitter.setSizes(splitter_sizes)
+        except Exception:
+            pass
+
+        try:
+            # Ensure collapsed state matches prior.
+            if bool(getattr(self, "_database_panel_collapsed", False)) != db_collapsed:
+                self._toggle_database_panel()
+        except Exception:
+            pass
+
     def _connect_menu_icon_color_scheme_refresh(self) -> None:
         """Rebuild themed menu icons when the system light/dark preference changes (Qt 6.5+)."""
         app = QApplication.instance()

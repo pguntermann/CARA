@@ -205,6 +205,45 @@ class AppController:
         
         # Initialize and connect services
         self._setup_services()
+
+    def set_config(self, config: Dict[str, Any]) -> None:
+        """Update config reference across controllers/services that hold it.
+
+        Intended for runtime theme switching where only UI styling changes.
+        """
+        self.config = config
+
+        # Most controllers keep a reference to config for UI strings/styling parameters.
+        for attr in (
+            "board_controller",
+            "database_controller",
+            "game_controller",
+            "notes_controller",
+            "move_classification_controller",
+            "game_summary_controller",
+            "engine_controller",
+            "manual_analysis_controller",
+            "evaluation_controller",
+            "game_analysis_controller",
+            "bulk_replace_controller",
+            "bulk_tag_controller",
+            "bulk_clean_pgn_controller",
+            "bulk_analysis_controller",
+            "deduplication_controller",
+            "positional_heatmap_controller",
+            "annotation_controller",
+            "ai_chat_controller",
+            "player_stats_controller",
+            "search_controller",
+            "debug_controller",
+            "menu_options_sync_controller",
+        ):
+            obj = getattr(self, attr, None)
+            if obj is not None and hasattr(obj, "config"):
+                try:
+                    obj.config = config
+                except Exception:
+                    pass
     
     def _setup_services(self) -> None:
         """Setup and connect services to models."""

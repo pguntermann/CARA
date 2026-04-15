@@ -44,6 +44,8 @@ def generate_combobox_stylesheet(
     
     # Get combobox-specific config values, with fallbacks
     dropdown_border_radius = combobox_config.get('dropdown_border_radius', border_radius)
+    disabled_brightness_factor = float(combobox_config.get("disabled_brightness_factor", 0.5) or 0.5)
+    disabled_brightness_factor = max(0.1, min(1.0, disabled_brightness_factor))
     
     # Get padding from config, parameter, or default
     if padding is None:
@@ -146,10 +148,20 @@ def generate_combobox_stylesheet(
     stylesheet += scrollbar_style
     
     # Disabled state
+    disabled_bg = [
+        int(bg_color[0] * disabled_brightness_factor),
+        int(bg_color[1] * disabled_brightness_factor),
+        int(bg_color[2] * disabled_brightness_factor),
+    ]
+    disabled_text = [
+        int(text_color[0] * disabled_brightness_factor),
+        int(text_color[1] * disabled_brightness_factor),
+        int(text_color[2] * disabled_brightness_factor),
+    ]
     stylesheet += (
         f"QComboBox:disabled {{"
-        f"background-color: rgb({bg_color[0] // 2}, {bg_color[1] // 2}, {bg_color[2] // 2});"
-        f"color: rgb({text_color[0] // 2}, {text_color[1] // 2}, {text_color[2] // 2});"
+        f"background-color: rgb({disabled_bg[0]}, {disabled_bg[1]}, {disabled_bg[2]});"
+        f"color: rgb({disabled_text[0]}, {disabled_text[1]}, {disabled_text[2]});"
         f"}}"
     )
     

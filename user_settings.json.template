@@ -969,7 +969,10 @@
     "request_timeout_seconds": 60
   },
   "ui": {
-    "welcome_shown": false
+    "welcome_shown": false,
+    "theme": {
+      "default_style_config": "app/config/style_default.config.json"
+    }
   },
   "player_stats_section_visibility": {
     "overview": true,

@@ -200,6 +200,29 @@ def _load_merged_config(config_path: Path) -> Dict[str, Any]:
     return base
 
 
+def _load_merged_config_with_style_override(config_path: Path, style_ref: str) -> Dict[str, Any]:
+    """Load config.json and merge a specific style config (override).
+
+    This is used for runtime theme switching without mutating config.json on disk.
+    The merge semantics match :func:`_load_merged_config`: style provides defaults,
+    base config overrides.
+    """
+    base = _load_json_allowing_comments(config_path)
+    if not isinstance(base, dict):
+        raise TypeError("Config root must be a JSON object")
+
+    if not isinstance(style_ref, str) or not style_ref.strip():
+        return base
+
+    style_path = _resolve_style_config_path(base_config_path=config_path, style_ref=style_ref.strip())
+    if not style_path.is_file():
+        raise FileNotFoundError(f'Style config not found: "{style_path}" (from "{style_ref}")')
+    style_cfg = _load_json_allowing_comments(style_path)
+    if not isinstance(style_cfg, dict):
+        raise TypeError("Style config root must be a JSON object")
+    return _deep_merge_dicts(style_cfg, base)
+
+
 def _apply_debug_random_placeholder_colors(config: Any) -> None:
     """Optionally override placeholder color constants with random RGB values.
 
@@ -306,6 +329,33 @@ class ConfigLoader:
         except Exception:
             pass  # Silently ignore if logging not available during config loading
         
+        return self._config
+
+    def load_with_style_override(self, style_ref: str) -> Dict[str, Any]:
+        """Load config.json but force a specific style config for defaults.
+
+        Args:
+            style_ref: Style config path/reference (same resolution rules as default_style_config).
+        """
+        if not self.config_path.exists():
+            self._fail(f"Configuration file not found: {self.config_path}")
+
+        if not self.config_path.is_file():
+            self._fail(f"Configuration path is not a file: {self.config_path}")
+
+        try:
+            self._config = _load_merged_config_with_style_override(self.config_path, style_ref)
+        except (OSError, json.JSONDecodeError, TypeError, FileNotFoundError) as e:
+            self._fail(f"Invalid JSON in configuration file: {e}")
+
+        _apply_debug_random_placeholder_colors(self._config)
+
+        try:
+            self._config = _expand_config_refs(self._config)
+        except ValueError as e:
+            self._fail(str(e))
+
+        self._validate()
         return self._config
     
     def _validate(self) -> None:

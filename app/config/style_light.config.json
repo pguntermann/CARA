@@ -1,101 +1,279 @@
 {
   "constants": {
-    "$_FONT_FAMILY_PRIMARY": "Helvetica Neue",
-    "$_FONT_FAMILY_MONO": "Monaco, Menlo, \"Liberation Mono\", Consolas, monospace",
-    "$_FONT_FAMILY_MONO_2": "Courier New, monospace",
+    "$_FONT_FAMILY_PRIMARY": "Segoe UI, -apple-system, BlinkMacSystemFont, Helvetica Neue, Arial, Noto Sans, sans-serif",
+    "$_FONT_FAMILY_MONO": "Cascadia Mono, Menlo, Monaco, Consolas, \"Liberation Mono\", \"DejaVu Sans Mono\", monospace",
+    "$_FONT_FAMILY_MONO_2": "Courier New, Courier, monospace",
     "$_FONT_SIZE_BASE_SMALL": 10,
     "$_FONT_SIZE_BASE_MEDIUM": 11,
     "$_FONT_SIZE_BASE_MEDIUM_2": 12,
     "$_FONT_SIZE_BASE_LARGE": 14,
-    "$_COLOR_NEAR_WHITE": [240, 240, 240],
-    "$_COLOR_NEAR_BLACK": [30, 30, 30],
+    "$_COLOR_NEAR_WHITE": [
+      250,
+      250,
+      252
+    ],
+    "$_COLOR_NEAR_BLACK": [
+      20,
+      20,
+      23
+    ],
     "$_COLOR_TEXT_PRIMARY": {
-      "$ref": "$_COLOR_NEAR_WHITE"
+      "$ref": "$_COLOR_NEAR_BLACK"
     },
-    "$_COLOR_TEXT_SECONDARY": [200, 200, 200],
-    "$_COLOR_TEXT_3": [220, 220, 220],
-    "$_COLOR_TEXT_4": [150, 150, 150],
-    "$_COLOR_TEXT_5": [255, 255, 255],
-    "$_COLOR_TEXT_6": [180, 180, 180],
-    "$_COLOR_TEXT_7": [230, 230, 230],
-    "$_COLOR_BACKGROUND_PRIMARY": [40, 40, 45],
-    "$_COLOR_BACKGROUND_SECONDARY": [30, 30, 35],
-    "$_COLOR_BACKGROUND_3": [45, 45, 50],
-    "$_COLOR_BACKGROUND_4": [35, 35, 40],
-    "$_COLOR_BACKGROUND_5": [50, 50, 55],
-    "$_COLOR_BACKGROUND_6": [55, 55, 60],
-    "$_COLOR_BACKGROUND_ACTIVE": [70, 90, 130],
-    "$_COLOR_BORDER": [60, 60, 65],
-    "$_COLOR_CHART_AXIS": [150, 150, 150],
-    "$_COLOR_CHART_GRIDLINE": [60, 60, 65],
-    "$_COLOR_CHART_LINE_MAIN": [255, 255, 255],
-    "$_COLOR_CHART_MAIN_2": [238, 236, 230],
-    "$_COLOR_CHART_LINE_2": [120, 190, 255],
-    "$_COLOR_CHART_LINE_3": [100, 150, 255],
-    "$_COLOR_CHART_LINE_4": [150, 150, 150],
+    "$_COLOR_TEXT_SECONDARY": [
+      60,
+      60,
+      66
+    ],
+    "$_COLOR_TEXT_3": [
+      35,
+      35,
+      40
+    ],
+    "$_COLOR_TEXT_4": [
+      90,
+      90,
+      98
+    ],
+    "$_COLOR_TEXT_5": [
+      10,
+      10,
+      12
+    ],
+    "$_COLOR_TEXT_6": [
+      75,
+      75,
+      82
+    ],
+    "$_COLOR_TEXT_7": [
+      45,
+      45,
+      50
+    ],
+    "$_COLOR_ACCENT_PRIMARY": [
+      55,
+      85,
+      135
+    ],
+    "$_COLOR_ON_ACCENT": [
+      238,
+      241,
+      246
+    ],
+    "$_COLOR_BACKGROUND_PRIMARY": [
+      208,
+      214,
+      228
+    ],
+    "$_COLOR_BACKGROUND_SECONDARY": [
+      212,
+      215,
+      220
+    ],
+    "$_COLOR_BACKGROUND_3": [
+      232,
+      234,
+      238
+    ],
+    "$_COLOR_BACKGROUND_4": [
+      220,
+      223,
+      228
+    ],
+    "$_COLOR_BACKGROUND_5": [
+      206,
+      210,
+      216
+    ],
+    "$_COLOR_BACKGROUND_6": [
+      194,
+      198,
+      205
+    ],
+    "$_COLOR_BACKGROUND_ACTIVE": [
+      60,
+      120,
+      210
+    ],
+    "$_COLOR_BORDER": [
+      170,
+      174,
+      182
+    ],
+    "$_COLOR_CHART_AXIS": [
+      95,
+      95,
+      102
+    ],
+    "$_COLOR_CHART_GRIDLINE": [
+      182,
+      186,
+      194
+    ],
+    "$_COLOR_CHART_LINE_MAIN": [
+      30,
+      30,
+      35
+    ],
+    "$_COLOR_CHART_MAIN_2": [
+      20,
+      20,
+      23
+    ],
+    "$_COLOR_CHART_LINE_2": [
+      35,
+      110,
+      210
+    ],
+    "$_COLOR_CHART_LINE_3": [
+      0,
+      160,
+      140
+    ],
+    "$_COLOR_CHART_LINE_4": [
+      160,
+      90,
+      210
+    ],
     "$_COLOR_BUTTON_BACKGROUND": {
       "$ref": "$_COLOR_BACKGROUND_5"
     },
-    "$_COLOR_BUTTON_HOVER_BACKGROUND": [60, 60, 65],
+    "$_COLOR_BUTTON_HOVER_BACKGROUND": [
+      220,
+      223,
+      230
+    ],
     "$_COLOR_BUTTON_ACTIVE_BACKGROUND": {
       "$ref": "$_COLOR_BACKGROUND_ACTIVE"
     },
-    "$_COLOR_SEPERATOR_BACKGROUND": [60, 60, 65],
-    "$_COLOR_ACTIVE_MOVE_BACKGROUND": [100, 120, 180],
-    "$_COLOR_INPUT_FOCUS_BORDER": [0, 120, 212],
+    "$_COLOR_SEPERATOR_BACKGROUND": [
+      210,
+      212,
+      218
+    ],
+    "$_COLOR_ACTIVE_MOVE_BACKGROUND": [
+      208,
+      226,
+      255
+    ],
+    "$_COLOR_INPUT_FOCUS_BORDER": [
+      0,
+      120,
+      212
+    ],
     "$_COLOR_SCROLLBAR_BACKGROUND": {
-      "$ref": "$_COLOR_BACKGROUND_3"
+      "$ref": "$_COLOR_BACKGROUND_4"
     },
-    "$_COLOR_SCROLLBAR_BUTTON_COLOR": [30, 30, 30],
-    "$_COLOR_SPLITTER_HANDLE": [30, 30, 30],
+    "$_COLOR_SCROLLBAR_BUTTON_COLOR": [
+      180,
+      180,
+      190
+    ],
+    "$_COLOR_SPLITTER_HANDLE": [
+      200,
+      202,
+      208
+    ],
     "$_COLOR_SCROLLBAR_HANDLE": {
       "$ref": "$_COLOR_BORDER"
     },
-    "$_COLOR_SCROLLBAR_HANDLE_HOVER": [90, 90, 95],
-    "$_COLOR_GRIDLINE": [60, 60, 65],
+    "$_COLOR_SCROLLBAR_HANDLE_HOVER": [
+      160,
+      162,
+      170
+    ],
+    "$_COLOR_GRIDLINE": [
+      210,
+      212,
+      218
+    ],
     "$_COLOR_BUTTON_BORDER": {
       "$ref": "$_COLOR_BORDER"
     },
-    "$_COLOR_WHITE": [255, 255, 255],
-    "$_COLOR_BLACK": [0, 0, 0]
+    "$_COLOR_WHITE": [
+      255,
+      255,
+      255
+    ],
+    "$_COLOR_BLACK": [
+      0,
+      0,
+      0
+    ]
   },
   "game_tags": {
     "builtin": [
       {
         "name": "Favourite",
-        "color": [255, 255, 0]
+        "color": [
+          255,
+          255,
+          0
+        ]
       },
       {
         "name": "Blunder-decided",
-        "color": [220, 80, 80]
+        "color": [
+          220,
+          80,
+          80
+        ]
       },
       {
         "name": "Brilliant Move",
-        "color": [255, 200, 60]
+        "color": [
+          255,
+          200,
+          60
+        ]
       },
       {
         "name": "Clean win",
-        "color": [70, 160, 110]
+        "color": [
+          70,
+          160,
+          110
+        ]
       },
       {
         "name": "Missed win",
-        "color": [200, 100, 255]
+        "color": [
+          200,
+          100,
+          255
+        ]
       },
       {
         "name": "Opening disaster",
-        "color": [200, 90, 160]
+        "color": [
+          200,
+          90,
+          160
+        ]
       },
       {
         "name": "Endgame grind",
-        "color": [110, 140, 220]
+        "color": [
+          110,
+          140,
+          220
+        ]
       },
       {
         "name": "Chaotic game",
-        "color": [140, 140, 140]
+        "color": [
+          140,
+          140,
+          140
+        ]
       },
       {
         "name": "Sharp",
-        "color": [90, 160, 200]
+        "color": [
+          90,
+          160,
+          200
+        ]
       }
     ]
   },
@@ -124,14 +302,18 @@
         "checked_background_color": {
           "$ref": "$_COLOR_BACKGROUND_ACTIVE"
         },
-        "checked_border_color": [100, 120, 160],
+        "checked_border_color": [
+          100,
+          120,
+          160
+        ],
         "hover_border_offset": 20,
         "margin_top": 2,
         "margin_bottom": 2
       },
       "combobox": {
         "dropdown_border_radius": 3,
-        "disabled_brightness_factor": 0.5,
+        "disabled_brightness_factor": 0.85,
         "padding": [
           8,
           6
@@ -153,9 +335,6 @@
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
-        "hover_text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
-        },
         "background_color": {
           "$ref": "$_COLOR_BUTTON_BACKGROUND"
         },
@@ -163,13 +342,10 @@
           "$ref": "$_COLOR_BUTTON_HOVER_BACKGROUND"
         },
         "active_background_color": {
-          "$ref": "$_COLOR_BUTTON_ACTIVE_BACKGROUND"
+          "$ref": "$_COLOR_ACCENT_PRIMARY"
         },
         "active_text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
-        },
-        "pressed_text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_ON_ACCENT"
         },
         "font_family": {
           "$ref": "$_FONT_FAMILY_PRIMARY"
@@ -208,7 +384,7 @@
           6
         ],
         "hover_border_offset": 20,
-        "disabled_brightness_factor": 0.5
+        "disabled_brightness_factor": 0.85
       },
       "spinbox": {
         "text_color": {
@@ -235,7 +411,7 @@
           8,
           6
         ],
-        "disabled_brightness_factor": 0.5,
+        "disabled_brightness_factor": 0.85,
         "hide_buttons": true,
         "minimum_height": 30
       },
@@ -264,7 +440,7 @@
           8,
           6
         ],
-        "disabled_brightness_factor": 0.5
+        "disabled_brightness_factor": 0.85
       },
       "group_box": {
         "border_color": {
@@ -315,10 +491,19 @@
         "hover_text_color": {
           "$ref": "$_COLOR_TEXT_7"
         },
-        "item_padding": [4, 20, 4, 14],
+        "item_padding": [
+          4,
+          20,
+          4,
+          14
+        ],
         "menu_horizontal_padding": 4,
         "separator_height": 1,
-        "separator_color": [60, 60, 65],
+        "separator_color": [
+          60,
+          60,
+          65
+        ],
         "separator_margin": [
           2,
           4
@@ -380,9 +565,21 @@
     },
     "positional_heatmap": {
       "colors": {
-        "positive": [0, 255, 0],
-        "negative": [255, 0, 0],
-        "neutral": [255, 255, 0],
+        "positive": [
+          0,
+          255,
+          0
+        ],
+        "negative": [
+          255,
+          0,
+          0
+        ],
+        "neutral": [
+          255,
+          255,
+          0
+        ],
         "neutral_threshold": -5.0,
         "opacity": 0.9,
         "gradient_radius_ratio": 0.85,
@@ -406,7 +603,11 @@
         "calculation_margin_bottom": 8,
         "overall_section_spacing": 12,
         "separator_enabled": true,
-        "separator_color": [70, 70, 75],
+        "separator_color": [
+          70,
+          70,
+          75
+        ],
         "separator_height": 1,
         "separator_margin": [
           8,
@@ -434,8 +635,16 @@
         "header_color": {
           "$ref": "$_COLOR_TEXT_PRIMARY"
         },
-        "positive_color": [100, 255, 100],
-        "negative_color": [255, 200, 100],
+        "positive_color": [
+          100,
+          255,
+          100
+        ],
+        "negative_color": [
+          255,
+          200,
+          100
+        ],
         "bullet_indent": 15,
         "calculation_indent": 12,
         "calculation_background": {
@@ -459,9 +668,14 @@
           "player_elo_size": 12,
           "opening_size": 14,
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_BUTTON_ACTIVE_BACKGROUND"
           },
-          "padding": [10, 25, 10, 0],
+          "padding": [
+            10,
+            25,
+            10,
+            0
+          ],
           "spacing": 8,
           "separator": {
             "text": " - ",
@@ -469,9 +683,14 @@
           }
         },
         "board": {
-          "padding": [20, 20, 20, 20],
+          "padding": [
+            20,
+            20,
+            20,
+            20
+          ],
           "border": {
-            "size": 4,
+            "size": 8,
             "color": {
               "$ref": "$_COLOR_BUTTON_BORDER"
             }
@@ -490,8 +709,16 @@
             "font_style": "normal"
           },
           "squares": {
-            "light_color": [217, 217, 217],
-            "dark_color": [58, 117, 196]
+            "light_color": [
+              236,
+              238,
+              242
+            ],
+            "dark_color": [
+              168,
+              189,
+              220
+            ]
           },
           "pieces": {
             "svg_path": "app/resources/chesspieces/default",
@@ -499,7 +726,12 @@
           },
           "turn_indicator": {
             "size": 16,
-            "padding": [0, 0, 10, 10],
+            "padding": [
+              0,
+              0,
+              10,
+              10
+            ],
             "white_color": {
               "$ref": "$_COLOR_WHITE"
             },
@@ -508,19 +740,39 @@
             }
           },
           "playedmove_arrow": {
-            "color": [255, 255, 0]
+            "color": [
+              255,
+              255,
+              0
+            ]
           },
           "bestnextmove_arrow": {
-            "color": [0, 0, 255]
+            "color": [
+              0,
+              0,
+              255
+            ]
           },
           "pv2_arrow": {
-            "color": [100, 150, 255]
+            "color": [
+              100,
+              150,
+              255
+            ]
           },
           "pv3_arrow": {
-            "color": [150, 150, 150]
+            "color": [
+              150,
+              150,
+              150
+            ]
           },
           "bestalternativemove_arrow": {
-            "color": [200, 0, 100]
+            "color": [
+              200,
+              0,
+              100
+            ]
           },
           "positional_plans": {
             "use_straight_lines": true,
@@ -529,8 +781,16 @@
               "line_width_end": 6,
               "opacity_start": 0.4,
               "opacity_end": 1.0,
-              "color_start": [100, 150, 255],
-              "color_end": [0, 100, 255],
+              "color_start": [
+                100,
+                150,
+                255
+              ],
+              "color_end": [
+                0,
+                100,
+                255
+              ],
               "curve_factor": 0.3
             },
             "trajectory_2": {
@@ -538,8 +798,16 @@
               "line_width_end": 6,
               "opacity_start": 0.4,
               "opacity_end": 1.0,
-              "color_start": [100, 255, 150],
-              "color_end": [0, 200, 100],
+              "color_start": [
+                100,
+                255,
+                150
+              ],
+              "color_end": [
+                0,
+                200,
+                100
+              ],
               "curve_factor": 0.3
             },
             "trajectory_3": {
@@ -547,47 +815,76 @@
               "line_width_end": 6,
               "opacity_start": 0.4,
               "opacity_end": 1.0,
-              "color_start": [255, 200, 100],
-              "color_end": [255, 150, 0],
+              "color_start": [
+                255,
+                200,
+                100
+              ],
+              "color_end": [
+                255,
+                150,
+                0
+              ],
               "curve_factor": 0.3
             },
             "numbered_markers": {
-              "background_color": [0, 100, 255],
+              "background_color": [
+                0,
+                100,
+                255
+              ],
               "background_radius": 8,
               "size": 24
             },
             "numbered_markers_2": {
-              "background_color": [0, 200, 100],
+              "background_color": [
+                0,
+                200,
+                100
+              ],
               "background_radius": 8,
               "size": 24
             },
             "numbered_markers_3": {
-              "background_color": [255, 150, 0],
+              "background_color": [
+                255,
+                150,
+                0
+              ],
               "background_radius": 8,
               "size": 24
             }
           },
           "evaluation_bar": {
-            "width": 30,
+            "width": 22,
             "padding_left": 40,
             "colors": {
-              "white": {
-                "$ref": "$_COLOR_WHITE"
-              },
-              "black": {
-                "$ref": "$_COLOR_BLACK"
-              }
+              "white": [
+                238,
+                241,
+                246
+              ],
+              "black": [
+                55,
+                85,
+                135
+              ]
             }
           },
           "material_widget": {
             "width": 110,
             "height": 130,
-            "padding": [12, 12, 10, 14],
+            "padding": [
+              12,
+              12,
+              10,
+              14
+            ],
             "background_color": {
               "$ref": "$_COLOR_BACKGROUND_SECONDARY"
             },
             "border_color": {
-              "$ref": "$_COLOR_BUTTON_BORDER"
+              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
             },
             "border_radius": 5,
             "font_family": {
@@ -597,20 +894,35 @@
               "$ref": "$_FONT_SIZE_BASE_SMALL"
             },
             "piece_size": 18,
-            "white_text_color": {
-              "$ref": "$_COLOR_TEXT_PRIMARY"
-            },
+            "white_text_color": [
+              35,
+              70,
+              120
+            ],
             "black_text_color": {
-              "$ref": "$_COLOR_TEXT_SECONDARY"
+              "$ref": "$_COLOR_NEAR_BLACK"
             },
-            "difference_text_color": [255, 255, 100],
-            "separator_color": [100, 100, 105]
+            "difference_text_color": [
+              170,
+              110,
+              20
+            ],
+            "separator_color": [
+              170,
+              174,
+              182
+            ]
           },
           "game_tags_widget": {
             "width": 170,
             "max_height": 0,
             "min_interactive_height": 200,
-            "padding": [10, 10, 15, 14],
+            "padding": [
+              10,
+              10,
+              15,
+              14
+            ],
             "spacing_below_material": 20,
             "flow_spacing": 6,
             "chip": {
@@ -620,7 +932,11 @@
                 8
               ],
               "minimum_height": 22,
-              "unmanaged_background_color": [95, 95, 100],
+              "unmanaged_background_color": [
+                232,
+                234,
+                238
+              ],
               "font_family": {
                 "$ref": "$_FONT_FAMILY_PRIMARY"
               },
@@ -628,21 +944,62 @@
                 "$ref": "$_FONT_SIZE_BASE_MEDIUM"
               },
               "font_weight": "bold",
-              "hover_background_rgba": [255, 255, 255, 18],
-              "hover_text_color": [68, 68, 74]
+              "hover_background_rgba": [
+                0,
+                0,
+                0,
+                18
+              ],
+              "hover_text_color": [
+                20,
+                20,
+                23
+              ]
             }
           },
           "move_classification_badges": {
             "inset_ratio": 0.04,
             "colors": {
-              "book_move": [150, 150, 150],
-              "brilliant": [255, 215, 0],
-              "best_move": [100, 255, 100],
-              "good_move": [150, 255, 150],
-              "inaccuracy": [255, 255, 100],
-              "mistake": [255, 200, 100],
-              "miss": [200, 100, 255],
-              "blunder": [255, 100, 100]
+              "book_move": [
+                150,
+                150,
+                150
+              ],
+              "brilliant": [
+                255,
+                215,
+                0
+              ],
+              "best_move": [
+                100,
+                255,
+                100
+              ],
+              "good_move": [
+                150,
+                255,
+                150
+              ],
+              "inaccuracy": [
+                255,
+                255,
+                100
+              ],
+              "mistake": [
+                255,
+                200,
+                100
+              ],
+              "miss": [
+                200,
+                100,
+                255
+              ],
+              "blunder": [
+                255,
+                100,
+                100
+              ]
             }
           }
         }
@@ -661,14 +1018,18 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_3"
+            "$ref": "$_COLOR_TEXT_PRIMARY"
           },
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
           "formatting": {
             "headers": {
-              "color": [100, 150, 255],
+              "color": [
+                100,
+                150,
+                255
+              ],
               "bold": true
             },
             "move_numbers": {
@@ -685,29 +1046,53 @@
             },
             "annotations": {
               "good": {
-                "color": [100, 255, 100],
+                "color": [
+                  100,
+                  255,
+                  100
+                ],
                 "bold": true
               },
               "bad": {
-                "color": [255, 100, 100],
+                "color": [
+                  255,
+                  100,
+                  100
+                ],
                 "bold": true
               },
               "interesting": {
-                "color": [255, 255, 100],
+                "color": [
+                  255,
+                  255,
+                  100
+                ],
                 "bold": true
               },
               "dubious": {
-                "color": [255, 200, 100],
+                "color": [
+                  255,
+                  200,
+                  100
+                ],
                 "bold": true
               }
             },
             "nags": {
-              "color": [200, 150, 255],
+              "color": [
+                120,
+                70,
+                150
+              ],
               "bold": false,
               "italic": true
             },
             "comments": {
-              "color": [180, 200, 255],
+              "color": [
+                55,
+                85,
+                135
+              ],
               "italic": true
             },
             "variations": {
@@ -717,7 +1102,11 @@
               "italic": true
             },
             "results": {
-              "color": [255, 255, 100],
+              "color": [
+                255,
+                255,
+                100
+              ],
               "bold": true
             },
             "active_move": {
@@ -766,10 +1155,10 @@
               "$ref": "$_COLOR_GRIDLINE"
             },
             "selection_background_color": {
-              "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+              "$ref": "$_COLOR_ACTIVE_MOVE_BACKGROUND"
             },
             "selection_text_color": {
-              "$ref": "$_COLOR_TEXT_PRIMARY"
+              "$ref": "$_COLOR_NEAR_BLACK"
             }
           }
         },
@@ -798,7 +1187,11 @@
             "black_line_color": {
               "$ref": "$_COLOR_BLACK"
             },
-            "current_move_line_color": [255, 255, 0],
+            "current_move_line_color": [
+              255,
+              255,
+              0
+            ],
             "current_move_line_width": 2,
             "line_width": 2,
             "font_family": {
@@ -813,7 +1206,12 @@
             "axis_color": {
               "$ref": "$_COLOR_CHART_AXIS"
             },
-            "padding": [40, 20, 20, 40],
+            "padding": [
+              40,
+              20,
+              20,
+              40
+            ],
             "normalized_mode_small_range_threshold": 50,
             "zero_based_mode_small_range_threshold": 100,
             "zero_based_mode_padding": 50,
@@ -832,20 +1230,60 @@
             },
             "phase_transition_line_width": 2,
             "phase_transition_line_style": "dashed",
-            "critical_moment_worst_line_color": [255, 0, 0],
-            "critical_moment_best_line_color": [150, 255, 150],
+            "critical_moment_worst_line_color": [
+              255,
+              0,
+              0
+            ],
+            "critical_moment_best_line_color": [
+              150,
+              255,
+              150
+            ],
             "critical_moment_line_width": 1,
             "critical_moment_line_style": "dotted"
           },
           "colors": {
-            "book_move": [150, 150, 150],
-            "brilliant": [255, 215, 0],
-            "best_move": [100, 255, 100],
-            "good_move": [150, 255, 150],
-            "inaccuracy": [255, 255, 100],
-            "mistake": [255, 200, 100],
-            "miss": [200, 100, 255],
-            "blunder": [255, 100, 100],
+            "book_move": [
+              150,
+              150,
+              150
+            ],
+            "brilliant": [
+              255,
+              215,
+              0
+            ],
+            "best_move": [
+              100,
+              255,
+              100
+            ],
+            "good_move": [
+              150,
+              255,
+              150
+            ],
+            "inaccuracy": [
+              255,
+              255,
+              100
+            ],
+            "mistake": [
+              255,
+              200,
+              100
+            ],
+            "miss": [
+              200,
+              100,
+              255
+            ],
+            "blunder": [
+              255,
+              100,
+              100
+            ],
             "text": {
               "$ref": "$_COLOR_TEXT_3"
             },
@@ -887,7 +1325,12 @@
             "spacing": 15,
             "section_spacing": 20,
             "player_section_spacing": 10,
-            "margins": [10, 10, 10, 10]
+            "margins": [
+              10,
+              10,
+              10,
+              10
+            ]
           },
           "pie_chart": {
             "minimum_size": [
@@ -895,13 +1338,18 @@
               200
             ],
             "margin": 20,
-            "slice_border_width": 1,
+            "slice_border_width": 0,
             "slice_border_darken": 120,
-            "opponent_ring_border_width": 1
+            "opponent_ring_border_width": 0
           },
           "widgets": {
             "border_radius": 5,
-            "section_margins": [10, 10, 10, 10],
+            "section_margins": [
+              10,
+              10,
+              10,
+              10
+            ],
             "section_spacing": 8,
             "grid_spacing": 5,
             "classification_widget_spacing": 10,
@@ -911,7 +1359,7 @@
               12,
               12
             ],
-            "color_indicator_border_width": 1,
+            "color_indicator_border_width": 0,
             "critical_moments_list_spacing": 3,
             "critical_moments_section_spacing": 10,
             "phase_spacing": 1,
@@ -924,7 +1372,12 @@
                   "$ref": "$_COLOR_NEAR_BLACK"
                 },
                 "border_radius": 3,
-                "padding": [6, 4, 6, 4],
+                "padding": [
+                  6,
+                  4,
+                  6,
+                  4
+                ],
                 "font_weight": "bold"
               },
               "black": {
@@ -932,10 +1385,15 @@
                   "$ref": "$_COLOR_NEAR_BLACK"
                 },
                 "text_color": {
-                  "$ref": "$_COLOR_TEXT_PRIMARY"
+                  "$ref": "$_COLOR_NEAR_WHITE"
                 },
                 "border_radius": 3,
-                "padding": [6, 4, 6, 4],
+                "padding": [
+                  6,
+                  4,
+                  6,
+                  4
+                ],
                 "font_weight": "bold"
               }
             }
@@ -953,7 +1411,11 @@
               "$ref": "$_FONT_FAMILY_PRIMARY"
             },
             "font_size": 9,
-            "text_color": [150, 150, 155]
+            "text_color": [
+              150,
+              150,
+              155
+            ]
           },
           "activity_status_font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
@@ -974,9 +1436,21 @@
             "border": {
               "$ref": "$_COLOR_BUTTON_BORDER"
             },
-            "phase_opening_color": [100, 150, 255],
-            "phase_middlegame_color": [150, 255, 100],
-            "phase_endgame_color": [255, 200, 100]
+            "phase_opening_color": [
+              100,
+              150,
+              255
+            ],
+            "phase_middlegame_color": [
+              150,
+              255,
+              100
+            ],
+            "phase_endgame_color": [
+              255,
+              200,
+              100
+            ]
           },
           "fonts": {
             "header_font_family": {
@@ -1002,11 +1476,21 @@
           "layout": {
             "spacing": 15,
             "section_spacing": 20,
-            "margins": [10, 10, 10, 10]
+            "margins": [
+              10,
+              10,
+              10,
+              10
+            ]
           },
           "widgets": {
             "border_radius": 5,
-            "section_margins": [10, 10, 10, 10],
+            "section_margins": [
+              10,
+              10,
+              10,
+              10
+            ],
             "section_spacing": 8,
             "grid_spacing": 5,
             "row_spacing": 5
@@ -1082,21 +1566,43 @@
             "banner_font_size": {
               "$ref": "$_FONT_SIZE_BASE_SMALL"
             },
-            "banner_margins": [10, 8, 10, 8],
+            "banner_margins": [
+              10,
+              8,
+              10,
+              8
+            ],
             "banner_spacing": 5,
             "indicator_size": [
               12,
               12
             ],
             "colors": {
-              "good_coverage": [100, 200, 100],
-              "moderate_coverage": [255, 200, 100],
-              "low_coverage": [255, 150, 150]
+              "good_coverage": [
+                100,
+                200,
+                100
+              ],
+              "moderate_coverage": [
+                255,
+                200,
+                100
+              ],
+              "low_coverage": [
+                255,
+                150,
+                150
+              ]
             }
           },
           "accuracy_distribution": {
             "height": 200,
-            "padding": [16, 14, 16, 14],
+            "padding": [
+              16,
+              14,
+              16,
+              14
+            ],
             "border_radius": 5,
             "section_spacing": 6,
             "background_color": {
@@ -1106,11 +1612,27 @@
             "bar_corner_radius": 2,
             "bar_gap_px": 1,
             "grid_major_horizontal_lines": 5,
-            "grid_major_color": [55, 55, 62],
-            "grid_minor_color": [45, 45, 50],
+            "grid_major_color": [
+              55,
+              55,
+              62
+            ],
+            "grid_minor_color": [
+              45,
+              45,
+              50
+            ],
             "x_axis_minor_grid": true,
-            "axis_color": [120, 120, 128],
-            "text_color": [200, 200, 205],
+            "axis_color": [
+              120,
+              120,
+              128
+            ],
+            "text_color": [
+              200,
+              200,
+              205
+            ],
             "font_family": {
               "$ref": "$_FONT_FAMILY_PRIMARY"
             },
@@ -1132,55 +1654,100 @@
             "hover_circle_radius": 6,
             "show_distribution_vertex_markers": true,
             "distribution_vertex_marker_radius": 3,
-            "bar_color": [120, 190, 255],
+            "bar_color": [
+              120,
+              190,
+              255
+            ],
             "color_presets": {
               "github_green": [
                 {
                   "max_acc": 64,
-                  "color": [200, 90, 90]
+                  "color": [
+                    200,
+                    90,
+                    90
+                  ]
                 },
                 {
                   "max_acc": 85,
-                  "color": [220, 180, 80]
+                  "color": [
+                    220,
+                    180,
+                    80
+                  ]
                 },
                 {
                   "max_acc": 100,
-                  "color": [80, 180, 120]
+                  "color": [
+                    80,
+                    180,
+                    120
+                  ]
                 }
               ],
               "ocean_blue": [
                 {
                   "max_acc": 64,
-                  "color": [200, 100, 100]
+                  "color": [
+                    200,
+                    100,
+                    100
+                  ]
                 },
                 {
                   "max_acc": 85,
-                  "color": [120, 160, 220]
+                  "color": [
+                    120,
+                    160,
+                    220
+                  ]
                 },
                 {
                   "max_acc": 100,
-                  "color": [100, 180, 240]
+                  "color": [
+                    100,
+                    180,
+                    240
+                  ]
                 }
               ],
               "amber": [
                 {
                   "max_acc": 64,
-                  "color": [180, 80, 80]
+                  "color": [
+                    180,
+                    80,
+                    80
+                  ]
                 },
                 {
                   "max_acc": 85,
-                  "color": [200, 150, 60]
+                  "color": [
+                    200,
+                    150,
+                    60
+                  ]
                 },
                 {
                   "max_acc": 100,
-                  "color": [230, 190, 80]
+                  "color": [
+                    230,
+                    190,
+                    80
+                  ]
                 }
               ]
             }
           },
           "error_patterns": {
             "item_spacing": 8,
-            "item_margins": [8, 6, 8, 6],
+            "item_margins": [
+              8,
+              6,
+              8,
+              6
+            ],
             "two_line_gap_factor": 0.15,
             "button": {
               "height": 28
@@ -1196,11 +1763,31 @@
               ],
               "border_radius": 6,
               "colors": {
-                "critical": [255, 100, 100],
-                "high": [255, 150, 100],
-                "moderate": [255, 200, 100],
-                "low": [200, 200, 100],
-                "default": [150, 150, 150]
+                "critical": [
+                  255,
+                  100,
+                  100
+                ],
+                "high": [
+                  255,
+                  150,
+                  100
+                ],
+                "moderate": [
+                  255,
+                  200,
+                  100
+                ],
+                "low": [
+                  200,
+                  200,
+                  100
+                ],
+                "default": [
+                  150,
+                  150,
+                  150
+                ]
               }
             }
           },
@@ -1285,7 +1872,11 @@
             "line_color": {
               "$ref": "$_COLOR_CHART_LINE_2"
             },
-            "opponent_line_color": [200, 130, 130],
+            "opponent_line_color": [
+              200,
+              130,
+              130
+            ],
             "line_style": "solid",
             "opponent_line_style": "dashed",
             "line_width": 2,
@@ -1301,7 +1892,12 @@
             "axis_color": {
               "$ref": "$_COLOR_CHART_AXIS"
             },
-            "padding": [40, 20, 20, 40],
+            "padding": [
+              40,
+              20,
+              20,
+              40
+            ],
             "min_grid_spacing": 30,
             "min_grid_lines": 3,
             "min_font_size": 8,
@@ -1311,7 +1907,11 @@
             "bin_data_marker_radius": 3
           },
           "time_series": {
-            "gap_compression_span_marker_color": [72, 72, 80],
+            "gap_compression_span_marker_color": [
+              72,
+              72,
+              80
+            ],
             "gap_compression_span_marker_line_width": 1,
             "progression_line_style": "smooth",
             "progression_line_smooth_strength": 1.0,
@@ -1334,7 +1934,12 @@
             "axis_color": {
               "$ref": "$_COLOR_CHART_AXIS"
             },
-            "padding": [40, 20, 8, 40],
+            "padding": [
+              40,
+              20,
+              8,
+              40
+            ],
             "min_grid_spacing": 30,
             "min_font_size": 8,
             "font_size_calculation_divisor": 20,
@@ -1342,8 +1947,16 @@
             "x_axis_label_spacing": 5,
             "hover_hit_threshold_px": 25,
             "bin_data_marker_radius": 3,
-            "x_axis_major_line_color": [88, 88, 95],
-            "x_axis_minor_line_color": [55, 55, 62],
+            "x_axis_major_line_color": [
+              88,
+              88,
+              95
+            ],
+            "x_axis_minor_line_color": [
+              55,
+              55,
+              62
+            ],
             "x_axis_major_line_width": 1,
             "x_axis_minor_line_width": 1,
             "x_axis_label_min_spacing_px": 44,
@@ -1356,33 +1969,97 @@
             "max_cell_size": 48,
             "color_presets": {
               "github_green": [
-                [22, 27, 34],
-                [0, 55, 40],
-                [38, 130, 80],
-                [120, 200, 120]
+                [
+                  232,
+                  234,
+                  238
+                ],
+                [
+                  198,
+                  226,
+                  210
+                ],
+                [
+                  120,
+                  190,
+                  150
+                ],
+                [
+                  55,
+                  140,
+                  110
+                ]
               ],
               "ocean_blue": [
-                [22, 27, 34],
-                [15, 45, 85],
-                [45, 100, 180],
-                [100, 180, 240]
+                [
+                  232,
+                  234,
+                  238
+                ],
+                [
+                  200,
+                  215,
+                  235
+                ],
+                [
+                  140,
+                  175,
+                  220
+                ],
+                [
+                  85,
+                  130,
+                  200
+                ]
               ],
               "amber": [
-                [22, 27, 34],
-                [70, 50, 10],
-                [140, 100, 30],
-                [230, 190, 80]
+                [
+                  232,
+                  234,
+                  238
+                ],
+                [
+                  240,
+                  220,
+                  185
+                ],
+                [
+                  235,
+                  190,
+                  120
+                ],
+                [
+                  220,
+                  150,
+                  70
+                ]
               ]
             },
             "month_label_band_height": 14,
             "month_label_font_size": 7,
-            "month_label_text_color": [150, 150, 158],
-            "week_divider_color": [72, 72, 80],
+            "month_label_text_color": [
+              60,
+              65,
+              75
+            ],
+            "week_divider_color": [
+              170,
+              174,
+              182
+            ],
             "week_divider_line_width": 1,
-            "month_divider_color": [120, 120, 135],
+            "month_divider_color": [
+              150,
+              155,
+              165
+            ],
             "month_divider_line_width": 2,
             "month_calendar_boundary": {
-              "line_color": [120, 120, 135],
+              "line_color": [
+                150,
+                155,
+                165
+              ],
               "line_width": 2,
               "line_style": "solid",
               "dash_pattern": [
@@ -1393,15 +2070,27 @@
               "draw_above_cells": true
             },
             "day_number_min_cell_size": 10,
-            "day_number_text_color": [130, 130, 138],
+            "day_number_text_color": [
+              55,
+              60,
+              70
+            ],
             "cell_size_week": 11,
             "cell_size_day": 10,
             "cell_size_month": 14,
             "corner_radius": 2,
             "row_label_width": 28,
             "label_font_size": 8,
-            "border_color": [55, 55, 62],
-            "empty_cell_color": [33, 38, 46]
+            "border_color": [
+              170,
+              174,
+              182
+            ],
+            "empty_cell_color": [
+              220,
+              223,
+              228
+            ]
           },
           "accuracy_over_time_chart": {
             "height": 220,
@@ -1412,7 +2101,11 @@
             "white_line_color": {
               "$ref": "$_COLOR_CHART_MAIN_2"
             },
-            "black_line_color": [72, 82, 98],
+            "black_line_color": [
+              72,
+              82,
+              98
+            ],
             "legend_width": 112,
             "legend_font_size": 9,
             "line_style": "solid",
@@ -1431,7 +2124,11 @@
                 "id": "best_move",
                 "label": "Best Move %",
                 "enabled": true,
-                "line_color": [100, 200, 140],
+                "line_color": [
+                  100,
+                  200,
+                  140
+                ],
                 "line_style": "solid",
                 "line_width": 2
               },
@@ -1439,7 +2136,11 @@
                 "id": "top3_move",
                 "label": "Top3-Move %",
                 "enabled": true,
-                "line_color": [100, 170, 255],
+                "line_color": [
+                  100,
+                  170,
+                  255
+                ],
                 "line_style": "solid",
                 "line_width": 2
               },
@@ -1447,7 +2148,11 @@
                 "id": "blunder_rate",
                 "label": "Blunder %",
                 "enabled": true,
-                "line_color": [255, 100, 100],
+                "line_color": [
+                  255,
+                  100,
+                  100
+                ],
                 "line_style": "solid",
                 "line_width": 2
               }
@@ -1465,7 +2170,7 @@
                 "label": "Opening",
                 "enabled": true,
                 "line_color": {
-                  "$ref": "$_COLOR_CHART_LINE_3"
+                  "$ref": "$_COLOR_ACCENT_PRIMARY"
                 },
                 "line_style": "solid",
                 "line_width": 2
@@ -1474,7 +2179,11 @@
                 "id": "middlegame",
                 "label": "Middlegame",
                 "enabled": true,
-                "line_color": [150, 255, 100],
+                "line_color": [
+                  35,
+                  140,
+                  80
+                ],
                 "line_style": "solid",
                 "line_width": 2
               },
@@ -1482,7 +2191,11 @@
                 "id": "endgame",
                 "label": "Endgame",
                 "enabled": true,
-                "line_color": [255, 200, 100],
+                "line_color": [
+                  180,
+                  110,
+                  20
+                ],
                 "line_style": "solid",
                 "line_width": 2
               }
@@ -1497,7 +2210,12 @@
         },
         "manual_analysis": {
           "control_bar": {
-            "margins": [8, 8, 8, 8],
+            "margins": [
+              8,
+              8,
+              8,
+              8
+            ],
             "spacing": 8,
             "button_group_spacing": 16,
             "background_color": {
@@ -1505,7 +2223,12 @@
             }
           },
           "info_bar": {
-            "margins": [8, 4, 8, 4],
+            "margins": [
+              8,
+              4,
+              8,
+              4
+            ],
             "spacing": 16
           },
           "buttons": {
@@ -1526,7 +2249,9 @@
             "disabled_color_multiplier": 0.5,
             "empty_label_color_multiplier": 0.7,
             "line_highlight_style": {
-              "color": [255, 255, 255],
+              "color": {
+                "$ref": "$_COLOR_ACCENT_PRIMARY"
+              },
               "font_weight": "bold"
             }
           },
@@ -1534,10 +2259,20 @@
             "spacing": 0
           },
           "analysis_area": {
-            "container_margins": [0, 0, 0, 0],
+            "container_margins": [
+              0,
+              0,
+              0,
+              0
+            ],
             "container_spacing": 8,
             "line_spacing": 8,
-            "line_area_padding": [8, 8, 8, 0],
+            "line_area_padding": [
+              8,
+              8,
+              8,
+              0
+            ],
             "empty_label_padding": 20
           },
           "multipv1_indicator": {
@@ -1552,20 +2287,47 @@
           "statistics": {
             "position": "top",
             "font_size": 9,
-            "color": [180, 180, 180],
-            "background_color": {
-              "$ref": "$_COLOR_BACKGROUND_3"
-            },
-            "padding": [8, 4, 8, 4]
+            "color": [
+              238,
+              241,
+              246
+            ],
+            "background_color": [
+              55,
+              85,
+              135
+            ],
+            "padding": [
+              8,
+              4,
+              8,
+              4
+            ]
           },
           "evaluation_difference": {
-            "positive_color": [100, 255, 100],
-            "negative_color": [255, 100, 100]
+            "positive_color": [
+              100,
+              255,
+              100
+            ],
+            "negative_color": [
+              255,
+              100,
+              100
+            ]
           },
           "trajectory_highlight": {
-            "color": [100, 200, 255],
+            "color": [
+              100,
+              200,
+              255
+            ],
             "font_weight": "bold",
-            "background_color": [50, 100, 150],
+            "background_color": [
+              50,
+              100,
+              150
+            ],
             "background_alpha": 0.3
           },
           "pv_hover": {
@@ -1599,7 +2361,12 @@
             "annotations_section_spacing": 5,
             "annotations_header_spacing": 5,
             "annotations_list_spacing": 3,
-            "annotations_list_margins": [5, 5, 5, 5]
+            "annotations_list_margins": [
+              5,
+              5,
+              5,
+              5
+            ]
           },
           "tool_buttons": {
             "minimum_width": 50,
@@ -1608,24 +2375,76 @@
           },
           "color_swatches": {
             "size": 34,
-            "selected_border_color": [120, 150, 200],
+            "selected_border_color": [
+              120,
+              150,
+              200
+            ],
             "selected_border_width": 2,
-            "unselected_border_color": [180, 180, 180],
+            "unselected_border_color": [
+              180,
+              180,
+              180
+            ],
             "unselected_border_width": 1
           },
           "preset_colors": [
-            [255, 100, 100],
-            [100, 220, 100],
-            [150, 200, 255],
-            [255, 200, 100],
-            [200, 100, 255],
-            [100, 220, 255],
-            [255, 150, 200],
-            [150, 150, 255],
-            [200, 200, 100],
-            [240, 240, 240]
+            [
+              255,
+              100,
+              100
+            ],
+            [
+              100,
+              220,
+              100
+            ],
+            [
+              150,
+              200,
+              255
+            ],
+            [
+              255,
+              200,
+              100
+            ],
+            [
+              200,
+              100,
+              255
+            ],
+            [
+              100,
+              220,
+              255
+            ],
+            [
+              255,
+              150,
+              200
+            ],
+            [
+              150,
+              150,
+              255
+            ],
+            [
+              200,
+              200,
+              100
+            ],
+            [
+              240,
+              240,
+              240
+            ]
           ],
-          "default_color": [255, 100, 100],
+          "default_color": [
+            255,
+            100,
+            100
+          ],
           "size_slider": {
             "minimum": 100,
             "maximum": 250,
@@ -1680,7 +2499,11 @@
             "border_radius": 5,
             "margin": 5,
             "user": {
-              "background_color": [60, 80, 120],
+              "background_color": [
+                60,
+                80,
+                120
+              ],
               "text_color": {
                 "$ref": "$_COLOR_TEXT_PRIMARY"
               }
@@ -1798,8 +2621,8 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
-          "font_weight": 400,
-          "selected_font_weight": 500,
+          "font_weight": 700,
+          "selected_font_weight": 700,
           "tab_height": 24,
           "pane_background": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
@@ -1813,7 +2636,7 @@
                 "$ref": "$_COLOR_BACKGROUND_SECONDARY"
               },
               "text": {
-                "$ref": "$_COLOR_TEXT_SECONDARY"
+                "$ref": "$_COLOR_TEXT_PRIMARY"
               },
               "border": {
                 "$ref": "$_COLOR_BUTTON_BORDER"
@@ -1826,16 +2649,24 @@
               "text": {
                 "$ref": "$_COLOR_TEXT_7"
               },
-              "border": [80, 80, 85]
+              "border": [
+                80,
+                80,
+                85
+              ]
             },
             "active": {
               "background": {
-                "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+                "$ref": "$_COLOR_ACCENT_PRIMARY"
               },
               "text": {
-                "$ref": "$_COLOR_TEXT_PRIMARY"
+                "$ref": "$_COLOR_ON_ACCENT"
               },
-              "border": [100, 120, 160]
+              "border": [
+                100,
+                120,
+                160
+              ]
             }
           }
         },
@@ -1849,14 +2680,30 @@
           "text_color": {
             "$ref": "$_COLOR_TEXT_5"
           },
-          "blockquote_text_color": [210, 190, 130],
-          "toolbar_separator_color": [60, 60, 65],
-          "inline_code_background_color": [90, 110, 160],
+          "blockquote_text_color": [
+            210,
+            190,
+            130
+          ],
+          "toolbar_separator_color": [
+            60,
+            60,
+            65
+          ],
+          "inline_code_background_color": [
+            90,
+            110,
+            160
+          ],
           "inline_code_background_alpha": 170,
           "inline_code_text_color": {
             "$ref": "$_COLOR_TEXT_5"
           },
-          "move_link_text_color": [100, 150, 255]
+          "move_link_text_color": [
+            100,
+            150,
+            255
+          ]
         },
         "metadata": {
           "background_color": {
@@ -1881,8 +2728,12 @@
             }
           },
           "standard_tag": {
-            "background_color": [50, 55, 60],
-            "text_color": [220, 220, 240]
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_5"
+            },
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_3"
+            }
           },
           "button_bar_background_color": {
             "$ref": "$_COLOR_BACKGROUND_PRIMARY"
@@ -1895,7 +2746,12 @@
             ],
             "border_radius": 4,
             "spacing": 8,
-            "margins": [8, 8, 8, 8],
+            "margins": [
+              8,
+              8,
+              8,
+              8
+            ],
             "background_color": {
               "$ref": "$_COLOR_BACKGROUND_5"
             },
@@ -1949,8 +2805,8 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
-          "font_weight": 400,
-          "selected_font_weight": 500,
+          "font_weight": 700,
+          "selected_font_weight": 700,
           "tab_height": 24,
           "pane_background": {
             "$ref": "$_COLOR_BACKGROUND_4"
@@ -1964,7 +2820,7 @@
                 "$ref": "$_COLOR_BACKGROUND_3"
               },
               "text": {
-                "$ref": "$_COLOR_TEXT_SECONDARY"
+                "$ref": "$_COLOR_TEXT_PRIMARY"
               },
               "border": {
                 "$ref": "$_COLOR_BUTTON_BORDER"
@@ -1977,16 +2833,24 @@
               "text": {
                 "$ref": "$_COLOR_TEXT_7"
               },
-              "border": [80, 80, 85]
+              "border": [
+                80,
+                80,
+                85
+              ]
             },
             "active": {
               "background": {
-                "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+                "$ref": "$_COLOR_ACCENT_PRIMARY"
               },
               "text": {
-                "$ref": "$_COLOR_TEXT_PRIMARY"
+                "$ref": "$_COLOR_ON_ACCENT"
               },
-              "border": [100, 120, 160]
+              "border": [
+                100,
+                120,
+                160
+              ]
             }
           }
         },
@@ -2046,10 +2910,10 @@
             "$ref": "$_COLOR_GRIDLINE"
           },
           "selection_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_ACTIVE_MOVE_BACKGROUND"
           },
           "selection_text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_NEAR_BLACK"
           }
         }
       },
@@ -2096,8 +2960,16 @@
       },
       "spacing": 4,
       "icons": {
-        "tint_color": [200, 200, 200],
-        "tint_color_light_scheme": [52, 52, 58]
+        "tint_color": [
+          70,
+          95,
+          140
+        ],
+        "tint_color_light_scheme": [
+          45,
+          60,
+          90
+        ]
       },
       "colors": {
         "normal": {
@@ -2128,7 +3000,12 @@
         "border_color": {
           "$ref": "$_COLOR_BUTTON_BORDER"
         },
-        "item_padding": [4, 20, 4, 8]
+        "item_padding": [
+          4,
+          20,
+          4,
+          8
+        ]
       },
       "separator": {
         "height": 1,
@@ -2159,9 +3036,24 @@
       }
     },
     "margins": {
-      "database_panel": [5, 5, 5, 5],
-      "status_panel": [5, 5, 5, 5],
-      "detail_panel": [0, 0, 0, 0]
+      "database_panel": [
+        5,
+        5,
+        5,
+        5
+      ],
+      "status_panel": [
+        5,
+        5,
+        5,
+        5
+      ],
+      "detail_panel": [
+        0,
+        0,
+        0,
+        0
+      ]
     },
     "spacing": {
       "database_panel": 5
@@ -2190,11 +3082,21 @@
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
         },
         "layout": {
-          "margins": [25, 25, 25, 25],
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ],
           "spacing": 15
         },
         "groups": {
-          "contents_margins": [10, 14, 10, 10],
+          "contents_margins": [
+            10,
+            14,
+            10,
+            10
+          ],
           "spacing": 10,
           "builtin_chip_container_min_height": 36,
           "custom_chip_container_min_height": 36
@@ -2211,7 +3113,12 @@
           "width": 420,
           "height": 140,
           "layout": {
-            "margins": [18, 18, 18, 18],
+            "margins": [
+              18,
+              18,
+              18,
+              18
+            ],
             "spacing": 10,
             "row_spacing": 10
           },
@@ -2235,14 +3142,32 @@
           }
         },
         "icon_badges": {
-          "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_6"
-          },
-          "background_hover_color": [75, 75, 82],
-          "icon_color": [235, 235, 235],
-          "icon_hover_color": [255, 255, 255]
+          "background_color": [
+            230,
+            232,
+            236
+          ],
+          "background_hover_color": [
+            214,
+            218,
+            224
+          ],
+          "icon_color": [
+            40,
+            40,
+            45
+          ],
+          "icon_hover_color": [
+            15,
+            15,
+            18
+          ]
         },
-        "builtin_hidden_chip_color": [75, 75, 82]
+        "builtin_hidden_chip_color": [
+          220,
+          222,
+          227
+        ]
       },
       "classification_settings": {
         "width": 480,
@@ -2255,7 +3180,12 @@
         },
         "layout": {
           "spacing": 5,
-          "margins": [25, 25, 25, 25],
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ],
           "section_spacing": 10
         },
         "groups": {
@@ -2275,7 +3205,12 @@
             0,
             5
           ],
-          "content_margins": [10, 20, 10, 15]
+          "content_margins": [
+            10,
+            20,
+            10,
+            15
+          ]
         },
         "fields": {
           "label_width": 200,
@@ -2284,7 +3219,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_3"
+              "$ref": "$_COLOR_TEXT_PRIMARY"
           },
           "spacing": 12,
           "right_padding": 0,
@@ -2297,7 +3232,12 @@
         },
         "cpl_scale": {
           "height": 120,
-          "padding": [10, 10, 10, 10],
+          "padding": [
+            10,
+            10,
+            10,
+            10
+          ],
           "scale_max": 500,
           "blunder_compression_enabled": true,
           "blunder_compression_factor": 0.4,
@@ -2307,7 +3247,11 @@
           "scale_line_color": {
             "$ref": "$_COLOR_CHART_LINE_4"
           },
-          "tick_color": [200, 200, 200],
+          "tick_color": [
+            200,
+            200,
+            200
+          ],
           "text_color": {
             "$ref": "$_COLOR_TEXT_3"
           },
@@ -2315,11 +3259,31 @@
             "$ref": "$_FONT_FAMILY_PRIMARY"
           },
           "font_size": 9,
-          "best_move_color": [100, 255, 100],
-          "good_move_color": [150, 255, 150],
-          "inaccuracy_color": [255, 255, 100],
-          "mistake_color": [255, 200, 100],
-          "blunder_color": [255, 100, 100],
+          "best_move_color": [
+            100,
+            255,
+            100
+          ],
+          "good_move_color": [
+            150,
+            255,
+            150
+          ],
+          "inaccuracy_color": [
+            255,
+            255,
+            100
+          ],
+          "mistake_color": [
+            255,
+            200,
+            100
+          ],
+          "blunder_color": [
+            255,
+            100,
+            100
+          ],
           "number_height_offset": 4,
           "section_height": 12,
           "scale_line_offset": 8,
@@ -2354,7 +3318,12 @@
         },
         "layout": {
           "spacing": 15,
-          "margins": [20, 20, 20, 20],
+          "margins": [
+            20,
+            20,
+            20,
+            20
+          ],
           "section_spacing": 20
         },
         "groups": {
@@ -2437,17 +3406,32 @@
         },
         "layout": {
           "spacing": 10,
-          "margins": [10, 10, 10, 10]
+          "margins": [
+            10,
+            10,
+            10,
+            10
+          ]
         },
         "tabs_layout": {
           "spacing": 10,
-          "margins": [15, 10, 15, 10],
+          "margins": [
+            15,
+            10,
+            15,
+            10
+          ],
           "top_spacer": 5,
           "copy_layout_spacing": 10,
           "common_layout_spacing": 10,
           "engine_params_layout_spacing": 10,
           "scroll_layout_spacing": 10,
-          "scroll_layout_margins": [10, 5, 10, 10]
+          "scroll_layout_margins": [
+            10,
+            5,
+            10,
+            10
+          ]
         },
         "header": {
           "background_color": {
@@ -2461,7 +3445,12 @@
           },
           "border_width": 1,
           "border_radius": 5,
-          "padding": [10, 10, 10, 10],
+          "padding": [
+            10,
+            10,
+            10,
+            10
+          ],
           "font_family": {
             "$ref": "$_FONT_FAMILY_PRIMARY"
           },
@@ -2503,7 +3492,11 @@
               "text": {
                 "$ref": "$_COLOR_TEXT_7"
               },
-              "border": [80, 80, 85]
+              "border": [
+                80,
+                80,
+                85
+              ]
             },
             "active": {
               "background": {
@@ -2512,7 +3505,11 @@
               "text": {
                 "$ref": "$_COLOR_TEXT_PRIMARY"
               },
-              "border": [100, 120, 160]
+              "border": [
+                100,
+                120,
+                160
+              ]
             }
           }
         },
@@ -2531,7 +3528,12 @@
           "spacing": 10,
           "margin_top": 8,
           "padding_top": 12,
-          "content_margins": [10, 15, 10, 10],
+          "content_margins": [
+            10,
+            15,
+            10,
+            10
+          ],
           "engine_params_content_margin_top": 2
         },
         "buttons": {
@@ -2568,10 +3570,23 @@
           "text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
           },
-          "disabled_color": [128, 128, 128],
-          "empty_label_color": [128, 128, 128],
+          "disabled_color": [
+            128,
+            128,
+            128
+          ],
+          "empty_label_color": [
+            128,
+            128,
+            128
+          ],
           "empty_label_font_style": "italic",
-          "empty_label_padding": [20, 20, 20, 20],
+          "empty_label_padding": [
+            20,
+            20,
+            20,
+            20
+          ],
           "form_label_font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           }
@@ -2592,7 +3607,12 @@
           },
           "border_width": 1,
           "border_radius": 3,
-          "padding": [2, 6, 2, 6],
+          "padding": [
+            2,
+            6,
+            2,
+            6
+          ],
           "font_family": {
             "$ref": "$_FONT_FAMILY_PRIMARY"
           },
@@ -2614,7 +3634,12 @@
           "height": 500,
           "layout": {
             "spacing": 15,
-            "margins": [15, 15, 15, 15]
+            "margins": [
+              15,
+              15,
+              15,
+              15
+            ]
           },
           "title": {
             "font_size": {
@@ -2647,7 +3672,12 @@
             "min_height": 250
           },
           "issue_widget": {
-            "margins": [10, 5, 10, 5],
+            "margins": [
+              10,
+              5,
+              10,
+              5
+            ],
             "spacing": 10
           },
           "severity_labels": {
@@ -2661,9 +3691,21 @@
             ],
             "border_radius": 3,
             "colors": {
-              "error": [255, 100, 100],
-              "warning": [255, 200, 100],
-              "info": [150, 200, 255]
+              "error": [
+                255,
+                100,
+                100
+              ],
+              "warning": [
+                255,
+                200,
+                100
+              ],
+              "info": [
+                150,
+                200,
+                255
+              ]
             }
           },
           "issue_message": {
@@ -2685,7 +3727,12 @@
         },
         "layout": {
           "spacing": 10,
-          "margins": [10, 10, 10, 10],
+          "margins": [
+            10,
+            10,
+            10,
+            10
+          ],
           "engine_info_section_spacing": 8
         },
         "labels": {
@@ -2712,7 +3759,12 @@
           },
           "border_width": 1,
           "border_radius": 3,
-          "padding": [2, 6, 2, 6],
+          "padding": [
+            2,
+            6,
+            2,
+            6
+          ],
           "font_family": {
             "$ref": "$_FONT_FAMILY_PRIMARY"
           },
@@ -2759,7 +3811,12 @@
             0,
             5
           ],
-          "content_margins": [10, 15, 10, 10],
+          "content_margins": [
+            10,
+            15,
+            10,
+            10
+          ],
           "content_spacing": 8,
           "path_layout_spacing": 8
         }
@@ -2783,7 +3840,12 @@
           "$ref": "$_FONT_FAMILY_PRIMARY"
         },
         "layout": {
-          "margins": [25, 25, 25, 25],
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ],
           "spacing": 12
         },
         "spacing": {
@@ -2853,7 +3915,12 @@
           "title_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           },
-          "content_margins": [10, 14, 10, 10],
+          "content_margins": [
+            10,
+            14,
+            10,
+            10
+          ],
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
@@ -2867,7 +3934,12 @@
           "columns": 2,
           "spacing": 8,
           "row_spacing": 4,
-          "margins": [10, 6, 8, 10]
+          "margins": [
+            10,
+            6,
+            8,
+            10
+          ]
         },
         "quick_select_buttons": {
           "enabled": true,
@@ -2895,7 +3967,12 @@
           "$ref": "$_FONT_FAMILY_PRIMARY"
         },
         "layout": {
-          "margins": [25, 25, 25, 25],
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ],
           "spacing": 12
         },
         "spacing": {
@@ -2968,7 +4045,12 @@
           "title_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           },
-          "content_margins": [10, 14, 10, 10],
+          "content_margins": [
+            10,
+            14,
+            10,
+            10
+          ],
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
@@ -2999,7 +4081,12 @@
           "$ref": "$_FONT_FAMILY_PRIMARY"
         },
         "layout": {
-          "margins": [24, 22, 24, 22],
+          "margins": [
+            24,
+            22,
+            24,
+            22
+          ],
           "spacing": 12
         },
         "spacing": {
@@ -3083,7 +4170,12 @@
           "$ref": "$_FONT_FAMILY_PRIMARY"
         },
         "layout": {
-          "margins": [25, 25, 25, 25],
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ],
           "spacing": 15
         },
         "spacing": {
@@ -3144,7 +4236,12 @@
           "title_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           },
-          "content_margins": [10, 20, 10, 15],
+          "content_margins": [
+            10,
+            20,
+            10,
+            15
+          ],
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
@@ -3154,11 +4251,20 @@
           ]
         },
         "tag_picker": {
-          "selected_border_color": [0, 200, 255],
+          "selected_border_color": [
+            0,
+            200,
+            255
+          ],
           "selected_border_width": 2,
           "popup_width": 360,
           "popup_max_height": 260,
-          "popup_layout_margins": [10, 10, 10, 10],
+          "popup_layout_margins": [
+            10,
+            10,
+            10,
+            10
+          ],
           "popup_layout_spacing": 8,
           "popup_extra_height": 16,
           "popup_anchor_gap_y": 24,
@@ -3185,7 +4291,12 @@
           "$ref": "$_FONT_FAMILY_PRIMARY"
         },
         "layout": {
-          "margins": [25, 25, 25, 25],
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ],
           "spacing": 15
         },
         "spacing": {
@@ -3249,7 +4360,12 @@
           "title_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           },
-          "content_margins": [10, 20, 10, 15],
+          "content_margins": [
+            10,
+            20,
+            10,
+            15
+          ],
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
@@ -3278,7 +4394,12 @@
           "$ref": "$_FONT_FAMILY_PRIMARY"
         },
         "layout": {
-          "margins": [25, 25, 25, 25],
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ],
           "spacing": 15
         },
         "spacing": {
@@ -3320,7 +4441,12 @@
           "title_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           },
-          "content_margins": [10, 12, 10, 15],
+          "content_margins": [
+            10,
+            12,
+            10,
+            15
+          ],
           "margin_top": 6,
           "padding_top": 3,
           "title_left": 10,
@@ -3382,7 +4508,12 @@
           "$ref": "$_FONT_FAMILY_PRIMARY"
         },
         "layout": {
-          "margins": [25, 25, 25, 25],
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ],
           "spacing": 15
         },
         "spacing": {
@@ -3444,7 +4575,12 @@
           "title_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           },
-          "content_margins": [10, 20, 10, 15],
+          "content_margins": [
+            10,
+            20,
+            10,
+            15
+          ],
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
@@ -3468,7 +4604,12 @@
         },
         "layout": {
           "spacing": 15,
-          "margins": [15, 15, 15, 15]
+          "margins": [
+            15,
+            15,
+            15,
+            15
+          ]
         },
         "title": {
           "font_size": {
@@ -3511,7 +4652,12 @@
         },
         "layout": {
           "spacing": 15,
-          "margins": [15, 15, 15, 15]
+          "margins": [
+            15,
+            15,
+            15,
+            15
+          ]
         },
         "title": {
           "font_size": {
@@ -3530,7 +4676,11 @@
           "text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
           },
-          "link_color": [120, 200, 255],
+          "link_color": [
+            120,
+            200,
+            255
+          ],
           "line_height": 20,
           "base_height": 150
         },
@@ -3554,7 +4704,12 @@
         },
         "layout": {
           "spacing": 12,
-          "margins": [15, 20, 15, 15]
+          "margins": [
+            15,
+            20,
+            15,
+            15
+          ]
         },
         "title": {
           "font_size": {
@@ -3593,7 +4748,12 @@
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "border_radius": 3,
-          "padding": [2, 6, 2, 5],
+          "padding": [
+            2,
+            6,
+            2,
+            5
+          ],
           "minimum_width": 200,
           "minimum_height": 25
         },
@@ -3619,7 +4779,12 @@
         },
         "layout": {
           "spacing": 15,
-          "margins": [15, 15, 15, 15]
+          "margins": [
+            15,
+            15,
+            15,
+            15
+          ]
         },
         "labels": {
           "font_family": {
@@ -3687,7 +4852,12 @@
         },
         "layout": {
           "spacing": 10,
-          "margins": [15, 15, 15, 15],
+          "margins": [
+            15,
+            15,
+            15,
+            15
+          ],
           "section_spacing": 10
         },
         "buttons": {
@@ -3744,7 +4914,12 @@
           "title_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           },
-          "content_margins": [10, 10, 10, 10],
+          "content_margins": [
+            10,
+            10,
+            10,
+            10
+          ],
           "margin_top": 10,
           "padding_top": 5,
           "font_group_spacing": 6
@@ -3777,7 +4952,12 @@
         },
         "layout": {
           "spacing": 10,
-          "margins": [15, 25, 15, 15],
+          "margins": [
+            15,
+            25,
+            15,
+            15
+          ],
           "section_spacing": 15
         },
         "buttons": {
@@ -3846,7 +5026,12 @@
           "title_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           },
-          "content_margins": [10, 15, 10, 10],
+          "content_margins": [
+            10,
+            15,
+            10,
+            10
+          ],
           "margin_top": 10,
           "padding_top": 5
         }
@@ -3859,7 +5044,12 @@
         },
         "layout": {
           "spacing": 12,
-          "margins": [30, 30, 30, 20],
+          "margins": [
+            30,
+            30,
+            30,
+            20
+          ],
           "icon_text_gap": 25,
           "text_element_spacing": 10,
           "button_section_top_margin": 12
@@ -3948,7 +5138,11 @@
           "color": {
             "$ref": "$_COLOR_TEXT_4"
           },
-          "link_color": [100, 150, 255],
+          "link_color": [
+            100,
+            150,
+            255
+          ],
           "margin_top": 8
         },
         "buttons": {
@@ -3977,7 +5171,12 @@
         },
         "layout": {
           "spacing": 15,
-          "margins": [20, 20, 20, 20],
+          "margins": [
+            20,
+            20,
+            20,
+            20
+          ],
           "button_section_top_margin": 15
         },
         "content": {
@@ -3990,7 +5189,11 @@
           "text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
           },
-          "link_color": [100, 150, 255],
+          "link_color": [
+            100,
+            150,
+            255
+          ],
           "pre_block": {
             "font_family": {
               "$ref": "$_FONT_FAMILY_MONO"
@@ -4085,17 +5288,37 @@
         },
         "layout": {
           "spacing": 10,
-          "margins": [15, 15, 15, 15],
-          "scroll_area_margins": [10, 10, 10, 10],
+          "margins": [
+            15,
+            15,
+            15,
+            15
+          ],
+          "scroll_area_margins": [
+            10,
+            10,
+            10,
+            10
+          ],
           "scroll_layout_spacing": 10,
           "left_panel_width": 250,
           "right_panel_label_left_padding": 10,
           "left_panel": {
-            "margins": [0, 0, 0, 0],
+            "margins": [
+              0,
+              0,
+              0,
+              0
+            ],
             "spacing": 5
           },
           "right_panel": {
-            "margins": [0, 0, 0, 0],
+            "margins": [
+              0,
+              0,
+              0,
+              0
+            ],
             "spacing": 5
           }
         },
@@ -4133,7 +5356,7 @@
           },
           "border_radius": 3,
           "header_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_3"
+            "$ref": "$_COLOR_BACKGROUND_5"
           },
           "header_text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
@@ -4179,7 +5402,12 @@
           "title_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           },
-          "content_margins": [10, 15, 10, 10],
+          "content_margins": [
+            10,
+            15,
+            10,
+            10
+          ],
           "layout_spacing": 8,
           "margin_top": 10,
           "padding_top": 5,

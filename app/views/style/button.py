@@ -20,6 +20,9 @@ def generate_button_stylesheet(
     hover_background_color: Optional[List[int]] = None,
     pressed_background_color: Optional[List[int]] = None,
     active_background_color: Optional[List[int]] = None,
+    hover_text_color: Optional[List[int]] = None,
+    pressed_text_color: Optional[List[int]] = None,
+    active_text_color: Optional[List[int]] = None,
     min_width: Optional[int] = None,
     min_height: Optional[int] = None
 ) -> str:
@@ -49,6 +52,11 @@ def generate_button_stylesheet(
     pressed_bg = pressed_background_color or normal_bg
     checked_bg = active_background_color or normal_bg
     disabled_bg = normal_bg
+
+    normal_text = text_color
+    hover_text = hover_text_color or normal_text
+    pressed_text = pressed_text_color or normal_text
+    checked_text = active_text_color or normal_text
     disabled_text = [
         text_color[0] // 2,
         text_color[1] // 2,
@@ -78,18 +86,22 @@ def generate_button_stylesheet(
         f"}}"
         f"QPushButton:hover {{"
         f"background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});"
+        f"color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});"
         f"border-color: rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
         f"}}"
         f"QPushButton:pressed {{"
         f"background-color: rgb({pressed_bg[0]}, {pressed_bg[1]}, {pressed_bg[2]});"
+        f"color: rgb({pressed_text[0]}, {pressed_text[1]}, {pressed_text[2]});"
         f"border-color: rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
         f"}}"
         f"QPushButton:checked {{"
         f"background-color: rgb({checked_bg[0]}, {checked_bg[1]}, {checked_bg[2]});"
+        f"color: rgb({checked_text[0]}, {checked_text[1]}, {checked_text[2]});"
         f"border-color: rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
         f"}}"
         f"QPushButton:checked:hover {{"
         f"background-color: rgb({checked_bg[0]}, {checked_bg[1]}, {checked_bg[2]});"
+        f"color: rgb({checked_text[0]}, {checked_text[1]}, {checked_text[2]});"
         f"border-color: rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
         f"}}"
         f"QPushButton:disabled {{"
@@ -121,6 +133,9 @@ def apply_button_styling(
     hover_background_color: Optional[List[int]] = None,
     pressed_background_color: Optional[List[int]] = None,
     active_background_color: Optional[List[int]] = None,
+    hover_text_color: Optional[List[int]] = None,
+    pressed_text_color: Optional[List[int]] = None,
+    active_text_color: Optional[List[int]] = None,
     min_width: Optional[int] = None,
     min_height: Optional[int] = None
 ) -> None:
@@ -159,6 +174,9 @@ def apply_button_styling(
         hover_background_color=hover_background_color,
         pressed_background_color=pressed_background_color,
         active_background_color=active_background_color,
+        hover_text_color=hover_text_color,
+        pressed_text_color=pressed_text_color,
+        active_text_color=active_text_color,
         min_width=min_width,
         min_height=min_height,
     )

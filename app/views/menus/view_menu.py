@@ -77,3 +77,7 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
         mw.view_notes_action,
     ]
 
+    # Theme switching (runtime)
+    view_menu.addSeparator()
+    mw._setup_theme_menu(view_menu)
+

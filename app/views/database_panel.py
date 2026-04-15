@@ -164,6 +164,8 @@ class DatabasePanel(QWidget):
         # Get font settings
         font_family = resolve_font_family(tabs_config.get('font_family', 'Helvetica Neue'))
         font_size = scale_font_size(tabs_config.get('font_size', 10))
+        tab_font_weight = tabs_config.get('font_weight', None)
+        selected_tab_font_weight = tabs_config.get('selected_font_weight', 500)
         tab_height = tabs_config.get('tab_height', 24)
         pane_bg = tabs_config.get('pane_background', [35, 35, 40])
         
@@ -192,6 +194,7 @@ class DatabasePanel(QWidget):
         scroll_button_color = tabs_config.get('scroll_button_color', [30, 30, 30])
         
         # Create stylesheet
+        tab_weight_css = f"font-weight: {int(tab_font_weight)};" if tab_font_weight is not None else ""
         stylesheet = f"""
             QTabWidget::pane {{
                 border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
@@ -214,6 +217,7 @@ class DatabasePanel(QWidget):
                 height: {tab_height}px;
                 font-family: "{font_family}";
                 font-size: {font_size}pt;
+                {tab_weight_css}
                 margin-right: 2px;
             }}
             
@@ -227,7 +231,7 @@ class DatabasePanel(QWidget):
                 background-color: rgb({active_bg[0]}, {active_bg[1]}, {active_bg[2]});
                 color: rgb({active_text[0]}, {active_text[1]}, {active_text[2]});
                 border-color: rgb({active_border[0]}, {active_border[1]}, {active_border[2]});
-                font-weight: 500;
+                font-weight: {int(selected_tab_font_weight)};
             }}
             
             QTabBar::tab:!selected {{

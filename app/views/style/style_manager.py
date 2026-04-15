@@ -321,6 +321,9 @@ class StyleManager:
         pressed_background_color = (
             button_config.get('pressed_background_color', None) or active_background_color
         )
+        hover_text_color = button_config.get('hover_text_color', None) or text_color
+        active_text_color = button_config.get('active_text_color', None) or text_color
+        pressed_text_color = button_config.get('pressed_text_color', None) or active_text_color
 
         # Keep legacy parameters for call-site compatibility, but do not use offsets for colors.
         if background_offset is None:
@@ -339,6 +342,9 @@ class StyleManager:
             hover_background_color=hover_background_color,
             pressed_background_color=pressed_background_color,
             active_background_color=active_background_color,
+            hover_text_color=hover_text_color,
+            pressed_text_color=pressed_text_color,
+            active_text_color=active_text_color,
             min_width=min_width,
             min_height=min_height,
         )
