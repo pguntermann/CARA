@@ -1,10 +1,10 @@
 """Unit tests for PGN formatter helpers used when copying from the UI."""
 
-import json
 import unittest
 from pathlib import Path
 
 from app.services.pgn_formatter_service import PgnFormatterService, clean_pgn_text
+from app.config.config_loader import ConfigLoader
 
 
 def _lf(s: str) -> str:
@@ -38,8 +38,7 @@ class TestCleanPgnTextHeaderLines(unittest.TestCase):
 
 def _load_app_config() -> dict:
     root = Path(__file__).resolve().parents[2]
-    with open(root / "app/config/config.json", encoding="utf-8") as f:
-        return json.load(f)
+    return ConfigLoader(root / "app/config/config.json").load()
 
 
 class TestFormatPgnNagDisplayModes(unittest.TestCase):
