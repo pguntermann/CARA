@@ -33,12 +33,16 @@
     "$_COLOR_CHART_MAIN_2": [238, 236, 230],
     "$_COLOR_CHART_LINE_2": [120, 190, 255],
     "$_COLOR_CHART_LINE_3": [100, 150, 255],
+    "$_COLOR_CHART_LINE_4": [150, 150, 150],
     "$_COLOR_BUTTON_HOVER_BACKGROUND": [60, 60, 65],
+    "$_COLOR_SEPERATOR_BACKGROUND": [60, 60, 65],
     "$_COLOR_ACTIVE_MOVE_BACKGROUND": [100, 120, 180],
     "$_COLOR_INPUT_FOCUS_BORDER": [0, 120, 212],
     "$_COLOR_SCROLLBAR_BACKGROUND": {
       "$ref": "$_COLOR_BACKGROUND_3"
     },
+    "$_COLOR_SCROLLBAR_BUTTON_COLOR": [30, 30, 30],
+    "$_COLOR_SPLITTER_HANDLE": [30, 30, 30],
     "$_COLOR_SCROLLBAR_HANDLE": {
       "$ref": "$_COLOR_BORDER"
     },
@@ -594,11 +598,15 @@
               "bold": true
             },
             "move_numbers": {
-              "color": [255, 255, 255],
+              "color": {
+                "$ref": "$_COLOR_TEXT_5"
+              },
               "bold": true
             },
             "moves": {
-              "color": [220, 220, 220],
+              "color": {
+                "$ref": "$_COLOR_TEXT_3"
+              },
               "bold": false
             },
             "annotations": {
@@ -631,7 +639,9 @@
               "italic": true
             },
             "variations": {
-              "color": [180, 180, 180],
+              "color": {
+                "$ref": "$_COLOR_TEXT_6"
+              },
               "italic": true
             },
             "results": {
@@ -1573,7 +1583,9 @@
                 "id": "opening",
                 "label": "Opening",
                 "enabled": true,
-                "line_color": [100, 150, 255],
+                "line_color": {
+                  "$ref": "$_COLOR_CHART_LINE_3"
+                },
                 "line_style": "solid",
                 "line_width": 2
               },
@@ -1804,7 +1816,9 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "separator": {
-            "line_color": [150, 150, 150],
+            "line_color": {
+              "$ref": "$_COLOR_CHART_LINE_4"
+            },
             "text_color": {
               "$ref": "$_COLOR_TEXT_6"
             },
@@ -1932,7 +1946,9 @@
           "pane_background": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
-          "scroll_button_color": [30, 30, 30],
+          "scroll_button_color": {
+            "$ref": "$_COLOR_SCROLLBAR_BUTTON_COLOR"
+          },
           "colors": {
             "normal": {
               "background": {
@@ -2029,7 +2045,9 @@
           "pane_background": {
             "$ref": "$_COLOR_BACKGROUND_4"
           },
-          "scroll_button_color": [30, 30, 30],
+          "scroll_button_color": {
+            "$ref": "$_COLOR_SCROLLBAR_BUTTON_COLOR"
+          },
           "colors": {
             "normal": {
               "background": {
@@ -2186,7 +2204,9 @@
       }
     },
     "splitter": {
-      "handle_color": [30, 30, 30],
+      "handle_color": {
+        "$ref": "$_COLOR_SPLITTER_HANDLE"
+      },
       "top": {
         "main_size": 600,
         "detail_size": 400,
@@ -2257,7 +2277,9 @@
       },
       "separator": {
         "height": 1,
-        "background_color": [60, 60, 65],
+        "background_color": {
+          "$ref": "$_COLOR_SEPERATOR_BACKGROUND"
+        },
         "margin": [
           2,
           4
@@ -2398,7 +2420,9 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
-          "scale_line_color": [150, 150, 150],
+          "scale_line_color": {
+            "$ref": "$_COLOR_CHART_LINE_4"
+          },
           "tick_color": [200, 200, 200],
           "text_color": {
             "$ref": "$_COLOR_TEXT_3"
@@ -2578,7 +2602,9 @@
           "pane_background": {
             "$ref": "$_COLOR_BACKGROUND_PRIMARY"
           },
-          "scroll_button_color": [30, 30, 30],
+          "scroll_button_color": {
+            "$ref": "$_COLOR_SCROLLBAR_BUTTON_COLOR"
+          },
           "colors": {
             "normal": {
               "background": {
