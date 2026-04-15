@@ -1,7 +1,7 @@
 {
   "constants": {
-    "$_FONT_FAMILY_PRIMARY": "Segoe UI, -apple-system, BlinkMacSystemFont, Helvetica Neue, Arial, Noto Sans, sans-serif",
-    "$_FONT_FAMILY_MONO": "Cascadia Mono, Menlo, Monaco, Consolas, \"Liberation Mono\", \"DejaVu Sans Mono\", monospace",
+    "$_FONT_FAMILY_PRIMARY": "Verdana, Geneva, Tahoma, DejaVu Sans, Liberation Sans, Arial, sans-serif",
+    "$_FONT_FAMILY_MONO": "Cascadia Mono, SF Mono, Menlo, Monaco, Consolas, \"Liberation Mono\", \"DejaVu Sans Mono\", monospace",
     "$_FONT_FAMILY_MONO_2": "Courier New, Courier, monospace",
     "$_FONT_SIZE_BASE_SMALL": 10,
     "$_FONT_SIZE_BASE_MEDIUM": 11,
@@ -89,6 +89,11 @@
       194,
       198,
       205
+    ],
+    "$_COLOR_TABLE_HEADER_BACKGROUND": [
+      216,
+      225,
+      220
     ],
     "$_COLOR_BACKGROUND_ACTIVE": [
       60,
@@ -183,9 +188,9 @@
       170
     ],
     "$_COLOR_GRIDLINE": [
-      210,
-      212,
-      218
+      120,
+      125,
+      135
     ],
     "$_COLOR_BUTTON_BORDER": {
       "$ref": "$_COLOR_BORDER"
@@ -1023,6 +1028,11 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_width": 1,
+          "padding": 5,
           "formatting": {
             "headers": {
               "color": [
@@ -1143,13 +1153,13 @@
               }
             },
             "header_background_color": {
-              "$ref": "$_COLOR_BACKGROUND_3"
+              "$ref": "$_COLOR_TABLE_HEADER_BACKGROUND"
             },
             "header_text_color": {
               "$ref": "$_COLOR_TEXT_SECONDARY"
             },
             "header_border_color": {
-              "$ref": "$_COLOR_BORDER"
+              "$ref": "$_COLOR_GRIDLINE"
             },
             "gridline_color": {
               "$ref": "$_COLOR_GRIDLINE"
@@ -2898,13 +2908,13 @@
             ]
           },
           "header_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_3"
+            "$ref": "$_COLOR_TABLE_HEADER_BACKGROUND"
           },
           "header_text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
           },
           "header_border_color": {
-            "$ref": "$_COLOR_BORDER"
+            "$ref": "$_COLOR_GRIDLINE"
           },
           "gridline_color": {
             "$ref": "$_COLOR_GRIDLINE"
@@ -2964,6 +2974,11 @@
           70,
           95,
           140
+        ],
+        "tint_color_dark_scheme": [
+          110,
+          140,
+          200
         ],
         "tint_color_light_scheme": [
           45,
@@ -3304,6 +3319,9 @@
         "width": 600,
         "height": 645,
         "form_label_min_width": 180,
+        "password_reveal_icon_tint_color": {
+          "$ref": "$_COLOR_BUTTON_ACTIVE_BACKGROUND"
+        },
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -4676,11 +4694,9 @@
           "text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
           },
-          "link_color": [
-            120,
-            200,
-            255
-          ],
+          "link_color": {
+            "$ref": "$_COLOR_BUTTON_ACTIVE_BACKGROUND"
+          },
           "line_height": 20,
           "base_height": 150
         },
@@ -5356,7 +5372,7 @@
           },
           "border_radius": 3,
           "header_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_5"
+            "$ref": "$_COLOR_TABLE_HEADER_BACKGROUND"
           },
           "header_text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"

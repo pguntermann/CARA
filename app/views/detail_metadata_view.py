@@ -245,7 +245,9 @@ class DetailMetadataView(QWidget):
                 background-color: rgb({header_bg[0]}, {header_bg[1]}, {header_bg[2]});
                 color: rgb({header_text[0]}, {header_text[1]}, {header_text[2]});
                 padding: 4px;
-                border: 1px solid rgb({header_border[0]}, {header_border[1]}, {header_border[2]});
+                border: none;
+                border-right: 1px solid rgb({header_border[0]}, {header_border[1]}, {header_border[2]});
+                border-bottom: 1px solid rgb({header_border[0]}, {header_border[1]}, {header_border[2]});
                 font-weight: 500;
             }}
             QTableCornerButton::section {{

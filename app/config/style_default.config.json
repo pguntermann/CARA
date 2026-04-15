@@ -666,6 +666,11 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_width": 1,
+          "padding": 5,
           "formatting": {
             "headers": {
               "color": [100, 150, 255],
@@ -2097,6 +2102,7 @@
       "spacing": 4,
       "icons": {
         "tint_color": [200, 200, 200],
+        "tint_color_dark_scheme": [200, 200, 200],
         "tint_color_light_scheme": [52, 52, 58]
       },
       "colors": {
@@ -2340,6 +2346,9 @@
         "width": 600,
         "height": 645,
         "form_label_min_width": 180,
+        "password_reveal_icon_tint_color": {
+          "$ref": "$_COLOR_TEXT_5"
+        },
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -3530,7 +3539,9 @@
           "text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
           },
-          "link_color": [120, 200, 255],
+          "link_color": {
+            "$ref": "$_COLOR_BUTTON_ACTIVE_BACKGROUND"
+          },
           "line_height": 20,
           "base_height": 150
         },

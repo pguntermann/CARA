@@ -163,8 +163,10 @@ def main() -> None:
         UserSettingsService.get_instance()
         MigrationService.run()
         
-        # Initialize MainWindow with injected configuration
-        window = MainWindow(config)
+        # Initialize MainWindow with injected configuration.
+        # Reuse the same style ref we already loaded at startup to sync the Theme menu.
+        active_style_ref = style_override or str(config.get("default_style_config", "") or "")
+        window = MainWindow(config, active_style_ref=active_style_ref)
         window.show()
         
         exit_code = app.exec()

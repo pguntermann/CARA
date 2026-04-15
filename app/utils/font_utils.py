@@ -19,8 +19,8 @@ def resolve_font_family(font_family: str) -> str:
         font_family: Font family string, possibly with comma-separated fallbacks.
         
     Returns:
-        First available font family, or the first one in the list if none found
-        (Qt will handle fallback in that case).
+        First available font family. If none are found, returns the original
+        string so Qt can apply its own fallback behavior.
     """
     if not font_family or ',' not in font_family:
         return font_family
@@ -38,8 +38,8 @@ def resolve_font_family(font_family: str) -> str:
             if available.lower() == font.lower():
                 return available
     
-    # If none found, return the first one (Qt will handle fallback)
-    return fonts[0] if fonts else font_family
+    # If none found, return the original string and let Qt decide fallbacks.
+    return font_family
 
 
 def get_font_size_multiplier() -> float:

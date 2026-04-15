@@ -408,10 +408,12 @@ class AIModelSettingsDialog(QDialog):
         The line edit remains a plain QLineEdit so StyleManager.style_line_edits still applies.
         """
         line_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        app_root = Path(__file__).resolve().parents[2]
-        icons_dir = app_root / "resources" / "icons"
-        icon_show = QIcon(str(icons_dir / "eye.svg"))
-        icon_hide = QIcon(str(icons_dir / "eye_off.svg"))
+        from app.utils.themed_icon import themed_icon_from_svg
+
+        dialog_cfg = (self.config.get("ui") or {}).get("dialogs", {}).get("ai_model_settings", {}) or {}
+        tint = dialog_cfg.get("password_reveal_icon_tint_color", [255, 255, 255])
+        icon_show = themed_icon_from_svg("app/resources/icons/eye.svg", tint)
+        icon_hide = themed_icon_from_svg("app/resources/icons/eye_off.svg", tint)
         action = QAction(self)
         action.setIcon(icon_show)
         action.setToolTip("Show password")

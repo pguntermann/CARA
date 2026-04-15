@@ -46,14 +46,18 @@ from typing import Dict, Any, Optional, List
 class MainWindow(QMainWindow):
     """Main application window with four distinct sections."""
     
-    def __init__(self, config: Dict[str, Any]) -> None:
+    def __init__(self, config: Dict[str, Any], *, active_style_ref: str = "") -> None:
         """Initialize the main window.
         
         Args:
             config: Configuration dictionary loaded from ConfigLoader.
+            active_style_ref: The currently active style config reference that was used to
+                load ``config`` (e.g. from persisted user settings at startup). Used to
+                sync the View → Theme menu without re-reading settings from disk.
         """
         super().__init__()
         self.config = config
+        self._active_style_ref = str(active_style_ref or "")
         self._menubar_action_icon_svgs: Dict[Any, str] = {}
 
         # Debug log: MainWindow initialization started
@@ -157,18 +161,21 @@ class MainWindow(QMainWindow):
 
         opts = discover_style_configs(config_path=ConfigLoader().config_path)
 
-        # Determine currently active style ref (best-effort)
-        cur_style = ""
-        try:
-            cur_style = str(self.config.get("default_style_config", "") or "")
-        except Exception:
-            cur_style = ""
+        # Reuse the already-determined active style ref (set at startup / apply_theme).
+        cur_style = str(getattr(self, "_active_style_ref", "") or "")
+        if not cur_style:
+            # Safe default when unset (e.g., tests).
+            try:
+                cur_style = str(self.config.get("default_style_config", "") or "")
+            except Exception:
+                cur_style = ""
 
         if not opts:
             a = theme_menu.addAction("(no themes found)")
             a.setEnabled(False)
             return
 
+        self._theme_menu_actions = []
         for opt in opts:
             act = theme_menu.addAction(opt.label)
             act.setCheckable(True)
@@ -176,6 +183,7 @@ class MainWindow(QMainWindow):
             if cur_style and (cur_style == opt.style_ref or cur_style.endswith(opt.absolute_path.name)):
                 act.setChecked(True)
             act.triggered.connect(lambda checked=False, sr=opt.style_ref: self.apply_theme(style_ref=sr))
+            self._theme_menu_actions.append((act, opt))
 
     def apply_theme(self, *, style_ref: str) -> None:
         """Switch the active style config and rebuild UI for immediate effect."""
@@ -214,6 +222,9 @@ class MainWindow(QMainWindow):
         # Load merged config with the selected style defaults (no disk mutation).
         cfg_path = ConfigLoader().config_path
         new_config = load_config_for_style(config_path=cfg_path, style_ref=style_ref)
+
+        # Store the active style ref for menu syncing without extra lookups.
+        self._active_style_ref = str(style_ref or "")
 
         # Update config references.
         self.config = new_config
@@ -275,6 +286,14 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         self._setup_ui()
+
+        # Ensure the View → Theme menu reflects the newly selected style.
+        try:
+            for act, opt in getattr(self, "_theme_menu_actions", []) or []:
+                if str(style_ref) == opt.style_ref or str(style_ref).endswith(opt.absolute_path.name):
+                    act.setChecked(True)
+        except Exception:
+            pass
 
         # Re-apply user settings to the newly created views (Player Stats visibility, etc.).
         try:

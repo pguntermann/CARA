@@ -102,8 +102,10 @@ def menu_icon_tint_rgb(config: Dict[str, Any]) -> Tuple[int, int, int]:
     tags vs. open folder perceived contrast). Those platforms always use the same tint
     as :func:`menu_icon_dark_tint_rgb` for the menubar.
 
-    For ``Dark`` or ``Unknown`` on macOS, uses ``ui.menu.icons.tint_color`` if set,
-    otherwise ``ui.menu.colors.normal.text``.
+    For ``Dark`` on macOS, uses ``ui.menu.icons.tint_color_dark_scheme`` if set
+    (otherwise falls back to ``ui.menu.icons.tint_color`` / menu text color).
+
+    For ``Unknown`` on macOS, uses the same tint as :func:`menu_icon_dark_tint_rgb`.
     """
     dark_tint = menu_icon_dark_tint_rgb(config)
 
@@ -118,9 +120,13 @@ def menu_icon_tint_rgb(config: Dict[str, Any]) -> Tuple[int, int, int]:
     if light_tint is None:
         light_tint = _DEFAULT_LIGHT_SCHEME_ICON_TINT
 
+    dark_scheme_tint = _rgb_from_config_list(icons_cfg.get("tint_color_dark_scheme"))
+
     scheme = _is_qt_light_color_scheme()
     if scheme is True:
         return light_tint
+    if scheme is False and dark_scheme_tint is not None:
+        return dark_scheme_tint
     return dark_tint
 
 
