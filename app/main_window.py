@@ -148,9 +148,11 @@ class MainWindow(QMainWindow):
         """
         from PyQt6.QtGui import QActionGroup
         from app.services.theme_service import discover_style_configs
+        from app.utils.themed_icon import SVG_MENU_PALETTE, set_menubar_themable_action_icon
 
         theme_menu = parent_menu.addMenu("Theme")
         self._apply_menu_styling(theme_menu)
+        set_menubar_themable_action_icon(self, theme_menu.menuAction(), SVG_MENU_PALETTE)
 
         group = QActionGroup(self)
         group.setExclusive(True)

@@ -230,14 +230,21 @@
                         <li><a href="#engines-menu">6.11 Engines Menu</a></li>
                         <li><a href="#ai-summary-menu">6.12 AI Summary Menu</a></li>
                         <li><a href="#notes-menu">6.13 Notes Menu</a></li>
-                        <li><a href="#help-menu">6.14 Help Menu</a></li>
-                        <li><a href="#complete-keyboard-shortcuts">6.15 Complete Keyboard Shortcuts</a></li>
+                        <li><a href="#view-menu">6.14 View Menu</a></li>
+                        <li><a href="#help-menu">6.15 Help Menu</a></li>
+                        <li><a href="#complete-keyboard-shortcuts">6.16 Complete Keyboard Shortcuts</a></li>
                     </ul>
                 </li>
                 <li><a href="#advanced-topics">7. Advanced Topics</a>
                     <ul>
-                        <li><a href="#customizing-config">7.1 Customizing config.json</a>
+                        <li><a href="#customizing-config">7.1 Understanding Configuration Files</a>
                             <ul>
+                                <li><a href="#config-vs-themes">7.1.1 config.json vs. theme files</a></li>
+                                <li><a href="#theme-constants">7.1.2 Using $_ constants</a></li>
+                                <li><a href="#behavioral-settings">7.1.3 Adjusting behavioral settings</a></li>
+                                <li><a href="#config-formula-examples">7.1.4 Adjusting formulas in config.json</a></li>
+                                <li><a href="#customizing-themes">7.1.5 Adjusting theme / style files</a></li>
+                                <li><a href="#creating-themes">7.1.6 Creating a new theme</a></li>
                                 <li><a href="#configuring-logging-settings">7.1.7 Configuring Logging Settings</a></li>
                             </ul>
                         </li>
@@ -563,7 +570,9 @@
                 <p>CARA uses three configuration files to manage settings and preferences:</p>
                 
                 <ul>
-                    <li><strong>config.json:</strong> Contains all UI styling, layout dimensions, colors, fonts, and application-wide default settings. This file is located in the <code>app/config/</code> directory and defines the visual appearance and behavior of the application. You can customize CARA's appearance by modifying this file without changing any source code.</li>
+                    <li><strong>config.json:</strong> Contains application-wide behavioral defaults such as import/export options, formulas, logging, analysis thresholds, and other non-user settings. This file is located in the <code>app/config/</code> directory.</li>
+                    
+                    <li><strong>Theme / style config files:</strong> Files such as <code>style_default.config.json</code> and <code>style_light.config.json</code> define colors, fonts, spacing, borders, and other visual styling. These files are also located in <code>app/config/</code> and can be used to customize or create themes.</li>
                     
                     <li><strong>user_settings.json:</strong> Stores your personal preferences and settings, including moves list column profiles, board visibility settings, PGN display options, engine configurations, and other user-specific settings. The file is automatically created when you first save settings and persists your preferences between application sessions.</li>
                     
@@ -607,9 +616,9 @@
                     <strong>Quick Tip:</strong> Use the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys to navigate through game moves. This is the primary and most efficient way to review games move-by-move. The board, moves list, and all analysis views update automatically as you navigate.
                 </div>
                 
-                <p>All aspects of CARA's appearance can be customized through the <code>config.json</code> configuration file. This includes fonts, colors, sizes, dimensions, panel layouts, and all UI styling. The configuration system follows a strict structure with no hardcoded values in the application code, allowing you to completely customize the application's appearance without modifying any source code.</p>
+                <p>CARA separates behavioral configuration from visual styling. Use <code>config.json</code> for things like import/export behavior, logging, and formulas. Use the theme / style config files in <code>app/config/</code> for colors, fonts, spacing, and other UI appearance settings.</p>
                 
-                <p>All functions and features in CARA can be accessed through the menu bar at the top of the application window. Most menu items have keyboard shortcuts displayed next to them for quick access.</p>
+                <p>All functions and features in CARA can be accessed through the menu bar at the top of the application window. Most menu items have keyboard shortcuts displayed next to them for quick access. Visual themes can be switched directly in the application through <span class="menu-item">View → Theme</span>.</p>
             </div>
             <div class="outline-item">
                 <h4 id="three-panel-layout">4.2 The Three-Panel Layout</h4>
@@ -623,7 +632,7 @@
                     <li><strong>Database Panel</strong> (bottom): Manages your game collections with tabs for multiple PGN databases, searchable game tables, and column customization. This panel can be collapsed to maximize space for the main and detail panels.</li>
                 </ul>
                 
-                <p>You can resize any panel by dragging the splitter handles between them. The database panel can be collapsed by double-clicking its splitter handle or using <span class="menu-item">View → Hide Database Panel</span> (<code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>). The status bar at the bottom of the window displays status messages and progress indicators during long-running operations.</p>
+                <p>You can resize any panel by dragging the splitter handles between them. The database panel can be collapsed by double-clicking its splitter handle or using <span class="menu-item">View → Hide Database Panel</span> (<code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>). The active visual theme can also be changed from <span class="menu-item">View → Theme</span>. The status bar at the bottom of the window displays status messages and progress indicators during long-running operations.</p>
             </div>
             <div class="outline-item">
                 <h4 id="main-panel-components">4.3 Main Panel Components</h4>
@@ -832,7 +841,7 @@
                 <p>The content is displayed in a formatted, color-coded view with syntax highlighting to distinguish between different elements.</p>
                 
                 <div class="tip-box">
-                    <strong>Quick Tip:</strong> You can customize the display format for NAG move assessments (symbols vs. text) using the PGN menu (Display NAG move assessments as...). Colors and fonts can be customized by editing <code>config.json</code>. See <a href="#customizing-pgn-display-formatting">section 7.1.6 "Customizing PGN Display Formatting"</a> for advanced customization options.
+                    <strong>Quick Tip:</strong> You can customize the display format for NAG move assessments (symbols vs. text) using the PGN menu (Display NAG move assessments as...). Colors and fonts are adjusted through the theme / style config files. See <a href="#customizing-themes">section 7.1.5 "Adjusting Theme / Style Files"</a> for advanced customization options.
                 </div>
                 
                 <p>As you navigate through the game using the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys, the active move is highlighted in the PGN notation. A <strong>single click</strong> on any main-line move jumps to that position. Single clicks on variation moves, comment text, or metadata tags do not change the current position.</p>
@@ -1876,7 +1885,7 @@
                     <li>Right-click in the section for <span class="menu-item">Copy section to clipboard</span> or <span class="menu-item">Copy stats to clipboard</span>. Section copy summarizes best and worst counts and accuracy ranges; in plain text that block is headed <strong>Top Games</strong> (the internal section name).</li>
                     <li>When the Player Stats area is narrow, the <strong>View</strong> buttons may hide automatically so the description still fits—the same width behavior as <a href="#ps-error-patterns">Error patterns</a>.</li>
                 </ul>
-                <p><strong>Settings:</strong> Show or hide this block with the <span class="menu-item">Player Stats</span> menu entry <span class="menu-item">Games by performance</span>. Caps on how many best and worst games are considered live under <code>ui → panels → detail → player_stats → top_games</code> in <code>config.json</code> (<code>max_best</code> and <code>max_worst</code>); see <a href="#customizing-config">section 7.1 Customizing config.json</a>.</p>
+                <p><strong>Settings:</strong> Show or hide this block with the <span class="menu-item">Player Stats</span> menu entry <span class="menu-item">Games by performance</span>. Caps on how many best and worst games are considered live under <code>ui → panels → detail → player_stats → top_games</code> in <code>config.json</code> (<code>max_best</code> and <code>max_worst</code>); see <a href="#customizing-config">section 7.1 Understanding Configuration Files</a>.</p>
                 <img src="screenshots/player_stats_section_games_by_performance.png" alt="CARA Player Stats — Games by performance section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
 
                 <h5 id="ps-significant-moves">5.7.16 Significant moves</h5>
@@ -1890,7 +1899,7 @@
                 <p><strong>Settings:</strong></p>
                 <ul class="settings-list">
                     <li><strong>Visibility:</strong> <span class="menu-item">Player Stats</span> → <span class="menu-item">Significant moves</span>.</li>
-                    <li><strong><code>max_moves</code>:</strong> In <code>config.json</code>, open <code>ui → panels → detail → player_stats → significant_moves</code>. The settings <code>brilliant_moves</code>, <code>misses</code>, and <code>blunders</code> can each set <code>max_moves</code>—the maximum number of moves that row’s <strong>View</strong> button will include when it opens <strong>Search Results</strong> (defaults are large). Details: <a href="#customizing-config">section 7.1 Customizing config.json</a>.</li>
+                    <li><strong><code>max_moves</code>:</strong> In <code>config.json</code>, open <code>ui → panels → detail → player_stats → significant_moves</code>. The settings <code>brilliant_moves</code>, <code>misses</code>, and <code>blunders</code> can each set <code>max_moves</code>—the maximum number of moves that row’s <strong>View</strong> button will include when it opens <strong>Search Results</strong> (defaults are large). Details: <a href="#customizing-config">section 7.1 Understanding Configuration Files</a>.</li>
                     <li><strong>Brilliant labels in analysis:</strong> <span class="menu-item">Game Analysis → Brilliant Move Detection</span> and related analysis options control brilliant move detection details.</li>
                 </ul>
                 <div class="tip-box">
@@ -1910,7 +1919,7 @@
                 <p><strong>Settings:</strong></p>
                 <ul class="settings-list">
                     <li><strong>Visibility:</strong> <span class="menu-item">Player Stats</span> → <span class="menu-item">Error patterns</span>.</li>
-                    <li><strong>Detection thresholds:</strong> Under <code>ui → panels → detail → player_stats → error_patterns → thresholds</code> in <code>config.json</code> you can tune when each rule fires (phase blunder share, tactical miss counts, opening error rates, CPL and conversion heuristics, repeated-position minima, and similar). See <a href="#customizing-config">section 7.1 Customizing config.json</a>.</li>
+                    <li><strong>Detection thresholds:</strong> Under <code>ui → panels → detail → player_stats → error_patterns → thresholds</code> in <code>config.json</code> you can tune when each rule fires (phase blunder share, tactical miss counts, opening error rates, CPL and conversion heuristics, repeated-position minima, and similar). See <a href="#customizing-config">section 7.1 Understanding Configuration Files</a>.</li>
                 </ul>
                 <img src="screenshots/player_stats_section_error_patterns.png" alt="CARA Player Stats — Error patterns section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
             </div>
@@ -2492,39 +2501,84 @@
                 <p>Saves the text from the Notes tab into the current game's PGN as a CARANotes tag (in memory). The database is marked as having unsaved changes until you save the database. Shortcut: <code>Ctrl+Alt+N</code>.</p>
             </div>
 
+            <!-- View Menu -->
+            <div class="outline-item">
+                <h4 id="view-menu">6.14 View Menu</h4>
+                <p>The <span class="menu-item">View</span> menu provides quick access to panel visibility, detail-tab switching, and visual theme selection.</p>
+
+                <h5>6.14.1 Theme</h5>
+                <p>Switches the active application theme. Each theme uses its own style configuration file, which controls colors, fonts, spacing, borders, and other UI appearance settings. See <a href="#customizing-themes">section 7.1.5</a> and <a href="#creating-themes">section 7.1.6</a> for more information about theme files and custom themes.</p>
+
+                <h5>6.14.2 Hide Database Panel</h5>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code></p>
+                <p>Toggles the visibility of the Database Panel to free more space for the Main and Detail panels.<br>See <a href="#three-panel-layout">section 4.2</a> for more information.</p>
+
+                <h5>6.14.3 Moves List</h5>
+                <p><strong>Shortcut:</strong> <code>F1</code></p>
+                <p>Switches the Detail Panel to the <strong>Moves List</strong> tab.<br>See <a href="#moves-list-tab">section 4.5.1</a> for more information.</p>
+
+                <h5>6.14.4 PGN header tags</h5>
+                <p><strong>Shortcut:</strong> <code>F2</code></p>
+                <p>Switches the Detail Panel to the <strong>PGN header tags</strong> tab.<br>See <a href="#pgn-header-tags-tab">section 4.5.2</a> for more information.</p>
+
+                <h5>6.14.5 Manual Analysis</h5>
+                <p><strong>Shortcut:</strong> <code>F3</code></p>
+                <p>Switches the Detail Panel to the <strong>Manual Analysis</strong> tab.<br>See <a href="#manual-analysis-tab">section 4.5.3</a> for more information.</p>
+
+                <h5>6.14.6 Game Summary</h5>
+                <p><strong>Shortcut:</strong> <code>F4</code></p>
+                <p>Switches the Detail Panel to the <strong>Game Summary</strong> tab.<br>See <a href="#game-summary-tab">section 4.5.4</a> for more information.</p>
+
+                <h5>6.14.7 Player Stats</h5>
+                <p><strong>Shortcut:</strong> <code>F5</code></p>
+                <p>Switches the Detail Panel to the <strong>Player Stats</strong> tab.<br>See <a href="#player-stats-tab">section 4.5.5</a> for more information.</p>
+
+                <h5>6.14.8 Annotations</h5>
+                <p><strong>Shortcut:</strong> <code>F6</code></p>
+                <p>Switches the Detail Panel to the <strong>Annotations</strong> tab.<br>See <a href="#annotations-tab">section 4.5.6</a> for more information.</p>
+
+                <h5>6.14.9 AI Summary</h5>
+                <p><strong>Shortcut:</strong> <code>F7</code></p>
+                <p>Switches the Detail Panel to the <strong>AI Summary</strong> tab.<br>See <a href="#ai-summary-tab">section 4.5.7</a> for more information.</p>
+
+                <h5>6.14.10 Notes</h5>
+                <p><strong>Shortcut:</strong> <code>F8</code></p>
+                <p>Switches the Detail Panel to the <strong>Notes</strong> tab.<br>See <a href="#notes-tab">section 4.5.8</a> for more information.</p>
+            </div>
+
             <!-- Help Menu -->
             <div class="outline-item">
-                <h4 id="help-menu">6.14 Help Menu</h4>
+                <h4 id="help-menu">6.15 Help Menu</h4>
                 
-                <h5>6.14.1 Open Manual</h5>
+                <h5>6.15.1 Open Manual</h5>
                 <p>Opens the application manual in your default web browser, providing comprehensive documentation and instructions for using CARA.</p>
                 
-                <h5>6.14.2 Watch Video Tutorials</h5>
+                <h5>6.15.2 Watch Video Tutorials</h5>
                 <p>Opens the CARA Chess YouTube channel in your default web browser, where you can watch video tutorials for using CARA.</p>
                 
-                <h5>6.14.3 Visit GitHub Repository</h5>
+                <h5>6.15.3 Visit GitHub Repository</h5>
                 <p>Opens the CARA project repository on GitHub in your default web browser, where you can view the source code, report issues, or contribute to the project.</p>
                 
-                <h5>6.14.4 Check for Updates...</h5>
+                <h5>6.15.4 Check for Updates...</h5>
                 <p>Checks if a newer version of CARA is available.</p>
                 
-                <h5>6.14.5 About...</h5>
+                <h5>6.15.5 About...</h5>
                 <p>Opens the About dialog displaying application information, including the application name, version number, description, and copyright information. The dialog provides a quick reference for identifying the CARA version you are using.</p>
             </div>
 
             <!-- Keyboard Shortcuts Reference -->
             <div class="outline-item">
-                <h4 id="complete-keyboard-shortcuts">6.15 Complete Keyboard Shortcuts</h4>
+                <h4 id="complete-keyboard-shortcuts">6.16 Complete Keyboard Shortcuts</h4>
                 <p>This section provides a comprehensive reference of all keyboard shortcuts in CARA.</p>
                 
-                <h5>6.15.1 Game Navigation</h5>
+                <h5>6.16.1 Game Navigation</h5>
                 <p>Essential shortcuts for navigating through games:</p>
                 <ul>
                     <li><code>Right Arrow</code>: Navigate to next move</li>
                     <li><code>Left Arrow</code>: Navigate to previous move</li>
                 </ul>
                 
-                <h5>6.15.2 Detail Panel Tabs</h5>
+                <h5>6.16.2 Detail Panel Tabs</h5>
                 <p>Quick access to different analysis views:</p>
                 <ul>
                     <li><code>F1</code>: Switch to Moves List tab</li>
@@ -2537,7 +2591,7 @@
                     <li><code>F8</code>: Switch to Notes tab</li>
                 </ul>
                 
-                <h5>6.15.3 Game Analysis</h5>
+                <h5>6.16.3 Game Analysis</h5>
                 <p>Shortcuts for analyzing games:</p>
                 <ul>
                     <li><code>Ctrl+G</code> / <code>⌘+G</code>: Start game analysis for the current game</li>
@@ -2546,7 +2600,7 @@
                     <li><code>Ctrl+Shift+N</code> / <code>⌘+Shift+N</code>: Toggle normalized evaluation graph mode</li>
                 </ul>
                 
-                <h5>6.15.4 File Operations</h5>
+                <h5>6.16.4 File Operations</h5>
                 <p>Standard file management shortcuts:</p>
                 <ul>
                     <li><code>Ctrl+O</code> / <code>⌘+O</code>: Open PGN database</li>
@@ -2557,7 +2611,7 @@
                     <li><code>Ctrl+Q</code> / <code>⌘+Q</code>: Close application</li>
                 </ul>
                 
-                <h5>6.15.5 Importing and Opening Games</h5>
+                <h5>6.16.5 Importing and Opening Games</h5>
                 <p>Shortcuts for importing and opening games:</p>
                 <ul>
                     <li><code>Ctrl+V</code> / <code>⌘+V</code>: Paste PGN to Clipboard database</li>
@@ -2565,7 +2619,7 @@
                     <li><code>Ctrl+Shift+I</code> / <code>⌘+Shift+I</code>: Import games from online platforms</li>
                 </ul>
                 
-                <h5>6.15.6 Copy and Cut Operations</h5>
+                <h5>6.16.6 Copy and Cut Operations</h5>
                 <p>Shortcuts for copying and moving game data:</p>
                 <ul>
                     <li><code>Ctrl+P</code> / <code>⌘+P</code>: Copy active game PGN to clipboard</li>
@@ -2575,7 +2629,7 @@
                     <li><code>Ctrl+Shift+X</code>: Cut selected games to clipboard</li>
                 </ul>
                 
-                <h5>6.15.7 Moves List Column Profiles</h5>
+                <h5>6.16.7 Moves List Column Profiles</h5>
                 <p>Shortcuts for managing and switching column profiles:</p>
                 <ul>
                     <li><code>1</code> - <code>9</code>: Switch to column profile 1 through 9</li>
@@ -2584,7 +2638,7 @@
                     <li><code>Ctrl+Shift+Delete</code> / <code>⌘+Shift+Delete</code>: Remove current profile</li>
                 </ul>
                 
-                <h5>6.15.8 Board Display Options</h5>
+                <h5>6.16.8 Board Display Options</h5>
                 <p>Shortcuts for toggling board display elements:</p>
                 <ul>
                     <li><code>X</code>: Rotate board 180 degrees</li>
@@ -2604,7 +2658,7 @@
                     <li><code>Alt+L</code> / <code>⌥+L</code>: Toggle annotations layer</li>
                 </ul>
 
-                <h5>6.15.9 Manual Analysis</h5>
+                <h5>6.16.9 Manual Analysis</h5>
                 <p>Shortcuts for manual position analysis:</p>
                 <ul>
                     <li><code>Alt+M</code> / <code>⌥+M</code>: Start or stop continuous engine analysis</li>
@@ -2612,7 +2666,7 @@
                     <li><code>Alt+R</code> / <code>⌥+R</code>: Remove principal variation line</li>
                 </ul>
                 
-                <h5>6.15.10 Annotations</h5>
+                <h5>6.16.10 Annotations</h5>
                 <p>Shortcuts for managing annotations:</p>
                 <ul>
                     <li><code>Ctrl+Alt+S</code>: Save annotations to current game</li>
@@ -2620,13 +2674,13 @@
                     <li><code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>: Clear all annotations for current game</li>
                 </ul>
                 
-                <h5>6.15.11 Engine Management</h5>
+                <h5>6.16.11 Engine Management</h5>
                 <p>Shortcuts for managing chess engines:</p>
                 <ul>
                     <li><code>Ctrl+E</code>: Add engine</li>
                 </ul>
                 
-                <h5>6.15.12 Database Operations</h5>
+                <h5>6.16.12 Database Operations</h5>
                 <p>Shortcuts for database management and bulk operations:</p>
                 <ul>
                     <li><code>Ctrl+Shift+F</code> / <code>⌘+Shift+F</code>: Search games across databases</li>
@@ -2638,7 +2692,7 @@
                     <li><code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code>: Clear Clipboard database</li>
                 </ul>
                 
-                <h5>6.15.13 PGN Display Options</h5>
+                <h5>6.16.13 PGN Display Options</h5>
                 <p>Shortcuts for controlling PGN notation display:</p>
                 <ul>
                     <li><code>Ctrl+M</code> / <code>⌘+M</code>: Toggle metadata display</li>
@@ -2649,7 +2703,7 @@
                     <li><code>Ctrl+R</code> / <code>⌘+R</code>: Toggle results display</li>
                 </ul>
                 
-                <h5>6.15.14 Notes</h5>
+                <h5>6.16.14 Notes</h5>
                 <p>Shortcuts for game notes:</p>
                 <ul>
                     <li><code>Ctrl+Shift+E</code>: Clear notes for current game</li>
@@ -2663,201 +2717,118 @@
             <h2>7. Advanced Topics</h2>
             
             <div class="outline-item">
-                <h4 id="customizing-config">7.1 Customizing config.json</h4>
-                <p>The <code>config.json</code> file controls all UI styling, layout dimensions, colors, fonts, and application-wide default settings. While the file is read-only from the application's perspective, you can manually edit it to customize CARA's appearance without modifying any source code.</p>
-                
-                <h5>7.1.1 File Structure</h5>
-                <p>The <code>config.json</code> file is located in the <code>app/config/</code> directory and uses a hierarchical JSON structure. Colors are specified as RGB arrays with values from 0 to 255 (e.g., <code>[217, 217, 217]</code> for light gray). Font sizes are specified in points, and dimensions are in pixels.</p>
-                
-                <h5>7.1.2 Example: Changing Chessboard Square Colors</h5>
-                <p>To change the colors of the chessboard squares:</p>
-                <ol>
-                    <li><strong>Locate the squares configuration:</strong><br>
-                    Open <code>config.json</code> in a text editor and navigate to: <code>ui → panels → main → board → squares</code></li>
-                    
-                    <li><strong>Modify the color values:</strong><br>
-                    You'll find two color properties:
-                    <ul>
-                        <li><code>"light_color": [217, 217, 217]</code> - Color for light squares (default: light gray)</li>
-                        <li><code>"dark_color": [58, 117, 196]</code> - Color for dark squares (default: blue)</li>
-                    </ul>
-                    Change these RGB arrays to your desired colors. For example, to use a classic green and cream color scheme:
-                    <pre><code>"squares": {
-    "light_color": [240, 217, 181],
-    "dark_color": [181, 136, 99]
-}</code></pre>
-                    </li>
-                    
-                    <li><strong>Save and restart:</strong><br>
-                    Save the file and restart CARA for the changes to take effect. If the JSON syntax is invalid, CARA will display an error message and may fail to start.</li>
-                </ol>
-                
+                <h4 id="customizing-config">7.1 Understanding Configuration Files</h4>
+                <p>CARA separates behavioral configuration from visual styling. For most advanced customization, you will work with two file types in <code>app/config/</code>: <code>config.json</code> and one or more theme / style config files such as <code>style_default.config.json</code> and <code>style_light.config.json</code>.</p>
+
                 <div class="tip-box">
-                    <strong>Important:</strong> Always make a backup copy of <code>config.json</code> before making changes. Invalid JSON syntax will prevent CARA from starting. Use a JSON validator or text editor with JSON syntax checking to ensure your changes are valid.
+                    <strong>Important:</strong> Always make a backup copy before editing configuration files. Invalid JSON syntax can prevent CARA from starting. Use a JSON-aware editor or validator whenever possible.
                 </div>
                 
-                <h5>7.1.3 Other Common Customizations</h5>
-                <p>You can customize many other visual elements in <code>config.json</code>:</p>
+                <h5 id="config-vs-themes">7.1.1 config.json vs. Theme / Style Files</h5>
+                <p>Use <code>config.json</code> when you want to change how CARA behaves. Use a theme / style config file when you want to change how CARA looks.</p>
                 <ul>
-                    <li><strong>Arrow colors:</strong> Modify colors for played move, best move, PV arrows, and best alternative move arrows in <code>ui → panels → main → board</code></li>
-                    <li><strong>Font families and sizes:</strong> Change fonts throughout the application in various <code>font_family</code> and <code>font_size</code> properties</li>
-                    <li><strong>Dialog dimensions:</strong> Adjust dialog widths and heights in <code>ui → dialogs</code></li>
-                    <li><strong>Panel colors:</strong> Modify background colors, borders, and text colors in <code>ui → panels</code></li>
-                    <li><strong>Move classification colors:</strong> Customize colors for move classifications (Brilliant, Best Move, Inaccuracy, etc.) in <code>ui → panels → detail → moveslist → colors</code></li>
+                    <li><strong><code>config.json</code>:</strong> Behavioral defaults and advanced application settings. Typical examples are PGN import / export behavior, logging, formulas, analysis thresholds, and debug options.</li>
+                    <li><strong>Theme / style config files:</strong> Colors, fonts, spacing, borders, dimensions, and per-theme appearance settings. These files control how widgets look in a given theme.</li>
                 </ul>
+                <p>In practice, if you are changing something like <code>strip_pua_characters</code>, log levels, or a formula, you should edit <code>config.json</code>. If you are changing a button color, text color, border, or panel appearance, you should edit a theme / style file instead.</p>
                 
-                <h5>7.1.4 Configuring PGN Export Format</h5>
-                <p>CARA allows you to customize how PGN files are formatted when saving databases. The PGN export settings control whether move notation is wrapped at a fixed width or saved as a single line.</p>
+                <h5 id="theme-constants">7.1.2 Using $_ Constants in Theme Files</h5>
+                <p>Theme / style files use reusable constants such as <code>$_COLOR_*</code>, <code>$_FONT_*</code>, and similar names. These constants let one value be defined once and reused in many places.</p>
+                <p>Instead of repeating literal RGB arrays everywhere, a style file often uses references:</p>
+                <pre><code>"text_color": {
+    "$ref": "$_COLOR_TEXT_PRIMARY"
+}</code></pre>
+                <p>This means “use the value of <code>$_COLOR_TEXT_PRIMARY</code> here.”</p>
+                <ul>
+                    <li><strong>Change the constant:</strong> Affects every place that references it.</li>
+                    <li><strong>Change one local property:</strong> Affects only that one widget or section.</li>
+                </ul>
+                <p>This is useful when creating a theme: shared colors can stay consistent, while special elements can still override individual values when needed.</p>
                 
-                <p>To configure PGN export formatting:</p>
+                <h5 id="behavioral-settings">7.1.3 Adjusting Behavioral Settings in config.json</h5>
+                <p><code>config.json</code> is best for non-visual tuning. Two concrete examples are PGN import cleanup and PGN export formatting.</p>
+                <p><strong>Example A: Remove unsupported ChessBase-style PUA characters during import</strong></p>
                 <ol>
-                    <li><strong>Locate the PGN export configuration:</strong><br>
-                    Open <code>config.json</code> in a text editor and navigate to: <code>pgn → export</code></li>
-                    
-                    <li><strong>Modify the export settings:</strong><br>
-                    You'll find two properties:
-                    <ul>
-                        <li><code>"use_fixed_width": true</code> - When <code>true</code>, move notation is wrapped at the specified width. When <code>false</code>, move notation is saved as a single continuous line.</li>
-                        <li><code>"fixed_width": 80</code> - The character width limit when <code>use_fixed_width</code> is <code>true</code>. Default is 80 characters, which is a common standard for PGN files.</li>
-                    </ul>
-                    Example configuration:
-                    <pre><code>"pgn": {
+                    <li>Open <code>config.json</code>.</li>
+                    <li>Navigate to <code>pgn → import</code>.</li>
+                    <li>Adjust <code>"strip_pua_characters"</code>.</li>
+                </ol>
+                <pre><code>"pgn": {
+    "import": {
+        "strip_pua_characters": true
+    }
+}</code></pre>
+                <p>When enabled, CARA removes Private Use Area (PUA) characters during import. This is useful when imported PGN files contain unsupported ChessBase font symbols that would otherwise appear as visual artifacts.</p>
+                <p><strong>Example B: Change how PGN files are written when saving</strong></p>
+                <ol>
+                    <li>Open <code>config.json</code>.</li>
+                    <li>Navigate to <code>pgn → export</code>.</li>
+                    <li>Adjust <code>"use_fixed_width"</code> and <code>"fixed_width"</code>.</li>
+                </ol>
+                <pre><code>"pgn": {
     "export": {
         "use_fixed_width": true,
         "fixed_width": 80
     }
 }</code></pre>
-                    </li>
-                    
-                    <li><strong>Save and restart:</strong><br>
-                    Save the file and restart CARA for the changes to take effect. The new formatting will apply to all future save operations (both "Save" and "Save As").</li>
-                </ol>
+                <p>These settings affect how PGN is saved to disk, not how it is displayed in the interface.</p>
+                <p><strong>Other good candidates for <code>config.json</code> edits:</strong></p>
+                <ul>
+                    <li><code>logging</code> for console/file logging behavior</li>
+                    <li><code>game_analysis</code> for thresholds, formulas, and automated analysis behavior</li>
+                    <li><code>debug</code> for enabling developer-oriented diagnostics</li>
+                </ul>
                 
-                <div class="tip-box">
-                    <strong>Note:</strong> These settings only affect how games are saved to disk. The formatting does not affect how games are displayed in CARA's interface or how they are parsed when loading PGN files.
-                </div>
-            </div>
-            
-            <div class="outline-item">
-                <h5 id="configuring-pgn-import-settings">7.1.5 Configuring PGN Import Settings</h5>
-                <p>CARA allows you to configure how PGN files are processed when importing games. The PGN import settings control character handling during file loading.</p>
-                
-                <p>To configure PGN import settings:</p>
-                <ol>
-                    <li><strong>Locate the PGN import configuration:</strong><br>
-                    Open <code>config.json</code> in a text editor and navigate to: <code>pgn → import</code></li>
-                    
-                    <li><strong>Modify the import settings:</strong><br>
-                    You'll find the following property:
-                    <ul>
-                        <li><code>"strip_pua_characters": true</code> - When <code>true</code>, removes Unicode Private Use Area (PUA) characters (U+E000-U+F8FF) from PGN text during import. These characters are used by ChessBase and other chess software for special font symbols. When fonts don't support these characters, they appear as blue boxes or other visual artifacts. Setting this to <code>true</code> removes them automatically during import to ensure clean PGN text.</li>
-                    </ul>
-                    Example configuration:
-                    <pre><code>"pgn": {
-    "import": {
-        "strip_pua_characters": true
-    }
+                <h5 id="config-formula-examples">7.1.4 Adjusting Formulas in config.json</h5>
+                <p>Formulas such as estimated ELO and accuracy live in <code>config.json</code> under <code>game_analysis</code>. These are behavioral settings, not theme settings.</p>
+                <p>Common formula locations:</p>
+                <ul>
+                    <li><code>game_analysis → elo_estimation</code></li>
+                    <li><code>game_analysis → accuracy_formula</code></li>
+                    <li><code>game_analysis → phase_accuracy_formulas</code></li>
+                </ul>
+                <p>Each formula block usually contains a <code>formula</code> string and a <code>value_on_error</code> fallback. For example:</p>
+                <pre><code>"accuracy_formula": {
+    "formula": "max(5.0, min(100.0, 100.0 - (average_cpl / 3.5)))",
+    "value_on_error": 0.0
 }</code></pre>
-                    </li>
-                    
-                    <li><strong>Save and restart:</strong><br>
-                    Save the file and restart CARA for the changes to take effect. The new settings will apply to all future import operations (opening PGN files, pasting PGN text, importing from online platforms).</li>
-                </ol>
-            </div>
-            
-            <div class="outline-item">
-                <h5 id="customizing-pgn-display-formatting">7.1.6 Customizing PGN Display Formatting</h5>
-                <p>CARA allows you to customize the visual appearance of PGN notation in the Detail Panel, including colors, fonts, and how annotations and NAGs are displayed.</p>
+                <p>Formula changes can have broad effects, so make small edits, keep backups, and test with a few known games first. The full formula reference remains documented in <a href="#customizing-formulas">section 7.8</a>.</p>
                 
-                <p><strong>Note:</strong> The display format for NAG move assessments (symbols vs. text) can be changed via the PGN menu (Display NAG move assessments as...) and is not configured through config.json.</p>
-                
-                <p>To customize PGN display formatting:</p>
-                <ol>
-                    <li><strong>Locate the PGN formatting configuration:</strong><br>
-                    Open <code>config.json</code> in a text editor and navigate to: <code>ui → panels → detail → pgn_notation → formatting</code></li>
-                    
-                    <li><strong>Modify formatting settings:</strong><br>
-                    You'll find several categories of formatting options:<br><br>
-                    
-                    <p><strong>Element Colors and Styling:</strong></p>
-                    <ul>
-                        <li><code>"headers"</code> - Color and bold styling for PGN header tags (Event, Site, Date, etc.)</li>
-                        <li><code>"move_numbers"</code> - Color and bold styling for move numbers (1., 2., etc.)</li>
-                        <li><code>"moves"</code> - Color and bold styling for chess moves (e4, Nf3, etc.)</li>
-                        <li><code>"comments"</code> - Color and italic styling for move comments</li>
-                        <li><code>"variations"</code> - Color and italic styling for move variations (alternative lines)</li>
-                        <li><code>"results"</code> - Color and bold styling for game results (1-0, 0-1, 1/2-1/2)</li>
-                    </ul>
-                    
-                    <p><strong>Active Move Highlighting:</strong></p>
-                    <ul>
-                        <li><code>"active_move"</code> - Background color, text color, and bold styling for the currently active move in the main line</li>
-                    </ul>
-                    
-                    <p><strong>Annotation Display Settings:</strong></p>
-                    <ul>
-                        <li><code>"annotations.good"</code> - Color and bold styling for good move annotations (!)</li>
-                        <li><code>"annotations.bad"</code> - Color and bold styling for poor move annotations (?)</li>
-                        <li><code>"annotations.interesting"</code> - Color and bold styling for interesting move annotations (!?)</li>
-                        <li><code>"annotations.dubious"</code> - Color and bold styling for dubious move annotations (?!)</li>
-                    </ul>
-                    
-                    <p><strong>NAG (Numeric Annotation Glyph) Settings:</strong></p>
-                    <ul>
-                        <li><code>"nags.color"</code> - Text color for NAG text</li>
-                        <li><code>"nags.bold"</code> - Whether NAG text is displayed in bold</li>
-                        <li><code>"nags.italic"</code> - Whether NAG text is displayed in italic</li>
-                    </ul>
-                    </li>
-                </ol>
-                
-                <ol start="3">
-                    <li><strong>Example configuration:</strong><br>
-                    <pre><code>"formatting": {
-    "headers": {
-        "color": [100, 150, 255],
-        "bold": true
-    },
-    "moves": {
-        "color": [220, 220, 220],
-        "bold": false
-    },
-    "annotations": {
-        "use_symbols": true,
-        "good": {
-            "color": [100, 255, 100],
-            "bold": true
+                <h5 id="customizing-themes">7.1.5 Adjusting Theme / Style Files</h5>
+                <p>Use a theme / style config file when you want to change appearance without changing application behavior. This includes colors, fonts, spacing, borders, tab styling, dialog styling, and per-panel presentation.</p>
+                <p>Typical examples include:</p>
+                <ul>
+                    <li>Changing PGN notation colors under <code>ui → panels → detail → pgn_notation</code></li>
+                    <li>Changing board colors under <code>ui → panels → main → board</code></li>
+                    <li>Adjusting button, dialog, and input styling under <code>ui → styles</code> or <code>ui → dialogs</code></li>
+                    <li>Customizing panel-specific text and background colors under <code>ui → panels</code></li>
+                </ul>
+                <p>For example, PGN display colors are not a <code>config.json</code> topic anymore. They belong to the currently selected theme file:</p>
+                <pre><code>"ui": {
+    "panels": {
+        "detail": {
+            "pgn_notation": {
+                "formatting": {
+                    "headers": {
+                        "color": { "$ref": "$_COLOR_BUTTON_ACTIVE_BACKGROUND" }
+                    }
+                }
+            }
         }
-    },
-    "nags": {
-        "color": [200, 150, 255],
-        "bold": false,
-        "italic": true,
-        "show_text": true
-    },
-    "comments": {
-        "color": [180, 200, 255],
-        "italic": true
-    },
-    "variations": {
-        "color": [180, 180, 180],
-        "italic": true
-    },
-    "results": {
-        "color": [255, 255, 100],
-        "bold": true
-    },
-    "active_move": {
-        "background_color": [100, 120, 180],
-        "text_color": [255, 255, 255],
-        "bold": true
     }
 }</code></pre>
-                    </li>
-                    
-                    <li><strong>Save and restart:</strong><br>
-                    Save the file and restart CARA for the changes to take effect. The new formatting will apply to all PGN notation displayed in the Detail Panel.</li>
+                <p>If a change is purely visual, start in the active theme file before touching <code>config.json</code>. In the application itself, use <span class="menu-item">View → Theme</span> to switch between available themes and immediately see which style file is active.</p>
+                
+                <h5 id="creating-themes">7.1.6 Creating a New Theme</h5>
+                <p>The easiest way to create a new theme is to copy an existing style file and modify it incrementally.</p>
+                <ol>
+                    <li><strong>Choose a base theme:</strong> Start from a file such as <code>style_default.config.json</code> or <code>style_light.config.json</code>.</li>
+                    <li><strong>Copy the file:</strong> Create a new file in <code>app/config/</code>, for example <code>style_mytheme.config.json</code>.</li>
+                    <li><strong>Adjust constants first:</strong> Change top-level <code>$_COLOR_*</code> and <code>$_FONT_*</code> constants before editing lots of local overrides.</li>
+                    <li><strong>Add local overrides only where needed:</strong> If one panel or widget should look different from the rest, override that specific section instead of changing a shared constant.</li>
+                    <li><strong>Select the theme in CARA:</strong> Use <span class="menu-item">View → Theme</span> to switch to the new theme inside the application.</li>
                 </ol>
+                <p>A good workflow is to keep the new theme close to an existing one at first, verify readability, then adjust only a few areas at a time. After each round of edits, switch back and forth via <span class="menu-item">View → Theme</span> to compare the result against an existing theme.</p>
             </div>
             
             <div class="outline-item">
