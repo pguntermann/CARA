@@ -658,7 +658,9 @@
           "padding": 5,
           "formatting": {
             "headers": {
-              "color": [100, 150, 255],
+              "color": {
+                "$ref": "$_COLOR_BUTTON_ACTIVE_BACKGROUND"
+              },
               "bold": true
             },
             "move_numbers": {
@@ -1673,7 +1675,7 @@
             "user": {
               "background_color": [60, 80, 120],
               "text_color": {
-                "$ref": "$_COLOR_TEXT_PRIMARY"
+                "$ref": "$_COLOR_ON_ACCENT"
               }
             },
             "ai": {
@@ -1870,7 +1872,7 @@
               "$ref": "$_COLOR_BACKGROUND_5"
             },
             "text_color": {
-              "$ref": "$_COLOR_TEXT_3"
+              "$ref": "$_COLOR_BUTTON_ACTIVE_BACKGROUND"
             }
           },
           "button_bar_background_color": {
@@ -1911,6 +1913,8 @@
         "minimum_height": 40,
         "default_height": 240,
         "collapsed_height": 30,
+        "unsaved_tab_indicator_color": [220, 120, 35],
+        "unsaved_table_indicator_color": [35, 140, 80],
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_4"
         },
@@ -1973,6 +1977,17 @@
                 "$ref": "$_COLOR_ON_ACCENT"
               },
               "border": [100, 120, 160]
+            },
+            "add_tab": {
+              "background": [210, 234, 214],
+              "text": [45, 85, 52],
+              "border": [120, 175, 128],
+              "hover_background": [198, 226, 203],
+              "hover_text": [38, 72, 44],
+              "hover_border": [104, 160, 113],
+              "active_background": [210, 234, 214],
+              "active_text": [45, 85, 52],
+              "active_border": [120, 175, 128]
             }
           }
         },

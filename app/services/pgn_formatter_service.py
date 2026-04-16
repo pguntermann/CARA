@@ -1335,6 +1335,7 @@ class PgnFormatterService:
         # This ensures headers are treated independently from moves
         headers_config = formatting.get('headers', {})
         header_color = headers_config.get('color', [100, 150, 255])
+        header_color_css = f"color: rgb({header_color[0]}, {header_color[1]}, {header_color[2]})"
         header_bold = headers_config.get('bold', True)
         
         # Process headers - find them and wrap entire header in span
@@ -1382,7 +1383,7 @@ class PgnFormatterService:
                     if tag_end != -1:
                         tag_content = formatted[i:tag_end + 1]
                         # Check if it's a header span
-                        if 'color: rgb(100, 150, 255)' in tag_content:
+                        if header_color_css in tag_content:
                             in_header_span = True
                             result_parts.append(formatted[i:tag_end + 1])
                             i = tag_end + 1
@@ -1507,8 +1508,8 @@ class PgnFormatterService:
                     tag_end = formatted.find('>', i)
                     if tag_end != -1:
                         tag_content = formatted[i:tag_end+1]
-                        # Check if this is a header span (blue color)
-                        if 'color: rgb(100, 150, 255)' in tag_content:
+                        # Check if this is a header span
+                        if header_color_css in tag_content:
                             in_header_span = True
                 # Check if this is a closing span tag (</span>)
                 elif i + 7 < len(formatted) and formatted[i:i+7] == '</span>':
@@ -1563,7 +1564,7 @@ class PgnFormatterService:
         # Format variations: wrap parentheses and format moves within them
         # NAG text is already styled above, so variation formatter will skip it
         formatted = PgnFormatterService._format_variations_with_moves(
-            formatted, variation_color, variation_italic, span, comment_color, nags_config
+            formatted, variation_color, variation_italic, span, comment_color, header_color, nags_config
         )
         
         # Format move numbers (e.g., 1., 2., 12., etc.) - but skip if inside HTML tags, headers, or variations
@@ -1575,7 +1576,7 @@ class PgnFormatterService:
         comment_color_css = f"color: rgb({comment_color[0]}, {comment_color[1]}, {comment_color[2]})"
         
         # Match move numbers outside HTML tags, header spans, and variation spans
-        # Header spans have color rgb(100, 150, 255)
+        # Header spans use the configured header color
         # Variation spans have color rgb(180, 180, 180) and italic style
         # Pattern matches: optional whitespace, digit(s) followed by period and optional space.
         # Not preceded by a digit (avoid "12. " matching "2. "). Not preceded by a letter so we don't
@@ -1615,7 +1616,7 @@ class PgnFormatterService:
                     span_type = 'other'
                     if tag_end != -1:
                         tag_content = formatted[i:tag_end+1]
-                        if 'color: rgb(100, 150, 255)' in tag_content:
+                        if header_color_css in tag_content:
                             span_type = 'header'
                         elif comment_color_css in tag_content:
                             span_type = 'comment'
@@ -1701,7 +1702,7 @@ class PgnFormatterService:
                     span_type = 'other'
                     if tag_end != -1:
                         tag_content = formatted[i:tag_end+1]
-                        if 'color: rgb(100, 150, 255)' in tag_content:
+                        if header_color_css in tag_content:
                             span_type = 'header'
                         elif comment_color_css in tag_content:
                             span_type = 'comment'
@@ -1845,7 +1846,7 @@ class PgnFormatterService:
                     if tag_end != -1:
                         tag_content = formatted[i:tag_end+1]
                         # Determine span type
-                        if 'color: rgb(100, 150, 255)' in tag_content:
+                        if header_color_css in tag_content:
                             span_stack.append('header')
                         elif comment_color_css in tag_content:
                             span_stack.append('comment')
@@ -1939,7 +1940,7 @@ class PgnFormatterService:
                     if tag_end != -1:
                         tag_content = formatted[i:tag_end+1]
                         # Check if it's a header span
-                        if 'color: rgb(100, 150, 255)' in tag_content:
+                        if header_color_css in tag_content:
                             in_header_span = True
                             span_stack.append(False)  # Header span
                         # Check if it's a variation span (has variation color and italic, but not comment color)
@@ -2053,6 +2054,7 @@ class PgnFormatterService:
         variation_italic: bool,
         span_func,
         comment_color: list,
+        header_color: list,
         nags_config: Optional[Dict[str, Any]] = None
     ) -> str:
         """Format variations by parsing individual moves within them.
@@ -2063,6 +2065,7 @@ class PgnFormatterService:
             variation_italic: Whether variation moves should be italic.
             span_func: Function to create HTML spans.
             comment_color: Color used for comment spans (to avoid reformatting comment content).
+            header_color: Color used for header spans (to avoid reformatting header content).
             
         Returns:
             Formatted text with variation moves individually styled.
@@ -2072,6 +2075,7 @@ class PgnFormatterService:
         in_header = False  # Track if we're inside a header [Key "Value"]
         in_header_span = False  # Track if we're inside a header span (already formatted)
         comment_color_css = f"color: rgb({comment_color[0]}, {comment_color[1]}, {comment_color[2]})"
+        header_color_css = f"color: rgb({header_color[0]}, {header_color[1]}, {header_color[2]})"
         comment_span_depth = 0  # Track nesting of comment spans
         
         while i < len(formatted):
@@ -2094,7 +2098,7 @@ class PgnFormatterService:
                     if tag_end != -1:
                         tag_content = formatted[i:tag_end+1]
                         # Check if it's a header span (has header color)
-                        if 'color: rgb(100, 150, 255)' in tag_content:
+                        if header_color_css in tag_content:
                             in_header_span = True
                         if comment_color_css in tag_content:
                             comment_span_depth += 1

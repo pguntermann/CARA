@@ -1339,6 +1339,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if checked, False otherwise.
         """
+        self._update_board_visibility_setting("show_annotations_layer", checked)
         if self.controller and self.controller.get_annotation_controller():
             self.controller.get_annotation_controller().toggle_annotations_visibility()
     
@@ -2586,6 +2587,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if metadata should be shown, False otherwise.
         """
+        self._update_pgn_visibility_setting("show_metadata", checked)
         # Update PGN view to show/hide metadata
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
             pgn_view = self.detail_panel.pgn_view
@@ -2604,6 +2606,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if comments should be shown, False otherwise.
         """
+        self._update_pgn_visibility_setting("show_comments", checked)
         # Update PGN view to show/hide comments
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
             pgn_view = self.detail_panel.pgn_view
@@ -2622,6 +2625,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if variations should be shown, False otherwise.
         """
+        self._update_pgn_visibility_setting("show_variations", checked)
         # Update PGN view to show/hide variations
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
             pgn_view = self.detail_panel.pgn_view
@@ -2640,6 +2644,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if annotations should be shown, False otherwise.
         """
+        self._update_pgn_visibility_setting("show_annotations", checked)
         # Update PGN view to show/hide annotations
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
             pgn_view = self.detail_panel.pgn_view
@@ -2658,6 +2663,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if results should be shown, False otherwise.
         """
+        self._update_pgn_visibility_setting("show_results", checked)
         # Update PGN view to show/hide results
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
             pgn_view = self.detail_panel.pgn_view
@@ -2697,12 +2703,37 @@ class MainWindow(QMainWindow):
         mode = "symbols" if use_symbols else "text"
         self.controller.set_status(f"NAG move assessments displayed as {mode}")
     
+    def _update_pgn_visibility_setting(self, key: str, checked: bool) -> None:
+        """Persist a PGN visibility toggle into the in-memory user settings model."""
+        from app.services.user_settings_service import UserSettingsService
+
+        UserSettingsService.get_instance().update_pgn_visibility({key: checked})
+
+    def _update_game_analysis_setting(self, key: str, value: Any) -> None:
+        """Persist a game-analysis menu option into the in-memory user settings model."""
+        from app.services.user_settings_service import UserSettingsService
+
+        UserSettingsService.get_instance().update_game_analysis({key: value})
+
+    def _update_manual_analysis_setting(self, key: str, value: Any) -> None:
+        """Persist a manual-analysis menu option into the in-memory user settings model."""
+        from app.services.user_settings_service import UserSettingsService
+
+        UserSettingsService.get_instance().update_manual_analysis({key: value})
+
+    def _update_board_visibility_setting(self, key: str, value: Any) -> None:
+        """Persist a board-visibility option into the in-memory user settings model."""
+        from app.services.user_settings_service import UserSettingsService
+
+        UserSettingsService.get_instance().update_board_visibility({key: value})
+
     def _on_show_non_standard_tags_toggled(self, checked: bool) -> None:
         """Handle Show Non-Standard Tags toggle.
         
         Args:
             checked: True if non-standard tags (like [%evp], [%mdl]) should be shown, False otherwise.
         """
+        self._update_pgn_visibility_setting("show_non_standard_tags", checked)
         # Update PGN view to show/hide non-standard tags
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
             pgn_view = self.detail_panel.pgn_view
@@ -2833,8 +2864,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if should return to PLY 0 after analysis completes, False otherwise.
         """
-        # Settings will be saved automatically on application exit
-        # No immediate action needed - behavior is handled in _on_game_analysis_completed
+        self._update_game_analysis_setting("return_to_first_move_after_analysis", checked)
     
     def _on_switch_to_moves_list_toggled(self, checked: bool) -> None:
         """Handle Switch to Moves List at the start of Analysis toggle.
@@ -2842,8 +2872,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if should switch to Moves List tab at the start of analysis, False otherwise.
         """
-        # Settings will be saved automatically on application exit
-        # No immediate action needed - behavior is handled in _on_game_analysis_started
+        self._update_game_analysis_setting("switch_to_moves_list_at_start_of_analysis", checked)
     
     def _on_switch_to_summary_toggled(self, checked: bool) -> None:
         """Handle Switch to Game Summary after Analysis toggle.
@@ -2851,7 +2880,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if should switch to Game Summary tab after analysis, False otherwise.
         """
-        # Settings will be saved automatically on application exit
+        self._update_game_analysis_setting("switch_to_summary_after_analysis", checked)
     
     def _on_brilliant_move_detection_toggled(self, checked: bool) -> None:
         """Handle Brilliant Move Detection toggle.
@@ -2938,6 +2967,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if normalized graph mode should be enabled, False for zero-based mode.
         """
+        self._update_game_analysis_setting("normalized_evaluation_graph", checked)
         # Apply setting to evaluation graph widget immediately
         self._update_evaluation_graph_mode(checked)
     
@@ -3000,6 +3030,7 @@ class MainWindow(QMainWindow):
     def _on_enable_miniature_preview_toggled(self) -> None:
         """Handle enable miniature preview toggle from menu."""
         enabled = self.enable_miniature_preview_action.isChecked()
+        self._update_manual_analysis_setting("enable_miniature_preview", enabled)
         manual_analysis_controller = self.controller.get_manual_analysis_controller()
         if manual_analysis_controller:
             manual_analysis_model = manual_analysis_controller.get_analysis_model()
@@ -3016,6 +3047,7 @@ class MainWindow(QMainWindow):
         for scale, action in self.miniature_preview_scale_actions.items():
             action.setChecked(scale == scale_factor)
         
+        self._update_manual_analysis_setting("miniature_preview_scale_factor", scale_factor)
         # Update model
         manual_analysis_controller = self.controller.get_manual_analysis_controller()
         if manual_analysis_controller:
@@ -3122,6 +3154,7 @@ class MainWindow(QMainWindow):
     def _on_hide_other_arrows_during_plan_exploration_toggled(self) -> None:
         """Handle hide other arrows during plan exploration toggle."""
         checked = self.hide_other_arrows_during_plan_exploration_action.isChecked()
+        self._update_board_visibility_setting("hide_other_arrows_during_plan_exploration", checked)
         board_model = self.controller.get_board_controller().get_board_model()
         board_model.set_hide_other_arrows_during_plan_exploration(checked)
         # Force update of chessboard widget to reflect the change

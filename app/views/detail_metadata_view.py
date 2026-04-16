@@ -2,7 +2,7 @@
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTableView, 
                              QPushButton, QDialog, QLabel, QLineEdit, QDialogButtonBox,
-                             QFormLayout, QSizePolicy, QMenu, QApplication)
+                             QFormLayout, QSizePolicy, QMenu, QApplication, QStyledItemDelegate)
 from PyQt6.QtCore import Qt, QTimer, QSize, QPoint, QModelIndex
 from PyQt6.QtGui import QPalette, QColor, QFont
 from typing import Dict, Any, Optional, List, Tuple
@@ -12,6 +12,22 @@ from app.models.game_model import GameModel
 from app.controllers.metadata_controller import MetadataController
 from app.utils.table_export import table_to_delimited, get_copy_table_config
 from app.utils.font_utils import resolve_font_family, scale_font_size
+
+
+class MetadataTableItemDelegate(QStyledItemDelegate):
+    """Applies shared themed styling to inline metadata table editors."""
+
+    def __init__(self, config: Dict[str, Any], parent=None) -> None:
+        super().__init__(parent)
+        self._config = config
+
+    def createEditor(self, parent, option, index):
+        editor = super().createEditor(parent, option, index)
+        if isinstance(editor, QLineEdit):
+            from app.views.style import StyleManager
+
+            StyleManager.style_line_edits([editor], self._config)
+        return editor
 
 
 class DetailMetadataView(QWidget):
@@ -74,6 +90,7 @@ class DetailMetadataView(QWidget):
         
         # Create table view
         self.metadata_table = QTableView()
+        self.metadata_table.setItemDelegate(MetadataTableItemDelegate(self.config, self.metadata_table))
         self.metadata_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.metadata_table.customContextMenuRequested.connect(self._on_metadata_table_context_menu)
         layout.addWidget(self.metadata_table)

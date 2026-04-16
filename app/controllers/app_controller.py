@@ -239,6 +239,12 @@ class AppController:
             "menu_options_sync_controller",
         ):
             obj = getattr(self, attr, None)
+            if obj is not None and hasattr(obj, "set_config"):
+                try:
+                    obj.set_config(config)
+                    continue
+                except Exception:
+                    pass
             if obj is not None and hasattr(obj, "config"):
                 try:
                     obj.config = config
@@ -314,6 +320,10 @@ class AppController:
         is_flipped = self.board_controller.get_board_model().is_flipped
         status = "Board flipped (rotated 180°)" if is_flipped else "Board unflipped (normal orientation)"
         self.set_status(status)
+
+    def _update_board_visibility_setting(self, key: str, value: Any) -> None:
+        """Persist a board-visibility option into the in-memory user settings model."""
+        self.user_settings_service.update_board_visibility({key: value})
     
     def toggle_coordinates_visibility(self) -> None:
         """Toggle the visibility of board coordinates.
@@ -324,6 +334,7 @@ class AppController:
         
         # Show status message
         show_coords = self.board_controller.get_board_model().show_coordinates
+        self._update_board_visibility_setting("show_coordinates", show_coords)
         status = "Coordinates shown" if show_coords else "Coordinates hidden"
         self.set_status(status)
     
@@ -336,6 +347,7 @@ class AppController:
         
         # Show status message
         show_indicator = self.board_controller.get_board_model().show_turn_indicator
+        self._update_board_visibility_setting("show_turn_indicator", show_indicator)
         status = "Turn indicator shown" if show_indicator else "Turn indicator hidden"
         self.set_status(status)
     
@@ -348,6 +360,7 @@ class AppController:
         
         # Show status message
         show_info = self.board_controller.get_board_model().show_game_info
+        self._update_board_visibility_setting("show_game_info", show_info)
         status = "Game info shown" if show_info else "Game info hidden"
         self.set_status(status)
     
@@ -360,6 +373,7 @@ class AppController:
         
         # Show status message
         show_arrow = self.board_controller.get_board_model().show_playedmove_arrow
+        self._update_board_visibility_setting("show_playedmove_arrow", show_arrow)
         status = "Played move arrow shown" if show_arrow else "Played move arrow hidden"
         self.set_status(status)
     
@@ -372,6 +386,7 @@ class AppController:
         
         # Show status message
         show_arrow = self.board_controller.get_board_model().show_bestnextmove_arrow
+        self._update_board_visibility_setting("show_bestnextmove_arrow", show_arrow)
         status = "Best next move arrow shown" if show_arrow else "Best next move arrow hidden"
         self.set_status(status)
     
@@ -384,6 +399,7 @@ class AppController:
         
         # Show status message
         show_arrow = self.board_controller.get_board_model().show_pv2_arrow
+        self._update_board_visibility_setting("show_pv2_arrow", show_arrow)
         status = "Next Best Move (PV2) arrow shown" if show_arrow else "Next Best Move (PV2) arrow hidden"
         self.set_status(status)
     
@@ -396,6 +412,7 @@ class AppController:
         
         # Show status message
         show_arrow = self.board_controller.get_board_model().show_pv3_arrow
+        self._update_board_visibility_setting("show_pv3_arrow", show_arrow)
         status = "Next Best Move (PV3) arrow shown" if show_arrow else "Next Best Move (PV3) arrow hidden"
         self.set_status(status)
     
@@ -408,6 +425,7 @@ class AppController:
         
         # Show status message
         show_arrow = self.board_controller.get_board_model().show_bestalternativemove_arrow
+        self._update_board_visibility_setting("show_bestalternativemove_arrow", show_arrow)
         status = "Best alternative move arrow shown" if show_arrow else "Best alternative move arrow hidden"
         self.set_status(status)
     
@@ -420,6 +438,7 @@ class AppController:
         
         # Show status message
         show_icons = self.board_controller.get_board_model().show_move_classification_icons
+        self._update_board_visibility_setting("show_move_classification_icons", show_icons)
         status = "Move classification icons shown" if show_icons else "Move classification icons hidden"
         self.set_status(status)
     
@@ -1129,6 +1148,7 @@ class AppController:
         
         # Show status message
         show_bar = self.board_controller.get_board_model().show_evaluation_bar
+        self._update_board_visibility_setting("show_evaluation_bar", show_bar)
         status = "Evaluation bar shown" if show_bar else "Evaluation bar hidden"
         self.set_status(status)
     
@@ -1141,6 +1161,7 @@ class AppController:
         
         # Show status message
         show_widget = self.board_controller.get_board_model().show_material_widget
+        self._update_board_visibility_setting("show_material_widget", show_widget)
         status = "Material widget shown" if show_widget else "Material widget hidden"
         self.set_status(status)
 
@@ -1148,6 +1169,7 @@ class AppController:
         """Toggle the visibility of the game tags widget."""
         self.board_controller.toggle_game_tags_widget_visibility()
         show_widget = self.board_controller.get_board_model().show_game_tags_widget
+        self._update_board_visibility_setting("show_game_tags_widget", show_widget)
         status = "Game tags shown" if show_widget else "Game tags hidden"
         self.set_status(status)
     

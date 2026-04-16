@@ -174,6 +174,7 @@ class DatabasePanel(QWidget):
         normal = colors_config.get('normal', {})
         hover = colors_config.get('hover', {})
         active = colors_config.get('active', {})
+        add_tab = colors_config.get('add_tab', {})
         
         # Normal state colors
         norm_bg = normal.get('background', [45, 45, 50])
@@ -189,6 +190,17 @@ class DatabasePanel(QWidget):
         active_bg = active.get('background', [70, 90, 130])
         active_text = active.get('text', [240, 240, 240])
         active_border = active.get('border', [100, 120, 160])
+
+        # Dedicated "+" tab colors (falls back to regular tab colors when unspecified)
+        add_tab_bg = add_tab.get('background', norm_bg)
+        add_tab_text = add_tab.get('text', norm_text)
+        add_tab_border = add_tab.get('border', norm_border)
+        add_tab_hover_bg = add_tab.get('hover_background', hover_bg)
+        add_tab_hover_text = add_tab.get('hover_text', hover_text)
+        add_tab_hover_border = add_tab.get('hover_border', hover_border)
+        add_tab_active_bg = add_tab.get('active_background', add_tab_bg)
+        add_tab_active_text = add_tab.get('active_text', add_tab_text)
+        add_tab_active_border = add_tab.get('active_border', add_tab_border)
         
         # Scroll button color
         scroll_button_color = tabs_config.get('scroll_button_color', [30, 30, 30])
@@ -243,7 +255,24 @@ class DatabasePanel(QWidget):
             }}
             
             QTabBar::tab:last:selected {{
+                background-color: rgb({add_tab_active_bg[0]}, {add_tab_active_bg[1]}, {add_tab_active_bg[2]});
+                color: rgb({add_tab_active_text[0]}, {add_tab_active_text[1]}, {add_tab_active_text[2]});
+                border-color: rgb({add_tab_active_border[0]}, {add_tab_active_border[1]}, {add_tab_active_border[2]});
                 margin-right: 0px;
+            }}
+
+            QTabBar::tab:last {{
+                background-color: rgb({add_tab_bg[0]}, {add_tab_bg[1]}, {add_tab_bg[2]});
+                color: rgb({add_tab_text[0]}, {add_tab_text[1]}, {add_tab_text[2]});
+                border-color: rgb({add_tab_border[0]}, {add_tab_border[1]}, {add_tab_border[2]});
+                min-width: 32px;
+                padding: 6px 10px;
+            }}
+
+            QTabBar::tab:last:hover {{
+                background-color: rgb({add_tab_hover_bg[0]}, {add_tab_hover_bg[1]}, {add_tab_hover_bg[2]});
+                color: rgb({add_tab_hover_text[0]}, {add_tab_hover_text[1]}, {add_tab_hover_text[2]});
+                border-color: rgb({add_tab_hover_border[0]}, {add_tab_hover_border[1]}, {add_tab_hover_border[2]});
             }}
             
             QTabBar QToolButton {{
@@ -269,6 +298,8 @@ class DatabasePanel(QWidget):
         tab_bar.setElideMode(Qt.TextElideMode.ElideNone)  # Prevent text truncation
         tab_bar.setUsesScrollButtons(True)  # Enable scroll buttons when tabs don't fit
         tab_bar.setDrawBase(False)  # Don't draw base line
+        # Keep the unsaved-state pulse visible regardless of platform/style defaults.
+        tab_bar.setIconSize(QSize(10, 10))
         tab_bar.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         tab_bar.customContextMenuRequested.connect(self._on_tab_bar_context_menu)
 
@@ -586,13 +617,7 @@ class DatabasePanel(QWidget):
         # Insert tab before the "+" tab
         tab_index = self._add_tab_index
         self.tab_widget.insertTab(tab_index, tab_widget, tab_label)
-        
-        # Check if database has unsaved changes and set icon
-        if self._panel_model:
-            db_info = self._panel_model.get_database(identifier)
-            if db_info and db_info.has_unsaved_changes:
-                self._set_tab_unsaved_indicator(tab_index, True)
-        
+
         # Store mappings
         self._tab_models[tab_index] = {
             'model': model,
@@ -601,6 +626,12 @@ class DatabasePanel(QWidget):
             'identifier': identifier
         }
         self._model_to_tab[model] = tab_index
+
+        # Restore the unsaved-state pulse for tabs recreated during theme/UI rebuilds.
+        if self._panel_model:
+            db_info = self._panel_model.get_database(identifier)
+            if db_info and db_info.has_unsaved_changes:
+                self._set_tab_unsaved_indicator(tab_index, True)
         
         # Update add tab index (it's now one position later)
         self._add_tab_index += 1
@@ -1291,9 +1322,12 @@ class DatabasePanel(QWidget):
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # Get tab text color for the circle (use a visible color)
-        # Use a light color that works on dark backgrounds
-        circle_color = QColor(255, 200, 100)  # Orange/yellow for visibility
+        panel_config = ((self.config.get("ui") or {}).get("panels", {}) or {}).get("database", {})
+        color = panel_config.get("unsaved_tab_indicator_color", [255, 200, 100])
+        try:
+            circle_color = QColor(int(color[0]), int(color[1]), int(color[2]))
+        except Exception:
+            circle_color = QColor(255, 200, 100)
         circle_color.setAlphaF(opacity)
         
         # Draw circle centered in pixmap

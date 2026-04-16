@@ -1916,6 +1916,8 @@
         "minimum_height": 40,
         "default_height": 240,
         "collapsed_height": 30,
+        "unsaved_tab_indicator_color": [255, 200, 100],
+        "unsaved_table_indicator_color": [255, 200, 100],
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_4"
         },
@@ -1978,6 +1980,33 @@
                 "$ref": "$_COLOR_TEXT_PRIMARY"
               },
               "border": [100, 120, 160]
+            },
+            "add_tab": {
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_3"
+              },
+              "text": {
+                "$ref": "$_COLOR_TEXT_SECONDARY"
+              },
+              "border": {
+                "$ref": "$_COLOR_BUTTON_BORDER"
+              },
+              "hover_background": {
+                "$ref": "$_COLOR_BACKGROUND_6"
+              },
+              "hover_text": {
+                "$ref": "$_COLOR_TEXT_7"
+              },
+              "hover_border": [80, 80, 85],
+              "active_background": {
+                "$ref": "$_COLOR_BACKGROUND_3"
+              },
+              "active_text": {
+                "$ref": "$_COLOR_TEXT_SECONDARY"
+              },
+              "active_border": {
+                "$ref": "$_COLOR_BUTTON_BORDER"
+              }
             }
           }
         },
