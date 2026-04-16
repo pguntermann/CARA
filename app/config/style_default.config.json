@@ -132,10 +132,7 @@
       "combobox": {
         "dropdown_border_radius": 3,
         "disabled_brightness_factor": 0.5,
-        "padding": [
-          8,
-          6
-        ]
+        "padding": [8, 6]
       },
       "radio_button": {
         "text_color": {
@@ -203,10 +200,7 @@
         },
         "border_width": 1,
         "border_radius": 3,
-        "padding": [
-          8,
-          4
-        ],
+        "padding": [8, 4],
         "hover_border_offset": 20,
         "disabled_brightness_factor": 0.5
       },
@@ -231,10 +225,7 @@
         },
         "border_width": 1,
         "border_radius": 3,
-        "padding": [
-          8,
-          4
-        ],
+        "padding": [8, 4],
         "disabled_brightness_factor": 0.5,
         "hide_buttons": true,
         "minimum_height": 30
@@ -260,10 +251,7 @@
         },
         "border_width": 1,
         "border_radius": 3,
-        "padding": [
-          8,
-          4
-        ],
+        "padding": [8, 4],
         "disabled_brightness_factor": 0.5
       },
       "group_box": {
@@ -286,10 +274,7 @@
           "$ref": "$_COLOR_TEXT_PRIMARY"
         },
         "title_left": 10,
-        "title_padding": [
-          0,
-          5
-        ]
+        "title_padding": [0, 5]
       },
       "context_menu": {
         "background_color": {
@@ -319,10 +304,7 @@
         "menu_horizontal_padding": 4,
         "separator_height": 1,
         "separator_color": [60, 60, 65],
-        "separator_margin": [
-          2,
-          4
-        ]
+        "separator_margin": [2, 4]
       },
       "tree_view": {
         "text_color": {
@@ -408,10 +390,7 @@
         "separator_enabled": true,
         "separator_color": [70, 70, 75],
         "separator_height": 1,
-        "separator_margin": [
-          8,
-          8
-        ],
+        "separator_margin": [8, 8],
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_3"
         },
@@ -633,10 +612,7 @@
             "flow_spacing": 6,
             "chip": {
               "border_radius": 10,
-              "padding": [
-                2,
-                8
-              ],
+              "padding": [2, 8],
               "minimum_height": 22,
               "unmanaged_background_color": [95, 95, 100],
               "font_family": {
@@ -1051,10 +1027,7 @@
           "button": {
             "height": 28,
             "border_radius": 4,
-            "padding": [
-              6,
-              4
-            ],
+            "padding": [6, 4],
             "background_color": {
               "$ref": "$_COLOR_BACKGROUND_5"
             },
@@ -1540,10 +1513,7 @@
           },
           "buttons": {
             "height": 28,
-            "padding": [
-              6,
-              4
-            ],
+            "padding": [6, 4],
             "border_radius": 4
           },
           "multipv_buttons": {
@@ -1799,19 +1769,13 @@
             "focus_border_color": {
               "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
             },
-            "padding": [
-              3,
-              3
-            ]
+            "padding": [3, 3]
           },
           "timeout": {
             "spacing_before": 12,
             "width": 56,
             "height": 30,
-            "padding": [
-              3,
-              3
-            ]
+            "padding": [3, 3]
           }
         },
         "splitter": {
@@ -1919,10 +1883,7 @@
           },
           "button": {
             "height": 28,
-            "padding": [
-              6,
-              4
-            ],
+            "padding": [6, 4],
             "border_radius": 4,
             "spacing": 8,
             "margins": [8, 8, 8, 8],
@@ -2058,10 +2019,7 @@
           },
           "tags_column": {
             "width": 260,
-            "cell_padding": [
-              4,
-              2
-            ]
+            "cell_padding": [4, 2]
           },
           "header_background_color": {
             "$ref": "$_COLOR_BACKGROUND_3"
@@ -2149,10 +2107,7 @@
         }
       },
       "menu_bar": {
-        "item_padding": [
-          4,
-          8
-        ]
+        "item_padding": [4, 8]
       },
       "menu": {
         "border_width": 1,
@@ -2166,10 +2121,7 @@
         "background_color": {
           "$ref": "$_COLOR_SEPERATOR_BACKGROUND"
         },
-        "margin": [
-          2,
-          4
-        ]
+        "margin": [2, 4]
       }
     },
     "splitter": {
@@ -2302,10 +2254,7 @@
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
-          "title_padding": [
-            0,
-            5
-          ],
+          "title_padding": [0, 5],
           "content_margins": [10, 20, 10, 15]
         },
         "fields": {
@@ -2692,10 +2641,7 @@
             "font_size": {
               "$ref": "$_FONT_SIZE_BASE_SMALL"
             },
-            "padding": [
-              2,
-              8
-            ],
+            "padding": [2, 8],
             "border_radius": 3,
             "colors": {
               "error": [255, 100, 100],
@@ -2793,10 +2739,7 @@
           "margin_top": 10,
           "padding_top": 0,
           "title_left": 10,
-          "title_padding": [
-            0,
-            5
-          ],
+          "title_padding": [0, 5],
           "content_margins": [10, 15, 10, 10],
           "content_spacing": 8,
           "path_layout_spacing": 8
@@ -2868,10 +2811,7 @@
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "border_radius": 3,
-          "padding": [
-            8,
-            4
-          ],
+          "padding": [8, 4],
           "minimum_width": 200,
           "minimum_height": 30,
           "selection_background_color": {
@@ -2895,10 +2835,7 @@
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
-          "title_padding": [
-            0,
-            5
-          ]
+          "title_padding": [0, 5]
         },
         "tags_list": {
           "background_color": {
@@ -2986,10 +2923,7 @@
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "border_radius": 3,
-          "padding": [
-            8,
-            4
-          ],
+          "padding": [8, 4],
           "minimum_width": 200,
           "minimum_height": 30,
           "selection_background_color": {
@@ -3013,10 +2947,7 @@
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
-          "title_padding": [
-            0,
-            5
-          ]
+          "title_padding": [0, 5]
         }
       },
       "move_comment": {
@@ -3082,10 +3013,7 @@
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "border_radius": 3,
-          "padding": [
-            8,
-            4
-          ],
+          "padding": [8, 4],
           "minimum_width": 200,
           "minimum_height": 30,
           "focus_border_color": {
@@ -3164,10 +3092,7 @@
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "border_radius": 3,
-          "padding": [
-            8,
-            4
-          ],
+          "padding": [8, 4],
           "selection_background_color": {
             "$ref": "$_COLOR_BACKGROUND_ACTIVE"
           },
@@ -3189,10 +3114,7 @@
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
-          "title_padding": [
-            0,
-            5
-          ]
+          "title_padding": [0, 5]
         },
         "tag_picker": {
           "selected_border_color": [0, 200, 255],
@@ -3267,10 +3189,7 @@
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "border_radius": 3,
-          "padding": [
-            8,
-            4
-          ],
+          "padding": [8, 4],
           "minimum_width": 250,
           "minimum_height": 30,
           "selection_background_color": {
@@ -3294,10 +3213,7 @@
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
-          "title_padding": [
-            0,
-            5
-          ]
+          "title_padding": [0, 5]
         }
       },
       "bulk_analysis_dialog": {
@@ -3365,10 +3281,7 @@
           "margin_top": 6,
           "padding_top": 3,
           "title_left": 10,
-          "title_padding": [
-            0,
-            5
-          ]
+          "title_padding": [0, 5]
         },
         "progress": {
           "label_font_size": {
@@ -3462,10 +3375,7 @@
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "border_radius": 3,
-          "padding": [
-            8,
-            4
-          ],
+          "padding": [8, 4],
           "minimum_width": 200,
           "minimum_height": 30,
           "selection_background_color": {
@@ -3489,10 +3399,7 @@
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
-          "title_padding": [
-            0,
-            5
-          ]
+          "title_padding": [0, 5]
         },
         "quick_select_buttons": {
           "enabled": true,
@@ -3692,10 +3599,7 @@
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "border_radius": 3,
-          "padding": [
-            8,
-            4
-          ],
+          "padding": [8, 4],
           "minimum_width": 200,
           "minimum_height": 30
         },
@@ -3766,10 +3670,7 @@
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "border_radius": 3,
-          "padding": [
-            8,
-            4
-          ],
+          "padding": [8, 4],
           "selection_background_color": {
             "$ref": "$_COLOR_BACKGROUND_ACTIVE"
           },
@@ -3868,10 +3769,7 @@
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "border_radius": 3,
-          "padding": [
-            8,
-            4
-          ],
+          "padding": [8, 4],
           "selection_background_color": {
             "$ref": "$_COLOR_BACKGROUND_ACTIVE"
           },
@@ -4202,10 +4100,7 @@
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "border_radius": 3,
-          "padding": [
-            8,
-            4
-          ],
+          "padding": [8, 4],
           "spinbox": {
             "min_value": 10,
             "max_value": 1000,
