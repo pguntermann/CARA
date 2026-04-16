@@ -553,25 +553,25 @@
                 width: 100%;
                 max-width: 520px;
                 margin: 0 auto;
-                overflow: hidden;
+                overflow: visible;
                 position: relative;
-                height: clamp(180px, 45vw, 320px);
+                height: auto;
             }
 
             .screenshot-tilt {
                 position: relative;
                 width: 100%;
-                height: 100%;
+                height: auto;
             }
 
             .screenshot {
                 display: block;
-                position: relative;
+                position: static;
                 width: 100%;
-                height: 100%;
-                object-fit: cover;
+                height: auto;
+                object-fit: contain;
                 object-position: center;
-                background: transparent;
+                background: rgb(24, 24, 28);
             }
 
             /* (intentionally no per-screenshot scaling on mobile) */
