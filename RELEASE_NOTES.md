@@ -1,5 +1,35 @@
 # Release Notes
 
+# CARA v2.7.2 - Themes!, Config Restructuring and UI Polish
+
+**Release Date:** 16.04.2026
+
+This release introduces a **theming system** with **hot switching** and includes an additional **light theme** as an example. To enable this, the `config.json` configuration file has been refactored, with behavioral settings remaining in `config.json` and styling-related settings being extracted into new `style-*.config.json` files. Additionally, the config files now support **defining constants** to ease theme creation.
+
+It also includes some additional **UI polish** and fixes some inconsistencies in the **default theme**.
+
+## New Features
+
+- **Theme switching:** Switch between themes directly in the application. A built-in **light theme** is included as an example and foundation for further user-defined themes. Hot-switching themes can be done through the **View** menu.
+
+## Enhancements
+
+- **Split configuration settings:** Styling and behavioral settings are now separated into dedicated config files, improving structure and maintainability.
+- **Config constants/placeholders:** Added support for reusable constants/placeholders in `config.json` and `style-*.config.json` files to reduce duplication and simplify config changes.
+- **UI/UX refinements:** Several small UI/UX refinements have been implemented as a side effect of testing the theming system.
+
+## Bug Fixes
+
+- **Brilliant move tag/icon:** Fixed an issue where the **brilliant** move tag and icon were not shown when `append_depthlevels_to_classification_text` was enabled.
+- **PGN formatter:** Fixed some additional small issues with the PGN formatter.
+
+
+## Documentation
+
+- **User manual:** Updated the HTML manual and screenshots to cover the new theme-switching functionality and light theme example.
+
+---
+
 # CARA v2.7.1 - Bug Fixes and Performance Optimizations
 
 **Release Date:** 11.04.2026

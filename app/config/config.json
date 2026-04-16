@@ -1,5 +1,5 @@
 {
-  "version": "2.7.1",
+  "version": "2.7.2",
   "default_style_config": "app/config/style_default.config.json",
   "ui": {
     "welcome_dialog": {
@@ -164,7 +164,7 @@
           "move_classification_pie": {
             "enabled": true,
             "show_opponent_overlay": true,
-            "hover_overlay_animation_ms": 1200, 
+            "hover_overlay_animation_ms": 1200,
             "player_legend_label": "Player",
             "opponent_legend_label": "Opponents"
           },
@@ -225,13 +225,13 @@
           }
         },
         "manual_analysis": {
-          "multipv1_indicator": { 
+          "multipv1_indicator": {
             "enabled": true
           },
-          "multipv2_indicator": { 
+          "multipv2_indicator": {
             "enabled": true
           },
-          "multipv3_indicator": { 
+          "multipv3_indicator": {
             "enabled": true
           },
           "statistics": {
@@ -270,7 +270,7 @@
           }
         },
         "notes": {
-          "heading_font_point_sizes": { 
+          "heading_font_point_sizes": {
             "h1": 13,
             "h2": 14,
             "h3": 15,
@@ -278,12 +278,12 @@
             "h5": 17,
             "h6": 18
           },
-          "hidden_marker_font_point_size": 0.5, 
+          "hidden_marker_font_point_size": 0.5,
           "placeholder_text": "Add notes about this game..."
         }
       },
       "database": {
-        "pgn_col_max_chars": 300, 
+        "pgn_col_max_chars": 300,
         "table": {
           "columns": {
             "col_num": "#",
@@ -795,9 +795,25 @@
     "show_debug_menu": false,
     "enable_debug_rand_colors": false,
     "enable_debug_backgrounds": false,
-    "background_color_debug_mainpanel": [255, 200, 200],
-    "background_color_debug_detailpanel": [200, 255, 200],
-    "background_color_debug_databasepanel": [200, 200, 255],
-    "background_color_debug_statuspanel": [255, 255, 200]
+    "background_color_debug_mainpanel": [
+      255,
+      200,
+      200
+    ],
+    "background_color_debug_detailpanel": [
+      200,
+      255,
+      200
+    ],
+    "background_color_debug_databasepanel": [
+      200,
+      200,
+      255
+    ],
+    "background_color_debug_statuspanel": [
+      255,
+      255,
+      200
+    ]
   }
 }
