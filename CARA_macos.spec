@@ -1,12 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from pathlib import Path
+
+config_json_datas = [(str(path), 'app/config') for path in sorted(Path('app/config').glob('*.json'))]
 
 a = Analysis(
     ['cara.py'],
     pathex=[],
     binaries=[],
     datas=[
-        ('app/config', 'app/config'),
+        *config_json_datas,
         ('app/resources', 'app/resources'),
         ('appicon.svg', '.'),
         ('manual.html', '.'),

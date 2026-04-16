@@ -4,13 +4,16 @@
 # For a desktop icon, ship a .desktop file pointing at dist/CARA/CARA and a PNG.
 
 import os
+from pathlib import Path
+
+config_json_datas = [(str(path), 'app/config') for path in sorted(Path('app/config').glob('*.json'))]
 
 a = Analysis(
     ['cara.py'],
     pathex=[],
     binaries=[],
     datas=[
-        ('app/config', 'app/config'),
+        *config_json_datas,
         ('app/resources', 'app/resources'),
         ('appicon.svg', '.'),
         ('manual.html', '.'),
