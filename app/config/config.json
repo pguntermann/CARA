@@ -4,7 +4,7 @@
   "ui": {
     "welcome_dialog": {
       "title": "Welcome to CARA",
-      "message": "<b>Thanks for installing CARA</b>.<br><br>As this is your first time starting the application, I would recommend that you take <br>a quick look at the <a href=\"manual://getting-started\">Getting Started</a> section of the manual.<br><br>It covers the most important aspects of configuring and using CARA, so that you will hopefully have a great time and enjoy using the application.<br><br>You will also find a link to CARA's YouTube channel with many tutorial videos<br>in the <b>Help menu</b>.<br><br>If you enjoy the project, please consider leaving a Star on the GitHub repository, subscribing to and liking the YouTube channel/videos, and spreading the word!<br><br>Best regards, Philipp."
+      "message": "<b>Thanks for installing CARA</b>.<br><br>As this is your first time starting the application, I would recommend that you take a quick look at the <a href=\"manual://getting-started\">Getting Started</a> section of the manual.<br><br>It covers the most important aspects of configuring and using CARA, so that you will hopefully have a great time and enjoy using the application.<br><br>You will also find a link to CARA's YouTube channel with many tutorial videos<br>in the <b>Help menu</b>.<br><br>If you enjoy the project, please consider leaving a Star on the GitHub repository, subscribing to and liking the YouTube channel/videos, and spreading the word!<br><br>Best regards, Philipp."
     },
     "window": {
       "x": 100,
