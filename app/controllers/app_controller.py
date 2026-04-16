@@ -58,6 +58,7 @@ class AppController:
         
         # Initialize controllers
         self.board_controller = BoardController(config)
+        self.user_settings_service.bind_board_model(self.board_controller.get_board_model())
         self.database_controller = DatabaseController(config)
         
         # Initialize game controller (depends on board controller)
@@ -82,6 +83,7 @@ class AppController:
         
         # Initialize engine controller
         self.engine_controller = EngineController(config)
+        self.user_settings_service.bind_engine_model(self.engine_controller.get_engine_model())
         
         # Initialize manual analysis controller first (depends on engine controller and game controller)
         self.manual_analysis_controller = ManualAnalysisController(config, self.engine_controller, self.game_controller)

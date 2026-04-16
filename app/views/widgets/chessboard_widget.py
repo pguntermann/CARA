@@ -98,6 +98,24 @@ class ChessBoardWidget(QWidget):
         self._single_click_timer: Optional[QTimer] = None  # Timer to delay single-click handling
         self._pending_click_pos: Optional[QPoint] = None  # Position of pending single-click
         self._pending_click_annotation_id: Optional[str] = None  # Annotation ID of pending click
+
+        # Initialize turn/arrow visibility and move state before binding a board model.
+        # ``set_model()`` populates these from the current BoardModel, so defaults must not
+        # overwrite model-driven state afterwards.
+        self._is_white_turn = True
+        self.show_turn_indicator = True
+        self.show_playedmove_arrow = True
+        self.show_bestnextmove_arrow = True
+        self.show_pv2_arrow = True
+        self.show_pv3_arrow = True
+        self.show_bestalternativemove_arrow = True
+        self.show_move_classification_icons = False
+        self._moveslist_model: Optional["MovesListModel"] = None
+        self._last_move: Optional[chess.Move] = None
+        self._best_next_move: Optional[chess.Move] = None
+        self._pv2_move: Optional[chess.Move] = None
+        self._pv3_move: Optional[chess.Move] = None
+        self._best_alternative_move: Optional[chess.Move] = None
         
         # Connect to model if provided
         # Set model after setup so it can load position from model
@@ -106,22 +124,6 @@ class ChessBoardWidget(QWidget):
         else:
             # If no model provided, use fallback starting position
             self._initialize_starting_position()
-        
-        # Initialize turn indicator state
-        self._is_white_turn = True
-        self.show_turn_indicator = True  # Default visibility state
-        self.show_playedmove_arrow = True  # Default visibility state
-        self.show_bestnextmove_arrow = True  # Default visibility state
-        self.show_pv2_arrow = True  # Default visibility state
-        self.show_pv3_arrow = True  # Default visibility state
-        self.show_bestalternativemove_arrow = True  # Default visibility state
-        self.show_move_classification_icons = False  # Default visibility state for move classification badges
-        self._moveslist_model: Optional["MovesListModel"] = None  # For move assessment badges
-        self._last_move: Optional[chess.Move] = None  # Track last move for arrow drawing
-        self._best_next_move: Optional[chess.Move] = None  # Track best next move for arrow drawing
-        self._pv2_move: Optional[chess.Move] = None  # Track PV2 move for arrow drawing
-        self._pv3_move: Optional[chess.Move] = None  # Track PV3 move for arrow drawing
-        self._best_alternative_move: Optional[chess.Move] = None  # Track best alternative move for arrow drawing
     
     def _load_config(self) -> None:
         """Load configuration for the chessboard."""
@@ -1427,7 +1429,6 @@ class ChessBoardWidget(QWidget):
                 pass
         
         self._board_model = model
-        
         # Initialize board array if not already done
         if not hasattr(self, 'board') or self.board is None:
             self.board = [[None for _ in range(self.square_count)] for _ in range(self.square_count)]

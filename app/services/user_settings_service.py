@@ -40,6 +40,10 @@ class UserSettingsService:
         self.settings_path = settings_path
         self._model: Optional[UserSettingsModel] = None
         self._migration_done = False
+        self._bound_board_model = None
+        self._board_model_callbacks: Dict[str, Any] = {}
+        self._bound_engine_model = None
+        self._engine_model_callbacks: Dict[str, Any] = {}
     
     def _load_config_filenames(self) -> None:
         """Load settings filenames from config.json.
@@ -433,6 +437,99 @@ class UserSettingsService:
             Current settings dictionary (read-only access).
         """
         return self.get_model().get_settings()
+
+    def bind_board_model(self, board_model: Any) -> None:
+        """Keep in-memory board visibility settings synchronized with the live board model."""
+        if board_model is self._bound_board_model or board_model is None:
+            return
+
+        if self._bound_board_model is not None:
+            self._disconnect_board_model(self._bound_board_model)
+
+        self._bound_board_model = board_model
+        self._connect_board_model(board_model)
+
+    def bind_engine_model(self, engine_model: Any) -> None:
+        """Keep in-memory engine settings synchronized with the live engine model."""
+        if engine_model is self._bound_engine_model or engine_model is None:
+            return
+
+        if self._bound_engine_model is not None:
+            self._disconnect_engine_model(self._bound_engine_model)
+
+        self._bound_engine_model = engine_model
+        self._connect_engine_model(engine_model)
+
+    def _connect_board_model(self, board_model: Any) -> None:
+        signal_to_key = {
+            "game_info_visibility_changed": "show_game_info",
+            "coordinates_visibility_changed": "show_coordinates",
+            "turn_indicator_visibility_changed": "show_turn_indicator",
+            "material_widget_visibility_changed": "show_material_widget",
+            "game_tags_widget_visibility_changed": "show_game_tags_widget",
+            "evaluation_bar_visibility_changed": "show_evaluation_bar",
+            "playedmove_arrow_visibility_changed": "show_playedmove_arrow",
+            "bestnextmove_arrow_visibility_changed": "show_bestnextmove_arrow",
+            "pv2_arrow_visibility_changed": "show_pv2_arrow",
+            "pv3_arrow_visibility_changed": "show_pv3_arrow",
+            "bestalternativemove_arrow_visibility_changed": "show_bestalternativemove_arrow",
+            "move_classification_icons_visibility_changed": "show_move_classification_icons",
+            "hide_other_arrows_during_plan_exploration_changed": "hide_other_arrows_during_plan_exploration",
+        }
+        for signal_name, key in signal_to_key.items():
+            signal = getattr(board_model, signal_name, None)
+            if signal is not None:
+                callback = lambda value, setting_key=key: self.update_board_visibility({setting_key: value})
+                self._board_model_callbacks[signal_name] = callback
+                signal.connect(callback)
+
+    def _disconnect_board_model(self, board_model: Any) -> None:
+        signal_to_key = {
+            "game_info_visibility_changed": "show_game_info",
+            "coordinates_visibility_changed": "show_coordinates",
+            "turn_indicator_visibility_changed": "show_turn_indicator",
+            "material_widget_visibility_changed": "show_material_widget",
+            "game_tags_widget_visibility_changed": "show_game_tags_widget",
+            "evaluation_bar_visibility_changed": "show_evaluation_bar",
+            "playedmove_arrow_visibility_changed": "show_playedmove_arrow",
+            "bestnextmove_arrow_visibility_changed": "show_bestnextmove_arrow",
+            "pv2_arrow_visibility_changed": "show_pv2_arrow",
+            "pv3_arrow_visibility_changed": "show_pv3_arrow",
+            "bestalternativemove_arrow_visibility_changed": "show_bestalternativemove_arrow",
+            "move_classification_icons_visibility_changed": "show_move_classification_icons",
+            "hide_other_arrows_during_plan_exploration_changed": "hide_other_arrows_during_plan_exploration",
+        }
+        for signal_name in signal_to_key:
+            signal = getattr(board_model, signal_name, None)
+            callback = self._board_model_callbacks.get(signal_name)
+            if signal is not None:
+                try:
+                    if callback is not None:
+                        signal.disconnect(callback)
+                except (TypeError, RuntimeError):
+                    pass
+        self._board_model_callbacks = {}
+
+    def _connect_engine_model(self, engine_model: Any) -> None:
+        engines_callback = lambda: self.update_engines(engine_model.to_dict())
+        assignments_callback = lambda: self.update_engine_assignments(engine_model.get_assignments())
+        self._engine_model_callbacks = {
+            "engines_changed": engines_callback,
+            "assignment_changed": assignments_callback,
+        }
+        engine_model.engines_changed.connect(engines_callback)
+        engine_model.assignment_changed.connect(assignments_callback)
+
+    def _disconnect_engine_model(self, engine_model: Any) -> None:
+        for signal_name, callback in self._engine_model_callbacks.items():
+            signal = getattr(engine_model, signal_name, None)
+            if signal is not None:
+                try:
+                    signal.disconnect(callback)
+                except (TypeError, RuntimeError):
+                    pass
+        self._engine_model_callbacks = {}
+
     
     def update_board_visibility(self, visibility: Dict[str, Any]) -> None:
         """Update board visibility settings.
