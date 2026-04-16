@@ -37,15 +37,7 @@
             "default_threads_formula": {
               "formula": "max(1, min(4, (cpu_count - reserved_cores) // 2))"
             },
-            "scale_max": 10.0,
-            "divisions": [
-              1,
-              2,
-              3,
-              5,
-              10
-            ],
-            "animation_duration_ms": 300
+            "scale_max": 10.0
           },
           "initial_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
         }

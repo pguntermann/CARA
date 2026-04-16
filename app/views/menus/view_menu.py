@@ -10,6 +10,10 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
     view_menu = menu_bar.addMenu("View")
     mw._apply_menu_styling(view_menu)
 
+    # Theme switching (runtime) should be at the top
+    mw._setup_theme_menu(view_menu)
+    view_menu.addSeparator()
+
     mw.view_moves_list_action = QAction("Moves List", mw)
     mw.view_moves_list_action.setShortcut(QKeySequence("F1"))
     mw.view_moves_list_action.setCheckable(True)
@@ -76,8 +80,3 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
         mw.view_ai_summary_action,
         mw.view_notes_action,
     ]
-
-    # Theme switching (runtime)
-    view_menu.addSeparator()
-    mw._setup_theme_menu(view_menu)
-

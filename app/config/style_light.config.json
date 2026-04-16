@@ -188,9 +188,9 @@
       170
     ],
     "$_COLOR_GRIDLINE": [
-      120,
-      125,
-      135
+      145,
+      150,
+      170
     ],
     "$_COLOR_BUTTON_BORDER": {
       "$ref": "$_COLOR_BORDER"
@@ -474,7 +474,7 @@
       },
       "context_menu": {
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_3"
+          "$ref": "$_COLOR_TABLE_HEADER_BACKGROUND"
         },
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
@@ -874,7 +874,33 @@
                 85,
                 135
               ]
-            }
+            },
+            "center_line": {
+              "color": [
+                55,
+                85,
+                135
+              ],
+              "width": 2,
+              "style": "solid"
+            },
+            "division_marks": {
+              "color": [
+                55,
+                85,
+                135
+              ],
+              "width": 1,
+              "style": "dash"
+            },
+            "divisions": [
+              1,
+              2,
+              3,
+              5,
+              10
+            ],
+            "animation_duration_ms": 300
           },
           "material_widget": {
             "width": 110,
@@ -1057,42 +1083,50 @@
             "annotations": {
               "good": {
                 "color": [
-                  100,
-                  255,
-                  100
+                  0,
+                  140,
+                  80
+                ],
+                "bold": true
+              },
+              "brilliant": {
+                "color": [
+                  210,
+                  120,
+                  0
                 ],
                 "bold": true
               },
               "bad": {
                 "color": [
-                  255,
-                  100,
-                  100
+                  200,
+                  60,
+                  60
                 ],
                 "bold": true
               },
               "interesting": {
                 "color": [
-                  255,
-                  255,
-                  100
+                  140,
+                  110,
+                  0
                 ],
                 "bold": true
               },
               "dubious": {
                 "color": [
-                  255,
-                  200,
-                  100
+                  170,
+                  100,
+                  0
                 ],
                 "bold": true
               }
             },
             "nags": {
               "color": [
-                120,
-                70,
-                150
+                90,
+                50,
+                130
               ],
               "bold": false,
               "italic": true
@@ -1113,9 +1147,9 @@
             },
             "results": {
               "color": [
-                255,
-                255,
-                100
+                55,
+                85,
+                135
               ],
               "bold": true
             },
@@ -1348,9 +1382,12 @@
               200
             ],
             "margin": 20,
-            "slice_border_width": 0,
-            "slice_border_darken": 120,
-            "opponent_ring_border_width": 0
+            "slice_border_width": 2,
+            "slice_border_darken": 150,
+            "slice_border_color": {
+              "$ref": "$_COLOR_BACKGROUND_4"
+            },
+            "opponent_ring_border_width": 1
           },
           "widgets": {
             "border_radius": 5,
@@ -2989,7 +3026,7 @@
       "colors": {
         "normal": {
           "background": {
-            "$ref": "$_COLOR_BACKGROUND_3"
+            "$ref": "$_COLOR_TABLE_HEADER_BACKGROUND"
           },
           "text": {
             "$ref": "$_COLOR_TEXT_SECONDARY"

@@ -627,6 +627,13 @@ class PieChartWidget(QWidget):
         self._slice_border_width = max(0, min(6, self._slice_border_width))
         self._slice_border_darken = int(pie_chart_config.get("slice_border_darken", 120) or 120)
         self._slice_border_darken = max(100, min(200, self._slice_border_darken))
+        self._slice_border_color: Optional[QColor] = None
+        _sbc = pie_chart_config.get("slice_border_color")
+        if isinstance(_sbc, (list, tuple)) and len(_sbc) >= 3:
+            try:
+                self._slice_border_color = QColor(int(_sbc[0]), int(_sbc[1]), int(_sbc[2]))
+            except (TypeError, ValueError):
+                self._slice_border_color = None
         self._opponent_ring_border_width = int(pie_chart_config.get("opponent_ring_border_width", 1) or 0)
         self._opponent_ring_border_width = max(0, min(6, self._opponent_ring_border_width))
 
@@ -952,7 +959,8 @@ class PieChartWidget(QWidget):
                     if self._slice_border_width <= 0:
                         painter.setPen(Qt.PenStyle.NoPen)
                     else:
-                        painter.setPen(QPen(color.darker(self._slice_border_darken), self._slice_border_width))
+                        edge = self._slice_border_color if self._slice_border_color is not None else color.darker(self._slice_border_darken)
+                        painter.setPen(QPen(edge, self._slice_border_width))
                     painter.drawPie(outer_rect, int(start_angle), int(angle))
                     start_angle += angle
             else:
@@ -965,7 +973,8 @@ class PieChartWidget(QWidget):
                     if self._slice_border_width <= 0:
                         painter.setPen(Qt.PenStyle.NoPen)
                     else:
-                        painter.setPen(QPen(color.darker(self._slice_border_darken), self._slice_border_width))
+                        edge = self._slice_border_color if self._slice_border_color is not None else color.darker(self._slice_border_darken)
+                        painter.setPen(QPen(edge, self._slice_border_width))
                     painter.drawPie(outer_rect, int(start_angle), int(angle))
                     start_angle += angle
 

@@ -577,7 +577,25 @@
               "black": {
                 "$ref": "$_COLOR_BLACK"
               }
-            }
+            },
+            "center_line": {
+              "color": [128, 128, 128],
+              "width": 1,
+              "style": "solid"
+            },
+            "division_marks": {
+              "color": [128, 128, 128],
+              "width": 1,
+              "style": "dash"
+            },
+            "divisions": [
+              1,
+              2,
+              3,
+              5,
+              10
+            ],
+            "animation_duration_ms": 300
           },
           "material_widget": {
             "width": 110,
@@ -690,6 +708,10 @@
             },
             "annotations": {
               "good": {
+                "color": [100, 255, 100],
+                "bold": true
+              },
+              "brilliant": {
                 "color": [100, 255, 100],
                 "bold": true
               },
@@ -900,9 +922,12 @@
               200
             ],
             "margin": 20,
-            "slice_border_width": 1,
+            "slice_border_width": 0,
             "slice_border_darken": 120,
-            "opponent_ring_border_width": 1
+            "slice_border_color": {
+              "$ref": "$_COLOR_BACKGROUND_4"
+            },
+            "opponent_ring_border_width": 0
           },
           "widgets": {
             "border_radius": 5,

@@ -1770,6 +1770,11 @@ class PgnFormatterService:
         good_config = annotations_config.get('good', {})
         good_color = good_config.get('color', [100, 255, 100])
         good_bold = good_config.get('bold', True)
+
+        # Brilliant moves (!!) - optional override; defaults to "good"
+        brilliant_config = annotations_config.get('brilliant', {})
+        brilliant_color = brilliant_config.get('color', good_color)
+        brilliant_bold = brilliant_config.get('bold', good_bold)
         
         # Bad moves (?, ??)
         bad_config = annotations_config.get('bad', {})
@@ -1793,7 +1798,7 @@ class PgnFormatterService:
         annotation_patterns = [
             (r'(!\?)', interesting_color, interesting_bold, 5),
             (r'(\?!)', dubious_color, dubious_bold, 6),
-            (r'(\!{2})', good_color, good_bold, 3),
+            (r'(\!{2})', brilliant_color, brilliant_bold, 3),
             (r'(\?{2})', bad_color, bad_bold, 4),
             (r'(!)', good_color, good_bold, 1),
             (r'(\?)', bad_color, bad_bold, 2),
@@ -1850,7 +1855,8 @@ class PgnFormatterService:
                         elif (f'color: rgb({good_color[0]}, {good_color[1]}, {good_color[2]})' in tag_content or
                               f'color: rgb({bad_color[0]}, {bad_color[1]}, {bad_color[2]})' in tag_content or
                               f'color: rgb({interesting_color[0]}, {interesting_color[1]}, {interesting_color[2]})' in tag_content or
-                              f'color: rgb({dubious_color[0]}, {dubious_color[1]}, {dubious_color[2]})' in tag_content):
+                              f'color: rgb({dubious_color[0]}, {dubious_color[1]}, {dubious_color[2]})' in tag_content or
+                              f'color: rgb({brilliant_color[0]}, {brilliant_color[1]}, {brilliant_color[2]})' in tag_content):
                             span_stack.append('annotation')
                         _recompute_annotation_span_flags()
                         # Append the entire span tag

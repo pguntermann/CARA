@@ -41,7 +41,19 @@ def discover_style_configs(*, config_path: Path) -> List[ThemeOption]:
     for p in sorted(config_dir.glob("style_*.config.json")):
         if not p.is_file():
             continue
-        label = p.name.replace(".config.json", "")
+        # Display name in menus: strip "style_" prefix and extension.
+        # Examples:
+        # - style_default.config.json -> Default
+        # - style_light.config.json -> Light
+        base = p.name
+        if base.endswith(".config.json"):
+            base = base[: -len(".config.json")]
+        elif base.lower().endswith(".json"):
+            base = base[: -len(".json")]
+        if base.startswith("style_"):
+            base = base[len("style_") :]
+        base = base.replace("_", " ").strip()
+        label = base[:1].upper() + base[1:] if base else p.name.replace(".config.json", "")
         style_ref = _to_posix_relpath(p, base=repo_root) or str(p)
         opts.append(ThemeOption(label=label, style_ref=style_ref, absolute_path=p.resolve()))
 
