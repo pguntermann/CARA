@@ -623,6 +623,20 @@ class PieChartWidget(QWidget):
         minimum_size = pie_chart_config.get("minimum_size", [200, 200])
         self.margin = pie_chart_config.get("margin", 20)
 
+        self._slice_border_width = int(pie_chart_config.get("slice_border_width", 1) or 0)
+        self._slice_border_width = max(0, min(6, self._slice_border_width))
+        self._slice_border_darken = int(pie_chart_config.get("slice_border_darken", 120) or 120)
+        self._slice_border_darken = max(100, min(200, self._slice_border_darken))
+        self._slice_border_color: Optional[QColor] = None
+        _sbc = pie_chart_config.get("slice_border_color")
+        if isinstance(_sbc, (list, tuple)) and len(_sbc) >= 3:
+            try:
+                self._slice_border_color = QColor(int(_sbc[0]), int(_sbc[1]), int(_sbc[2]))
+            except (TypeError, ValueError):
+                self._slice_border_color = None
+        self._opponent_ring_border_width = int(pie_chart_config.get("opponent_ring_border_width", 1) or 0)
+        self._opponent_ring_border_width = max(0, min(6, self._opponent_ring_border_width))
+
         self.data: Dict[str, int] = {}
         self.total: int = 0
         self._opponent_data: Optional[Dict[str, int]] = None
@@ -834,7 +848,10 @@ class PieChartWidget(QWidget):
         painter.setBrush(fill)
         edge = QColor(fill)
         edge.setAlpha(min(255, int(fill.alpha() * 1.1)))
-        painter.setPen(QPen(edge, 1))
+        if self._opponent_ring_border_width <= 0:
+            painter.setPen(Qt.PenStyle.NoPen)
+        else:
+            painter.setPen(QPen(edge, self._opponent_ring_border_width))
 
         if span_deg >= 359.5:
             outer = QPainterPath()
@@ -939,7 +956,11 @@ class PieChartWidget(QWidget):
                     angle = int(round((count / self.total) * 360 * 16))
                     color = self._category_color(category)
                     painter.setBrush(color)
-                    painter.setPen(QPen(color.darker(120), 1))
+                    if self._slice_border_width <= 0:
+                        painter.setPen(Qt.PenStyle.NoPen)
+                    else:
+                        edge = self._slice_border_color if self._slice_border_color is not None else color.darker(self._slice_border_darken)
+                        painter.setPen(QPen(edge, self._slice_border_width))
                     painter.drawPie(outer_rect, int(start_angle), int(angle))
                     start_angle += angle
             else:
@@ -949,7 +970,11 @@ class PieChartWidget(QWidget):
                     angle = int(round((count / self.total) * 360 * 16))
                     color = self._category_color(category)
                     painter.setBrush(color)
-                    painter.setPen(QPen(color.darker(120), 1))
+                    if self._slice_border_width <= 0:
+                        painter.setPen(Qt.PenStyle.NoPen)
+                    else:
+                        edge = self._slice_border_color if self._slice_border_color is not None else color.darker(self._slice_border_darken)
+                        painter.setPen(QPen(edge, self._slice_border_width))
                     painter.drawPie(outer_rect, int(start_angle), int(angle))
                     start_angle += angle
 
@@ -1350,6 +1375,8 @@ class DetailSummaryView(QWidget):
         counts_layout_spacing = widgets_config.get('counts_layout_spacing', 3)
         row_spacing = widgets_config.get('row_spacing', 5)
         color_indicator_size = widgets_config.get('color_indicator_size', [12, 12])
+        color_indicator_border_width = int(widgets_config.get("color_indicator_border_width", 1) or 0)
+        color_indicator_border_width = max(0, min(4, color_indicator_border_width))
         critical_moments_list_spacing = widgets_config.get('critical_moments_list_spacing', 3)
         critical_moments_section_spacing = widgets_config.get('critical_moments_section_spacing', 10)
         phase_spacing = widgets_config.get('phase_spacing', 1)
@@ -1745,6 +1772,8 @@ class DetailSummaryView(QWidget):
         counts_layout_spacing = widgets_config.get('counts_layout_spacing', 3)
         row_spacing = widgets_config.get('row_spacing', 5)
         color_indicator_size = widgets_config.get('color_indicator_size', [12, 12])
+        color_indicator_border_width = int(widgets_config.get("color_indicator_border_width", 1) or 0)
+        color_indicator_border_width = max(0, min(4, color_indicator_border_width))
         
         # Get player name label styling
         player_name_config = widgets_config.get('player_name_label', {})
@@ -1819,12 +1848,16 @@ class DetailSummaryView(QWidget):
                 color_r = color[0] if isinstance(color, (list, tuple)) and len(color) >= 1 else 150
                 color_g = color[1] if isinstance(color, (list, tuple)) and len(color) >= 2 else 150
                 color_b = color[2] if isinstance(color, (list, tuple)) and len(color) >= 3 else 150
-                color_widget.setStyleSheet(f"""
-                    QWidget {{
-                        background-color: rgb({color_r}, {color_g}, {color_b});
-                        border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
-                    }}
-                """)
+                if color_indicator_border_width <= 0:
+                    color_widget.setStyleSheet(
+                        f"QWidget {{ background-color: rgb({color_r}, {color_g}, {color_b}); border: none; }}"
+                    )
+                else:
+                    color_widget.setStyleSheet(
+                        f"QWidget {{ background-color: rgb({color_r}, {color_g}, {color_b}); "
+                        f"border: {color_indicator_border_width}px solid rgb({border_color.red()}, "
+                        f"{border_color.green()}, {border_color.blue()}); }}"
+                    )
                 row.addWidget(color_widget)
                 
                 # Label

@@ -78,6 +78,151 @@ def _expand_config_refs(config: Any) -> Any:
     return _expand_node(config)
 
 
+def _strip_json_comments(text: str) -> str:
+    """Strip // and /* */ comments from JSON-like text, preserving strings."""
+    out: list[str] = []
+    i = 0
+    n = len(text)
+    in_string = False
+    string_quote = '"'
+    escape = False
+    in_line_comment = False
+    in_block_comment = False
+
+    while i < n:
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < n else ""
+
+        if in_line_comment:
+            if ch == "\n":
+                in_line_comment = False
+                out.append("\n")
+            i += 1
+            continue
+
+        if in_block_comment:
+            if ch == "*" and nxt == "/":
+                in_block_comment = False
+                i += 2
+                continue
+            if ch == "\n":
+                out.append("\n")
+            i += 1
+            continue
+
+        if in_string:
+            out.append(ch)
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == string_quote:
+                in_string = False
+            i += 1
+            continue
+
+        if ch in ('"', "'"):
+            in_string = True
+            string_quote = ch
+            out.append(ch)
+            i += 1
+            continue
+
+        if ch == "/" and nxt == "/":
+            in_line_comment = True
+            i += 2
+            continue
+        if ch == "/" and nxt == "*":
+            in_block_comment = True
+            i += 2
+            continue
+
+        out.append(ch)
+        i += 1
+
+    return "".join(out)
+
+
+def _load_json_allowing_comments(path: Path) -> Any:
+    with open(path, "r", encoding="utf-8") as f:
+        raw = f.read()
+    return json.loads(_strip_json_comments(raw))
+
+
+def _deep_merge_dicts(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:
+    """Deep merge two dicts, with overlay taking precedence.
+
+    - Dict values are merged recursively.
+    - Non-dict values (including lists) are replaced by overlay.
+    """
+    merged: Dict[str, Any] = dict(base)
+    for k, v in overlay.items():
+        if k in merged and isinstance(merged[k], dict) and isinstance(v, dict):
+            merged[k] = _deep_merge_dicts(merged[k], v)
+        else:
+            merged[k] = v
+    return merged
+
+
+def _resolve_style_config_path(*, base_config_path: Path, style_ref: str) -> Path:
+    """Resolve a style config path relative to config.json and repo root."""
+    # 1) Relative to the directory containing config.json
+    candidate = (base_config_path.parent / style_ref).resolve()
+    if candidate.is_file():
+        return candidate
+
+    # 2) Relative to repo root (config.json is typically <repo>/app/config/config.json)
+    try:
+        repo_root = base_config_path.resolve().parents[2]
+    except Exception:
+        repo_root = base_config_path.parent
+    candidate = (repo_root / style_ref).resolve()
+    return candidate
+
+
+def _load_merged_config(config_path: Path) -> Dict[str, Any]:
+    """Load config.json and optionally merge a default style config."""
+    base = _load_json_allowing_comments(config_path)
+    if not isinstance(base, dict):
+        raise TypeError("Config root must be a JSON object")
+
+    style_ref = base.get("default_style_config")
+    if isinstance(style_ref, str) and style_ref.strip():
+        style_path = _resolve_style_config_path(base_config_path=config_path, style_ref=style_ref.strip())
+        if not style_path.is_file():
+            raise FileNotFoundError(f'Default style config not found: "{style_path}" (from "{style_ref}")')
+        style_cfg = _load_json_allowing_comments(style_path)
+        if not isinstance(style_cfg, dict):
+            raise TypeError("Style config root must be a JSON object")
+        # style_cfg provides defaults; base overrides
+        return _deep_merge_dicts(style_cfg, base)
+
+    return base
+
+
+def _load_merged_config_with_style_override(config_path: Path, style_ref: str) -> Dict[str, Any]:
+    """Load config.json and merge a specific style config (override).
+
+    This is used for runtime theme switching without mutating config.json on disk.
+    The merge semantics match :func:`_load_merged_config`: style provides defaults,
+    base config overrides.
+    """
+    base = _load_json_allowing_comments(config_path)
+    if not isinstance(base, dict):
+        raise TypeError("Config root must be a JSON object")
+
+    if not isinstance(style_ref, str) or not style_ref.strip():
+        return base
+
+    style_path = _resolve_style_config_path(base_config_path=config_path, style_ref=style_ref.strip())
+    if not style_path.is_file():
+        raise FileNotFoundError(f'Style config not found: "{style_path}" (from "{style_ref}")')
+    style_cfg = _load_json_allowing_comments(style_path)
+    if not isinstance(style_cfg, dict):
+        raise TypeError("Style config root must be a JSON object")
+    return _deep_merge_dicts(style_cfg, base)
+
+
 def _apply_debug_random_placeholder_colors(config: Any) -> None:
     """Optionally override placeholder color constants with random RGB values.
 
@@ -158,9 +303,8 @@ class ConfigLoader:
             self._fail(f"Configuration path is not a file: {self.config_path}")
         
         try:
-            with open(self.config_path, "r", encoding="utf-8") as f:
-                self._config = json.load(f)
-        except json.JSONDecodeError as e:
+            self._config = _load_merged_config(self.config_path)
+        except (OSError, json.JSONDecodeError, TypeError, FileNotFoundError) as e:
             self._fail(f"Invalid JSON in configuration file: {e}")
 
         # Debug: optionally replace placeholder colors with random colors
@@ -185,6 +329,33 @@ class ConfigLoader:
         except Exception:
             pass  # Silently ignore if logging not available during config loading
         
+        return self._config
+
+    def load_with_style_override(self, style_ref: str) -> Dict[str, Any]:
+        """Load config.json but force a specific style config for defaults.
+
+        Args:
+            style_ref: Style config path/reference (same resolution rules as default_style_config).
+        """
+        if not self.config_path.exists():
+            self._fail(f"Configuration file not found: {self.config_path}")
+
+        if not self.config_path.is_file():
+            self._fail(f"Configuration path is not a file: {self.config_path}")
+
+        try:
+            self._config = _load_merged_config_with_style_override(self.config_path, style_ref)
+        except (OSError, json.JSONDecodeError, TypeError, FileNotFoundError) as e:
+            self._fail(f"Invalid JSON in configuration file: {e}")
+
+        _apply_debug_random_placeholder_colors(self._config)
+
+        try:
+            self._config = _expand_config_refs(self._config)
+        except ValueError as e:
+            self._fail(str(e))
+
+        self._validate()
         return self._config
     
     def _validate(self) -> None:
@@ -1759,8 +1930,7 @@ def read_ui_dialog_section(
     try:
         if not config_path.is_file():
             return None
-        with open(config_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        data = _load_merged_config(config_path)
         data = _expand_config_refs(data)
         section = data.get("ui", {}).get("dialogs", {}).get(dialog_key)
         return section if isinstance(section, dict) else None

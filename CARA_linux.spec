@@ -10,7 +10,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('app/config/config.json', 'app/config'),
+        ('app/config', 'app/config'),
         ('app/resources', 'app/resources'),
         ('appicon.svg', '.'),
         ('manual.html', '.'),

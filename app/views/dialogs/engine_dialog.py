@@ -333,8 +333,8 @@ class EngineDialog(QDialog):
         group_border_width = group_box_config.get('border_width', 1)
         group_border_radius = group_box_config.get('border_radius', 5)
         group_bg_color = group_box_config.get('background_color')  # None = use unified default
-        group_title_color = group_box_config.get('title_color', [240, 240, 240])
-        group_title_font_family = resolve_font_family(group_box_config.get('title_font_family', 'Helvetica Neue'))
+        group_title_color = group_box_config.get('title_color')
+        group_title_font_family = resolve_font_family(group_box_config.get('title_font_family'))
         group_title_font_size = scale_font_size(group_box_config.get('title_font_size', 11))
         group_margin_top = group_box_config.get('margin_top', 10)
         group_padding_top = group_box_config.get('padding_top', 10)

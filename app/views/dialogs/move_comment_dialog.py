@@ -104,6 +104,13 @@ class MoveCommentDialog(QDialog):
             "focus_border_color", styles_le.get("focus_border_color", [0, 120, 212])
         )
         self._input_border_width = styles_le.get("border_width", 1)
+        self._input_hover_border_offset = styles_le.get("hover_border_offset", 20)
+        self._input_disabled_brightness_factor = float(
+            styles_le.get("disabled_brightness_factor", 0.5) or 0.5
+        )
+        self._input_disabled_brightness_factor = max(
+            0.1, min(1.0, self._input_disabled_brightness_factor)
+        )
 
         text_edits_config = dialog_config.get("text_edits", {})
         self._text_edit_min_h = text_edits_config.get("minimum_height", 80)
@@ -267,6 +274,8 @@ class MoveCommentDialog(QDialog):
             border_width=self._input_border_width,
             border_radius=self._input_border_radius,
             padding=self._input_padding,
+            hover_border_offset=self._input_hover_border_offset,
+            disabled_brightness_factor=self._input_disabled_brightness_factor,
         ).replace("QLineEdit", "QTextEdit")
 
         for te in (self._white_edit, self._black_edit):

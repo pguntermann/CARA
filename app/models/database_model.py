@@ -155,6 +155,37 @@ class DatabaseModel(QAbstractTableModel):
         ui_cfg = (self._config.get("ui") or {})
         db_panel_cfg = ui_cfg.get("panels", {}).get("database", {})
         self._pgn_preview_max_len: int = db_panel_cfg.get("pgn_col_max_chars", 250)
+
+    def set_config(self, config: Dict[str, Any]) -> None:
+        """Update config and refresh cached theme-driven assets."""
+        self._config = config or {}
+        ui_cfg = (self._config.get("ui") or {})
+        db_panel_cfg = ui_cfg.get("panels", {}).get("database", {})
+        self._pgn_preview_max_len = db_panel_cfg.get("pgn_col_max_chars", 250)
+        self._unsaved_icon = None
+        self._emit_unsaved_icon_data_change()
+
+    def _get_unsaved_indicator_color(self) -> QColor:
+        """Return the configured unsaved table-indicator color."""
+        db_panel_cfg = ((self._config.get("ui") or {}).get("panels", {}) or {}).get("database", {})
+        color = db_panel_cfg.get("unsaved_table_indicator_color", [255, 200, 100])
+        try:
+            return QColor(int(color[0]), int(color[1]), int(color[2]))
+        except Exception:
+            return QColor(255, 200, 100)
+
+    def _emit_unsaved_icon_data_change(self) -> None:
+        """Refresh the unsaved-indicator column after a theme/config change."""
+        if not self._games:
+            return
+        parent = QModelIndex()
+        top_left = self.index(0, self.COL_UNSAVED, parent)
+        bottom_right = self.index(len(self._games) - 1, self.COL_UNSAVED, parent)
+        self.dataChanged.emit(
+            top_left,
+            bottom_right,
+            [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole],
+        )
     
     def _emit_stats_relevant_data_change(self) -> None:
         """Notify listeners that stats-relevant game data or membership changed."""
@@ -860,8 +891,7 @@ class DatabaseModel(QAbstractTableModel):
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # Use orange/yellow color for visibility (same as tab indicator)
-        circle_color = QColor(255, 200, 100)
+        circle_color = self._get_unsaved_indicator_color()
         
         # Draw circle positioned more to the right in the pixmap
         # Add extra padding on left to push visible circle toward center of column

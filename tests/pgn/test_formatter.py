@@ -14,13 +14,49 @@ from app.services.pgn_formatter_service import PgnFormatterService, PGN_MOVE_RES
 from app.config.config_loader import ConfigLoader
 
 
-def _validate_formatter_output(pgn_text: str, formatted_html: str, move_info: list, test_name: str) -> list:
+def _rgb_marker(rgb: list) -> str:
+    """Return the CSS marker substring used in formatter spans for a given RGB triplet."""
+    try:
+        r, g, b = int(rgb[0]), int(rgb[1]), int(rgb[2])
+    except Exception:
+        r, g, b = 0, 0, 0
+    return f"color: rgb({r}, {g}, {b})"
+
+
+def _get_pgn_formatting_config(config: dict) -> dict:
+    ui_config = config.get("ui", {}) if isinstance(config, dict) else {}
+    panel_config = (ui_config.get("panels", {}) or {}).get("detail", {}) if isinstance(ui_config, dict) else {}
+    pgn_cfg = (panel_config.get("pgn_notation", {}) or {}) if isinstance(panel_config, dict) else {}
+    formatting = (pgn_cfg.get("formatting", {}) or {}) if isinstance(pgn_cfg, dict) else {}
+    return {"pgn": pgn_cfg, "formatting": formatting}
+
+
+def _validate_formatter_output(pgn_text: str, formatted_html: str, move_info: list, test_name: str, config: dict) -> list:
     """Validate formatter output and return list of error messages (empty if valid)."""
     errors = []
 
+    cfg = _get_pgn_formatting_config(config)
+    formatting = cfg["formatting"]
+    pgn_cfg = cfg["pgn"]
+
+    # These defaults must mirror PgnFormatterService.format_pgn_to_html fallbacks.
+    header_color = (formatting.get("headers", {}) or {}).get("color", [100, 150, 255])
+    comment_color = (formatting.get("comments", {}) or {}).get("color", [180, 200, 255])
+    variation_color = (formatting.get("variations", {}) or {}).get("color", [180, 180, 180])
+    move_number_color = (formatting.get("move_numbers", {}) or {}).get("color", [255, 255, 255])
+    move_number_bold = bool((formatting.get("move_numbers", {}) or {}).get("bold", True))
+    result_color = (formatting.get("results", {}) or {}).get("color", [255, 255, 100])
+    result_bold = bool((formatting.get("results", {}) or {}).get("bold", True))
+
+    header_marker = _rgb_marker(header_color)
+    comment_marker = _rgb_marker(comment_color)
+    variation_marker = _rgb_marker(variation_color)
+    move_number_marker = _rgb_marker(move_number_color)
+    result_marker = _rgb_marker(result_color)
+
     # Check that headers are formatted (if headers exist)
     if '[' in pgn_text and ']' in pgn_text:
-        if 'color: rgb(100, 150, 255)' not in formatted_html:
+        if header_marker not in formatted_html:
             errors.append("Headers not found with expected color")
 
     # Check for moves in the PGN (simple check: look for "digit. " pattern)
@@ -29,7 +65,7 @@ def _validate_formatter_output(pgn_text: str, formatted_html: str, move_info: li
 
     # Check that comments are formatted (if present in move notation, not in headers)
     if '{' in pgn_text and '}' in pgn_text and has_moves:
-        if 'color: rgb(180, 200, 255)' not in formatted_html:
+        if comment_marker not in formatted_html:
             errors.append("Comments not found with expected color")
 
     # Check that variations are formatted (if present in move notation)
@@ -40,32 +76,35 @@ def _validate_formatter_output(pgn_text: str, formatted_html: str, move_info: li
     has_variations_in_moves = '(' in move_notation_text and ')' in move_notation_text and has_moves
 
     if has_variations_in_moves:
-        if 'color: rgb(180, 180, 180)' not in formatted_html or 'font-style: italic' not in formatted_html:
+        if variation_marker not in formatted_html or 'font-style: italic' not in formatted_html:
             errors.append("Variations not found with expected styling")
     # Check that move numbers are formatted (if moves present)
     if has_moves:
-        has_formatted_move_numbers = 'color: rgb(255, 255, 255)' in formatted_html and 'font-weight: bold' in formatted_html
+        has_formatted_move_numbers = move_number_marker in formatted_html and (
+            (not move_number_bold) or ('font-weight: bold' in formatted_html)
+        )
         move_number_pattern = re.compile(r'\d+\.\s+')
         move_numbers_in_pgn = move_number_pattern.findall(pgn_text)
         if move_numbers_in_pgn and not has_formatted_move_numbers:
-            if 'color: rgb(180, 180, 180)' not in formatted_html:
-                errors.append("Move numbers not found with expected formatting (white/bold for main line)")
+            # Move numbers might only appear in variation styling if move number formatting is disabled.
+            if variation_marker not in formatted_html:
+                errors.append("Move numbers not found with expected formatting (color/bold from config)")
 
     has_result_in_moves = bool(PGN_MOVE_RESULT_RE.search(move_notation_text))
 
     if has_result_in_moves:
-        if 'color: rgb(255, 255, 100)' not in formatted_html or 'font-weight: bold' not in formatted_html:
-            errors.append("Results not found with expected formatting (yellow/bold)")
+        if result_marker not in formatted_html or (result_bold and 'font-weight: bold' not in formatted_html):
+            errors.append("Results not found with expected formatting (color/bold from config)")
 
     # Check that results in variations are NOT formatted as results
     variation_span_pattern = re.compile(
-        r'<span[^>]*color:\s*rgb\(180,\s*180,\s*180\)[^>]*font-style:\s*italic[^>]*>([^<]*)</span>'
+        r'<span[^>]*color:\s*rgb\(\s*\d+,\s*\d+,\s*\d+\s*\)[^>]*font-style:\s*italic[^>]*>([^<]*)</span>'
     )
     for match in variation_span_pattern.finditer(formatted_html):
         variation_content = match.group(1)
         if PGN_MOVE_RESULT_RE.search(variation_content):
             full_variation_span = match.group(0)
-            if 'color: rgb(255, 255, 100)' in full_variation_span:
+            if result_marker in full_variation_span:
                 errors.append("Result in variation is incorrectly formatted as result (should use variation formatting)")
 
     open_spans = formatted_html.count('<span')
@@ -105,23 +144,24 @@ def _validate_formatter_output(pgn_text: str, formatted_html: str, move_info: li
                     if not has_unknown_nag:
                         pass
 
-    header_pattern = re.compile(r'<span[^>]*color:\s*rgb\(100,\s*150,\s*255\)[^>]*>([^<]*)</span>')
+    header_pattern = re.compile(r'<span[^>]*color:\s*rgb\(\s*\d+,\s*\d+,\s*\d+\s*\)[^>]*>([^<]*)</span>')
     for match in header_pattern.finditer(formatted_html):
         header_content = match.group(1)
-        if 'color: rgb(180, 180, 180)' in header_content or 'font-style: italic' in header_content:
+        if variation_marker in header_content or 'font-style: italic' in header_content:
             errors.append("Variation formatting found inside header (should not happen)")
-        if 'color: rgb(255, 255, 255)' in header_content and 'font-weight: bold' in header_content:
+        if move_number_marker in header_content and (not move_number_bold or 'font-weight: bold' in header_content):
             if re.search(r'\d+\.\s*', header_content):
                 errors.append("Move number formatting found inside header (should not happen)")
-        if 'color: rgb(255, 255, 100)' in header_content and 'Result' not in match.group(0):
+        if result_marker in header_content and 'Result' not in match.group(0):
             if PGN_MOVE_RESULT_RE.search(header_content):
                 errors.append("Result formatting found inside non-Result header (should not happen)")
 
     if has_moves:
-        move_color_pattern = re.compile(r'color:\s*rgb\(220,\s*220,\s*220\)')
+        default_text_color = pgn_cfg.get("text_color", [220, 220, 220])
+        move_color_pattern = re.compile(rf'color:\s*rgb\(\s*{int(default_text_color[0])},\s*{int(default_text_color[1])},\s*{int(default_text_color[2])}\s*\)')
         has_move_color = bool(move_color_pattern.search(formatted_html))
         if has_moves and not has_move_color:
-            variation_move_pattern = re.compile(r'color:\s*rgb\(180,\s*180,\s*180\).*font-style:\s*italic')
+            variation_move_pattern = re.compile(rf'{re.escape(variation_marker)}.*font-style:\s*italic')
             has_variation_moves = bool(variation_move_pattern.search(formatted_html))
             if not has_variation_moves:
                 pass  # Move color formatting might be disabled in config
@@ -140,7 +180,8 @@ def _validate_formatter_output(pgn_text: str, formatted_html: str, move_info: li
                 errors.append("Unknown NAG 146 should be converted to 'NAG 146' or 'Novelty'")
 
     if "Mainline Moves" in test_name and has_moves:
-        move_color_pattern = re.compile(r'color:\s*rgb\(220,\s*220,\s*220\)')
+        default_text_color = pgn_cfg.get("text_color", [220, 220, 220])
+        move_color_pattern = re.compile(rf'color:\s*rgb\(\s*{int(default_text_color[0])},\s*{int(default_text_color[1])},\s*{int(default_text_color[2])}\s*\)')
         has_move_color = bool(move_color_pattern.search(formatted_html))
         if not has_move_color:
             pass  # Move color formatting might be disabled in config
@@ -168,7 +209,7 @@ class TestPgnFormatter(unittest.TestCase):
             with self.subTest(name=test_case["name"]):
                 pgn_text = test_case["pgn"]
                 formatted_html, move_info = PgnFormatterService.format_pgn_to_html(pgn_text, self.config)
-                errors = _validate_formatter_output(pgn_text, formatted_html, move_info, test_case["name"])
+                errors = _validate_formatter_output(pgn_text, formatted_html, move_info, test_case["name"], self.config)
                 self.assertEqual([], errors, "\n".join(errors) if errors else "")
 
     def _get_test_cases(self):

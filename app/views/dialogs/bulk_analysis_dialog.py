@@ -616,20 +616,21 @@ class BulkAnalysisDialog(QDialog):
         
         # Group box styling - use StyleManager
         groups_config = dialog_config.get('groups', {})
-        group_border_color = groups_config.get('border_color', [60, 60, 65])
-        group_border_width = groups_config.get('border_width', 1)
-        group_border_radius = groups_config.get('border_radius', 5)
+        group_border_color = groups_config.get('border_color')
+        group_border_width = groups_config.get('border_width')
+        group_border_radius = groups_config.get('border_radius')
         group_bg_color = groups_config.get('background_color')  # None = use unified default
-        group_title_color = groups_config.get('title_color', [240, 240, 240])
-        group_title_font_family_raw = groups_config.get('title_font_family', 'Helvetica Neue')
+        group_title_color = groups_config.get('title_color')
+        group_title_font_family_raw = groups_config.get('title_font_family')
         from app.utils.font_utils import resolve_font_family, scale_font_size
         from app.views.style import StyleManager
-        group_title_font_family = resolve_font_family(group_title_font_family_raw)
-        group_title_font_size = scale_font_size(groups_config.get('title_font_size', 11))
-        group_margin_top = groups_config.get('margin_top', 10)
-        group_padding_top = groups_config.get('padding_top', 5)
-        group_title_left = groups_config.get('title_left', 10)
-        group_title_padding = groups_config.get('title_padding', [0, 5])
+        group_title_font_family = resolve_font_family(group_title_font_family_raw) if group_title_font_family_raw else None
+        group_title_font_size_raw = groups_config.get('title_font_size')
+        group_title_font_size = scale_font_size(group_title_font_size_raw) if group_title_font_size_raw is not None else None
+        group_margin_top = groups_config.get('margin_top')
+        group_padding_top = groups_config.get('padding_top')
+        group_title_left = groups_config.get('title_left')
+        group_title_padding = groups_config.get('title_padding')
         
         group_boxes = list(self.findChildren(QGroupBox))
         if group_boxes:
@@ -705,8 +706,8 @@ class BulkAnalysisDialog(QDialog):
                 spinboxes,
                 self.config,
                 text_color=input_text_color,
-                font_family=label_font_family,
-                font_size=label_font_size,
+                font_family=None,
+                font_size=None,
                 bg_color=spinbox_bg_color,
                 border_color=input_border,
                 focus_border_color=spinbox_focus_border_color,

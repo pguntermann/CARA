@@ -5067,8 +5067,6 @@ class DetailPlayerStatsView(QWidget):
             # Update visibility based on initial width (defer to allow layout to complete)
             QTimer.singleShot(0, self._update_move_classification_visibility)
         
-        layout.addStretch()
-        
         # Set size policy to prevent excessive width usage
         widget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         

@@ -352,6 +352,7 @@ class CriteriaRowWidget(QWidget):
         buttons_config = dialog_config.get("buttons", {})
         self.button_height = buttons_config.get("height", 30)
         self.small_button_width = buttons_config.get("small_width", 80)
+        self.logic_combo_width = buttons_config.get("logic_combo_width", 70)
         
         # Labels
         labels_config = dialog_config.get("labels", {})
@@ -370,7 +371,7 @@ class CriteriaRowWidget(QWidget):
         self.logic_combo = QComboBox()
         self.logic_combo.addItems(["AND", "OR"])
         self.logic_combo.setCurrentText("AND")
-        self.logic_combo.setFixedWidth(70)
+        self.logic_combo.setFixedWidth(self.logic_combo_width)
         self.logic_combo.setVisible(False)  # Hidden by default
         layout.addWidget(self.logic_combo)
         
@@ -513,7 +514,7 @@ class CriteriaRowWidget(QWidget):
         # Use smaller padding for the Remove button to match input field height better
         from app.views.style import StyleManager
         buttons_config = self.config.get("ui", {}).get("dialogs", {}).get("search", {}).get("buttons", {})
-        border_color = buttons_config.get("border_color", [60, 60, 65])
+        border_color = buttons_config.get("border_color", dialog_config.get("border_color"))
         # Use smaller padding (3px) for inline button
         StyleManager.style_buttons(
             [self.remove_btn, self.tags_picker_btn],
@@ -1287,9 +1288,9 @@ class SearchDialog(QDialog):
         group_border_radius = groups_config.get("border_radius", 5)
         from app.utils.font_utils import resolve_font_family, scale_font_size
         from app.views.style import StyleManager
-        group_title_font_family = resolve_font_family(groups_config.get("title_font_family", "Helvetica Neue"))
+        group_title_font_family = resolve_font_family(groups_config.get("title_font_family"))
         group_title_font_size = scale_font_size(groups_config.get("title_font_size", 11))
-        group_title_color = groups_config.get("title_color", [240, 240, 240])
+        group_title_color = groups_config.get("title_color")
         group_content_margins = groups_config.get("content_margins", [10, 20, 10, 15])
         group_margin_top = groups_config.get("margin_top", 10)
         group_padding_top = groups_config.get("padding_top", 5)
@@ -1347,7 +1348,7 @@ class SearchDialog(QDialog):
         
         # Apply button styling using StyleManager (uses unified config)
         buttons_config = self.config.get("ui", {}).get("dialogs", {}).get("search", {}).get("buttons", {})
-        border_color = buttons_config.get("border_color", [60, 60, 65])
+        border_color = buttons_config.get("border_color", dialog_config.get("border_color"))
         bg_color_list = [self.bg_color.red(), self.bg_color.green(), self.bg_color.blue()]
         border_color_list = [border_color[0], border_color[1], border_color[2]]
         

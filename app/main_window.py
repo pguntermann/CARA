@@ -46,14 +46,18 @@ from typing import Dict, Any, Optional, List
 class MainWindow(QMainWindow):
     """Main application window with four distinct sections."""
     
-    def __init__(self, config: Dict[str, Any]) -> None:
+    def __init__(self, config: Dict[str, Any], *, active_style_ref: str = "") -> None:
         """Initialize the main window.
         
         Args:
             config: Configuration dictionary loaded from ConfigLoader.
+            active_style_ref: The currently active style config reference that was used to
+                load ``config`` (e.g. from persisted user settings at startup). Used to
+                sync the View → Theme menu without re-reading settings from disk.
         """
         super().__init__()
         self.config = config
+        self._active_style_ref = str(active_style_ref or "")
         self._menubar_action_icon_svgs: Dict[Any, str] = {}
 
         # Debug log: MainWindow initialization started
@@ -136,6 +140,202 @@ class MainWindow(QMainWindow):
 
         _setup_menu_bar_definitions(self, menu_bar)
         self._connect_menu_icon_color_scheme_refresh()
+
+    def _setup_theme_menu(self, parent_menu: QMenu) -> None:
+        """Add a View → Theme submenu.
+
+        Theme discovery/loading is handled via ThemeService; this method only wires UI actions.
+        """
+        from PyQt6.QtGui import QActionGroup
+        from app.services.theme_service import discover_style_configs
+        from app.utils.themed_icon import SVG_MENU_PALETTE, set_menubar_themable_action_icon
+
+        theme_menu = parent_menu.addMenu("Theme")
+        self._apply_menu_styling(theme_menu)
+        set_menubar_themable_action_icon(self, theme_menu.menuAction(), SVG_MENU_PALETTE)
+
+        group = QActionGroup(self)
+        group.setExclusive(True)
+
+        # Discover themes next to config.json.
+        # Use ConfigLoader default path resolution (app/config/config.json).
+        from app.config.config_loader import ConfigLoader
+
+        opts = discover_style_configs(config_path=ConfigLoader().config_path)
+
+        # Reuse the already-determined active style ref (set at startup / apply_theme).
+        cur_style = str(getattr(self, "_active_style_ref", "") or "")
+        if not cur_style:
+            # Safe default when unset (e.g., tests).
+            try:
+                cur_style = str(self.config.get("default_style_config", "") or "")
+            except Exception:
+                cur_style = ""
+
+        if not opts:
+            a = theme_menu.addAction("(no themes found)")
+            a.setEnabled(False)
+            return
+
+        self._theme_menu_actions = []
+        for opt in opts:
+            act = theme_menu.addAction(opt.label)
+            act.setCheckable(True)
+            act.setActionGroup(group)
+            if cur_style and (cur_style == opt.style_ref or cur_style.endswith(opt.absolute_path.name)):
+                act.setChecked(True)
+            act.triggered.connect(lambda checked=False, sr=opt.style_ref: self.apply_theme(style_ref=sr))
+            self._theme_menu_actions.append((act, opt))
+
+    def apply_theme(self, *, style_ref: str) -> None:
+        """Switch the active style config and rebuild UI for immediate effect."""
+        from app.config.config_loader import ConfigLoader
+        from app.services.theme_service import load_config_for_style
+        from app.utils.themed_icon import refresh_all_menubar_themable_action_icons
+
+        # Preserve a small amount of UI state.
+        detail_tab = -1
+        ps_current_player = None
+        ps_source_sel = None
+        try:
+            if hasattr(self, "detail_panel") and hasattr(self.detail_panel, "tab_widget"):
+                detail_tab = int(self.detail_panel.tab_widget.currentIndex())
+        except Exception:
+            detail_tab = -1
+
+        # Preserve Player Stats selection (fixes view needing manual reselect after rebuild).
+        try:
+            psc = self.controller.get_player_stats_controller() if hasattr(self, "controller") else None
+            if psc is not None and hasattr(psc, "get_current_player"):
+                ps_current_player = psc.get_current_player()
+            if psc is not None and hasattr(psc, "get_source_selection"):
+                ps_source_sel = psc.get_source_selection()
+        except Exception:
+            ps_current_player = None
+            ps_source_sel = None
+
+        db_collapsed = bool(getattr(self, "_database_panel_collapsed", False))
+        splitter_sizes = None
+        try:
+            splitter_sizes = self.middle_splitter.sizes() if hasattr(self, "middle_splitter") else None
+        except Exception:
+            splitter_sizes = None
+
+        # Load merged config with the selected style defaults (no disk mutation).
+        cfg_path = ConfigLoader().config_path
+        new_config = load_config_for_style(config_path=cfg_path, style_ref=style_ref)
+
+        # Store the active style ref for menu syncing without extra lookups.
+        self._active_style_ref = str(style_ref or "")
+
+        # Update config references.
+        self.config = new_config
+        try:
+            self.controller.set_config(new_config)
+        except Exception:
+            pass
+
+        # Persist theme choice in user settings (save happens by existing shutdown flow).
+        try:
+            from app.services.user_settings_service import UserSettingsService
+
+            svc = UserSettingsService.get_instance()
+            model = svc.get_model()
+            cur = model.get_settings()
+            ui = cur.get("ui", {}) if isinstance(cur.get("ui"), dict) else {}
+            theme = ui.get("theme", {}) if isinstance(ui.get("theme"), dict) else {}
+            theme["default_style_config"] = str(style_ref)
+            ui["theme"] = theme
+            updated = dict(cur)
+            updated["ui"] = ui
+            model.update_from_dict(updated)
+        except Exception:
+            pass
+
+        # Re-apply global tooltip styling.
+        self._setup_tooltip_styling()
+
+        # Re-apply menu bar + menu styling (menubar is not rebuilt in _setup_ui()).
+        try:
+            mb = self.menuBar()
+            self._apply_menu_bar_styling(mb)
+            # Also restyle existing menus/submenus (recursive).
+            def _restyle_menu_recursive(menu: QMenu) -> None:
+                self._apply_menu_styling(menu)
+                for a in menu.actions():
+                    sm = a.menu()
+                    if sm is not None:
+                        _restyle_menu_recursive(sm)
+
+            for action in mb.actions():
+                m = action.menu()
+                if m is not None:
+                    _restyle_menu_recursive(m)
+        except Exception:
+            pass
+
+        # Rebuild themed menu icons for new tint colors.
+        try:
+            refresh_all_menubar_themable_action_icons(self)
+        except Exception:
+            pass
+
+        # Rebuild central UI to force widgets to reload styling from config.
+        try:
+            old = self.takeCentralWidget()
+            if old is not None:
+                old.deleteLater()
+        except Exception:
+            pass
+        self._setup_ui()
+
+        # Ensure the View → Theme menu reflects the newly selected style.
+        try:
+            for act, opt in getattr(self, "_theme_menu_actions", []) or []:
+                if str(style_ref) == opt.style_ref or str(style_ref).endswith(opt.absolute_path.name):
+                    act.setChecked(True)
+        except Exception:
+            pass
+
+        # Re-apply user settings to the newly created views (Player Stats visibility, etc.).
+        try:
+            self._load_user_settings()
+        except Exception:
+            pass
+
+        # Re-emit Player Stats selection to force a refresh (same effect as reselecting in dropdown).
+        try:
+            psc = self.controller.get_player_stats_controller() if hasattr(self, "controller") else None
+            if psc is not None and ps_source_sel is not None and hasattr(psc, "set_source_selection"):
+                psc.set_source_selection(int(ps_source_sel))
+            if psc is not None and ps_current_player and hasattr(psc, "set_player_selection"):
+                # Force refresh even if controller kept the same player across theme switch.
+                psc.set_player_selection(None)
+                from PyQt6.QtCore import QTimer
+
+                QTimer.singleShot(0, lambda p=str(ps_current_player): psc.set_player_selection(p))
+        except Exception:
+            pass
+
+        # Restore basic UI state.
+        try:
+            if detail_tab >= 0 and hasattr(self, "detail_panel") and hasattr(self.detail_panel, "tab_widget"):
+                self.detail_panel.tab_widget.setCurrentIndex(detail_tab)
+        except Exception:
+            pass
+
+        try:
+            if splitter_sizes and hasattr(self, "middle_splitter"):
+                self.middle_splitter.setSizes(splitter_sizes)
+        except Exception:
+            pass
+
+        try:
+            # Ensure collapsed state matches prior.
+            if bool(getattr(self, "_database_panel_collapsed", False)) != db_collapsed:
+                self._toggle_database_panel()
+        except Exception:
+            pass
 
     def _connect_menu_icon_color_scheme_refresh(self) -> None:
         """Rebuild themed menu icons when the system light/dark preference changes (Qt 6.5+)."""
@@ -1141,6 +1341,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if checked, False otherwise.
         """
+        self._update_board_visibility_setting("show_annotations_layer", checked)
         if self.controller and self.controller.get_annotation_controller():
             self.controller.get_annotation_controller().toggle_annotations_visibility()
     
@@ -2388,6 +2589,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if metadata should be shown, False otherwise.
         """
+        self._update_pgn_visibility_setting("show_metadata", checked)
         # Update PGN view to show/hide metadata
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
             pgn_view = self.detail_panel.pgn_view
@@ -2406,6 +2608,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if comments should be shown, False otherwise.
         """
+        self._update_pgn_visibility_setting("show_comments", checked)
         # Update PGN view to show/hide comments
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
             pgn_view = self.detail_panel.pgn_view
@@ -2424,6 +2627,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if variations should be shown, False otherwise.
         """
+        self._update_pgn_visibility_setting("show_variations", checked)
         # Update PGN view to show/hide variations
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
             pgn_view = self.detail_panel.pgn_view
@@ -2442,6 +2646,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if annotations should be shown, False otherwise.
         """
+        self._update_pgn_visibility_setting("show_annotations", checked)
         # Update PGN view to show/hide annotations
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
             pgn_view = self.detail_panel.pgn_view
@@ -2460,6 +2665,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if results should be shown, False otherwise.
         """
+        self._update_pgn_visibility_setting("show_results", checked)
         # Update PGN view to show/hide results
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
             pgn_view = self.detail_panel.pgn_view
@@ -2499,12 +2705,37 @@ class MainWindow(QMainWindow):
         mode = "symbols" if use_symbols else "text"
         self.controller.set_status(f"NAG move assessments displayed as {mode}")
     
+    def _update_pgn_visibility_setting(self, key: str, checked: bool) -> None:
+        """Persist a PGN visibility toggle into the in-memory user settings model."""
+        from app.services.user_settings_service import UserSettingsService
+
+        UserSettingsService.get_instance().update_pgn_visibility({key: checked})
+
+    def _update_game_analysis_setting(self, key: str, value: Any) -> None:
+        """Persist a game-analysis menu option into the in-memory user settings model."""
+        from app.services.user_settings_service import UserSettingsService
+
+        UserSettingsService.get_instance().update_game_analysis({key: value})
+
+    def _update_manual_analysis_setting(self, key: str, value: Any) -> None:
+        """Persist a manual-analysis menu option into the in-memory user settings model."""
+        from app.services.user_settings_service import UserSettingsService
+
+        UserSettingsService.get_instance().update_manual_analysis({key: value})
+
+    def _update_board_visibility_setting(self, key: str, value: Any) -> None:
+        """Persist a board-visibility option into the in-memory user settings model."""
+        from app.services.user_settings_service import UserSettingsService
+
+        UserSettingsService.get_instance().update_board_visibility({key: value})
+
     def _on_show_non_standard_tags_toggled(self, checked: bool) -> None:
         """Handle Show Non-Standard Tags toggle.
         
         Args:
             checked: True if non-standard tags (like [%evp], [%mdl]) should be shown, False otherwise.
         """
+        self._update_pgn_visibility_setting("show_non_standard_tags", checked)
         # Update PGN view to show/hide non-standard tags
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
             pgn_view = self.detail_panel.pgn_view
@@ -2635,8 +2866,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if should return to PLY 0 after analysis completes, False otherwise.
         """
-        # Settings will be saved automatically on application exit
-        # No immediate action needed - behavior is handled in _on_game_analysis_completed
+        self._update_game_analysis_setting("return_to_first_move_after_analysis", checked)
     
     def _on_switch_to_moves_list_toggled(self, checked: bool) -> None:
         """Handle Switch to Moves List at the start of Analysis toggle.
@@ -2644,8 +2874,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if should switch to Moves List tab at the start of analysis, False otherwise.
         """
-        # Settings will be saved automatically on application exit
-        # No immediate action needed - behavior is handled in _on_game_analysis_started
+        self._update_game_analysis_setting("switch_to_moves_list_at_start_of_analysis", checked)
     
     def _on_switch_to_summary_toggled(self, checked: bool) -> None:
         """Handle Switch to Game Summary after Analysis toggle.
@@ -2653,7 +2882,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if should switch to Game Summary tab after analysis, False otherwise.
         """
-        # Settings will be saved automatically on application exit
+        self._update_game_analysis_setting("switch_to_summary_after_analysis", checked)
     
     def _on_brilliant_move_detection_toggled(self, checked: bool) -> None:
         """Handle Brilliant Move Detection toggle.
@@ -2740,6 +2969,7 @@ class MainWindow(QMainWindow):
         Args:
             checked: True if normalized graph mode should be enabled, False for zero-based mode.
         """
+        self._update_game_analysis_setting("normalized_evaluation_graph", checked)
         # Apply setting to evaluation graph widget immediately
         self._update_evaluation_graph_mode(checked)
     
@@ -2802,6 +3032,7 @@ class MainWindow(QMainWindow):
     def _on_enable_miniature_preview_toggled(self) -> None:
         """Handle enable miniature preview toggle from menu."""
         enabled = self.enable_miniature_preview_action.isChecked()
+        self._update_manual_analysis_setting("enable_miniature_preview", enabled)
         manual_analysis_controller = self.controller.get_manual_analysis_controller()
         if manual_analysis_controller:
             manual_analysis_model = manual_analysis_controller.get_analysis_model()
@@ -2818,6 +3049,7 @@ class MainWindow(QMainWindow):
         for scale, action in self.miniature_preview_scale_actions.items():
             action.setChecked(scale == scale_factor)
         
+        self._update_manual_analysis_setting("miniature_preview_scale_factor", scale_factor)
         # Update model
         manual_analysis_controller = self.controller.get_manual_analysis_controller()
         if manual_analysis_controller:
@@ -2924,6 +3156,7 @@ class MainWindow(QMainWindow):
     def _on_hide_other_arrows_during_plan_exploration_toggled(self) -> None:
         """Handle hide other arrows during plan exploration toggle."""
         checked = self.hide_other_arrows_during_plan_exploration_action.isChecked()
+        self._update_board_visibility_setting("hide_other_arrows_during_plan_exploration", checked)
         board_model = self.controller.get_board_controller().get_board_model()
         board_model.set_hide_other_arrows_during_plan_exploration(checked)
         # Force update of chessboard widget to reflect the change

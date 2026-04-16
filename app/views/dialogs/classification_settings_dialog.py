@@ -678,8 +678,8 @@ class ClassificationSettingsDialog(QDialog):
         border_color = group_border_color
         border_width = groups_config.get('border_width', 1)
         border_radius = groups_config.get('border_radius', 5)
-        title_color = groups_config.get('title_color', [240, 240, 240])
-        title_font_family = resolve_font_family(groups_config.get('title_font_family', 'Helvetica Neue'))
+        title_color = groups_config.get('title_color')
+        title_font_family = resolve_font_family(groups_config.get('title_font_family'))
         title_font_size = scale_font_size(groups_config.get('title_font_size', 11))
         margin_top = groups_config.get('margin_top', 10)
         padding_top = groups_config.get('padding_top', 5)

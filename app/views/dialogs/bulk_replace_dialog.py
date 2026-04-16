@@ -151,6 +151,7 @@ class BulkReplaceDialog(QDialog):
         self.tags_list_spacing = tags_list_config.get("spacing", 8)
         self.tags_list_row_spacing = tags_list_config.get("row_spacing", 4)
         self.tags_list_margins = tags_list_config.get("margins", [10, 6, 8, 10])
+        self.tags_list_bg_color = QColor(*tags_list_config.get("background_color", inputs_config.get("background_color", [30, 30, 35])))
         
         # Quick select buttons
         quick_select_config = dialog_config.get("quick_select_buttons", {})
@@ -406,7 +407,7 @@ class BulkReplaceDialog(QDialog):
         # Set background color to match scroll area to prevent white bar
         tags_widget.setAutoFillBackground(True)
         tags_palette = tags_widget.palette()
-        tags_palette.setColor(tags_widget.backgroundRole(), self.input_bg_color)
+        tags_palette.setColor(tags_widget.backgroundRole(), self.tags_list_bg_color)
         tags_widget.setPalette(tags_palette)
         tags_grid = QGridLayout(tags_widget)
         tags_grid.setSpacing(self.tags_list_spacing)
@@ -671,7 +672,7 @@ class BulkReplaceDialog(QDialog):
         if hasattr(self, 'tags_scroll_area'):
             from app.views.style import StyleManager
             # Convert QColor to [R, G, B] list
-            input_bg = [self.input_bg_color.red(), self.input_bg_color.green(), self.input_bg_color.blue()]
+            input_bg = [self.tags_list_bg_color.red(), self.tags_list_bg_color.green(), self.tags_list_bg_color.blue()]
             input_border = [self.input_border_color.red(), self.input_border_color.green(), self.input_border_color.blue()]
             StyleManager.style_scroll_area(
                 self.tags_scroll_area,
@@ -691,9 +692,9 @@ class BulkReplaceDialog(QDialog):
         group_border_color = groups_config.get("border_color", border_color) if "border_color" in groups_config else border_color
         group_border_radius = groups_config.get("border_radius", 5)
         from app.utils.font_utils import resolve_font_family, scale_font_size
-        group_title_font_family = resolve_font_family(groups_config.get("title_font_family", "Helvetica Neue"))
+        group_title_font_family = resolve_font_family(groups_config.get("title_font_family"))
         group_title_font_size = scale_font_size(groups_config.get("title_font_size", 11))
-        group_title_color = groups_config.get("title_color", [240, 240, 240])
+        group_title_color = groups_config.get("title_color")
         group_content_margins = groups_config.get("content_margins", [10, 15, 10, 10])
         group_margin_top = groups_config.get("margin_top", 10)
         group_padding_top = groups_config.get("padding_top", 5)

@@ -186,18 +186,26 @@ def build_database_table_context_menu(
 
 def dismiss_database_table_context_menus(panel, ctx: DatabaseTableContextMenu) -> None:
     """Close our database table context menu hierarchy reliably (macOS needs extra help)."""
-    ctx.menu.close()
-    ctx.menu.hide()
-    ctx.select_rows_menu.close()
-    ctx.select_rows_menu.hide()
-    ctx.select_mode_menu.close()
-    ctx.select_mode_menu.hide()
+    # During theme switches / UI rebuilds, the menus can be deleted while the QTimer
+    # callback is still pending (PyQt then raises RuntimeError on any access).
+    try:
+        ctx.menu.close()
+        ctx.menu.hide()
+        ctx.select_rows_menu.close()
+        ctx.select_rows_menu.hide()
+        ctx.select_mode_menu.close()
+        ctx.select_mode_menu.hide()
+    except RuntimeError:
+        return
     if sys.platform == "darwin":
         QApplication.processEvents()
         popup = QApplication.activePopupWidget()
         while popup is not None:
-            popup.close()
-            popup.hide()
+            try:
+                popup.close()
+                popup.hide()
+            except RuntimeError:
+                break
             QApplication.processEvents()
             popup = QApplication.activePopupWidget()
 

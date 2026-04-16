@@ -120,9 +120,9 @@ class DeduplicationCriteriaDialog(QDialog):
         # Groups
         groups_config = dialog_config.get('groups', {})
         from app.utils.font_utils import resolve_font_family, scale_font_size
-        self.group_title_font_family = resolve_font_family(groups_config.get('title_font_family', 'Helvetica Neue'))
+        self.group_title_font_family = resolve_font_family(groups_config.get('title_font_family'))
         self.group_title_font_size = scale_font_size(groups_config.get('title_font_size', 11))
-        self.group_title_color = groups_config.get('title_color', [240, 240, 240])
+        self.group_title_color = groups_config.get('title_color')
         self.group_content_margins = groups_config.get('content_margins', [10, 15, 10, 10])
         self.group_margin_top = groups_config.get('margin_top', 10)
         self.group_padding_top = groups_config.get('padding_top', 5)
@@ -130,7 +130,9 @@ class DeduplicationCriteriaDialog(QDialog):
         # Checkboxes
         checkbox_config = dialog_config.get('checkboxes', {})
         self.checkbox_spacing = checkbox_config.get('spacing', 5)
-        self.checkbox_text_color = checkbox_config.get('text_color', [200, 200, 200])
+        # If the dialog doesn't specify checkbox colors, inherit from labels/dialog text color.
+        # This matters for light themes where the old dark-theme fallback looked "disabled".
+        self.checkbox_text_color = checkbox_config.get('text_color', self.label_text_color or self.text_color)
         from app.utils.font_utils import scale_font_size
         self.checkbox_font_size = scale_font_size(checkbox_config.get('font_size', 11))
         

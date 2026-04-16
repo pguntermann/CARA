@@ -32,6 +32,14 @@ class EvaluationBarWidget(QWidget):
         self._animation_duration_ms: int = 300
         self._animation_timer: Optional[QTimer] = None
         self._is_animating: bool = False
+
+        # Line styling
+        self._center_line_color = QColor(128, 128, 128)
+        self._center_line_width = 1
+        self._center_line_style = Qt.PenStyle.SolidLine
+        self._division_marks_color = QColor(128, 128, 128)
+        self._division_marks_width = 1
+        self._division_marks_style = Qt.PenStyle.DashLine
         
         self._load_config()
         self._setup_ui()
@@ -44,6 +52,32 @@ class EvaluationBarWidget(QWidget):
         """Load configuration from config dictionary."""
         board_config = self.config.get("ui", {}).get("panels", {}).get("main", {}).get("board", {})
         eval_config = board_config.get("evaluation_bar", {})
+
+        def _qcolor_from_cfg(value: Any, default: QColor) -> QColor:
+            if isinstance(value, (list, tuple)) and len(value) >= 3:
+                try:
+                    return QColor(int(value[0]), int(value[1]), int(value[2]))
+                except (TypeError, ValueError):
+                    return default
+            return default
+
+        def _pen_style_from_cfg(value: Any, default: Qt.PenStyle) -> Qt.PenStyle:
+            if not isinstance(value, str):
+                return default
+            key = value.strip().lower()
+            mapping = {
+                "solid": Qt.PenStyle.SolidLine,
+                "solidline": Qt.PenStyle.SolidLine,
+                "dash": Qt.PenStyle.DashLine,
+                "dashline": Qt.PenStyle.DashLine,
+                "dot": Qt.PenStyle.DotLine,
+                "dotline": Qt.PenStyle.DotLine,
+                "dashdot": Qt.PenStyle.DashDotLine,
+                "dashdotline": Qt.PenStyle.DashDotLine,
+                "dashdotdot": Qt.PenStyle.DashDotDotLine,
+                "dashdotdotline": Qt.PenStyle.DashDotDotLine,
+            }
+            return mapping.get(key, default)
         
         self.width = eval_config.get("width", 30)
         scale_max = eval_config.get("scale_max", 10.0)
@@ -57,6 +91,18 @@ class EvaluationBarWidget(QWidget):
         colors_config = eval_config.get("colors", {})
         self.white_color = QColor(*colors_config.get("white", [255, 255, 255]))
         self.black_color = QColor(*colors_config.get("black", [0, 0, 0]))
+
+        center_cfg = eval_config.get("center_line", {})
+        if isinstance(center_cfg, dict):
+            self._center_line_color = _qcolor_from_cfg(center_cfg.get("color"), self._center_line_color)
+            self._center_line_width = int(center_cfg.get("width", self._center_line_width) or self._center_line_width)
+            self._center_line_style = _pen_style_from_cfg(center_cfg.get("style"), self._center_line_style)
+
+        division_cfg = eval_config.get("division_marks", {})
+        if isinstance(division_cfg, dict):
+            self._division_marks_color = _qcolor_from_cfg(division_cfg.get("color"), self._division_marks_color)
+            self._division_marks_width = int(division_cfg.get("width", self._division_marks_width) or self._division_marks_width)
+            self._division_marks_style = _pen_style_from_cfg(division_cfg.get("style"), self._division_marks_style)
         
         # Set fixed width
         self.setFixedWidth(self.width)
@@ -217,12 +263,12 @@ class EvaluationBarWidget(QWidget):
             painter.fillRect(white_rect, QBrush(self.white_color))
         
         # Draw center line
-        center_pen = QPen(QColor(128, 128, 128), 1, Qt.PenStyle.SolidLine)
+        center_pen = QPen(self._center_line_color, self._center_line_width, self._center_line_style)
         painter.setPen(center_pen)
         painter.drawLine(0, int(center_y), width, int(center_y))
         
         # Draw division marks
-        division_pen = QPen(QColor(128, 128, 128), 1, Qt.PenStyle.DashLine)
+        division_pen = QPen(self._division_marks_color, self._division_marks_width, self._division_marks_style)
         painter.setPen(division_pen)
         
         for division in self.divisions:

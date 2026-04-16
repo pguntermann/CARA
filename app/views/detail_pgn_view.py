@@ -303,6 +303,9 @@ class DetailPgnView(QWidget):
         pgn_font_size = int(scale_font_size(pgn_config.get('font_size', 11)))
         pgn_text_color = pgn_config.get('text_color', [220, 220, 220])
         pgn_background_color = pgn_config.get('background_color', [30, 30, 35])
+        pgn_border_color = pgn_config.get('border_color', [60, 60, 65])
+        pgn_border_width = int(pgn_config.get('border_width', 1))
+        pgn_padding = int(pgn_config.get('padding', 5))
         
         # Set font
         pgn_font = QFont(pgn_font_family, pgn_font_size)
@@ -311,12 +314,13 @@ class DetailPgnView(QWidget):
         # Set background and text colors via stylesheet
         pgn_bg_rgb = f"rgb({pgn_background_color[0]}, {pgn_background_color[1]}, {pgn_background_color[2]})"
         pgn_text_rgb = f"rgb({pgn_text_color[0]}, {pgn_text_color[1]}, {pgn_text_color[2]})"
+        pgn_border_rgb = f"rgb({pgn_border_color[0]}, {pgn_border_color[1]}, {pgn_border_color[2]})"
         text_edit_style = f"""
             QTextEdit {{
                 background-color: {pgn_bg_rgb};
                 color: {pgn_text_rgb};
-                border: 1px solid rgb(60, 60, 65);
-                padding: 5px;
+                border: {pgn_border_width}px solid {pgn_border_rgb};
+                padding: {pgn_padding}px;
             }}
         """
         
@@ -325,7 +329,7 @@ class DetailPgnView(QWidget):
             self.pgn_text,
             self.config,
             pgn_background_color,
-            [60, 60, 65],  # Border color (matches the border in stylesheet)
+            pgn_border_color,
             text_edit_style
         )
         

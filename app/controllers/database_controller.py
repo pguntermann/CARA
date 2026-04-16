@@ -152,6 +152,15 @@ class DatabaseController:
             The DatabasePanelModel instance for observing panel state.
         """
         return self.panel_model
+
+    def set_config(self, config: Dict[str, Any]) -> None:
+        """Update controller and open database models for runtime theme switching."""
+        self.config = config
+        for model in self.panel_model.get_all_database_models():
+            try:
+                model.set_config(config)
+            except Exception:
+                pass
     
     def mark_database_unsaved(self, model: DatabaseModel) -> None:
         """Mark a database as having unsaved changes.

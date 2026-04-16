@@ -62,6 +62,7 @@ from app.config.config_loader import ConfigLoader
 from app.main_window import MainWindow
 from app.services.error_handler import ErrorHandler
 from app.utils.path_resolver import get_app_resource_path
+from app.services.theme_service import load_saved_theme_style_ref
 
 def _is_kde_plasma_session() -> bool:
     """Best-effort detection of KDE Plasma desktop sessions (Linux only)."""
@@ -141,7 +142,8 @@ def main() -> None:
         
         # Load configuration with strict validation
         loader = ConfigLoader()
-        config = loader.load()
+        style_override = load_saved_theme_style_ref()
+        config = loader.load_with_style_override(style_override) if style_override else loader.load()
         
         # Initialize logging service
         from app.services.logging_service import LoggingService
@@ -161,8 +163,10 @@ def main() -> None:
         UserSettingsService.get_instance()
         MigrationService.run()
         
-        # Initialize MainWindow with injected configuration
-        window = MainWindow(config)
+        # Initialize MainWindow with injected configuration.
+        # Reuse the same style ref we already loaded at startup to sync the Theme menu.
+        active_style_ref = style_override or str(config.get("default_style_config", "") or "")
+        window = MainWindow(config, active_style_ref=active_style_ref)
         window.show()
         
         exit_code = app.exec()
