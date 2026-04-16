@@ -1218,9 +1218,9 @@ class MovesListProfileSetupDialog(QDialog):
         # Group box styling
         groups_config = dialog_config.get('groups', {})
         from app.utils.font_utils import resolve_font_family, scale_font_size
-        group_title_font = resolve_font_family(groups_config.get('title_font_family', 'Helvetica Neue'))
+        group_title_font = resolve_font_family(groups_config.get('title_font_family'))
         group_title_size = scale_font_size(groups_config.get('title_font_size', 11))
-        group_title_color = groups_config.get('title_color', [240, 240, 240])
+        group_title_color = groups_config.get('title_color')
         content_margins = groups_config.get('content_margins', [10, 15, 10, 10])
         margin_top = groups_config.get('margin_top', 10)
         padding_top = groups_config.get('padding_top', 5)

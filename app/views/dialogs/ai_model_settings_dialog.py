@@ -825,8 +825,8 @@ class AIModelSettingsDialog(QDialog):
             else self.border_color
         )
         border_radius = self.groups_config.get('border_radius', 5)
-        title_color = self.groups_config.get('title_color', [240, 240, 240])
-        title_font_family = self.groups_config.get('title_font_family', 'Helvetica Neue')
+        title_color = self.groups_config.get('title_color')
+        title_font_family = self.groups_config.get('title_font_family')
         from app.utils.font_utils import scale_font_size
         title_font_size = scale_font_size(self.groups_config.get('title_font_size', 11))
         margin_top = self.groups_config.get('margin_top', 10)

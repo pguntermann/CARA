@@ -193,7 +193,7 @@
       170
     ],
     "$_COLOR_BUTTON_BORDER": {
-      "$ref": "$_COLOR_BORDER"
+      "$ref": "$_COLOR_BACKGROUND_ACTIVE"
     },
     "$_COLOR_WHITE": [
       255,
@@ -464,7 +464,7 @@
         },
         "title_font_weight": null,
         "title_color": {
-          "$ref": "$_COLOR_TEXT_PRIMARY"
+          "$ref": "$_COLOR_BUTTON_BORDER"
         },
         "title_left": 10,
         "title_padding": [
@@ -697,7 +697,7 @@
           "border": {
             "size": 8,
             "color": {
-              "$ref": "$_COLOR_BUTTON_BORDER"
+              "$ref": "$_COLOR_BORDER"
             }
           },
           "coordinates": {
@@ -3248,7 +3248,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "margin_top": 10,
           "padding_top": 5,
@@ -3391,7 +3391,7 @@
           },
           "title_font_weight": "bold",
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "margin_top": 10,
           "padding_top": 20,
@@ -3578,7 +3578,7 @@
           },
           "title_font_weight": "bold",
           "title_color": {
-            "$ref": "$_COLOR_TEXT_3"
+            "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "spacing": 10,
           "margin_top": 8,
@@ -3851,7 +3851,7 @@
           "border_width": 1,
           "border_radius": 5,
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "title_font_family": {
             "$ref": "$_FONT_FAMILY_PRIMARY"
@@ -3968,7 +3968,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "content_margins": [
             10,
@@ -3985,6 +3985,9 @@
           ]
         },
         "tags_list": {
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_3"
+          },
           "height": 160,
           "columns": 2,
           "spacing": 8,
@@ -4098,7 +4101,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "content_margins": [
             10,
@@ -4177,10 +4180,10 @@
             "$ref": "$_COLOR_TEXT_PRIMARY"
           },
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_BACKGROUND_3"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_BORDER"
           },
           "border_radius": 3,
           "padding": [
@@ -4240,7 +4243,8 @@
           "spacing": 10,
           "width": 120,
           "height": 30,
-          "small_width": 100
+          "small_width": 100,
+          "logic_combo_width": 82
         },
         "labels": {
           "font_family": {
@@ -4289,7 +4293,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "content_margins": [
             10,
@@ -4413,7 +4417,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "content_margins": [
             10,
@@ -4494,7 +4498,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "content_margins": [
             10,
@@ -4628,7 +4632,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "content_margins": [
             10,
@@ -4965,7 +4969,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "content_margins": [
             10,
@@ -5077,7 +5081,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "content_margins": [
             10,
@@ -5453,7 +5457,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_BUTTON_BORDER"
           },
           "content_margins": [
             10,

@@ -187,7 +187,7 @@
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
         "font_family": {
-          "$ref": "$_FONT_FAMILY_PRIMARY"
+          "$ref": "$_FONT_FAMILY_MONO"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -205,7 +205,7 @@
         "border_radius": 3,
         "padding": [
           8,
-          6
+          4
         ],
         "hover_border_offset": 20,
         "disabled_brightness_factor": 0.5
@@ -215,7 +215,7 @@
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
         "font_family": {
-          "$ref": "$_FONT_FAMILY_PRIMARY"
+          "$ref": "$_FONT_FAMILY_MONO"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -233,7 +233,7 @@
         "border_radius": 3,
         "padding": [
           8,
-          6
+          4
         ],
         "disabled_brightness_factor": 0.5,
         "hide_buttons": true,
@@ -244,7 +244,7 @@
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
         "font_family": {
-          "$ref": "$_FONT_FAMILY_PRIMARY"
+          "$ref": "$_FONT_FAMILY_MONO"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -262,7 +262,7 @@
         "border_radius": 3,
         "padding": [
           8,
-          6
+          4
         ],
         "disabled_brightness_factor": 0.5
       },
@@ -2311,6 +2311,9 @@
         "fields": {
           "label_width": 200,
           "input_width": 100,
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          },
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
@@ -2628,7 +2631,7 @@
           "border_radius": 3,
           "padding": [2, 6, 2, 6],
           "font_family": {
-            "$ref": "$_FONT_FAMILY_PRIMARY"
+            "$ref": "$_FONT_FAMILY_MONO"
           },
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -2748,7 +2751,7 @@
           "border_radius": 3,
           "padding": [2, 6, 2, 6],
           "font_family": {
-            "$ref": "$_FONT_FAMILY_PRIMARY"
+            "$ref": "$_FONT_FAMILY_MONO"
           },
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -2769,7 +2772,8 @@
         "buttons": {
           "spacing": 10,
           "width": 120,
-          "height": 30
+          "height": 30,
+          "logic_combo_width": 70
         },
         "group_box": {
           "border_color": {
@@ -2866,7 +2870,7 @@
           "border_radius": 3,
           "padding": [
             8,
-            6
+            4
           ],
           "minimum_width": 200,
           "minimum_height": 30,
@@ -2897,6 +2901,9 @@
           ]
         },
         "tags_list": {
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
           "height": 160,
           "columns": 2,
           "spacing": 8,
@@ -2981,7 +2988,7 @@
           "border_radius": 3,
           "padding": [
             8,
-            6
+            4
           ],
           "minimum_width": 200,
           "minimum_height": 30,
@@ -3077,7 +3084,7 @@
           "border_radius": 3,
           "padding": [
             8,
-            6
+            4
           ],
           "minimum_width": 200,
           "minimum_height": 30,
@@ -3159,7 +3166,7 @@
           "border_radius": 3,
           "padding": [
             8,
-            6
+            4
           ],
           "selection_background_color": {
             "$ref": "$_COLOR_BACKGROUND_ACTIVE"
@@ -3262,7 +3269,7 @@
           "border_radius": 3,
           "padding": [
             8,
-            6
+            4
           ],
           "minimum_width": 250,
           "minimum_height": 30,
@@ -3457,7 +3464,7 @@
           "border_radius": 3,
           "padding": [
             8,
-            6
+            4
           ],
           "minimum_width": 200,
           "minimum_height": 30,
@@ -3614,7 +3621,7 @@
         },
         "input": {
           "font_family": {
-            "$ref": "$_FONT_FAMILY_PRIMARY"
+            "$ref": "$_FONT_FAMILY_MONO"
           },
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -3687,7 +3694,7 @@
           "border_radius": 3,
           "padding": [
             8,
-            6
+            4
           ],
           "minimum_width": 200,
           "minimum_height": 30
@@ -3761,7 +3768,7 @@
           "border_radius": 3,
           "padding": [
             8,
-            6
+            4
           ],
           "selection_background_color": {
             "$ref": "$_COLOR_BACKGROUND_ACTIVE"
@@ -3863,7 +3870,7 @@
           "border_radius": 3,
           "padding": [
             8,
-            6
+            4
           ],
           "selection_background_color": {
             "$ref": "$_COLOR_BACKGROUND_ACTIVE"
@@ -4197,7 +4204,7 @@
           "border_radius": 3,
           "padding": [
             8,
-            6
+            4
           ],
           "spinbox": {
             "min_value": 10,

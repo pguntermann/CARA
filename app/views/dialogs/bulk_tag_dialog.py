@@ -551,9 +551,9 @@ class BulkTagDialog(QDialog):
         group_border_color = groups_config.get("border_color", border_color) if "border_color" in groups_config else border_color
         group_border_radius = groups_config.get("border_radius", 5)
         from app.utils.font_utils import resolve_font_family, scale_font_size
-        group_title_font_family = resolve_font_family(groups_config.get("title_font_family", "Helvetica Neue"))
+        group_title_font_family = resolve_font_family(groups_config.get("title_font_family"))
         group_title_font_size = scale_font_size(groups_config.get("title_font_size", 11))
-        group_title_color = groups_config.get("title_color", [240, 240, 240])
+        group_title_color = groups_config.get("title_color")
         group_content_margins = groups_config.get("content_margins", [10, 14, 10, 10])
         group_margin_top = groups_config.get("margin_top", 10)
         group_padding_top = groups_config.get("padding_top", 5)
