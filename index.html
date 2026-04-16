@@ -82,6 +82,8 @@
         .screenshot-frame {
             position: relative;
             overflow: visible;
+            cursor: zoom-in;
+            transition: transform 180ms ease;
         }
 
         .screenshot-tilt {
@@ -89,6 +91,7 @@
             z-index: 2;
             transform-style: preserve-3d;
             will-change: transform;
+            transition: transform 180ms ease;
         }
 
         .hero-shot-card-primary .screenshot-tilt {
@@ -99,6 +102,77 @@
         .hero-shot-card-secondary .screenshot-tilt {
             transform: perspective(1400px) rotateY(-24deg);
             transform-origin: left center;
+        }
+
+        /* Hover interaction (desktop only via pointer/hover media query) */
+        @media (hover: hover) and (pointer: fine) {
+            .screenshot-frame:hover {
+                transform: scale(1.06);
+                z-index: 10;
+            }
+
+            .screenshot-frame:hover .screenshot {
+                box-shadow: 0 20px 52px rgba(0, 0, 0, 0.58);
+            }
+        }
+
+        /* Screenshot zoom (lightbox) */
+        .screenshot-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 10, 12, 0.82);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            z-index: 9999;
+        }
+
+        .screenshot-modal.open {
+            display: flex;
+        }
+
+        .screenshot-modal-dialog {
+            width: min(1200px, 96vw);
+            max-height: 92vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .screenshot-modal-close {
+            align-self: flex-end;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(30, 30, 35, 0.75);
+            color: rgb(240, 240, 240);
+            padding: 10px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .screenshot-modal-close:hover {
+            background: rgba(45, 45, 50, 0.85);
+        }
+
+        /* Shrink-wrap to image pixels — avoids dark “letterbox” bars inside the img box */
+        .screenshot-modal-img {
+            display: block;
+            width: auto;
+            max-width: 100%;
+            height: auto;
+            max-height: calc(92vh - 52px);
+            border-radius: 12px;
+            box-shadow: 0 22px 70px rgba(0, 0, 0, 0.7);
+            background: transparent;
+        }
+
+        /* Light-theme shot: subtle mat matches the UI; no grey frame vs. dark screenshots */
+        .screenshot-modal.screenshot-modal--light .screenshot-modal-img {
+            box-shadow:
+                0 0 0 1px rgba(0, 0, 0, 0.08),
+                0 22px 70px rgba(0, 0, 0, 0.45);
         }
         
         .logo {
@@ -556,6 +630,21 @@
                 overflow: visible;
                 position: relative;
                 height: auto;
+                cursor: auto;
+            }
+
+            /* No hover zoom / lightbox affordance on narrow layouts */
+            .screenshot-frame:hover {
+                transform: none !important;
+                z-index: auto !important;
+            }
+
+            .screenshot-frame:hover .screenshot {
+                box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+            }
+
+            .screenshot-modal {
+                display: none !important;
             }
 
             .screenshot-tilt {
@@ -746,7 +835,7 @@
                     <div class="hero-shot-card hero-shot-card-primary">
                         <div class="screenshot-frame">
                             <div class="screenshot-tilt">
-                                <img src="app/resources/manual/screenshots/light_theme.png"
+                                <img src="app/resources/manual/screenshots/light_theme_small.png"
                                      alt="CARA application overview in the light theme"
                                      class="screenshot screenshot--light">
                             </div>
@@ -755,7 +844,7 @@
                     <div class="hero-shot-card hero-shot-card-secondary">
                         <div class="screenshot-frame">
                             <div class="screenshot-tilt">
-                                <img src="app/resources/manual/screenshots/app_overview.png"
+                                <img src="app/resources/manual/screenshots/app_overview_small.png"
                                      alt="CARA application overview in the default theme"
                                      class="screenshot screenshot--dark">
                             </div>
@@ -923,6 +1012,13 @@
             <p style="margin-top: 12px;">
                 Contact: <a href="mailto:pguntermann@me.com">pguntermann@me.com</a>
             </p>
+        </div>
+    </div>
+
+    <div class="screenshot-modal" id="screenshot-modal" aria-hidden="true">
+        <div class="screenshot-modal-dialog" role="dialog" aria-modal="true" aria-label="Screenshot preview">
+            <button class="screenshot-modal-close" type="button" id="screenshot-modal-close">Close</button>
+            <img class="screenshot-modal-img" id="screenshot-modal-img" alt="Screenshot preview">
         </div>
     </div>
     
@@ -1129,6 +1225,77 @@
                 document.addEventListener('DOMContentLoaded', boot);
             } else {
                 boot();
+            }
+        })();
+    </script>
+
+    <script>
+        (function() {
+            function resolveFullSizeSrc(src) {
+                if (!src) return src;
+                return src.replace('_small.png', '.png');
+            }
+
+            function openModal(fullSrc) {
+                var modal = document.getElementById('screenshot-modal');
+                var img = document.getElementById('screenshot-modal-img');
+                if (!modal || !img) return;
+                var isLightTheme = /light_theme/i.test(fullSrc || '');
+                modal.classList.toggle('screenshot-modal--light', isLightTheme);
+                img.src = fullSrc;
+                modal.classList.add('open');
+                modal.setAttribute('aria-hidden', 'false');
+            }
+
+            function closeModal() {
+                var modal = document.getElementById('screenshot-modal');
+                var img = document.getElementById('screenshot-modal-img');
+                if (!modal || !img) return;
+                modal.classList.remove('open');
+                modal.classList.remove('screenshot-modal--light');
+                modal.setAttribute('aria-hidden', 'true');
+                img.removeAttribute('src');
+            }
+
+            function isWideLayout() {
+                try {
+                    return window.matchMedia('(min-width: 769px)').matches;
+                } catch (e) {
+                    return window.innerWidth >= 769;
+                }
+            }
+
+            function bootZoom() {
+                var modal = document.getElementById('screenshot-modal');
+                var closeBtn = document.getElementById('screenshot-modal-close');
+                if (closeBtn) closeBtn.addEventListener('click', closeModal);
+                if (modal) {
+                    modal.addEventListener('click', function(e) {
+                        if (e.target === modal) closeModal();
+                    });
+                }
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') closeModal();
+                });
+
+                var imgs = document.querySelectorAll('.hero-shot-stage img.screenshot');
+                if (!imgs || !imgs.length) return;
+                imgs.forEach(function(img) {
+                    img.addEventListener('click', function() {
+                        if (!isWideLayout()) return;
+                        openModal(resolveFullSizeSrc(img.getAttribute('src')));
+                    });
+                });
+
+                window.addEventListener('resize', function() {
+                    if (!isWideLayout()) closeModal();
+                });
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', bootZoom);
+            } else {
+                bootZoom();
             }
         })();
     </script>
