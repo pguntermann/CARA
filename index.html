@@ -241,6 +241,22 @@
         .meta-sep {
             opacity: 0.55;
         }
+
+        /* iPhone/narrow widths: avoid awkward mid-line wraps around the separator dot */
+        @media (max-width: 420px) {
+            .meta-line {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .meta-sep {
+                display: none;
+            }
+
+            .meta-platforms {
+                justify-content: center;
+            }
+        }
         .description {
             color: rgb(200, 200, 200);
             font-size: 1.05em;
@@ -278,6 +294,23 @@
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 12px;
+        }
+
+        .features-more {
+            margin-top: 14px;
+            text-align: center;
+            color: rgb(155, 155, 160);
+            font-size: 0.92em;
+            line-height: 1.6;
+        }
+
+        .features-more strong {
+            color: rgb(190, 190, 195);
+            font-weight: 600;
+        }
+
+        .features-more .features-more-items {
+            display: inline;
         }
 
         .feature-card {
@@ -1071,6 +1104,13 @@
                         <a class="feature-link" href="manual.html#moves-list">Learn more...</a>
                     </div>
                 </div>
+            </div>
+
+            <div class="features-more" aria-label="Additional features">
+                <strong>More:</strong>
+                <span class="features-more-items">
+                    Highly customizable • Online import (Chess.com/Lichess) • Manage multiple databases • Theme support • Bulk analysis • Bulk PGN header management • Deduplication • Powerful search • Move classification icons • Annotations • Notes
+                </span>
             </div>
         </section>
         
