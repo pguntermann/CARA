@@ -469,6 +469,20 @@ class ManageGameTagsDialog(QDialog):
         plus_cfg = dlg_cfg.get("plus_chip", {}) or {}
         self.plus_chip_text = str(plus_cfg.get("text", "+"))
         self.plus_chip_bold = bool(plus_cfg.get("bold", True))
+        self.plus_chip_bg_rgb: Optional[List[int]] = None
+        self.plus_chip_text_rgb: Optional[List[int]] = None
+        _pcb = plus_cfg.get("background_color")
+        if isinstance(_pcb, list) and len(_pcb) == 3:
+            try:
+                self.plus_chip_bg_rgb = [int(_pcb[0]), int(_pcb[1]), int(_pcb[2])]
+            except Exception:
+                self.plus_chip_bg_rgb = None
+        _pct = plus_cfg.get("text_color")
+        if isinstance(_pct, list) and len(_pct) == 3:
+            try:
+                self.plus_chip_text_rgb = [int(_pct[0]), int(_pct[1]), int(_pct[2])]
+            except Exception:
+                self.plus_chip_text_rgb = None
 
         add_dlg_cfg = dlg_cfg.get("add_custom_tag_dialog", {}) or {}
         self.add_dialog_width = int(add_dlg_cfg.get("width", 420))
@@ -598,7 +612,14 @@ class ManageGameTagsDialog(QDialog):
 
         # Scrollbar styling
         try:
-            StyleManager.style_scroll_area(self.scroll, self.config, bg_color=bg, border_color=border, border_radius=3)
+            StyleManager.style_scroll_area(
+                self.scroll,
+                self.config,
+                bg_color=bg,
+                border_color=border,
+                border_radius=3,
+                include_scroll_area_border=False,
+            )
         except Exception:
             pass
 
@@ -846,12 +867,19 @@ class ManageGameTagsDialog(QDialog):
             plus.setFont(f)
         except Exception:
             pass
-        # Use a neutral chip background but keep the standard hover behavior.
+        # Neutral chip fill: optional dialog-specific colors, else board "unmanaged" chip color.
         neutral = QColor(95, 95, 100)
         try:
-            ubg = getattr(self, "chip_unmanaged_bg", None)
-            if isinstance(ubg, list) and len(ubg) == 3:
-                neutral = QColor(int(ubg[0]), int(ubg[1]), int(ubg[2]))
+            if isinstance(self.plus_chip_bg_rgb, list) and len(self.plus_chip_bg_rgb) == 3:
+                neutral = QColor(
+                    int(self.plus_chip_bg_rgb[0]),
+                    int(self.plus_chip_bg_rgb[1]),
+                    int(self.plus_chip_bg_rgb[2]),
+                )
+            else:
+                ubg = getattr(self, "chip_unmanaged_bg", None)
+                if isinstance(ubg, list) and len(ubg) == 3:
+                    neutral = QColor(int(ubg[0]), int(ubg[1]), int(ubg[2]))
         except Exception:
             pass
         self._style_chip(plus, neutral, removable=True)
@@ -946,6 +974,18 @@ class ManageGameTagsDialog(QDialog):
         bg = f"rgb({color.red()}, {color.green()}, {color.blue()})"
         is_light = (0.2126 * color.red() + 0.7152 * color.green() + 0.0722 * color.blue()) > 150
         text = "rgb(15, 15, 18)" if is_light else "rgb(245, 245, 245)"
+        if isinstance(chip, _AddChipButton) and isinstance(
+            getattr(self, "plus_chip_text_rgb", None), list
+        ) and len(self.plus_chip_text_rgb) == 3:
+            try:
+                tr, tg, tb = (
+                    int(self.plus_chip_text_rgb[0]),
+                    int(self.plus_chip_text_rgb[1]),
+                    int(self.plus_chip_text_rgb[2]),
+                )
+                text = f"rgb({tr}, {tg}, {tb})"
+            except Exception:
+                pass
         if removable and isinstance(chip, (_RemovableChipButton, _BuiltinChipButton)):
             chip.set_chip_text_color(QColor(15, 15, 18) if is_light else QColor(245, 245, 245))
             try:

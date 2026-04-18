@@ -58,7 +58,11 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import QtMsgType, qInstallMessageHandler, QLoggingCategory
 
-from app.config.config_loader import ConfigLoader
+from app.config.config_loader import (
+    ConfigLoader,
+    read_default_style_config_ref,
+    resolve_style_config_path,
+)
 from app.main_window import MainWindow
 from app.services.error_handler import ErrorHandler
 from app.utils.path_resolver import get_app_resource_path
@@ -143,6 +147,19 @@ def main() -> None:
         # Load configuration with strict validation
         loader = ConfigLoader()
         style_override = load_saved_theme_style_ref()
+        if style_override:
+            resolved = resolve_style_config_path(
+                base_config_path=loader.config_path, style_ref=style_override
+            )
+            if not resolved.is_file():
+                default_ref = read_default_style_config_ref(loader.config_path)
+                default_name = default_ref or "app/config/style_default.config.json"
+                err = (
+                    f'Style config not found: "{resolved}" (from "{style_override}"). '
+                    f"Falling back to default style config: {default_name}"
+                )
+                print(f"Configuration Error: {err}", file=sys.stderr)
+                style_override = None
         config = loader.load_with_style_override(style_override) if style_override else loader.load()
         
         # Initialize logging service

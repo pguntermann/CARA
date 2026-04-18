@@ -164,7 +164,7 @@ def _deep_merge_dicts(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str
     return merged
 
 
-def _resolve_style_config_path(*, base_config_path: Path, style_ref: str) -> Path:
+def resolve_style_config_path(*, base_config_path: Path, style_ref: str) -> Path:
     """Resolve a style config path relative to config.json and repo root."""
     # 1) Relative to the directory containing config.json
     candidate = (base_config_path.parent / style_ref).resolve()
@@ -180,6 +180,20 @@ def _resolve_style_config_path(*, base_config_path: Path, style_ref: str) -> Pat
     return candidate
 
 
+def read_default_style_config_ref(config_path: Path) -> Optional[str]:
+    """Read ``default_style_config`` from base ``config.json`` (no style merge).
+
+    Used when falling back from a missing user-selected style file.
+    """
+    base = _load_json_allowing_comments(config_path)
+    if not isinstance(base, dict):
+        return None
+    ref = base.get("default_style_config")
+    if isinstance(ref, str) and ref.strip():
+        return ref.strip()
+    return None
+
+
 def _load_merged_config(config_path: Path) -> Dict[str, Any]:
     """Load config.json and optionally merge a default style config."""
     base = _load_json_allowing_comments(config_path)
@@ -188,7 +202,7 @@ def _load_merged_config(config_path: Path) -> Dict[str, Any]:
 
     style_ref = base.get("default_style_config")
     if isinstance(style_ref, str) and style_ref.strip():
-        style_path = _resolve_style_config_path(base_config_path=config_path, style_ref=style_ref.strip())
+        style_path = resolve_style_config_path(base_config_path=config_path, style_ref=style_ref.strip())
         if not style_path.is_file():
             raise FileNotFoundError(f'Default style config not found: "{style_path}" (from "{style_ref}")')
         style_cfg = _load_json_allowing_comments(style_path)
@@ -214,7 +228,7 @@ def _load_merged_config_with_style_override(config_path: Path, style_ref: str) -
     if not isinstance(style_ref, str) or not style_ref.strip():
         return base
 
-    style_path = _resolve_style_config_path(base_config_path=config_path, style_ref=style_ref.strip())
+    style_path = resolve_style_config_path(base_config_path=config_path, style_ref=style_ref.strip())
     if not style_path.is_file():
         raise FileNotFoundError(f'Style config not found: "{style_path}" (from "{style_ref}")')
     style_cfg = _load_json_allowing_comments(style_path)
@@ -495,6 +509,8 @@ class ConfigLoader:
             'ui.dialogs.manage_game_tags.icon_badges.icon_color',
             'ui.dialogs.manage_game_tags.icon_badges.icon_hover_color',
             'ui.dialogs.manage_game_tags.builtin_hidden_chip_color',
+            'ui.dialogs.manage_game_tags.plus_chip.background_color',
+            'ui.dialogs.manage_game_tags.plus_chip.text_color',
             'ui.panels.detail.minimum_width',
             'ui.panels.detail.minimum_height',
             'ui.panels.detail.background_color',

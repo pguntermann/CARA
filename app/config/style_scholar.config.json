@@ -1,63 +1,104 @@
 {
   "constants": {
-    "$_FONT_FAMILY_PRIMARY": "Helvetica Neue",
-    "$_FONT_FAMILY_MONO": "Monaco, Menlo, \"Liberation Mono\", Consolas, monospace",
-    "$_FONT_FAMILY_MONO_2": "Courier New, monospace",
+    "$_FONT_FAMILY_PRIMARY": "Comic Sans MS, Comic Neue, Comic Sans, Chalkboard SE, Chalkboard, Segoe Print, cursive, sans-serif",
+    "$_FONT_FAMILY_MONO": "Cascadia Mono, SF Mono, Menlo, Monaco, Consolas, \"Liberation Mono\", \"DejaVu Sans Mono\", monospace",
+    "$_FONT_FAMILY_MONO_2": "Courier New, Courier, monospace",
     "$_FONT_SIZE_BASE_SMALL": 10,
     "$_FONT_SIZE_BASE_MEDIUM": 11,
     "$_FONT_SIZE_BASE_MEDIUM_2": 12,
     "$_FONT_SIZE_BASE_LARGE": 14,
-    "$_COLOR_NEAR_WHITE": [240, 240, 240],
-    "$_COLOR_NEAR_BLACK": [30, 30, 30],
-    "$_COLOR_TEXT_PRIMARY": {
-      "$ref": "$_COLOR_NEAR_WHITE"
+    "$_COLOR_PARCHMENT_WHITE": [255, 252, 248],
+    "$_COLOR_ESPRESSO_INK": [28, 22, 18],
+    "$_COLOR_INK_BODY": {
+      "$ref": "$_COLOR_ESPRESSO_INK"
     },
-    "$_COLOR_TEXT_SECONDARY": [200, 200, 200],
-    "$_COLOR_TEXT_3": [220, 220, 220],
-    "$_COLOR_TEXT_4": [150, 150, 150],
-    "$_COLOR_TEXT_5": [255, 255, 255],
-    "$_COLOR_TEXT_6": [180, 180, 180],
-    "$_COLOR_TEXT_7": [230, 230, 230],
-    "$_COLOR_BACKGROUND_PRIMARY": [40, 40, 45],
-    "$_COLOR_BACKGROUND_SECONDARY": [30, 30, 35],
-    "$_COLOR_BACKGROUND_3": [45, 45, 50],
-    "$_COLOR_BACKGROUND_4": [35, 35, 40],
-    "$_COLOR_BACKGROUND_5": [50, 50, 55],
-    "$_COLOR_BACKGROUND_6": [55, 55, 60],
-    "$_COLOR_BACKGROUND_ACTIVE": [70, 90, 130],
-    "$_COLOR_BORDER": [60, 60, 65],
-    "$_COLOR_CHART_AXIS": [150, 150, 150],
-    "$_COLOR_CHART_GRIDLINE": [60, 60, 65],
-    "$_COLOR_CHART_LINE_MAIN": [255, 255, 255],
-    "$_COLOR_CHART_MAIN_2": [238, 236, 230],
-    "$_COLOR_CHART_LINE_2": [120, 190, 255],
-    "$_COLOR_CHART_LINE_3": [100, 150, 255],
-    "$_COLOR_CHART_LINE_4": [150, 150, 150],
-    "$_COLOR_BUTTON_BACKGROUND": {
-      "$ref": "$_COLOR_BACKGROUND_5"
+    "$_COLOR_COCOA_BROWN": [62, 52, 44],
+    "$_COLOR_BURNT_UMBER": [42, 34, 28],
+    "$_COLOR_DRIFTWOOD": [95, 85, 75],
+    "$_COLOR_NIGHT_BROWN": [18, 14, 12],
+    "$_COLOR_TOBACCO": [78, 68, 58],
+    "$_COLOR_MINK_BROWN": [52, 44, 38],
+    "$_COLOR_DEEP_TEAL": [18, 118, 108],
+    "$_COLOR_FROST_MINT": [245, 250, 248],
+    "$_COLOR_LINEN_CREAM": [244, 238, 228],
+    "$_COLOR_WHEAT_CREAM": [235, 228, 216],
+    "$_COLOR_PAPYRUS_WHITE": [248, 244, 236],
+    "$_COLOR_OATMEAL_BEIGE": [225, 218, 206],
+    "$_COLOR_TAUPE_SAND": [214, 206, 194],
+    "$_COLOR_KHAKI_DUST": [200, 192, 180],
+    "$_COLOR_SAGE_PAPER": [228, 234, 226],
+    "$_COLOR_BOURBON_TEAL": [0, 132, 122],
+    "$_COLOR_TAN_MOCHA": [175, 165, 150],
+    "$_COLOR_AXIS_UMBER": [90, 82, 72],
+    "$_COLOR_GRID_PUTTY": [195, 188, 178],
+    "$_COLOR_INK_CHARCOAL": [35, 30, 26],
+    "$_COLOR_RICH_BLACK": [24, 20, 18],
+    "$_COLOR_JADE_TEAL": [0, 130, 118],
+    "$_COLOR_BRONZE_RUST": [160, 95, 40],
+    "$_COLOR_AMETHYST_PURPLE": [130, 70, 150],
+    "$_COLOR_TAUPE_BUTTON_FACE": {
+      "$ref": "$_COLOR_TAUPE_SAND"
     },
-    "$_COLOR_BUTTON_HOVER_BACKGROUND": [60, 60, 65],
-    "$_COLOR_BUTTON_ACTIVE_BACKGROUND": {
-      "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+    "$_COLOR_SANDALWOOD": [220, 212, 198],
+    "$_COLOR_BOURBON_TEAL_PRESS": {
+      "$ref": "$_COLOR_BOURBON_TEAL"
     },
-    "$_COLOR_SEPERATOR_BACKGROUND": [60, 60, 65],
-    "$_COLOR_ACTIVE_MOVE_BACKGROUND": [100, 120, 180],
-    "$_COLOR_INPUT_FOCUS_BORDER": [0, 120, 212],
-    "$_COLOR_SCROLLBAR_BACKGROUND": {
-      "$ref": "$_COLOR_BACKGROUND_3"
+    "$_COLOR_WARM_STONE": [205, 198, 188],
+    "$_COLOR_PEACH_HIGHLIGHT": [232, 205, 175],
+    "$_COLOR_FOCUS_RING_TEAL": [0, 128, 118],
+    "$_COLOR_OATMEAL_SCROLL": {
+      "$ref": "$_COLOR_OATMEAL_BEIGE"
     },
-    "$_COLOR_SCROLLBAR_BUTTON_COLOR": [30, 30, 30],
-    "$_COLOR_SPLITTER_HANDLE": [30, 30, 30],
-    "$_COLOR_SCROLLBAR_HANDLE": {
-      "$ref": "$_COLOR_BORDER"
+    "$_COLOR_PEWTER_SCROLL": [170, 162, 152],
+    "$_COLOR_STONE_SPLIT": [198, 190, 178],
+    "$_COLOR_TAN_MOCHA_DRAG": {
+      "$ref": "$_COLOR_TAN_MOCHA"
     },
-    "$_COLOR_SCROLLBAR_HANDLE_HOVER": [90, 90, 95],
-    "$_COLOR_GRIDLINE": [60, 60, 65],
-    "$_COLOR_BUTTON_BORDER": {
-      "$ref": "$_COLOR_BORDER"
+    "$_COLOR_MOCHA_DRAG": [150, 142, 130],
+    "$_COLOR_TAUPE_GRID": [155, 145, 130],
+    "$_COLOR_BOURBON_OUTLINE": {
+      "$ref": "$_COLOR_BOURBON_TEAL"
     },
-    "$_COLOR_WHITE": [255, 255, 255],
-    "$_COLOR_BLACK": [0, 0, 0]
+    "$_COLOR_PURE_WHITE": [255, 255, 255],
+    "$_COLOR_PURE_BLACK": [0, 0, 0],
+    "$_COLOR_FOREST_FRAME": [32, 88, 78],
+    "$_COLOR_PAPYRUS_PANEL": {
+      "$ref": "$_COLOR_PAPYRUS_WHITE"
+    },
+    "$_COLOR_FOREST_OUTLINE": {
+      "$ref": "$_COLOR_FOREST_FRAME"
+    },
+    "$_COLOR_COPPER_TITLE": {
+      "$ref": "$_COLOR_COPPER_ORANGE"
+    },
+    "$_COLOR_CREAM_NEUTRAL": [248, 242, 232],
+    "$_COLOR_PATINA_GREEN": [28, 92, 86],
+    "$_COLOR_TRAIL_AQUA": [40, 200, 185],
+    "$_COLOR_TRAIL_DEEP": [25, 100, 92],
+    "$_COLOR_ICON_FOREST": [30, 100, 92],
+    "$_COLOR_ICON_FOREST_LIGHT": [20, 85, 78],
+    "$_COLOR_COOL_SILVER": [170, 174, 182],
+    "$_COLOR_DIM_SLATE": [80, 80, 85],
+    "$_COLOR_GRAPHITE_LINE": [60, 60, 65],
+    "$_COLOR_LATTE_DOT": [158, 148, 132],
+    "$_COLOR_APRICOT_GLOW": [240, 196, 160],
+    "$_COLOR_COPPER_ORANGE": [184, 107, 53],
+    "$_COLOR_PAPYRUS_FIELD": {
+      "$ref": "$_COLOR_PAPYRUS_WHITE"
+    },
+    "$_COLOR_PEACH_OUTLINE": {
+      "$ref": "$_COLOR_PEACH_GRID"
+    },
+    "$_COLOR_PEACH_GRID": [225, 203, 184],
+    "$_COLOR_APRICOT_SELECTION": [243, 214, 188],
+    "$_COLOR_TAG_SLATE": [128, 120, 110],
+    "$_COLOR_TAG_GOLD": [208, 148, 38],
+    "$_COLOR_TAG_EMERALD": [42, 132, 112],
+    "$_COLOR_TAG_SAGE": [108, 168, 138],
+    "$_COLOR_TAG_LEMON": [232, 208, 118],
+    "$_COLOR_TAG_ORANGE": [210, 135, 78],
+    "$_COLOR_TAG_ORCHID": [152, 105, 148],
+    "$_COLOR_TAG_CRIMSON": [192, 68, 64]
   },
   "game_tags": {
     "builtin": [
@@ -67,19 +108,27 @@
       },
       {
         "name": "Blunder-decided",
-        "color": [220, 80, 80]
+        "color": {
+          "$ref": "$_COLOR_TAG_CRIMSON"
+        }
       },
       {
         "name": "Brilliant Move",
-        "color": [255, 200, 60]
+        "color": {
+          "$ref": "$_COLOR_TAG_GOLD"
+        }
       },
       {
         "name": "Clean win",
-        "color": [70, 160, 110]
+        "color": {
+          "$ref": "$_COLOR_TAG_EMERALD"
+        }
       },
       {
         "name": "Missed win",
-        "color": [200, 100, 255]
+        "color": {
+          "$ref": "$_COLOR_TAG_ORCHID"
+        }
       },
       {
         "name": "Opening disaster",
@@ -104,13 +153,13 @@
       "scrollbar": {
         "width": 6,
         "background_color": {
-          "$ref": "$_COLOR_SCROLLBAR_BACKGROUND"
+          "$ref": "$_COLOR_OATMEAL_SCROLL"
         },
         "handle_color": {
-          "$ref": "$_COLOR_SCROLLBAR_HANDLE"
+          "$ref": "$_COLOR_TAN_MOCHA_DRAG"
         },
         "handle_hover_color": {
-          "$ref": "$_COLOR_SCROLLBAR_HANDLE_HOVER"
+          "$ref": "$_COLOR_MOCHA_DRAG"
         },
         "border_radius": 3,
         "min_height": 20,
@@ -122,7 +171,7 @@
         "indicator_height": 16,
         "indicator_border_radius": 3,
         "checked_background_color": {
-          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          "$ref": "$_COLOR_BOURBON_TEAL"
         },
         "checked_border_color": [100, 120, 160],
         "hover_border_offset": 20,
@@ -131,12 +180,12 @@
       },
       "combobox": {
         "dropdown_border_radius": 3,
-        "disabled_brightness_factor": 0.5,
+        "disabled_brightness_factor": 0.85,
         "padding": [8, 6]
       },
       "radio_button": {
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_family": {
           "$ref": "$_FONT_FAMILY_PRIMARY"
@@ -148,25 +197,19 @@
       },
       "button": {
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
-        },
-        "hover_text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "background_color": {
-          "$ref": "$_COLOR_BUTTON_BACKGROUND"
+          "$ref": "$_COLOR_TAUPE_BUTTON_FACE"
         },
         "hover_background_color": {
-          "$ref": "$_COLOR_BUTTON_HOVER_BACKGROUND"
+          "$ref": "$_COLOR_SANDALWOOD"
         },
         "active_background_color": {
-          "$ref": "$_COLOR_BUTTON_ACTIVE_BACKGROUND"
+          "$ref": "$_COLOR_DEEP_TEAL"
         },
         "active_text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
-        },
-        "pressed_text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_FROST_MINT"
         },
         "font_family": {
           "$ref": "$_FONT_FAMILY_PRIMARY"
@@ -176,88 +219,88 @@
         },
         "border_radius": 3,
         "padding": 5,
-        "border_width": 1,
+        "border_width": 0,
         "default_height": 30,
         "default_width": 120
       },
       "line_edit": {
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_family": {
-          "$ref": "$_FONT_FAMILY_MONO"
+          "$ref": "$_FONT_FAMILY_PRIMARY"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
         },
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_3"
+          "$ref": "$_COLOR_PAPYRUS_FIELD"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_PEACH_OUTLINE"
         },
         "focus_border_color": {
-          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          "$ref": "$_COLOR_FOCUS_RING_TEAL"
         },
         "border_width": 1,
         "border_radius": 3,
-        "padding": [8, 4],
+        "padding": [8, 6],
         "hover_border_offset": 20,
-        "disabled_brightness_factor": 0.5
+        "disabled_brightness_factor": 0.85
       },
       "spinbox": {
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_family": {
-          "$ref": "$_FONT_FAMILY_MONO"
+          "$ref": "$_FONT_FAMILY_PRIMARY"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
         },
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_3"
+          "$ref": "$_COLOR_PAPYRUS_FIELD"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_PEACH_OUTLINE"
         },
         "focus_border_color": {
-          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          "$ref": "$_COLOR_FOCUS_RING_TEAL"
         },
         "border_width": 1,
         "border_radius": 3,
-        "padding": [8, 4],
-        "disabled_brightness_factor": 0.5,
+        "padding": [8, 6],
+        "disabled_brightness_factor": 0.85,
         "hide_buttons": true,
         "minimum_height": 30
       },
       "date_edit": {
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_family": {
-          "$ref": "$_FONT_FAMILY_MONO"
+          "$ref": "$_FONT_FAMILY_PRIMARY"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
         },
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_3"
+          "$ref": "$_COLOR_PAPYRUS_FIELD"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_PEACH_OUTLINE"
         },
         "focus_border_color": {
-          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          "$ref": "$_COLOR_FOCUS_RING_TEAL"
         },
         "border_width": 1,
         "border_radius": 3,
-        "padding": [8, 4],
-        "disabled_brightness_factor": 0.5
+        "padding": [8, 6],
+        "disabled_brightness_factor": 0.85
       },
       "group_box": {
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_DEEP_TEAL"
         },
         "border_width": 1,
         "border_radius": 5,
@@ -272,17 +315,17 @@
         },
         "title_font_weight": null,
         "title_color": {
-          "$ref": "$_COLOR_TEXT_PRIMARY"
+          "$ref": "$_COLOR_COPPER_ORANGE"
         },
         "title_left": 10,
         "title_padding": [0, 5]
       },
       "context_menu": {
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_3"
+          "$ref": "$_COLOR_SAGE_PAPER"
         },
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_family": {
           "$ref": "$_FONT_FAMILY_PRIMARY"
@@ -291,28 +334,28 @@
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_BOURBON_OUTLINE"
         },
         "border_width": 1,
         "border_radius": 3,
         "hover_background_color": {
-          "$ref": "$_COLOR_BACKGROUND_6"
+          "$ref": "$_COLOR_KHAKI_DUST"
         },
         "hover_text_color": {
-          "$ref": "$_COLOR_TEXT_7"
+          "$ref": "$_COLOR_MINK_BROWN"
         },
         "item_padding": [4, 20, 4, 14],
         "menu_horizontal_padding": 4,
         "separator_height": 1,
-        "separator_color": [60, 60, 65],
+        "separator_color": { "$ref": "$_COLOR_GRAPHITE_LINE" },
         "separator_margin": [2, 4]
       },
       "tree_view": {
         "text_color": {
-          "$ref": "$_COLOR_TEXT_3"
+          "$ref": "$_COLOR_BURNT_UMBER"
         },
         "header_text_color": {
-          "$ref": "$_COLOR_TEXT_7"
+          "$ref": "$_COLOR_MINK_BROWN"
         },
         "font_family": {
           "$ref": "$_FONT_FAMILY_PRIMARY"
@@ -327,19 +370,19 @@
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
         },
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_4"
+          "$ref": "$_COLOR_OATMEAL_BEIGE"
         },
         "alternate_background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_LINEN_CREAM"
         },
         "grid_color": {
-          "$ref": "$_COLOR_CHART_GRIDLINE"
+          "$ref": "$_COLOR_GRID_PUTTY"
         },
         "selection_background_color": {
-          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          "$ref": "$_COLOR_APRICOT_SELECTION"
         },
         "selection_text_color": {
-          "$ref": "$_COLOR_TEXT_PRIMARY"
+          "$ref": "$_COLOR_INK_BODY"
         },
         "row_height": 20,
         "header_min_height": 20,
@@ -348,16 +391,16 @@
       },
       "tooltip": {
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_3"
+          "$ref": "$_COLOR_PAPYRUS_WHITE"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_BOURBON_OUTLINE"
         },
         "border_width": 1,
         "border_radius": 5,
         "padding": 10,
         "text_color": {
-          "$ref": "$_COLOR_TEXT_3"
+          "$ref": "$_COLOR_BURNT_UMBER"
         }
       }
     },
@@ -393,33 +436,37 @@
         "separator_height": 1,
         "separator_margin": [8, 8],
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_3"
+          "$ref": "$_COLOR_PAPYRUS_WHITE"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_BOURBON_OUTLINE"
         },
         "border_width": 1,
         "border_radius": 5,
         "text_color": {
-          "$ref": "$_COLOR_TEXT_3"
+          "$ref": "$_COLOR_BURNT_UMBER"
         },
         "title_font_size": 13,
         "title_color": {
-          "$ref": "$_COLOR_TEXT_5"
+          "$ref": "$_COLOR_NIGHT_BROWN"
         },
         "title_font_weight": "bold",
         "header_font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM_2"
         },
         "header_color": {
-          "$ref": "$_COLOR_TEXT_PRIMARY"
+          "$ref": "$_COLOR_INK_BODY"
         },
-        "positive_color": [100, 255, 100],
-        "negative_color": [255, 200, 100],
+        "positive_color": {
+          "$ref": "$_COLOR_TAG_EMERALD"
+        },
+        "negative_color": {
+          "$ref": "$_COLOR_TAG_ORANGE"
+        },
         "bullet_indent": 15,
         "calculation_indent": 12,
         "calculation_background": {
-          "$ref": "$_COLOR_BACKGROUND_4"
+          "$ref": "$_COLOR_OATMEAL_BEIGE"
         },
         "calculation_padding": 6
       }
@@ -429,7 +476,7 @@
         "minimum_width": 450,
         "minimum_height": 200,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_LINEN_CREAM"
         },
         "gameinfo": {
           "font_family": {
@@ -439,7 +486,7 @@
           "player_elo_size": 12,
           "opening_size": 14,
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_BOURBON_TEAL_PRESS"
           },
           "padding": [10, 25, 10, 0],
           "spacing": 8,
@@ -451,9 +498,9 @@
         "board": {
           "padding": [20, 20, 20, 20],
           "border": {
-            "size": 4,
+            "size": 12,
             "color": {
-              "$ref": "$_COLOR_BUTTON_BORDER"
+              "$ref": "$_COLOR_FOREST_FRAME"
             }
           },
           "coordinates": {
@@ -465,42 +512,52 @@
               "$ref": "$_FONT_SIZE_BASE_SMALL"
             },
             "color": {
-              "$ref": "$_COLOR_TEXT_SECONDARY"
+              "$ref": "$_COLOR_COCOA_BROWN"
             },
             "font_style": "normal"
           },
           "squares": {
-            "light_color": [217, 217, 217],
-            "dark_color": [58, 117, 196]
+            "light_color": [246, 238, 224],
+            "dark_color": [82, 118, 95]
           },
           "pieces": {
-            "svg_path": "app/resources/chesspieces/default",
+            "svg_path": "app/resources/chesspieces/scholar",
             "padding_ratio": 0.05
           },
           "turn_indicator": {
             "size": 16,
             "padding": [0, 0, 10, 10],
             "white_color": {
-              "$ref": "$_COLOR_WHITE"
+              "$ref": "$_COLOR_LATTE_DOT"
             },
             "black_color": {
-              "$ref": "$_COLOR_BLACK"
+              "$ref": "$_COLOR_DEEP_TEAL"
             }
           },
           "playedmove_arrow": {
-            "color": [255, 255, 0]
+            "color": {
+              "$ref": "$_COLOR_TAG_GOLD"
+            }
           },
           "bestnextmove_arrow": {
-            "color": [0, 0, 255]
+            "color": {
+              "$ref": "$_COLOR_DEEP_TEAL"
+            }
           },
           "pv2_arrow": {
-            "color": [100, 150, 255]
+            "color": {
+              "$ref": "$_COLOR_TRAIL_AQUA"
+            }
           },
           "pv3_arrow": {
-            "color": [150, 150, 150]
+            "color": {
+              "$ref": "$_COLOR_AMETHYST_PURPLE"
+            }
           },
           "bestalternativemove_arrow": {
-            "color": [200, 0, 100]
+            "color": {
+              "$ref": "$_COLOR_COPPER_ORANGE"
+            }
           },
           "positional_plans": {
             "use_straight_lines": true,
@@ -548,44 +605,35 @@
             }
           },
           "evaluation_bar": {
-            "width": 30,
+            "width": 22,
             "padding_left": 40,
             "colors": {
               "white": {
-                "$ref": "$_COLOR_WHITE"
+                "$ref": "$_COLOR_LATTE_DOT"
               },
               "black": {
-                "$ref": "$_COLOR_BLACK"
+                "$ref": "$_COLOR_DEEP_TEAL"
               }
             },
             "center_line": {
-              "color": [128, 128, 128],
-              "width": 1,
+              "color": {
+                "$ref": "$_COLOR_DEEP_TEAL"
+              },
+              "width": 2,
               "style": "solid"
             },
-            "division_marks": {
-              "color": [128, 128, 128],
-              "width": 1,
-              "style": "dash"
-            },
-            "divisions": [
-              1,
-              2,
-              3,
-              5,
-              10
-            ],
+            "divisions": [],
             "animation_duration_ms": 300
           },
           "material_widget": {
-            "width": 110,
+            "width": 120,
             "height": 130,
-            "padding": [12, 12, 10, 14],
+            "padding": [12, 12, 10, 24],
             "background_color": {
-              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+              "$ref": "$_COLOR_WHEAT_CREAM"
             },
             "border_color": {
-              "$ref": "$_COLOR_BUTTON_BORDER"
+              "$ref": "$_COLOR_WHEAT_CREAM"
             },
             "border_radius": 5,
             "font_family": {
@@ -596,26 +644,28 @@
             },
             "piece_size": 18,
             "white_text_color": {
-              "$ref": "$_COLOR_TEXT_PRIMARY"
+              "$ref": "$_COLOR_PATINA_GREEN"
             },
             "black_text_color": {
-              "$ref": "$_COLOR_TEXT_SECONDARY"
+              "$ref": "$_COLOR_ESPRESSO_INK"
             },
-            "difference_text_color": [255, 255, 100],
-            "separator_color": [100, 100, 105]
+            "difference_text_color": [170, 110, 20],
+            "separator_color": { "$ref": "$_COLOR_COOL_SILVER" }
           },
           "game_tags_widget": {
             "width": 170,
             "max_height": 0,
             "min_interactive_height": 200,
-            "padding": [10, 10, 15, 14],
+            "padding": [10, 10, 15, 28],
             "spacing_below_material": 20,
             "flow_spacing": 6,
             "chip": {
               "border_radius": 10,
               "padding": [2, 8],
               "minimum_height": 22,
-              "unmanaged_background_color": [95, 95, 100],
+              "unmanaged_background_color": {
+                "$ref": "$_COLOR_CREAM_NEUTRAL"
+              },
               "font_family": {
                 "$ref": "$_FONT_FAMILY_PRIMARY"
               },
@@ -623,21 +673,39 @@
                 "$ref": "$_FONT_SIZE_BASE_MEDIUM"
               },
               "font_weight": "bold",
-              "hover_background_rgba": [255, 255, 255, 18],
-              "hover_text_color": [68, 68, 74]
+              "hover_background_rgba": [0, 0, 0, 18],
+              "hover_text_color": {
+                "$ref": "$_COLOR_DRIFTWOOD"
+              }
             }
           },
           "move_classification_badges": {
             "inset_ratio": 0.04,
             "colors": {
-              "book_move": [150, 150, 150],
-              "brilliant": [255, 215, 0],
-              "best_move": [100, 255, 100],
-              "good_move": [150, 255, 150],
-              "inaccuracy": [255, 255, 100],
-              "mistake": [255, 200, 100],
-              "miss": [200, 100, 255],
-              "blunder": [255, 100, 100]
+              "book_move": {
+                "$ref": "$_COLOR_TAG_SLATE"
+              },
+              "brilliant": {
+                "$ref": "$_COLOR_TAG_GOLD"
+              },
+              "best_move": {
+                "$ref": "$_COLOR_TAG_EMERALD"
+              },
+              "good_move": {
+                "$ref": "$_COLOR_TAG_SAGE"
+              },
+              "inaccuracy": {
+                "$ref": "$_COLOR_TAG_LEMON"
+              },
+              "mistake": {
+                "$ref": "$_COLOR_TAG_ORANGE"
+              },
+              "miss": {
+                "$ref": "$_COLOR_TAG_ORCHID"
+              },
+              "blunder": {
+                "$ref": "$_COLOR_TAG_CRIMSON"
+              }
             }
           }
         }
@@ -646,7 +714,7 @@
         "minimum_width": 200,
         "minimum_height": 200,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_LINEN_CREAM"
         },
         "pgn_notation": {
           "font_family": {
@@ -656,80 +724,96 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_3"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_WHEAT_CREAM"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
           },
           "border_width": 1,
           "padding": 5,
           "formatting": {
             "headers": {
-              "color": [100, 150, 255],
+              "color": {
+                "$ref": "$_COLOR_BOURBON_TEAL_PRESS"
+              },
               "bold": true
             },
             "move_numbers": {
               "color": {
-                "$ref": "$_COLOR_TEXT_5"
+                "$ref": "$_COLOR_NIGHT_BROWN"
               },
               "bold": true
             },
             "moves": {
               "color": {
-                "$ref": "$_COLOR_TEXT_3"
+                "$ref": "$_COLOR_BURNT_UMBER"
               },
               "bold": false
             },
             "annotations": {
               "good": {
-                "color": [100, 255, 100],
+                "color": {
+                  "$ref": "$_COLOR_TAG_EMERALD"
+                },
                 "bold": true
               },
               "brilliant": {
-                "color": [100, 255, 100],
+                "color": {
+                  "$ref": "$_COLOR_TAG_GOLD"
+                },
                 "bold": true
               },
               "bad": {
-                "color": [255, 100, 100],
+                "color": {
+                  "$ref": "$_COLOR_TAG_CRIMSON"
+                },
                 "bold": true
               },
               "interesting": {
-                "color": [255, 255, 100],
+                "color": {
+                  "$ref": "$_COLOR_TAG_LEMON"
+                },
                 "bold": true
               },
               "dubious": {
-                "color": [255, 200, 100],
+                "color": {
+                  "$ref": "$_COLOR_TAG_ORANGE"
+                },
                 "bold": true
               }
             },
             "nags": {
-              "color": [200, 150, 255],
+              "color": [90, 50, 130],
               "bold": false,
               "italic": true
             },
             "comments": {
-              "color": [180, 200, 255],
+              "color": {
+                "$ref": "$_COLOR_DEEP_TEAL"
+              },
               "italic": true
             },
             "variations": {
               "color": {
-                "$ref": "$_COLOR_TEXT_6"
+                "$ref": "$_COLOR_TOBACCO"
               },
               "italic": true
             },
             "results": {
-              "color": [255, 255, 100],
+              "color": {
+                "$ref": "$_COLOR_DEEP_TEAL"
+              },
               "bold": true
             },
             "active_move": {
               "background_color": {
-                "$ref": "$_COLOR_ACTIVE_MOVE_BACKGROUND"
+                "$ref": "$_COLOR_PEACH_HIGHLIGHT"
               },
               "text_color": {
-                "$ref": "$_COLOR_TEXT_5"
+                "$ref": "$_COLOR_NIGHT_BROWN"
               },
               "bold": true
             }
@@ -751,36 +835,36 @@
             },
             "active_move": {
               "background_color": {
-                "$ref": "$_COLOR_ACTIVE_MOVE_BACKGROUND"
+                "$ref": "$_COLOR_PEACH_HIGHLIGHT"
               },
               "text_color": {
-                "$ref": "$_COLOR_TEXT_5"
+                "$ref": "$_COLOR_NIGHT_BROWN"
               }
             },
             "header_background_color": {
-              "$ref": "$_COLOR_BACKGROUND_3"
+              "$ref": "$_COLOR_SAGE_PAPER"
             },
             "header_text_color": {
-              "$ref": "$_COLOR_TEXT_SECONDARY"
+              "$ref": "$_COLOR_COCOA_BROWN"
             },
             "header_border_color": {
-              "$ref": "$_COLOR_BORDER"
+              "$ref": "$_COLOR_TAUPE_GRID"
             },
             "gridline_color": {
-              "$ref": "$_COLOR_GRIDLINE"
+              "$ref": "$_COLOR_PEACH_GRID"
             },
             "selection_background_color": {
-              "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+              "$ref": "$_COLOR_APRICOT_SELECTION"
             },
             "selection_text_color": {
-              "$ref": "$_COLOR_TEXT_PRIMARY"
+              "$ref": "$_COLOR_ESPRESSO_INK"
             }
           }
         },
         "summary": {
           "placeholder": {
             "text_color": {
-              "$ref": "$_COLOR_TEXT_4"
+              "$ref": "$_COLOR_DRIFTWOOD"
             },
             "font_size": {
               "$ref": "$_FONT_SIZE_BASE_LARGE"
@@ -791,16 +875,16 @@
             "height": 200,
             "minimum_height": 100,
             "background_color": {
-              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+              "$ref": "$_COLOR_WHEAT_CREAM"
             },
             "grid_color": {
-              "$ref": "$_COLOR_CHART_GRIDLINE"
+              "$ref": "$_COLOR_GRID_PUTTY"
             },
             "white_line_color": {
-              "$ref": "$_COLOR_CHART_LINE_MAIN"
+              "$ref": "$_COLOR_DEEP_TEAL"
             },
             "black_line_color": {
-              "$ref": "$_COLOR_BLACK"
+              "$ref": "$_COLOR_PURE_BLACK"
             },
             "current_move_line_color": [255, 255, 0],
             "current_move_line_width": 2,
@@ -812,10 +896,10 @@
               "$ref": "$_FONT_SIZE_BASE_SMALL"
             },
             "text_color": {
-              "$ref": "$_COLOR_TEXT_SECONDARY"
+              "$ref": "$_COLOR_COCOA_BROWN"
             },
             "axis_color": {
-              "$ref": "$_COLOR_CHART_AXIS"
+              "$ref": "$_COLOR_AXIS_UMBER"
             },
             "padding": [40, 20, 20, 40],
             "normalized_mode_small_range_threshold": 50,
@@ -832,38 +916,58 @@
             "min_move_labels": 3,
             "x_axis_label_spacing": 5,
             "phase_transition_line_color": {
-              "$ref": "$_COLOR_CHART_LINE_3"
+              "$ref": "$_COLOR_BRONZE_RUST"
             },
             "phase_transition_line_width": 2,
             "phase_transition_line_style": "dashed",
-            "critical_moment_worst_line_color": [255, 0, 0],
-            "critical_moment_best_line_color": [150, 255, 150],
+            "critical_moment_worst_line_color": {
+              "$ref": "$_COLOR_TAG_CRIMSON"
+            },
+            "critical_moment_best_line_color": {
+              "$ref": "$_COLOR_TAG_SAGE"
+            },
             "critical_moment_line_width": 1,
             "critical_moment_line_style": "dotted"
           },
           "colors": {
-            "book_move": [150, 150, 150],
-            "brilliant": [255, 215, 0],
-            "best_move": [100, 255, 100],
-            "good_move": [150, 255, 150],
-            "inaccuracy": [255, 255, 100],
-            "mistake": [255, 200, 100],
-            "miss": [200, 100, 255],
-            "blunder": [255, 100, 100],
+            "book_move": {
+              "$ref": "$_COLOR_TAG_SLATE"
+            },
+            "brilliant": {
+              "$ref": "$_COLOR_TAG_GOLD"
+            },
+            "best_move": {
+              "$ref": "$_COLOR_TAG_EMERALD"
+            },
+            "good_move": {
+              "$ref": "$_COLOR_TAG_SAGE"
+            },
+            "inaccuracy": {
+              "$ref": "$_COLOR_TAG_LEMON"
+            },
+            "mistake": {
+              "$ref": "$_COLOR_TAG_ORANGE"
+            },
+            "miss": {
+              "$ref": "$_COLOR_TAG_ORCHID"
+            },
+            "blunder": {
+              "$ref": "$_COLOR_TAG_CRIMSON"
+            },
             "text": {
-              "$ref": "$_COLOR_TEXT_3"
+              "$ref": "$_COLOR_BURNT_UMBER"
             },
             "header_text": {
-              "$ref": "$_COLOR_TEXT_PRIMARY"
+              "$ref": "$_COLOR_INK_BODY"
             },
             "background": {
-              "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+              "$ref": "$_COLOR_LINEN_CREAM"
             },
             "section_background": {
-              "$ref": "$_COLOR_BACKGROUND_4"
+              "$ref": "$_COLOR_OATMEAL_BEIGE"
             },
             "border": {
-              "$ref": "$_COLOR_BUTTON_BORDER"
+              "$ref": "$_COLOR_OATMEAL_BEIGE"
             }
           },
           "fonts": {
@@ -899,12 +1003,12 @@
               200
             ],
             "margin": 20,
-            "slice_border_width": 0,
-            "slice_border_darken": 120,
+            "slice_border_width": 2,
+            "slice_border_darken": 150,
             "slice_border_color": {
-              "$ref": "$_COLOR_BACKGROUND_4"
+              "$ref": "$_COLOR_OATMEAL_BEIGE"
             },
-            "opponent_ring_border_width": 0
+            "opponent_ring_border_width": 1
           },
           "widgets": {
             "border_radius": 5,
@@ -918,17 +1022,17 @@
               12,
               12
             ],
-            "color_indicator_border_width": 1,
+            "color_indicator_border_width": 0,
             "critical_moments_list_spacing": 3,
             "critical_moments_section_spacing": 10,
             "phase_spacing": 1,
             "player_name_label": {
               "white": {
                 "background_color": {
-                  "$ref": "$_COLOR_NEAR_WHITE"
+                  "$ref": "$_COLOR_TAUPE_SAND"
                 },
                 "text_color": {
-                  "$ref": "$_COLOR_NEAR_BLACK"
+                  "$ref": "$_COLOR_PATINA_GREEN"
                 },
                 "border_radius": 3,
                 "padding": [6, 4, 6, 4],
@@ -936,10 +1040,10 @@
               },
               "black": {
                 "background_color": {
-                  "$ref": "$_COLOR_NEAR_BLACK"
+                  "$ref": "$_COLOR_FOREST_FRAME"
                 },
                 "text_color": {
-                  "$ref": "$_COLOR_TEXT_PRIMARY"
+                  "$ref": "$_COLOR_FROST_MINT"
                 },
                 "border_radius": 3,
                 "padding": [6, 4, 6, 4],
@@ -960,30 +1064,36 @@
               "$ref": "$_FONT_FAMILY_PRIMARY"
             },
             "font_size": 9,
-            "text_color": [150, 150, 155]
+            "text_color": {
+              "$ref": "$_COLOR_DRIFTWOOD"
+            }
           },
           "activity_status_font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "colors": {
             "text_color": {
-              "$ref": "$_COLOR_TEXT_3"
+              "$ref": "$_COLOR_BURNT_UMBER"
             },
             "header_text": {
-              "$ref": "$_COLOR_TEXT_PRIMARY"
+              "$ref": "$_COLOR_INK_BODY"
             },
             "background": {
-              "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+              "$ref": "$_COLOR_LINEN_CREAM"
             },
             "section_background": {
-              "$ref": "$_COLOR_BACKGROUND_4"
+              "$ref": "$_COLOR_OATMEAL_BEIGE"
             },
             "border": {
-              "$ref": "$_COLOR_BUTTON_BORDER"
+              "$ref": "$_COLOR_OATMEAL_BEIGE"
             },
-            "phase_opening_color": [100, 150, 255],
-            "phase_middlegame_color": [150, 255, 100],
-            "phase_endgame_color": [255, 200, 100]
+            "phase_opening_color": {
+              "$ref": "$_COLOR_JADE_TEAL"
+            },
+            "phase_middlegame_color": [95, 145, 105],
+            "phase_endgame_color": {
+              "$ref": "$_COLOR_BRONZE_RUST"
+            }
           },
           "fonts": {
             "header_font_family": {
@@ -1030,16 +1140,16 @@
             "border_radius": 4,
             "padding": [6, 4],
             "background_color": {
-              "$ref": "$_COLOR_BACKGROUND_5"
+              "$ref": "$_COLOR_TAUPE_SAND"
             },
             "border_color": {
-              "$ref": "$_COLOR_BUTTON_BORDER"
+              "$ref": "$_COLOR_TAUPE_GRID"
             },
             "hover_background_color": {
-              "$ref": "$_COLOR_BUTTON_HOVER_BACKGROUND"
+              "$ref": "$_COLOR_SANDALWOOD"
             },
             "hover_text_color": {
-              "$ref": "$_COLOR_TEXT_PRIMARY"
+              "$ref": "$_COLOR_INK_BODY"
             },
             "font_size": {
               "$ref": "$_FONT_SIZE_BASE_SMALL"
@@ -1049,19 +1159,19 @@
           },
           "input_widgets": {
             "background_color": {
-              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+              "$ref": "$_COLOR_WHEAT_CREAM"
             },
             "border_color": {
-              "$ref": "$_COLOR_BUTTON_BORDER"
+              "$ref": "$_COLOR_TAUPE_GRID"
             },
             "focus_border_color": {
-              "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+              "$ref": "$_COLOR_FOCUS_RING_TEAL"
             },
             "selection_background_color": {
-              "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+              "$ref": "$_COLOR_APRICOT_SELECTION"
             },
             "selection_text_color": {
-              "$ref": "$_COLOR_TEXT_PRIMARY"
+              "$ref": "$_COLOR_INK_BODY"
             }
           },
           "scroll_area": {
@@ -1075,13 +1185,13 @@
           },
           "analysis_coverage": {
             "banner_background_color": {
-              "$ref": "$_COLOR_BACKGROUND_3"
+              "$ref": "$_COLOR_PAPYRUS_WHITE"
             },
             "banner_border_color": {
-              "$ref": "$_COLOR_BUTTON_BORDER"
+              "$ref": "$_COLOR_PAPYRUS_WHITE"
             },
             "banner_text_color": {
-              "$ref": "$_COLOR_TEXT_SECONDARY"
+              "$ref": "$_COLOR_COCOA_BROWN"
             },
             "banner_font_size": {
               "$ref": "$_FONT_SIZE_BASE_SMALL"
@@ -1104,17 +1214,25 @@
             "border_radius": 5,
             "section_spacing": 6,
             "background_color": {
-              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+              "$ref": "$_COLOR_WHEAT_CREAM"
             },
             "plot_corner_radius": 4,
             "bar_corner_radius": 2,
             "bar_gap_px": 1,
             "grid_major_horizontal_lines": 5,
-            "grid_major_color": [55, 55, 62],
-            "grid_minor_color": [45, 45, 50],
+            "grid_major_color": {
+              "$ref": "$_COLOR_GRID_PUTTY"
+            },
+            "grid_minor_color": {
+              "$ref": "$_COLOR_WARM_STONE"
+            },
             "x_axis_minor_grid": true,
-            "axis_color": [120, 120, 128],
-            "text_color": [200, 200, 205],
+            "axis_color": {
+              "$ref": "$_COLOR_AXIS_UMBER"
+            },
+            "text_color": {
+              "$ref": "$_COLOR_COCOA_BROWN"
+            },
             "font_family": {
               "$ref": "$_FONT_FAMILY_PRIMARY"
             },
@@ -1126,7 +1244,7 @@
             "y_axis_label_spacing": 5,
             "x_axis_label_spacing": 5,
             "distribution_line_color": {
-              "$ref": "$_COLOR_CHART_LINE_2"
+              "$ref": "$_COLOR_DEEP_TEAL"
             },
             "distribution_line_width": 2,
             "distribution_line_pen_style": "solid",
@@ -1136,7 +1254,7 @@
             "hover_circle_radius": 6,
             "show_distribution_vertex_markers": true,
             "distribution_vertex_marker_radius": 3,
-            "bar_color": [120, 190, 255],
+            "bar_color": [95, 145, 135],
             "color_presets": {
               "github_green": [
                 {
@@ -1200,17 +1318,25 @@
               ],
               "border_radius": 6,
               "colors": {
-                "critical": [255, 100, 100],
-                "high": [255, 150, 100],
-                "moderate": [255, 200, 100],
-                "low": [200, 200, 100],
-                "default": [150, 150, 150]
+                "critical": {
+                  "$ref": "$_COLOR_TAG_CRIMSON"
+                },
+                "high": {
+                  "$ref": "$_COLOR_TAG_ORANGE"
+                },
+                "moderate": {
+                  "$ref": "$_COLOR_TAG_LEMON"
+                },
+                "low": [205, 188, 115],
+                "default": {
+                  "$ref": "$_COLOR_TAG_SLATE"
+                }
               }
             }
           },
           "placeholder": {
             "text_color": {
-              "$ref": "$_COLOR_TEXT_4"
+              "$ref": "$_COLOR_DRIFTWOOD"
             },
             "font_size": {
               "$ref": "$_FONT_SIZE_BASE_LARGE"
@@ -1281,13 +1407,13 @@
           "accuracy_vs_progress_chart": {
             "height": 220,
             "background_color": {
-              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+              "$ref": "$_COLOR_WHEAT_CREAM"
             },
             "grid_color": {
-              "$ref": "$_COLOR_CHART_GRIDLINE"
+              "$ref": "$_COLOR_GRID_PUTTY"
             },
             "line_color": {
-              "$ref": "$_COLOR_CHART_LINE_2"
+              "$ref": "$_COLOR_DEEP_TEAL"
             },
             "opponent_line_color": [200, 130, 130],
             "line_style": "solid",
@@ -1300,10 +1426,10 @@
               "$ref": "$_FONT_SIZE_BASE_SMALL"
             },
             "text_color": {
-              "$ref": "$_COLOR_TEXT_SECONDARY"
+              "$ref": "$_COLOR_COCOA_BROWN"
             },
             "axis_color": {
-              "$ref": "$_COLOR_CHART_AXIS"
+              "$ref": "$_COLOR_AXIS_UMBER"
             },
             "padding": [40, 20, 20, 40],
             "min_grid_spacing": 30,
@@ -1321,10 +1447,10 @@
             "progression_line_smooth_strength": 1.0,
             "subcaption_font_size": 9,
             "background_color": {
-              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+              "$ref": "$_COLOR_WHEAT_CREAM"
             },
             "grid_color": {
-              "$ref": "$_COLOR_CHART_GRIDLINE"
+              "$ref": "$_COLOR_GRID_PUTTY"
             },
             "font_family": {
               "$ref": "$_FONT_FAMILY_PRIMARY"
@@ -1333,10 +1459,10 @@
               "$ref": "$_FONT_SIZE_BASE_SMALL"
             },
             "text_color": {
-              "$ref": "$_COLOR_TEXT_SECONDARY"
+              "$ref": "$_COLOR_COCOA_BROWN"
             },
             "axis_color": {
-              "$ref": "$_COLOR_CHART_AXIS"
+              "$ref": "$_COLOR_AXIS_UMBER"
             },
             "padding": [40, 20, 8, 40],
             "min_grid_spacing": 30,
@@ -1346,8 +1472,12 @@
             "x_axis_label_spacing": 5,
             "hover_hit_threshold_px": 25,
             "bin_data_marker_radius": 3,
-            "x_axis_major_line_color": [88, 88, 95],
-            "x_axis_minor_line_color": [55, 55, 62],
+            "x_axis_major_line_color": {
+              "$ref": "$_COLOR_AXIS_UMBER"
+            },
+            "x_axis_minor_line_color": {
+              "$ref": "$_COLOR_GRID_PUTTY"
+            },
             "x_axis_major_line_width": 1,
             "x_axis_minor_line_width": 1,
             "x_axis_label_min_spacing_px": 44,
@@ -1360,33 +1490,47 @@
             "max_cell_size": 48,
             "color_presets": {
               "github_green": [
-                [22, 27, 34],
-                [0, 55, 40],
-                [38, 130, 80],
-                [120, 200, 120]
+                {
+                  "$ref": "$_COLOR_CREAM_NEUTRAL"
+                },
+                [208, 228, 212],
+                [118, 178, 142],
+                [48, 118, 95]
               ],
               "ocean_blue": [
-                [22, 27, 34],
-                [15, 45, 85],
-                [45, 100, 180],
-                [100, 180, 240]
+                {
+                  "$ref": "$_COLOR_CREAM_NEUTRAL"
+                },
+                [210, 232, 224],
+                [130, 195, 178],
+                [38, 115, 102]
               ],
               "amber": [
-                [22, 27, 34],
-                [70, 50, 10],
-                [140, 100, 30],
-                [230, 190, 80]
+                {
+                  "$ref": "$_COLOR_CREAM_NEUTRAL"
+                },
+                [244, 228, 200],
+                [232, 188, 118],
+                [196, 128, 58]
               ]
             },
             "month_label_band_height": 14,
             "month_label_font_size": 7,
-            "month_label_text_color": [150, 150, 158],
-            "week_divider_color": [72, 72, 80],
+            "month_label_text_color": {
+              "$ref": "$_COLOR_COCOA_BROWN"
+            },
+            "week_divider_color": {
+              "$ref": "$_COLOR_TAUPE_GRID"
+            },
             "week_divider_line_width": 1,
-            "month_divider_color": [120, 120, 135],
+            "month_divider_color": {
+              "$ref": "$_COLOR_TAUPE_GRID"
+            },
             "month_divider_line_width": 2,
             "month_calendar_boundary": {
-              "line_color": [120, 120, 135],
+              "line_color": {
+                "$ref": "$_COLOR_TAUPE_GRID"
+              },
               "line_width": 2,
               "line_style": "solid",
               "dash_pattern": [
@@ -1397,26 +1541,34 @@
               "draw_above_cells": true
             },
             "day_number_min_cell_size": 10,
-            "day_number_text_color": [130, 130, 138],
+            "day_number_text_color": {
+              "$ref": "$_COLOR_COCOA_BROWN"
+            },
             "cell_size_week": 11,
             "cell_size_day": 10,
             "cell_size_month": 14,
             "corner_radius": 2,
             "row_label_width": 28,
             "label_font_size": 8,
-            "border_color": [55, 55, 62],
-            "empty_cell_color": [33, 38, 46]
+            "border_color": {
+              "$ref": "$_COLOR_TAUPE_GRID"
+            },
+            "empty_cell_color": {
+              "$ref": "$_COLOR_TAUPE_SAND"
+            }
           },
           "accuracy_over_time_chart": {
             "height": 220,
             "min_grid_lines": 3,
             "line_color": {
-              "$ref": "$_COLOR_CHART_LINE_2"
+              "$ref": "$_COLOR_DEEP_TEAL"
             },
             "white_line_color": {
-              "$ref": "$_COLOR_CHART_MAIN_2"
+              "$ref": "$_COLOR_DEEP_TEAL"
             },
-            "black_line_color": [72, 82, 98],
+            "black_line_color": {
+              "$ref": "$_COLOR_FOREST_FRAME"
+            },
             "legend_width": 112,
             "legend_font_size": 9,
             "line_style": "solid",
@@ -1435,7 +1587,9 @@
                 "id": "best_move",
                 "label": "Best Move %",
                 "enabled": true,
-                "line_color": [100, 200, 140],
+                "line_color": {
+                  "$ref": "$_COLOR_TAG_SAGE"
+                },
                 "line_style": "solid",
                 "line_width": 2
               },
@@ -1443,7 +1597,9 @@
                 "id": "top3_move",
                 "label": "Top3-Move %",
                 "enabled": true,
-                "line_color": [100, 170, 255],
+                "line_color": {
+                  "$ref": "$_COLOR_JADE_TEAL"
+                },
                 "line_style": "solid",
                 "line_width": 2
               },
@@ -1451,7 +1607,9 @@
                 "id": "blunder_rate",
                 "label": "Blunder %",
                 "enabled": true,
-                "line_color": [255, 100, 100],
+                "line_color": {
+                  "$ref": "$_COLOR_TAG_CRIMSON"
+                },
                 "line_style": "solid",
                 "line_width": 2
               }
@@ -1469,7 +1627,7 @@
                 "label": "Opening",
                 "enabled": true,
                 "line_color": {
-                  "$ref": "$_COLOR_CHART_LINE_3"
+                  "$ref": "$_COLOR_DEEP_TEAL"
                 },
                 "line_style": "solid",
                 "line_width": 2
@@ -1478,7 +1636,7 @@
                 "id": "middlegame",
                 "label": "Middlegame",
                 "enabled": true,
-                "line_color": [150, 255, 100],
+                "line_color": [35, 140, 80],
                 "line_style": "solid",
                 "line_width": 2
               },
@@ -1486,7 +1644,7 @@
                 "id": "endgame",
                 "label": "Endgame",
                 "enabled": true,
-                "line_color": [255, 200, 100],
+                "line_color": [180, 110, 20],
                 "line_style": "solid",
                 "line_width": 2
               }
@@ -1505,7 +1663,7 @@
             "spacing": 8,
             "button_group_spacing": 16,
             "background_color": {
-              "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+              "$ref": "$_COLOR_LINEN_CREAM"
             }
           },
           "info_bar": {
@@ -1527,7 +1685,9 @@
             "disabled_color_multiplier": 0.5,
             "empty_label_color_multiplier": 0.7,
             "line_highlight_style": {
-              "color": [255, 255, 255],
+              "color": {
+                "$ref": "$_COLOR_DEEP_TEAL"
+              },
               "font_weight": "bold"
             }
           },
@@ -1553,20 +1713,28 @@
           "statistics": {
             "position": "top",
             "font_size": 9,
-            "color": [180, 180, 180],
+            "color": [238, 241, 246],
             "background_color": {
-              "$ref": "$_COLOR_BACKGROUND_3"
+              "$ref": "$_COLOR_DEEP_TEAL"
             },
             "padding": [8, 4, 8, 4]
           },
           "evaluation_difference": {
-            "positive_color": [100, 255, 100],
-            "negative_color": [255, 100, 100]
+            "positive_color": {
+              "$ref": "$_COLOR_TAG_EMERALD"
+            },
+            "negative_color": {
+              "$ref": "$_COLOR_TAG_CRIMSON"
+            }
           },
           "trajectory_highlight": {
-            "color": [100, 200, 255],
+            "color": {
+              "$ref": "$_COLOR_TRAIL_AQUA"
+            },
             "font_weight": "bold",
-            "background_color": [50, 100, 150],
+            "background_color": {
+              "$ref": "$_COLOR_TRAIL_DEEP"
+            },
             "background_alpha": 0.3
           },
           "pv_hover": {
@@ -1578,7 +1746,7 @@
               "border": {
                 "size": 4,
                 "color": {
-                  "$ref": "$_COLOR_BUTTON_BORDER"
+                  "$ref": "$_COLOR_COPPER_ORANGE"
                 }
               }
             }
@@ -1587,7 +1755,7 @@
         "annotations": {
           "placeholder": {
             "text_color": {
-              "$ref": "$_COLOR_TEXT_4"
+              "$ref": "$_COLOR_DRIFTWOOD"
             },
             "font_size": {
               "$ref": "$_FONT_SIZE_BASE_LARGE"
@@ -1621,18 +1789,18 @@
             "unselected_border_width": 1
           },
           "preset_colors": [
-            [255, 100, 100],
-            [100, 220, 100],
-            [150, 200, 255],
-            [255, 200, 100],
-            [200, 100, 255],
-            [100, 220, 255],
-            [255, 150, 200],
-            [150, 150, 255],
-            [200, 200, 100],
-            [240, 240, 240]
+            [192, 68, 64],
+            [42, 132, 112],
+            [145, 160, 168],
+            [232, 208, 118],
+            [152, 105, 148],
+            [85, 150, 138],
+            [215, 145, 95],
+            [128, 118, 138],
+            [210, 195, 125],
+            [244, 238, 228]
           ],
-          "default_color": [255, 100, 100],
+          "default_color": [192, 68, 64],
           "size_slider": {
             "minimum": 100,
             "maximum": 250,
@@ -1641,16 +1809,16 @@
           },
           "scroll_area": {
             "background_color": {
-              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+              "$ref": "$_COLOR_WHEAT_CREAM"
             },
             "border_color": {
-              "$ref": "$_COLOR_BUTTON_BORDER"
+              "$ref": "$_COLOR_BOURBON_OUTLINE"
             }
           },
           "annotations_list": {
             "minimum_height": 100,
             "text_color": {
-              "$ref": "$_COLOR_TEXT_SECONDARY"
+              "$ref": "$_COLOR_COCOA_BROWN"
             },
             "wrapping": {
               "color_buffer": 0,
@@ -1671,10 +1839,10 @@
         },
         "ai_chat": {
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_WHEAT_CREAM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "font_family": {
             "$ref": "$_FONT_FAMILY_PRIMARY"
@@ -1689,15 +1857,15 @@
             "user": {
               "background_color": [60, 80, 120],
               "text_color": {
-                "$ref": "$_COLOR_TEXT_PRIMARY"
+                "$ref": "$_COLOR_FROST_MINT"
               }
             },
             "ai": {
               "background_color": {
-                "$ref": "$_COLOR_BACKGROUND_5"
+                "$ref": "$_COLOR_TAUPE_SAND"
               },
               "text_color": {
-                "$ref": "$_COLOR_TEXT_SECONDARY"
+                "$ref": "$_COLOR_COCOA_BROWN"
               }
             },
             "typing_indicator": {
@@ -1706,19 +1874,19 @@
             },
             "system": {
               "background_color": {
-                "$ref": "$_COLOR_BACKGROUND_3"
+                "$ref": "$_COLOR_PAPYRUS_WHITE"
               },
               "text_color": {
-                "$ref": "$_COLOR_TEXT_4"
+                "$ref": "$_COLOR_DRIFTWOOD"
               }
             }
           },
           "separator": {
             "line_color": {
-              "$ref": "$_COLOR_CHART_LINE_4"
+              "$ref": "$_COLOR_AMETHYST_PURPLE"
             },
             "text_color": {
-              "$ref": "$_COLOR_TEXT_6"
+              "$ref": "$_COLOR_TOBACCO"
             },
             "font_size": {
               "$ref": "$_FONT_SIZE_BASE_SMALL"
@@ -1728,18 +1896,18 @@
             "height": 30,
             "padding": 5,
             "background_color": {
-              "$ref": "$_COLOR_BACKGROUND_3"
+              "$ref": "$_COLOR_PAPYRUS_WHITE"
             },
             "text_color": {
-              "$ref": "$_COLOR_TEXT_SECONDARY"
+              "$ref": "$_COLOR_COCOA_BROWN"
             },
             "border_color": {
-              "$ref": "$_COLOR_BUTTON_BORDER"
+              "$ref": "$_COLOR_BOURBON_OUTLINE"
             },
             "border_width": 1,
             "border_radius": 3,
             "focus_border_color": {
-              "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
+              "$ref": "$_COLOR_FOCUS_RING_TEAL"
             }
           },
           "button": {
@@ -1747,7 +1915,7 @@
             "height": 30,
             "border_width": 1,
             "border_color": {
-              "$ref": "$_COLOR_BUTTON_BORDER"
+              "$ref": "$_COLOR_BOURBON_OUTLINE"
             }
           },
           "tokens": {
@@ -1763,18 +1931,18 @@
               "$ref": "$_FONT_SIZE_BASE_MEDIUM"
             },
             "text_color": {
-              "$ref": "$_COLOR_TEXT_SECONDARY"
+              "$ref": "$_COLOR_COCOA_BROWN"
             },
             "background_color": {
-              "$ref": "$_COLOR_BACKGROUND_3"
+              "$ref": "$_COLOR_PAPYRUS_WHITE"
             },
             "border_color": {
-              "$ref": "$_COLOR_BUTTON_BORDER"
+              "$ref": "$_COLOR_BOURBON_OUTLINE"
             },
             "border_width": 1,
             "border_radius": 3,
             "focus_border_color": {
-              "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
+              "$ref": "$_COLOR_FOCUS_RING_TEAL"
             },
             "padding": [3, 3]
           },
@@ -1799,44 +1967,48 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
-          "font_weight": 400,
-          "selected_font_weight": 500,
+          "font_weight": 700,
+          "selected_font_weight": 700,
           "tab_height": 24,
           "pane_background": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_WHEAT_CREAM"
           },
           "scroll_button_color": {
-            "$ref": "$_COLOR_SCROLLBAR_BUTTON_COLOR"
+            "$ref": "$_COLOR_PEWTER_SCROLL"
           },
           "colors": {
             "normal": {
               "background": {
-                "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+                "$ref": "$_COLOR_WHEAT_CREAM"
               },
               "text": {
-                "$ref": "$_COLOR_TEXT_SECONDARY"
+                "$ref": "$_COLOR_INK_BODY"
               },
               "border": {
-                "$ref": "$_COLOR_BUTTON_BORDER"
+                "$ref": "$_COLOR_WHEAT_CREAM"
               }
             },
             "hover": {
               "background": {
-                "$ref": "$_COLOR_BACKGROUND_6"
+                "$ref": "$_COLOR_KHAKI_DUST"
               },
               "text": {
-                "$ref": "$_COLOR_TEXT_7"
+                "$ref": "$_COLOR_MINK_BROWN"
               },
-              "border": [80, 80, 85]
+              "border": {
+                "$ref": "$_COLOR_KHAKI_DUST"
+              }
             },
             "active": {
               "background": {
-                "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+                "$ref": "$_COLOR_DEEP_TEAL"
               },
               "text": {
-                "$ref": "$_COLOR_TEXT_PRIMARY"
+                "$ref": "$_COLOR_FROST_MINT"
               },
-              "border": [100, 120, 160]
+              "border": {
+                "$ref": "$_COLOR_DEEP_TEAL"
+              }
             }
           }
         },
@@ -1848,20 +2020,22 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_5"
+            "$ref": "$_COLOR_NIGHT_BROWN"
           },
           "blockquote_text_color": [210, 190, 130],
-          "toolbar_separator_color": [60, 60, 65],
+          "toolbar_separator_color": { "$ref": "$_COLOR_GRAPHITE_LINE" },
           "inline_code_background_color": [90, 110, 160],
           "inline_code_background_alpha": 170,
           "inline_code_text_color": {
-            "$ref": "$_COLOR_TEXT_5"
+            "$ref": "$_COLOR_NIGHT_BROWN"
           },
-          "move_link_text_color": [100, 150, 255]
+          "move_link_text_color": {
+            "$ref": "$_COLOR_PATINA_GREEN"
+          }
         },
         "metadata": {
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+            "$ref": "$_COLOR_LINEN_CREAM"
           },
           "table": {
             "font_family": {
@@ -1882,11 +2056,15 @@
             }
           },
           "standard_tag": {
-            "background_color": [50, 55, 60],
-            "text_color": [220, 220, 240]
+            "background_color": {
+              "$ref": "$_COLOR_TAUPE_SAND"
+            },
+            "text_color": {
+              "$ref": "$_COLOR_BOURBON_TEAL_PRESS"
+            }
           },
           "button_bar_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+            "$ref": "$_COLOR_LINEN_CREAM"
           },
           "button": {
             "height": 28,
@@ -1895,22 +2073,22 @@
             "spacing": 8,
             "margins": [8, 8, 8, 8],
             "background_color": {
-              "$ref": "$_COLOR_BACKGROUND_5"
+              "$ref": "$_COLOR_TAUPE_SAND"
             },
             "border_color": {
-              "$ref": "$_COLOR_BUTTON_BORDER"
+              "$ref": "$_COLOR_BOURBON_OUTLINE"
             },
             "hover_background_color": {
-              "$ref": "$_COLOR_BUTTON_HOVER_BACKGROUND"
+              "$ref": "$_COLOR_SANDALWOOD"
             },
             "hover_text_color": {
-              "$ref": "$_COLOR_TEXT_PRIMARY"
+              "$ref": "$_COLOR_INK_BODY"
             },
             "active_background_color": {
-              "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+              "$ref": "$_COLOR_BOURBON_TEAL"
             },
             "active_text_color": {
-              "$ref": "$_COLOR_TEXT_PRIMARY"
+              "$ref": "$_COLOR_INK_BODY"
             },
             "font_size": {
               "$ref": "$_FONT_SIZE_BASE_SMALL"
@@ -1923,10 +2101,10 @@
         "minimum_height": 40,
         "default_height": 240,
         "collapsed_height": 30,
-        "unsaved_tab_indicator_color": [255, 200, 100],
-        "unsaved_table_indicator_color": [255, 200, 100],
+        "unsaved_tab_indicator_color": [220, 120, 35],
+        "unsaved_table_indicator_color": [35, 140, 80],
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_4"
+          "$ref": "$_COLOR_OATMEAL_BEIGE"
         },
         "collapse_button": {
           "maximum_width": 30,
@@ -1939,7 +2117,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM_2"
           },
           "color": {
-            "$ref": "$_COLOR_TEXT_3"
+            "$ref": "$_COLOR_BURNT_UMBER"
           }
         },
         "tabs": {
@@ -1949,70 +2127,76 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
-          "font_weight": 400,
-          "selected_font_weight": 500,
+          "font_weight": 700,
+          "selected_font_weight": 700,
           "tab_height": 24,
           "pane_background": {
-            "$ref": "$_COLOR_BACKGROUND_4"
+            "$ref": "$_COLOR_OATMEAL_BEIGE"
           },
           "scroll_button_color": {
-            "$ref": "$_COLOR_SCROLLBAR_BUTTON_COLOR"
+            "$ref": "$_COLOR_PEWTER_SCROLL"
           },
           "colors": {
             "normal": {
               "background": {
-                "$ref": "$_COLOR_BACKGROUND_3"
+                "$ref": "$_COLOR_PAPYRUS_WHITE"
               },
               "text": {
-                "$ref": "$_COLOR_TEXT_SECONDARY"
+                "$ref": "$_COLOR_INK_BODY"
               },
               "border": {
-                "$ref": "$_COLOR_BUTTON_BORDER"
+                "$ref": "$_COLOR_OATMEAL_BEIGE"
               }
             },
             "hover": {
               "background": {
-                "$ref": "$_COLOR_BACKGROUND_6"
+                "$ref": "$_COLOR_KHAKI_DUST"
               },
               "text": {
-                "$ref": "$_COLOR_TEXT_7"
+                "$ref": "$_COLOR_MINK_BROWN"
               },
-              "border": [80, 80, 85]
+              "border": {
+                "$ref": "$_COLOR_KHAKI_DUST"
+              }
             },
             "active": {
               "background": {
-                "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+                "$ref": "$_COLOR_DEEP_TEAL"
               },
               "text": {
-                "$ref": "$_COLOR_TEXT_PRIMARY"
+                "$ref": "$_COLOR_FROST_MINT"
               },
-              "border": [100, 120, 160]
+              "border": {
+                "$ref": "$_COLOR_DEEP_TEAL"
+              }
             },
             "add_tab": {
               "background": {
-                "$ref": "$_COLOR_BACKGROUND_3"
+                "$ref": "$_COLOR_SAGE_PAPER"
               },
               "text": {
-                "$ref": "$_COLOR_TEXT_SECONDARY"
+                "$ref": "$_COLOR_COCOA_BROWN"
               },
               "border": {
-                "$ref": "$_COLOR_BUTTON_BORDER"
+                "$ref": "$_COLOR_SAGE_PAPER"
               },
               "hover_background": {
-                "$ref": "$_COLOR_BACKGROUND_6"
+                "$ref": "$_COLOR_KHAKI_DUST"
               },
               "hover_text": {
-                "$ref": "$_COLOR_TEXT_7"
+                "$ref": "$_COLOR_MINK_BROWN"
               },
-              "hover_border": [80, 80, 85],
+              "hover_border": {
+                "$ref": "$_COLOR_KHAKI_DUST"
+              },
               "active_background": {
-                "$ref": "$_COLOR_BACKGROUND_3"
+                "$ref": "$_COLOR_SAGE_PAPER"
               },
               "active_text": {
-                "$ref": "$_COLOR_TEXT_SECONDARY"
+                "$ref": "$_COLOR_COCOA_BROWN"
               },
               "active_border": {
-                "$ref": "$_COLOR_BUTTON_BORDER"
+                "$ref": "$_COLOR_SAGE_PAPER"
               }
             }
           }
@@ -2058,29 +2242,29 @@
             "cell_padding": [4, 2]
           },
           "header_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_3"
+            "$ref": "$_COLOR_SAGE_PAPER"
           },
           "header_text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "header_border_color": {
-            "$ref": "$_COLOR_BORDER"
+            "$ref": "$_COLOR_TAUPE_GRID"
           },
           "gridline_color": {
-            "$ref": "$_COLOR_GRIDLINE"
+            "$ref": "$_COLOR_PEACH_GRID"
           },
           "selection_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_APRICOT_SELECTION"
           },
           "selection_text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_ESPRESSO_INK"
           }
         }
       },
       "status": {
         "minimum_height": 30,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_3"
+          "$ref": "$_COLOR_PAPYRUS_WHITE"
         },
         "version": {
           "font_family": {
@@ -2090,7 +2274,7 @@
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "color": {
-            "$ref": "$_COLOR_TEXT_6"
+            "$ref": "$_COLOR_TOBACCO"
           },
           "width": 80
         },
@@ -2102,7 +2286,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "color": {
-            "$ref": "$_COLOR_TEXT_3"
+            "$ref": "$_COLOR_BURNT_UMBER"
           }
         },
         "resize_grip": {
@@ -2120,25 +2304,29 @@
       },
       "spacing": 4,
       "icons": {
-        "tint_color": [200, 200, 200],
-        "tint_color_dark_scheme": [200, 200, 200],
-        "tint_color_light_scheme": [52, 52, 58]
+        "tint_color": {
+          "$ref": "$_COLOR_ICON_FOREST"
+        },
+        "tint_color_dark_scheme": [110, 140, 200],
+        "tint_color_light_scheme": {
+          "$ref": "$_COLOR_ICON_FOREST_LIGHT"
+        }
       },
       "colors": {
         "normal": {
           "background": {
-            "$ref": "$_COLOR_BACKGROUND_3"
+            "$ref": "$_COLOR_SAGE_PAPER"
           },
           "text": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           }
         },
         "hover": {
           "background": {
-            "$ref": "$_COLOR_BACKGROUND_6"
+            "$ref": "$_COLOR_KHAKI_DUST"
           },
           "text": {
-            "$ref": "$_COLOR_TEXT_7"
+            "$ref": "$_COLOR_MINK_BROWN"
           }
         }
       },
@@ -2148,21 +2336,21 @@
       "menu": {
         "border_width": 1,
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_BOURBON_OUTLINE"
         },
         "item_padding": [4, 20, 4, 8]
       },
       "separator": {
         "height": 1,
         "background_color": {
-          "$ref": "$_COLOR_SEPERATOR_BACKGROUND"
+          "$ref": "$_COLOR_WARM_STONE"
         },
         "margin": [2, 4]
       }
     },
     "splitter": {
       "handle_color": {
-        "$ref": "$_COLOR_SPLITTER_HANDLE"
+        "$ref": "$_COLOR_STONE_SPLIT"
       },
       "top": {
         "main_size": 600,
@@ -2194,13 +2382,13 @@
         "width": 600,
         "height": 440,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_FOREST_OUTLINE"
         },
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_family": {
           "$ref": "$_FONT_FAMILY_PRIMARY"
@@ -2226,10 +2414,10 @@
           "text": "+",
           "bold": true,
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_5"
+            "$ref": "$_COLOR_TAUPE_SAND"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           }
         },
         "add_custom_tag_dialog": {
@@ -2253,30 +2441,38 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           }
         },
         "icon_badges": {
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_6"
+            "$ref": "$_COLOR_OATMEAL_BEIGE"
           },
-          "background_hover_color": [75, 75, 82],
-          "icon_color": [235, 235, 235],
-          "icon_hover_color": [255, 255, 255]
+          "background_hover_color": {
+            "$ref": "$_COLOR_TAUPE_SAND"
+          },
+          "icon_color": {
+            "$ref": "$_COLOR_COCOA_BROWN"
+          },
+          "icon_hover_color": {
+            "$ref": "$_COLOR_INK_BODY"
+          }
         },
-        "builtin_hidden_chip_color": [75, 75, 82]
+        "builtin_hidden_chip_color": {
+          "$ref": "$_COLOR_TAUPE_SAND"
+        }
       },
       "classification_settings": {
         "width": 480,
         "height": 660,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_FOREST_OUTLINE"
         },
         "layout": {
           "spacing": 5,
@@ -2291,7 +2487,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_COPPER_TITLE"
           },
           "margin_top": 10,
           "padding_top": 5,
@@ -2302,19 +2498,16 @@
         "fields": {
           "label_width": 200,
           "input_width": 100,
-          "font_family": {
-            "$ref": "$_FONT_FAMILY_MONO"
-          },
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_3"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "spacing": 12,
           "right_padding": 0,
           "disabled_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_4"
+            "$ref": "$_COLOR_OATMEAL_BEIGE"
           },
           "input_border_radius": 3,
           "input_padding": 3,
@@ -2327,24 +2520,36 @@
           "blunder_compression_enabled": true,
           "blunder_compression_factor": 0.4,
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_WHEAT_CREAM"
           },
           "scale_line_color": {
-            "$ref": "$_COLOR_CHART_LINE_4"
+            "$ref": "$_COLOR_AMETHYST_PURPLE"
           },
-          "tick_color": [200, 200, 200],
+          "tick_color": {
+            "$ref": "$_COLOR_GRID_PUTTY"
+          },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_3"
+            "$ref": "$_COLOR_BURNT_UMBER"
           },
           "font_family": {
             "$ref": "$_FONT_FAMILY_PRIMARY"
           },
           "font_size": 9,
-          "best_move_color": [100, 255, 100],
-          "good_move_color": [150, 255, 150],
-          "inaccuracy_color": [255, 255, 100],
-          "mistake_color": [255, 200, 100],
-          "blunder_color": [255, 100, 100],
+          "best_move_color": {
+            "$ref": "$_COLOR_TAG_EMERALD"
+          },
+          "good_move_color": {
+            "$ref": "$_COLOR_TAG_SAGE"
+          },
+          "inaccuracy_color": {
+            "$ref": "$_COLOR_TAG_LEMON"
+          },
+          "mistake_color": {
+            "$ref": "$_COLOR_TAG_ORANGE"
+          },
+          "blunder_color": {
+            "$ref": "$_COLOR_TAG_CRIMSON"
+          },
           "number_height_offset": 4,
           "section_height": 12,
           "scale_line_offset": 8,
@@ -2357,25 +2562,25 @@
           "width": 120,
           "height": 30,
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
           }
         }
       },
       "ai_model_settings": {
         "width": 600,
-        "height": 645,
+        "height": 660,
         "form_label_min_width": 180,
         "password_reveal_icon_tint_color": {
-          "$ref": "$_COLOR_TEXT_5"
+          "$ref": "$_COLOR_BOURBON_TEAL_PRESS"
         },
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_FOREST_OUTLINE"
         },
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -2395,7 +2600,7 @@
           },
           "title_font_weight": "bold",
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_COPPER_TITLE"
           },
           "margin_top": 10,
           "padding_top": 20,
@@ -2413,18 +2618,18 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           }
         },
         "inputs": {
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_3"
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_width": 1,
           "border_radius": 3,
@@ -2436,13 +2641,13 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "focus_border_color": {
-            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
+            "$ref": "$_COLOR_FOCUS_RING_TEAL"
           },
           "selection_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_APRICOT_SELECTION"
           },
           "selection_text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           }
         },
         "buttons": {
@@ -2450,7 +2655,7 @@
           "width": 120,
           "height": 30,
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
           }
         }
       },
@@ -2458,10 +2663,10 @@
         "width": 600,
         "height": 680,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_FOREST_OUTLINE"
         },
         "layout": {
           "spacing": 10,
@@ -2479,13 +2684,13 @@
         },
         "header": {
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_3"
+            "$ref": "$_COLOR_PAPYRUS_WHITE"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_width": 1,
           "border_radius": 5,
@@ -2506,44 +2711,48 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "font_weight": 400,
-          "selected_font_weight": 500,
+          "font_weight": 700,
+          "selected_font_weight": 700,
           "tab_height": 24,
           "pane_background": {
-            "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+            "$ref": "$_COLOR_PAPYRUS_PANEL"
           },
           "scroll_button_color": {
-            "$ref": "$_COLOR_SCROLLBAR_BUTTON_COLOR"
+            "$ref": "$_COLOR_PEWTER_SCROLL"
           },
           "colors": {
             "normal": {
               "background": {
-                "$ref": "$_COLOR_BACKGROUND_3"
+                "$ref": "$_COLOR_PAPYRUS_PANEL"
               },
               "text": {
-                "$ref": "$_COLOR_TEXT_SECONDARY"
+                "$ref": "$_COLOR_INK_BODY"
               },
               "border": {
-                "$ref": "$_COLOR_BUTTON_BORDER"
+                "$ref": "$_COLOR_PAPYRUS_PANEL"
               }
             },
             "hover": {
               "background": {
-                "$ref": "$_COLOR_BACKGROUND_6"
+                "$ref": "$_COLOR_KHAKI_DUST"
               },
               "text": {
-                "$ref": "$_COLOR_TEXT_7"
+                "$ref": "$_COLOR_MINK_BROWN"
               },
-              "border": [80, 80, 85]
+              "border": {
+                "$ref": "$_COLOR_KHAKI_DUST"
+              }
             },
             "active": {
               "background": {
-                "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+                "$ref": "$_COLOR_DEEP_TEAL"
               },
               "text": {
-                "$ref": "$_COLOR_TEXT_PRIMARY"
+                "$ref": "$_COLOR_FROST_MINT"
               },
-              "border": [100, 120, 160]
+              "border": {
+                "$ref": "$_COLOR_DEEP_TEAL"
+              }
             }
           }
         },
@@ -2557,7 +2766,7 @@
           },
           "title_font_weight": "bold",
           "title_color": {
-            "$ref": "$_COLOR_TEXT_3"
+            "$ref": "$_COLOR_COPPER_TITLE"
           },
           "spacing": 10,
           "margin_top": 8,
@@ -2573,13 +2782,13 @@
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
           }
         },
         "scroll_area": {
           "min_height": 200,
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_3"
+            "$ref": "$_COLOR_WHEAT_CREAM"
           },
           "height_calculation": {
             "header_height": 60,
@@ -2597,7 +2806,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "disabled_color": [128, 128, 128],
           "empty_label_color": [128, 128, 128],
@@ -2613,31 +2822,31 @@
         },
         "input_widgets": {
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_3"
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_width": 1,
           "border_radius": 3,
           "padding": [2, 6, 2, 6],
           "font_family": {
-            "$ref": "$_FONT_FAMILY_MONO"
+            "$ref": "$_FONT_FAMILY_PRIMARY"
           },
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "selection_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_APRICOT_SELECTION"
           },
           "selection_text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "focus_border_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_FOCUS_RING_TEAL"
           }
         },
         "validation_dialog": {
@@ -2653,7 +2862,7 @@
             },
             "padding": 5,
             "text_color": {
-              "$ref": "$_COLOR_TEXT_PRIMARY"
+              "$ref": "$_COLOR_INK_BODY"
             }
           },
           "description": {
@@ -2662,7 +2871,7 @@
             },
             "padding": 5,
             "text_color": {
-              "$ref": "$_COLOR_TEXT_SECONDARY"
+              "$ref": "$_COLOR_COCOA_BROWN"
             }
           },
           "task_header": {
@@ -2671,7 +2880,7 @@
             },
             "padding": 5,
             "text_color": {
-              "$ref": "$_COLOR_TEXT_3"
+              "$ref": "$_COLOR_BURNT_UMBER"
             }
           },
           "scroll_area": {
@@ -2689,9 +2898,15 @@
             "padding": [2, 8],
             "border_radius": 3,
             "colors": {
-              "error": [255, 100, 100],
-              "warning": [255, 200, 100],
-              "info": [150, 200, 255]
+              "error": {
+                "$ref": "$_COLOR_TAG_CRIMSON"
+              },
+              "warning": {
+                "$ref": "$_COLOR_TAG_LEMON"
+              },
+              "info": {
+                "$ref": "$_COLOR_JADE_TEAL"
+              }
             }
           },
           "issue_message": {
@@ -2700,7 +2915,7 @@
             },
             "padding": 2,
             "text_color": {
-              "$ref": "$_COLOR_TEXT_SECONDARY"
+              "$ref": "$_COLOR_COCOA_BROWN"
             }
           }
         }
@@ -2709,7 +2924,7 @@
         "width": 550,
         "height": 360,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "layout": {
           "spacing": 10,
@@ -2724,37 +2939,37 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "minimum_width": 100
         },
         "input_widgets": {
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_3"
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_width": 1,
           "border_radius": 3,
           "padding": [2, 6, 2, 6],
           "font_family": {
-            "$ref": "$_FONT_FAMILY_MONO"
+            "$ref": "$_FONT_FAMILY_PRIMARY"
           },
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "selection_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_APRICOT_SELECTION"
           },
           "selection_text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "focus_border_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_FOCUS_RING_TEAL"
           },
           "hover_border_offset": 20,
           "disabled_brightness_factor": 0.5,
@@ -2763,17 +2978,16 @@
         "buttons": {
           "spacing": 10,
           "width": 120,
-          "height": 30,
-          "logic_combo_width": 70
+          "height": 30
         },
         "group_box": {
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_DEEP_TEAL"
           },
           "border_width": 1,
           "border_radius": 5,
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_COPPER_TITLE"
           },
           "title_font_family": {
             "$ref": "$_FONT_FAMILY_PRIMARY"
@@ -2794,13 +3008,13 @@
         "width": 600,
         "height": 800,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_FOREST_OUTLINE"
         },
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -2832,7 +3046,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "note_font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
@@ -2847,23 +3061,23 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_radius": 3,
-          "padding": [8, 4],
+          "padding": [8, 6],
           "minimum_width": 200,
           "minimum_height": 30,
           "selection_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_APRICOT_SELECTION"
           },
           "selection_text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           }
         },
         "groups": {
@@ -2874,7 +3088,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_COPPER_TITLE"
           },
           "content_margins": [10, 14, 10, 10],
           "margin_top": 10,
@@ -2884,7 +3098,7 @@
         },
         "tags_list": {
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_WHEAT_CREAM"
           },
           "height": 160,
           "columns": 2,
@@ -2903,13 +3117,13 @@
         "width": 600,
         "height": 500,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_FOREST_OUTLINE"
         },
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -2941,7 +3155,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "note_font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
@@ -2959,23 +3173,23 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_radius": 3,
-          "padding": [8, 4],
+          "padding": [8, 6],
           "minimum_width": 200,
           "minimum_height": 30,
           "selection_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_APRICOT_SELECTION"
           },
           "selection_text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           }
         },
         "groups": {
@@ -2986,7 +3200,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_COPPER_TITLE"
           },
           "content_margins": [10, 14, 10, 10],
           "margin_top": 10,
@@ -3001,13 +3215,13 @@
         "minimum_width": 440,
         "minimum_height": 370,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_FOREST_OUTLINE"
         },
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -3037,7 +3251,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "minimum_width": 72
         },
@@ -3049,26 +3263,26 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_radius": 3,
-          "padding": [8, 4],
+          "padding": [8, 6],
           "minimum_width": 200,
           "minimum_height": 30,
           "focus_border_color": {
-            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
+            "$ref": "$_COLOR_FOCUS_RING_TEAL"
           },
           "selection_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_APRICOT_SELECTION"
           },
           "selection_text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           }
         },
         "text_edits": {
@@ -3082,13 +3296,13 @@
         "minimum_width": 700,
         "minimum_height": 500,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_FOREST_OUTLINE"
         },
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -3107,7 +3321,8 @@
           "spacing": 10,
           "width": 120,
           "height": 30,
-          "small_width": 100
+          "small_width": 100,
+          "logic_combo_width": 82
         },
         "labels": {
           "font_family": {
@@ -3117,7 +3332,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           }
         },
         "inputs": {
@@ -3128,21 +3343,21 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_radius": 3,
-          "padding": [8, 4],
+          "padding": [8, 6],
           "selection_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_APRICOT_SELECTION"
           },
           "selection_text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           }
         },
         "groups": {
@@ -3153,7 +3368,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_COPPER_TITLE"
           },
           "content_margins": [10, 20, 10, 15],
           "margin_top": 10,
@@ -3162,7 +3377,9 @@
           "title_padding": [0, 5]
         },
         "tag_picker": {
-          "selected_border_color": [0, 200, 255],
+          "selected_border_color": {
+            "$ref": "$_COLOR_DEEP_TEAL"
+          },
           "selected_border_width": 2,
           "popup_width": 360,
           "popup_max_height": 260,
@@ -3178,13 +3395,13 @@
         "width": 550,
         "height": 600,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_FOREST_OUTLINE"
         },
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -3213,7 +3430,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "minimum_width": 120
         },
@@ -3225,23 +3442,23 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_radius": 3,
-          "padding": [8, 4],
+          "padding": [8, 6],
           "minimum_width": 250,
           "minimum_height": 30,
           "selection_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_APRICOT_SELECTION"
           },
           "selection_text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           }
         },
         "groups": {
@@ -3252,7 +3469,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_COPPER_TITLE"
           },
           "content_margins": [10, 20, 10, 15],
           "margin_top": 10,
@@ -3265,13 +3482,13 @@
         "width": 600,
         "height": 500,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_FOREST_OUTLINE"
         },
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -3305,7 +3522,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "fixed_width": 110
         },
@@ -3320,7 +3537,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_COPPER_TITLE"
           },
           "content_margins": [10, 12, 10, 15],
           "margin_top": 6,
@@ -3333,25 +3550,25 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "label_text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "status_font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "status_text_color": {
-            "$ref": "$_COLOR_TEXT_4"
+            "$ref": "$_COLOR_DRIFTWOOD"
           }
         },
         "progress_bar": {
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_WHEAT_CREAM"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_radius": 3,
           "chunk_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_BOURBON_TEAL"
           },
           "chunk_border_radius": 2
         },
@@ -3366,13 +3583,13 @@
         "minimum_width": 600,
         "minimum_height": 300,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_FOREST_OUTLINE"
         },
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -3400,7 +3617,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           }
         },
         "inputs": {
@@ -3411,23 +3628,23 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_radius": 3,
-          "padding": [8, 4],
+          "padding": [8, 6],
           "minimum_width": 200,
           "minimum_height": 30,
           "selection_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_APRICOT_SELECTION"
           },
           "selection_text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           }
         },
         "groups": {
@@ -3438,7 +3655,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_COPPER_TITLE"
           },
           "content_margins": [10, 20, 10, 15],
           "margin_top": 10,
@@ -3457,7 +3674,7 @@
         "width": 400,
         "height": 150,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "layout": {
           "spacing": 15,
@@ -3469,7 +3686,7 @@
           },
           "padding": 5,
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           }
         },
         "message": {
@@ -3478,7 +3695,7 @@
           },
           "padding": 5,
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "line_height": 20,
           "base_height": 150
@@ -3491,7 +3708,7 @@
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
           }
         }
       },
@@ -3500,7 +3717,7 @@
         "max_width": 600,
         "height": 150,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "layout": {
           "spacing": 15,
@@ -3512,7 +3729,7 @@
           },
           "padding": 5,
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           }
         },
         "message": {
@@ -3521,10 +3738,10 @@
           },
           "padding": 5,
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "link_color": {
-            "$ref": "$_COLOR_BUTTON_ACTIVE_BACKGROUND"
+            "$ref": "$_COLOR_DEEP_TEAL"
           },
           "line_height": 20,
           "base_height": 150
@@ -3537,7 +3754,7 @@
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
           }
         }
       },
@@ -3545,7 +3762,7 @@
         "width": 400,
         "height": 220,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "layout": {
           "spacing": 12,
@@ -3558,7 +3775,7 @@
           "padding": 5,
           "spacing_after": 5,
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           }
         },
         "label": {
@@ -3567,25 +3784,25 @@
           },
           "padding": 5,
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "spacing_after": 3
         },
         "input": {
           "font_family": {
-            "$ref": "$_FONT_FAMILY_MONO"
+            "$ref": "$_FONT_FAMILY_PRIMARY"
           },
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_radius": 3,
           "padding": [2, 6, 2, 5],
@@ -3600,7 +3817,7 @@
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
           }
         }
       },
@@ -3610,7 +3827,7 @@
         "minimum_width": 350,
         "minimum_height": 150,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "layout": {
           "spacing": 15,
@@ -3624,7 +3841,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           }
         },
         "inputs": {
@@ -3635,16 +3852,16 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_radius": 3,
-          "padding": [8, 4],
+          "padding": [8, 6],
           "minimum_width": 200,
           "minimum_height": 30
         },
@@ -3656,7 +3873,7 @@
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
           }
         }
       },
@@ -3666,13 +3883,13 @@
         "minimum_width": 480,
         "minimum_height": 350,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_FOREST_OUTLINE"
         },
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -3695,7 +3912,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           }
         },
         "inputs": {
@@ -3706,21 +3923,21 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_radius": 3,
-          "padding": [8, 4],
+          "padding": [8, 6],
           "selection_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_APRICOT_SELECTION"
           },
           "selection_text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           }
         },
         "groups": {
@@ -3731,7 +3948,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_COPPER_TITLE"
           },
           "content_margins": [10, 10, 10, 10],
           "margin_top": 10,
@@ -3753,13 +3970,13 @@
         "width": 600,
         "height": 480,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_FOREST_OUTLINE"
         },
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -3782,7 +3999,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           }
         },
         "description": {
@@ -3793,7 +4010,7 @@
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_6"
+            "$ref": "$_COLOR_TOBACCO"
           },
           "margin_top": 8
         },
@@ -3805,21 +4022,21 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_radius": 3,
-          "padding": [8, 4],
+          "padding": [8, 6],
           "selection_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_APRICOT_SELECTION"
           },
           "selection_text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           }
         },
         "groups": {
@@ -3830,7 +4047,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_COPPER_TITLE"
           },
           "content_margins": [10, 15, 10, 10],
           "margin_top": 10,
@@ -3841,7 +4058,7 @@
         "width": 550,
         "height": 360,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "layout": {
           "spacing": 12,
@@ -3857,7 +4074,7 @@
           "font_size": 26,
           "font_weight": "bold",
           "color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "margin_bottom": 6
         },
@@ -3867,7 +4084,7 @@
           },
           "font_size": 13,
           "color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "margin_bottom": 12
         },
@@ -3879,7 +4096,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "color": {
-            "$ref": "$_COLOR_TEXT_6"
+            "$ref": "$_COLOR_TOBACCO"
           },
           "margin_bottom": 12
         },
@@ -3895,7 +4112,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "line_height": 1.5,
           "margin_bottom": 6,
@@ -3909,7 +4126,7 @@
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "color": {
-            "$ref": "$_COLOR_TEXT_4"
+            "$ref": "$_COLOR_DRIFTWOOD"
           }
         },
         "license": {
@@ -3920,7 +4137,7 @@
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "color": {
-            "$ref": "$_COLOR_TEXT_4"
+            "$ref": "$_COLOR_DRIFTWOOD"
           },
           "margin_top": 8
         },
@@ -3932,9 +4149,11 @@
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "color": {
-            "$ref": "$_COLOR_TEXT_4"
+            "$ref": "$_COLOR_DRIFTWOOD"
           },
-          "link_color": [100, 150, 255],
+          "link_color": {
+            "$ref": "$_COLOR_PATINA_GREEN"
+          },
           "margin_top": 8
         },
         "buttons": {
@@ -3945,7 +4164,7 @@
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
           },
           "alignment": "right"
         }
@@ -3956,10 +4175,10 @@
         "minimum_width": 500,
         "minimum_height": 400,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_FOREST_OUTLINE"
         },
         "layout": {
           "spacing": 15,
@@ -3974,9 +4193,11 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
-          "link_color": [100, 150, 255],
+          "link_color": {
+            "$ref": "$_COLOR_PATINA_GREEN"
+          },
           "pre_block": {
             "font_family": {
               "$ref": "$_FONT_FAMILY_MONO"
@@ -4048,7 +4269,7 @@
           "width": 120,
           "height": 30,
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
           }
         }
       },
@@ -4058,13 +4279,13 @@
         "minimum_width": 600,
         "minimum_height": 400,
         "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
         "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
+          "$ref": "$_COLOR_FOREST_OUTLINE"
         },
         "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
+          "$ref": "$_COLOR_COCOA_BROWN"
         },
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
@@ -4093,7 +4314,7 @@
             "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
           }
         },
         "labels": {
@@ -4104,25 +4325,25 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           }
         },
         "table": {
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_WHEAT_CREAM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
           },
           "border_radius": 3,
           "header_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_3"
+            "$ref": "$_COLOR_SAGE_PAPER"
           },
           "header_text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
+            "$ref": "$_COLOR_COCOA_BROWN"
           },
           "item_padding": 5,
           "header_padding": 5,
@@ -4136,16 +4357,16 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_INK_BODY"
           },
           "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "border_radius": 3,
-          "padding": [8, 4],
+          "padding": [8, 6],
           "spinbox": {
             "min_value": 10,
             "max_value": 1000,
@@ -4160,7 +4381,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
+            "$ref": "$_COLOR_COPPER_TITLE"
           },
           "content_margins": [10, 15, 10, 10],
           "layout_spacing": 8,

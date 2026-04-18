@@ -31,7 +31,9 @@ class StyleManager:
         config: Dict[str, Any],
         bg_color: List[int],
         border_color: List[int],
-        border_radius: int = 3
+        border_radius: int = 3,
+        *,
+        include_scroll_area_border: bool = True,
     ) -> None:
         """Apply scrollbar styling to a QScrollArea.
         
@@ -41,8 +43,16 @@ class StyleManager:
             bg_color: Background color as [R, G, B].
             border_color: Border color as [R, G, B].
             border_radius: Border radius for scroll area container (default: 3).
+            include_scroll_area_border: When False, omit QScrollArea frame (e.g. inside QGroupBox).
         """
-        apply_scrollbar_styling(scroll_area, config, bg_color, border_color, border_radius)
+        apply_scrollbar_styling(
+            scroll_area,
+            config,
+            bg_color,
+            border_color,
+            border_radius,
+            include_scroll_area_border=include_scroll_area_border,
+        )
     
     @staticmethod
     def style_table_scrollbar(
@@ -312,6 +322,7 @@ class StyleManager:
             border_radius = button_config.get('border_radius', 3)
         if padding is None:
             padding = button_config.get('padding', 5)
+        border_width = int(button_config.get('border_width', 1))
 
         # Unified button colors (no offset logic).
         # If any color is missing, fall back to the provided bg_color (not offsets).
@@ -347,6 +358,7 @@ class StyleManager:
             active_text_color=active_text_color,
             min_width=min_width,
             min_height=min_height,
+            border_width=border_width,
         )
     
     @staticmethod

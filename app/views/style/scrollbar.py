@@ -91,7 +91,9 @@ def generate_scrollbar_stylesheet(
 def generate_scroll_area_stylesheet(
     bg_color: List[int],
     border_color: List[int],
-    border_radius: int
+    border_radius: int,
+    *,
+    include_border: bool = True,
 ) -> str:
     """Generate QSS stylesheet for scroll area container.
     
@@ -99,14 +101,20 @@ def generate_scroll_area_stylesheet(
         bg_color: Background color as [R, G, B].
         border_color: Border color as [R, G, B].
         border_radius: Border radius in pixels.
+        include_border: When False, omit the 1px frame (e.g. scroll areas inside QGroupBox).
     
     Returns:
         QSS stylesheet string.
     """
+    border_qss = (
+        f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
+        if include_border
+        else "border: none;"
+    )
     stylesheet = (
         f"QScrollArea {{"
         f"background-color: rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]});"
-        f"border: none;"
+        f"{border_qss}"
         f"border-radius: {border_radius}px;"
         f"}}"
         f"QScrollArea QWidget {{"
@@ -122,7 +130,9 @@ def apply_scrollbar_styling(
     config: Dict[str, Any],
     bg_color: List[int],
     border_color: List[int],
-    border_radius: int = 3
+    border_radius: int = 3,
+    *,
+    include_scroll_area_border: bool = True,
 ) -> None:
     """Apply complete scrollbar styling to a QScrollArea.
     
@@ -139,9 +149,12 @@ def apply_scrollbar_styling(
         bg_color: Background color as [R, G, B].
         border_color: Border color as [R, G, B].
         border_radius: Border radius for scroll area container.
+        include_scroll_area_border: When False, no frame on QScrollArea (avoids double lines in group boxes).
     """
     # Generate scroll area stylesheet (container + scrollbar)
-    scroll_area_style = generate_scroll_area_stylesheet(bg_color, border_color, border_radius)
+    scroll_area_style = generate_scroll_area_stylesheet(
+        bg_color, border_color, border_radius, include_border=include_scroll_area_border
+    )
     scrollbar_style = generate_scrollbar_stylesheet(config, bg_color, border_color)
     combined_style = scroll_area_style + scrollbar_style
     

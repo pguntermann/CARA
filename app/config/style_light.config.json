@@ -173,6 +173,7 @@
         },
         "border_radius": 3,
         "padding": 5,
+        "border_width": 1,
         "default_height": 30,
         "default_width": 120
       },
@@ -1566,7 +1567,13 @@
             "mini_board": {
               "size": 160,
               "offset_x": 20,
-              "offset_y": 20
+              "offset_y": 20,
+              "border": {
+                "size": 8,
+                "color": {
+                  "$ref": "$_COLOR_BORDER"
+                }
+              }
             }
           }
         },
@@ -2198,7 +2205,13 @@
         },
         "plus_chip": {
           "text": "+",
-          "bold": true
+          "bold": true,
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_5"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          }
         },
         "add_custom_tag_dialog": {
           "width": 420,
@@ -2418,7 +2431,7 @@
         }
       },
       "engine_configuration": {
-        "width": 600,
+        "width": 620,
         "height": 680,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
@@ -2445,7 +2458,7 @@
             "$ref": "$_COLOR_BACKGROUND_3"
           },
           "text_color": {
-            "$ref": "$_COLOR_TEXT_3"
+            "$ref": "$_COLOR_TEXT_SECONDARY"
           },
           "border_color": {
             "$ref": "$_COLOR_BUTTON_BORDER"
@@ -2459,15 +2472,18 @@
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "font_style": "normal"
+          "font_style": "normal",
+          "path_opacity": 0.7
         },
         "tabs": {
           "font_family": {
             "$ref": "$_FONT_FAMILY_PRIMARY"
           },
           "font_size": {
-            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
+          "font_weight": 700,
+          "selected_font_weight": 700,
           "tab_height": 24,
           "pane_background": {
             "$ref": "$_COLOR_BACKGROUND_PRIMARY"
@@ -2498,10 +2514,10 @@
             },
             "active": {
               "background": {
-                "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+                "$ref": "$_COLOR_ACCENT_PRIMARY"
               },
               "text": {
-                "$ref": "$_COLOR_TEXT_PRIMARY"
+                "$ref": "$_COLOR_ON_ACCENT"
               },
               "border": [100, 120, 160]
             }

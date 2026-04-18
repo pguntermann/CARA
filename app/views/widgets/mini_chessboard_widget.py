@@ -57,7 +57,7 @@ class MiniChessBoardWidget(QWidget):
         self.svg_path = pieces_config.get('svg_path', 'app/resources/chesspieces/default')
         self.piece_padding_ratio = max(0.0, min(0.5, float(pieces_config.get('padding_ratio', 0.1))))
         
-        # Border
+        # Border (defaults match main board; mini_board.border can override)
         border_config = board_config.get('border', {})
         self.border_size = border_config.get('size', 2)
         self.border_color = border_config.get('color', [60, 60, 65])
@@ -66,6 +66,11 @@ class MiniChessBoardWidget(QWidget):
         manual_analysis_config = ui_config.get('panels', {}).get('detail', {}).get('manual_analysis', {})
         pv_hover_config = manual_analysis_config.get('pv_hover', {})
         mini_board_config = pv_hover_config.get('mini_board', {})
+        mini_border = mini_board_config.get('border', {})
+        if 'size' in mini_border:
+            self.border_size = int(mini_border['size'])
+        if 'color' in mini_border:
+            self.border_color = mini_border['color']
         
         # Size (default 120x120) - apply scale factor
         base_size = mini_board_config.get('size', 120)

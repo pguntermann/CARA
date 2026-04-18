@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 45 45">
+  <!-- Rook: one silhouette — wall + castellated top in a single path (no stacked blocks) -->
+  <g fill="#f6eee0" stroke="#1a342f" stroke-width="1.55" stroke-linejoin="round">
+    <ellipse cx="22.5" cy="37.2" rx="11" ry="3.2"/>
+    <path d="
+      M 11 34
+      L 11 14
+      L 11 8  L 16 8  L 16 14
+      L 20 14
+      L 20 8  L 25 8  L 25 14
+      L 29 14
+      L 29 8  L 34 8  L 34 14
+      L 34 34
+      Z"/>
+  </g>
+</svg>

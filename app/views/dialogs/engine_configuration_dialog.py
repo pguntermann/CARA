@@ -149,17 +149,27 @@ class EngineConfigurationDialog(QDialog):
 
     def _update_path_label_truncation(self) -> None:
         """Re-truncate path using label's actual width and font (DPI-aware)."""
-        label = self.info_label
-        path_prefix = "Path: "
-        path_prefix_width_px = QFontMetrics(label.font()).horizontalAdvance(path_prefix)
-        path_max_width_px = max(80, label.width() - path_prefix_width_px - 8)
+        path_label = self._engine_path_label
+        font = self._engine_path_font
+        w = path_label.width()
+        if w > 0:
+            path_max_width_px = max(80, w - 8)
+        else:
+            dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('engine_configuration', {})
+            layout_margins = dialog_config.get('layout', {}).get('margins', [10, 10, 10, 10])
+            path_max_width_px = max(
+                80,
+                dialog_config.get('width', 600)
+                - layout_margins[0]
+                - layout_margins[2]
+                - getattr(self, '_engine_path_lead_spacer', 0)
+                - 8,
+            )
         path_display = truncate_path_for_display(
-            self.engine_path, max_width_px=path_max_width_px, font=label.font()
+            self.engine_path, max_width_px=path_max_width_px, font=font
         )
-        label.setText(
-            f"<b>Engine:</b> {escape(self.engine.name)}<br><b>Path:</b> {escape(path_display)}"
-        )
-        label.setToolTip(str(self.engine_path))
+        path_label.setText(path_display)
+        path_label.setToolTip(str(self.engine_path))
 
     def _adjust_layouts(self) -> None:
         """Adjust tab widget and scroll area heights after layout is ready."""
@@ -175,7 +185,9 @@ class EngineConfigurationDialog(QDialog):
         top_margin = layout_margins[1]
         bottom_margin = layout_margins[3]
 
-        header_height = self.info_label.height() or self.info_label.sizeHint().height()
+        header_height = (
+            self._engine_header_widget.height() or self._engine_header_widget.sizeHint().height()
+        )
         button_height = max(
             self.ok_button.height() or self.ok_button.sizeHint().height(),
             self.cancel_button.height() or self.cancel_button.sizeHint().height()
@@ -266,31 +278,83 @@ class EngineConfigurationDialog(QDialog):
         layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetNoConstraint)
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
-        # Engine info header: path truncated to fit one line (font/DPI-aware); full path in tooltip
+        # Engine info header (same pattern as BulkReplaceDialog database name/path: no boxed frame).
+        # Font metrics match BulkReplaceDialog labels (dialogs.*.labels), with header.* as fallback.
+        labels_config = dialog_config.get('labels', {})
         header_config = dialog_config.get('header', {})
-        header_font_family = resolve_font_family(header_config.get('font_family', 'Helvetica Neue'))
-        header_font_size = scale_font_size(header_config.get('font_size', 11))
-        header_font = QFont(header_font_family, header_font_size)
-        path_label_prefix = "Path: "
-        path_prefix_width_px = QFontMetrics(header_font).horizontalAdvance(path_label_prefix)
-        path_max_width_px = max(
+        title_font_family = resolve_font_family(
+            labels_config.get('font_family') or header_config.get('font_family', 'Helvetica Neue')
+        )
+        # Same sizing as BulkReplaceDialog database path: int(scale_font_size(labels.font_size)) - 2
+        _label_fs_raw = labels_config.get('font_size', header_config.get('font_size', 11))
+        label_font_size = int(scale_font_size(_label_fs_raw))
+        title_font_size = label_font_size
+        # Same delta as BulkReplaceDialog path (label_font_size - 2); explicit QSS enforces pt size on Windows.
+        path_font_size = max(8, label_font_size - 2)
+        self._engine_label_font_size = label_font_size
+        self._engine_title_font_family_resolved = title_font_family
+        title_font = QFont(title_font_family, title_font_size)
+        path_font = QFont(title_font_family, path_font_size)
+        path_font_metrics = QFontMetrics(path_font)
+        path_line_height = path_font_metrics.lineSpacing()
+
+        self._engine_header_widget = QWidget()
+        header_layout = QVBoxLayout(self._engine_header_widget)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(2)
+
+        title_row = QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 0, 0)
+        title_row.setSpacing(8)
+        self._engine_label_prefix = QLabel("Engine:")
+        self._engine_label_prefix.setFont(title_font)
+        self._engine_name_label = QLabel(f"<b>{escape(self.engine.name)}</b>")
+        self._engine_name_label.setFont(title_font)
+        self._engine_name_label.setWordWrap(False)
+        title_row.addWidget(self._engine_label_prefix)
+        title_row.addWidget(self._engine_name_label)
+        title_row.addStretch()
+
+        header_layout.addLayout(title_row)
+
+        path_row = QHBoxLayout()
+        path_row.setContentsMargins(0, 0, 0, 0)
+        path_row.setSpacing(0)
+        label_fm = QFontMetrics(self._engine_label_prefix.font())
+        spacer_w = label_fm.horizontalAdvance("Engine:") + 8
+        self._engine_path_lead_spacer = spacer_w
+        path_spacer = QWidget()
+        path_spacer.setFixedWidth(spacer_w)
+        path_row.addWidget(path_spacer)
+
+        initial_path_max = max(
             80,
             dialog_config.get('width', 600)
             - layout_margins[0]
             - layout_margins[2]
-            - path_prefix_width_px
+            - spacer_w
             - 8,
         )
         path_display = truncate_path_for_display(
-            self.engine_path, max_width_px=path_max_width_px, font=header_font
+            self.engine_path, max_width_px=initial_path_max, font=path_font
         )
-        self.info_label = QLabel(
-            f"<b>Engine:</b> {escape(self.engine.name)}<br><b>Path:</b> {escape(path_display)}"
-        )
-        self.info_label.setToolTip(str(self.engine_path))
-        self.info_label.setWordWrap(False)
-        self.info_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        layout.addWidget(self.info_label)
+        self._engine_path_label = QLabel(path_display)
+        self._engine_path_label.setWordWrap(False)
+        self._engine_path_label.setToolTip(str(self.engine_path))
+        # Match BulkReplaceDialog db path: setFont drives point size; stylesheet is color-only (see _apply_engine_info_path_style).
+        self._engine_path_label.setFont(path_font)
+        self._engine_path_font = path_font
+        self._apply_engine_info_path_style(dialog_config)
+        self._engine_path_label.setFixedHeight(path_line_height)
+        path_row.addWidget(self._engine_path_label)
+        path_row.addStretch()
+
+        path_row_widget = QWidget()
+        path_row_widget.setLayout(path_row)
+        path_row_widget.setFixedHeight(path_line_height)
+        header_layout.addWidget(path_row_widget)
+
+        layout.addWidget(self._engine_header_widget)
         
         # Tab widget for tasks
         self.tab_widget = QTabWidget()
@@ -1030,39 +1094,50 @@ class EngineConfigurationDialog(QDialog):
         
         return widget
 
+    def _apply_engine_info_path_style(self, dialog_config: Dict[str, Any]) -> None:
+        """Path line: same pattern as BulkReplaceDialog — setFont in _setup_ui; stylesheet color only.
+
+        Setting font-size/family in QSS can fight setFont on Windows/DPI and make the path look tiny.
+        """
+        header_config = dialog_config.get('header', {})
+        header_text = header_config.get('text_color', [51, 51, 51])
+        path_opacity = float(header_config.get('path_opacity', 0.7))
+        tr, tg, tb = header_text[0], header_text[1], header_text[2]
+        bg_rgb = dialog_config.get('background_color', [255, 255, 255])
+        br, bgr, bb = bg_rgb[0], bg_rgb[1], bg_rgb[2]
+        t = path_opacity
+        pr = int(tr * t + br * (1.0 - t))
+        pg = int(tg * t + bgr * (1.0 - t))
+        pb = int(tb * t + bb * (1.0 - t))
+        self._engine_path_label.setStyleSheet(
+            f'color: rgb({pr}, {pg}, {pb});'
+        )
+
     def _apply_styling(self) -> None:
         """Apply styling to UI elements based on configuration."""
         ui_config = self.config.get('ui', {})
         dialog_config = ui_config.get('dialogs', {}).get('engine_configuration', {})
         
-        # Header styling
+        # Header: first row uses palette only (stylesheets would reset font). Path uses _apply_engine_info_path_style.
         header_config = dialog_config.get('header', {})
-        header_bg = header_config.get('background_color', [245, 245, 245])
         header_text = header_config.get('text_color', [51, 51, 51])
-        header_border = header_config.get('border_color', [204, 204, 204])
-        header_border_width = header_config.get('border_width', 1)
-        header_border_radius = header_config.get('border_radius', 5)
-        header_padding = header_config.get('padding', [10, 10, 10, 10])
-        header_font_family = header_config.get('font_family', 'Helvetica Neue')
-        header_font_size = scale_font_size(header_config.get('font_size', 11))
-        header_font_style = header_config.get('font_style', 'normal')
+        tr, tg, tb = header_text[0], header_text[1], header_text[2]
+        from PyQt6.QtGui import QPalette, QColor
+
+        title_color = QColor(tr, tg, tb)
+        for w in (self._engine_label_prefix, self._engine_name_label):
+            pal = w.palette()
+            pal.setColor(QPalette.ColorRole.WindowText, title_color)
+            w.setPalette(pal)
+
+        self._apply_engine_info_path_style(dialog_config)
         
-        header_style = (
-            f"padding: {header_padding[0]}px {header_padding[1]}px {header_padding[2]}px {header_padding[3]}px; "
-            f"background-color: rgb({header_bg[0]}, {header_bg[1]}, {header_bg[2]}); "
-            f"color: rgb({header_text[0]}, {header_text[1]}, {header_text[2]}); "
-            f"border: {header_border_width}px solid rgb({header_border[0]}, {header_border[1]}, {header_border[2]}); "
-            f"border-radius: {header_border_radius}px; "
-            f"font-family: {header_font_family}; "
-            f"font-size: {header_font_size}pt; "
-            f"font-style: {header_font_style};"
-        )
-        self.info_label.setStyleSheet(header_style)
-        
-        # Tab widget styling
+        # Tab widget styling (aligned with DetailPanel._apply_tab_styling)
         tabs_config = dialog_config.get('tabs', {})
-        tab_font_family = tabs_config.get('font_family', 'Helvetica Neue')
+        tab_font_family = resolve_font_family(tabs_config.get('font_family', 'Helvetica Neue'))
         tab_font_size = scale_font_size(tabs_config.get('font_size', 10))
+        tab_font_weight = tabs_config.get('font_weight', None)
+        selected_tab_font_weight = tabs_config.get('selected_font_weight', 500)
         tab_height = tabs_config.get('tab_height', 24)
         pane_bg = tabs_config.get('pane_background', [255, 255, 255])
         colors_config = tabs_config.get('colors', {})
@@ -1082,6 +1157,12 @@ class EngineConfigurationDialog(QDialog):
         active_text = active.get('text', [255, 255, 255])
         active_border = active.get('border', [100, 120, 160])
         
+        tab_weight_css = (
+            f"font-weight: {int(tab_font_weight)};"
+            if tab_font_weight is not None
+            else ""
+        )
+        
         # Scroll button color
         scroll_button_color = tabs_config.get('scroll_button_color', [30, 30, 30])
         
@@ -1090,8 +1171,8 @@ class EngineConfigurationDialog(QDialog):
                 background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
             }}
             QTabWidget::pane {{
-                background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
                 border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
+                background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
             }}
             QTabWidget::tab-bar {{
                 alignment: left;
@@ -1100,22 +1181,39 @@ class EngineConfigurationDialog(QDialog):
                 background-color: rgb({norm_bg[0]}, {norm_bg[1]}, {norm_bg[2]});
                 color: rgb({norm_text[0]}, {norm_text[1]}, {norm_text[2]});
                 border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
-                padding: 4px 12px;
-                margin-right: 2px;
-                font-family: {tab_font_family};
-                font-size: {tab_font_size}pt;
-                min-height: {tab_height}px;
+                border-bottom: none;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                padding: 6px 12px;
                 min-width: 80px;
+                height: {tab_height}px;
+                font-family: "{tab_font_family}";
+                font-size: {tab_font_size}pt;
+                {tab_weight_css}
+                margin-right: 2px;
             }}
             QTabBar::tab:hover {{
                 background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});
                 color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});
-                border: 1px solid rgb({hover_border[0]}, {hover_border[1]}, {hover_border[2]});
+                border-color: rgb({hover_border[0]}, {hover_border[1]}, {hover_border[2]});
             }}
             QTabBar::tab:selected {{
                 background-color: rgb({active_bg[0]}, {active_bg[1]}, {active_bg[2]});
                 color: rgb({active_text[0]}, {active_text[1]}, {active_text[2]});
-                border: 1px solid rgb({active_border[0]}, {active_border[1]}, {active_border[2]});
+                border-color: rgb({active_border[0]}, {active_border[1]}, {active_border[2]});
+                font-weight: {int(selected_tab_font_weight)};
+            }}
+            QTabBar::tab:focus {{
+                outline: none;
+            }}
+            QTabBar::tab:!selected {{
+                margin-top: 2px;
+            }}
+            QTabBar::tab:first:selected {{
+                margin-left: 0px;
+            }}
+            QTabBar::tab:last:selected {{
+                margin-right: 0px;
             }}
             QTabBar QToolButton {{
                 background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
@@ -1396,19 +1494,23 @@ class EngineConfigurationDialog(QDialog):
         
         from app.views.style import StyleManager
         
-        # Set dialog background color to match dark theme (apply first)
+        # Window chrome: same as BulkReplaceDialog (dialogs.*.background_color), not tab pane color
         tabs_config = dialog_config.get('tabs', {})
         pane_bg = tabs_config.get('pane_background', [40, 40, 45])
+        dialog_chrome_bg = dialog_config.get('background_color', pane_bg)
         from PyQt6.QtGui import QPalette, QColor
         palette = self.palette()
-        palette.setColor(self.backgroundRole(), QColor(pane_bg[0], pane_bg[1], pane_bg[2]))
+        palette.setColor(
+            self.backgroundRole(),
+            QColor(dialog_chrome_bg[0], dialog_chrome_bg[1], dialog_chrome_bg[2]),
+        )
         self.setPalette(palette)
         self.setAutoFillBackground(True)
         
         # Also set stylesheet to ensure background color covers the entire window including frame
         dialog_stylesheet = f"""
             QDialog {{
-                background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
+                background-color: rgb({dialog_chrome_bg[0]}, {dialog_chrome_bg[1]}, {dialog_chrome_bg[2]});
             }}
         """
         # Append to existing stylesheet if any, otherwise set it

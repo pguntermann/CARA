@@ -24,7 +24,8 @@ def generate_button_stylesheet(
     pressed_text_color: Optional[List[int]] = None,
     active_text_color: Optional[List[int]] = None,
     min_width: Optional[int] = None,
-    min_height: Optional[int] = None
+    min_height: Optional[int] = None,
+    border_width: int = 1,
 ) -> str:
     """Generate QSS stylesheet for buttons.
     
@@ -42,6 +43,7 @@ def generate_button_stylesheet(
         padding: Padding in pixels.
         min_width: Minimum width in pixels. If None, not included in stylesheet.
         min_height: Minimum height in pixels. If None, not included in stylesheet.
+        border_width: Border width in pixels; 0 removes the visible border.
     
     Returns:
         A string containing the QSS stylesheet for buttons.
@@ -62,11 +64,23 @@ def generate_button_stylesheet(
         text_color[1] // 2,
         text_color[2] // 2
     ]
+
+    if border_width <= 0:
+        border_rule = "border: none;"
+        border_color_rule = ""
+    else:
+        border_rule = (
+            f"border: {border_width}px solid rgb({border_color[0]}, "
+            f"{border_color[1]}, {border_color[2]});"
+        )
+        border_color_rule = (
+            f"border-color: rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
+        )
     
     # Build base stylesheet
     base_styles = [
         f"background-color: rgb({normal_bg[0]}, {normal_bg[1]}, {normal_bg[2]});",
-        f"border: 1px solid rgb({border_color[0]}, {border_color[1]}, {border_color[2]});",
+        border_rule,
         f"border-radius: {border_radius}px;",
         f"padding: {padding}px;",
         f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});",
@@ -87,22 +101,22 @@ def generate_button_stylesheet(
         f"QPushButton:hover {{"
         f"background-color: rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]});"
         f"color: rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]});"
-        f"border-color: rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
+        f"{border_color_rule if border_width > 0 else 'border: none;'}"
         f"}}"
         f"QPushButton:pressed {{"
         f"background-color: rgb({pressed_bg[0]}, {pressed_bg[1]}, {pressed_bg[2]});"
         f"color: rgb({pressed_text[0]}, {pressed_text[1]}, {pressed_text[2]});"
-        f"border-color: rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
+        f"{border_color_rule if border_width > 0 else 'border: none;'}"
         f"}}"
         f"QPushButton:checked {{"
         f"background-color: rgb({checked_bg[0]}, {checked_bg[1]}, {checked_bg[2]});"
         f"color: rgb({checked_text[0]}, {checked_text[1]}, {checked_text[2]});"
-        f"border-color: rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
+        f"{border_color_rule if border_width > 0 else 'border: none;'}"
         f"}}"
         f"QPushButton:checked:hover {{"
         f"background-color: rgb({checked_bg[0]}, {checked_bg[1]}, {checked_bg[2]});"
         f"color: rgb({checked_text[0]}, {checked_text[1]}, {checked_text[2]});"
-        f"border-color: rgb({border_color[0]}, {border_color[1]}, {border_color[2]});"
+        f"{border_color_rule if border_width > 0 else 'border: none;'}"
         f"}}"
         f"QPushButton:disabled {{"
         f"background-color: rgb({disabled_bg[0]}, {disabled_bg[1]}, {disabled_bg[2]});"
@@ -137,7 +151,8 @@ def apply_button_styling(
     pressed_text_color: Optional[List[int]] = None,
     active_text_color: Optional[List[int]] = None,
     min_width: Optional[int] = None,
-    min_height: Optional[int] = None
+    min_height: Optional[int] = None,
+    border_width: int = 1,
 ) -> None:
     """Apply styling to a list of buttons.
     
@@ -179,6 +194,7 @@ def apply_button_styling(
         active_text_color=active_text_color,
         min_width=min_width,
         min_height=min_height,
+        border_width=border_width,
     )
     
     # Apply stylesheet to all buttons
