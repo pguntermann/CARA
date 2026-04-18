@@ -2757,13 +2757,13 @@
           "colors": {
             "normal": {
               "background": {
-                "$ref": "$_COLOR_PAPYRUS_PANEL"
+                "$ref": "$_COLOR_WHEAT_CREAM"
               },
               "text": {
                 "$ref": "$_COLOR_INK_BODY"
               },
               "border": {
-                "$ref": "$_COLOR_PAPYRUS_PANEL"
+                "$ref": "$_COLOR_WHEAT_CREAM"
               }
             },
             "hover": {
