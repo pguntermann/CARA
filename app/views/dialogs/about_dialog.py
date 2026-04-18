@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSizePolicy,
 )
 from PyQt6.QtGui import QColor, QIcon
 from PyQt6.QtCore import Qt
@@ -30,11 +31,11 @@ class AboutDialog(QDialog):
         # Get about dialog config
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('about_dialog', {})
         
-        # Set dialog properties
+        # Set dialog properties (same pattern as Annotation Preferences / Import Games: fixed size from config)
         self.setWindowTitle("About CARA")
         dialog_width = dialog_config.get('width', 550)
-        # About dialog should not be resizable; we fix the size after layout is built.
-        self.setFixedWidth(dialog_width)
+        dialog_height = dialog_config.get('height', 460)
+        self.setFixedSize(dialog_width, dialog_height)
         
         # Set dialog background color
         bg_color = dialog_config.get('background_color', [40, 40, 45])
@@ -43,10 +44,10 @@ class AboutDialog(QDialog):
         dialog_palette.setColor(self.backgroundRole(), QColor(bg_color[0], bg_color[1], bg_color[2]))
         self.setPalette(dialog_palette)
         
-        # Create main layout
+        # Create main layout (same vertical rhythm as Annotation Preferences: layout spacing + stretch + button_row_spacing)
         main_layout = QVBoxLayout(self)
         layout_config = dialog_config.get('layout', {})
-        layout_spacing = layout_config.get('spacing', 25)
+        layout_spacing = layout_config.get('spacing', 12)
         layout_margins = layout_config.get('margins', [30, 30, 30, 30])
         main_layout.setSpacing(layout_spacing)
         main_layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
@@ -161,7 +162,6 @@ class AboutDialog(QDialog):
         icon_size = icon_config.get('size', 120)
         icon_text_gap = layout_config.get('icon_text_gap', 25)
         # No minimum height: let description use only the space it needs (avoids gap below text)
-        from PyQt6.QtWidgets import QSizePolicy
         description_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         
         description_label.setStyleSheet(
@@ -267,12 +267,26 @@ class AboutDialog(QDialog):
         
         main_layout.addLayout(content_layout)
         
-        # Button section (no extra spacing; main_layout spacing already separates from content)
+        # Same pattern as Annotation Preferences: stretch absorbs extra height so the button row
+        # aligns with other dialogs (fixed height uses bottom margin + stretch, not space below Close).
+        main_layout.addStretch(1)
+        button_row_top_spacing = layout_config.get(
+            'button_row_spacing',
+            layout_config.get('button_section_top_margin', 20),
+        )
+        try:
+            button_row_top_spacing = int(button_row_top_spacing)
+        except (TypeError, ValueError):
+            button_row_top_spacing = 20
+        main_layout.addSpacing(button_row_top_spacing)
+        
+        # Button section
+        buttons_config = dialog_config.get('buttons', {})
         button_layout = QHBoxLayout()
+        button_layout.setSpacing(buttons_config.get("spacing", 10))
         button_layout.addStretch()
         
         # Apply button styling using StyleManager (uses unified config)
-        buttons_config = dialog_config.get('buttons', {})
         button_width = buttons_config.get('width', 120)
         button_height = buttons_config.get('height', 30)
         border_color = buttons_config.get('border_color', [60, 60, 65])
@@ -296,8 +310,3 @@ class AboutDialog(QDialog):
         )
         
         main_layout.addLayout(button_layout)
-
-        # Finalize size: use content height so there is no extra space below the button
-        self.adjustSize()
-        self.setFixedSize(dialog_width, self.sizeHint().height())
-

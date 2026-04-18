@@ -451,13 +451,24 @@ class ManageGameTagsDialog(QDialog):
         dlg_cfg = (self.config.get("ui", {}) or {}).get("dialogs", {}).get("manage_game_tags", {})
         self.dialog_width = int(dlg_cfg.get("width", 680))
         self.dialog_height = int(dlg_cfg.get("height", 520))
+        self.scroll_area_height = max(1, int(dlg_cfg.get("scroll_area_height", 120)))
         self.bg_color = QColor(*(dlg_cfg.get("background_color", [40, 40, 45])))
         self.border_color = dlg_cfg.get("border_color", [60, 60, 65])
-        self.layout_margins = (dlg_cfg.get("layout", {}) or {}).get("margins", [18, 18, 18, 18])
-        self.layout_spacing = (dlg_cfg.get("layout", {}) or {}).get("spacing", 10)
+        layout_cfg = dlg_cfg.get("layout", {}) or {}
+        self.layout_margins = layout_cfg.get("margins", [25, 25, 25, 25])
+        spacing_cfg = dlg_cfg.get("spacing", {}) or {}
+        self.section_spacing = int(
+            layout_cfg.get("section_spacing")
+            or spacing_cfg.get("section")
+            or 15
+        )
 
         groups_cfg = dlg_cfg.get("groups", {}) or {}
-        self.group_contents_margins = groups_cfg.get("contents_margins", [10, 14, 10, 10])
+        _gm = groups_cfg.get("content_margins") or groups_cfg.get("contents_margins", [10, 20, 10, 15])
+        self.group_content_margins = [int(x) for x in _gm[:4]]
+
+        buttons_cfg = dlg_cfg.get("buttons", {}) or {}
+        self.button_spacing = int(buttons_cfg.get("spacing", 10))
         self.group_spacing = int(groups_cfg.get("spacing", 10))
         self.builtin_chip_container_min_h = int(groups_cfg.get("builtin_chip_container_min_height", 36))
         self.custom_chip_container_min_h = int(groups_cfg.get("custom_chip_container_min_height", 36))
@@ -522,6 +533,10 @@ class ManageGameTagsDialog(QDialog):
         self.chip_unmanaged_bg = chip_cfg.get("unmanaged_background_color", [95, 95, 100])
         self.chip_hover_bg = chip_cfg.get("hover_background_rgba", [255, 255, 255, 18])
         self.chip_hover_text_color = chip_cfg.get("hover_text_color", [68, 68, 74])
+        # Used when chip background is dark (light label): hover_text_color is for light chips only.
+        self.chip_hover_text_color_dark_bg = chip_cfg.get(
+            "hover_text_color_dark_background", [255, 255, 255]
+        )
 
         font_family_raw = chip_cfg.get("font_family", "Helvetica Neue")
         self.chip_font_family = resolve_font_family(font_family_raw)
@@ -531,12 +546,13 @@ class ManageGameTagsDialog(QDialog):
     def _setup_ui(self) -> None:
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(*self.layout_margins)
-        main_layout.setSpacing(self.layout_spacing)
+        # Match Import Games / Bulk Replace: explicit gaps between group boxes (setSpacing alone is easy to miss visually)
+        main_layout.setSpacing(0)
 
         # Built-in tags as chips
         builtin_group = QGroupBox("Built-in game tags")
         builtin_layout = QVBoxLayout()
-        builtin_layout.setContentsMargins(*self.group_contents_margins)
+        builtin_layout.setContentsMargins(*self.group_content_margins)
         builtin_layout.setSpacing(self.group_spacing)
         builtin_group.setLayout(builtin_layout)
 
@@ -545,10 +561,12 @@ class ManageGameTagsDialog(QDialog):
         builtin_layout.addWidget(self.builtin_chip_container)
         main_layout.addWidget(builtin_group)
 
+        main_layout.addSpacing(self.section_spacing)
+
         # Custom tags (chips with + button)
         custom_group = QGroupBox("Custom game tags")
         custom_layout = QVBoxLayout()
-        custom_layout.setContentsMargins(*self.group_contents_margins)
+        custom_layout.setContentsMargins(*self.group_content_margins)
         custom_layout.setSpacing(self.group_spacing)
         custom_group.setLayout(custom_layout)
 
@@ -561,12 +579,23 @@ class ManageGameTagsDialog(QDialog):
         self.custom_chip_container = QWidget()
         self.custom_chip_container.setMinimumHeight(self.custom_chip_container_min_h)
         self.scroll.setWidget(self.custom_chip_container)
-        custom_layout.addWidget(self.scroll, 1)
+        self.scroll.setFixedHeight(self.scroll_area_height)
+        # Do not stretch the scroll area: extra dialog height should go to the spacer below, not the viewport.
+        self.scroll.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed,
+        )
+        custom_layout.addWidget(self.scroll, 0)
 
-        main_layout.addWidget(custom_group, 1)
+        main_layout.addWidget(custom_group, 0)
+
+        main_layout.addStretch(1)
+
+        main_layout.addSpacing(self.section_spacing)
 
         # Bottom buttons
         btn_row = QHBoxLayout()
+        btn_row.setSpacing(self.button_spacing)
         self.reset_builtin_btn = QPushButton("Reset to Defaults")
         self.reset_builtin_btn.clicked.connect(self._reset_builtin_to_defaults)
         btn_row.addWidget(self.reset_builtin_btn)
@@ -608,7 +637,37 @@ class ManageGameTagsDialog(QDialog):
 
         groups = list(self.findChildren(QGroupBox))
         if groups:
-            StyleManager.style_group_boxes(groups, self.config)
+            dlg_cfg = (self.config.get("ui", {}) or {}).get("dialogs", {}).get("manage_game_tags", {})
+            groups_cfg = dlg_cfg.get("groups", {}) or {}
+            bc = self.border_color if isinstance(self.border_color, list) and len(self.border_color) >= 3 else [60, 60, 65]
+            bc = [int(bc[0]), int(bc[1]), int(bc[2])]
+            bg_rgb = [self.bg_color.red(), self.bg_color.green(), self.bg_color.blue()]
+            title_ff = groups_cfg.get("title_font_family")
+            title_ff = resolve_font_family(title_ff) if title_ff else None
+            title_fs = (
+                scale_font_size(groups_cfg["title_font_size"])
+                if "title_font_size" in groups_cfg
+                else None
+            )
+            title_color = groups_cfg.get("title_color")
+            if isinstance(title_color, dict) and "$ref" in title_color:
+                title_color = None
+            StyleManager.style_group_boxes(
+                groups,
+                self.config,
+                border_color=bc,
+                bg_color=bg_rgb,
+                border_radius=groups_cfg.get("border_radius"),
+                border_width=groups_cfg.get("border_width"),
+                margin_top=groups_cfg.get("margin_top"),
+                padding_top=groups_cfg.get("padding_top"),
+                title_font_family=title_ff,
+                title_font_size=title_fs,
+                title_color=title_color,
+                title_left=groups_cfg.get("title_left"),
+                title_padding=groups_cfg.get("title_padding"),
+                content_margins=list(self.group_content_margins),
+            )
 
         # Scrollbar styling
         try:
@@ -1018,7 +1077,27 @@ class ManageGameTagsDialog(QDialog):
             if isinstance(self.chip_hover_text_color, list) and len(self.chip_hover_text_color) >= 3
             else [68, 68, 74]
         )
-        hover_text = f"rgb({int(htc[0])}, {int(htc[1])}, {int(htc[2])})"
+        htd = (
+            self.chip_hover_text_color_dark_bg
+            if isinstance(self.chip_hover_text_color_dark_bg, list)
+            and len(self.chip_hover_text_color_dark_bg) >= 3
+            else [255, 255, 255]
+        )
+        # Plus chip: match label to chip fill luminance (light chip → dark hover text; dark chip → light hover text).
+        # Tag chips: match label to hover overlay tint from theme — lightening overlay (e.g. white) → dark text;
+        # darkening overlay (e.g. black) → light text, so contrast stays readable with the composited hover.
+        if isinstance(chip, _AddChipButton):
+            if is_light:
+                hover_text = f"rgb({int(htc[0])}, {int(htc[1])}, {int(htc[2])})"
+            else:
+                hover_text = f"rgb({int(htd[0])}, {int(htd[1])}, {int(htd[2])})"
+        else:
+            hr, hg, hb = int(hover_rgba[0]), int(hover_rgba[1]), int(hover_rgba[2])
+            overlay_lum = 0.2126 * hr + 0.7152 * hg + 0.0722 * hb
+            if overlay_lum > 150:
+                hover_text = f"rgb({int(htc[0])}, {int(htc[1])}, {int(htc[2])})"
+            else:
+                hover_text = f"rgb({int(htd[0])}, {int(htd[1])}, {int(htd[2])})"
         hover = (
             "QPushButton:hover {"
             f"  background-color: rgba({int(hover_rgba[0])}, {int(hover_rgba[1])}, {int(hover_rgba[2])}, {int(hover_rgba[3])});"
@@ -1135,7 +1214,10 @@ class _AddCustomTagDialog(QDialog):
         row.addWidget(self.name_edit, 1)
         layout.addLayout(row)
 
+        layout.addStretch(1)
+
         btn_row = QHBoxLayout()
+        btn_row.setSpacing(int(getattr(parent, "button_spacing", 10)))
         btn_row.addStretch(1)
         self.cancel_btn = QPushButton("Cancel")
         self.ok_btn = QPushButton("OK")

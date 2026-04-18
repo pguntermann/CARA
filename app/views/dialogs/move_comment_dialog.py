@@ -71,7 +71,7 @@ class MoveCommentDialog(QDialog):
         self._layout_spacing = layout_config.get("spacing", 12)
 
         spacing_config = dialog_config.get("spacing", {})
-        self._section_spacing = spacing_config.get("section", 12)
+        self._section_spacing = spacing_config.get("section", 15)
         self._form_spacing = spacing_config.get("form", 8)
         self._before_buttons_spacing = spacing_config.get("before_buttons", 20)
 
@@ -218,6 +218,7 @@ class MoveCommentDialog(QDialog):
         body_layout.addLayout(black_block)
 
         main_layout.addWidget(body)
+        main_layout.addStretch(1)
         main_layout.addSpacing(self._before_buttons_spacing)
 
         self._ok_button = QPushButton("OK")

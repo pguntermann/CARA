@@ -18,7 +18,7 @@ from PyQt6.QtGui import (
     QDropEvent,
 )
 from PyQt6.QtCore import Qt, QModelIndex, QTimer, QSize, QRect, QItemSelection
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from pathlib import Path
 import math
 import sys
@@ -28,6 +28,7 @@ from app.models.database_model import DatabaseModel
 from app.models.database_panel_model import DatabasePanelModel
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.table_export import table_to_delimited, get_copy_table_config
+from app.utils.themed_icon import SVG_MENU_FOLDER_OPEN, themed_icon_from_svg
 
 
 class DatabasePanel(QWidget):
@@ -55,7 +56,7 @@ class DatabasePanel(QWidget):
                        If provided, panel will automatically update when model changes.
             on_row_double_click: Optional callback function called when a row is double-clicked.
                                Receives the row index as argument.
-            on_add_tab_clicked: Optional callback function called when the "+" tab is clicked.
+            on_add_tab_clicked: Optional callback when the open-database tab (folder icon) is activated.
                               Should trigger the open PGN database dialog.
             on_open_pgn_paths: Optional callback(list of filesystem paths) to open PGN files
                               (same as File → Open; used for drag-and-drop).
@@ -82,6 +83,7 @@ class DatabasePanel(QWidget):
         self._on_cut_selected_games = on_cut_selected_games
         self._on_paste_games = on_paste_games
         self._on_clear_game_tags_selected = on_clear_game_tags_selected
+        self._add_tab_index: int = -1  # Index of the open-database tab (folder icon); set in _initialize_tabs
         # Map DatabaseModel instances to tab indices: {DatabaseModel: tab_index}
         self._model_to_tab: Dict[DatabaseModel, int] = {}
         # Track tabs and their models: {tab_index: {'model': DatabaseModel, 'file_path': str, 'table': QTableView, 'identifier': str}}
@@ -129,7 +131,7 @@ class DatabasePanel(QWidget):
         self._pulse_timer.timeout.connect(self._update_pulse_animation)
         self._pulse_timer.setInterval(self._pulse_interval_ms)
         
-        # Initialize tabs: "Clipboard" first, "+" last
+        # Initialize tabs; open-database tab (folder icon) is last
         self._initialize_tabs()
         
         # Configure QTabBar after tabs are added
@@ -191,7 +193,7 @@ class DatabasePanel(QWidget):
         active_text = active.get('text', [240, 240, 240])
         active_border = active.get('border', [100, 120, 160])
 
-        # Dedicated "+" tab colors (falls back to regular tab colors when unspecified)
+        # Dedicated last-tab (open database) colors (falls back to regular tab colors when unspecified)
         add_tab_bg = add_tab.get('background', norm_bg)
         add_tab_text = add_tab.get('text', norm_text)
         add_tab_border = add_tab.get('border', norm_border)
@@ -204,6 +206,12 @@ class DatabasePanel(QWidget):
         
         # Scroll button color
         scroll_button_color = tabs_config.get('scroll_button_color', [30, 30, 30])
+
+        # Last tab (open-database icon): symmetric horizontal padding and min-width so the
+        # icon-only tab's content width matches the icon — Qt then draws it centered.
+        open_db_icon_px = self._tab_bar_icon_pixel_size()
+        open_db_tab_h_pad = 8
+        open_db_tab_min_w = open_db_icon_px + 2 * open_db_tab_h_pad
         
         # Create stylesheet
         tab_weight_css = f"font-weight: {int(tab_font_weight)};" if tab_font_weight is not None else ""
@@ -265,8 +273,8 @@ class DatabasePanel(QWidget):
                 background-color: rgb({add_tab_bg[0]}, {add_tab_bg[1]}, {add_tab_bg[2]});
                 color: rgb({add_tab_text[0]}, {add_tab_text[1]}, {add_tab_text[2]});
                 border-color: rgb({add_tab_border[0]}, {add_tab_border[1]}, {add_tab_border[2]});
-                min-width: 32px;
-                padding: 6px 10px;
+                min-width: {open_db_tab_min_w}px;
+                padding: 6px {open_db_tab_h_pad}px;
             }}
 
             QTabBar::tab:last:hover {{
@@ -290,7 +298,48 @@ class DatabasePanel(QWidget):
         """
         
         self.tab_widget.setStyleSheet(stylesheet)
-    
+        self._refresh_open_database_tab_icon()
+
+    def _open_database_tab_icon_tint_rgb(self) -> Tuple[int, int, int]:
+        """RGB for the open-database tab icon; optional add_tab.icon_tint, else add_tab.text (QSS)."""
+        panel_config = (self.config.get("ui") or {}).get("panels", {}).get("database", {})
+        tabs_config = panel_config.get("tabs", {})
+        colors_config = tabs_config.get("colors", {})
+        normal = colors_config.get("normal", {})
+        add_tab = colors_config.get("add_tab", {})
+        norm_text = normal.get("text", [200, 200, 200])
+        icon_tint = add_tab.get("icon_tint")
+        if isinstance(icon_tint, (list, tuple)) and len(icon_tint) >= 3:
+            try:
+                return (int(icon_tint[0]), int(icon_tint[1]), int(icon_tint[2]))
+            except Exception:
+                pass
+        add_tab_text = add_tab.get("text", norm_text)
+        try:
+            return (int(add_tab_text[0]), int(add_tab_text[1]), int(add_tab_text[2]))
+        except Exception:
+            try:
+                return (int(norm_text[0]), int(norm_text[1]), int(norm_text[2]))
+            except Exception:
+                return (200, 200, 200)
+
+    def _tab_bar_icon_pixel_size(self) -> int:
+        """Icon size for tab icons (open-folder tab + unsaved pulse); scales with tab height."""
+        panel_config = (self.config.get("ui") or {}).get("panels", {}).get("database", {})
+        tabs_config = panel_config.get("tabs", {})
+        tab_height = int(tabs_config.get("tab_height", 24))
+        return max(14, min(20, tab_height - 4))
+
+    def _refresh_open_database_tab_icon(self) -> None:
+        if self._add_tab_index < 0:
+            return
+        rgb = self._open_database_tab_icon_tint_rgb()
+        self.tab_widget.setTabIcon(
+            self._add_tab_index,
+            themed_icon_from_svg(SVG_MENU_FOLDER_OPEN, rgb),
+        )
+        self.tab_widget.setTabToolTip(self._add_tab_index, "Open database…")
+
     def _configure_tab_bar(self) -> None:
         """Configure QTabBar for macOS compatibility (left-aligned, content-sized tabs)."""
         tab_bar = self.tab_widget.tabBar()
@@ -298,8 +347,8 @@ class DatabasePanel(QWidget):
         tab_bar.setElideMode(Qt.TextElideMode.ElideNone)  # Prevent text truncation
         tab_bar.setUsesScrollButtons(True)  # Enable scroll buttons when tabs don't fit
         tab_bar.setDrawBase(False)  # Don't draw base line
-        # Keep the unsaved-state pulse visible regardless of platform/style defaults.
-        tab_bar.setIconSize(QSize(10, 10))
+        icon_px = self._tab_bar_icon_pixel_size()
+        tab_bar.setIconSize(QSize(icon_px, icon_px))
         tab_bar.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         tab_bar.customContextMenuRequested.connect(self._on_tab_bar_context_menu)
 
@@ -379,14 +428,14 @@ class DatabasePanel(QWidget):
             # col_pgn stretches, no width needed
         ]
         
-        # "+" tab (always last) for adding new tabs
+        # Open-database tab (always last): folder icon, same asset as Add Engine browse
         add_tab_widget = QWidget()
-        self.tab_widget.addTab(add_tab_widget, "+")
-        
-        # Store reference to the add tab index
-        self._add_tab_index = 0  # Index of the "+" tab (will be updated as databases are added)
-        
-        # Connect tab change signal to handle "+" tab clicks
+        rgb = self._open_database_tab_icon_tint_rgb()
+        open_icon = themed_icon_from_svg(SVG_MENU_FOLDER_OPEN, rgb)
+        self._add_tab_index = self.tab_widget.addTab(add_tab_widget, open_icon, "")
+        self.tab_widget.setTabToolTip(self._add_tab_index, "Open database…")
+
+        # Connect tab change signal to handle open-database tab activation
         self.tab_widget.currentChanged.connect(self._on_tab_changed)
     
     def set_panel_model(self, panel_model: DatabasePanelModel) -> None:
@@ -614,7 +663,7 @@ class DatabasePanel(QWidget):
         else:
             tab_label = "Clipboard"
         
-        # Insert tab before the "+" tab
+        # Insert tab before the open-database tab
         tab_index = self._add_tab_index
         self.tab_widget.insertTab(tab_index, tab_widget, tab_label)
 
@@ -753,14 +802,14 @@ class DatabasePanel(QWidget):
         Args:
             index: Index of the newly selected tab.
         """
-        # If the "+" tab is clicked, trigger the open PGN database callback
+        # If the open-database tab is selected, trigger the open PGN database callback
         if index == self._add_tab_index and self._on_add_tab_clicked:
             # Switch back to the previous tab (or Clipboard if no previous tab)
             if self._add_tab_index > 1:
-                # There's at least one other tab before the "+" tab
+                # At least one data tab before the open-database tab
                 self.tab_widget.setCurrentIndex(self._add_tab_index - 1)
             else:
-                # Only Clipboard and "+" tabs exist, switch to Clipboard
+                # Only Clipboard and open-database tab exist — switch to Clipboard
                 self.tab_widget.setCurrentIndex(0)
             
             # Trigger the open PGN database callback
@@ -1314,8 +1363,8 @@ class DatabasePanel(QWidget):
         Returns:
             QPixmap with the circle icon.
         """
-        # Icon size - small circle that fits in tab
-        size = 8
+        icon_px = self._tab_bar_icon_pixel_size()
+        size = max(6, min(12, icon_px - 6))
         pixmap = QPixmap(size, size)
         pixmap.fill(Qt.GlobalColor.transparent)
         

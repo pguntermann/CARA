@@ -100,7 +100,7 @@ class MovesListProfileSetupDialog(QDialog):
         
         # Set splitter sizes after dialog is set up
         # Left panel: fixed width (narrower), Right panel: takes remaining space
-        margins = self.layout_config.get('margins', [15, 15, 15, 15])
+        margins = self.layout_config.get('margins', [25, 25, 25, 25])
         available_width = self._dialog_width - margins[0] - margins[2]  # left + right margins
         left_panel_width = self.layout_config.get('left_panel_width', 250)
         right_size = available_width - left_panel_width  # Right panel takes remaining space
@@ -114,11 +114,11 @@ class MovesListProfileSetupDialog(QDialog):
         """Setup the dialog UI."""
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('moveslist_profile_setup', {})
         self.layout_config = dialog_config.get('layout', {})
-        layout_spacing = self.layout_config.get('spacing', 10)
-        layout_margins = self.layout_config.get('margins', [15, 15, 15, 15])
+        layout_margins = self.layout_config.get('margins', [25, 25, 25, 25])
         
         main_layout = QVBoxLayout(self)
-        main_layout.setSpacing(layout_spacing)
+        main_layout.setSpacing(0)
+        # Insets inside the dialog client area (aligned with other modals). QLayout preserves these when resized.
         main_layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
         # Create splitter for two-panel layout
@@ -158,10 +158,20 @@ class MovesListProfileSetupDialog(QDialog):
             }}
         """)
         
-        main_layout.addWidget(self.splitter)
+        main_layout.addWidget(self.splitter, 1)
         
         # Store dialog width for splitter sizing
         self._dialog_width = dialog_config.get('width', 750)
+        
+        button_row_spacing = self.layout_config.get('button_row_spacing')
+        if button_row_spacing is None:
+            button_row_spacing = self.layout_config.get('spacing', 10)
+        try:
+            button_row_spacing = int(button_row_spacing)
+        except (TypeError, ValueError):
+            button_row_spacing = 10
+        if button_row_spacing > 0:
+            main_layout.addSpacing(button_row_spacing)
         
         # Buttons
         button_layout = QHBoxLayout()
@@ -197,7 +207,7 @@ class MovesListProfileSetupDialog(QDialog):
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('moveslist_profile_setup', {})
         layout_config = dialog_config.get('layout', {})
         left_panel_config = layout_config.get('left_panel', {})
-        left_panel_margins = left_panel_config.get('margins', [0, 0, 0, 0])
+        left_panel_margins = left_panel_config.get('margins', [0, 0, 10, 0])
         left_panel_spacing = left_panel_config.get('spacing', 5)
         layout.setContentsMargins(left_panel_margins[0], left_panel_margins[1], left_panel_margins[2], left_panel_margins[3])
         layout.setSpacing(left_panel_spacing)
@@ -227,8 +237,8 @@ class MovesListProfileSetupDialog(QDialog):
         # Get groups config for layout spacing and content margins
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('moveslist_profile_setup', {})
         groups_config = dialog_config.get('groups', {})
-        group_content_margins = groups_config.get('content_margins', [10, 15, 10, 10])
-        group_layout_spacing = groups_config.get('layout_spacing', 8)
+        group_content_margins = groups_config.get('content_margins', [10, 20, 10, 15])
+        group_layout_spacing = groups_config.get('layout_spacing', 10)
         
         # Create group boxes for each category
         all_column_names = self.profile_model.get_column_names()
@@ -284,7 +294,7 @@ class MovesListProfileSetupDialog(QDialog):
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('moveslist_profile_setup', {})
         layout_config = dialog_config.get('layout', {})
         right_panel_config = layout_config.get('right_panel', {})
-        right_panel_margins = right_panel_config.get('margins', [0, 0, 0, 0])
+        right_panel_margins = right_panel_config.get('margins', [10, 0, 0, 0])
         right_panel_spacing = right_panel_config.get('spacing', 5)
         layout.setContentsMargins(right_panel_margins[0], right_panel_margins[1], right_panel_margins[2], right_panel_margins[3])
         layout.setSpacing(right_panel_spacing)
@@ -415,6 +425,8 @@ class MovesListProfileSetupDialog(QDialog):
                         if column_name:
                             order_after.append(column_name)
                 
+                if hasattr(self.parent_dialog, '_apply_visible_table_row_heights'):
+                    self.parent_dialog._apply_visible_table_row_heights()
             
             def drop_on(self, event) -> Optional[int]:
                 """Get the row index where the drop occurred."""
@@ -548,8 +560,36 @@ class MovesListProfileSetupDialog(QDialog):
                         self.visible_table.setCellWidget(row, 1, spinbox)
                         # Apply styling to spinbox
                         self._apply_spinbox_styling(spinbox)
+            self._apply_visible_table_row_heights()
         finally:
             self._updating_ui = False
+    
+    def _visible_table_row_height(self) -> int:
+        """Total height per table row: width spinbox minimum height + optional extra spacing."""
+        dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('moveslist_profile_setup', {})
+        table_config = dialog_config.get('table', {})
+        row_spacing = table_config.get('row_spacing', 10)
+        try:
+            row_spacing = int(row_spacing)
+        except (TypeError, ValueError):
+            row_spacing = 10
+        row_spacing = max(0, row_spacing)
+        spinbox_config = dialog_config.get('inputs', {}).get('spinbox', {})
+        spinbox_min_h = spinbox_config.get('minimum_height', 30)
+        try:
+            spinbox_min_h = int(spinbox_min_h)
+        except (TypeError, ValueError):
+            spinbox_min_h = 30
+        spinbox_min_h = max(1, spinbox_min_h)
+        return spinbox_min_h + row_spacing
+    
+    def _apply_visible_table_row_heights(self) -> None:
+        """Apply fixed row heights so rows have consistent vertical spacing."""
+        if not hasattr(self, 'visible_table'):
+            return
+        h = self._visible_table_row_height()
+        for row in range(self.visible_table.rowCount()):
+            self.visible_table.setRowHeight(row, h)
     
     def _create_width_spinbox(self, column_name: str, width: int) -> QSpinBox:
         """Create a width spinbox with proper event handling."""
@@ -746,6 +786,7 @@ class MovesListProfileSetupDialog(QDialog):
             self.visible_table.setCellWidget(row, 1, spinbox)
             # Apply styling to spinbox
             self._apply_spinbox_styling(spinbox)
+            self._apply_visible_table_row_heights()
             
             # Restore preserved widths for existing columns (in case they were reset)
             for i in range(self.visible_table.rowCount() - 1):  # Exclude the row we just added
@@ -766,6 +807,7 @@ class MovesListProfileSetupDialog(QDialog):
                         del self.width_spinboxes[column_name]
                     self.visible_table.removeRow(i)
                     break
+            self._apply_visible_table_row_heights()
     
     def _on_clear_all(self) -> None:
         """Clear all columns except #."""
@@ -808,6 +850,7 @@ class MovesListProfileSetupDialog(QDialog):
         self.visible_table.setCellWidget(row, 1, spinbox)
         # Apply styling to spinbox
         self._apply_spinbox_styling(spinbox)
+        self._apply_visible_table_row_heights()
     
     def _on_reset(self) -> None:
         """Reset to persisted state of the active profile (state saved to disk)."""
@@ -848,6 +891,7 @@ class MovesListProfileSetupDialog(QDialog):
                 self.visible_table.setCellWidget(row, 1, spinbox)
                 # Apply styling to spinbox
                 self._apply_spinbox_styling(spinbox)
+        self._apply_visible_table_row_heights()
     
     def _on_apply(self) -> None:
         """Apply changes to model via controller."""
@@ -953,6 +997,7 @@ class MovesListProfileSetupDialog(QDialog):
                     self.visible_table.setCellWidget(row, 1, spinbox)
                     # Apply styling to spinbox
                     self._apply_spinbox_styling(spinbox)
+                    self._apply_visible_table_row_heights()
             else:
                 # Remove from table
                 for i in range(self.visible_table.rowCount()):
@@ -963,6 +1008,7 @@ class MovesListProfileSetupDialog(QDialog):
                             del self.width_spinboxes[column_name]
                         self.visible_table.removeRow(i)
                         break
+                self._apply_visible_table_row_heights()
     
     def _save_all_spinbox_values(self) -> None:
         """Save all current spinbox values to _current_dialog_widths."""
@@ -1092,6 +1138,11 @@ class MovesListProfileSetupDialog(QDialog):
             input_bg = inputs_config.get('background_color', [30, 30, 35])
             input_border = inputs_config.get('border_color', [60, 60, 65])
             input_border_radius = inputs_config.get('border_radius', 3)
+            _sab = inputs_config.get('scroll_area_include_border', True)
+            if isinstance(_sab, str):
+                scroll_area_include_border = _sab.strip().lower() in ('true', '1', 'yes', 'on')
+            else:
+                scroll_area_include_border = bool(_sab)
             
             # Apply scrollbar styling using StyleManager
             from app.views.style import StyleManager
@@ -1100,7 +1151,8 @@ class MovesListProfileSetupDialog(QDialog):
                 self.config,
                 input_bg,
                 input_border,
-                input_border_radius
+                input_border_radius,
+                include_scroll_area_border=scroll_area_include_border,
             )
         
         # Table widget styling
@@ -1113,6 +1165,16 @@ class MovesListProfileSetupDialog(QDialog):
         table_header_text = table_config.get('header_text_color', [200, 200, 200])
         table_item_padding = table_config.get('item_padding', 5)
         table_header_padding = table_config.get('header_padding', 5)
+        _hb = table_config.get('header_section_border', True)
+        if isinstance(_hb, str):
+            header_section_border = _hb.strip().lower() in ('true', '1', 'yes', 'on')
+        else:
+            header_section_border = bool(_hb)
+        header_border_qss = (
+            f"border: 1px solid rgb({table_border_color[0]}, {table_border_color[1]}, {table_border_color[2]});"
+            if header_section_border
+            else "border: none;"
+        )
         
         table_style = (
             f"QTableWidget {{"
@@ -1132,13 +1194,18 @@ class MovesListProfileSetupDialog(QDialog):
             f"QHeaderView::section {{"
             f"background-color: rgb({table_header_bg[0]}, {table_header_bg[1]}, {table_header_bg[2]});"
             f"color: rgb({table_header_text[0]}, {table_header_text[1]}, {table_header_text[2]});"
-            f"border: 1px solid rgb({table_border_color[0]}, {table_border_color[1]}, {table_border_color[2]});"
+            f"{header_border_qss}"
             f"padding: {table_header_padding}px;"
             f"font-size: {font_size}pt;"
             f"}}"
         )
         
         self.visible_table.setStyleSheet(table_style)
+        
+        v_header = self.visible_table.verticalHeader()
+        v_header.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        v_header.setDefaultSectionSize(self._visible_table_row_height())
+        self._apply_visible_table_row_heights()
         
         # Apply scrollbar styling to table widget to match the left scroll area exactly
         # Use same input colors as left scroll area for exact matching
@@ -1221,7 +1288,7 @@ class MovesListProfileSetupDialog(QDialog):
         group_title_font = resolve_font_family(groups_config.get('title_font_family'))
         group_title_size = scale_font_size(groups_config.get('title_font_size', 11))
         group_title_color = groups_config.get('title_color')
-        content_margins = groups_config.get('content_margins', [10, 15, 10, 10])
+        content_margins = groups_config.get('content_margins', [10, 20, 10, 15])
         margin_top = groups_config.get('margin_top', 10)
         padding_top = groups_config.get('padding_top', 5)
         

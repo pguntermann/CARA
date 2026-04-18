@@ -156,10 +156,11 @@ class InlineContentDialog(QDialog):
         StyleManager.style_text_edit_scrollbar(
             text_browser, self.config, bg_color, scroll_border_color, content_style
         )
-        main_layout.addWidget(text_browser)
+        main_layout.addWidget(text_browser, 1)
 
         main_layout.addSpacing(layout_config.get("button_section_top_margin", 15))
         button_layout = QHBoxLayout()
+        button_layout.setSpacing(buttons_config.get("spacing", 10))
         button_layout.addStretch()
 
         button_width = buttons_config.get("width", 120)

@@ -303,6 +303,19 @@ class ChessBoardWidget(QWidget):
         self._load_pieces()
         
         # Board state will be initialized when model is set or in fallback case
+
+    def _material_padding_left(self, material_config: Dict[str, Any]) -> int:
+        """Horizontal offset from the board to the material widget: ``material_widget.padding[3]``.
+
+        Same convention as ``game_tags_widget.padding[3]`` for the board-adjacent gap.
+        """
+        pad = material_config.get("padding", [10, 10, 15, 10])
+        if isinstance(pad, list) and len(pad) >= 4:
+            try:
+                return int(pad[3])
+            except (TypeError, ValueError):
+                pass
+        return 10
     
     def _calculate_board_dimensions(self) -> dict:
         """Calculate board dimensions and positions.
@@ -360,8 +373,7 @@ class ChessBoardWidget(QWidget):
         if material_widget_visible and self.material_widget:
             material_w = self.material_widget.width()
             material_config = board_config.get("material_widget", {})
-            material_padding = material_config.get("padding", [10, 10, 15, 10])  # [top, right, bottom, left]
-            material_w += material_padding[3]  # left padding
+            material_w += self._material_padding_left(material_config)
             right_widget_width = max(right_widget_width, material_w)
         if game_tags_widget_visible and self.game_tags_widget:
             tags_w = self.game_tags_widget.width()
@@ -2011,7 +2023,7 @@ class ChessBoardWidget(QWidget):
         # Get material widget config
         board_config = self.config.get("ui", {}).get("panels", {}).get("main", {}).get("board", {})
         material_config = board_config.get("material_widget", {})
-        material_padding = material_config.get("padding", [10, 10, 15, 10])  # [top, right, bottom, left]
+        gap = self._material_padding_left(material_config)
         
         # Position material widget to the upper right of the board
         # Get widget size from QWidget methods (not attributes)
@@ -2019,7 +2031,7 @@ class ChessBoardWidget(QWidget):
         material_widget_height = self.material_widget.height()
         # Position to the right of the board with padding
         # The board size calculation already accounts for material widget width, so position it correctly
-        material_widget_x = start_x + board_size + material_padding[3]  # left padding from board edge
+        material_widget_x = start_x + board_size + gap
         # Align with board top (including border) - no additional top padding for perfect alignment
         material_widget_y = board_top_y
         

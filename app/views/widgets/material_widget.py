@@ -12,6 +12,16 @@ from app.utils.material_tracker import PIECE_VALUES, calculate_material_balance
 from app.utils.font_utils import resolve_font_family, scale_font_size
 
 
+def _parse_padding_quad(raw: Any) -> Optional[List[int]]:
+    """Parse [top, right, bottom, left] padding from config; ints only."""
+    if not isinstance(raw, (list, tuple)) or len(raw) < 4:
+        return None
+    try:
+        return [int(raw[0]), int(raw[1]), int(raw[2]), int(raw[3])]
+    except (TypeError, ValueError):
+        return None
+
+
 class MaterialWidget(QWidget):
     """Widget displaying captured pieces and material difference."""
     
@@ -58,7 +68,20 @@ class MaterialWidget(QWidget):
         
         self.widget_width = material_config.get("width", 120)
         self.widget_height = material_config.get("height", 60)
-        self.padding = material_config.get("padding", [10, 10, 10, 10])  # [top, right, bottom, left]
+        # Inner insets for painted text [top, right, bottom, left]. ``padding`` is also the board
+        # gap (padding[3]) for chessboard_widget; when those are split, use ``inner_padding`` here.
+        inner = _parse_padding_quad(material_config.get("inner_padding"))
+        if inner is not None:
+            self.padding = inner
+        else:
+            outer = _parse_padding_quad(material_config.get("padding", [10, 10, 10, 10]))
+            if outer is None:
+                self.padding = [10, 10, 10, 10]
+            elif outer[3] > 18:
+                # padding[3] is only the board gap (e.g. scholar); never use it as text inset.
+                self.padding = [12, 10, 10, 10]
+            else:
+                self.padding = outer
         self.background_color = QColor(*material_config.get("background_color", [30, 30, 35]))
         self.border_color = QColor(*material_config.get("border_color", [60, 60, 65]))
         self.border_radius = material_config.get("border_radius", 5)

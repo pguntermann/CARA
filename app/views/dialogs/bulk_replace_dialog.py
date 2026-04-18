@@ -358,12 +358,11 @@ class BulkReplaceDialog(QDialog):
         tags_container.setFixedHeight(container_fixed_height)
         tags_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)  # Fixed height prevents growth
         
-        # Quick selection buttons (ABOVE scroll area)
+        # Quick selection buttons (ABOVE scroll area): helpers on the left (same as Bulk Clean PGN)
         if self.quick_select_enabled:
             quick_select_layout = QHBoxLayout()
             quick_select_layout.setSpacing(self.quick_select_spacing)
             quick_select_layout.setContentsMargins(0, 0, 0, 0)
-            quick_select_layout.addStretch()
             
             self.select_all_button = QPushButton("Select All")
             self.select_all_button.setFixedSize(self.quick_select_width, self.quick_select_height)
@@ -374,6 +373,8 @@ class BulkReplaceDialog(QDialog):
             self.deselect_all_button.setFixedSize(self.quick_select_width, self.quick_select_height)
             self.deselect_all_button.clicked.connect(self._on_deselect_all_clicked)
             quick_select_layout.addWidget(self.deselect_all_button)
+            
+            quick_select_layout.addStretch()
             
             tags_container_layout.addLayout(quick_select_layout)
             
@@ -695,7 +696,7 @@ class BulkReplaceDialog(QDialog):
         group_title_font_family = resolve_font_family(groups_config.get("title_font_family"))
         group_title_font_size = scale_font_size(groups_config.get("title_font_size", 11))
         group_title_color = groups_config.get("title_color")
-        group_content_margins = groups_config.get("content_margins", [10, 15, 10, 10])
+        group_content_margins = groups_config.get("content_margins", [10, 20, 10, 15])
         group_margin_top = groups_config.get("margin_top", 10)
         group_padding_top = groups_config.get("padding_top", 5)
         
@@ -1108,6 +1109,8 @@ class BulkReplaceDialog(QDialog):
             f"color: rgb({message_text_color[0]}, {message_text_color[1]}, {message_text_color[2]});"
         )
         layout.addWidget(message_label)
+        
+        layout.addStretch(1)
         
         # Buttons
         button_layout = QHBoxLayout()

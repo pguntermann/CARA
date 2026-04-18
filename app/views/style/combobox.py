@@ -18,7 +18,7 @@ def generate_combobox_stylesheet(
     selection_text_color: List[int],
     border_width: int = 1,
     border_radius: int = 3,
-    padding: List[int] = None
+    padding: List[int] = None,
 ) -> str:
     """Generate QSS stylesheet for comboboxes.
     
@@ -34,7 +34,7 @@ def generate_combobox_stylesheet(
         selection_text_color: Selection text color as [R, G, B].
         border_width: Border width in pixels (default: 1).
         border_radius: Border radius in pixels (default: 3).
-        padding: Padding as [horizontal, vertical] (default: [8, 6]).
+        padding: Padding as [horizontal, vertical] (default: [8, 8]).
     
     Returns:
         A string containing the QSS stylesheet for comboboxes.
@@ -54,11 +54,11 @@ def generate_combobox_stylesheet(
         if config_padding is not None:
             padding = config_padding if isinstance(config_padding, list) else [config_padding, config_padding]
         else:
-            # Default fallback
-            padding = [8, 6]
+            # Default fallback (vertical 8px: avoids ascender clipping with rounded/large fonts)
+            padding = [8, 8]
     
     padding_h = padding[0] if isinstance(padding, list) and len(padding) > 0 else 8
-    padding_v = padding[1] if isinstance(padding, list) and len(padding) > 1 else 6
+    padding_v = padding[1] if isinstance(padding, list) and len(padding) > 1 else 8
     
     stylesheet = (
         f"QComboBox {{"
@@ -204,7 +204,7 @@ def apply_combobox_styling(
         selection_text_color: Selection text color as [R, G, B].
         border_width: Border width in pixels (default: 1).
         border_radius: Border radius in pixels (default: 3).
-        padding: Padding as [horizontal, vertical] (default: [8, 6]).
+        padding: Padding as [horizontal, vertical] (default: [8, 8]).
         editable: Whether comboboxes should be editable (default: False).
     """
     combobox_style = generate_combobox_stylesheet(

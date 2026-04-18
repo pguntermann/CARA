@@ -145,6 +145,8 @@ class MessageDialog(QDialog):
         )
         layout.addWidget(message_label)
         
+        layout.addStretch(1)
+        
         # Buttons
         button_layout = QHBoxLayout()
         button_spacing = buttons_config.get('spacing', 10)

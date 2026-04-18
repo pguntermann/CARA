@@ -113,10 +113,10 @@ class AnnotationPreferencesDialog(QDialog):
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('annotation_preferences', {})
         
         # Dialog dimensions
-        self.dialog_width = dialog_config.get('width', 600)
-        self.dialog_height = dialog_config.get('height', 500)
-        self.dialog_min_width = dialog_config.get('minimum_width', 500)
-        self.dialog_min_height = dialog_config.get('minimum_height', 400)
+        self.dialog_width = dialog_config.get('width', 520)
+        self.dialog_height = dialog_config.get('height', 380)
+        self.dialog_min_width = dialog_config.get('minimum_width', 480)
+        self.dialog_min_height = dialog_config.get('minimum_height', 340)
         
         # Background and colors
         self.bg_color = dialog_config.get('background_color', [40, 40, 45])
@@ -128,8 +128,11 @@ class AnnotationPreferencesDialog(QDialog):
         # Layout
         layout_config = dialog_config.get('layout', {})
         self.layout_spacing = layout_config.get('spacing', 10)
-        self.layout_margins = layout_config.get('margins', [15, 15, 15, 15])
+        # Match bulk_replace and other dialogs (window chrome inset for group boxes)
+        self.layout_margins = layout_config.get('margins', [25, 25, 25, 25])
         self.section_spacing = layout_config.get('section_spacing', 15)
+        # Extra gap between last QGroupBox and button row (bulk_replace uses section_spacing before buttons)
+        self.button_row_top_spacing = layout_config.get('button_row_spacing', 20)
         
         # Buttons
         buttons_config = dialog_config.get('buttons', {})
@@ -167,10 +170,12 @@ class AnnotationPreferencesDialog(QDialog):
         self.group_title_font_family = resolve_font_family(groups_config.get('title_font_family'))
         self.group_title_font_size = scale_font_size(groups_config.get('title_font_size', 11))
         self.group_title_color = groups_config.get('title_color')
-        self.group_content_margins = groups_config.get('content_margins', [10, 15, 10, 10])
+        # Same pattern as bulk_replace / import_games: applied via StyleManager.style_group_boxes
+        self.group_content_margins = groups_config.get('content_margins', [10, 20, 10, 15])
         self.group_margin_top = groups_config.get('margin_top', 10)
         self.group_padding_top = groups_config.get('padding_top', 5)
-        self.font_group_spacing = groups_config.get('font_group_spacing', 6)
+        self.group_title_left = groups_config.get('title_left', 10)
+        self.group_title_padding = groups_config.get('title_padding', [0, 5])
         
         # Color swatches
         color_swatches_config = dialog_config.get('color_swatches', {})
@@ -206,16 +211,10 @@ class AnnotationPreferencesDialog(QDialog):
         layout.setSpacing(self.layout_spacing)
         layout.setContentsMargins(self.layout_margins[0], self.layout_margins[1], self.layout_margins[2], self.layout_margins[3])
         
-        layout.addSpacing(self.section_spacing)
-        
         # Color Palette group
         color_group = QGroupBox("Color Palette")
         color_group_layout = QGridLayout(color_group)
         color_group_layout.setSpacing(self.swatch_spacing)
-        color_group_layout.setContentsMargins(
-            self.group_content_margins[0], self.group_content_margins[1],
-            self.group_content_margins[2], self.group_content_margins[3]
-        )
         
         self.color_swatches: List[ColorSwatchButton] = []
         row = 0
@@ -234,48 +233,43 @@ class AnnotationPreferencesDialog(QDialog):
         
         layout.addSpacing(self.section_spacing)
         
-        # Text Font group
+        # Text Annotation Font: family + size on one row (saves vertical space)
         font_group = QGroupBox("Text Annotation Font")
-        font_group_layout = QVBoxLayout(font_group)
-        font_group_layout.setContentsMargins(
-            self.group_content_margins[0], self.group_content_margins[1],
-            self.group_content_margins[2], self.group_content_margins[3]
-        )
-        font_group_layout.setSpacing(self.font_group_spacing)
+        font_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        font_row = QHBoxLayout(font_group)
+        font_row.setSpacing(8)
         
-        # Font family
-        font_family_layout = QHBoxLayout()
-        font_family_label = QLabel("Font Family:")
-        font_family_label.setMinimumWidth(100)
+        font_family_label = QLabel("Font family:")
+        font_family_label.setMinimumWidth(90)
         self.font_family_combo = QComboBox()
         self.font_family_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
-        # Populate with fonts, filtering out problematic ones
         problematic_fonts = {"Small Fonts", "System", "MS Sans Serif", "MS Serif"}
         all_fonts = QFontDatabase.families()
         valid_fonts = sorted([f for f in all_fonts if f not in problematic_fonts])
         self.font_family_combo.addItems(valid_fonts)
         
-        font_family_layout.addWidget(font_family_label)
-        font_family_layout.addWidget(self.font_family_combo)
-        font_group_layout.addLayout(font_family_layout)
-        
-        # Font size
-        font_size_layout = QHBoxLayout()
-        font_size_label = QLabel("Font Size:")
-        font_size_label.setMinimumWidth(100)
+        font_size_label = QLabel("Size:")
+        font_size_label.setMinimumWidth(36)
+        font_size_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.font_size_spinbox = QSpinBox()
         self.font_size_spinbox.setMinimum(self.font_size_min)
         self.font_size_spinbox.setMaximum(self.font_size_max)
         self.font_size_spinbox.setValue(self.font_size_default)
-        self.font_size_spinbox.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        # Hide increment/decrement buttons
+        self.font_size_spinbox.setFixedWidth(56)
+        self.font_size_spinbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.font_size_spinbox.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
-        font_size_layout.addWidget(font_size_label)
-        font_size_layout.addWidget(self.font_size_spinbox)
-        font_group_layout.addLayout(font_size_layout)
+        
+        font_row.addWidget(font_family_label)
+        font_row.addWidget(self.font_family_combo, 1)
+        font_row.addSpacing(12)
+        font_row.addWidget(font_size_label)
+        font_row.addWidget(self.font_size_spinbox)
         
         layout.addWidget(font_group)
+        
+        layout.addStretch(1)
+        layout.addSpacing(self.button_row_top_spacing)
         
         # Buttons
         button_layout = QHBoxLayout()
@@ -353,8 +347,10 @@ class AnnotationPreferencesDialog(QDialog):
             focus_border_color=self.input_focus_border_color,
             border_width=input_border_width,
             border_radius=self.input_border_radius,
-            padding=spinbox_padding
+            padding=spinbox_padding,
         )
+        # Theme spinbox minimum_height (30px) is for dense forms; this row should match combo height
+        self.font_size_spinbox.setMinimumHeight(0)
         
         # Apply combobox styling using StyleManager
         from app.views.style import StyleManager
@@ -379,6 +375,7 @@ class AnnotationPreferencesDialog(QDialog):
             padding=self.input_padding,
             editable=False  # This combobox is non-editable
         )
+        self.font_family_combo.setMinimumHeight(0)
         
         # Group box styling - use StyleManager
         # Read values from dialog's groups config, or use unified defaults (pass None)
@@ -399,8 +396,9 @@ class AnnotationPreferencesDialog(QDialog):
                 title_font_family=self.group_title_font_family,
                 title_font_size=self.group_title_font_size,
                 title_color=self.group_title_color,
-                title_left=groups_config.get('title_left'),  # None = use unified default
-                title_padding=groups_config.get('title_padding')  # None = use unified default
+                title_left=self.group_title_left,
+                title_padding=self.group_title_padding,
+                content_margins=self.group_content_margins,
             )
     
     def _load_user_settings(self) -> None:

@@ -99,12 +99,15 @@ class BulkTagDialog(QDialog):
         # Layout
         layout_config = dialog_config.get("layout", {})
         self.layout_margins = layout_config.get("margins", [25, 25, 25, 25])
-        self.layout_spacing = layout_config.get("spacing", 12)
+        self.layout_spacing = layout_config.get("spacing", 15)
         
-        # Spacing
+        # Spacing (align with import_games: section gaps between group boxes)
         spacing_config = dialog_config.get("spacing", {})
-        self.section_spacing = spacing_config.get("section", 8)
+        self.section_spacing = spacing_config.get("section", 15)
         self.form_spacing = spacing_config.get("form", 14)
+        
+        groups_config = dialog_config.get("groups", {})
+        self.group_content_margins = groups_config.get("content_margins", [10, 20, 10, 15])
         
         # Buttons
         buttons_config = dialog_config.get("buttons", {})
@@ -260,14 +263,11 @@ class BulkTagDialog(QDialog):
         games_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         games_layout = QHBoxLayout()
         games_layout.setSpacing(self.section_spacing)
-        dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("bulk_tag", {})
-        groups_config = dialog_config.get("groups", {})
-        games_content_margins = groups_config.get("content_margins", [10, 14, 10, 10])
         games_layout.setContentsMargins(
-            games_content_margins[0],
-            games_content_margins[1],
-            games_content_margins[2],
-            games_content_margins[3]
+            self.group_content_margins[0],
+            self.group_content_margins[1],
+            self.group_content_margins[2],
+            self.group_content_margins[3],
         )
         self.games_button_group = QButtonGroup(self)
         self.all_games_radio = QRadioButton("All games")
@@ -297,12 +297,11 @@ class BulkTagDialog(QDialog):
         operation_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         operation_layout = QHBoxLayout()
         operation_layout.setSpacing(self.section_spacing)
-        operation_content_margins = groups_config.get("content_margins", [10, 14, 10, 10])
         operation_layout.setContentsMargins(
-            operation_content_margins[0],
-            operation_content_margins[1],
-            operation_content_margins[2],
-            operation_content_margins[3]
+            self.group_content_margins[0],
+            self.group_content_margins[1],
+            self.group_content_margins[2],
+            self.group_content_margins[3],
         )
         self.operation_button_group = QButtonGroup(self)
         self.add_tag_radio = QRadioButton("Add Tag")
@@ -335,12 +334,11 @@ class BulkTagDialog(QDialog):
         # Set alignment for macOS compatibility (left-align labels and form)
         tag_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
         tag_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        tag_content_margins = groups_config.get("content_margins", [10, 14, 10, 10])
         tag_layout.setContentsMargins(
-            tag_content_margins[0],
-            tag_content_margins[1],
-            tag_content_margins[2],
-            tag_content_margins[3]
+            self.group_content_margins[0],
+            self.group_content_margins[1],
+            self.group_content_margins[2],
+            self.group_content_margins[3],
         )
         
         # Set fixed label width
@@ -554,7 +552,6 @@ class BulkTagDialog(QDialog):
         group_title_font_family = resolve_font_family(groups_config.get("title_font_family"))
         group_title_font_size = scale_font_size(groups_config.get("title_font_size", 11))
         group_title_color = groups_config.get("title_color")
-        group_content_margins = groups_config.get("content_margins", [10, 14, 10, 10])
         group_margin_top = groups_config.get("margin_top", 10)
         group_padding_top = groups_config.get("padding_top", 5)
         
@@ -578,7 +575,7 @@ class BulkTagDialog(QDialog):
                 title_color=group_title_color,
                 title_left=group_title_left,
                 title_padding=group_title_padding,
-                content_margins=group_content_margins
+                content_margins=list(self.group_content_margins),
             )
         
         # Apply label styling - apply to ALL labels to prevent macOS theme override
@@ -968,6 +965,8 @@ class BulkTagDialog(QDialog):
             f"color: rgb({message_text_color[0]}, {message_text_color[1]}, {message_text_color[2]});"
         )
         layout.addWidget(message_label)
+        
+        layout.addStretch(1)
         
         # Buttons
         button_layout = QHBoxLayout()

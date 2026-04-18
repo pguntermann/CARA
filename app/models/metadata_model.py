@@ -4,6 +4,8 @@ from PyQt6.QtCore import QAbstractTableModel, Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 from typing import Optional, List, Tuple, Dict, Any
 
+from app.utils.pgn_header_utils import is_valid_pgn_header_tag_name
+
 
 class MetadataModel(QAbstractTableModel):
     """Model representing metadata table data (Name-Value pairs).
@@ -331,12 +333,11 @@ class MetadataModel(QAbstractTableModel):
         Returns:
             True if tag was added successfully, False if tag already exists or validation failed.
         """
-        # Validate tag name
-        if not tag_name or not tag_name.strip():
-            return False
-        
-        tag_name = tag_name.strip()
+        tag_name = tag_name.strip() if tag_name else ""
         tag_value = tag_value.strip() if tag_value else ""
+
+        if not is_valid_pgn_header_tag_name(tag_name):
+            return False
         
         # Check if tag already exists
         for name, _ in self._metadata:

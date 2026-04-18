@@ -86,6 +86,8 @@ class ImportGamesDialog(QDialog):
         spacing_config = dialog_config.get("spacing", {})
         self.section_spacing = spacing_config.get("section", 15)
         self.form_spacing = spacing_config.get("form", 10)
+        self.spacing_before_date_range_filter = int(spacing_config.get("before_date_range_filter", 8))
+        self.spacing_before_game_type = int(spacing_config.get("before_game_type", 8))
         
         # Buttons
         buttons_config = dialog_config.get("buttons", {})
@@ -131,7 +133,21 @@ class ImportGamesDialog(QDialog):
         self.checkbox_checked_bg_color = QColor(*checked_config.get("background_color", [70, 90, 130]))
         self.checkbox_checked_border_color = QColor(*checked_config.get("border_color", [100, 120, 160]))
         self.checkbox_hover_border_offset = checkboxes_config.get("hover_border_offset", 20)
-    
+
+    @staticmethod
+    def _filters_field_placeholder() -> QWidget:
+        """Empty field cell so filter checkboxes sit in the label column like other filter labels."""
+        w = QWidget()
+        w.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        return w
+
+    def _add_filters_vertical_gap(self, form: QFormLayout, height: int) -> None:
+        if height <= 0:
+            return
+        gap = QWidget()
+        gap.setFixedHeight(height)
+        form.addRow(gap)
+
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
         # Set fixed size
@@ -241,12 +257,12 @@ class ImportGamesDialog(QDialog):
             self.group_content_margins[3]
         )
         
-        # Max games limit
+        # Max games limit (checkbox in label column to align with "Maximum games:", dates, etc.)
         self.limit_checkbox = QCheckBox("Limit number of games")
         self.limit_checkbox.setChecked(False)
         self.limit_checkbox.toggled.connect(self._on_limit_toggled)
-        filters_layout.addRow("", self.limit_checkbox)
-        
+        filters_layout.addRow(self.limit_checkbox, self._filters_field_placeholder())
+
         self.max_games_spin = QSpinBox()
         self.max_games_spin.setMinimum(1)
         self.max_games_spin.setMaximum(999999)
@@ -259,12 +275,14 @@ class ImportGamesDialog(QDialog):
         max_games_label = QLabel("Maximum games:")
         max_games_label.setMinimumWidth(self.label_minimum_width)
         filters_layout.addRow(max_games_label, self.max_games_spin)
-        
+
+        self._add_filters_vertical_gap(filters_layout, self.spacing_before_date_range_filter)
+
         # Date range
         self.date_range_checkbox = QCheckBox("Filter by date range")
         self.date_range_checkbox.setChecked(False)
         self.date_range_checkbox.toggled.connect(self._on_date_range_toggled)
-        filters_layout.addRow("", self.date_range_checkbox)
+        filters_layout.addRow(self.date_range_checkbox, self._filters_field_placeholder())
         
         # Since date
         self.since_date_edit = QDateEdit()
@@ -289,7 +307,9 @@ class ImportGamesDialog(QDialog):
         until_date_label = QLabel("To date:")
         until_date_label.setMinimumWidth(self.label_minimum_width)
         filters_layout.addRow(until_date_label, self.until_date_edit)
-        
+
+        self._add_filters_vertical_gap(filters_layout, self.spacing_before_game_type)
+
         # Game type (Lichess only)
         self.game_type_label = QLabel("Game type:")
         self.game_type_label.setMinimumWidth(self.label_minimum_width)

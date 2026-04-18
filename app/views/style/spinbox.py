@@ -1,7 +1,28 @@
 """Spinbox styling utilities."""
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from PyQt6.QtWidgets import QAbstractSpinBox, QDoubleSpinBox, QSpinBox
+
+
+def _inner_line_edit_text_margins(padding: Optional[List[int]]) -> Tuple[int, int, int, int]:
+    """Map style padding to QLineEdit.setTextMargins (left, top, right, bottom).
+
+    Same [horizontal, vertical] convention as line_edit / generate_spinbox_stylesheet.
+    QSS padding on ``QSpinBox QLineEdit`` is unreliable on macOS; margins fix the text inset.
+    """
+    if padding is None:
+        padding = [8, 6]
+    if len(padding) == 2:
+        h, v = int(padding[0]), int(padding[1])
+        return (h, v, h, v)
+    if len(padding) >= 4:
+        return (
+            int(padding[0]),
+            int(padding[1]),
+            int(padding[2]),
+            int(padding[3]),
+        )
+    return (8, 6, 8, 6)
 
 
 def generate_spinbox_stylesheet(
@@ -38,15 +59,9 @@ def generate_spinbox_stylesheet(
     Returns:
         QSS stylesheet string.
     """
-    # Default padding if not provided
+    # Default padding if not provided (used for inner text margins in apply_spinbox_styling)
     if padding is None:
         padding = [8, 6]
-    
-    # Handle padding format: [horizontal, vertical] or [left, top, right, bottom]
-    if len(padding) == 2:
-        padding_str = f"{padding[1]}px {padding[0]}px"
-    else:
-        padding_str = f"{padding[1]}px {padding[0]}px {padding[3]}px {padding[2]}px"
     
     # Calculate disabled colors
     disabled_bg = [
@@ -86,11 +101,13 @@ def generate_spinbox_stylesheet(
     # Inner QLineEdit must be styled explicitly when the spin box uses QSS; otherwise
     # some platforms accept the wheel but ignore keyboard input. Transparent fill lets
     # the outer spin box background show through.
+    # Do not rely on QSS padding here: on macOS it often does not inset text (esp. left edge).
+    # apply_spinbox_styling applies QLineEdit.setTextMargins from the same padding values.
     stylesheet += (
         f"QSpinBox QLineEdit, QDoubleSpinBox QLineEdit {{"
         f"background-color: transparent;"
         f"border: none;"
-        f"padding: {padding_str};"
+        f"padding: 0px;"
         f"margin: 0px;"
         f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
         f"font-family: \"{font_family}\";"
@@ -135,11 +152,13 @@ def apply_spinbox_styling(
         hide_buttons: Whether to hide up/down buttons (default: True).
         minimum_height: If > 0, set ``setMinimumHeight`` on each spin box (helps Linux/Fusion layout).
     """
+    eff_padding = padding if padding is not None else [8, 6]
     stylesheet = generate_spinbox_stylesheet(
         config, text_color, font_family, font_size, bg_color, border_color,
-        focus_border_color, border_width, border_radius, padding,
+        focus_border_color, border_width, border_radius, eff_padding,
         disabled_brightness_factor,
     )
+    margins = _inner_line_edit_text_margins(eff_padding)
     
     for spinbox in spinboxes:
         if hide_buttons:
@@ -152,4 +171,5 @@ def apply_spinbox_styling(
         le = spinbox.lineEdit()
         if le is not None:
             le.setReadOnly(False)
+            le.setTextMargins(*margins)
 

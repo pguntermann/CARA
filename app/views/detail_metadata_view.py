@@ -1,17 +1,18 @@
 """PGN header tags view for detail panel."""
 
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTableView, 
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTableView,
                              QPushButton, QDialog, QLabel, QLineEdit, QDialogButtonBox,
-                             QFormLayout, QSizePolicy, QMenu, QApplication, QStyledItemDelegate)
+                             QSizePolicy, QMenu, QApplication, QStyledItemDelegate)
 from PyQt6.QtCore import Qt, QTimer, QSize, QPoint, QModelIndex
 from PyQt6.QtGui import QPalette, QColor, QFont
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List
 
 from app.models.metadata_model import MetadataModel
 from app.models.game_model import GameModel
 from app.controllers.metadata_controller import MetadataController
 from app.utils.table_export import table_to_delimited, get_copy_table_config
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.views.dialogs.add_pgn_header_dialog import AddPgnHeaderDialog
 
 
 class MetadataTableItemDelegate(QStyledItemDelegate):
@@ -542,7 +543,7 @@ class DetailMetadataView(QWidget):
             return
         
         # Show dialog to enter tag name and value
-        dialog = AddTagDialog(self.config, self)
+        dialog = AddPgnHeaderDialog(self.config, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             tag_name, tag_value = dialog.get_tag_info()
             if tag_name:
@@ -687,220 +688,3 @@ class DetailMetadataView(QWidget):
         
         # Use controller to remove the metadata tag
         self._metadata_controller.remove_metadata_tag(tag_name)
-
-
-class AddTagDialog(QDialog):
-    """Dialog for adding a new PGN header tag."""
-    
-    def __init__(self, config: Dict[str, Any], parent=None) -> None:
-        """Initialize the add tag dialog.
-        
-        Args:
-            config: Configuration dictionary.
-            parent: Parent widget.
-        """
-        super().__init__(parent)
-        self.config = config
-        self.tag_name = ""
-        self.tag_value = ""
-        
-        self._load_config()
-        self._setup_ui()
-        self._apply_styling()
-        self.setWindowTitle("Add PGN header tag")
-    
-    def _load_config(self) -> None:
-        """Load configuration values from config dictionary."""
-        dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('add_tag_dialog', {})
-        self.dialog_width = dialog_config.get('width', 400)
-        self.dialog_height = dialog_config.get('height', 180)
-        self.dialog_min_width = dialog_config.get('minimum_width', 350)
-        self.dialog_min_height = dialog_config.get('minimum_height', 150)
-        self.dialog_bg_color = dialog_config.get('background_color', [40, 40, 45])
-        
-        layout_config = dialog_config.get('layout', {})
-        self.layout_spacing = layout_config.get('spacing', 15)
-        self.layout_margins = layout_config.get('margins', [15, 15, 15, 15])
-        
-        labels_config = dialog_config.get('labels', {})
-        self.label_font_family = labels_config.get('font_family', 'Helvetica Neue')
-        from app.utils.font_utils import scale_font_size
-        self.label_font_size = scale_font_size(labels_config.get('font_size', 11))
-        self.label_text_color = labels_config.get('text_color', [200, 200, 200])
-        
-        inputs_config = dialog_config.get('inputs', {})
-        from app.utils.font_utils import resolve_font_family
-        input_font_family_raw = inputs_config.get('font_family', 'Cascadia Mono')
-        self.input_font_family = resolve_font_family(input_font_family_raw)
-        self.input_font_size = inputs_config.get('font_size', 11)
-        self.input_text_color = inputs_config.get('text_color', [240, 240, 240])
-        self.input_bg_color = inputs_config.get('background_color', [30, 30, 35])
-        self.input_border_color = inputs_config.get('border_color', [60, 60, 65])
-        self.input_border_radius = inputs_config.get('border_radius', 3)
-        self.input_padding = inputs_config.get('padding', [8, 6])
-        self.input_min_width = inputs_config.get('minimum_width', 200)
-        self.input_min_height = inputs_config.get('minimum_height', 30)
-        
-        buttons_config = dialog_config.get('buttons', {})
-        self.button_width = buttons_config.get('width', 120)
-        self.button_height = buttons_config.get('height', 30)
-        self.button_border_radius = buttons_config.get('border_radius', 3)
-        self.button_padding = buttons_config.get('padding', 5)
-        self.button_bg_offset = buttons_config.get('background_offset', 20)
-        self.button_hover_bg_offset = buttons_config.get('hover_background_offset', 30)
-        self.button_pressed_bg_offset = buttons_config.get('pressed_background_offset', 10)
-        from app.utils.font_utils import scale_font_size
-        self.button_font_size = scale_font_size(buttons_config.get('font_size', 10))
-        self.button_text_color = buttons_config.get('text_color', [200, 200, 200])
-        self.button_border_color = buttons_config.get('border_color', [60, 60, 65])
-        self.button_spacing = buttons_config.get('spacing', 10)
-    
-    def _setup_ui(self) -> None:
-        """Setup the dialog UI."""
-        # Set dialog size
-        self.setFixedSize(self.dialog_width, self.dialog_height)
-        self.setMinimumSize(self.dialog_min_width, self.dialog_min_height)
-        
-        # Set dialog background color
-        self.setAutoFillBackground(True)
-        palette = self.palette()
-        palette.setColor(self.backgroundRole(), QColor(
-            self.dialog_bg_color[0], self.dialog_bg_color[1], self.dialog_bg_color[2]
-        ))
-        self.setPalette(palette)
-        
-        # Create main layout
-        layout = QVBoxLayout(self)
-        layout.setSpacing(self.layout_spacing)
-        layout.setContentsMargins(
-            self.layout_margins[0], self.layout_margins[1],
-            self.layout_margins[2], self.layout_margins[3]
-        )
-        
-        # Create form layout for inputs
-        form_layout = QFormLayout()
-        form_layout.setSpacing(self.layout_spacing)
-        # Set field growth policy to make fields expand
-        form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
-        # Set alignment for macOS compatibility (left-align labels and form)
-        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
-        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        
-        # Tag name input
-        tag_name_label = QLabel("Tag name:")
-        self.tag_name_input = QLineEdit()
-        self.tag_name_input.setMinimumWidth(self.input_min_width)
-        self.tag_name_input.setMinimumHeight(self.input_min_height)
-        self.tag_name_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        form_layout.addRow(tag_name_label, self.tag_name_input)
-        
-        # Tag value input
-        tag_value_label = QLabel("Value:")
-        self.tag_value_input = QLineEdit()
-        self.tag_value_input.setMinimumWidth(self.input_min_width)
-        self.tag_value_input.setMinimumHeight(self.input_min_height)
-        self.tag_value_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        form_layout.addRow(tag_value_label, self.tag_value_input)
-        
-        layout.addLayout(form_layout)
-        
-        # Buttons (explicit order): Cancel (left), OK (right)
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(self.button_spacing)
-        button_layout.addStretch()
-        cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)
-        button_layout.addWidget(cancel_button)
-        ok_button = QPushButton("OK")
-        ok_button.setDefault(True)
-        ok_button.clicked.connect(self._on_ok_clicked)
-        button_layout.addWidget(ok_button)
-        layout.addLayout(button_layout)
-        
-        # Set focus on tag name input
-        self.tag_name_input.setFocus()
-    
-    def _apply_styling(self) -> None:
-        """Apply styling to dialog elements."""
-        # Label styling
-        label_style = f"""
-            QLabel {{
-                font-family: '{self.label_font_family}';
-                font-size: {self.label_font_size}pt;
-                color: rgb({self.label_text_color[0]}, {self.label_text_color[1]}, {self.label_text_color[2]});
-            }}
-        """
-        
-        # Apply unified line edit styling using StyleManager
-        from app.views.style import StyleManager
-        from app.utils.font_utils import scale_font_size
-        
-        # Scale font size
-        scaled_font_size = scale_font_size(self.input_font_size)
-        
-        # Get focus border color (use hardcoded value from original style or get from config)
-        input_focus_border_color = [100, 150, 200]  # From original hardcoded value
-        
-        # Convert padding from [horizontal, vertical] format (already in correct format)
-        input_padding = self.input_padding if isinstance(self.input_padding, list) and len(self.input_padding) == 2 else [8, 6]
-        
-        # Get all QLineEdit widgets
-        line_edits = list(self.findChildren(QLineEdit))
-        
-        if line_edits:
-            StyleManager.style_line_edits(
-                line_edits,
-                self.config,
-                font_family=self.input_font_family,  # Match original dialog font (already resolved)
-                font_size=scaled_font_size,  # Match original dialog font size
-                bg_color=self.input_bg_color,  # Match dialog background color
-                border_color=self.input_border_color,  # Match dialog border color
-                focus_border_color=input_focus_border_color,  # Match original focus border color
-                border_radius=self.input_border_radius,  # Match dialog border radius
-                padding=input_padding  # Preserve existing padding for alignment
-            )
-        
-        # Apply styles to labels
-        for label in self.findChildren(QLabel):
-            label.setStyleSheet(label_style)
-        
-        # Apply button styling using StyleManager
-        from app.views.style import StyleManager
-        buttons = list(self.findChildren(QPushButton))
-        if buttons:
-            bg_color_list = [self.dialog_bg_color[0], self.dialog_bg_color[1], self.dialog_bg_color[2]]
-            border_color_list = [self.button_border_color[0], self.button_border_color[1], self.button_border_color[2]]
-            StyleManager.style_buttons(
-                buttons,
-                self.config,
-                bg_color_list,
-                border_color_list,
-                background_offset=self.button_bg_offset,
-                hover_background_offset=self.button_hover_bg_offset,
-                pressed_background_offset=self.button_pressed_bg_offset,
-                min_width=self.button_width,
-                min_height=self.button_height
-            )
-    
-    def _on_ok_clicked(self) -> None:
-        """Handle OK button click."""
-        tag_name = self.tag_name_input.text().strip()
-        tag_value = self.tag_value_input.text().strip()
-        
-        if not tag_name:
-            from app.views.dialogs.message_dialog import MessageDialog
-            MessageDialog.show_warning(self.config, "Invalid input", "PGN header tag name cannot be empty.", self)
-            return
-        
-        self.tag_name = tag_name
-        self.tag_value = tag_value
-        self.accept()
-    
-    def get_tag_info(self) -> Tuple[str, str]:
-        """Get the tag name and value entered in the dialog.
-        
-        Returns:
-            Tuple of (tag_name, tag_value).
-        """
-        return (self.tag_name, self.tag_value)
-

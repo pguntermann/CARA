@@ -940,6 +940,7 @@ class SearchDialog(QDialog):
         # Dialog dimensions
         self.dialog_width = dialog_config.get("width", 800)
         self.dialog_height = dialog_config.get("height", 600)
+        self.criteria_scroll_area_height = max(1, int(dialog_config.get("scroll_area_height", 250)))
         
         # Background color
         bg_color = dialog_config.get("background_color", [40, 40, 45])
@@ -1051,12 +1052,23 @@ class SearchDialog(QDialog):
         self.criteria_layout.addStretch()
         
         self.criteria_scroll_area.setWidget(self.criteria_container)
+        self.criteria_scroll_area.setFixedHeight(self.criteria_scroll_area_height)
+        self.criteria_scroll_area.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed,
+        )
         criteria_layout.addWidget(self.criteria_scroll_area)
         
-        # Buttons for managing criteria
+        # Buttons for managing criteria: add row on the left; grouping actions on the right
         criteria_buttons_layout = QHBoxLayout()
         criteria_buttons_layout.setSpacing(self.button_spacing)
-        criteria_buttons_layout.addStretch()
+        
+        self.add_criterion_btn = QPushButton("Add Criterion")
+        self.add_criterion_btn.setFixedSize(self.button_width, self.button_height)
+        self.add_criterion_btn.clicked.connect(self._add_criterion_row)
+        criteria_buttons_layout.addWidget(self.add_criterion_btn)
+        
+        criteria_buttons_layout.addStretch(1)
         
         self.start_group_btn = QPushButton("Start Group")
         self.start_group_btn.setFixedSize(self.button_width, self.button_height)
@@ -1068,15 +1080,13 @@ class SearchDialog(QDialog):
         self.end_group_btn.clicked.connect(self._on_end_group_clicked)
         criteria_buttons_layout.addWidget(self.end_group_btn)
         
-        self.add_criterion_btn = QPushButton("Add Criterion")
-        self.add_criterion_btn.setFixedSize(self.button_width, self.button_height)
-        self.add_criterion_btn.clicked.connect(self._add_criterion_row)
-        criteria_buttons_layout.addWidget(self.add_criterion_btn)
-        
         criteria_layout.addLayout(criteria_buttons_layout)
         criteria_group.setLayout(criteria_layout)
-        main_layout.addWidget(criteria_group)
-        
+        # Criteria scroll has fixed height; extra dialog height goes to the spacer before Cancel/Search.
+        main_layout.addWidget(criteria_group, 0)
+
+        main_layout.addStretch(1)
+
         # Buttons at bottom
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(self.button_spacing)

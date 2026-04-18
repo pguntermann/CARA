@@ -10,10 +10,9 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QSizePolicy,
-    QSpacerItem,
 )
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QPalette
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QColor, QPalette, QShowEvent
 from typing import Dict, Any, Optional, Tuple, List
 from enum import Enum
 
@@ -76,7 +75,7 @@ class DeduplicationCriteriaDialog(QDialog):
         # Layout
         layout_config = dialog_config.get('layout', {})
         self.layout_spacing = layout_config.get('spacing', 10)
-        self.layout_margins = layout_config.get('margins', [15, 15, 15, 15])
+        self.layout_margins = layout_config.get('margins', [25, 25, 25, 25])
         self.section_spacing = layout_config.get('section_spacing', 15)
         
         # Buttons
@@ -123,7 +122,7 @@ class DeduplicationCriteriaDialog(QDialog):
         self.group_title_font_family = resolve_font_family(groups_config.get('title_font_family'))
         self.group_title_font_size = scale_font_size(groups_config.get('title_font_size', 11))
         self.group_title_color = groups_config.get('title_color')
-        self.group_content_margins = groups_config.get('content_margins', [10, 15, 10, 10])
+        self.group_content_margins = groups_config.get('content_margins', [10, 20, 10, 15])
         self.group_margin_top = groups_config.get('margin_top', 10)
         self.group_padding_top = groups_config.get('padding_top', 5)
         
@@ -194,10 +193,13 @@ class DeduplicationCriteriaDialog(QDialog):
         # Description label (below combo box)
         self.description_label = QLabel()
         self.description_label.setWordWrap(True)
+        self.description_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        # Without a max height, a wrapped QLabel expands to fill extra space inside the group box.
         self.description_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         mode_group_layout.addWidget(self.description_label)
-        
-        layout.addWidget(mode_group)
+        mode_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+
+        layout.addWidget(mode_group, 0)
         
         layout.addSpacing(self.section_spacing)
         
@@ -221,13 +223,12 @@ class DeduplicationCriteriaDialog(QDialog):
             customization_layout.addWidget(checkbox)
         
         self.customization_group.setVisible(False)
-        layout.addWidget(self.customization_group)
-        
-        # Dynamic spacer to fill space when customization is hidden
-        # This spacer will be adjusted when mode changes
-        self.spacer_item = QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-        layout.addItem(self.spacer_item)
-        
+        self.customization_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        layout.addWidget(self.customization_group, 0)
+
+        # Extra dialog height goes here (not into stretching the group boxes)
+        layout.addStretch(1)
+
         # Buttons
         button_layout = QHBoxLayout()
         button_layout.setSpacing(self.button_spacing)
@@ -248,7 +249,36 @@ class DeduplicationCriteriaDialog(QDialog):
         # Add spacing before buttons
         layout.addSpacing(self.section_spacing)
         layout.addLayout(button_layout)
-    
+
+    def _description_label_effective_width(self) -> int:
+        """Width available for wrapping the mode description (before label has a real geometry)."""
+        try:
+            m = self.layout().contentsMargins()
+            g = self.group_content_margins
+            return max(1, self.width() - m.left() - m.right() - int(g[0]) - int(g[2]) - 4)
+        except Exception:
+            return max(1, int(self.dialog_width) - 48)
+
+    def _sync_description_label_height(self) -> None:
+        """Keep the wrapped description label from expanding vertically inside the group box."""
+        lbl = self.description_label
+        if not lbl.text().strip():
+            lbl.setMaximumHeight(16777215)
+            return
+        w = lbl.width()
+        if w < 2:
+            w = self._description_label_effective_width()
+        h = lbl.heightForWidth(max(1, w))
+        lbl.setMaximumHeight(max(1, h))
+
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        QTimer.singleShot(0, self._sync_description_label_height)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._sync_description_label_height()
+
     def _apply_styling(self) -> None:
         """Apply styling from config.json to all UI elements."""
         # Get inputs config for combo box styling
@@ -398,27 +428,20 @@ class DeduplicationCriteriaDialog(QDialog):
     
     def _on_mode_changed(self) -> None:
         """Handle mode combo box change.
-        
+
         Updates description text and shows/hides customization area.
-        Adjusts spacer to fill empty space appropriately.
         """
         current_value = self.mode_combo.currentData()
         if not current_value:
             return
-        
+
         # Update description
         description = self.mode_descriptions.get(current_value, '')
         self.description_label.setText(description)
-        
+        self._sync_description_label_height()
+
         # Show/hide customization area based on mode
-        if current_value == 'header_based':
-            self.customization_group.setVisible(True)
-            # When customization is visible, use minimal spacer
-            self.spacer_item.changeSize(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
-        else:
-            self.customization_group.setVisible(False)
-            # When customization is hidden, expand spacer to fill space
-            self.spacer_item.changeSize(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        self.customization_group.setVisible(current_value == "header_based")
     
     def _on_ok_clicked(self) -> None:
         """Handle OK button click."""

@@ -60,7 +60,8 @@
       "$ref": "$_COLOR_BACKGROUND_ACTIVE"
     },
     "$_COLOR_WHITE": [255, 255, 255],
-    "$_COLOR_BLACK": [0, 0, 0]
+    "$_COLOR_BLACK": [0, 0, 0],
+    "$_PADDING_LINE_EDIT_INNER": [8, 6]
   },
   "game_tags": {
     "builtin": [
@@ -135,7 +136,7 @@
       "combobox": {
         "dropdown_border_radius": 3,
         "disabled_brightness_factor": 0.85,
-        "padding": [8, 6]
+        "padding": [8, 10]
       },
       "radio_button": {
         "text_color": {
@@ -198,7 +199,9 @@
         },
         "border_width": 1,
         "border_radius": 3,
-        "padding": [8, 6],
+        "padding": {
+          "$ref": "$_PADDING_LINE_EDIT_INNER"
+        },
         "hover_border_offset": 20,
         "disabled_brightness_factor": 0.85
       },
@@ -223,7 +226,9 @@
         },
         "border_width": 1,
         "border_radius": 3,
-        "padding": [8, 6],
+        "padding": {
+          "$ref": "$_PADDING_LINE_EDIT_INNER"
+        },
         "disabled_brightness_factor": 0.85,
         "hide_buttons": true,
         "minimum_height": 30
@@ -249,7 +254,9 @@
         },
         "border_width": 1,
         "border_radius": 3,
-        "padding": [8, 6],
+        "padding": {
+          "$ref": "$_PADDING_LINE_EDIT_INNER"
+        },
         "disabled_brightness_factor": 0.85
       },
       "group_box": {
@@ -574,6 +581,7 @@
             "width": 110,
             "height": 130,
             "padding": [12, 12, 10, 14],
+            "inner_padding": [12, 12, 10, 14],
             "background_color": {
               "$ref": "$_COLOR_BACKGROUND_SECONDARY"
             },
@@ -615,7 +623,8 @@
               },
               "font_weight": "bold",
               "hover_background_rgba": [0, 0, 0, 18],
-              "hover_text_color": [20, 20, 23]
+              "hover_text_color": [20, 20, 23],
+              "hover_text_color_dark_background": [255, 255, 255]
             }
           },
           "move_classification_badges": {
@@ -1986,6 +1995,9 @@
               "border": [100, 120, 160]
             },
             "add_tab": {
+              "icon_tint": {
+                "$ref": "$_COLOR_ACCENT_PRIMARY"
+              },
               "background": [210, 234, 214],
               "text": [45, 85, 52],
               "border": [120, 175, 128],
@@ -2173,7 +2185,8 @@
     "dialogs": {
       "manage_game_tags": {
         "width": 600,
-        "height": 440,
+        "height": 480,
+        "scroll_area_height": 120,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -2193,8 +2206,16 @@
           "margins": [25, 25, 25, 25],
           "spacing": 15
         },
+        "spacing": {
+          "section": 15
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30
+        },
         "groups": {
-          "contents_margins": [10, 14, 10, 10],
+          "content_margins": [10, 20, 10, 15],
           "spacing": 10,
           "builtin_chip_container_min_height": 36,
           "custom_chip_container_min_height": 36
@@ -2241,16 +2262,22 @@
           }
         },
         "icon_badges": {
-          "background_color": [230, 232, 236],
-          "background_hover_color": [214, 218, 224],
-          "icon_color": [40, 40, 45],
-          "icon_hover_color": [15, 15, 18]
+          "background_color": {
+            "$ref": "$_COLOR_ACCENT_PRIMARY"
+          },
+          "background_hover_color": [48, 75, 119],
+          "icon_color": {
+            "$ref": "$_COLOR_ON_ACCENT"
+          },
+          "icon_hover_color": {
+            "$ref": "$_COLOR_WHITE"
+          }
         },
         "builtin_hidden_chip_color": [220, 222, 227]
       },
       "classification_settings": {
         "width": 480,
-        "height": 660,
+        "height": 685,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -2339,7 +2366,7 @@
       },
       "ai_model_settings": {
         "width": 600,
-        "height": 645,
+        "height": 716,
         "form_label_min_width": 180,
         "password_reveal_icon_tint_color": {
           "$ref": "$_COLOR_BUTTON_ACTIVE_BACKGROUND"
@@ -2379,7 +2406,8 @@
           "title_padding": 5
         },
         "fields": {
-          "spacing": 8
+          "spacing": 8,
+          "custom_endpoint_checkbox_spacing": 16
         },
         "labels": {
           "font_family": {
@@ -2432,7 +2460,7 @@
       },
       "engine_configuration": {
         "width": 620,
-        "height": 680,
+        "height": 740,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -2441,12 +2469,17 @@
         },
         "layout": {
           "spacing": 10,
-          "margins": [10, 10, 10, 10]
+          "margins": [25, 25, 25, 25],
+          "spacing_after_header": 8,
+          "button_row_spacing": 20
         },
         "tabs_layout": {
           "spacing": 10,
-          "margins": [15, 10, 15, 10],
+          "margins": [0, 10, 0, 10],
           "top_spacer": 5,
+          "spacing_before_copy_paste": 12,
+          "copy_paste_to_scroll_spacing": 10,
+          "scroll_bottom_spacing": 12,
           "copy_layout_spacing": 10,
           "common_layout_spacing": 10,
           "engine_params_layout_spacing": 10,
@@ -2490,6 +2523,12 @@
           },
           "scroll_button_color": {
             "$ref": "$_COLOR_SCROLLBAR_BUTTON_COLOR"
+          },
+          "pane_separator": {
+            "width": 1,
+            "color": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            }
           },
           "colors": {
             "normal": {
@@ -2538,7 +2577,7 @@
           "spacing": 10,
           "margin_top": 8,
           "padding_top": 12,
-          "content_margins": [10, 15, 10, 10],
+          "content_margins": [10, 20, 10, 15],
           "engine_params_content_margin_top": 2
         },
         "buttons": {
@@ -2553,6 +2592,7 @@
           }
         },
         "scroll_area": {
+          "height": 225,
           "min_height": 200,
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_3"
@@ -2585,7 +2625,8 @@
         },
         "form_layout": {
           "spacing": 10,
-          "label_minimum_width": 100
+          "label_minimum_width": 100,
+          "checkbox_row_min_height": 28
         },
         "input_widgets": {
           "background_color": {
@@ -2683,14 +2724,14 @@
       },
       "engine_dialog": {
         "width": 550,
-        "height": 360,
+        "height": 400,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
         "layout": {
-          "spacing": 10,
-          "margins": [10, 10, 10, 10],
-          "engine_info_section_spacing": 8
+          "spacing": 15,
+          "margins": [25, 25, 25, 25],
+          "engine_info_section_spacing": 15
         },
         "labels": {
           "font_family": {
@@ -2760,14 +2801,14 @@
           "padding_top": 0,
           "title_left": 10,
           "title_padding": [0, 5],
-          "content_margins": [10, 15, 10, 10],
+          "content_margins": [10, 20, 10, 15],
           "content_spacing": 8,
           "path_layout_spacing": 8
         }
       },
       "bulk_replace": {
         "width": 600,
-        "height": 800,
+        "height": 830,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -2785,11 +2826,11 @@
         },
         "layout": {
           "margins": [25, 25, 25, 25],
-          "spacing": 12
+          "spacing": 15
         },
         "spacing": {
           "layout": 10,
-          "section": 8,
+          "section": 15,
           "form": 14,
           "options": 22,
           "result": 8
@@ -2851,7 +2892,7 @@
           "title_color": {
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
-          "content_margins": [10, 14, 10, 10],
+          "content_margins": [10, 20, 10, 15],
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
@@ -2876,7 +2917,7 @@
       },
       "bulk_tag": {
         "width": 600,
-        "height": 500,
+        "height": 550,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -2894,11 +2935,11 @@
         },
         "layout": {
           "margins": [25, 25, 25, 25],
-          "spacing": 12
+          "spacing": 15
         },
         "spacing": {
           "layout": 10,
-          "section": 8,
+          "section": 15,
           "form": 14,
           "options": 22,
           "result": 8
@@ -2963,7 +3004,7 @@
           "title_color": {
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
-          "content_margins": [10, 14, 10, 10],
+          "content_margins": [10, 20, 10, 15],
           "margin_top": 10,
           "padding_top": 5,
           "title_left": 10,
@@ -2995,7 +3036,7 @@
           "spacing": 12
         },
         "spacing": {
-          "section": 12,
+          "section": 15,
           "form": 6,
           "before_buttons": 20
         },
@@ -3053,7 +3094,8 @@
       },
       "search": {
         "width": 800,
-        "height": 600,
+        "height": 580,
+        "scroll_area_height": 250,
         "minimum_width": 700,
         "minimum_height": 500,
         "background_color": {
@@ -3152,7 +3194,7 @@
       },
       "import_games": {
         "width": 550,
-        "height": 600,
+        "height": 650,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -3174,7 +3216,9 @@
         },
         "spacing": {
           "section": 15,
-          "form": 10
+          "form": 10,
+          "before_date_range_filter": 8,
+          "before_game_type": 8
         },
         "buttons": {
           "spacing": 10,
@@ -3261,6 +3305,7 @@
         },
         "spacing": {
           "section": 15,
+          "re_analyze_to_controls": 24,
           "controls_row": 20,
           "label_spinbox": 8,
           "progress_bar": 8,
@@ -3298,9 +3343,9 @@
           "title_color": {
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
-          "content_margins": [10, 12, 10, 15],
-          "margin_top": 6,
-          "padding_top": 3,
+          "content_margins": [10, 20, 10, 15],
+          "margin_top": 10,
+          "padding_top": 5,
           "title_left": 10,
           "title_padding": [0, 5]
         },
@@ -3338,7 +3383,7 @@
       },
       "bulk_clean_pgn": {
         "width": 650,
-        "height": 350,
+        "height": 362,
         "minimum_width": 600,
         "minimum_height": 300,
         "background_color": {
@@ -3581,16 +3626,26 @@
         }
       },
       "add_tag_dialog": {
-        "width": 400,
-        "height": 180,
-        "minimum_width": 350,
-        "minimum_height": 150,
+        "width": 440,
+        "height": 220,
+        "minimum_width": 380,
+        "minimum_height": 180,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
         "layout": {
-          "spacing": 15,
-          "margins": [15, 15, 15, 15]
+          "spacing": 10,
+          "margins": [25, 25, 25, 25],
+          "button_row_spacing": 20,
+          "form_horizontal_spacing": 14,
+          "form_vertical_spacing": 12
+        },
+        "groups": {
+          "title": "PGN header tag",
+          "content_margins": [10, 20, 10, 15]
         },
         "labels": {
           "font_family": {
@@ -3601,7 +3656,8 @@
           },
           "text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
-          }
+          },
+          "minimum_width": 130
         },
         "inputs": {
           "font_family": {
@@ -3622,7 +3678,10 @@
           "border_radius": 3,
           "padding": [8, 6],
           "minimum_width": 200,
-          "minimum_height": 30
+          "minimum_height": 30,
+          "focus_border_color": {
+            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
+          }
         },
         "buttons": {
           "spacing": 10,
@@ -3638,9 +3697,9 @@
       },
       "annotation_preferences": {
         "width": 520,
-        "height": 400,
+        "height": 372,
         "minimum_width": 480,
-        "minimum_height": 350,
+        "minimum_height": 340,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -3655,8 +3714,9 @@
         },
         "layout": {
           "spacing": 10,
-          "margins": [15, 15, 15, 15],
-          "section_spacing": 10
+          "margins": [25, 25, 25, 25],
+          "section_spacing": 15,
+          "button_row_spacing": 20
         },
         "buttons": {
           "spacing": 10,
@@ -3709,10 +3769,11 @@
           "title_color": {
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
-          "content_margins": [10, 10, 10, 10],
+          "content_margins": [10, 20, 10, 15],
           "margin_top": 10,
           "padding_top": 5,
-          "font_group_spacing": 6
+          "title_left": 10,
+          "title_padding": [0, 5]
         },
         "color_swatches": {
           "size": 40,
@@ -3742,7 +3803,7 @@
         },
         "layout": {
           "spacing": 10,
-          "margins": [15, 25, 15, 15],
+          "margins": [25, 25, 25, 25],
           "section_spacing": 15
         },
         "buttons": {
@@ -3808,14 +3869,14 @@
           "title_color": {
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
-          "content_margins": [10, 15, 10, 10],
+          "content_margins": [10, 20, 10, 15],
           "margin_top": 10,
           "padding_top": 5
         }
       },
       "about_dialog": {
         "width": 550,
-        "height": 360,
+        "height": 460,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -3824,7 +3885,8 @@
           "margins": [30, 30, 30, 20],
           "icon_text_gap": 25,
           "text_element_spacing": 10,
-          "button_section_top_margin": 12
+          "button_section_top_margin": 12,
+          "button_row_spacing": 20
         },
         "app_name": {
           "font_family": {
@@ -4047,17 +4109,18 @@
         },
         "layout": {
           "spacing": 10,
-          "margins": [15, 15, 15, 15],
+          "margins": [25, 25, 25, 25],
+          "button_row_spacing": 40,
           "scroll_area_margins": [10, 10, 10, 10],
           "scroll_layout_spacing": 10,
           "left_panel_width": 250,
           "right_panel_label_left_padding": 10,
           "left_panel": {
-            "margins": [0, 0, 0, 0],
+            "margins": [0, 0, 10, 0],
             "spacing": 5
           },
           "right_panel": {
-            "margins": [0, 0, 0, 0],
+            "margins": [10, 0, 0, 0],
             "spacing": 5
           }
         },
@@ -4091,7 +4154,7 @@
             "$ref": "$_COLOR_TEXT_PRIMARY"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_BORDER"
           },
           "border_radius": 3,
           "header_background_color": {
@@ -4102,7 +4165,9 @@
           },
           "item_padding": 5,
           "header_padding": 5,
-          "width_column_width": 80
+          "width_column_width": 80,
+          "row_spacing": 10,
+          "header_section_border": true
         },
         "inputs": {
           "font_family": {
@@ -4118,9 +4183,10 @@
             "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
           "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_BORDER"
           },
           "border_radius": 3,
+          "scroll_area_include_border": true,
           "padding": [8, 6],
           "spinbox": {
             "min_value": 10,
@@ -4138,8 +4204,8 @@
           "title_color": {
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
-          "content_margins": [10, 15, 10, 10],
-          "layout_spacing": 8,
+          "content_margins": [10, 20, 10, 15],
+          "layout_spacing": 10,
           "margin_top": 10,
           "padding_top": 5,
           "border_radius": 3,

@@ -122,6 +122,9 @@ def apply_group_box_styling(
     )
     
     for group_box in group_boxes:
+        # Flat avoids the native macOS group box frame stacking on top of QSS borders
+        # (otherwise a thin outer line appears around the styled border).
+        group_box.setFlat(True)
         group_box.setStyleSheet(stylesheet)
         
         # Set content margins on layout if provided

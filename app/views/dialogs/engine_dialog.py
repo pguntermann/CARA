@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 
 from app.controllers.engine_dialog_controller import EngineDialogController
+from app.utils.themed_icon import SVG_MENU_FOLDER_OPEN, themed_icon_from_svg
 
 
 class EngineDialog(QDialog):
@@ -101,9 +102,9 @@ class EngineDialog(QDialog):
         # Get layout spacing and margins from config
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('engine_dialog', {})
         layout_config = dialog_config.get('layout', {})
-        layout_spacing = layout_config.get('spacing', 10)
-        layout_margins = layout_config.get('margins', [10, 10, 10, 10])
-        engine_info_section_spacing = layout_config.get('engine_info_section_spacing', 2)
+        layout_spacing = layout_config.get('spacing', 15)
+        layout_margins = layout_config.get('margins', [25, 25, 25, 25])
+        engine_info_section_spacing = layout_config.get('engine_info_section_spacing', 15)
         buttons_config = dialog_config.get('buttons', {})
         
         layout = QVBoxLayout(self)
@@ -111,18 +112,11 @@ class EngineDialog(QDialog):
         layout.setSpacing(0)
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
-        layout.addSpacing(layout_spacing)
-        
         # Engine path selection group
         path_group = QGroupBox("Select UCI Engine")
         path_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         path_group_layout = QVBoxLayout(path_group)
-        # Get group box content margins from config
         group_box_config = dialog_config.get('group_box', {})
-        group_margins = group_box_config.get('content_margins', [10, 15, 10, 10])
-        path_group_layout.setContentsMargins(
-            group_margins[0], group_margins[1], group_margins[2], group_margins[3]
-        )
         # Get spacing from config
         group_content_spacing = group_box_config.get('content_spacing', 8)
         path_group_layout.setSpacing(group_content_spacing)
@@ -141,7 +135,9 @@ class EngineDialog(QDialog):
         # Ensure no margins for proper alignment
         self.path_input.setContentsMargins(0, 0, 0, 0)
         
-        self.browse_button = QPushButton("...")
+        self.browse_button = QPushButton()
+        self.browse_button.setToolTip("Choose engine executable…")
+        self.browse_button.setAccessibleName("Browse for engine")
         self.browse_button.clicked.connect(self._browse_engine_path)
         self.browse_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         
@@ -159,12 +155,6 @@ class EngineDialog(QDialog):
         engine_info_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         engine_info_layout = QVBoxLayout(engine_info_group)
         engine_info_layout.setSpacing(engine_info_section_spacing)
-        # Get group box content margins from config
-        group_box_config = dialog_config.get('group_box', {})
-        group_margins = group_box_config.get('content_margins', [10, 15, 10, 10])
-        engine_info_layout.setContentsMargins(
-            group_margins[0], group_margins[1], group_margins[2], group_margins[3]
-        )
         
         # Name
         name_layout = QHBoxLayout()
@@ -213,20 +203,24 @@ class EngineDialog(QDialog):
         
         layout.addWidget(engine_info_group)
         
-        # Buttons
+        # Absorb extra height so the button row stays on the window bottom (same as Bulk Replace)
+        layout.addStretch(1)
+        
+        # Buttons: Validate (bottom-left), stretch, Cancel and Add (bottom-right)
         button_layout = QHBoxLayout()
         button_spacing = buttons_config.get('spacing', 10)
         button_layout.setSpacing(button_spacing)
-        button_layout.addStretch()
         
         self.validate_button = QPushButton("Validate Engine")
         self.validate_button.setEnabled(False)
         self.validate_button.clicked.connect(self._validate_engine)
+        button_layout.addWidget(self.validate_button)
+        
+        button_layout.addStretch(1)
+        
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_button)
-        
-        button_layout.addWidget(self.validate_button)
         
         self.add_button = QPushButton("Add Engine")
         self.add_button.setEnabled(False)
@@ -340,6 +334,7 @@ class EngineDialog(QDialog):
         group_padding_top = group_box_config.get('padding_top', 10)
         group_title_left = group_box_config.get('title_left', 10)
         group_title_padding = group_box_config.get('title_padding', [0, 5])
+        group_content_margins = group_box_config.get('content_margins', [10, 20, 10, 15])
         
         # Get all group boxes from layout
         group_boxes = []
@@ -362,7 +357,8 @@ class EngineDialog(QDialog):
                 title_font_size=group_title_font_size,
                 title_color=group_title_color,
                 title_left=group_title_left,
-                title_padding=group_title_padding
+                title_padding=group_title_padding,
+                content_margins=group_content_margins,
             )
         
         # Apply button styling using StyleManager (uses unified config)
@@ -414,6 +410,15 @@ class EngineDialog(QDialog):
             padding=button_padding  # Same vertical padding as input field
         )
         
+        # Folder glyph (template SVG tinted like input text; same asset as File → Open)
+        input_text_rgb = input_config.get("text_color")
+        if not isinstance(input_text_rgb, (list, tuple)) or len(input_text_rgb) < 3:
+            input_text_rgb = line_edit_config.get("text_color", [200, 200, 200])
+        browse_tint = (int(input_text_rgb[0]), int(input_text_rgb[1]), int(input_text_rgb[2]))
+        self.browse_button.setIcon(themed_icon_from_svg(SVG_MENU_FOLDER_OPEN, browse_tint))
+        self.browse_button.setText("")
+        self.browse_button.setIconSize(QSize(20, 20))
+        
         # Get size hints from both widgets after styling
         self.path_input.updateGeometry()
         self.browse_button.updateGeometry()
@@ -430,6 +435,9 @@ class EngineDialog(QDialog):
         if final_height <= 0:
             # Fallback: use the calculated final_height from earlier
             pass  # final_height already calculated above
+        
+        icon_px = max(16, min(24, final_height - 8))
+        self.browse_button.setIconSize(QSize(icon_px, icon_px))
         
         # Set fixed height on both widgets using the same calculated height
         self.path_input.setFixedHeight(final_height)
@@ -471,6 +479,7 @@ class EngineDialog(QDialog):
         self.browse_button.setFixedHeight(final_height)
         self.browse_button.setMinimumHeight(final_height)
         self.browse_button.setMaximumHeight(final_height)
+        self.browse_button.setFixedWidth(final_height)
         
         # Ensure both widgets have the same size policy for alignment
         self.path_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)

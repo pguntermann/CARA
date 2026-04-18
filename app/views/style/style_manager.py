@@ -172,7 +172,8 @@ class StyleManager:
             selection_text_color: Selection text color as [R, G, B]. If None, reads from centralized config.
             border_width: Border width in pixels (default: 1).
             border_radius: Border radius in pixels (default: 3).
-            padding: Padding as [horizontal, vertical] (default: [8, 6]).
+            padding: Padding as [horizontal, vertical]. Ignored when ``use_unified_defaults`` is True
+                (uses ``ui.styles.line_edit.padding`` to match ``style_line_edits``).
             editable: Whether comboboxes should be editable (default: False).
             use_unified_defaults: If True (default), ignore per-dialog overrides and use unified config values
                 from ``ui.styles`` for a consistent look across the app.
@@ -215,8 +216,13 @@ class StyleManager:
         if selection_text_color is None:
             selection_text_color = line_edit_config.get('selection_text_color', [240, 240, 240])
 
-        # Allow combobox-only padding overrides from ui.styles.combobox, but keep unified by default.
-        if padding is None and isinstance(combobox_config, dict):
+        # When unified, ignore caller padding so combos match ui.styles.line_edit (callers that
+        # passed converted dialog padding could otherwise supply inconsistent [horizontal, vertical]).
+        if use_unified_defaults:
+            padding = line_edit_config.get('padding', [8, 6])
+            border_width = line_edit_config.get('border_width', border_width)
+            border_radius = line_edit_config.get('border_radius', border_radius)
+        elif padding is None and isinstance(combobox_config, dict):
             padding = combobox_config.get('padding', None)
 
         apply_combobox_styling(
@@ -502,6 +508,7 @@ class StyleManager:
         # Get unified config values if parameters are not provided
         styles_config = config.get('ui', {}).get('styles', {})
         spinbox_config = styles_config.get('spinbox', {})
+        line_edit_config = styles_config.get('line_edit', {})
         
         if text_color is None:
             text_color = spinbox_config.get('text_color', [200, 200, 200])
@@ -522,7 +529,9 @@ class StyleManager:
         if border_radius is None:
             border_radius = spinbox_config.get('border_radius', 3)
         if padding is None:
-            padding = spinbox_config.get('padding', [8, 6])
+            padding = spinbox_config.get('padding')
+        if padding is None:
+            padding = line_edit_config.get('padding', [8, 6])
         if disabled_brightness_factor is None:
             disabled_brightness_factor = spinbox_config.get('disabled_brightness_factor', 0.5)
         if hide_buttons is None:

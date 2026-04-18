@@ -148,13 +148,22 @@ class BulkAnalysisDialog(QDialog):
         options_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         options_layout = QVBoxLayout(options_group)
         options_layout.setContentsMargins(group_margins[0], group_margins[1], group_margins[2], group_margins[3])
-        options_layout.setSpacing(section_spacing)
+        # Only checkbox + options grid: vertical gap between them uses spacing.re_analyze_to_controls
+        options_layout.setSpacing(0)
         
         # Re-analyze checkbox row
         self.re_analyze_checkbox = QCheckBox("Re-analyze already analyzed games")
         self.re_analyze_checkbox.setChecked(False)
         self.re_analyze_checkbox.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         options_layout.addWidget(self.re_analyze_checkbox)
+        
+        re_analyze_to_controls = spacing_config.get('re_analyze_to_controls', 24)
+        try:
+            re_analyze_to_controls = int(re_analyze_to_controls)
+        except (TypeError, ValueError):
+            re_analyze_to_controls = 24
+        if re_analyze_to_controls > 0:
+            options_layout.addSpacing(re_analyze_to_controls)
         
         # Left-aligned labels (same as typical form dialogs); grid column width follows longest label
         label_align = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter

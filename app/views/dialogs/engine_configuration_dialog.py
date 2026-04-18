@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QSizePolicy,
     QApplication,
+    QFrame,
 )
 from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtGui import QFont, QFontMetrics, QIntValidator, QResizeEvent, QShowEvent, QMoveEvent, QWheelEvent
@@ -24,6 +25,11 @@ from html import escape
 from typing import Optional, Dict, Any, List
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.path_display_utils import truncate_path_for_display
+from app.utils.themed_icon import (
+    SVG_MENU_COPY,
+    SVG_MENU_PASTE_CLIPBOARD,
+    themed_icon_from_svg,
+)
 from app.controllers.engine_configuration_controller import EngineConfigurationController
 
 
@@ -89,8 +95,8 @@ class EngineConfigurationDialog(QDialog):
         self._task_order = [self.TASK_EVALUATION, self.TASK_GAME_ANALYSIS, self.TASK_MANUAL_ANALYSIS, self.TASK_BRILLIANCY_DETECTION]
         # Paste buttons (one per task tab); enabled only when clipboard has content
         self._paste_buttons: List[QPushButton] = []
-        # Track per-task UI sections for dynamic sizing
-        self._task_sections: Dict[str, Dict[str, Any]] = {}
+        # Copy/Paste toolbar buttons (icon-only; styled separately from main actions)
+        self._copy_paste_icon_buttons: List[QPushButton] = []
         
         # Store fixed size - set it BEFORE layout is set up
         # Read size from config, accounting for Windows frame margins
@@ -117,7 +123,6 @@ class EngineConfigurationDialog(QDialog):
         self.setFixedSize(self._fixed_size)
         self.setMinimumSize(self._fixed_size)
         self.setMaximumSize(self._fixed_size)
-        QTimer.singleShot(0, self._adjust_layouts)
         QTimer.singleShot(0, self._update_path_label_truncation)
     
     def sizeHint(self) -> QSize:
@@ -171,99 +176,6 @@ class EngineConfigurationDialog(QDialog):
         path_label.setText(path_display)
         path_label.setToolTip(str(self.engine_path))
 
-    def _adjust_layouts(self) -> None:
-        """Adjust tab widget and scroll area heights after layout is ready."""
-        self._adjust_tab_widget_height()
-        self._adjust_scroll_areas()
-
-    def _adjust_tab_widget_height(self) -> None:
-        """Ensure the tab widget height fits within the fixed dialog."""
-        dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('engine_configuration', {})
-        layout_config = dialog_config.get('layout', {})
-        layout_margins = layout_config.get('margins', [10, 10, 10, 10])
-        layout_spacing = layout_config.get('spacing', 10)
-        top_margin = layout_margins[1]
-        bottom_margin = layout_margins[3]
-
-        header_height = (
-            self._engine_header_widget.height() or self._engine_header_widget.sizeHint().height()
-        )
-        button_height = max(
-            self.ok_button.height() or self.ok_button.sizeHint().height(),
-            self.cancel_button.height() or self.cancel_button.sizeHint().height()
-        )
-
-        # There are two spacings in the vertical layout (between header/tab and tab/buttons)
-        total_spacing = layout_spacing * 2
-
-        available_height = (
-            self._fixed_size.height()
-            - top_margin
-            - bottom_margin
-            - header_height
-            - button_height
-            - total_spacing
-        )
-
-        # Ensure we don't set negative heights
-        available_height = max(available_height, 100)
-
-        self.tab_widget.setMinimumHeight(available_height)
-        self.tab_widget.setMaximumHeight(available_height)
-
-    def _adjust_scroll_areas(self) -> None:
-        """Ensure each task scroll area fits within its tab."""
-        for task, info in self._task_sections.items():
-            tab = info['tab']
-            scroll = info['scroll']
-            common_group = info['common_group']
-            tab_layout_margins = info['tab_layout_margins']
-            tab_layout_spacing = info['tab_layout_spacing']
-            top_spacer = info['top_spacer']
-            group_margin_top = info['group_margin_top']
-            group_padding_top = info['group_padding_top']
-            group_border_width = info['group_border_width']
-            min_height = info['min_height']
-
-            tab_height = tab.height()
-            if tab_height <= 0:
-                continue
-
-            # Get the actual height of engine_params_group (including title, margins, padding, border)
-            engine_params_group = None
-            for widget in tab.findChildren(QGroupBox):
-                if widget.title() == "Engine-Specific Parameters":
-                    engine_params_group = widget
-                    break
-
-            if engine_params_group:
-                engine_params_group_height = engine_params_group.sizeHint().height()
-                used_height = (
-                    tab_layout_margins[1]
-                    + top_spacer
-                    + tab_layout_spacing
-                    + common_group.sizeHint().height()
-                    + tab_layout_spacing
-                    + engine_params_group_height
-                    + tab_layout_margins[3]
-                )
-            else:
-                used_height = (
-                    tab_layout_margins[1]
-                    + top_spacer
-                    + tab_layout_spacing
-                    + common_group.sizeHint().height()
-                    + tab_layout_spacing
-                    + group_margin_top
-                    + group_padding_top
-                    + (group_border_width * 2)
-                    + tab_layout_margins[3]
-                )
-
-            available = tab_height - used_height
-            available = max(available, min_height)
-            scroll.setFixedHeight(available)
-    
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
         # Get layout spacing and margins from config
@@ -271,6 +183,7 @@ class EngineConfigurationDialog(QDialog):
         layout_config = dialog_config.get('layout', {})
         layout_spacing = layout_config.get('spacing', 10)
         layout_margins = layout_config.get('margins', [10, 10, 10, 10])
+        spacing_after_header = layout_config.get('spacing_after_header', 8)
         
         layout = QVBoxLayout(self)
         layout.setSpacing(layout_spacing)
@@ -300,7 +213,7 @@ class EngineConfigurationDialog(QDialog):
 
         self._engine_header_widget = QWidget()
         header_layout = QVBoxLayout(self._engine_header_widget)
-        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setContentsMargins(0, 0, 0, spacing_after_header)
         header_layout.setSpacing(2)
 
         title_row = QHBoxLayout()
@@ -356,10 +269,10 @@ class EngineConfigurationDialog(QDialog):
 
         layout.addWidget(self._engine_header_widget)
         
-        # Tab widget for tasks
+        # Tab widget for tasks (vertical size = content; extra dialog height goes to stretch below)
         self.tab_widget = QTabWidget()
         self.tab_widget.setDocumentMode(False)  # Disable document mode for better control
-        self.tab_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.tab_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         
         # Create tabs for each task
         self._create_task_tab(self.TASK_EVALUATION, "Evaluation")
@@ -367,13 +280,21 @@ class EngineConfigurationDialog(QDialog):
         self._create_task_tab(self.TASK_MANUAL_ANALYSIS, "Manual Analysis")
         self._create_task_tab(self.TASK_BRILLIANCY_DETECTION, "Brilliancy Detection")
         
-        # Configure QTabBar after tabs are added
-        self._configure_tab_bar()
+        layout.addWidget(self.tab_widget)
+        layout.addStretch(1)
         
-        layout.addWidget(self.tab_widget, stretch=1)
+        button_row_spacing = layout_config.get('button_row_spacing', 20)
+        try:
+            button_row_spacing = int(button_row_spacing)
+        except (TypeError, ValueError):
+            button_row_spacing = 20
+        if button_row_spacing > 0:
+            layout.addSpacing(button_row_spacing)
         
-        # Buttons: Reset (bottom-left), then stretch, Save and Cancel (bottom-right)
+        # Buttons: Reset (bottom-left), then stretch, Cancel and Save (bottom-right)
+        buttons_config = dialog_config.get('buttons', {})
         button_layout = QHBoxLayout()
+        button_layout.setSpacing(buttons_config.get('spacing', 10))
         self.reset_button = QPushButton("Reset to Defaults")
         self.reset_button.setToolTip("Reset all engine settings to defaults")
         self.reset_button.clicked.connect(self._on_reset_clicked)
@@ -513,40 +434,58 @@ class EngineConfigurationDialog(QDialog):
             engine_params_group_layout = QVBoxLayout()
             engine_params_group_layout.setContentsMargins(0, 0, 0, 0)
             engine_params_group_layout.setSpacing(0)
-            # Copy / Paste row at top of engine-specific section (no extra spacing)
+            copy_paste_top = tabs_layout_config.get('spacing_before_copy_paste', 12)
+            try:
+                copy_paste_top = int(copy_paste_top)
+            except (TypeError, ValueError):
+                copy_paste_top = 12
+            if copy_paste_top > 0:
+                engine_params_group_layout.addSpacing(copy_paste_top)
+            # Copy / Paste row at top of engine-specific section
             copy_paste_layout = QHBoxLayout()
             copy_layout_spacing = tabs_layout_config.get('copy_layout_spacing', 10)
             copy_paste_layout.setSpacing(copy_layout_spacing)
-            copy_btn = QPushButton("Copy")
+            copy_btn = QPushButton()
             copy_btn.setToolTip("Copy engine-specific parameters from this task to paste into another task")
+            copy_btn.setAccessibleName("Copy")
             copy_btn.clicked.connect(lambda checked, t=task: self._copy_engine_params(t))
             copy_paste_layout.addWidget(copy_btn)
-            paste_btn = QPushButton("Paste")
+            paste_btn = QPushButton()
             paste_btn.setToolTip("Paste engine-specific parameters copied from another task")
+            paste_btn.setAccessibleName("Paste")
             paste_btn.clicked.connect(lambda checked, t=task: self._paste_engine_params(t))
             paste_btn.setEnabled(False)
             self._paste_buttons.append(paste_btn)
+            self._copy_paste_icon_buttons.extend([copy_btn, paste_btn])
             copy_paste_layout.addWidget(paste_btn)
             copy_paste_layout.addStretch()
             engine_params_group_layout.addLayout(copy_paste_layout)
-            engine_params_layout = QFormLayout()
-            engine_params_layout_spacing = tabs_layout_config.get('engine_params_layout_spacing', 10)
-            engine_params_layout.setSpacing(engine_params_layout_spacing)
-            # Set alignment for macOS compatibility (left-align labels and form)
-            engine_params_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
-            engine_params_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-            
-            # Create scroll area for engine parameters (in case there are many)
+            copy_to_scroll_gap = tabs_layout_config.get('copy_paste_to_scroll_spacing', 10)
+            try:
+                copy_to_scroll_gap = int(copy_to_scroll_gap)
+            except (TypeError, ValueError):
+                copy_to_scroll_gap = 10
+            if copy_to_scroll_gap > 0:
+                engine_params_group_layout.addSpacing(copy_to_scroll_gap)
+
+            # Create scroll area for engine parameters (fixed height from config; see main layout stretch)
             scroll_area_config = dialog_config.get('scroll_area', {})
-            min_height = scroll_area_config.get('min_height', 200)
+            raw_scroll_h = scroll_area_config.get('height')
+            if raw_scroll_h is None:
+                raw_scroll_h = scroll_area_config.get('min_height', 200)
+            try:
+                scroll_fixed_h = max(80, int(raw_scroll_h))
+            except (TypeError, ValueError):
+                scroll_fixed_h = 200
             scroll_bg = scroll_area_config.get('background_color', [45, 45, 50])
             
             scroll = QScrollArea()
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
             scroll.setWidgetResizable(True)
             scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-            scroll.setMinimumHeight(min_height)
-            scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            scroll.setFixedHeight(scroll_fixed_h)
+            scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             
             # Apply scrollbar styling using StyleManager
             from app.views.style import StyleManager
@@ -556,7 +495,8 @@ class EngineConfigurationDialog(QDialog):
                 self.config,
                 scroll_bg,
                 scroll_border,
-                0  # No border radius
+                0,  # No border radius
+                include_scroll_area_border=False,
             )
             
             scroll_widget = QWidget()
@@ -565,8 +505,10 @@ class EngineConfigurationDialog(QDialog):
             scroll_layout.setSpacing(scroll_layout_spacing)
             # Set field growth policy to make fields expand
             scroll_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
-            # Set alignment for macOS compatibility (left-align labels and form)
-            scroll_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+            # Labels vertically centered with fields (checkbox rows use min-height matching combos)
+            scroll_layout.setLabelAlignment(
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+            )
             scroll_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             scroll_layout_margins = tabs_layout_config.get('scroll_layout_margins', [0, 0, 0, 0])
             scroll_layout.setContentsMargins(
@@ -603,30 +545,24 @@ class EngineConfigurationDialog(QDialog):
                 widget = self._create_option_widget(option_type, saved_value, option_min, option_max, option_var)
                 if widget:
                     scroll_layout.addRow(f"{option_name}:", widget)
-                    # Store widget reference for later retrieval
-                    self.task_widgets[task][f"engine_option_{option_name}"] = widget
+                    # Store value widget (inner QCheckBox when wrapped) for state read/write
+                    stored = getattr(widget, "_engine_option_checkbox", widget)
+                    self.task_widgets[task][f"engine_option_{option_name}"] = stored
             
             scroll_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
             scroll.setWidget(scroll_widget)
             
             engine_params_group_layout.addWidget(scroll)
+            scroll_bottom_spacing = tabs_layout_config.get('scroll_bottom_spacing', 12)
+            try:
+                scroll_bottom_spacing = int(scroll_bottom_spacing)
+            except (TypeError, ValueError):
+                scroll_bottom_spacing = 12
+            if scroll_bottom_spacing > 0:
+                engine_params_group_layout.addSpacing(scroll_bottom_spacing)
             engine_params_group.setLayout(engine_params_group_layout)
-            engine_params_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-            tab_layout.addWidget(engine_params_group, stretch=1)
-
-            # Track sections for dynamic sizing
-            self._task_sections[task] = {
-                'tab': tab,
-                'scroll': scroll,
-                'common_group': common_group,
-                'tab_layout_margins': tab_layout_margins,
-                'tab_layout_spacing': tab_layout_spacing,
-                'top_spacer': top_spacer,
-                'group_margin_top': groups_config.get('margin_top', 8),
-                'group_padding_top': groups_config.get('padding_top', 12),
-                'group_border_width': groups_config.get('border_width', 1),
-                'min_height': min_height,
-            }
+            engine_params_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            tab_layout.addWidget(engine_params_group)
         else:
             # No engine options available
             no_options_label = QLabel("No engine-specific parameters available.\nEngine options will be loaded after validation.")
@@ -672,7 +608,23 @@ class EngineConfigurationDialog(QDialog):
             check = QCheckBox()
             if default is not None:
                 check.setChecked(bool(default))
-            return check
+            # Full-width row + min height so checkboxes align with line edits / combos in QFormLayout
+            dialog_cfg = self.config.get("ui", {}).get("dialogs", {}).get("engine_configuration", {})
+            fl = dialog_cfg.get("form_layout", {})
+            row_min = fl.get("checkbox_row_min_height")
+            if row_min is None:
+                sp_style = self.config.get("ui", {}).get("styles", {}).get("spinbox", {})
+                row_min = sp_style.get("minimum_height", 28)
+            wrap = QWidget()
+            row = QHBoxLayout(wrap)
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(0)
+            row.addWidget(check, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            row.addStretch(1)
+            wrap.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            wrap.setMinimumHeight(int(row_min))
+            setattr(wrap, "_engine_option_checkbox", check)
+            return wrap
         
         elif option_type == "combo":
             combo = NoWheelComboBox()
@@ -903,6 +855,7 @@ class EngineConfigurationDialog(QDialog):
         
         # Scroll area for issues
         scroll = QScrollArea()
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setWidgetResizable(True)
         scroll_min_height = validation_scroll_config.get('min_height', 250)
         # Fix white background - use scroll_area background_color from main dialog config
@@ -918,7 +871,8 @@ class EngineConfigurationDialog(QDialog):
             self.config,
             scroll_bg,
             scroll_border,
-            0  # No border radius for validation dialog
+            0,  # No border radius for validation dialog
+            include_scroll_area_border=False,
         )
         scroll_widget = QWidget()
         scroll_layout = QVBoxLayout(scroll_widget)
@@ -1166,12 +1120,27 @@ class EngineConfigurationDialog(QDialog):
         # Scroll button color
         scroll_button_color = tabs_config.get('scroll_button_color', [30, 30, 30])
         
+        # Horizontal rule under the tab row (grounds tabs when pane has no full border)
+        sep_cfg = tabs_config.get('pane_separator') or {}
+        sep_width = sep_cfg.get('width', 1)
+        sep_color = sep_cfg.get('color')
+        if sep_color is None:
+            sep_color = norm_border
+        if sep_width and sep_width > 0:
+            pane_top_rule = (
+                f"border-top: {int(sep_width)}px solid "
+                f"rgb({sep_color[0]}, {sep_color[1]}, {sep_color[2]});"
+            )
+        else:
+            pane_top_rule = ""
+        
         tab_stylesheet = f"""
             QTabWidget {{
                 background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
             }}
             QTabWidget::pane {{
-                border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
+                border: none;
+                {pane_top_rule}
                 background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
             }}
             QTabWidget::tab-bar {{
@@ -1230,8 +1199,50 @@ class EngineConfigurationDialog(QDialog):
         """
         self.tab_widget.setStyleSheet(tab_stylesheet)
         
-        # Call _configure_tab_bar to apply group box, labels, form layout, input widgets, and button styling
+        # Group boxes, tab chrome, inputs (after main dialog buttons exist — not during _setup_ui)
         self._configure_tab_bar()
+        
+        buttons_config = dialog_config.get('buttons', {})
+        button_width = buttons_config.get('width', 120)
+        button_height = buttons_config.get('height', 30)
+        tabs_cfg = dialog_config.get('tabs', {})
+        pane_bg_btn = tabs_cfg.get('pane_background', [40, 40, 45])
+        bg_color = dialog_config.get('background_color', pane_bg_btn)
+        border_color = dialog_config.get('border_color', buttons_config.get('border_color', [60, 60, 65]))
+        bg_color_list = [bg_color[0], bg_color[1], bg_color[2]]
+        border_color_list = [border_color[0], border_color[1], border_color[2]]
+        from app.views.style import StyleManager
+        
+        # Main actions: full-width text buttons. Copy/Paste: icon-only (same SVGs as Edit menu).
+        main_action_buttons = [self.reset_button, self.cancel_button, self.ok_button]
+        StyleManager.style_buttons(
+            main_action_buttons,
+            self.config,
+            bg_color_list,
+            border_color_list,
+            min_width=button_width,
+            min_height=button_height,
+        )
+        if self._copy_paste_icon_buttons:
+            StyleManager.style_buttons(
+                self._copy_paste_icon_buttons,
+                self.config,
+                bg_color_list,
+                border_color_list,
+                min_width=None,
+                min_height=button_height,
+            )
+            labels_tc = dialog_config.get('labels', {}).get('text_color', [200, 200, 200])
+            if not isinstance(labels_tc, (list, tuple)) or len(labels_tc) < 3:
+                labels_tc = [200, 200, 200]
+            tint = (int(labels_tc[0]), int(labels_tc[1]), int(labels_tc[2]))
+            icon_px = max(16, min(22, button_height - 8))
+            for i, btn in enumerate(self._copy_paste_icon_buttons):
+                svg_path = SVG_MENU_COPY if i % 2 == 0 else SVG_MENU_PASTE_CLIPBOARD
+                btn.setIcon(themed_icon_from_svg(svg_path, tint))
+                btn.setText('')
+                btn.setIconSize(QSize(icon_px, icon_px))
+                btn.setFixedSize(button_height, button_height)
     
     def _configure_tab_bar(self) -> None:
         """Configure QTabBar for macOS compatibility (left-aligned, content-sized tabs)."""
@@ -1288,7 +1299,7 @@ class EngineConfigurationDialog(QDialog):
         group_spacing = groups_config.get('spacing', 10)
         group_margin_top = groups_config.get('margin_top', 8)
         group_padding_top = groups_config.get('padding_top', 12)
-        group_content_margins = groups_config.get('content_margins', [10, 15, 10, 10])
+        group_content_margins = groups_config.get('content_margins', [10, 20, 10, 15])
         group_title_left = groups_config.get('title_left', 10)  # Standard left offset
         # Convert from fixed "0 4px" to array format [0, 4] (Pattern 1)
         group_title_padding = [0, 4]
@@ -1393,106 +1404,47 @@ class EngineConfigurationDialog(QDialog):
                 if label.parent() and isinstance(label.parent().layout(), QFormLayout):
                     label.setMinimumWidth(label_min_width)
         
-        # Input widgets styling (QLineEdit, QComboBox, QCheckBox)
+        # Input widgets: QLineEdit / QComboBox use ui.styles via StyleManager (same as Import Games et al.).
+        # Checkboxes still need explicit colors (StyleManager.style_checkboxes has no unified-defaults path).
         input_config = dialog_config.get('input_widgets', {})
         input_bg = input_config.get('background_color', [45, 45, 50])
-        input_text = input_config.get('text_color', [200, 200, 200])
         input_border = input_config.get('border_color', [60, 60, 65])
-        input_border_width = input_config.get('border_width', 1)
-        input_border_radius = input_config.get('border_radius', 3)
-        input_padding = input_config.get('padding', [2, 6, 2, 6])
-        input_font_family = input_config.get('font_family', 'Helvetica Neue')
-        input_font_size = scale_font_size(input_config.get('font_size', 9))
-        # Get selection colors from config (use defaults if not available)
-        selection_bg = input_config.get('selection_background_color', [70, 90, 130])
-        selection_text = input_config.get('selection_text_color', [240, 240, 240])
-        # Get focus border color from config (use default if not available)
-        input_focus_border = input_config.get('focus_border_color', [70, 90, 130])
-        
-        # Get checkmark icon path
-        from pathlib import Path
         app_root = Path(__file__).resolve().parents[2]
         checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
-        checkmark_url = str(checkmark_path).replace("\\", "/") if checkmark_path.exists() else ""
+        checkbox_font_family = resolve_font_family(label_font_family)
         
-        # Apply unified line edit styling using StyleManager
         from app.views.style import StyleManager
-        resolved_font_family = resolve_font_family(input_font_family)
-        
-        # Convert padding from [top, right, bottom, left] to [horizontal, vertical]
-        # input_padding = [2, 6, 2, 6] -> horizontal = 6, vertical = 2
-        padding_h = input_padding[1] if len(input_padding) > 1 else 6
-        padding_v = input_padding[0] if len(input_padding) > 0 else 2
-        combobox_padding = [padding_h, padding_v]
-        line_edit_padding = [padding_h, padding_v]  # Same format for line edits
         
         for i in range(self.tab_widget.count()):
             tab = self.tab_widget.widget(i)
             
-            # Apply unified line edit styling using StyleManager
-            line_edits = list(tab.findChildren(QLineEdit))
+            combo_inner_line_edits = set()
+            for cb in tab.findChildren(QComboBox):
+                inner = cb.lineEdit()
+                if inner is not None:
+                    combo_inner_line_edits.add(inner)
+            line_edits = [
+                le for le in tab.findChildren(QLineEdit) if le not in combo_inner_line_edits
+            ]
             if line_edits:
-                StyleManager.style_line_edits(
-                    line_edits,
-                    self.config,
-                    font_family=resolved_font_family,  # Match original dialog font
-                    font_size=input_font_size,  # Match original dialog font size
-                    bg_color=input_bg,  # Match combobox background color
-                    border_color=input_border,  # Match combobox border color
-                    focus_border_color=input_focus_border,  # Match combobox focus border color
-                    border_width=input_border_width,  # Match combobox border width
-                    border_radius=input_border_radius,  # Match combobox border radius
-                    padding=line_edit_padding  # Preserve existing padding for alignment
-                )
+                StyleManager.style_line_edits(line_edits, self.config)
             
-            # Apply combobox styling using StyleManager
             comboboxes = tab.findChildren(QComboBox)
             if comboboxes:
-                StyleManager.style_comboboxes(
-                    comboboxes,
-                    self.config,
-                    input_text,
-                    resolved_font_family,
-                    input_font_size,
-                    input_bg,
-                    input_border,
-                    input_focus_border,
-                    selection_bg,
-                    selection_text,
-                    border_width=input_border_width,
-                    border_radius=input_border_radius,
-                    padding=combobox_padding,
-                    editable=True
-                )
+                StyleManager.style_comboboxes(comboboxes, self.config, editable=True)
             
-            # Apply checkbox styling using StyleManager
             checkboxes = tab.findChildren(QCheckBox)
             if checkboxes:
                 StyleManager.style_checkboxes(
                     checkboxes,
                     self.config,
-                    input_text,
-                    resolved_font_family,
-                    input_font_size,
+                    label_text_color,
+                    checkbox_font_family,
+                    label_font_size,
                     input_bg,
                     input_border,
-                    checkmark_path
+                    checkmark_path,
                 )
-        
-        # Apply button styling using StyleManager (uses unified config)
-        buttons_config = dialog_config.get('buttons', {})
-        button_width = buttons_config.get('width', 120)
-        button_height = buttons_config.get('height', 30)
-        
-        # Get background color for button offset calculation (match other dialogs)
-        tabs_config = dialog_config.get('tabs', {})
-        pane_bg = tabs_config.get('pane_background', [40, 40, 45])
-        bg_color = dialog_config.get('background_color', pane_bg)
-        border_color = dialog_config.get('border_color', buttons_config.get('border_color', [60, 60, 65]))
-        bg_color_list = [bg_color[0], bg_color[1], bg_color[2]]
-        border_color_list = [border_color[0], border_color[1], border_color[2]]
-        
-        from app.views.style import StyleManager
         
         # Window chrome: same as BulkReplaceDialog (dialogs.*.background_color), not tab pane color
         tabs_config = dialog_config.get('tabs', {})
@@ -1519,17 +1471,4 @@ class EngineConfigurationDialog(QDialog):
             self.setStyleSheet(current_stylesheet + "\n" + dialog_stylesheet)
         else:
             self.setStyleSheet(dialog_stylesheet)
-        
-        # Apply button styling to all buttons AFTER dialog stylesheet (to ensure it takes precedence)
-        # Only style buttons if they exist (they're created in _setup_ui which may call _apply_styling)
-        all_buttons = self.findChildren(QPushButton)
-        if all_buttons:
-            StyleManager.style_buttons(
-                all_buttons,
-                self.config,
-                bg_color_list,
-                border_color_list,
-                min_width=button_width,
-                min_height=button_height
-            )
 

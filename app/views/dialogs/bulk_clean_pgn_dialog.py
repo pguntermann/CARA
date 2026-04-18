@@ -357,7 +357,7 @@ class BulkCleanPgnDialog(QDialog):
         group_title_font_family = resolve_font_family(groups_config.get("title_font_family"))
         group_title_font_size = scale_font_size(groups_config.get("title_font_size", 11))
         group_title_color = groups_config.get("title_color")
-        group_content_margins = groups_config.get("content_margins", [10, 15, 10, 10])
+        group_content_margins = groups_config.get("content_margins", [10, 20, 10, 15])
         group_margin_top = groups_config.get("margin_top", 10)
         group_padding_top = groups_config.get("padding_top", 5)
         

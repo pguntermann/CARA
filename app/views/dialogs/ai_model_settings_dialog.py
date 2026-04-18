@@ -231,7 +231,7 @@ class AIModelSettingsDialog(QDialog):
         scroll_layout.addStretch()
         
         scroll.setWidget(scroll_widget)
-        layout.addWidget(scroll)
+        layout.addWidget(scroll, 1)
         
         # Request timeout (applies to all providers)
         timeout_layout = QFormLayout()
@@ -243,7 +243,8 @@ class AIModelSettingsDialog(QDialog):
         self.request_timeout_spinbox = QSpinBox()
         self.request_timeout_spinbox.setRange(10, 600)
         self.request_timeout_spinbox.setValue(60)
-        self.request_timeout_spinbox.setFixedWidth(56)
+        # Wide enough for three digits + inner text margins (same padding as other inputs after styling).
+        self.request_timeout_spinbox.setMinimumWidth(80)
         timeout_layout.addRow(timeout_label, self.request_timeout_spinbox)
         timeout_widget = QWidget()
         timeout_widget.setLayout(timeout_layout)
@@ -347,6 +348,16 @@ class AIModelSettingsDialog(QDialog):
         enable_checkbox.toggled.connect(self._on_custom_enabled_toggled)
         self.custom_enabled_checkbox = enable_checkbox
         form_layout.addRow(enable_checkbox)
+        
+        gap_after_checkbox = self.fields_config.get("custom_endpoint_checkbox_spacing", 16)
+        try:
+            gap_after_checkbox = int(gap_after_checkbox)
+        except (TypeError, ValueError):
+            gap_after_checkbox = 16
+        if gap_after_checkbox > 0:
+            spacer = QWidget()
+            spacer.setFixedHeight(gap_after_checkbox)
+            form_layout.addRow(spacer)
         
         default_url = getattr(self, 'default_custom_base_url', 'http://localhost:1234/v1')
         base_url_label = QLabel("Base URL:")
@@ -814,7 +825,8 @@ class AIModelSettingsDialog(QDialog):
                 self.config,
                 self.bg_color,
                 scroll_border,
-                border_radius
+                border_radius,
+                include_scroll_area_border=False,
             )
         
         # Group boxes
@@ -986,7 +998,13 @@ class AIModelSettingsDialog(QDialog):
         # Apply spinbox styling using StyleManager (e.g. Request timeout)
         spinboxes = list(self.findChildren(QSpinBox))
         if spinboxes:
-            spinbox_padding = [input_padding_h, input_padding_v]
+            # Tighter vertical inner margins (setTextMargins) than line edits/combos: the spinbox
+            # line-edit area is shorter, so full input vertical padding clips digits top/bottom.
+            try:
+                spinbox_v = max(0, int(input_padding_v) - 2)
+            except (TypeError, ValueError):
+                spinbox_v = 0
+            spinbox_padding = [input_padding_h, spinbox_v]
             StyleManager.style_spinboxes(
                 spinboxes,
                 self.config,
@@ -998,7 +1016,8 @@ class AIModelSettingsDialog(QDialog):
                 focus_border_color=input_focus_border_color,
                 border_width=input_border_width,
                 border_radius=input_border_radius,
-                padding=spinbox_padding
+                padding=spinbox_padding,
+                use_unified_defaults=False,
             )
         
         # Apply button styling using StyleManager (uses unified config)
