@@ -1864,7 +1864,9 @@
             "border_radius": 5,
             "margin": 5,
             "user": {
-              "background_color": [60, 80, 120],
+              "background_color": {
+                "$ref": "$_COLOR_DEEP_TEAL"
+              },
               "text_color": {
                 "$ref": "$_COLOR_FROST_MINT"
               }
