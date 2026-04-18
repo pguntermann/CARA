@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import Qt, QSize, QTimer, QRectF
 from PyQt6.QtCore import QByteArray
-from PyQt6.QtGui import QColor, QPalette, QPainter, QPen, QPixmap, QIcon, QFont
+from PyQt6.QtGui import QColor, QPalette, QPainter, QPen, QPixmap, QIcon, QFont, QShowEvent
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -430,11 +430,7 @@ class ManageGameTagsDialog(QDialog):
         self._settings_service = UserSettingsService.get_instance()
 
         self._load_config()
-        self._fixed_size = QSize(self.dialog_width, self.dialog_height)
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
 
         self._original_custom = self._get_custom_from_settings()
         self._working_custom = [c.copy() for c in self._original_custom]
@@ -445,13 +441,16 @@ class ManageGameTagsDialog(QDialog):
         self._apply_styling()
         self._rebuild_builtin_chips()
         self._rebuild_custom_chips()
+        self._apply_configured_dialog_size()
         self.setWindowTitle("Manage game tags")
 
     def _load_config(self) -> None:
         dlg_cfg = (self.config.get("ui", {}) or {}).get("dialogs", {}).get("manage_game_tags", {})
         self.dialog_width = int(dlg_cfg.get("width", 680))
-        self.dialog_height = int(dlg_cfg.get("height", 520))
         self.scroll_area_height = max(1, int(dlg_cfg.get("scroll_area_height", 120)))
+        self.bottom_button_top_padding = int(dlg_cfg.get("bottom_button_top_padding", 50))
+        self.dialog_minimum_width = dlg_cfg.get("minimum_width")
+        self.dialog_minimum_height = dlg_cfg.get("minimum_height")
         self.bg_color = QColor(*(dlg_cfg.get("background_color", [40, 40, 45])))
         self.border_color = dlg_cfg.get("border_color", [60, 60, 65])
         layout_cfg = dlg_cfg.get("layout", {}) or {}
@@ -580,7 +579,7 @@ class ManageGameTagsDialog(QDialog):
         self.custom_chip_container.setMinimumHeight(self.custom_chip_container_min_h)
         self.scroll.setWidget(self.custom_chip_container)
         self.scroll.setFixedHeight(self.scroll_area_height)
-        # Do not stretch the scroll area: extra dialog height should go to the spacer below, not the viewport.
+        # Scroll viewport height is config-fixed; overall dialog height follows layout (chip rows + padding).
         self.scroll.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Fixed,
@@ -589,9 +588,7 @@ class ManageGameTagsDialog(QDialog):
 
         main_layout.addWidget(custom_group, 0)
 
-        main_layout.addStretch(1)
-
-        main_layout.addSpacing(self.section_spacing)
+        main_layout.addSpacing(self.bottom_button_top_padding)
 
         # Bottom buttons
         btn_row = QHBoxLayout()
@@ -839,13 +836,30 @@ class ManageGameTagsDialog(QDialog):
         self.builtin_chip_container.updateGeometry()
         self.builtin_chip_container.update()
 
-    def showEvent(self, event) -> None:
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout size hint (floored by optional minimum_height)."""
+        w = int(self.dialog_width)
+        if self.dialog_minimum_width is not None:
+            w = max(w, int(self.dialog_minimum_width))
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
+            return
+        h = lay.sizeHint().height()
+        if h <= 0:
+            return
+        if self.dialog_minimum_height is not None:
+            h = max(h, int(self.dialog_minimum_height))
+        self.setFixedHeight(h)
+
+    def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
+        self._apply_configured_dialog_size()
         # On macOS/Linux, the scroll viewport width can be wrong until after the dialog is shown.
         # Rebuild once on the next tick so chip geometry uses the final layout width.
         # Use a bound slot (not a lambda) so Qt drops the timer if the dialog is destroyed first;
-        # avoid rebuilding from resizeEvent — fixed-size dialog + setFixedWidth on the chip
-        # container can trigger layout/resize feedback loops on some platforms (Ubuntu freeze).
+        # avoid rebuilding from resizeEvent — setFixedWidth on the chip container plus repeated
+        # layout can trigger feedback loops on some platforms (Ubuntu freeze).
         QTimer.singleShot(0, self._deferred_post_show_chip_layout)
 
     def _deferred_post_show_chip_layout(self) -> None:
@@ -853,6 +867,7 @@ class ManageGameTagsDialog(QDialog):
             return
         self._rebuild_builtin_chips()
         self._rebuild_custom_chips()
+        self._apply_configured_dialog_size()
 
     def _rebuild_custom_chips(self) -> None:
         for child in self.custom_chip_container.findChildren(QPushButton):

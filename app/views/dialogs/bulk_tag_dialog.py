@@ -16,8 +16,8 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QWidget,
 )
-from PyQt6.QtCore import Qt, QSize, QTimer
-from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent, QResizeEvent
 from typing import Optional, Dict, Any, List
 
 from app.controllers.bulk_tag_controller import BulkTagController
@@ -54,33 +54,22 @@ class BulkTagDialog(QDialog):
         self.database = database
         self.selected_game_indices = selected_game_indices if selected_game_indices else []
         
-        # Store fixed size
-        dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_tag', {})
-        width = dialog_config.get('width', 600)
-        height = dialog_config.get('height', 680)
-        self._fixed_size = QSize(width, height)
-        
-        # Set fixed size
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        
         # Track operation state
         self._operation_in_progress = False
         
         self._load_config()
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         self._setup_ui()
         self._apply_styling()
+        self._apply_configured_dialog_size()
         self.setWindowTitle("Bulk Add/Remove PGN header tags")
     
     def _load_config(self) -> None:
         """Load configuration values from config.json."""
         dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("bulk_tag", {})
         
-        # Dialog dimensions
         self.dialog_width = dialog_config.get("width", 600)
-        self.dialog_height = dialog_config.get("height", 680)
+        self.bottom_button_top_padding = dialog_config.get("bottom_button_top_padding", 50)
         
         # Background color
         bg_color = dialog_config.get("background_color", [40, 40, 45])
@@ -326,6 +315,7 @@ class BulkTagDialog(QDialog):
         
         # Tag Operation group
         tag_group = QGroupBox("Tag Operation")
+        self.tag_group = tag_group
         tag_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         tag_layout = QFormLayout()
         tag_layout.setSpacing(self.form_spacing)
@@ -401,18 +391,21 @@ class BulkTagDialog(QDialog):
         self.source_tag_combo.setMinimumWidth(self.input_minimum_width)
         self.source_tag_combo.setMinimumHeight(self.input_minimum_height)
         self.source_tag_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.source_tag_combo.setVisible(False)
         self.source_tag_label = QLabel("Source tag:")
         self.source_tag_label.setFont(QFont(self.label_font_family, self.label_font_size))
         self.source_tag_label.setMinimumWidth(label_min_width)
-        self.source_tag_label.setVisible(False)
         tag_layout.addRow(self.source_tag_label, self.source_tag_combo)
+
+        self._tag_form_layout = tag_layout
+        # Row indices for QFormLayout.setRowVisible (addRow order)
+        self._form_row_tag_combo = 0
+        self._form_row_tag_spacer = 1
+        self._form_row_value_source = 2
+        self._form_row_fixed_value = 3
+        self._form_row_source_tag = 4
         
         tag_group.setLayout(tag_layout)
         main_layout.addWidget(tag_group)
-        
-        # Absorb extra height when the window is taller than content (avoids stretching group boxes on macOS)
-        main_layout.addStretch(1)
         
         # Buttons
         buttons_layout = QHBoxLayout()
@@ -426,12 +419,22 @@ class BulkTagDialog(QDialog):
         buttons_layout.addWidget(self.cancel_button)
         buttons_layout.addWidget(self.apply_button)
         
-        # Add spacing before buttons
-        main_layout.addSpacing(self.section_spacing)
+        main_layout.addSpacing(self.bottom_button_top_padding)
         main_layout.addLayout(buttons_layout)
         
         # Initialize UI state
         self._on_operation_changed()
+    
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout size hint (content-driven)."""
+        w = int(self.dialog_width)
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
+            return
+        h = lay.sizeHint().height()
+        if h > 0:
+            self.setFixedHeight(h)
     
     def _apply_styling(self) -> None:
         """Apply styling from config.json."""
@@ -642,11 +645,17 @@ class BulkTagDialog(QDialog):
     def showEvent(self, event: QShowEvent) -> None:
         """Override showEvent to ensure styling is applied when dialog is shown."""
         super().showEvent(event)
+        self._apply_configured_dialog_size()
         self._apply_checkbox_styling()
-        QTimer.singleShot(0, self._update_path_label_truncation)
+        self._update_path_label_truncation()
         # Update tag combobox if in remove mode
         if self.remove_tag_radio.isChecked():
             self._update_tag_combo_for_remove()
+        self._apply_configured_dialog_size()
+    
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._update_path_label_truncation()
     
     def _update_path_label_truncation(self) -> None:
         """Re-truncate path and name using actual width and font (DPI-aware)."""
@@ -667,18 +676,25 @@ class BulkTagDialog(QDialog):
         path_display = truncate_path_for_display(self._db_path_full, w, label.font())
         label.setText(path_display)
 
+    def _sync_tag_form_row_visibility(self) -> None:
+        """Show/hide whole form rows (setVisible leaves empty gaps in QFormLayout)."""
+        form = self._tag_form_layout
+        is_add = self.add_tag_radio.isChecked()
+        form.setRowVisible(self._form_row_tag_spacer, is_add)
+        form.setRowVisible(self._form_row_value_source, is_add)
+        if not is_add:
+            form.setRowVisible(self._form_row_fixed_value, False)
+            form.setRowVisible(self._form_row_source_tag, False)
+        else:
+            form.setRowVisible(self._form_row_fixed_value, self.fixed_value_radio.isChecked())
+            form.setRowVisible(self._form_row_source_tag, self.copy_from_tag_radio.isChecked())
+        self.tag_group.updateGeometry()
+    
     def _on_operation_changed(self) -> None:
         """Handle operation selection change."""
         is_add_mode = self.add_tag_radio.isChecked()
         
-        # Show/hide value source options based on operation
-        self.value_source_label.setVisible(is_add_mode)
-        self.fixed_value_radio.setVisible(is_add_mode)
-        self.copy_from_tag_radio.setVisible(is_add_mode)
-        self.fixed_value_input.setVisible(is_add_mode and self.fixed_value_radio.isChecked())
-        self.fixed_value_label.setVisible(is_add_mode and self.fixed_value_radio.isChecked())
-        self.source_tag_combo.setVisible(is_add_mode and self.copy_from_tag_radio.isChecked())
-        self.source_tag_label.setVisible(is_add_mode and self.copy_from_tag_radio.isChecked())
+        self._sync_tag_form_row_visibility()
         
         # Update tag label
         self.tag_label.setText("Tag:" if is_add_mode else "Tag to remove:")
@@ -692,6 +708,7 @@ class BulkTagDialog(QDialog):
         else:
             # Remove mode: use tags that exist in the database
             self._update_tag_combo_for_remove()
+        self._apply_configured_dialog_size()
     
     def _update_tag_combo_for_remove(self) -> None:
         """Update tag combobox with tags that exist in the database."""
@@ -750,19 +767,14 @@ class BulkTagDialog(QDialog):
     
     def _on_value_source_changed(self) -> None:
         """Handle value source selection change."""
-        is_copy_mode = self.copy_from_tag_radio.isChecked()
         is_fixed_mode = self.fixed_value_radio.isChecked()
         
-        # Show/hide source tag selection
-        self.source_tag_combo.setVisible(is_copy_mode)
-        self.source_tag_label.setVisible(is_copy_mode)
-        
-        # Show/hide fixed value input
-        self.fixed_value_input.setVisible(is_fixed_mode)
-        self.fixed_value_label.setVisible(is_fixed_mode)
+        if self.add_tag_radio.isChecked():
+            self._sync_tag_form_row_visibility()
         
         # Enable/disable fixed value input
         self.fixed_value_input.setEnabled(is_fixed_mode)
+        self._apply_configured_dialog_size()
     
     def _on_apply_clicked(self) -> None:
         """Handle apply button click."""
@@ -897,10 +909,6 @@ class BulkTagDialog(QDialog):
         self.selected_games_radio.setEnabled(enabled)
         self.apply_button.setEnabled(enabled)
         self.cancel_button.setEnabled(enabled)
-    
-    def sizeHint(self) -> QSize:
-        """Return the fixed size as the size hint."""
-        return self._fixed_size
     
     def _show_success_dialog(self, title: str, message: str) -> None:
         """Show a styled success dialog.

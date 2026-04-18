@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QColorDialog,
 )
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QColor, QPalette, QPainter, QPen, QPixmap, QIcon, QFontDatabase
+from PyQt6.QtGui import QColor, QPalette, QPainter, QPen, QPixmap, QIcon, QFontDatabase, QShowEvent
 from typing import Dict, Any, List, Optional
 from copy import deepcopy
 
@@ -94,6 +94,8 @@ class AnnotationPreferencesDialog(QDialog):
         # Load config
         self._load_config()
         
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        
         # Setup UI
         self._setup_ui()
         
@@ -106,17 +108,38 @@ class AnnotationPreferencesDialog(QDialog):
         # Store original values for cancel
         self._store_original_values()
         
+        self._apply_configured_dialog_size()
         self.setWindowTitle("Annotation Preferences")
+    
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout size hint (floored by optional minimum_height)."""
+        w = int(self.dialog_width)
+        if self.dialog_minimum_width is not None:
+            w = max(w, int(self.dialog_minimum_width))
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
+            return
+        h = lay.sizeHint().height()
+        if h <= 0:
+            return
+        if self.dialog_minimum_height is not None:
+            h = max(h, int(self.dialog_minimum_height))
+        self.setFixedHeight(h)
+    
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        self._apply_configured_dialog_size()
     
     def _load_config(self) -> None:
         """Load configuration values from config.json."""
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('annotation_preferences', {})
         
         # Dialog dimensions
-        self.dialog_width = dialog_config.get('width', 520)
-        self.dialog_height = dialog_config.get('height', 380)
-        self.dialog_min_width = dialog_config.get('minimum_width', 480)
-        self.dialog_min_height = dialog_config.get('minimum_height', 340)
+        self.dialog_width = int(dialog_config.get('width', 520))
+        self.bottom_button_top_padding = int(dialog_config.get('bottom_button_top_padding', 50))
+        self.dialog_minimum_width = dialog_config.get('minimum_width')
+        self.dialog_minimum_height = dialog_config.get('minimum_height')
         
         # Background and colors
         self.bg_color = dialog_config.get('background_color', [40, 40, 45])
@@ -131,8 +154,6 @@ class AnnotationPreferencesDialog(QDialog):
         # Match bulk_replace and other dialogs (window chrome inset for group boxes)
         self.layout_margins = layout_config.get('margins', [25, 25, 25, 25])
         self.section_spacing = layout_config.get('section_spacing', 15)
-        # Extra gap between last QGroupBox and button row (bulk_replace uses section_spacing before buttons)
-        self.button_row_top_spacing = layout_config.get('button_row_spacing', 20)
         
         # Buttons
         buttons_config = dialog_config.get('buttons', {})
@@ -197,9 +218,6 @@ class AnnotationPreferencesDialog(QDialog):
     
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
-        # Set dialog size (fixed, non-resizable)
-        self.setFixedSize(self.dialog_width, self.dialog_height)
-        
         # Set background color
         self.setAutoFillBackground(True)
         palette = self.palette()
@@ -268,8 +286,7 @@ class AnnotationPreferencesDialog(QDialog):
         
         layout.addWidget(font_group)
         
-        layout.addStretch(1)
-        layout.addSpacing(self.button_row_top_spacing)
+        layout.addSpacing(self.bottom_button_top_padding)
         
         # Buttons
         button_layout = QHBoxLayout()

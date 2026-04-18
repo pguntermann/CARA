@@ -12,8 +12,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QWidget,
 )
-from PyQt6.QtCore import QSize
-from PyQt6.QtGui import QPalette, QColor, QFont
+from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent
 
 from app.views.style import StyleManager
 from app.views.style.line_edit import generate_line_edit_stylesheet
@@ -37,15 +36,6 @@ class MoveCommentDialog(QDialog):
         self.config = config
         self._has_black_half = has_black_half
 
-        dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("move_comment", {})
-        width = dialog_config.get("width", 500)
-        height = dialog_config.get("height", 400)
-        self._fixed_size = QSize(width, height)
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-
         self._load_config()
         self._setup_ui(
             move_number,
@@ -55,10 +45,22 @@ class MoveCommentDialog(QDialog):
             black_initial,
         )
         self._apply_styling()
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        self._apply_configured_dialog_size()
         self.setWindowTitle("Move comments")
 
     def _load_config(self) -> None:
         dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("move_comment", {})
+
+        self._dialog_width = dialog_config.get("width", 500)
+        spacing_config = dialog_config.get("spacing", {})
+        self._bottom_button_top_padding = dialog_config.get(
+            "bottom_button_top_padding", spacing_config.get("before_buttons", 50)
+        )
+        self._dialog_minimum_width = dialog_config.get("minimum_width")
+        self._dialog_minimum_height = dialog_config.get(
+            "minimum_height", dialog_config.get("height", 370)
+        )
 
         bg_color = dialog_config.get("background_color", [40, 40, 45])
         self._bg_color = QColor(bg_color[0], bg_color[1], bg_color[2])
@@ -70,10 +72,8 @@ class MoveCommentDialog(QDialog):
         self._layout_margins = layout_config.get("margins", [20, 20, 20, 20])
         self._layout_spacing = layout_config.get("spacing", 12)
 
-        spacing_config = dialog_config.get("spacing", {})
         self._section_spacing = spacing_config.get("section", 15)
         self._form_spacing = spacing_config.get("form", 8)
-        self._before_buttons_spacing = spacing_config.get("before_buttons", 20)
 
         buttons_config = dialog_config.get("buttons", {})
         self._button_width = buttons_config.get("width", 120)
@@ -113,7 +113,7 @@ class MoveCommentDialog(QDialog):
         )
 
         text_edits_config = dialog_config.get("text_edits", {})
-        self._text_edit_min_h = text_edits_config.get("minimum_height", 80)
+        self._text_edit_min_h = text_edits_config.get("minimum_height", 96)
         self._text_side_inset = text_edits_config.get("side_inset", 10)
 
         self._dialog_bg_rgb = dialog_config.get("background_color", [40, 40, 45])
@@ -187,10 +187,9 @@ class MoveCommentDialog(QDialog):
         self._white_edit = QTextEdit()
         self._white_edit.setAcceptRichText(False)
         self._white_edit.setPlainText(white_initial)
-        self._white_edit.setMinimumHeight(self._text_edit_min_h)
         self._white_edit.setSizePolicy(
             QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Fixed,
         )
         white_block.addWidget(self._white_edit)
         body_layout.addLayout(white_block)
@@ -208,18 +207,16 @@ class MoveCommentDialog(QDialog):
         self._black_edit = QTextEdit()
         self._black_edit.setAcceptRichText(False)
         self._black_edit.setPlainText(black_initial)
-        self._black_edit.setMinimumHeight(self._text_edit_min_h)
         self._black_edit.setSizePolicy(
             QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Fixed,
         )
         self._black_edit.setEnabled(self._has_black_half)
         black_block.addWidget(self._black_edit)
         body_layout.addLayout(black_block)
 
         main_layout.addWidget(body)
-        main_layout.addStretch(1)
-        main_layout.addSpacing(self._before_buttons_spacing)
+        main_layout.addSpacing(self._bottom_button_top_padding)
 
         self._ok_button = QPushButton("OK")
         self._ok_button.setDefault(True)
@@ -288,6 +285,29 @@ class MoveCommentDialog(QDialog):
                 self._input_border_rgb,
                 text_edit_style,
             )
+        # QTextEdit ignores a small minimumHeight for layout: its sizeHint stays large unless height is fixed.
+        for te in (self._white_edit, self._black_edit):
+            te.setFixedHeight(self._text_edit_min_h)
+
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout (floored by optional minimum_height)."""
+        w = int(self._dialog_width)
+        if self._dialog_minimum_width is not None:
+            w = max(w, int(self._dialog_minimum_width))
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
+            return
+        h = lay.sizeHint().height()
+        if h <= 0:
+            return
+        if self._dialog_minimum_height is not None:
+            h = max(h, int(self._dialog_minimum_height))
+        self.setFixedHeight(h)
+
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        self._apply_configured_dialog_size()
 
     def get_comments(self) -> Tuple[str, str]:
         """Return plain-text white and black comments as edited."""

@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any, Dict, Tuple
 
 from PyQt6.QtCore import Qt, QRegularExpression
-from PyQt6.QtGui import QColor, QRegularExpressionValidator
+from PyQt6.QtGui import QColor, QRegularExpressionValidator, QShowEvent
 from PyQt6.QtWidgets import (
     QDialog,
     QFormLayout,
@@ -40,20 +40,21 @@ class AddPgnHeaderDialog(QDialog):
         self._load_config()
         self._setup_ui()
         self._apply_styling()
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        self._apply_configured_dialog_size()
         self.setWindowTitle("Add PGN header tag")
 
     def _load_config(self) -> None:
         dialog_config = self.config.get("ui", {}).get("dialogs", {}).get(self.CONFIG_KEY, {})
-        self.dialog_width = dialog_config.get("width", 440)
-        self.dialog_height = dialog_config.get("height", 220)
-        self.dialog_min_width = dialog_config.get("minimum_width", 380)
-        self.dialog_min_height = dialog_config.get("minimum_height", 180)
+        self.dialog_width = dialog_config.get("width", 420)
+        self.bottom_button_top_padding = dialog_config.get("bottom_button_top_padding", 50)
+        self.dialog_minimum_width = dialog_config.get("minimum_width")
+        self.dialog_minimum_height = dialog_config.get("minimum_height")
         self.dialog_bg_color = dialog_config.get("background_color", [40, 40, 45])
         self.dialog_border_color = dialog_config.get("border_color", [60, 60, 65])
 
         layout_config = dialog_config.get("layout", {})
         self.layout_margins = layout_config.get("margins", [25, 25, 25, 25])
-        self.button_row_spacing = layout_config.get("button_row_spacing", 20)
         self.form_horizontal_spacing = layout_config.get("form_horizontal_spacing", 14)
         self.form_vertical_spacing = layout_config.get("form_vertical_spacing", 12)
 
@@ -88,10 +89,27 @@ class AddPgnHeaderDialog(QDialog):
         self.button_border_color = buttons_config.get("border_color", [60, 60, 65])
         self.button_spacing = buttons_config.get("spacing", 10)
 
-    def _setup_ui(self) -> None:
-        self.setMinimumSize(self.dialog_min_width, self.dialog_min_height)
-        self.resize(self.dialog_width, self.dialog_height)
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout size hint (floored by optional minimum_height)."""
+        w = int(self.dialog_width)
+        if self.dialog_minimum_width is not None:
+            w = max(w, int(self.dialog_minimum_width))
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
+            return
+        h = lay.sizeHint().height()
+        if h <= 0:
+            return
+        if self.dialog_minimum_height is not None:
+            h = max(h, int(self.dialog_minimum_height))
+        self.setFixedHeight(h)
 
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        self._apply_configured_dialog_size()
+
+    def _setup_ui(self) -> None:
         self.setAutoFillBackground(True)
         palette = self.palette()
         palette.setColor(
@@ -143,8 +161,7 @@ class AddPgnHeaderDialog(QDialog):
         tag_group.setLayout(form_layout)
         layout.addWidget(tag_group)
 
-        layout.addStretch(1)
-        layout.addSpacing(self.button_row_spacing)
+        layout.addSpacing(self.bottom_button_top_padding)
 
         button_layout = QHBoxLayout()
         button_layout.setSpacing(self.button_spacing)

@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QSpacerItem,
     QFrame,
 )
-from PyQt6.QtCore import Qt, QSize, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent, QFontMetrics
 from typing import Optional, Dict, Any, List, Tuple, Callable
 
@@ -910,21 +910,11 @@ class SearchDialog(QDialog):
         self.all_databases = all_databases
         self.search_query: Optional[SearchQuery] = None
         
-        # Store fixed size
-        dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('search', {})
-        width = dialog_config.get('width', 800)
-        height = dialog_config.get('height', 600)
-        self._fixed_size = QSize(width, height)
-        
-        # Set fixed size
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        
         self._load_config()
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         self._setup_ui()
         self._apply_styling()
+        self._apply_configured_dialog_size()
         self.setWindowTitle("Search Games")
         
         # Add initial criterion row or restore last search query
@@ -937,9 +927,10 @@ class SearchDialog(QDialog):
         """Load configuration values from config.json."""
         dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("search", {})
         
-        # Dialog dimensions
         self.dialog_width = dialog_config.get("width", 800)
-        self.dialog_height = dialog_config.get("height", 600)
+        self.dialog_minimum_width = dialog_config.get("minimum_width")
+        self.dialog_minimum_height = dialog_config.get("minimum_height")
+        self.bottom_button_top_padding = dialog_config.get("bottom_button_top_padding", 50)
         self.criteria_scroll_area_height = max(1, int(dialog_config.get("scroll_area_height", 250)))
         
         # Background color
@@ -1082,10 +1073,8 @@ class SearchDialog(QDialog):
         
         criteria_layout.addLayout(criteria_buttons_layout)
         criteria_group.setLayout(criteria_layout)
-        # Criteria scroll has fixed height; extra dialog height goes to the spacer before Cancel/Search.
+        # Criteria scroll has fixed height from config (scroll_area_height).
         main_layout.addWidget(criteria_group, 0)
-
-        main_layout.addStretch(1)
 
         # Buttons at bottom
         buttons_layout = QHBoxLayout()
@@ -1099,8 +1088,7 @@ class SearchDialog(QDialog):
         buttons_layout.addWidget(self.cancel_btn)
         buttons_layout.addWidget(self.search_btn)
         
-        # Add spacing before buttons
-        main_layout.addSpacing(self.section_spacing)
+        main_layout.addSpacing(self.bottom_button_top_padding)
         main_layout.addLayout(buttons_layout)
         
         # Track criteria rows
@@ -1108,6 +1096,26 @@ class SearchDialog(QDialog):
         self.group_starts: List[int] = []  # Track which rows are group starts
         self.group_ends: List[int] = []  # Track which rows are group ends
         self.group_levels: Dict[int, int] = {}  # Track group nesting levels
+    
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout (floored by optional minimum_height)."""
+        w = int(self.dialog_width)
+        if self.dialog_minimum_width is not None:
+            w = max(w, int(self.dialog_minimum_width))
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
+            return
+        h = lay.sizeHint().height()
+        if h <= 0:
+            return
+        if self.dialog_minimum_height is not None:
+            h = max(h, int(self.dialog_minimum_height))
+        self.setFixedHeight(h)
+    
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        self._apply_configured_dialog_size()
     
     def _add_criterion_row(self, is_group_start: bool = False) -> None:
         """Add a new criterion row.

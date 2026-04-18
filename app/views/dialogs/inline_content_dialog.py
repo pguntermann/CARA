@@ -158,7 +158,7 @@ class InlineContentDialog(QDialog):
         )
         main_layout.addWidget(text_browser, 1)
 
-        main_layout.addSpacing(layout_config.get("button_section_top_margin", 15))
+        main_layout.addSpacing(int(dialog_config.get("bottom_button_top_padding", 50)))
         button_layout = QHBoxLayout()
         button_layout.setSpacing(buttons_config.get("spacing", 10))
         button_layout.addStretch()

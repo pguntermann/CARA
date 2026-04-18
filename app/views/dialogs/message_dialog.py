@@ -6,14 +6,18 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSizePolicy,
 )
-from PyQt6.QtGui import QPalette, QColor, QDesktopServices, QFont, QFontMetrics
+from PyQt6.QtGui import QPalette, QColor, QFont, QFontMetrics, QShowEvent
 from PyQt6.QtCore import Qt, QUrl
 import re
 from pathlib import Path
 from typing import Dict, Any, Literal
 import sys
 import subprocess
+
+from app.utils.font_utils import scale_font_size
+from app.views.style import StyleManager
 
 
 def _inject_rich_text_link_color(html: str, r: int, g: int, b: int) -> str:
@@ -70,11 +74,14 @@ class MessageDialog(QDialog):
         layout_margins_for_width = layout_config.get('margins', [15, 15, 15, 15])
         margin_h = layout_margins_for_width[0] + layout_margins_for_width[2]
         message_padding_for_width = message_config.get('padding', 5) * 2
-        min_width = dialog_config.get('width', 400)
-        max_width = dialog_config.get('max_width', 600)
-        # Compute width from message content (strip HTML, measure longest line)
-        from app.utils.font_utils import scale_font_size
-        msg_font_size = scale_font_size(message_config.get('font_size', 11))
+        min_width = dialog_config.get("width", 420)
+        max_width = dialog_config.get("max_width", 600)
+        self.bottom_button_top_padding = dialog_config.get("bottom_button_top_padding", 50)
+        self.dialog_minimum_height = dialog_config.get(
+            "minimum_height", dialog_config.get("height", 150)
+        )
+
+        msg_font_size = scale_font_size(message_config.get("font_size", 11))
         msg_font = QFont()
         msg_font.setPointSize(msg_font_size)
         fm = QFontMetrics(msg_font)
@@ -85,8 +92,8 @@ class MessageDialog(QDialog):
         content_w = 0
         for line in lines:
             content_w = max(content_w, fm.horizontalAdvance(line.strip()))
-        # Clamp to min/max and add padding
         dialog_width = max(min_width, min(max_width, content_w + margin_h + message_padding_for_width + 40))
+        self.dialog_width = dialog_width
         
         # Set dialog background color
         bg_color = dialog_config.get('background_color', [40, 40, 45])
@@ -101,11 +108,9 @@ class MessageDialog(QDialog):
         layout_margins = layout_config.get('margins', [15, 15, 15, 15])
         layout.setSpacing(layout_spacing)
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
-        
-        # Title
-        from app.utils.font_utils import scale_font_size
-        title_font_size = scale_font_size(title_config.get('font_size', 14))
-        title_padding = title_config.get('padding', 5)
+
+        title_font_size = scale_font_size(title_config.get("font_size", 14))
+        title_padding = title_config.get("padding", 5)
         # Get title text color from config, fallback to dialog text_color or default
         title_text_color = title_config.get('text_color', dialog_config.get('text_color', [240, 240, 240]))
         title_label = QLabel(f"<b>{title}</b>")
@@ -137,35 +142,33 @@ class MessageDialog(QDialog):
         message_label.setOpenExternalLinks(False)
         message_label.linkActivated.connect(self._on_link_activated)
         # Set minimum width to ensure proper word wrapping calculation
-        message_label.setMinimumWidth(dialog_width - layout_margins[0] - layout_margins[2] - (message_padding * 2))
+        message_label.setMinimumWidth(
+            self.dialog_width - layout_margins[0] - layout_margins[2] - (message_padding * 2)
+        )
         message_label.setStyleSheet(
             f"font-size: {message_font_size}pt; "
             f"padding: {message_padding}px; "
             f"color: rgb({message_text_color[0]}, {message_text_color[1]}, {message_text_color[2]});"
         )
         layout.addWidget(message_label)
-        
-        layout.addStretch(1)
-        
-        # Buttons
+
+        layout.addSpacing(self.bottom_button_top_padding)
+
         button_layout = QHBoxLayout()
         button_spacing = buttons_config.get('spacing', 10)
         button_layout.setSpacing(button_spacing)
         button_layout.addStretch()
         
-        # Apply button styling using StyleManager (uses unified config)
-        button_width = buttons_config.get('width', 120)
-        button_height = buttons_config.get('height', 30)
-        border_color = buttons_config.get('border_color', [60, 60, 65])
+        button_width = buttons_config.get("width", 120)
+        button_height = buttons_config.get("height", 30)
+        border_color = buttons_config.get("border_color", [60, 60, 65])
         bg_color_list = [bg_color[0], bg_color[1], bg_color[2]]
         border_color_list = [border_color[0], border_color[1], border_color[2]]
         
-        from app.views.style import StyleManager
         ok_button = QPushButton("OK")
         ok_button.clicked.connect(self.accept)
         button_layout.addWidget(ok_button)
         
-        # Style button using StyleManager
         StyleManager.style_buttons(
             [ok_button],
             self.config,
@@ -176,23 +179,30 @@ class MessageDialog(QDialog):
         )
         
         layout.addLayout(button_layout)
-        
-        # Let Qt calculate the natural size after layout is set up
-        # This accounts for DPI scaling automatically
-        self.setMinimumWidth(dialog_width)
-        self.adjustSize()
-        
-        # Ensure minimum height from config
-        min_height = dialog_config.get('height', 150)
-        if self.height() < min_height:
-            self.setMinimumHeight(min_height)
-            self.resize(self.width(), min_height)
-        # Fix size so the user cannot resize the dialog
-        self.setFixedSize(self.size())
-    
+
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        self._apply_configured_dialog_size()
+
+    def _apply_configured_dialog_size(self) -> None:
+        """Fixed width (content-based); height from layout (floored by optional minimum_height)."""
+        self.setFixedWidth(int(self.dialog_width))
+        lay = self.layout()
+        if lay is None:
+            return
+        h = lay.sizeHint().height()
+        if h <= 0:
+            return
+        if self.dialog_minimum_height is not None:
+            h = max(h, int(self.dialog_minimum_height))
+        self.setFixedHeight(h)
+
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        self._apply_configured_dialog_size()
+
     def _on_link_activated(self, link: str) -> None:
         """Handle link activation in message text.
-        
+
         Args:
             link: The link URL that was clicked.
         """

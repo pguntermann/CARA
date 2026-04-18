@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QFrame,
 )
 from PyQt6.QtCore import Qt, QSize, QTimer
-from PyQt6.QtGui import QFont, QFontMetrics, QIntValidator, QResizeEvent, QShowEvent, QMoveEvent, QWheelEvent
+from PyQt6.QtGui import QFont, QFontMetrics, QIntValidator, QShowEvent, QMoveEvent, QWheelEvent
 from pathlib import Path
 from html import escape
 from typing import Optional, Dict, Any, List
@@ -98,55 +98,39 @@ class EngineConfigurationDialog(QDialog):
         # Copy/Paste toolbar buttons (icon-only; styled separately from main actions)
         self._copy_paste_icon_buttons: List[QPushButton] = []
         
-        # Store fixed size - set it BEFORE layout is set up
-        # Read size from config, accounting for Windows frame margins
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('engine_configuration', {})
-        width = dialog_config.get('width', 600)
-        height = dialog_config.get('height', 792)  # Default: 800 - 8 (bottom frame margin)
-        self._fixed_size = QSize(width, height)
+        self.dialog_width = int(dialog_config.get('width', 600))
+        self.bottom_button_top_padding = int(dialog_config.get('bottom_button_top_padding', 50))
+        self.dialog_minimum_width = dialog_config.get('minimum_width')
+        self.dialog_minimum_height = dialog_config.get('minimum_height')
         
-        # Set fixed size BEFORE UI setup to prevent layout from requesting more space
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         
         self._setup_ui()
         self._apply_styling()
+        self._apply_configured_dialog_size()
         self.setWindowTitle(f"Engine Configuration - {engine.name}")
     
-    def showEvent(self, event: QShowEvent) -> None:
-        """Override show event to set fixed size after layout is calculated."""
-        super().showEvent(event)
-        # Re-enforce fixed size after dialog is shown
-        # The resizeEvent handler will catch and correct any resize attempts
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-        QTimer.singleShot(0, self._update_path_label_truncation)
-    
-    def sizeHint(self) -> QSize:
-        """Return the fixed size as the size hint to prevent layout from expanding."""
-        return self._fixed_size
-    
-    def minimumSizeHint(self) -> QSize:
-        """Return the fixed size as the minimum size hint."""
-        return self._fixed_size
-    
-    def resizeEvent(self, event: QResizeEvent) -> None:
-        """Override resize event to prevent resizing."""
-        if event.size() != self._fixed_size:
-            # Immediately restore fixed size using setGeometry to prevent layout expansion
-            event.ignore()
-            self.blockSignals(True)
-            current_pos = self.pos()
-            self.setGeometry(current_pos.x(), current_pos.y(), self._fixed_size.width(), self._fixed_size.height())
-            self.setFixedSize(self._fixed_size)
-            self.setMinimumSize(self._fixed_size)
-            self.setMaximumSize(self._fixed_size)
-            self.blockSignals(False)
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout size hint (floored by optional minimum_height)."""
+        w = int(self.dialog_width)
+        if self.dialog_minimum_width is not None:
+            w = max(w, int(self.dialog_minimum_width))
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
             return
-        event.accept()
+        h = lay.sizeHint().height()
+        if h <= 0:
+            return
+        if self.dialog_minimum_height is not None:
+            h = max(h, int(self.dialog_minimum_height))
+        self.setFixedHeight(h)
+    
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        self._apply_configured_dialog_size()
+        QTimer.singleShot(0, self._update_path_label_truncation)
     
     def moveEvent(self, event: QMoveEvent) -> None:
         """Override move event."""
@@ -164,7 +148,7 @@ class EngineConfigurationDialog(QDialog):
             layout_margins = dialog_config.get('layout', {}).get('margins', [10, 10, 10, 10])
             path_max_width_px = max(
                 80,
-                dialog_config.get('width', 600)
+                int(getattr(self, 'dialog_width', dialog_config.get('width', 600)))
                 - layout_margins[0]
                 - layout_margins[2]
                 - getattr(self, '_engine_path_lead_spacer', 0)
@@ -242,7 +226,7 @@ class EngineConfigurationDialog(QDialog):
 
         initial_path_max = max(
             80,
-            dialog_config.get('width', 600)
+            int(self.dialog_width)
             - layout_margins[0]
             - layout_margins[2]
             - spacer_w
@@ -269,7 +253,7 @@ class EngineConfigurationDialog(QDialog):
 
         layout.addWidget(self._engine_header_widget)
         
-        # Tab widget for tasks (vertical size = content; extra dialog height goes to stretch below)
+        # Tab widget for tasks (scroll areas use config-fixed heights; dialog height follows layout)
         self.tab_widget = QTabWidget()
         self.tab_widget.setDocumentMode(False)  # Disable document mode for better control
         self.tab_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
@@ -281,15 +265,8 @@ class EngineConfigurationDialog(QDialog):
         self._create_task_tab(self.TASK_BRILLIANCY_DETECTION, "Brilliancy Detection")
         
         layout.addWidget(self.tab_widget)
-        layout.addStretch(1)
         
-        button_row_spacing = layout_config.get('button_row_spacing', 20)
-        try:
-            button_row_spacing = int(button_row_spacing)
-        except (TypeError, ValueError):
-            button_row_spacing = 20
-        if button_row_spacing > 0:
-            layout.addSpacing(button_row_spacing)
+        layout.addSpacing(self.bottom_button_top_padding)
         
         # Buttons: Reset (bottom-left), then stretch, Cancel and Save (bottom-right)
         buttons_config = dialog_config.get('buttons', {})

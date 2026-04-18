@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QApplication,
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QShowEvent, QColor, QPalette, QPainter, QPen, QFont, QFontMetrics
 from typing import Optional, Dict, Any, Tuple
 
@@ -295,28 +295,39 @@ class ClassificationSettingsDialog(QDialog):
         self.default_thresholds = game_analysis_config.get("assessment_thresholds", {})
         self.default_brilliant = game_analysis_config.get("brilliant_criteria", {})
         
-        # Store fixed size - set it BEFORE layout is set up
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('classification_settings', {})
-        width = dialog_config.get('width', 600)
-        height = dialog_config.get('height', 700)
-        self._fixed_size = QSize(width, height)
+        self.dialog_width = int(dialog_config.get('width', 600))
+        self.bottom_button_top_padding = int(dialog_config.get('bottom_button_top_padding', 50))
+        self.dialog_minimum_width = dialog_config.get('minimum_width')
+        self.dialog_minimum_height = dialog_config.get('minimum_height')
         
-        # Set fixed size BEFORE UI setup
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         
         self._setup_ui()
         self._apply_styling()
+        self._apply_configured_dialog_size()
         self.setWindowTitle("Classification Settings")
     
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout size hint (floored by optional minimum_height)."""
+        w = int(self.dialog_width)
+        if self.dialog_minimum_width is not None:
+            w = max(w, int(self.dialog_minimum_width))
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
+            return
+        h = lay.sizeHint().height()
+        if h <= 0:
+            return
+        if self.dialog_minimum_height is not None:
+            h = max(h, int(self.dialog_minimum_height))
+        self.setFixedHeight(h)
+    
     def showEvent(self, event: QShowEvent) -> None:
-        """Handle show event to enforce fixed size and refresh values from model."""
+        """Refresh values from model when shown (e.g. if changed elsewhere)."""
         super().showEvent(event)
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
+        self._apply_configured_dialog_size()
         
         # Refresh values from model in case they were changed elsewhere
         classification_model = self.classification_controller.get_classification_model()
@@ -336,10 +347,6 @@ class ClassificationSettingsDialog(QDialog):
         
         # Update CPL scale
         self._update_cpl_scale()
-    
-    def sizeHint(self) -> QSize:
-        """Return the fixed size as the size hint."""
-        return self._fixed_size
     
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
@@ -371,8 +378,6 @@ class ClassificationSettingsDialog(QDialog):
         brilliant_group = self._create_brilliant_group()
         layout.addWidget(brilliant_group)
         
-        layout.addStretch()
-        
         # Buttons
         button_layout = QHBoxLayout()
         button_spacing = buttons_config.get('spacing', 10)
@@ -392,6 +397,7 @@ class ClassificationSettingsDialog(QDialog):
         self.save_button.clicked.connect(self._on_save)
         button_layout.addWidget(self.save_button)
         
+        layout.addSpacing(self.bottom_button_top_padding)
         layout.addLayout(button_layout)
     
     def _create_thresholds_group(self) -> QGroupBox:

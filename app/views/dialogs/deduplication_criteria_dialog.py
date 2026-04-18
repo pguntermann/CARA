@@ -11,8 +11,8 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QSizePolicy,
 )
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QColor, QPalette, QShowEvent
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QPalette, QShowEvent, QResizeEvent
 from typing import Dict, Any, Optional, Tuple, List
 from enum import Enum
 
@@ -43,6 +43,8 @@ class DeduplicationCriteriaDialog(QDialog):
         # Load config
         self._load_config()
         
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        
         # Setup UI
         self._setup_ui()
         
@@ -61,9 +63,8 @@ class DeduplicationCriteriaDialog(QDialog):
         """Load configuration values from config.json."""
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('deduplication_criteria', {})
         
-        # Dialog dimensions
         self.dialog_width = dialog_config.get('width', 600)
-        self.dialog_height = dialog_config.get('height', 450)
+        self.bottom_button_top_padding = dialog_config.get('bottom_button_top_padding', 50)
         
         # Background and colors
         self.bg_color = dialog_config.get('background_color', [40, 40, 45])
@@ -159,9 +160,6 @@ class DeduplicationCriteriaDialog(QDialog):
     
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
-        # Set dialog size (fixed, non-resizable)
-        self.setFixedSize(self.dialog_width, self.dialog_height)
-        
         # Set background color
         self.setAutoFillBackground(True)
         palette = self.palette()
@@ -194,7 +192,7 @@ class DeduplicationCriteriaDialog(QDialog):
         self.description_label = QLabel()
         self.description_label.setWordWrap(True)
         self.description_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        # Without a max height, a wrapped QLabel expands to fill extra space inside the group box.
+        # Preferred height from wrapped text; do not clamp with setMaximumHeight (breaks wrapping/margins).
         self.description_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         mode_group_layout.addWidget(self.description_label)
         mode_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
@@ -226,9 +224,6 @@ class DeduplicationCriteriaDialog(QDialog):
         self.customization_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         layout.addWidget(self.customization_group, 0)
 
-        # Extra dialog height goes here (not into stretching the group boxes)
-        layout.addStretch(1)
-
         # Buttons
         button_layout = QHBoxLayout()
         button_layout.setSpacing(self.button_spacing)
@@ -246,38 +241,27 @@ class DeduplicationCriteriaDialog(QDialog):
         self.ok_button.clicked.connect(self._on_ok_clicked)
         button_layout.addWidget(self.ok_button)
         
-        # Add spacing before buttons
-        layout.addSpacing(self.section_spacing)
+        layout.addSpacing(self.bottom_button_top_padding)
         layout.addLayout(button_layout)
 
-    def _description_label_effective_width(self) -> int:
-        """Width available for wrapping the mode description (before label has a real geometry)."""
-        try:
-            m = self.layout().contentsMargins()
-            g = self.group_content_margins
-            return max(1, self.width() - m.left() - m.right() - int(g[0]) - int(g[2]) - 4)
-        except Exception:
-            return max(1, int(self.dialog_width) - 48)
-
-    def _sync_description_label_height(self) -> None:
-        """Keep the wrapped description label from expanding vertically inside the group box."""
-        lbl = self.description_label
-        if not lbl.text().strip():
-            lbl.setMaximumHeight(16777215)
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout size hint (content-driven)."""
+        w = int(self.dialog_width)
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
             return
-        w = lbl.width()
-        if w < 2:
-            w = self._description_label_effective_width()
-        h = lbl.heightForWidth(max(1, w))
-        lbl.setMaximumHeight(max(1, h))
+        h = lay.sizeHint().height()
+        if h > 0:
+            self.setFixedHeight(h)
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
-        QTimer.singleShot(0, self._sync_description_label_height)
+        self._apply_configured_dialog_size()
 
-    def resizeEvent(self, event) -> None:
+    def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
-        self._sync_description_label_height()
+        self._apply_configured_dialog_size()
 
     def _apply_styling(self) -> None:
         """Apply styling from config.json to all UI elements."""
@@ -438,10 +422,12 @@ class DeduplicationCriteriaDialog(QDialog):
         # Update description
         description = self.mode_descriptions.get(current_value, '')
         self.description_label.setText(description)
-        self._sync_description_label_height()
 
         # Show/hide customization area based on mode
-        self.customization_group.setVisible(current_value == "header_based")
+        show_headers = current_value == "header_based"
+        self.customization_group.setVisible(show_headers)
+        self.customization_group.updateGeometry()
+        self._apply_configured_dialog_size()
     
     def _on_ok_clicked(self) -> None:
         """Handle OK button click."""

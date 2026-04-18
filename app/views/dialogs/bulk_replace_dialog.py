@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QFrame,
 )
-from PyQt6.QtCore import Qt, QSize, QTimer
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent, QFontMetrics, QResizeEvent
 from typing import Optional, Dict, Any, List
 
@@ -49,17 +49,7 @@ class BulkReplaceDialog(QDialog):
         self.database = database
         self.selected_game_indices = selected_game_indices if selected_game_indices else []
         
-        # Store fixed size
-        dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_replace', {})
-        width = dialog_config.get('width', 600)
-        height = dialog_config.get('height', 680)
-        self._fixed_size = QSize(width, height)
-        
-        # Set fixed size
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         
         # Track operation state
         self._operation_in_progress = False
@@ -67,15 +57,15 @@ class BulkReplaceDialog(QDialog):
         self._load_config()
         self._setup_ui()
         self._apply_styling()
+        # After styling, layout may invalidate; apply size once loaded UI + styles are stable
+        self._apply_configured_dialog_size()
         self.setWindowTitle("Bulk Replace")
     
     def _load_config(self) -> None:
         """Load configuration values from config.json."""
         dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("bulk_replace", {})
         
-        # Dialog dimensions
         self.dialog_width = dialog_config.get("width", 600)
-        self.dialog_height = dialog_config.get("height", 900)
         
         # Background color
         bg_color = dialog_config.get("background_color", [40, 40, 45])
@@ -102,6 +92,7 @@ class BulkReplaceDialog(QDialog):
         self.form_spacing = spacing_config.get("form", 15)
         self.options_spacing = spacing_config.get("options", 22)
         self.result_spacing = spacing_config.get("result", 8)
+        self.bottom_button_top_padding = dialog_config.get("bottom_button_top_padding", 50)
         
         # Buttons
         buttons_config = dialog_config.get("buttons", {})
@@ -316,6 +307,7 @@ class BulkReplaceDialog(QDialog):
         
         # PGN header tag replacement group
         replace_group = QGroupBox("PGN header tag replacement")
+        self.replace_group = replace_group
         replace_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         replace_layout = QFormLayout()
         replace_layout.setSpacing(self.form_spacing)
@@ -482,11 +474,9 @@ class BulkReplaceDialog(QDialog):
         self.source_tag_combo.setMinimumWidth(self.input_minimum_width)
         self.source_tag_combo.setMinimumHeight(self.input_minimum_height)
         self.source_tag_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.source_tag_combo.setVisible(False)
         source_tag_label = QLabel("Source tag:")
         source_tag_label.setFont(QFont(self.label_font_family, self.label_font_size))
         source_tag_label.setMinimumWidth(label_min_width)
-        source_tag_label.setVisible(False)
         replace_layout.addRow(source_tag_label, self.source_tag_combo)
         self.source_tag_label = source_tag_label
         
@@ -530,6 +520,16 @@ class BulkReplaceDialog(QDialog):
         self.options_label.setMinimumWidth(label_min_width)
         replace_layout.addRow(self.options_label, options_layout)
         self.options_layout = options_layout
+
+        self._replace_form_layout = replace_layout
+        # Row indices for QFormLayout.setRowVisible (addRow order): 0=tags, 1=mode, 2=source, 3=find,
+        # 4=replace, 5=spacer, 6=options
+        self._form_row_source_tag = 2
+        self._form_row_find = 3
+        self._form_row_replace = 4
+        self._form_row_spacer_before_options = 5
+        self._form_row_options = 6
+        replace_layout.setRowVisible(self._form_row_source_tag, False)
         
         replace_group.setLayout(replace_layout)
         main_layout.addWidget(replace_group)
@@ -557,9 +557,6 @@ class BulkReplaceDialog(QDialog):
         smart_update_group.setLayout(smart_update_layout)
         main_layout.addWidget(smart_update_group)
         
-        # Absorb extra height when the window is taller than content (avoids stretching group boxes on macOS)
-        main_layout.addStretch(1)
-        
         # Buttons
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(self.button_spacing)
@@ -573,8 +570,23 @@ class BulkReplaceDialog(QDialog):
         buttons_layout.addWidget(self.apply_button)
         
         # Add spacing before buttons
-        main_layout.addSpacing(self.section_spacing)
+        main_layout.addSpacing(self.bottom_button_top_padding)
         main_layout.addLayout(buttons_layout)
+
+        # Do not use QLayout.SetFixedSize: it re-applies whenever the layout invalidates (e.g. after
+        # _apply_styling) and forces both axes to the layout size hint, ignoring config width.
+        # Height is set in _apply_configured_dialog_size from the layout hint.
+    
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout size hint (content-driven, no SetFixedSize)."""
+        w = int(self.dialog_width)
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
+            return
+        h = lay.sizeHint().height()
+        if h > 0:
+            self.setFixedHeight(h)
     
     def _apply_styling(self) -> None:
         """Apply styling from config.json."""
@@ -803,14 +815,9 @@ class BulkReplaceDialog(QDialog):
     def showEvent(self, event: QShowEvent) -> None:
         """Override showEvent to ensure checkbox styling is applied when dialog is shown."""
         super().showEvent(event)
-        
-        # Re-enforce fixed size after dialog is shown (prevents resizing in PyInstaller bundles)
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-        
-        # Truncate path using label's actual width and font (DPI-aware) after layout
-        QTimer.singleShot(0, self._update_path_label_truncation)
+        self._apply_configured_dialog_size()
+
+        self._update_path_label_truncation()
         
         # Update source tag combo with available tags
         available_tags = self._get_available_tags()
@@ -825,10 +832,9 @@ class BulkReplaceDialog(QDialog):
         
         # Reapply checkbox styling to fix any truncation issues
         self._apply_checkbox_styling()
-        
-        # Update tags widget size after dialog is shown to ensure proper scrolling
-        if hasattr(self, '_tags_widget') and hasattr(self, '_tags_scroll_area'):
-            QTimer.singleShot(0, self._update_tags_widget_size)
+
+        self._update_tags_widget_size()
+        self._apply_configured_dialog_size()
     
     def _update_path_label_truncation(self) -> None:
         """Re-truncate path and name using actual width and font (DPI-aware)."""
@@ -858,11 +864,8 @@ class BulkReplaceDialog(QDialog):
         # Force layout update
         self._tags_widget.updateGeometry()
         
-        # Get viewport width
         viewport_width = self._tags_scroll_area.viewport().width()
         if viewport_width <= 0:
-            # Try again after a short delay if viewport not ready
-            QTimer.singleShot(50, self._update_tags_widget_size)
             return
         
         # Get content height from size hint
@@ -873,22 +876,20 @@ class BulkReplaceDialog(QDialog):
     
     def _on_copy_mode_toggled(self, checked: bool) -> None:
         """Handle copy mode checkbox toggle."""
-        # Show/hide source tag dropdown
-        self.source_tag_combo.setVisible(checked)
-        self.source_tag_label.setVisible(checked)
-        
-        # Hide/show Find/Replace fields and options
-        self.find_input.setVisible(not checked)
-        self.find_label.setVisible(not checked)
-        self.replace_input.setVisible(not checked)
-        self.replace_label.setVisible(not checked)
-        self.options_label.setVisible(not checked)
-        self.case_sensitive_check.setVisible(not checked)
-        self.regex_check.setVisible(not checked)
+        # Collapse whole form rows (setVisible on widgets alone leaves empty gaps in QFormLayout).
+        form = self._replace_form_layout
+        form.setRowVisible(self._form_row_source_tag, checked)
+        form.setRowVisible(self._form_row_find, not checked)
+        form.setRowVisible(self._form_row_replace, not checked)
+        form.setRowVisible(self._form_row_spacer_before_options, not checked)
+        form.setRowVisible(self._form_row_options, not checked)
+
         self.overwrite_all_check.setVisible(not checked)
         
         # Update label for tags
         self.tag_label.setText("Target tags:" if checked else "Tags:")
+        self.replace_group.updateGeometry()
+        self._apply_configured_dialog_size()
     
     def _on_select_all_clicked(self) -> None:
         """Handle Select All button click."""
@@ -1025,21 +1026,11 @@ class BulkReplaceDialog(QDialog):
         self.apply_button.setEnabled(enabled)
         self.cancel_button.setEnabled(enabled)
     
-    def sizeHint(self) -> QSize:
-        """Return the fixed size as the size hint."""
-        return self._fixed_size
-    
     def resizeEvent(self, event: QResizeEvent) -> None:
-        """Handle resize event to prevent resizing."""
+        """Keep path and tags grid aligned with the laid-out width (no deferred sizing)."""
         super().resizeEvent(event)
-        if event.size() != self._fixed_size:
-            self.blockSignals(True)
-            current_pos = self.pos()
-            self.setGeometry(current_pos.x(), current_pos.y(), self._fixed_size.width(), self._fixed_size.height())
-            self.setFixedSize(self._fixed_size)
-            self.setMinimumSize(self._fixed_size)
-            self.setMaximumSize(self._fixed_size)
-            self.blockSignals(False)
+        self._update_path_label_truncation()
+        self._update_tags_widget_size()
     
     def _show_success_dialog(self, title: str, message: str) -> None:
         """Show a styled success dialog.

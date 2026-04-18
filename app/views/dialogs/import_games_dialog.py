@@ -18,8 +18,8 @@ from PyQt6.QtWidgets import (
     QSpinBox,
     QCheckBox,
 )
-from PyQt6.QtCore import Qt, QSize, QDate
-from PyQt6.QtGui import QPalette, QColor, QFont
+from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 
@@ -52,17 +52,18 @@ class ImportGamesDialog(QDialog):
         self.active_database = active_database
         
         self._load_config()
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         self._setup_ui()
         self._apply_styling()
+        self._apply_configured_dialog_size()
         self.setWindowTitle("Import Games from Online")
     
     def _load_config(self) -> None:
         """Load configuration values from config.json."""
         dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("import_games", {})
         
-        # Dialog dimensions
         self.dialog_width = dialog_config.get("width", 550)
-        self.dialog_height = dialog_config.get("height", 600)
+        self.bottom_button_top_padding = dialog_config.get("bottom_button_top_padding", 50)
         
         # Background color
         bg_color = dialog_config.get("background_color", [40, 40, 45])
@@ -150,9 +151,6 @@ class ImportGamesDialog(QDialog):
 
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
-        # Set fixed size
-        self.setFixedSize(self.dialog_width, self.dialog_height)
-        
         # Set background color
         self.setAutoFillBackground(True)
         palette = self.palette()
@@ -324,8 +322,6 @@ class ImportGamesDialog(QDialog):
         filters_group.setLayout(filters_layout)
         main_layout.addWidget(filters_group)
         
-        main_layout.addStretch()
-        
         # Buttons
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(self.button_spacing)
@@ -339,9 +335,23 @@ class ImportGamesDialog(QDialog):
         buttons_layout.addWidget(self.cancel_button)
         buttons_layout.addWidget(self.import_button)
         
-        # Add spacing before buttons
-        main_layout.addSpacing(self.section_spacing)
+        main_layout.addSpacing(self.bottom_button_top_padding)
         main_layout.addLayout(buttons_layout)
+    
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout size hint (content-driven)."""
+        w = int(self.dialog_width)
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
+            return
+        h = lay.sizeHint().height()
+        if h > 0:
+            self.setFixedHeight(h)
+    
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        self._apply_configured_dialog_size()
     
     def _on_platform_changed(self, platform: str) -> None:
         """Handle platform selection change."""

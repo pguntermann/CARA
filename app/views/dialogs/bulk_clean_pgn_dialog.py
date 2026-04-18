@@ -12,8 +12,8 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QWidget,
 )
-from PyQt6.QtCore import Qt, QSize, QTimer
-from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent, QResizeEvent
 from typing import Optional, Dict, Any
 
 from app.controllers.bulk_clean_pgn_controller import BulkCleanPgnController
@@ -40,33 +40,24 @@ class BulkCleanPgnDialog(QDialog):
         self.controller = bulk_clean_pgn_controller
         self.database = database
         
-        # Store fixed size
-        dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_clean_pgn', {})
-        width = dialog_config.get('width', 500)
-        height = dialog_config.get('height', 400)
-        self._fixed_size = QSize(width, height)
-        
-        # Set fixed size
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        
         # Track operation state
         self._operation_in_progress = False
         
         self._load_config()
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         self._setup_ui()
         self._apply_styling()
+        self._apply_configured_dialog_size()
         self.setWindowTitle("Bulk Clean PGN")
     
     def _load_config(self) -> None:
         """Load configuration values from config.json."""
         dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("bulk_clean_pgn", {})
         
-        # Dialog dimensions
         self.dialog_width = dialog_config.get("width", 500)
-        self.dialog_height = dialog_config.get("height", 400)
+        self.dialog_minimum_width = dialog_config.get("minimum_width")
+        self.dialog_minimum_height = dialog_config.get("minimum_height")
+        self.bottom_button_top_padding = dialog_config.get("bottom_button_top_padding", 50)
         
         # Background color
         bg_color = dialog_config.get("background_color", [40, 40, 45])
@@ -297,8 +288,6 @@ class BulkCleanPgnDialog(QDialog):
         options_group.layout().addWidget(options_container)
         main_layout.addWidget(options_group)
         
-        main_layout.addStretch()
-        
         # Buttons
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(self.button_spacing)
@@ -311,9 +300,24 @@ class BulkCleanPgnDialog(QDialog):
         buttons_layout.addWidget(self.cancel_button)
         buttons_layout.addWidget(self.apply_button)
         
-        # Add spacing before buttons
-        main_layout.addSpacing(self.section_spacing)
+        main_layout.addSpacing(self.bottom_button_top_padding)
         main_layout.addLayout(buttons_layout)
+    
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout size hint (floored by optional minimum_height)."""
+        w = int(self.dialog_width)
+        if self.dialog_minimum_width is not None:
+            w = max(w, int(self.dialog_minimum_width))
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
+            return
+        h = lay.sizeHint().height()
+        if h <= 0:
+            return
+        if self.dialog_minimum_height is not None:
+            h = max(h, int(self.dialog_minimum_height))
+        self.setFixedHeight(h)
     
     def _apply_styling(self) -> None:
         """Apply styling from config.json."""
@@ -416,7 +420,13 @@ class BulkCleanPgnDialog(QDialog):
     def showEvent(self, event: QShowEvent) -> None:
         """Override showEvent to run path truncation with actual label size (DPI-aware)."""
         super().showEvent(event)
-        QTimer.singleShot(0, self._update_path_label_truncation)
+        self._apply_configured_dialog_size()
+        self._update_path_label_truncation()
+        self._apply_configured_dialog_size()
+    
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._update_path_label_truncation()
     
     def _update_path_label_truncation(self) -> None:
         """Re-truncate path and name using actual width and font (DPI-aware)."""

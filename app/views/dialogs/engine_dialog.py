@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QGroupBox,
 )
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QResizeEvent, QShowEvent, QPalette, QColor
+from PyQt6.QtGui import QShowEvent, QPalette, QColor
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 
@@ -50,52 +50,38 @@ class EngineDialog(QDialog):
         self.engine_author: str = ""
         self.engine_version: str = ""
         
-        # Store fixed size - set it BEFORE layout is set up
-        # Read size from config, accounting for Windows frame margins
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('engine_dialog', {})
-        width = dialog_config.get('width', 600)
-        height = dialog_config.get('height', 400)
-        self._fixed_size = QSize(width, height)
+        self.dialog_width = int(dialog_config.get('width', 600))
+        self.bottom_button_top_padding = int(dialog_config.get('bottom_button_top_padding', 50))
+        self.dialog_minimum_width = dialog_config.get('minimum_width')
+        self.dialog_minimum_height = dialog_config.get('minimum_height')
         
-        # Set fixed size BEFORE UI setup to prevent layout from requesting more space
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         
         self._setup_ui()
         self._apply_styling()
+        self._apply_configured_dialog_size()
         self.setWindowTitle("Add UCI Engine")
     
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout size hint (floored by optional minimum_height)."""
+        w = int(self.dialog_width)
+        if self.dialog_minimum_width is not None:
+            w = max(w, int(self.dialog_minimum_width))
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
+            return
+        h = lay.sizeHint().height()
+        if h <= 0:
+            return
+        if self.dialog_minimum_height is not None:
+            h = max(h, int(self.dialog_minimum_height))
+        self.setFixedHeight(h)
+    
     def showEvent(self, event: QShowEvent) -> None:
-        """Handle show event to enforce fixed size."""
         super().showEvent(event)
-        # Re-enforce fixed size after dialog is shown
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-    
-    def sizeHint(self) -> QSize:
-        """Return the fixed size as the size hint."""
-        return self._fixed_size
-    
-    def minimumSizeHint(self) -> QSize:
-        """Return the fixed size as the minimum size hint."""
-        return self._fixed_size
-    
-    def resizeEvent(self, event: QResizeEvent) -> None:
-        """Handle resize event to prevent resizing."""
-        super().resizeEvent(event)
-        # If size changed, immediately restore fixed size
-        if event.size() != self._fixed_size:
-            # Block signals temporarily to prevent recursion
-            self.blockSignals(True)
-            current_pos = self.pos()
-            self.setGeometry(current_pos.x(), current_pos.y(), self._fixed_size.width(), self._fixed_size.height())
-            self.setFixedSize(self._fixed_size)
-            self.setMinimumSize(self._fixed_size)
-            self.setMaximumSize(self._fixed_size)
-            self.blockSignals(False)
+        self._apply_configured_dialog_size()
     
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
@@ -203,9 +189,6 @@ class EngineDialog(QDialog):
         
         layout.addWidget(engine_info_group)
         
-        # Absorb extra height so the button row stays on the window bottom (same as Bulk Replace)
-        layout.addStretch(1)
-        
         # Buttons: Validate (bottom-left), stretch, Cancel and Add (bottom-right)
         button_layout = QHBoxLayout()
         button_spacing = buttons_config.get('spacing', 10)
@@ -227,8 +210,7 @@ class EngineDialog(QDialog):
         self.add_button.clicked.connect(self._add_engine)
         button_layout.addWidget(self.add_button)
         
-        # Add spacing before buttons
-        layout.addSpacing(layout_spacing)
+        layout.addSpacing(self.bottom_button_top_padding)
         layout.addLayout(button_layout)
         
         # Connect path input changes

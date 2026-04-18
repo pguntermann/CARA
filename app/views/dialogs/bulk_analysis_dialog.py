@@ -16,8 +16,8 @@ from PyQt6.QtWidgets import (
     QApplication,
     QSpinBox,
 )
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QPalette, QColor, QShowEvent, QResizeEvent
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPalette, QColor, QShowEvent
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 import os
@@ -49,49 +49,39 @@ class BulkAnalysisDialog(QDialog):
         self.controller.game_analyzed.connect(self._on_game_analyzed)
         self.controller.finished.connect(self._on_analysis_finished)
         
-        # Store fixed size
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {})
-        width = dialog_config.get('width', 550)
-        height = dialog_config.get('height', 400)
-        self._fixed_size = QSize(width, height)
+        self.dialog_width = int(dialog_config.get('width', 550))
+        self.bottom_button_top_padding = int(dialog_config.get('bottom_button_top_padding', 50))
+        self.dialog_minimum_width = dialog_config.get('minimum_width')
+        self.dialog_minimum_height = dialog_config.get('minimum_height')
         
-        # Set fixed size
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         
         self._setup_ui()
         self._apply_styling()
+        self._apply_configured_dialog_size()
         self.setWindowTitle("Bulk Analyze Database")
         self.setModal(True)
     
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout size hint (floored by optional minimum_height)."""
+        w = int(self.dialog_width)
+        if self.dialog_minimum_width is not None:
+            w = max(w, int(self.dialog_minimum_width))
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
+            return
+        h = lay.sizeHint().height()
+        if h <= 0:
+            return
+        if self.dialog_minimum_height is not None:
+            h = max(h, int(self.dialog_minimum_height))
+        self.setFixedHeight(h)
+    
     def showEvent(self, event: QShowEvent) -> None:
-        """Handle show event to enforce fixed size."""
         super().showEvent(event)
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-    
-    def sizeHint(self) -> QSize:
-        """Return the fixed size as the size hint."""
-        return self._fixed_size
-    
-    def minimumSizeHint(self) -> QSize:
-        """Return the fixed size as the minimum size hint."""
-        return self._fixed_size
-    
-    def resizeEvent(self, event: QResizeEvent) -> None:
-        """Handle resize event to prevent resizing."""
-        super().resizeEvent(event)
-        if event.size() != self._fixed_size:
-            self.blockSignals(True)
-            current_pos = self.pos()
-            self.setGeometry(current_pos.x(), current_pos.y(), self._fixed_size.width(), self._fixed_size.height())
-            self.setFixedSize(self._fixed_size)
-            self.setMinimumSize(self._fixed_size)
-            self.setMaximumSize(self._fixed_size)
-            self.blockSignals(False)
+        self._apply_configured_dialog_size()
     
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
@@ -320,9 +310,6 @@ class BulkAnalysisDialog(QDialog):
         
         layout.addWidget(self.progress_group)
         
-        # Absorb extra height when the window is taller than content (avoids stretching group boxes on macOS)
-        layout.addStretch(1)
-        
         # Buttons
         button_layout = QHBoxLayout()
         buttons_config = dialog_config.get('buttons', {})
@@ -337,8 +324,7 @@ class BulkAnalysisDialog(QDialog):
         button_layout.addWidget(self.cancel_button)
         button_layout.addWidget(self.start_button)
         
-        # Add spacing before buttons
-        layout.addSpacing(section_spacing)
+        layout.addSpacing(self.bottom_button_top_padding)
         layout.addLayout(button_layout)
         
         # Initialize parallel games limit based on current selection

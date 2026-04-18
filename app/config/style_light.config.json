@@ -2185,7 +2185,7 @@
     "dialogs": {
       "manage_game_tags": {
         "width": 600,
-        "height": 480,
+        "bottom_button_top_padding": 50,
         "scroll_area_height": 120,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
@@ -2277,7 +2277,7 @@
       },
       "classification_settings": {
         "width": 480,
-        "height": 685,
+        "bottom_button_top_padding": 50,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -2366,7 +2366,7 @@
       },
       "ai_model_settings": {
         "width": 600,
-        "height": 716,
+        "bottom_button_top_padding": 50,
         "form_label_min_width": 180,
         "password_reveal_icon_tint_color": {
           "$ref": "$_COLOR_BUTTON_ACTIVE_BACKGROUND"
@@ -2460,7 +2460,7 @@
       },
       "engine_configuration": {
         "width": 620,
-        "height": 740,
+        "bottom_button_top_padding": 50,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -2470,8 +2470,7 @@
         "layout": {
           "spacing": 10,
           "margins": [25, 25, 25, 25],
-          "spacing_after_header": 8,
-          "button_row_spacing": 20
+          "spacing_after_header": 8
         },
         "tabs_layout": {
           "spacing": 10,
@@ -2724,7 +2723,7 @@
       },
       "engine_dialog": {
         "width": 550,
-        "height": 400,
+        "bottom_button_top_padding": 50,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -2808,7 +2807,7 @@
       },
       "bulk_replace": {
         "width": 600,
-        "height": 830,
+        "bottom_button_top_padding": 50,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -2902,7 +2901,7 @@
           "background_color": {
             "$ref": "$_COLOR_BACKGROUND_3"
           },
-          "height": 160,
+          "height": 120,
           "columns": 2,
           "spacing": 8,
           "row_spacing": 4,
@@ -2917,7 +2916,7 @@
       },
       "bulk_tag": {
         "width": 600,
-        "height": 550,
+        "bottom_button_top_padding": 50,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -3013,7 +3012,7 @@
       },
       "move_comment": {
         "width": 500,
-        "height": 430,
+        "bottom_button_top_padding": 50,
         "minimum_width": 440,
         "minimum_height": 370,
         "background_color": {
@@ -3037,8 +3036,7 @@
         },
         "spacing": {
           "section": 15,
-          "form": 6,
-          "before_buttons": 20
+          "form": 6
         },
         "buttons": {
           "spacing": 10,
@@ -3088,13 +3086,13 @@
           }
         },
         "text_edits": {
-          "minimum_height": 80,
+          "minimum_height": 96,
           "side_inset": 10
         }
       },
       "search": {
         "width": 800,
-        "height": 580,
+        "bottom_button_top_padding": 50,
         "scroll_area_height": 250,
         "minimum_width": 700,
         "minimum_height": 500,
@@ -3194,7 +3192,7 @@
       },
       "import_games": {
         "width": 550,
-        "height": 650,
+        "bottom_button_top_padding": 50,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -3283,7 +3281,7 @@
       },
       "bulk_analysis_dialog": {
         "width": 600,
-        "height": 500,
+        "bottom_button_top_padding": 50,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -3383,7 +3381,7 @@
       },
       "bulk_clean_pgn": {
         "width": 650,
-        "height": 362,
+        "bottom_button_top_padding": 50,
         "minimum_width": 600,
         "minimum_height": 300,
         "background_color": {
@@ -3475,8 +3473,9 @@
         }
       },
       "confirmation_dialog": {
-        "width": 400,
-        "height": 150,
+        "width": 420,
+        "bottom_button_top_padding": 50,
+        "minimum_height": 150,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -3517,9 +3516,10 @@
         }
       },
       "message_dialog": {
-        "width": 400,
+        "width": 420,
         "max_width": 600,
-        "height": 150,
+        "bottom_button_top_padding": 50,
+        "minimum_height": 150,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -3563,8 +3563,9 @@
         }
       },
       "input_dialog": {
-        "width": 400,
-        "height": 220,
+        "width": 420,
+        "bottom_button_top_padding": 50,
+        "minimum_height": 220,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -3626,8 +3627,8 @@
         }
       },
       "add_tag_dialog": {
-        "width": 440,
-        "height": 220,
+        "width": 420,
+        "bottom_button_top_padding": 50,
         "minimum_width": 380,
         "minimum_height": 180,
         "background_color": {
@@ -3639,7 +3640,6 @@
         "layout": {
           "spacing": 10,
           "margins": [25, 25, 25, 25],
-          "button_row_spacing": 20,
           "form_horizontal_spacing": 14,
           "form_vertical_spacing": 12
         },
@@ -3697,7 +3697,7 @@
       },
       "annotation_preferences": {
         "width": 520,
-        "height": 372,
+        "bottom_button_top_padding": 50,
         "minimum_width": 480,
         "minimum_height": 340,
         "background_color": {
@@ -3715,8 +3715,7 @@
         "layout": {
           "spacing": 10,
           "margins": [25, 25, 25, 25],
-          "section_spacing": 15,
-          "button_row_spacing": 20
+          "section_spacing": 15
         },
         "buttons": {
           "spacing": 10,
@@ -3788,7 +3787,7 @@
       },
       "deduplication_criteria": {
         "width": 600,
-        "height": 480,
+        "bottom_button_top_padding": 50,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -3876,7 +3875,7 @@
       },
       "about_dialog": {
         "width": 550,
-        "height": 460,
+        "bottom_button_top_padding": 50,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -3884,9 +3883,7 @@
           "spacing": 12,
           "margins": [30, 30, 30, 20],
           "icon_text_gap": 25,
-          "text_element_spacing": 10,
-          "button_section_top_margin": 12,
-          "button_row_spacing": 20
+          "text_element_spacing": 10
         },
         "app_name": {
           "font_family": {
@@ -3993,6 +3990,7 @@
         "height": 500,
         "minimum_width": 500,
         "minimum_height": 400,
+        "bottom_button_top_padding": 50,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -4001,8 +3999,7 @@
         },
         "layout": {
           "spacing": 15,
-          "margins": [20, 20, 20, 20],
-          "button_section_top_margin": 15
+          "margins": [20, 20, 20, 20]
         },
         "content": {
           "font_family": {
@@ -4095,6 +4092,7 @@
         "height": 600,
         "minimum_width": 600,
         "minimum_height": 400,
+        "bottom_button_top_padding": 50,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -4110,7 +4108,6 @@
         "layout": {
           "spacing": 10,
           "margins": [25, 25, 25, 25],
-          "button_row_spacing": 40,
           "scroll_area_margins": [10, 10, 10, 10],
           "scroll_layout_spacing": 10,
           "left_panel_width": 250,

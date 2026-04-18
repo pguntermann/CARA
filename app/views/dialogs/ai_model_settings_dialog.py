@@ -8,16 +8,14 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QComboBox,
     QPushButton,
-    QScrollArea,
     QGroupBox,
     QFormLayout,
     QSizePolicy,
     QWidget,
-    QFrame,
     QCheckBox,
     QSpinBox,
 )
-from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QShowEvent, QPalette, QColor, QAction, QIcon
 from typing import Dict, Any, Optional, List
 from pathlib import Path
@@ -90,18 +88,6 @@ class AIModelSettingsDialog(QDialog):
             "custom": list(self.current_settings.get("custom", {}).get("models", []))
         }
         
-        # Store fixed size - set it BEFORE layout is set up
-        dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('ai_model_settings', {})
-        width = dialog_config.get('width', 600)
-        height = dialog_config.get('height', 400)
-        self._fixed_size = QSize(width, height)
-        
-        # Set fixed size BEFORE UI setup
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        
         # Initialize discovery service
         from app.services.ai_model_discovery_service import AIModelDiscoveryService
         self.discovery_service = AIModelDiscoveryService(self.config)
@@ -125,8 +111,11 @@ class AIModelSettingsDialog(QDialog):
         # Load config values
         self._load_config()
         
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        
         self._setup_ui()
         self._apply_styling()
+        self._apply_configured_dialog_size()
         self.setWindowTitle("AI Model Settings")
     
     def _load_config(self) -> None:
@@ -134,8 +123,10 @@ class AIModelSettingsDialog(QDialog):
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('ai_model_settings', {})
         
         # Dialog dimensions
-        self.dialog_width = dialog_config.get('width', 600)
-        self.dialog_height = dialog_config.get('height', 500)
+        self.dialog_width = int(dialog_config.get('width', 600))
+        self.bottom_button_top_padding = int(dialog_config.get('bottom_button_top_padding', 50))
+        self.dialog_minimum_width = dialog_config.get('minimum_width')
+        self.dialog_minimum_height = dialog_config.get('minimum_height')
         self.default_custom_base_url = dialog_config.get('default_custom_base_url', 'http://localhost:1234/v1')
         # Minimum width for form labels so input fields align across all groups (pixels).
         self.form_label_min_width = dialog_config.get('form_label_min_width', 220)
@@ -184,19 +175,27 @@ class AIModelSettingsDialog(QDialog):
             "or irrelevant answers. Use at your own discretion.",
         )
     
-    def showEvent(self, event: QShowEvent) -> None:
-        """Handle show event to enforce fixed size and refresh values."""
-        super().showEvent(event)
-        self.setFixedSize(self._fixed_size)
-        self.setMinimumSize(self._fixed_size)
-        self.setMaximumSize(self._fixed_size)
-        
-        # Refresh values from settings
-        self._load_settings()
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout size hint (floored by optional minimum_height)."""
+        w = int(self.dialog_width)
+        if self.dialog_minimum_width is not None:
+            w = max(w, int(self.dialog_minimum_width))
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
+            return
+        h = lay.sizeHint().height()
+        if h <= 0:
+            return
+        if self.dialog_minimum_height is not None:
+            h = max(h, int(self.dialog_minimum_height))
+        self.setFixedHeight(h)
     
-    def sizeHint(self) -> QSize:
-        """Return the fixed size as the size hint."""
-        return self._fixed_size
+    def showEvent(self, event: QShowEvent) -> None:
+        """Refresh values when shown; re-apply size after layout."""
+        super().showEvent(event)
+        self._apply_configured_dialog_size()
+        self._load_settings()
     
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
@@ -204,34 +203,22 @@ class AIModelSettingsDialog(QDialog):
         layout.setSpacing(self.layout_spacing)
         layout.setContentsMargins(self.layout_margins[0], self.layout_margins[1], self.layout_margins[2], self.layout_margins[3])
         
-        # Create scroll area for form
-        scroll = QScrollArea()
-        scroll.setFrameShape(QFrame.Shape.NoFrame)  # Remove border on macOS
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        # Provider sections (fixed layout — no scroll area)
+        providers_widget = QWidget()
+        providers_layout = QVBoxLayout(providers_widget)
+        providers_layout.setSpacing(self.section_spacing)
+        providers_layout.setContentsMargins(0, 0, 0, 0)
         
-        scroll_widget = QWidget()
-        scroll_layout = QVBoxLayout(scroll_widget)
-        scroll_layout.setSpacing(self.section_spacing)
-        scroll_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # OpenAI group
         openai_group = self._create_provider_group("OpenAI", "openai")
-        scroll_layout.addWidget(openai_group)
+        providers_layout.addWidget(openai_group)
         
-        # Anthropic group
         anthropic_group = self._create_provider_group("Anthropic", "anthropic")
-        scroll_layout.addWidget(anthropic_group)
+        providers_layout.addWidget(anthropic_group)
         
-        # Custom endpoint group (OpenAI-compatible, e.g. local LLM)
         custom_group = self._create_custom_provider_group()
-        scroll_layout.addWidget(custom_group)
+        providers_layout.addWidget(custom_group)
         
-        scroll_layout.addStretch()
-        
-        scroll.setWidget(scroll_widget)
-        layout.addWidget(scroll, 1)
+        layout.addWidget(providers_widget)
         
         # Request timeout (applies to all providers)
         timeout_layout = QFormLayout()
@@ -249,9 +236,6 @@ class AIModelSettingsDialog(QDialog):
         timeout_widget = QWidget()
         timeout_widget.setLayout(timeout_layout)
         layout.addWidget(timeout_widget, 0, Qt.AlignmentFlag.AlignLeft)
-        
-        # Store scroll area for styling
-        self.scroll_area = scroll
         
         # Buttons
         button_layout = QHBoxLayout()
@@ -276,6 +260,7 @@ class AIModelSettingsDialog(QDialog):
         self.save_button.clicked.connect(self._on_save)
         button_layout.addWidget(self.save_button)
         
+        layout.addSpacing(self.bottom_button_top_padding)
         layout.addLayout(button_layout)
     
     def _create_provider_group(self, provider_name: str, provider_key: str) -> QGroupBox:
@@ -810,24 +795,6 @@ class AIModelSettingsDialog(QDialog):
         palette.setColor(QPalette.ColorRole.Window, bg_q)
         self.setPalette(palette)
         self.setAutoFillBackground(True)
-        
-        # Apply scrollbar styling to scroll area
-        if hasattr(self, 'scroll_area'):
-            from app.views.style import StyleManager
-            scroll_border = (
-                self.groups_config.get('border_color', self.border_color)
-                if 'border_color' in self.groups_config
-                else self.border_color
-            )
-            border_radius = self.groups_config.get('border_radius', 5)
-            StyleManager.style_scroll_area(
-                self.scroll_area,
-                self.config,
-                self.bg_color,
-                scroll_border,
-                border_radius,
-                include_scroll_area_border=False,
-            )
         
         # Group boxes
         group_bg_color = self.groups_config.get('background_color')  # None = use unified default

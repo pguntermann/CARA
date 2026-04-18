@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QSizePolicy,
 )
-from PyQt6.QtGui import QColor, QIcon
+from PyQt6.QtGui import QColor, QIcon, QShowEvent
 from PyQt6.QtCore import Qt
 from typing import Dict, Any
 from app.utils.font_utils import resolve_font_family, scale_font_size
@@ -30,12 +30,12 @@ class AboutDialog(QDialog):
         
         # Get about dialog config
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('about_dialog', {})
+        self.dialog_width = int(dialog_config.get('width', 550))
+        self.bottom_button_top_padding = int(dialog_config.get('bottom_button_top_padding', 50))
+        self.dialog_minimum_width = dialog_config.get('minimum_width')
+        self.dialog_minimum_height = dialog_config.get('minimum_height')
         
-        # Set dialog properties (same pattern as Annotation Preferences / Import Games: fixed size from config)
         self.setWindowTitle("About CARA")
-        dialog_width = dialog_config.get('width', 550)
-        dialog_height = dialog_config.get('height', 460)
-        self.setFixedSize(dialog_width, dialog_height)
         
         # Set dialog background color
         bg_color = dialog_config.get('background_color', [40, 40, 45])
@@ -44,7 +44,6 @@ class AboutDialog(QDialog):
         dialog_palette.setColor(self.backgroundRole(), QColor(bg_color[0], bg_color[1], bg_color[2]))
         self.setPalette(dialog_palette)
         
-        # Create main layout (same vertical rhythm as Annotation Preferences: layout spacing + stretch + button_row_spacing)
         main_layout = QVBoxLayout(self)
         layout_config = dialog_config.get('layout', {})
         layout_spacing = layout_config.get('spacing', 12)
@@ -156,11 +155,6 @@ class AboutDialog(QDialog):
         description_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         description_label.setWordWrap(True)
         
-        # Calculate available width for text (dialog width - margins - icon - gap)
-        dialog_width = dialog_config.get('width', 550)
-        layout_margins = layout_config.get('margins', [30, 30, 30, 30])
-        icon_size = icon_config.get('size', 120)
-        icon_text_gap = layout_config.get('icon_text_gap', 25)
         # No minimum height: let description use only the space it needs (avoids gap below text)
         description_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         
@@ -267,18 +261,7 @@ class AboutDialog(QDialog):
         
         main_layout.addLayout(content_layout)
         
-        # Same pattern as Annotation Preferences: stretch absorbs extra height so the button row
-        # aligns with other dialogs (fixed height uses bottom margin + stretch, not space below Close).
-        main_layout.addStretch(1)
-        button_row_top_spacing = layout_config.get(
-            'button_row_spacing',
-            layout_config.get('button_section_top_margin', 20),
-        )
-        try:
-            button_row_top_spacing = int(button_row_top_spacing)
-        except (TypeError, ValueError):
-            button_row_top_spacing = 20
-        main_layout.addSpacing(button_row_top_spacing)
+        main_layout.addSpacing(self.bottom_button_top_padding)
         
         # Button section
         buttons_config = dialog_config.get('buttons', {})
@@ -310,3 +293,26 @@ class AboutDialog(QDialog):
         )
         
         main_layout.addLayout(button_layout)
+        
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        self._apply_configured_dialog_size()
+    
+    def _apply_configured_dialog_size(self) -> None:
+        """Width from config; height from layout size hint (floored by optional minimum_height)."""
+        w = int(self.dialog_width)
+        if self.dialog_minimum_width is not None:
+            w = max(w, int(self.dialog_minimum_width))
+        self.setFixedWidth(w)
+        lay = self.layout()
+        if lay is None:
+            return
+        h = lay.sizeHint().height()
+        if h <= 0:
+            return
+        if self.dialog_minimum_height is not None:
+            h = max(h, int(self.dialog_minimum_height))
+        self.setFixedHeight(h)
+    
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        self._apply_configured_dialog_size()
