@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Matches page background so Safari iOS overscroll / rubber-band and the status area do not flash white. -->
+    <meta name="theme-color" content="#1e1e23">
     <title>CARA - Chess Analysis and Review Application</title>
     <style>
         * {
@@ -10,12 +12,20 @@
             padding: 0;
             box-sizing: border-box;
         }
+
+        /* Paint the root canvas: body alone leaves html default (white) visible on iOS pull-to-refresh / overscroll. */
+        html {
+            color-scheme: dark;
+            background-color: rgb(30, 30, 35);
+            background-image: linear-gradient(135deg, rgb(30, 30, 35) 0%, rgb(40, 40, 45) 100%);
+            min-height: 100vh;
+        }
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.6;
             color: rgb(220, 220, 220);
-            background: linear-gradient(135deg, rgb(30, 30, 35) 0%, rgb(40, 40, 45) 100%);
+            background: transparent;
             min-height: 100vh;
             padding: 40px 20px;
         }
