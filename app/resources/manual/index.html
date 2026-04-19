@@ -62,7 +62,8 @@
                     <ul>
                         <li><a href="#what-is-cara">1.1 What is CARA?</a></li>
                         <li><a href="#key-features">1.2 Key Features</a></li>
-                        <li><a href="#about-manual">1.3 About This Manual</a></li>
+                        <li><a href="#technical-details">1.3 Technical details</a></li>
+                        <li><a href="#about-manual">1.4 About This Manual</a></li>
                     </ul>
                 </li>
                 <li><a href="#attributions">2. Attributions</a>
@@ -239,13 +240,12 @@
                     <ul>
                         <li><a href="#customizing-config">7.1 Understanding Configuration Files</a>
                             <ul>
-                                <li><a href="#config-vs-themes">7.1.1 config.json vs. theme files</a></li>
-                                <li><a href="#theme-constants">7.1.2 Using $_ constants</a></li>
-                                <li><a href="#behavioral-settings">7.1.3 Adjusting behavioral settings</a></li>
-                                <li><a href="#config-formula-examples">7.1.4 Adjusting formulas in config.json</a></li>
-                                <li><a href="#customizing-themes">7.1.5 Adjusting theme / style files</a></li>
-                                <li><a href="#creating-themes">7.1.6 Creating a new theme</a></li>
-                                <li><a href="#configuring-logging-settings">7.1.7 Configuring Logging Settings</a></li>
+                                <li><a href="#theme-constants">7.1.1 Using $_ constants</a></li>
+                                <li><a href="#behavioral-settings">7.1.2 Behavioral Settings in config.json</a></li>
+                                <li><a href="#config-formula-examples">7.1.3 Formulas in config.json</a></li>
+                                <li><a href="#customizing-themes">7.1.4 Theme / style files</a></li>
+                                <li><a href="#creating-themes">7.1.5 Creating a new theme</a></li>
+                                <li><a href="#configuring-logging-settings">7.1.6 Logging and Debug</a></li>
                             </ul>
                         </li>
                         <li><a href="#understanding-user-settings">7.2 Understanding user_settings.json</a></li>
@@ -271,12 +271,7 @@
                 
                 <p>The development of CARA was motivated by the author's underwhelming experience with existing (and sometimes quite expensive) chess analysis tools, which often fell short in terms of usability, practical workflow integration, and the ability to deliver meaningful, actionable insights. Many applications overwhelmed users with unnecessary complexity and provided superficial analysis that didn't translate into genuine improvement. CARA was created to bridge this gap, offering an intuitive interface that makes deep game analysis accessible in an efficient manner while providing the detailed insights needed to understand not just what moves were played, but why they were played and how to improve.</p>
                 
-                <p>CARA was built in large part by an AI model under the author's direction. The author took special care to ensure the AI adhered to the established architectural guidelines and coding conventions throughout the development process, while proposing the features, user stories, and UX design. This project served as an experiment to explore the feasibility of building a full-fledged, complex desktop application with Python using AI code completion, testing whether modern AI tools can produce polished, fully-featured software when guided by clear architectural principles and consistent oversight.</p>
-                
                 <img src="screenshots/app_overview.png" alt="CARA Application Overview - Main interface showing chess board, game database, and analysis panels" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
-                
-                <p>CARA is built with PyQt6 and follows PyQt's Model/View architecture with additional separation of business logic using Controllers and signal observation patterns, ensuring a responsive user interface and clean separation of concerns. Views observe models through Qt's signal/slot mechanism, automatically updating when model data changes, while Controllers orchestrate business logic and coordinate between services and models. Following a strict coding convention, all UI styling, including fonts, colors, sizes, and dimensions, is defined in a centralized configuration file with no hardcoded values in the view components. This allows for complete customization of the application's appearance without modifying code. The application supports multiple chess engines via the UCI (Universal Chess Interface) protocol, so you can use any UCI-compatible engine (for example Stockfish, Lc0, Komodo, Shredder).</p>
-                <p>If you’re not sure what to install, see <a href="#recommended-engines">section 7.10 “Recommended Chess Engines”</a>.</p>
                 
                 <p>Whether you're analyzing your own games, studying master games, or reviewing games from online platforms like Lichess or Chess.com, CARA provides the tools you need to gain deep insights into chess positions, moves, and patterns.</p>
             </div>
@@ -304,7 +299,7 @@
                     
                     <li><strong>Annotations:</strong> Powerful free-form annotation system for marking positions, ideas, and analysis insights. Unlike other chess applications, text can be freely positioned anywhere on the board, adjusted in size and rotated. In addition to text, you can add arrows, circles, and square highlighting with customizable colors. Annotations are position-specific, attached to individual moves in the game, and are compressed and serialized in a PGN metadata tag to keep the PGN move notation clean. This flexible annotation system enables you to create rich, personalized study materials and analysis notes.</li>
                     
-                    <li><strong>UCI Engine Integration:</strong> The system supports multiple engine setups with per-task configuration, allowing you to assign different engines to different analysis tasks: evaluation (for the evaluation bar), game analysis, manual analysis, and brilliancy detection. Each task can have its own engine and task-specific parameters such as thread count, depth limits, time limits, and engine-specific options. You can use a single engine for all tasks or mix and match—for example, a fast engine for evaluation and a stronger one for deep game analysis. Each engine operation runs in dedicated threads, keeping the interface responsive.</li>
+                    <li><strong>UCI Engine Integration:</strong> CARA uses the UCI (Universal Chess Interface) protocol, so you can use any UCI-compatible chess engine (for example Stockfish, Lc0, Komodo, Shredder). The system supports multiple engine setups with per-task configuration, allowing you to assign different engines to different analysis tasks: evaluation (for the evaluation bar), game analysis, manual analysis, and brilliancy detection. Each task can have its own engine and task-specific parameters such as thread count, depth limits, time limits, and engine-specific options. You can use a single engine for all tasks or mix and match—for example, a fast engine for evaluation and a stronger one for deep game analysis. Each engine operation runs in dedicated threads, keeping the interface responsive. If you’re not sure what to install, see <a href="#recommended-engines">section 7.10 “Recommended Chess Engines”</a>.</li>
                     
                     <li><strong>AI Summary:</strong> Interactive chat interface allowing you to discuss any position in a game with a Large Language Model (LLM). The AI model has access to extensive game data, including detailed engine analysis, move classifications, evaluation metrics, and positional information, enabling it to provide accurate assessments of the game, played moves, and current position.</li>
                     
@@ -313,8 +308,15 @@
                 
                 <p>These features work together to provide a complete analysis environment, from importing and organizing games to deep positional understanding and statistical insights.</p>
             </div>
+            
             <div class="outline-item">
-                <h4 id="about-manual">1.3 About This Manual</h4>
+                <h4 id="technical-details">1.3 Technical details</h4>
+                <p>CARA was built in large part by an AI model under the author's direction. The author took special care to ensure the AI adhered to the established architectural guidelines and coding conventions throughout the development process, while proposing the features, user stories, and UX design. This project served as an experiment to explore the feasibility of building a full-fledged, complex desktop application with Python using AI code completion, testing whether modern AI tools can produce polished, fully-featured software when guided by clear architectural principles and consistent oversight.</p>
+                <p>CARA is built with PyQt6 and follows PyQt's Model/View architecture with additional separation of business logic using Controllers and signal observation patterns, ensuring a responsive user interface and clean separation of concerns. Views observe models through Qt's signal/slot mechanism, automatically updating when model data changes, while Controllers orchestrate business logic and coordinate between services and models. Following a strict coding convention, all UI styling, including fonts, colors, sizes, and dimensions, is defined in a centralized configuration file with no hardcoded values in the view components. This allows for complete customization of the application's appearance without modifying code.</p>
+            </div>
+            
+            <div class="outline-item">
+                <h4 id="about-manual">1.4 About This Manual</h4>
                 <p>This manual provides comprehensive documentation for CARA, covering everything from installation and basic usage to advanced configuration and troubleshooting. The manual is organized into seven main sections:</p>
                 <ul>
                     <li><strong>Introduction:</strong> Overview of CARA, its features, and what makes it unique</li>
@@ -579,7 +581,7 @@
                     <li><strong>engine_parameters.json:</strong> Stores engine-specific parameters and options for each configured chess engine. Engine settings are automatically saved to this file when you configure engines through the application interface.</li>
                 </ul>
                 
-                <h5>Where Configuration Files Are Stored</h5>
+                <h5 id="where-configuration-files-stored">Where Configuration Files Are Stored</h5>
                 <p>The file location for <code>user_settings.json</code> and <code>engine_parameters.json</code> is determined by CARA's configuration settings. By default, these files are stored in the CARA root directory.</p>
                 
                 <p>However, when running CARA as an app bundle, the files are stored in different locations:</p>
@@ -841,7 +843,7 @@
                 <p>The content is displayed in a formatted, color-coded view with syntax highlighting to distinguish between different elements.</p>
                 
                 <div class="tip-box">
-                    <strong>Quick Tip:</strong> You can customize the display format for NAG move assessments (symbols vs. text) using the PGN menu (Display NAG move assessments as...). Colors and fonts are adjusted through the theme / style config files. See <a href="#customizing-themes">section 7.1.5 "Adjusting Theme / Style Files"</a> for advanced customization options.
+                    <strong>Quick Tip:</strong> You can customize the display format for NAG move assessments (symbols vs. text) using the PGN menu (Display NAG move assessments as...). Colors and fonts are adjusted through the theme / style config files. See <a href="#customizing-themes">section 7.1.4 “Theme / Style Files”</a> for advanced customization options.
                 </div>
                 
                 <p>As you navigate through the game using the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys, the active move is highlighted in the PGN notation. A <strong>single click</strong> on any main-line move jumps to that position. Single clicks on variation moves, comment text, or metadata tags do not change the current position.</p>
@@ -2507,7 +2509,7 @@
                 <p>The <span class="menu-item">View</span> menu provides quick access to panel visibility, detail-tab switching, and visual theme selection.</p>
 
                 <h5>6.14.1 Theme</h5>
-                <p>Switches the active application theme. Each theme uses its own style configuration file, which controls colors, fonts, spacing, borders, and other UI appearance settings. See <a href="#customizing-themes">section 7.1.5</a> and <a href="#creating-themes">section 7.1.6</a> for more information about theme files and custom themes.</p>
+                <p>Switches the active application theme. Each theme uses its own style configuration file, which controls colors, fonts, spacing, borders, and other UI appearance settings. See <a href="#customizing-themes">section 7.1.4</a> and <a href="#creating-themes">section 7.1.5</a> for more information about theme files and custom themes.</p>
 
                 <h5>6.14.2 Hide Database Panel</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code></p>
@@ -2718,35 +2720,41 @@
             
             <div class="outline-item">
                 <h4 id="customizing-config">7.1 Understanding Configuration Files</h4>
-                <p>CARA separates behavioral configuration from visual styling. For most advanced customization, you will work with two file types in <code>app/config/</code>: <code>config.json</code> and one or more theme / style config files such as <code>style_default.config.json</code> and <code>style_light.config.json</code>.</p>
+                <p>CARA uses different types of configuration files. They fall into two groups: <strong>application configuration</strong> shipped under <code>app/config/</code>, and <strong>per-user data files</strong> that the application creates for your preferences and engines.</p>
+                
+                <p><strong>Application configuration (<code>app/config/</code>)</strong></p>
+                <ul id="config-vs-themes">
+                    <li><strong><code>config.json</code> — behavior</strong> — Processing and analysis defaults: <code>pgn</code> import/export, <code>game_analysis</code> (formulas, thresholds), <code>logging</code>, <code>debug</code>, and similar. Not for colors or fonts.</li>
+                    <li><strong>Theme / style files — appearance</strong> — e.g. <code>style_default.config.json</code>, <code>style_light.config.json</code>: colors, fonts, spacing, borders, and widget styling.</li>
+                </ul>
+                <p>In a source tree or manual Python install, these files are in the project’s <code>app/config/</code> directory. On macOS, the <code>CARA.app</code> bundle hides that folder in Finder: Control-click (or right-click) <strong>CARA</strong>, choose <strong>Show Package Contents</strong>, then open <code>Contents/Resources/app/config/</code> to browse the shipped JSON files.</p>
+                
+                <p><strong>User data files</strong></p>
+                <ul>
+                    <li><strong><code>user_settings.json</code></strong> — UI preferences (engines, column profiles, board and PGN toggles, and similar). See <a href="#understanding-user-settings">section 7.2</a>.</li>
+                    <li><strong><code>engine_parameters.json</code></strong> — Per-engine UCI options and task parameters; updated when you configure engines in CARA. See <a href="#understanding-engine-parameters">section 7.3</a>.</li>
+                </ul>
+                <p>These files live outside <code>app/config/</code>. CARA writes them to a <strong>user data directory</strong> chosen from your platform, install type (app bundle vs. manual), and whether the program folder is writable (“portable” mode). For example: often next to the executable when that location is writable; otherwise Windows may use <code>%APPDATA%\CARA\</code>, macOS app bundles use <code>~/Library/Application Support/CARA/</code>, and Linux may use <code>$XDG_DATA_HOME/CARA/</code> or <code>~/.local/share/CARA/</code>. To open the exact folder this installation uses, choose <span class="menu-item">Help → Open User Data Directory</span>. Platform-by-platform detail and Finder/Explorer tips are in <a href="#where-configuration-files-stored">section 3.5, “Where Configuration Files Are Stored”</a>.</p>
 
                 <div class="tip-box">
                     <strong>Important:</strong> Always make a backup copy before editing configuration files. Invalid JSON syntax can prevent CARA from starting. Use a JSON-aware editor or validator whenever possible.
                 </div>
                 
-                <h5 id="config-vs-themes">7.1.1 config.json vs. Theme / Style Files</h5>
-                <p>Use <code>config.json</code> when you want to change how CARA behaves. Use a theme / style config file when you want to change how CARA looks.</p>
-                <ul>
-                    <li><strong><code>config.json</code>:</strong> Behavioral defaults and advanced application settings. Typical examples are PGN import / export behavior, logging, formulas, analysis thresholds, and debug options.</li>
-                    <li><strong>Theme / style config files:</strong> Colors, fonts, spacing, borders, dimensions, and per-theme appearance settings. These files control how widgets look in a given theme.</li>
-                </ul>
-                <p>In practice, if you are changing something like <code>strip_pua_characters</code>, log levels, or a formula, you should edit <code>config.json</code>. If you are changing a button color, text color, border, or panel appearance, you should edit a theme / style file instead.</p>
-                
-                <h5 id="theme-constants">7.1.2 Using $_ Constants in Theme Files</h5>
-                <p>Theme / style files use reusable constants such as <code>$_COLOR_*</code>, <code>$_FONT_*</code>, and similar names. These constants let one value be defined once and reused in many places.</p>
-                <p>Instead of repeating literal RGB arrays everywhere, a style file often uses references:</p>
+                <h5 id="theme-constants">7.1.1 Using $_ Constants in Theme Files</h5>
+                <p>Theme / style files define reusable constants such as <code>$_COLOR_*</code> and <code>$_FONT_*</code>. Define a value once at the top level, then reference it wherever that color or font should appear.</p>
+                <p>A property can point to a constant with <code>$ref</code> instead of repeating a literal RGB array everywhere:</p>
                 <pre><code>"text_color": {
     "$ref": "$_COLOR_TEXT_PRIMARY"
 }</code></pre>
-                <p>This means “use the value of <code>$_COLOR_TEXT_PRIMARY</code> here.”</p>
+                <p>That entry means “use whatever <code>$_COLOR_TEXT_PRIMARY</code> is set to.”</p>
                 <ul>
-                    <li><strong>Change the constant:</strong> Affects every place that references it.</li>
-                    <li><strong>Change one local property:</strong> Affects only that one widget or section.</li>
+                    <li><strong>Editing the constant</strong> updates every widget that references it.</li>
+                    <li><strong>Editing a single property</strong> overrides only that spot, which is useful for one-off exceptions.</li>
                 </ul>
-                <p>This is useful when creating a theme: shared colors can stay consistent, while special elements can still override individual values when needed.</p>
+                <p>This keeps palettes and typography consistent across a theme while still allowing local overrides.</p>
                 
-                <h5 id="behavioral-settings">7.1.3 Adjusting Behavioral Settings in config.json</h5>
-                <p><code>config.json</code> is best for non-visual tuning. Two concrete examples are PGN import cleanup and PGN export formatting.</p>
+                <h5 id="behavioral-settings">7.1.2 Behavioral Settings in config.json</h5>
+                <p>Two common <code>pgn</code> examples:</p>
                 <p><strong>Example A: Remove unsupported ChessBase-style PUA characters during import</strong></p>
                 <ol>
                     <li>Open <code>config.json</code>.</li>
@@ -2771,39 +2779,24 @@
         "fixed_width": 80
     }
 }</code></pre>
-                <p>These settings affect how PGN is saved to disk, not how it is displayed in the interface.</p>
-                <p><strong>Other good candidates for <code>config.json</code> edits:</strong></p>
-                <ul>
-                    <li><code>logging</code> for console/file logging behavior</li>
-                    <li><code>game_analysis</code> for thresholds, formulas, and automated analysis behavior</li>
-                    <li><code>debug</code> for enabling developer-oriented diagnostics</li>
-                </ul>
+                <p>These options affect the saved file format only; on-screen PGN colors are set in the theme file (see <a href="#customizing-themes">section 7.1.4</a>).</p>
                 
-                <h5 id="config-formula-examples">7.1.4 Adjusting Formulas in config.json</h5>
-                <p>Formulas such as estimated ELO and accuracy live in <code>config.json</code> under <code>game_analysis</code>. These are behavioral settings, not theme settings.</p>
-                <p>Common formula locations:</p>
+                <h5 id="config-formula-examples">7.1.3 Formulas in config.json</h5>
+                <p>Estimated ELO, accuracy, and related expressions are under <code>game_analysis</code>:</p>
                 <ul>
                     <li><code>game_analysis → elo_estimation</code></li>
                     <li><code>game_analysis → accuracy_formula</code></li>
                     <li><code>game_analysis → phase_accuracy_formulas</code></li>
                 </ul>
-                <p>Each formula block usually contains a <code>formula</code> string and a <code>value_on_error</code> fallback. For example:</p>
+                <p>Each block normally includes a <code>formula</code> string and a <code>value_on_error</code> fallback if evaluation fails. For example:</p>
                 <pre><code>"accuracy_formula": {
     "formula": "max(5.0, min(100.0, 100.0 - (average_cpl / 3.5)))",
     "value_on_error": 0.0
 }</code></pre>
-                <p>Formula changes can have broad effects, so make small edits, keep backups, and test with a few known games first. The full formula reference remains documented in <a href="#customizing-formulas">section 7.8</a>.</p>
+                <p>Formula edits affect scores across many games; change a little at a time, keep backups, and verify on a few test games. Full detail is in <a href="#customizing-formulas">section 7.8</a>.</p>
                 
-                <h5 id="customizing-themes">7.1.5 Adjusting Theme / Style Files</h5>
-                <p>Use a theme / style config file when you want to change appearance without changing application behavior. This includes colors, fonts, spacing, borders, tab styling, dialog styling, and per-panel presentation.</p>
-                <p>Typical examples include:</p>
-                <ul>
-                    <li>Changing PGN notation colors under <code>ui → panels → detail → pgn_notation</code></li>
-                    <li>Changing board colors under <code>ui → panels → main → board</code></li>
-                    <li>Adjusting button, dialog, and input styling under <code>ui → styles</code> or <code>ui → dialogs</code></li>
-                    <li>Customizing panel-specific text and background colors under <code>ui → panels</code></li>
-                </ul>
-                <p>For example, PGN display colors are not a <code>config.json</code> topic anymore. They belong to the currently selected theme file:</p>
+                <h5 id="customizing-themes">7.1.4 Theme / Style Files</h5>
+                <p>In the theme file, common branches include <code>ui → panels → detail → pgn_notation</code>, <code>ui → panels → main → board</code>, <code>ui → styles</code>, <code>ui → dialogs</code>, and other <code>ui → panels</code> sections. Shared colors often reference <code>$_COLOR_*</code> (see <a href="#theme-constants">section 7.1.1</a>). Example (PGN header color):</p>
                 <pre><code>"ui": {
     "panels": {
         "detail": {
@@ -2817,10 +2810,10 @@
         }
     }
 }</code></pre>
-                <p>If a change is purely visual, start in the active theme file before touching <code>config.json</code>. In the application itself, use <span class="menu-item">View → Theme</span> to switch between available themes and immediately see which style file is active.</p>
+                <p>Use <span class="menu-item">View → Theme</span> to switch themes and preview changes.</p>
                 
-                <h5 id="creating-themes">7.1.6 Creating a New Theme</h5>
-                <p>The easiest way to create a new theme is to copy an existing style file and modify it incrementally.</p>
+                <h5 id="creating-themes">7.1.5 Creating a New Theme</h5>
+                <p>The straightforward approach is to copy an existing style file and adjust it step by step.</p>
                 <ol>
                     <li><strong>Choose a base theme:</strong> Start from a file such as <code>style_default.config.json</code> or <code>style_light.config.json</code>.</li>
                     <li><strong>Copy the file:</strong> Create a new file in <code>app/config/</code>, for example <code>style_mytheme.config.json</code>.</li>
@@ -2828,16 +2821,16 @@
                     <li><strong>Add local overrides only where needed:</strong> If one panel or widget should look different from the rest, override that specific section instead of changing a shared constant.</li>
                     <li><strong>Select the theme in CARA:</strong> Use <span class="menu-item">View → Theme</span> to switch to the new theme inside the application.</li>
                 </ol>
-                <p>A good workflow is to keep the new theme close to an existing one at first, verify readability, then adjust only a few areas at a time. After each round of edits, switch back and forth via <span class="menu-item">View → Theme</span> to compare the result against an existing theme.</p>
+                <p>Stay close to a stock theme at first, confirm readability, then change one area at a time. Use <span class="menu-item">View → Theme</span> to compare your theme against the originals after each round of edits.</p>
             </div>
             
             <div class="outline-item">
-                <h5 id="configuring-logging-settings">7.1.7 Configuring Logging Settings</h5>
-                <p>CARA provides configurable logging to help with debugging and troubleshooting. Logging can be configured for both console output and file output, with separate log levels for each.</p>
+                <h5 id="configuring-logging-settings">7.1.6 Logging and Debug</h5>
+                <p><strong>Logging</strong> is under <code>logging</code> in <code>config.json</code> (separate levels for console and file output).</p>
                 
-                <p><strong>Important:</strong> Console logging is only visible when you launch CARA from a terminal. This is always true for manual installations. For app bundles, it depends on the platform: Windows and macOS bundles are typically started via the GUI (no console), while Linux bundles can be started from a terminal to see console output.</p>
+                <p><strong>Important:</strong> Console output only appears when CARA is started from a terminal. That always applies to a manual Python install. For app bundles, Windows and macOS users usually launch from the GUI (no console); Linux users can often run the bundle from a terminal if they need to see console logs.</p>
                 
-                <p>To configure logging settings:</p>
+                <p>To change logging:</p>
                 <ol>
                     <li><strong>Locate the logging configuration:</strong><br>
                     Open <code>config.json</code> in a text editor and navigate to: <code>logging</code></li>
@@ -2900,39 +2893,18 @@
                     Save the file and restart CARA for the changes to take effect.</li>
                 </ol>
                 
-                <h5>7.1.7.1 Advanced Debug Logging</h5>
-                <p>In addition to the standard logging levels, CARA provides detailed debug logging for UCI engine communication and AI service interactions. These debug logs provide detailed information about:</p>
+                <h5>7.1.6.1 Advanced Debug Logging</h5>
+                <p>Set <code>debug → show_debug_menu</code> to <code>true</code> in <code>config.json</code>, restart CARA, then use the <span class="menu-item">Debug</span> menu to turn verbose streams on or off. Each item is a checkable toggle; output goes to the log file (if file logging is enabled) or the console. Toggles do not persist after you quit CARA.</p>
                 <ul>
-                    <li><strong>UCI Lifecycle:</strong> Engine process lifecycle events (started, stopped, quit, crashed)</li>
-                    <li><strong>UCI Outbound:</strong> Commands sent to chess engines (e.g., "uci", "isready", "position", "go")</li>
-                    <li><strong>UCI Inbound:</strong> Responses received from chess engines (e.g., "uciok", "readyok", "bestmove")</li>
-                    <li><strong>AI Outbound:</strong> Requests sent to AI services (OpenAI, Anthropic)</li>
-                    <li><strong>AI Inbound:</strong> Responses received from AI services</li>
+                    <li><span class="menu-item">Debug → Debug UCI Lifecycle</span> — engine process events (start, stop, crash)</li>
+                    <li><span class="menu-item">Debug → Debug UCI Outbound</span> — commands sent to engines</li>
+                    <li><span class="menu-item">Debug → Debug UCI Inbound</span> — engine responses</li>
+                    <li><span class="menu-item">Debug → Debug AI Outbound</span> — AI requests</li>
+                    <li><span class="menu-item">Debug → Debug AI Inbound</span> — AI responses</li>
                 </ul>
                 
-                <p>To enable these advanced debug logs:</p>
-                <ol>
-                    <li><strong>Enable the Debug menu:</strong><br>
-                    Open <code>config.json</code> in a text editor and navigate to: <code>debug → show_debug_menu</code><br>
-                    Set <code>"show_debug_menu": true</code> to enable the Debug menu in the application.</li>
-                    
-                    <li><strong>Restart CARA:</strong><br>
-                    After enabling the debug menu, restart CARA. The Debug menu will now appear in the menu bar.</li>
-                    
-                    <li><strong>Enable debug options:</strong><br>
-                    Use the Debug menu to enable the desired debug logging options:
-                    <ul>
-                        <li><span class="menu-item">Debug → Debug UCI Lifecycle</span> - Enable UCI lifecycle event logging</li>
-                        <li><span class="menu-item">Debug → Debug UCI Outbound</span> - Enable UCI command logging</li>
-                        <li><span class="menu-item">Debug → Debug UCI Inbound</span> - Enable UCI response logging</li>
-                        <li><span class="menu-item">Debug → Debug AI Outbound</span> - Enable AI request logging</li>
-                        <li><span class="menu-item">Debug → Debug AI Inbound</span> - Enable AI response logging</li>
-                    </ul>
-                    These options are checkable menu items that can be toggled on or off at runtime. When enabled, the corresponding debug messages will be written to the log file (if file logging is enabled) or displayed in the console.</li>
-                </ol>
-                
                 <div class="tip-box">
-                    <strong>Note:</strong> Advanced debug logging can generate a large volume of log messages, especially UCI Inbound logs during engine analysis. Use these options only when troubleshooting specific issues. The debug options are runtime settings and do not persist between application sessions—you'll need to re-enable them each time you start CARA.
+                    <strong>Note:</strong> Verbose UCI and AI logging can produce very large logs (especially inbound UCI during analysis). Use it only while diagnosing a specific issue.
                 </div>
             </div>
             
