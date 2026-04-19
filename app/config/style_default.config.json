@@ -2797,8 +2797,7 @@
         "buttons": {
           "spacing": 10,
           "width": 120,
-          "height": 30,
-          "logic_combo_width": 70
+          "height": 30
         },
         "group_box": {
           "border_color": {
@@ -3141,7 +3140,8 @@
           "spacing": 10,
           "width": 120,
           "height": 30,
-          "small_width": 100
+          "small_width": 100,
+          "logic_combo_width": 70
         },
         "labels": {
           "font_family": {

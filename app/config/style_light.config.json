@@ -154,6 +154,9 @@
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"
         },
+        "hover_text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
         "background_color": {
           "$ref": "$_COLOR_BUTTON_BACKGROUND"
         },
@@ -165,6 +168,9 @@
         },
         "active_text_color": {
           "$ref": "$_COLOR_ON_ACCENT"
+        },
+        "pressed_text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
         },
         "font_family": {
           "$ref": "$_FONT_FAMILY_PRIMARY"
@@ -2308,6 +2314,9 @@
         "fields": {
           "label_width": 200,
           "input_width": 100,
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          },
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },

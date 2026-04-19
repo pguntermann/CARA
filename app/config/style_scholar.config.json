@@ -200,6 +200,9 @@
         "text_color": {
           "$ref": "$_COLOR_COCOA_BROWN"
         },
+        "hover_text_color": {
+          "$ref": "$_COLOR_COCOA_BROWN"
+        },
         "background_color": {
           "$ref": "$_COLOR_TAUPE_BUTTON_FACE"
         },
@@ -210,6 +213,9 @@
           "$ref": "$_COLOR_DEEP_TEAL"
         },
         "active_text_color": {
+          "$ref": "$_COLOR_FROST_MINT"
+        },
+        "pressed_text_color": {
           "$ref": "$_COLOR_FROST_MINT"
         },
         "font_family": {
@@ -628,6 +634,13 @@
               },
               "width": 2,
               "style": "solid"
+            },
+            "division_marks": {
+              "color": {
+                "$ref": "$_COLOR_DEEP_TEAL"
+              },
+              "width": 1,
+              "style": "dash"
             },
             "divisions": [],
             "animation_duration_ms": 300
@@ -2523,6 +2536,9 @@
         "fields": {
           "label_width": 200,
           "input_width": 100,
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          },
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
