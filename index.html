@@ -421,6 +421,10 @@
         
         .download-status.unavailable {
             color: rgb(200, 150, 100);
+            text-align: center;
+            max-width: 560px;
+            margin-left: auto;
+            margin-right: auto;
         }
         
         .gatekeeper-note {
@@ -1031,7 +1035,7 @@
                 </span>
             </span>
         </p>
-        <p class="version">Version 2.7.2</p>
+        <p class="version">Version 2.7.3</p>
         <p class="description">
             A full-featured desktop application for analyzing and reviewing chess games. 
             CARA helps you understand your games, identify mistakes, recognize patterns, 
@@ -1149,7 +1153,7 @@
                         </div>
                     </div>
                     <div class="platform-body">
-                        <a href="https://github.com/pguntermann/CARA/releases/download/2.7.2/CARA.2.7.2.windows.AppBundle.zip"
+                        <a href="https://github.com/pguntermann/CARA/releases/download/2.7.3/CARA.2.7.3.windows.AppBundle.zip"
                            class="dl-row disabled dl-row-pending"
                            id="download-windows"
                            data-platform="windows"
@@ -1158,7 +1162,7 @@
                            aria-disabled="true"
                            target="_blank"
                            rel="noopener noreferrer">
-                            <span>CARA 2.7.2 App Bundle</span>
+                            <span>CARA 2.7.3 App Bundle</span>
                             <span class="dl-row-trailing">Checking…</span>
                         </a>
                     </div>
@@ -1174,7 +1178,7 @@
                         </div>
                     </div>
                     <div class="platform-body">
-                        <a href="https://github.com/pguntermann/CARA/releases/download/2.7.2/CARA.2.7.2.macOS.AppBundle.zip"
+                        <a href="https://github.com/pguntermann/CARA/releases/download/2.7.3/CARA.2.7.3.macOS.AppBundle.zip"
                            class="dl-row macos disabled dl-row-pending"
                            id="download-macos"
                            data-platform="macos"
@@ -1183,7 +1187,7 @@
                            aria-disabled="true"
                            target="_blank"
                            rel="noopener noreferrer">
-                            <span>CARA 2.7.2 App Bundle</span>
+                            <span>CARA 2.7.3 App Bundle</span>
                             <span class="dl-row-trailing">Checking…</span>
                         </a>
                     </div>
@@ -1205,7 +1209,7 @@
                         </div>
                     </div>
                     <div class="platform-body">
-                        <a href="https://github.com/pguntermann/CARA/releases/download/2.7.2/CARA.2.7.2.linux.amd64.AppBundle.tar.gz"
+                        <a href="https://github.com/pguntermann/CARA/releases/download/2.7.3/CARA.2.7.3.linux.amd64.AppBundle.tar.gz"
                            class="dl-row disabled dl-row-pending"
                            id="download-linux-amd64"
                            data-platform="linux-amd64"
@@ -1217,7 +1221,7 @@
                             <span>x86_64 (amd64)</span>
                             <span class="dl-row-trailing dl-unavailable-label">Checking…</span>
                         </a>
-                        <a href="https://github.com/pguntermann/CARA/releases/download/2.7.2/CARA.2.7.2.linux.arm64.AppBundle.tar.gz"
+                        <a href="https://github.com/pguntermann/CARA/releases/download/2.7.3/CARA.2.7.3.linux.arm64.AppBundle.tar.gz"
                            class="dl-row disabled dl-row-pending"
                            id="download-linux-arm64"
                            data-platform="linux-arm64"
@@ -1305,6 +1309,9 @@
     
     <script>
         (function() {
+            var NO_DOWNLOADS_NOTICE =
+                'It looks like a new release version is currently being prepared. Please try again in a few minutes for downloads to become available.';
+
             function updateDownloadButtonsGlobalOnly() {
                 var downloadSection = document.querySelector('.download-section');
                 var statusDiv = document.getElementById('download-status');
@@ -1325,7 +1332,7 @@
                 });
                 if (statusDiv) {
                     if (!downloadsAvailable) {
-                        statusDiv.textContent = 'A new release is currently being prepared. Downloads will be available shortly.';
+                        statusDiv.textContent = NO_DOWNLOADS_NOTICE;
                         statusDiv.classList.add('unavailable');
                     } else {
                         statusDiv.textContent = '';
@@ -1467,6 +1474,7 @@
 
             async function runArtifactChecks() {
                 var downloadSection = document.querySelector('.download-section');
+                var statusDiv = document.getElementById('download-status');
                 if (!downloadSection) return;
                 if (downloadSection.getAttribute('data-downloads-available') === 'false') {
                     updateDownloadButtonsGlobalOnly();
@@ -1477,16 +1485,29 @@
                     document.querySelectorAll('a.dl-row[data-artifact-check="true"]')
                 );
                 var assets = await getReleaseAssetNameSet(8000);
+                var anyAvailable = false;
                 if (assets) {
                     links.forEach(function(link) {
                         var expected = resolveExpectedAssetName(link);
-                        applyLinkAvailability(link, !!(expected && assets[expected]));
+                        var available = !!(expected && assets[expected]);
+                        if (available) anyAvailable = true;
+                        applyLinkAvailability(link, available);
                     });
                 } else {
                     // If checks fail (network, rate limits, etc.), prefer "safe disabled" until release assets exist.
                     links.forEach(function(link) {
                         applyLinkAvailability(link, false);
                     });
+                }
+
+                if (statusDiv) {
+                    if (!anyAvailable) {
+                        statusDiv.textContent = NO_DOWNLOADS_NOTICE;
+                        statusDiv.classList.add('unavailable');
+                    } else {
+                        statusDiv.textContent = '';
+                        statusDiv.classList.remove('unavailable');
+                    }
                 }
 
                 highlightRecommendedCard();

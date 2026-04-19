@@ -1,5 +1,31 @@
 # Release Notes
 
+# CARA v2.7.3 - Scholar Theme, Revised Dialog Layouts and more UI Polish
+
+**Release Date:** 19.04.2026
+
+This release builds on the improvements of the last release by further streamlining and polishing the user interface, refining the theming system, and introducing a new prebuilt **scholar** theme. Dialogs now size from layout rather than fixed configured heights to provide a better visual consistency between different platforms.
+
+## New Features
+
+- **Scholar theme:** New prebuilt theme available alongside the existing built-in themes. This theme also comes with a new set of chess piece SVGs, even though they are a bit extravagant.
+
+## Enhancements
+
+- **Dialog sizing:** Reworked dialogs to use layout-driven sizing instead of fixed configured heights, improving consistency across different platforms and themes.
+- **UI and themes:** Additional UI and theme refinements in all prebuilt themes.
+- **Configuration validation:** Stricter validation of configuration files.
+
+## Bug Fixes
+
+- **PGN header tags:** Fixed a bug that allowed users to add new PGN header tags with invalid PGN header names.
+
+## Documentation
+
+- **User manual:** Improvements to the HTML user manual.
+
+---
+
 # CARA v2.7.2 - Themes!, Config Restructuring and UI Polish
 
 **Release Date:** 16.04.2026
