@@ -35,7 +35,7 @@
             "max_depth_evaluation": 0,
             "update_interval_ms": 500,
             "default_threads_formula": {
-              "formula": "max(1, min(4, (cpu_count - reserved_cores) // 2))"
+              "formula": "1"
             },
             "scale_max": 10.0
           },
@@ -256,7 +256,7 @@
             "restore_on_leave": true
           },
           "default_threads_formula": {
-            "formula": "max(1, min(6, cpu_count - reserved_cores))"
+            "formula": "max(1, min(12, cpu_count - reserved_cores))"
           },
           "update_interval_ms": 100,
           "max_depth": null
@@ -623,7 +623,7 @@
     "max_depth": 0,
     "time_limit_per_move_ms": 750,
     "default_threads_formula": {
-      "formula": "max(1, min(8, cpu_count - reserved_cores))"
+      "formula": "max(1, min(12, cpu_count - reserved_cores))"
     },
     "progress_update_interval_ms": 100,
     "assessment_thresholds": {
@@ -699,7 +699,7 @@
     },
     "brilliancy_detection": {
       "default_threads_formula": {
-        "formula": "max(1, min(8, cpu_count - reserved_cores))"
+        "formula": "max(1, min(4, cpu_count - reserved_cores))"
       },
       "time_limit_per_move_ms": 750
     },
