@@ -1,5 +1,27 @@
 # Release Notes
 
+# CARA v2.7.4 - Maintenance Release
+
+**Release Date:** 22.04.2026
+
+This release focuses on **bug fixes** and (even more) **UI polish**. It also improves the **Add/Remove PGN tags** function by allowing users to remove multiple tags at once. 
+
+## Enhancements
+
+- **Manage Game Tags dialog:** Simplified/reworked layout for better cross-platform compatibility.
+- **Bulk add/remove PGN tags:** Added the ability to remove **multiple tags at once**.
+- **Engine setup defaults:** Improved default thread settings when adding new engines.
+- **Player Stats:** Small UI improvements for readability and navigation, especially on the **light theme**
+- **Manual Analysis:** Improved the info line display and made small UI refinements.
+- **Minor UI improvements:** Small UI polish here and there.
+
+## Bug Fixes
+
+- **Opening detection:** Fixed cases where the most specific opening variant was not always returned.
+- **Bulk tag operations:** Fixed an issue where fixed roster tags (non-removable) could be selected for removal.
+
+---
+
 # CARA v2.7.3 - Scholar Theme, Revised Dialog Layouts and more UI Polish
 
 **Release Date:** 19.04.2026

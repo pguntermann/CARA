@@ -1,5 +1,5 @@
 {
-  "version": "2.7.3",
+  "version": "2.7.4",
   "default_style_config": "app/config/style_default.config.json",
   "ui": {
     "welcome_dialog": {
