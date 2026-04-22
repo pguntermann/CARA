@@ -41,6 +41,7 @@ class ManualAnalysisModel(QObject):
         self._is_analyzing: bool = False
         self._multipv: int = 2  # Number of lines to analyze
         self._start_time: Optional[float] = None  # Timestamp when analysis started (None if not analyzing)
+        self._last_update_time: Optional[float] = None  # Timestamp of last engine update (None if none yet)
         self._enable_miniature_preview: bool = True  # Enable miniature board preview on PV hover
         self._miniature_preview_scale_factor: float = 1.25  # Matches template default; menu presets 1.0–2.0
     
@@ -74,9 +75,11 @@ class ManualAnalysisModel(QObject):
             if value:
                 # Start tracking time when analysis begins
                 self._start_time = time.time()
+                self._last_update_time = None
             else:
                 # Clear start time when analysis stops
                 self._start_time = None
+                self._last_update_time = None
             self.is_analyzing_changed.emit(value)
     
     @property
@@ -171,6 +174,7 @@ class ManualAnalysisModel(QObject):
             line.pv = pv
             line.nps = nps
             line.hashfull = hashfull
+            self._last_update_time = time.time()
             self.analysis_changed.emit()
         else:
             # Line doesn't exist - only create if within current multipv range
@@ -178,6 +182,7 @@ class ManualAnalysisModel(QObject):
             if multipv <= self._multipv:
                 line = AnalysisLine(multipv, centipawns, is_mate, mate_moves, depth, pv, nps, hashfull)
                 self._lines.append(line)
+                self._last_update_time = time.time()
                 self.analysis_changed.emit()
             # If line doesn't exist and multipv > current, silently ignore
     
@@ -198,6 +203,12 @@ class ManualAnalysisModel(QObject):
         if self._start_time is None:
             return 0.0
         return time.time() - self._start_time
+
+    def get_seconds_since_last_update(self) -> Optional[float]:
+        """Seconds since the last received engine update, or None if no update yet."""
+        if self._last_update_time is None:
+            return None
+        return max(0.0, time.time() - self._last_update_time)
     
     @property
     def enable_miniature_preview(self) -> bool:
@@ -244,6 +255,7 @@ class ManualAnalysisModel(QObject):
         self._lines.clear()
         self._is_analyzing = False
         self._start_time = None
+        self._last_update_time = None
         self.analysis_changed.emit()
         self.lines_changed.emit()
 

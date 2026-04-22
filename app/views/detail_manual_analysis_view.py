@@ -47,6 +47,11 @@ class DetailManualAnalysisView(QWidget):
         self._analysis_update_timer.setSingleShot(True)
         self._analysis_update_timer.timeout.connect(self._on_analysis_changed_debounced)
         self._pending_analysis_update = False
+
+        # UI-only timer: keep statistics time/age label fresh even without new engine info lines.
+        self._statistics_refresh_timer = QTimer()
+        self._statistics_refresh_timer.setInterval(500)
+        self._statistics_refresh_timer.timeout.connect(self._on_statistics_refresh_tick)
         
         self._load_config()
         self._setup_ui()
@@ -1325,6 +1330,22 @@ class DetailManualAnalysisView(QWidget):
                 self.statistics_bar.setVisible(False)
         self.start_stop_button.blockSignals(False)
         self._refresh_start_stop_button_icon(is_analyzing=is_analyzing)
+
+        # Keep the statistics label updated (Time / Last update age) even when engine doesn't emit new lines.
+        if is_analyzing:
+            if self.statistics_enabled and self.statistics_show_time:
+                self._statistics_refresh_timer.start()
+        else:
+            self._statistics_refresh_timer.stop()
+
+    def _on_statistics_refresh_tick(self) -> None:
+        if not self._analysis_model or not self._is_analyzing:
+            self._statistics_refresh_timer.stop()
+            return
+        if not self.statistics_enabled or not self.statistics_show_time:
+            self._statistics_refresh_timer.stop()
+            return
+        self._update_statistics_bar()
     
     def _on_lines_changed(self) -> None:
         """Handle lines count change from model."""
@@ -2226,6 +2247,19 @@ class DetailManualAnalysisView(QWidget):
                     seconds = elapsed_time % 60
                     time_str = f"{minutes}m {seconds:.1f}s"
                 stats_parts.append(f"Time: {time_str}")
+
+            # Last engine update age (independent of UI refresh cadence)
+            last_age = self._analysis_model.get_seconds_since_last_update()
+            if last_age is None:
+                stats_parts.append("Last update: —")
+            else:
+                if last_age < 60:
+                    last_str = f"{last_age:.0f}s ago"
+                elif last_age < 3600:
+                    last_str = f"{int(last_age // 60)}m ago"
+                else:
+                    last_str = f"{int(last_age // 3600)}h ago"
+                stats_parts.append(f"Last update: {last_str}")
         
         if self.statistics_show_nodes and nps >= 0 and self._analysis_model.get_elapsed_time() > 0:
             # Calculate total nodes (NPS * time)
