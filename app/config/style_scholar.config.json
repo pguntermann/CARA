@@ -370,6 +370,25 @@
         "header_text_color": {
           "$ref": "$_COLOR_MINK_BROWN"
         },
+        "header_sort_indicator_color": {
+          "$ref": "$_COLOR_MINK_BROWN"
+        },
+        "branch_indicator": {
+          "icon_tint_rgb": {
+            "$ref": "$_COLOR_MINK_BROWN"
+          },
+          "size_px": 14,
+          "icons": {
+            "closed_svg": "app/resources/icons/tree_chevron_right.svg",
+            "open_svg": "app/resources/icons/tree_chevron_down.svg"
+          }
+        },
+        "header_borders": {
+          "show_top": false,
+          "show_left_first": false,
+          "show_right_last": false
+        },
+        "scrollbar_gutter_px": 10,
         "font_family": {
           "$ref": "$_FONT_FAMILY_PRIMARY"
         },
@@ -1178,6 +1197,16 @@
             },
             "border_width": 1,
             "background_offset": 20
+          },
+          "tree_height_controls": {
+            "icon_tint_rgb": {
+              "$ref": "$_COLOR_INK_BODY"
+            },
+            "icon_size_px": 16,
+            "icons": {
+              "zoom_in_svg": "app/resources/icons/zoom_in.svg",
+              "zoom_out_svg": "app/resources/icons/zoom_out.svg"
+            }
           },
           "input_widgets": {
             "background_color": {

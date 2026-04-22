@@ -324,6 +324,25 @@
         "header_text_color": {
           "$ref": "$_COLOR_TEXT_7"
         },
+        "header_sort_indicator_color": {
+          "$ref": "$_COLOR_TEXT_7"
+        },
+        "branch_indicator": {
+          "icon_tint_rgb": {
+            "$ref": "$_COLOR_ACCENT_PRIMARY"
+          },
+          "size_px": 14,
+          "icons": {
+            "closed_svg": "app/resources/icons/tree_chevron_right.svg",
+            "open_svg": "app/resources/icons/tree_chevron_down.svg"
+          }
+        },
+        "header_borders": {
+          "show_top": false,
+          "show_left_first": false,
+          "show_right_last": false
+        },
+        "scrollbar_gutter_px": 10,
         "font_family": {
           "$ref": "$_FONT_FAMILY_PRIMARY"
         },
@@ -346,10 +365,10 @@
           "$ref": "$_COLOR_CHART_GRIDLINE"
         },
         "selection_background_color": {
-          "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          "$ref": "$_COLOR_ACTIVE_MOVE_BACKGROUND"
         },
         "selection_text_color": {
-          "$ref": "$_COLOR_TEXT_PRIMARY"
+          "$ref": "$_COLOR_NEAR_BLACK"
         },
         "row_height": 20,
         "header_min_height": 20,
@@ -1055,6 +1074,16 @@
             "border_width": 1,
             "background_offset": 20
           },
+          "tree_height_controls": {
+            "icon_tint_rgb": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            },
+            "icon_size_px": 16,
+            "icons": {
+              "zoom_in_svg": "app/resources/icons/zoom_in.svg",
+              "zoom_out_svg": "app/resources/icons/zoom_out.svg"
+            }
+          },
           "input_widgets": {
             "background_color": {
               "$ref": "$_COLOR_BACKGROUND_SECONDARY"
@@ -1121,8 +1150,12 @@
             "grid_major_color": [55, 55, 62],
             "grid_minor_color": [45, 45, 50],
             "x_axis_minor_grid": true,
-            "axis_color": [120, 120, 128],
-            "text_color": [200, 200, 205],
+            "axis_color": {
+              "$ref": "$_COLOR_CHART_AXIS"
+            },
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            },
             "font_family": {
               "$ref": "$_FONT_FAMILY_PRIMARY"
             },

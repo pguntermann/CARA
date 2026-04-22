@@ -36,6 +36,7 @@ from PyQt6.QtGui import (
     QMouseEvent,
     QResizeEvent,
 )
+from app.utils.themed_icon import themed_icon_from_svg, SVG_ZOOM_IN, SVG_ZOOM_OUT
 from app.views.detail_summary_view import PieChartWidget
 from typing import Callable, Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 from app.models.database_model import DatabaseModel
@@ -4661,6 +4662,68 @@ class DetailPlayerStatsView(QWidget):
         
         return widget
 
+    def _apply_tree_height_control_icons(
+        self,
+        *,
+        decrease_btn: QToolButton,
+        increase_btn: QToolButton,
+        tint_rgb: List[int],
+        zoom_in_svg: str,
+        zoom_out_svg: str,
+        icon_px: int,
+        button_style_cfg: Dict[str, Any],
+    ) -> None:
+        for b in (decrease_btn, increase_btn):
+            b.setText("")
+            b.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+            b.setIconSize(QSize(icon_px, icon_px))
+            b.setAutoRaise(False)
+
+        # Style: match other Player Stats buttons (hover/pressed/disabled) using config.
+        try:
+            bg = button_style_cfg.get("background_color", [50, 50, 55])
+            hover_bg = button_style_cfg.get("hover_background_color", bg)
+            border = button_style_cfg.get("border_color", [60, 60, 65])
+            border_w = int(button_style_cfg.get("border_width", 1))
+            radius = int(button_style_cfg.get("border_radius", 4))
+            pad = button_style_cfg.get("padding", [6, 4])
+            pad_h = int(pad[0]) if isinstance(pad, list) and len(pad) >= 1 else 6
+            pad_v = int(pad[1]) if isinstance(pad, list) and len(pad) >= 2 else 4
+            hover_text = button_style_cfg.get("hover_text_color", tint_rgb)
+
+            bg_rgb = f"rgb({int(bg[0])}, {int(bg[1])}, {int(bg[2])})"
+            hover_bg_rgb = f"rgb({int(hover_bg[0])}, {int(hover_bg[1])}, {int(hover_bg[2])})"
+            border_rgb = f"rgb({int(border[0])}, {int(border[1])}, {int(border[2])})"
+            hover_text_rgb = f"rgb({int(hover_text[0])}, {int(hover_text[1])}, {int(hover_text[2])})"
+
+            ss = "\n".join(
+                [
+                    "QToolButton {",
+                    f"  background-color: {bg_rgb};",
+                    f"  border: {border_w}px solid {border_rgb};",
+                    f"  border-radius: {radius}px;",
+                    f"  padding: {pad_v}px {pad_h}px;",
+                    "}",
+                    "QToolButton:hover {",
+                    f"  background-color: {hover_bg_rgb};",
+                    f"  color: {hover_text_rgb};",
+                    "}",
+                    "QToolButton:pressed {",
+                    f"  background-color: {hover_bg_rgb};",
+                    "}",
+                    "QToolButton:disabled {",
+                    "  opacity: 0.45;",
+                    "}",
+                ]
+            )
+            decrease_btn.setStyleSheet(ss)
+            increase_btn.setStyleSheet(ss)
+        except Exception:
+            pass
+
+        decrease_btn.setIcon(themed_icon_from_svg(zoom_out_svg, tint_rgb))
+        increase_btn.setIcon(themed_icon_from_svg(zoom_in_svg, tint_rgb))
+
     def _create_top_games_widget(self, stats: "AggregatedPlayerStats",
                                  text_color: QColor, label_font: QFont, value_font: QFont,
                                  bg_color: QColor, border_color: QColor,
@@ -5287,19 +5350,31 @@ class DetailPlayerStatsView(QWidget):
         controls_layout.addStretch()
         height_step = self._endgame_tree_height_step or 40
         decrease_btn = QToolButton(widget)
-        decrease_btn.setText("−")
         decrease_btn.setToolTip("Decrease endgame tree height")
         increase_btn = QToolButton(widget)
-        increase_btn.setText("+")
         increase_btn.setToolTip("Increase endgame tree height")
         button_config = player_stats_config.get('button', {})
         btn_height = int(button_config.get('height', 24))
         decrease_btn.setFixedHeight(btn_height)
         increase_btn.setFixedHeight(btn_height)
-        # Match button text color to tree text for dark theme consistency
-        btn_text = f"rgb({text_color.red()}, {text_color.green()}, {text_color.blue()})"
-        decrease_btn.setStyleSheet(f"QToolButton {{ color: {btn_text}; }}")
-        increase_btn.setStyleSheet(f"QToolButton {{ color: {btn_text}; }}")
+        decrease_btn.setFixedWidth(btn_height)
+        increase_btn.setFixedWidth(btn_height)
+        # Use themed icons (configurable).
+        controls_cfg = player_stats_config.get("tree_height_controls", {}) if isinstance(player_stats_config.get("tree_height_controls", {}), dict) else {}
+        icon_tint = controls_cfg.get("icon_tint_rgb", [text_color.red(), text_color.green(), text_color.blue()])
+        icons_cfg = controls_cfg.get("icons", {}) if isinstance(controls_cfg.get("icons", {}), dict) else {}
+        zoom_in_svg = str(icons_cfg.get("zoom_in_svg", SVG_ZOOM_IN))
+        zoom_out_svg = str(icons_cfg.get("zoom_out_svg", SVG_ZOOM_OUT))
+        icon_px = int(controls_cfg.get("icon_size_px", 16))
+        self._apply_tree_height_control_icons(
+            decrease_btn=decrease_btn,
+            increase_btn=increase_btn,
+            tint_rgb=icon_tint,
+            zoom_in_svg=zoom_in_svg,
+            zoom_out_svg=zoom_out_svg,
+            icon_px=icon_px,
+            button_style_cfg=button_config,
+        )
         decrease_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_endgame_tree_height(-step))
         increase_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_endgame_tree_height(step))
         controls_layout.addWidget(decrease_btn)
@@ -5470,19 +5545,31 @@ class DetailPlayerStatsView(QWidget):
         controls_layout.addStretch()
         height_step = self._opening_tree_height_step or 40
         decrease_btn = QToolButton(widget)
-        decrease_btn.setText("−")
         decrease_btn.setToolTip("Decrease opening tree height")
         increase_btn = QToolButton(widget)
-        increase_btn.setText("+")
         increase_btn.setToolTip("Increase opening tree height")
         button_config = player_stats_config.get('button', {})
         btn_height = int(button_config.get('height', 24))
         decrease_btn.setFixedHeight(btn_height)
         increase_btn.setFixedHeight(btn_height)
-        # Match button text color to tree text for dark theme consistency
-        btn_text = f"rgb({text_color.red()}, {text_color.green()}, {text_color.blue()})"
-        decrease_btn.setStyleSheet(f"QToolButton {{ color: {btn_text}; }}")
-        increase_btn.setStyleSheet(f"QToolButton {{ color: {btn_text}; }}")
+        decrease_btn.setFixedWidth(btn_height)
+        increase_btn.setFixedWidth(btn_height)
+        # Use themed icons (configurable).
+        controls_cfg = player_stats_config.get("tree_height_controls", {}) if isinstance(player_stats_config.get("tree_height_controls", {}), dict) else {}
+        icon_tint = controls_cfg.get("icon_tint_rgb", [text_color.red(), text_color.green(), text_color.blue()])
+        icons_cfg = controls_cfg.get("icons", {}) if isinstance(controls_cfg.get("icons", {}), dict) else {}
+        zoom_in_svg = str(icons_cfg.get("zoom_in_svg", SVG_ZOOM_IN))
+        zoom_out_svg = str(icons_cfg.get("zoom_out_svg", SVG_ZOOM_OUT))
+        icon_px = int(controls_cfg.get("icon_size_px", 16))
+        self._apply_tree_height_control_icons(
+            decrease_btn=decrease_btn,
+            increase_btn=increase_btn,
+            tint_rgb=icon_tint,
+            zoom_in_svg=zoom_in_svg,
+            zoom_out_svg=zoom_out_svg,
+            icon_px=icon_px,
+            button_style_cfg=button_config,
+        )
         decrease_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_opening_tree_height(-step))
         increase_btn.clicked.connect(lambda checked=False, step=height_step: self._adjust_opening_tree_height(step))
         controls_layout.addWidget(decrease_btn)
@@ -6305,8 +6392,14 @@ class DetailPlayerStatsView(QWidget):
             spacing = error_patterns_config.get('item_spacing', 8)
             truncation_config = error_patterns_config.get('truncation', {})
             min_text_width = truncation_config.get('min_text_width', 50)
-            # Reserve space for button when full (so title elides to one line and row height stays consistent)
-            button_reserve = 90 if should_show_full else 0
+            # Reserve space for the View button when visible so the title elides to one line.
+            # Use the actual widget size hint (instead of a hardcoded pixel guess) to be robust across fonts/themes.
+            button_reserve = 0
+            if should_show_full and button and button.isVisible():
+                try:
+                    button_reserve = int(button.sizeHint().width()) + spacing
+                except Exception:
+                    button_reserve = 90
             estimated_available = max(
                 min_text_width,
                 row_budget - item_margins - indicator_width - spacing - button_reserve,
