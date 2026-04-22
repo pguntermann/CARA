@@ -1523,7 +1523,19 @@
           "buttons": {
             "height": 28,
             "padding": [6, 4],
-            "border_radius": 4
+            "border_radius": 4,
+            "start_stop": {
+              "start_icon_tint_rgb": {
+                "$ref": "$_COLOR_TEXT_PRIMARY"
+              },
+              "stop_icon_tint_rgb": {
+                "$ref": "$_COLOR_ON_ACCENT"
+              },
+              "icons": {
+                "start_svg": "app/resources/icons/menu_play.svg",
+                "stop_svg": "app/resources/icons/menu_stop.svg"
+              }
+            }
           },
           "multipv_buttons": {
             "width": 30
@@ -1904,6 +1916,13 @@
             "height": 28,
             "padding": [6, 4],
             "border_radius": 4,
+            "icon_tint_rgb": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            },
+            "icons": {
+              "add_svg": "app/resources/icons/menu_plus.svg",
+              "remove_svg": "app/resources/icons/menu_minus.svg"
+            },
             "spacing": 8,
             "margins": [8, 8, 8, 8],
             "background_color": {
@@ -2001,6 +2020,7 @@
               "border": [100, 120, 160]
             },
             "add_tab": {
+              "icon_svg": "app/resources/icons/folder_open.svg",
               "icon_tint": {
                 "$ref": "$_COLOR_ACCENT_PRIMARY"
               },
@@ -2791,7 +2811,8 @@
           },
           "hover_border_offset": 20,
           "disabled_brightness_factor": 0.5,
-          "browse_button_height": 28
+          "browse_button_height": 28,
+          "browse_button_icon_svg": "app/resources/icons/folder_open.svg"
         },
         "buttons": {
           "spacing": 10,

@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy, QMenu, QApplication
 )
-from PyQt6.QtCore import Qt, QEvent, QPropertyAnimation, QEasingCurve, QTimer, QPoint
+from PyQt6.QtCore import Qt, QEvent, QPropertyAnimation, QEasingCurve, QTimer, QPoint, QSize
 from PyQt6.QtGui import QPalette, QColor, QFont, QFontMetrics
 from typing import Dict, Any, Optional
 
@@ -13,6 +13,7 @@ from app.models.manual_analysis_model import ManualAnalysisModel
 from app.controllers.manual_analysis_controller import ManualAnalysisController
 from app.controllers.engine_controller import TASK_MANUAL_ANALYSIS
 from app.views.dialogs.message_dialog import MessageDialog
+from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_PLAY, SVG_MENU_STOP
 
 
 class DetailManualAnalysisView(QWidget):
@@ -54,6 +55,9 @@ class DetailManualAnalysisView(QWidget):
         self.start_stop_button.toggled.connect(self._on_start_stop_toggled)
         self.add_line_button.clicked.connect(self._on_add_line_clicked)
         self.remove_line_button.clicked.connect(self._on_remove_line_clicked)
+
+        # Apply initial start/stop icon (text is set in _setup_ui)
+        self._refresh_start_stop_button_icon(is_analyzing=self._is_analyzing)
         
         # Connect to models if provided
         if game_model:
@@ -158,6 +162,32 @@ class DetailManualAnalysisView(QWidget):
         # Trajectory 3 colors (third most moved piece)
         trajectory_3_config = positional_plans_config.get('trajectory_3', {})
         self.trajectory_3_color = trajectory_3_config.get('color_end', [255, 150, 0])
+
+    def _refresh_start_stop_button_icon(self, is_analyzing: bool) -> None:
+        """Set the start/stop button icon based on analysis state."""
+        if not hasattr(self, "start_stop_button"):
+            return
+
+        ui_config = self.config.get("ui", {})
+        manual_cfg = (
+            ui_config.get("panels", {}).get("detail", {}).get("manual_analysis", {})
+        )
+        start_stop_cfg = (manual_cfg.get("buttons", {}) or {}).get("start_stop", {})
+        # Prefer per-state tints; fall back to legacy single tint if present.
+        legacy_tint = start_stop_cfg.get("icon_tint_rgb")
+        if not isinstance(legacy_tint, (list, tuple)) or len(legacy_tint) < 3:
+            legacy_tint = [220, 220, 240]
+        start_tint = start_stop_cfg.get("start_icon_tint_rgb", legacy_tint)
+        stop_tint = start_stop_cfg.get("stop_icon_tint_rgb", legacy_tint)
+        tint = stop_tint if is_analyzing else start_tint
+        icons_cfg = start_stop_cfg.get("icons", {})
+
+        start_svg = icons_cfg.get("start_svg", SVG_MENU_PLAY)
+        stop_svg = icons_cfg.get("stop_svg", SVG_MENU_STOP)
+        svg_path = stop_svg if is_analyzing else start_svg
+
+        self.start_stop_button.setIcon(themed_icon_from_svg(svg_path, tint))
+        self.start_stop_button.setIconSize(QSize(18, 18))
     
     def _setup_ui(self) -> None:
         """Setup the manual analysis UI."""
@@ -1104,6 +1134,7 @@ class DetailManualAnalysisView(QWidget):
                 # Failed to start - uncheck button
                 self.start_stop_button.setChecked(False)
                 self.start_stop_button.setText("Start Analysis")
+                self._refresh_start_stop_button_icon(is_analyzing=False)
         else:
             # Stop analysis
             self._analysis_controller.stop_analysis()
@@ -1293,6 +1324,7 @@ class DetailManualAnalysisView(QWidget):
             if self.statistics_bar:
                 self.statistics_bar.setVisible(False)
         self.start_stop_button.blockSignals(False)
+        self._refresh_start_stop_button_icon(is_analyzing=is_analyzing)
     
     def _on_lines_changed(self) -> None:
         """Handle lines count change from model."""

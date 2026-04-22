@@ -392,12 +392,13 @@ class EngineDialog(QDialog):
             padding=button_padding  # Same vertical padding as input field
         )
         
-        # Folder glyph (template SVG tinted like input text; same asset as File → Open)
+        # Folder glyph (template SVG tinted like input text; configurable SVG path)
         input_text_rgb = input_config.get("text_color")
         if not isinstance(input_text_rgb, (list, tuple)) or len(input_text_rgb) < 3:
             input_text_rgb = line_edit_config.get("text_color", [200, 200, 200])
         browse_tint = (int(input_text_rgb[0]), int(input_text_rgb[1]), int(input_text_rgb[2]))
-        self.browse_button.setIcon(themed_icon_from_svg(SVG_MENU_FOLDER_OPEN, browse_tint))
+        browse_svg = input_config.get("browse_button_icon_svg", SVG_MENU_FOLDER_OPEN)
+        self.browse_button.setIcon(themed_icon_from_svg(browse_svg, browse_tint))
         self.browse_button.setText("")
         self.browse_button.setIconSize(QSize(20, 20))
         

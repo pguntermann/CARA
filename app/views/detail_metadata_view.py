@@ -13,6 +13,7 @@ from app.controllers.metadata_controller import MetadataController
 from app.utils.table_export import table_to_delimited, get_copy_table_config
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.views.dialogs.add_pgn_header_dialog import AddPgnHeaderDialog
+from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_PLUS, SVG_MENU_MINUS
 
 
 class MetadataTableItemDelegate(QStyledItemDelegate):
@@ -143,11 +144,11 @@ class DetailMetadataView(QWidget):
         button_bar.setAutoFillBackground(True)
         
         # Add button
-        self.add_tag_button = QPushButton("Add")
+        self.add_tag_button = QPushButton()
         layout.addWidget(self.add_tag_button)
         
         # Remove button
-        self.remove_tag_button = QPushButton("Remove")
+        self.remove_tag_button = QPushButton()
         layout.addWidget(self.remove_tag_button)
         
         # Add stretch to push buttons to the left
@@ -159,8 +160,29 @@ class DetailMetadataView(QWidget):
         
         # Apply consistent styling to match other detail views
         self._apply_button_styling()
+        self._apply_button_icons()
         
         return button_bar
+
+    def _apply_button_icons(self) -> None:
+        """Apply themed SVG icons to the add/remove tag buttons."""
+        if not hasattr(self, "add_tag_button") or not hasattr(self, "remove_tag_button"):
+            return
+
+        ui_config = self.config.get("ui", {})
+        button_cfg = (
+            ui_config.get("panels", {}).get("detail", {}).get("metadata", {}).get("button", {})
+        )
+        icons_cfg = button_cfg.get("icons", {})
+        tint = button_cfg.get("icon_tint_rgb", [220, 220, 240])
+
+        add_svg = icons_cfg.get("add_svg", SVG_MENU_PLUS)
+        remove_svg = icons_cfg.get("remove_svg", SVG_MENU_MINUS)
+
+        self.add_tag_button.setIcon(themed_icon_from_svg(add_svg, tint))
+        self.remove_tag_button.setIcon(themed_icon_from_svg(remove_svg, tint))
+        for button in (self.add_tag_button, self.remove_tag_button):
+            button.setIconSize(QSize(18, 18))
 
     def _apply_button_styling(self) -> None:
         """Apply shared detail-panel button styling to metadata buttons using StyleManager."""

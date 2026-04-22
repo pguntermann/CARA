@@ -334,9 +334,14 @@ class DatabasePanel(QWidget):
         if self._add_tab_index < 0:
             return
         rgb = self._open_database_tab_icon_tint_rgb()
+        panel_config = (self.config.get("ui") or {}).get("panels", {}).get("database", {})
+        tabs_config = panel_config.get("tabs", {})
+        colors_config = tabs_config.get("colors", {})
+        add_tab = colors_config.get("add_tab", {})
+        svg_path = add_tab.get("icon_svg", SVG_MENU_FOLDER_OPEN)
         self.tab_widget.setTabIcon(
             self._add_tab_index,
-            themed_icon_from_svg(SVG_MENU_FOLDER_OPEN, rgb),
+            themed_icon_from_svg(svg_path, rgb),
         )
         self.tab_widget.setTabToolTip(self._add_tab_index, "Open database…")
 
