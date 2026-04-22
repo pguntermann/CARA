@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
     QColorDialog,
     QWidget,
     QScrollArea,
+    QFrame,
 )
 
 from PyQt6.QtSvg import QSvgRenderer
@@ -462,15 +463,21 @@ class ManageGameTagsDialog(QDialog):
             or 15
         )
 
-        groups_cfg = dlg_cfg.get("groups", {}) or {}
-        _gm = groups_cfg.get("content_margins") or groups_cfg.get("contents_margins", [10, 20, 10, 15])
-        self.group_content_margins = [int(x) for x in _gm[:4]]
-
         buttons_cfg = dlg_cfg.get("buttons", {}) or {}
         self.button_spacing = int(buttons_cfg.get("spacing", 10))
-        self.group_spacing = int(groups_cfg.get("spacing", 10))
-        self.builtin_chip_container_min_h = int(groups_cfg.get("builtin_chip_container_min_height", 36))
-        self.custom_chip_container_min_h = int(groups_cfg.get("custom_chip_container_min_height", 36))
+
+        sections_cfg = dlg_cfg.get("sections", {}) or {}
+        _cm = sections_cfg.get("content_margins", [10, 20, 10, 15])
+        self.section_content_margins = [int(x) for x in _cm[:4]]
+        self.builtin_chip_container_min_h = int(sections_cfg.get("builtin_chip_container_min_height", 36))
+        self.custom_chip_container_min_h = int(sections_cfg.get("custom_chip_container_min_height", 36))
+
+        sep_cfg = dlg_cfg.get("separator", {}) or {}
+        self.separator_padding_before = int(sep_cfg.get("padding_before", 12))
+        self.separator_padding_after = int(sep_cfg.get("padding_after", 12))
+        self.separator_thickness = int(sep_cfg.get("thickness", 1))
+        self.separator_style = str(sep_cfg.get("style", "solid")).strip().lower()
+        self.separator_color = sep_cfg.get("color", self.border_color)
 
         chips_cfg = dlg_cfg.get("chips", {}) or {}
         self.chip_spacing_multiplier = int(chips_cfg.get("spacing_multiplier", 2))
@@ -545,48 +552,56 @@ class ManageGameTagsDialog(QDialog):
     def _setup_ui(self) -> None:
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(*self.layout_margins)
-        # Match Import Games / Bulk Replace: explicit gaps between group boxes (setSpacing alone is easy to miss visually)
         main_layout.setSpacing(0)
 
-        # Built-in tags as chips
-        builtin_group = QGroupBox("Built-in game tags")
-        builtin_layout = QVBoxLayout()
-        builtin_layout.setContentsMargins(*self.group_content_margins)
-        builtin_layout.setSpacing(self.group_spacing)
-        builtin_group.setLayout(builtin_layout)
+        # Built-in chips scroll area (fixed-height)
+        self.builtin_scroll = QScrollArea()
+        self.builtin_scroll.setWidgetResizable(True)
+        self.builtin_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.builtin_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.builtin_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.builtin_scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.builtin_scroll.setFixedHeight(self.scroll_area_height)
 
         self.builtin_chip_container = QWidget()
         self.builtin_chip_container.setMinimumHeight(self.builtin_chip_container_min_h)
-        builtin_layout.addWidget(self.builtin_chip_container)
-        main_layout.addWidget(builtin_group)
+        self.builtin_scroll.setWidget(self.builtin_chip_container)
 
-        main_layout.addSpacing(self.section_spacing)
+        builtin_section = QWidget()
+        builtin_section_layout = QVBoxLayout(builtin_section)
+        builtin_section_layout.setContentsMargins(*self.section_content_margins)
+        builtin_section_layout.setSpacing(0)
+        builtin_section_layout.addWidget(self.builtin_scroll)
+        main_layout.addWidget(builtin_section)
 
-        # Custom tags (chips with + button)
-        custom_group = QGroupBox("Custom game tags")
-        custom_layout = QVBoxLayout()
-        custom_layout.setContentsMargins(*self.group_content_margins)
-        custom_layout.setSpacing(self.group_spacing)
-        custom_group.setLayout(custom_layout)
+        # Separator line
+        main_layout.addSpacing(self.separator_padding_before)
+        self.separator_line = QFrame()
+        self.separator_line.setFrameShape(QFrame.Shape.HLine)
+        self.separator_line.setFrameShadow(QFrame.Shadow.Plain)
+        self.separator_line.setFixedHeight(max(1, self.separator_thickness))
+        main_layout.addWidget(self.separator_line)
+        main_layout.addSpacing(self.separator_padding_after)
 
-        # Scroll area for chips
+        # Custom tags scroll area (fixed-height)
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        # Chip galleries should wrap; horizontal scrollbar is noise.
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.scroll.setFixedHeight(self.scroll_area_height)
+
         self.custom_chip_container = QWidget()
         self.custom_chip_container.setMinimumHeight(self.custom_chip_container_min_h)
         self.scroll.setWidget(self.custom_chip_container)
-        self.scroll.setFixedHeight(self.scroll_area_height)
-        # Scroll viewport height is config-fixed; overall dialog height follows layout (chip rows + padding).
-        self.scroll.setSizePolicy(
-            QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Fixed,
-        )
-        custom_layout.addWidget(self.scroll, 0)
 
-        main_layout.addWidget(custom_group, 0)
+        custom_section = QWidget()
+        custom_section_layout = QVBoxLayout(custom_section)
+        custom_section_layout.setContentsMargins(*self.section_content_margins)
+        custom_section_layout.setSpacing(0)
+        custom_section_layout.addWidget(self.scroll, 0)
+        main_layout.addWidget(custom_section, 0)
 
         main_layout.addSpacing(self.bottom_button_top_padding)
 
@@ -632,44 +647,36 @@ class ManageGameTagsDialog(QDialog):
                 min_height=default_btn_h,
             )
 
-        groups = list(self.findChildren(QGroupBox))
-        if groups:
-            dlg_cfg = (self.config.get("ui", {}) or {}).get("dialogs", {}).get("manage_game_tags", {})
-            groups_cfg = dlg_cfg.get("groups", {}) or {}
-            bc = self.border_color if isinstance(self.border_color, list) and len(self.border_color) >= 3 else [60, 60, 65]
-            bc = [int(bc[0]), int(bc[1]), int(bc[2])]
-            bg_rgb = [self.bg_color.red(), self.bg_color.green(), self.bg_color.blue()]
-            title_ff = groups_cfg.get("title_font_family")
-            title_ff = resolve_font_family(title_ff) if title_ff else None
-            title_fs = (
-                scale_font_size(groups_cfg["title_font_size"])
-                if "title_font_size" in groups_cfg
-                else None
+        # Separator line styling
+        try:
+            if isinstance(self.separator_color, list) and len(self.separator_color) >= 3:
+                c = [int(self.separator_color[0]), int(self.separator_color[1]), int(self.separator_color[2])]
+            else:
+                c = border
+            style_map = {"solid": "solid", "dashed": "dashed", "dotted": "dotted"}
+            line_style = style_map.get(self.separator_style, "solid")
+            self.separator_line.setStyleSheet(
+                "QFrame {"
+                "border: none;"
+                f"border-top: {max(1, int(self.separator_thickness))}px {line_style} rgb({c[0]}, {c[1]}, {c[2]});"
+                "background: transparent;"
+                "}"
             )
-            title_color = groups_cfg.get("title_color")
-            if isinstance(title_color, dict) and "$ref" in title_color:
-                title_color = None
-            StyleManager.style_group_boxes(
-                groups,
-                self.config,
-                border_color=bc,
-                bg_color=bg_rgb,
-                border_radius=groups_cfg.get("border_radius"),
-                border_width=groups_cfg.get("border_width"),
-                margin_top=groups_cfg.get("margin_top"),
-                padding_top=groups_cfg.get("padding_top"),
-                title_font_family=title_ff,
-                title_font_size=title_fs,
-                title_color=title_color,
-                title_left=groups_cfg.get("title_left"),
-                title_padding=groups_cfg.get("title_padding"),
-                content_margins=list(self.group_content_margins),
-            )
+        except Exception:
+            pass
 
         # Scrollbar styling
         try:
             StyleManager.style_scroll_area(
                 self.scroll,
+                self.config,
+                bg_color=bg,
+                border_color=border,
+                border_radius=3,
+                include_scroll_area_border=False,
+            )
+            StyleManager.style_scroll_area(
+                self.builtin_scroll,
                 self.config,
                 bg_color=bg,
                 border_color=border,

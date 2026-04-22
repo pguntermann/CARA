@@ -2410,7 +2410,7 @@
       "manage_game_tags": {
         "width": 600,
         "bottom_button_top_padding": 50,
-        "scroll_area_height": 120,
+        "scroll_area_height": 130,
         "background_color": {
           "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
@@ -2438,11 +2438,19 @@
           "width": 120,
           "height": 30
         },
-        "groups": {
-          "content_margins": [10, 20, 10, 15],
-          "spacing": 10,
+        "sections": {
+          "content_margins": [8, 12, 8, 10],
           "builtin_chip_container_min_height": 36,
           "custom_chip_container_min_height": 36
+        },
+        "separator": {
+          "color": {
+            "$ref": "$_COLOR_FOREST_OUTLINE"
+          },
+          "thickness": 1,
+          "style": "solid",
+          "padding_before": 12,
+          "padding_after": 12
         },
         "chips": {
           "spacing_multiplier": 2,
