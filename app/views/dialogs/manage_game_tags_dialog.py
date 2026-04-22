@@ -39,6 +39,16 @@ from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.path_resolver import get_app_root
 
 
+class _NoWheelScrollArea(QScrollArea):
+    """ScrollArea that ignores wheel/trackpad scrolling (used to suppress scrolling)."""
+
+    def wheelEvent(self, event) -> None:  # type: ignore[override]
+        try:
+            event.ignore()
+        except Exception:
+            return
+
+
 class ColorSwatchButton(QPushButton):
     """Button that displays a color swatch and opens color picker on click."""
 
@@ -555,11 +565,11 @@ class ManageGameTagsDialog(QDialog):
         main_layout.setSpacing(0)
 
         # Built-in chips scroll area (fixed-height)
-        self.builtin_scroll = QScrollArea()
+        self.builtin_scroll = _NoWheelScrollArea()
         self.builtin_scroll.setWidgetResizable(True)
         self.builtin_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         self.builtin_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.builtin_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.builtin_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.builtin_scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.builtin_scroll.setFixedHeight(self.scroll_area_height)
 
