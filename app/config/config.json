@@ -140,8 +140,8 @@
             }
           },
           "top_games": {
-            "max_best": 5,
-            "max_worst": 5
+            "max_best": 3,
+            "max_worst": 3
           },
           "error_patterns": {
             "thresholds": {
