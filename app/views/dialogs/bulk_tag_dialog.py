@@ -15,6 +15,8 @@ from PyQt6.QtWidgets import (
     QButtonGroup,
     QSizePolicy,
     QWidget,
+    QScrollArea,
+    QGridLayout,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent, QResizeEvent
@@ -28,14 +30,6 @@ from app.utils.path_display_utils import truncate_path_for_display, truncate_tex
 
 class BulkTagDialog(QDialog):
     """Dialog for bulk tag operations on databases."""
-    
-    # Standard PGN tags
-    STANDARD_TAGS = [
-        "White", "Black", "Result", "Date", "Event", "Site", "Round",
-        "ECO", "WhiteElo", "BlackElo", "TimeControl", "WhiteTitle",
-        "BlackTitle", "WhiteFideId", "BlackFideId", "WhiteTeam", "BlackTeam",
-        "PlyCount", "EventDate", "Termination", "Annotator", "UTCTime"
-    ]
     
     def __init__(self, config: Dict[str, Any], bulk_tag_controller: BulkTagController,
                  database: Optional[DatabaseModel], selected_game_indices: Optional[List[int]] = None, parent=None) -> None:
@@ -137,6 +131,17 @@ class BulkTagDialog(QDialog):
         self.checkbox_checked_bg_color = QColor(*checked_config.get("background_color", [70, 90, 130]))
         self.checkbox_checked_border_color = QColor(*checked_config.get("border_color", [100, 120, 160]))
         self.checkbox_hover_border_offset = checkboxes_config.get("hover_border_offset", 20)
+
+        # Tags list (remove-tags multi-select)
+        tags_list_config = dialog_config.get("tags_list", {}) if isinstance(dialog_config.get("tags_list", {}), dict) else {}
+        self.tags_list_height = int(tags_list_config.get("height", 180))
+        self.tags_list_columns = int(tags_list_config.get("columns", 2))
+        self.tags_list_spacing = int(tags_list_config.get("spacing", 8))
+        self.tags_list_margins = tags_list_config.get("margins", [10, 6, 8, 10])
+        try:
+            self.tags_list_margins = [int(x) for x in self.tags_list_margins[:4]]
+        except Exception:
+            self.tags_list_margins = [10, 6, 8, 10]
         
         # Radio buttons
         radio_buttons_config = dialog_config.get("radio_buttons", {})
@@ -294,7 +299,7 @@ class BulkTagDialog(QDialog):
         )
         self.operation_button_group = QButtonGroup(self)
         self.add_tag_radio = QRadioButton("Add Tag")
-        self.remove_tag_radio = QRadioButton("Remove Tag")
+        self.remove_tag_radio = QRadioButton("Remove Tag(s)")
         self.operation_button_group.addButton(self.add_tag_radio, 0)
         self.operation_button_group.addButton(self.remove_tag_radio, 1)
         self.add_tag_radio.setChecked(True)
@@ -336,7 +341,7 @@ class BulkTagDialog(QDialog):
         
         # Tag selection
         self.tag_combo = QComboBox()
-        self.tag_combo.addItems(self.STANDARD_TAGS)
+        self.tag_combo.addItems(self.controller.get_add_tag_options())
         self.tag_combo.setCurrentText("EventDate")
         self.tag_combo.setMinimumWidth(self.input_minimum_width)
         self.tag_combo.setMinimumHeight(self.input_minimum_height)
@@ -345,6 +350,54 @@ class BulkTagDialog(QDialog):
         self.tag_label.setFont(QFont(self.label_font_family, self.label_font_size))
         self.tag_label.setMinimumWidth(label_min_width)
         tag_layout.addRow(self.tag_label, self.tag_combo)
+
+        # Remove tags selection (multi-select, shown only in Remove Tag mode)
+        self.remove_tags_scroll_area = QScrollArea()
+        self.remove_tags_scroll_area.setWidgetResizable(True)
+        self.remove_tags_scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.remove_tags_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        remove_tags_widget = QWidget()
+        remove_tags_widget.setAutoFillBackground(True)
+        tags_grid = QGridLayout(remove_tags_widget)
+        tags_grid.setContentsMargins(
+            self.tags_list_margins[0],
+            self.tags_list_margins[1],
+            self.tags_list_margins[2],
+            self.tags_list_margins[3],
+        )
+        tags_grid.setSpacing(self.tags_list_spacing)
+
+        self._remove_tags_widget = remove_tags_widget
+        self._remove_tags_grid = tags_grid
+        self._remove_tag_checkboxes: Dict[str, QCheckBox] = {}
+
+        self.remove_tags_scroll_area.setWidget(remove_tags_widget)
+        self.remove_tags_scroll_area.setFixedHeight(self.tags_list_height)
+
+        remove_tags_container = QWidget()
+        remove_tags_container_layout = QVBoxLayout(remove_tags_container)
+        remove_tags_container_layout.setContentsMargins(0, 0, 0, 0)
+        remove_tags_container_layout.setSpacing(8)
+
+        btn_row = QHBoxLayout()
+        btn_row.setContentsMargins(0, 0, 0, 0)
+        btn_row.setSpacing(self.button_spacing)
+        self.remove_select_all_btn = QPushButton("Select All")
+        self.remove_deselect_all_btn = QPushButton("Deselect All")
+        self.remove_select_all_btn.clicked.connect(self._on_remove_select_all_clicked)
+        self.remove_deselect_all_btn.clicked.connect(self._on_remove_deselect_all_clicked)
+        btn_row.addWidget(self.remove_select_all_btn)
+        btn_row.addWidget(self.remove_deselect_all_btn)
+        btn_row.addStretch()
+
+        remove_tags_container_layout.addLayout(btn_row)
+        remove_tags_container_layout.addWidget(self.remove_tags_scroll_area)
+
+        self.remove_tags_label = QLabel("Tags to remove:")
+        self.remove_tags_label.setFont(QFont(self.label_font_family, self.label_font_size))
+        self.remove_tags_label.setMinimumWidth(label_min_width)
+        tag_layout.addRow(self.remove_tags_label, remove_tags_container)
         
         # Spacer before value source options
         spacer_widget = QWidget()
@@ -386,7 +439,7 @@ class BulkTagDialog(QDialog):
         
         # Source tag selection (for Add Tag mode with copy from tag)
         self.source_tag_combo = QComboBox()
-        self.source_tag_combo.addItems(self.STANDARD_TAGS)
+        self.source_tag_combo.addItems(self.controller.STANDARD_TAGS)
         self.source_tag_combo.setCurrentText("Date")
         self.source_tag_combo.setMinimumWidth(self.input_minimum_width)
         self.source_tag_combo.setMinimumHeight(self.input_minimum_height)
@@ -399,10 +452,11 @@ class BulkTagDialog(QDialog):
         self._tag_form_layout = tag_layout
         # Row indices for QFormLayout.setRowVisible (addRow order)
         self._form_row_tag_combo = 0
-        self._form_row_tag_spacer = 1
-        self._form_row_value_source = 2
-        self._form_row_fixed_value = 3
-        self._form_row_source_tag = 4
+        self._form_row_remove_tags = 1
+        self._form_row_tag_spacer = 2
+        self._form_row_value_source = 3
+        self._form_row_fixed_value = 4
+        self._form_row_source_tag = 5
         
         tag_group.setLayout(tag_layout)
         main_layout.addWidget(tag_group)
@@ -463,7 +517,7 @@ class BulkTagDialog(QDialog):
         # Apply button styling using StyleManager (uses unified config)
         from app.views.style import StyleManager
         StyleManager.style_buttons(
-            [self.apply_button, self.cancel_button],
+            [self.apply_button, self.cancel_button, self.remove_select_all_btn, self.remove_deselect_all_btn],
             self.config,
             bg_color,
             border_color,
@@ -476,6 +530,18 @@ class BulkTagDialog(QDialog):
         inputs_config = dialog_config.get("inputs", {})
         selection_bg = inputs_config.get('selection_background_color', [70, 90, 130])
         selection_text = inputs_config.get('selection_text_color', [240, 240, 240])
+
+        # Match Bulk Replace tag list background for remove-tags list (falls back to input bg).
+        tags_list_config = dialog_config.get("tags_list", {}) if isinstance(dialog_config.get("tags_list", {}), dict) else {}
+        tags_bg = tags_list_config.get("background_color", None)
+        if isinstance(tags_bg, list) and len(tags_bg) == 3:
+            tags_list_bg_color = QColor(*tags_bg)
+        else:
+            tags_list_bg_color = QColor(self.input_bg_color)
+        self._remove_tags_widget.setAutoFillBackground(True)
+        tags_palette = self._remove_tags_widget.palette()
+        tags_palette.setColor(self._remove_tags_widget.backgroundRole(), tags_list_bg_color)
+        self._remove_tags_widget.setPalette(tags_palette)
         
         # Apply unified line edit styling using StyleManager
         from app.views.style import StyleManager
@@ -611,6 +677,18 @@ class BulkTagDialog(QDialog):
         
         # Apply checkbox styling to ensure consistent font size and style
         self._apply_checkbox_styling()
+
+        # Style remove-tags scroll area like bulk replace tags list
+        from app.views.style import StyleManager
+        input_bg = [self.input_bg_color.red(), self.input_bg_color.green(), self.input_bg_color.blue()]
+        input_border = [self.input_border_color.red(), self.input_border_color.green(), self.input_border_color.blue()]
+        StyleManager.style_scroll_area(
+            self.remove_tags_scroll_area,
+            self.config,
+            input_bg,
+            input_border,
+            self.input_border_radius,
+        )
     
     def _apply_checkbox_styling(self) -> None:
         """Apply checkbox styling to all checkboxes."""
@@ -648,9 +726,8 @@ class BulkTagDialog(QDialog):
         self._apply_configured_dialog_size()
         self._apply_checkbox_styling()
         self._update_path_label_truncation()
-        # Update tag combobox if in remove mode
         if self.remove_tag_radio.isChecked():
-            self._update_tag_combo_for_remove()
+            self._rebuild_remove_tags_widget()
         self._apply_configured_dialog_size()
     
     def resizeEvent(self, event: QResizeEvent) -> None:
@@ -680,6 +757,8 @@ class BulkTagDialog(QDialog):
         """Show/hide whole form rows (setVisible leaves empty gaps in QFormLayout)."""
         form = self._tag_form_layout
         is_add = self.add_tag_radio.isChecked()
+        form.setRowVisible(self._form_row_tag_combo, is_add)
+        form.setRowVisible(self._form_row_remove_tags, not is_add)
         form.setRowVisible(self._form_row_tag_spacer, is_add)
         form.setRowVisible(self._form_row_value_source, is_add)
         if not is_add:
@@ -696,74 +775,52 @@ class BulkTagDialog(QDialog):
         
         self._sync_tag_form_row_visibility()
         
-        # Update tag label
-        self.tag_label.setText("Tag:" if is_add_mode else "Tag to remove:")
-        
-        # Update tag combobox based on operation mode
         if is_add_mode:
-            # Add mode: use standard tags
+            self.tag_label.setText("Tag:")
             self.tag_combo.clear()
-            self.tag_combo.addItems(self.STANDARD_TAGS)
+            self.tag_combo.addItems(self.controller.get_add_tag_options())
             self.tag_combo.setCurrentText("EventDate")
         else:
-            # Remove mode: use tags that exist in the database
-            self._update_tag_combo_for_remove()
+            self._rebuild_remove_tags_widget()
         self._apply_configured_dialog_size()
-    
-    def _update_tag_combo_for_remove(self) -> None:
-        """Update tag combobox with tags that exist in the database."""
-        if not self.database:
+
+    def _get_available_tags(self) -> List[str]:
+        """Get available tags from database, ordered by commonality."""
+        return self.controller.get_removable_tags(self.database)
+
+    def _rebuild_remove_tags_widget(self) -> None:
+        """Rebuild multi-select tag list for Remove Tag mode."""
+        for cb in self._remove_tag_checkboxes.values():
+            cb.setParent(None)
+        self._remove_tag_checkboxes.clear()
+
+        tags = self._get_available_tags()
+        if not tags:
+            self.remove_select_all_btn.setEnabled(False)
+            self.remove_deselect_all_btn.setEnabled(False)
             return
-        
-        # Extract all tags from database games
-        existing_tags = self._extract_tags_from_database()
-        
-        # Sort tags: standard tags first (in order), then non-standard tags alphabetically
-        standard_tags_set = set(self.STANDARD_TAGS)
-        standard_tags_list = [tag for tag in self.STANDARD_TAGS if tag in existing_tags]
-        non_standard_tags = sorted([tag for tag in existing_tags if tag not in standard_tags_set])
-        
-        # Combine: standard tags first, then non-standard tags
-        all_tags = standard_tags_list + non_standard_tags
-        
-        # Update combobox
-        self.tag_combo.clear()
-        if all_tags:
-            self.tag_combo.addItems(all_tags)
-            self.tag_combo.setCurrentText(all_tags[0])
-        else:
-            # No tags found, keep editable for manual entry
-            self.tag_combo.setCurrentText("")
-    
-    def _extract_tags_from_database(self) -> set:
-        """Extract all tags that exist in the database games.
-        
-        Returns:
-            Set of tag names that exist in at least one game.
-        """
-        if not self.database:
-            return set()
-        
-        tags = set()
-        games = self.database.get_all_games()
-        
-        for game in games:
-            try:
-                import chess.pgn
-                from io import StringIO
-                
-                # Parse PGN to get headers
-                pgn_io = StringIO(game.pgn)
-                chess_game = chess.pgn.read_game(pgn_io)
-                
-                if chess_game:
-                    # Add all tag names from headers
-                    tags.update(chess_game.headers.keys())
-            except Exception:
-                # Skip games that fail to parse
-                continue
-        
-        return tags
+
+        self.remove_select_all_btn.setEnabled(True)
+        self.remove_deselect_all_btn.setEnabled(True)
+
+        cols = max(1, int(self.tags_list_columns))
+        for i, tag in enumerate(tags):
+            cb = QCheckBox(tag)
+            self._remove_tag_checkboxes[tag] = cb
+            r = i // cols
+            c = i % cols
+            self._remove_tags_grid.addWidget(cb, r, c)
+
+        self._apply_checkbox_styling()
+        self._remove_tags_widget.updateGeometry()
+
+    def _on_remove_select_all_clicked(self) -> None:
+        for cb in self._remove_tag_checkboxes.values():
+            cb.setChecked(True)
+
+    def _on_remove_deselect_all_clicked(self) -> None:
+        for cb in self._remove_tag_checkboxes.values():
+            cb.setChecked(False)
     
     def _on_value_source_changed(self) -> None:
         """Handle value source selection change."""
@@ -786,24 +843,34 @@ class BulkTagDialog(QDialog):
         if self._operation_in_progress:
             return
         
-        # Get tag name
-        raw_tag_name = self.tag_combo.currentText().strip()
-        if not raw_tag_name:
-            from app.views.dialogs.message_dialog import MessageDialog
-            MessageDialog.show_warning(self.config, "Error", "Please enter a tag name", self)
-            return
-        
-        # Sanitize tag name using controller method
-        tag_name = self.controller.sanitize_tag_name(raw_tag_name)
-        if not tag_name:
-            from app.views.dialogs.message_dialog import MessageDialog
-            MessageDialog.show_warning(self.config, "Error", "Tag name contains only invalid characters", self)
-            return
-        
-        # If the tag name was modified, update the combobox to show the sanitized version
-        if tag_name != raw_tag_name:
-            # Update the combobox to show the sanitized tag name
-            self.tag_combo.setCurrentText(tag_name)
+        if self.add_tag_radio.isChecked():
+            raw_tag_name = self.tag_combo.currentText().strip()
+            if not raw_tag_name:
+                from app.views.dialogs.message_dialog import MessageDialog
+                MessageDialog.show_warning(self.config, "Error", "Please enter a tag name", self)
+                return
+
+            tag_name = self.controller.sanitize_tag_name(raw_tag_name)
+            if not tag_name:
+                from app.views.dialogs.message_dialog import MessageDialog
+                MessageDialog.show_warning(self.config, "Error", "Tag name contains only invalid characters", self)
+                return
+
+            if tag_name != raw_tag_name:
+                self.tag_combo.setCurrentText(tag_name)
+        else:
+            raw_selected = [t for t, cb in self._remove_tag_checkboxes.items() if cb.isChecked()]
+            if not raw_selected:
+                from app.views.dialogs.message_dialog import MessageDialog
+                MessageDialog.show_warning(self.config, "Error", "Please select at least one tag to remove", self)
+                return
+
+            tag_names = [self.controller.sanitize_tag_name(t) for t in raw_selected]
+            tag_names = [t for t in tag_names if t]
+            if not tag_names:
+                from app.views.dialogs.message_dialog import MessageDialog
+                MessageDialog.show_warning(self.config, "Error", "Tag selection contains only invalid characters", self)
+                return
         
         # Get game indices
         game_indices = None
@@ -869,9 +936,9 @@ class BulkTagDialog(QDialog):
                 )
             else:
                 # Remove tag operation
-                result = self.controller.remove_tag(
+                result = self.controller.remove_tags(
                     self.database,
-                    tag_name,
+                    tag_names,
                     game_indices
                 )
             
@@ -899,6 +966,9 @@ class BulkTagDialog(QDialog):
     def _set_controls_enabled(self, enabled: bool) -> None:
         """Enable or disable all controls."""
         self.tag_combo.setEnabled(enabled)
+        self.remove_tags_scroll_area.setEnabled(enabled)
+        self.remove_select_all_btn.setEnabled(enabled)
+        self.remove_deselect_all_btn.setEnabled(enabled)
         self.add_tag_radio.setEnabled(enabled)
         self.remove_tag_radio.setEnabled(enabled)
         self.fixed_value_radio.setEnabled(enabled)

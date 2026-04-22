@@ -19,6 +19,37 @@ class BulkTagController(QObject):
     
     # Signal emitted when operation completes
     operation_complete = pyqtSignal(BulkOperationStats)  # result
+
+    # Standard PGN tags (dialog presents these as common options)
+    STANDARD_TAGS: List[str] = [
+        "White",
+        "Black",
+        "Result",
+        "Date",
+        "Event",
+        "Site",
+        "Round",
+        "ECO",
+        "WhiteElo",
+        "BlackElo",
+        "TimeControl",
+        "WhiteTitle",
+        "BlackTitle",
+        "WhiteFideId",
+        "BlackFideId",
+        "WhiteTeam",
+        "BlackTeam",
+        "PlyCount",
+        "EventDate",
+        "Termination",
+        "Annotator",
+        "UTCTime",
+    ]
+
+    # PGN Seven Tag Roster (always present in exported PGN; omit from add/remove options)
+    FIXED_PGN_TAGS: frozenset[str] = frozenset(
+        {"Event", "Site", "Date", "Round", "White", "Black", "Result"}
+    )
     
     def __init__(self, config: Dict[str, Any], database_controller, game_controller=None) -> None:
         """Initialize the bulk tag controller.
@@ -49,6 +80,17 @@ class BulkTagController(QObject):
             The active DatabaseModel instance, or None.
         """
         return self.database_controller.get_active_database()
+
+    def get_add_tag_options(self) -> List[str]:
+        """Tag name presets for Add Tag mode (omits fixed PGN roster tags)."""
+        return [t for t in self.STANDARD_TAGS if t not in self.FIXED_PGN_TAGS]
+
+    def get_removable_tags(self, database: Optional[DatabaseModel]) -> List[str]:
+        """Tags shown in Remove Tag(s) mode (omits fixed PGN roster tags)."""
+        if not database:
+            return []
+        tags = self.database_controller.get_available_tags(database)
+        return [t for t in tags if t not in self.FIXED_PGN_TAGS]
     
     @staticmethod
     def sanitize_tag_name(tag_name: str) -> str:
@@ -159,17 +201,17 @@ class BulkTagController(QObject):
         
         return result
     
-    def remove_tag(
+    def remove_tags(
         self,
         database: DatabaseModel,
-        tag_name: str,
+        tag_names: List[str],
         game_indices: Optional[List[int]] = None
     ) -> BulkOperationStats:
-        """Remove a tag from games.
+        """Remove one or more tags from games.
         
         Args:
             database: DatabaseModel instance to process.
-            tag_name: PGN tag name to remove (will be sanitized).
+            tag_names: PGN tag names to remove (each will be sanitized).
             game_indices: Optional list of game indices to process (None = all games).
             
         Returns:
@@ -177,8 +219,8 @@ class BulkTagController(QObject):
         """
         self._cancelled = False
         
-        # Sanitize tag name to ensure it's valid for PGN format
-        tag_name = self.sanitize_tag_name(tag_name)
+        tag_names = [self.sanitize_tag_name(t) for t in tag_names]
+        tag_names = [t for t in tag_names if t]
         
         # Show progress
         self.progress_service.show_progress()
@@ -198,9 +240,9 @@ class BulkTagController(QObject):
             return self._cancelled
         
         # Perform operation
-        result = self.service.remove_tag(
+        result = self.service.remove_tags(
             database,
-            tag_name,
+            tag_names,
             game_indices,
             progress_callback,
             cancel_flag

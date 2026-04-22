@@ -3246,6 +3246,15 @@
             "$ref": "$_COLOR_INK_BODY"
           }
         },
+        "tags_list": {
+          "background_color": {
+            "$ref": "$_COLOR_WHEAT_CREAM"
+          },
+          "height": 120,
+          "columns": 2,
+          "spacing": 8,
+          "margins": [10, 6, 8, 10]
+        },
         "groups": {
           "title_font_family": {
             "$ref": "$_FONT_FAMILY_PRIMARY"
