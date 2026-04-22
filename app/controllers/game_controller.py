@@ -925,8 +925,10 @@ class GameController:
             ply_count = 0
             last_known_eco = None  # Track last known ECO (for positions not in database)
             last_known_opening_name = None  # Track last known opening name (for positions not in database)
-            previous_move_eco = None  # Track previous move's ECO for comparison
-            previous_move_opening_name = None  # Track previous move's opening name for comparison
+            previous_row_eco = None  # Track previous full-move row ECO (after black move, or last white if game ended)
+            previous_row_opening_name = None  # Track previous full-move row opening name
+            pending_row_eco = ""  # Latest known opening for the current row (updated on each ply)
+            pending_row_opening_name = ""  # Latest known opening name for the current row (updated on each ply)
             
             # Iterate through the main line variations
             while node.variations:
@@ -950,24 +952,12 @@ class GameController:
                 if opening_name:
                     last_known_opening_name = opening_name
                 
-                # Use the found opening, or fall back to last known opening if not found
-                display_eco = eco if eco else (last_known_eco if last_known_eco else "")
-                display_opening_name = opening_name if opening_name else (last_known_opening_name if last_known_opening_name else "")
-                
-                # Check if this opening is the same as the previous move's opening
-                # Compare actual opening values (not display values) to determine if they match
+                # Determine the latest known opening at this ply (fallback to last known).
                 actual_eco = eco if eco else (last_known_eco if last_known_eco else "")
                 actual_opening_name = opening_name if opening_name else (last_known_opening_name if last_known_opening_name else "")
-                
-                if actual_eco and actual_opening_name and previous_move_eco and previous_move_opening_name:
-                    if actual_eco == previous_move_eco and actual_opening_name == previous_move_opening_name:
-                        # Same as previous - use repeat indicator
-                        display_eco = self.opening_repeat_indicator
-                        display_opening_name = self.opening_repeat_indicator
-                
-                # Update previous move tracking for next iteration (use actual values, not display values)
-                previous_move_eco = actual_eco if actual_eco else None
-                previous_move_opening_name = actual_opening_name if actual_opening_name else None
+                if actual_eco and actual_opening_name:
+                    pending_row_eco = actual_eco
+                    pending_row_opening_name = actual_opening_name
                 
                 # Get the board position before the move
                 board_before = node.board()
@@ -1010,8 +1000,8 @@ class GameController:
                         assess_black="",
                         best_white="",
                         best_black="",
-                        eco=display_eco,
-                        opening_name=display_opening_name,
+                        eco="",  # Set when the row is finalized (after black move, or last white move if no reply)
+                        opening_name="",
                         comment=node_comment,
                         white_capture=white_capture,
                         black_capture="",
@@ -1059,9 +1049,30 @@ class GameController:
                         # Capture FEN after black's move
                         current_move_data.fen_black = board_after.fen()
                         
-                        # Update opening info after black's move (position after black's move)
-                        current_move_data.eco = display_eco
-                        current_move_data.opening_name = display_opening_name
+                        # Finalize row opening info based on the latest known opening after the full move.
+                        if pending_row_eco and pending_row_opening_name:
+                            row_eco = pending_row_eco
+                            row_opening_name = pending_row_opening_name
+                        else:
+                            row_eco = ""
+                            row_opening_name = ""
+
+                        if (
+                            row_eco
+                            and row_opening_name
+                            and previous_row_eco
+                            and previous_row_opening_name
+                            and row_eco == previous_row_eco
+                            and row_opening_name == previous_row_opening_name
+                        ):
+                            current_move_data.eco = self.opening_repeat_indicator
+                            current_move_data.opening_name = self.opening_repeat_indicator
+                        else:
+                            current_move_data.eco = row_eco
+                            current_move_data.opening_name = row_opening_name
+
+                        previous_row_eco = row_eco if row_eco else None
+                        previous_row_opening_name = row_opening_name if row_opening_name else None
                         
                         # Combine comments if both white and black have comments
                         if current_move_data.comment and node_comment:
@@ -1071,6 +1082,29 @@ class GameController:
                 
                 # Move to next node
                 node = next_node
+
+            # If the game ends on white's move, finalize the last row's opening based on that last ply.
+            if current_move_data is not None and not current_move_data.black_move:
+                if pending_row_eco and pending_row_opening_name:
+                    row_eco = pending_row_eco
+                    row_opening_name = pending_row_opening_name
+                else:
+                    row_eco = ""
+                    row_opening_name = ""
+
+                if (
+                    row_eco
+                    and row_opening_name
+                    and previous_row_eco
+                    and previous_row_opening_name
+                    and row_eco == previous_row_eco
+                    and row_opening_name == previous_row_opening_name
+                ):
+                    current_move_data.eco = self.opening_repeat_indicator
+                    current_move_data.opening_name = self.opening_repeat_indicator
+                else:
+                    current_move_data.eco = row_eco
+                    current_move_data.opening_name = row_opening_name
         
         except Exception as e:
             # On any error, return empty list
