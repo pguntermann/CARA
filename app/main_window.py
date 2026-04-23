@@ -808,6 +808,7 @@ class MainWindow(QMainWindow):
             self.config,
             active_database,
             all_databases,
+            self.controller.get_current_fen,
             self
         )
         

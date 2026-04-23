@@ -318,7 +318,12 @@ class CriteriaRowWidget(QWidget):
     
     removed = pyqtSignal()  # Emitted when remove button is clicked
     
-    def __init__(self, config: Dict[str, Any], parent=None) -> None:
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        current_fen_provider: Optional[Callable[[], str]] = None,
+        parent=None,
+    ) -> None:
         """Initialize criteria row widget.
         
         Args:
@@ -327,6 +332,8 @@ class CriteriaRowWidget(QWidget):
         """
         super().__init__(parent)
         self.config = config
+        self._current_fen_provider = current_fen_provider
+        self._last_validation_error: str = ""
         self._load_config()
         self._setup_ui()
         self._apply_styling()
@@ -379,7 +386,9 @@ class CriteriaRowWidget(QWidget):
         self.field_combo = QComboBox()
         self.field_combo.addItems([
             "White", "Black", "WhiteElo", "BlackElo", "Result", "Date", 
-            "Event", "Site", "ECO", "TimeControl", "TC Type", "Analyzed", "Annotated", "Game tags", "Custom PGN header tag"
+            "Event", "Site", "ECO", "TimeControl", "TC Type", "Analyzed", "Annotated", "Game tags", "Custom PGN header tag",
+            "Position",
+            "Position (fuzzy)",
         ])
         self.field_combo.setFixedWidth(120)
         self.field_combo.currentTextChanged.connect(self._on_field_changed)
@@ -397,6 +406,14 @@ class CriteriaRowWidget(QWidget):
         self.value_input.setMinimumWidth(100)  # Reduced from 150
         self.value_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.value_input)
+
+        # Position input (hidden by default)
+        self.position_input = QLineEdit()
+        self.position_input.setPlaceholderText("FEN… or (Current Position)")
+        self.position_input.setVisible(False)
+        self.position_input.setMinimumWidth(100)
+        self.position_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        layout.addWidget(self.position_input)
 
         # Game tags picker (hidden by default; used when field == "Game tags")
         self._selected_tags: List[str] = []
@@ -442,6 +459,7 @@ class CriteriaRowWidget(QWidget):
             self.value_input.clear()
             self.value_input.setPlaceholderText("")
             self.custom_tag_input.setVisible(False)
+            self.position_input.setVisible(False)
         elif field_text in ["WhiteElo", "BlackElo"]:
             self.operator_combo.addItems([
                 "equals", "not equals", "greater than", "less than", 
@@ -451,6 +469,7 @@ class CriteriaRowWidget(QWidget):
             self.value_input.setEnabled(True)
             self.value_input.setPlaceholderText("Value...")
             self.custom_tag_input.setVisible(False)
+            self.position_input.setVisible(False)
         elif field_text == "TimeControl":
             self.operator_combo.addItems([
                 "equals", "not equals", "greater than", "less than",
@@ -461,6 +480,7 @@ class CriteriaRowWidget(QWidget):
             self.value_input.setEnabled(True)
             self.value_input.setPlaceholderText("Base seconds (e.g. 300, 600)")
             self.custom_tag_input.setVisible(False)
+            self.position_input.setVisible(False)
         elif field_text == "Date":
             self.operator_combo.addItems([
                 "contains", "equals", "not equals", "before", "after"
@@ -469,18 +489,36 @@ class CriteriaRowWidget(QWidget):
             self.value_input.setVisible(True)
             self.value_input.setEnabled(True)
             self.custom_tag_input.setVisible(False)
+            self.position_input.setVisible(False)
         elif field_text == "Custom PGN header tag":
             self.operator_combo.addItems(["contains", "equals", "not equals", "starts with", "ends with"])
             self.value_input.setVisible(True)
             self.value_input.setEnabled(True)
             self.value_input.setPlaceholderText("Value...")
             self.custom_tag_input.setVisible(True)
+            self.position_input.setVisible(False)
         elif field_text == "Game tags":
             self.operator_combo.addItems(["contains", "does not contain"])
             self.value_input.setVisible(False)
             self.tags_picker_btn.setVisible(True)
             self._sync_tags_picker_label()
             self.custom_tag_input.setVisible(False)
+            self.position_input.setVisible(False)
+        elif field_text == "Position":
+            self.operator_combo.addItems(["equals", "not equals"])
+            self.value_input.setVisible(False)
+            self.tags_picker_btn.setVisible(False)
+            self.custom_tag_input.setVisible(False)
+            self.position_input.setVisible(True)
+            # Default: use current position token (user can override by typing a FEN).
+            self.position_input.setText("(Current Position)")
+        elif field_text == "Position (fuzzy)":
+            self.operator_combo.addItems(["equals", "not equals"])
+            self.value_input.setVisible(False)
+            self.tags_picker_btn.setVisible(False)
+            self.custom_tag_input.setVisible(False)
+            self.position_input.setVisible(True)
+            self.position_input.setText("(Current Position)")
         else:
             # Text fields
             self.operator_combo.addItems([
@@ -492,6 +530,7 @@ class CriteriaRowWidget(QWidget):
             self.value_input.setEnabled(True)
             self.tags_picker_btn.setVisible(False)
             self.custom_tag_input.setVisible(False)
+            self.position_input.setVisible(False)
     
     def _apply_styling(self) -> None:
         """Apply styling to widgets."""
@@ -564,7 +603,7 @@ class CriteriaRowWidget(QWidget):
         focus_border_color = [self.input_focus_border_color.red(), self.input_focus_border_color.green(), self.input_focus_border_color.blue()]
         
         StyleManager.style_line_edits(
-            [self.value_input, self.custom_tag_input],
+            [self.value_input, self.custom_tag_input, self.position_input],
             self.config,
             font_family=self.input_font_family,  # Match original dialog font
             font_size=self.input_font_size,  # Match original dialog font size
@@ -599,6 +638,8 @@ class CriteriaRowWidget(QWidget):
         value_text = self.value_input.text().strip()
         custom_tag = self.custom_tag_input.text().strip() if self.custom_tag_input.isVisible() else None
         logic_text = self.logic_combo.currentText()
+        fen_text = self.position_input.text().strip() if self.position_input.isVisible() else ""
+        self._last_validation_error = ""
         
         # Map field text to SearchField enum
         field_map = {
@@ -617,6 +658,8 @@ class CriteriaRowWidget(QWidget):
             "Annotated": SearchField.ANNOTATED,
             "Game tags": SearchField.TAGS,
             "Custom PGN header tag": SearchField.CUSTOM_TAG,
+            "Position": SearchField.POSITION,
+            "Position (fuzzy)": SearchField.POSITION_FUZZY,
         }
         field = field_map.get(field_text)
         if field is None:
@@ -664,6 +707,43 @@ class CriteriaRowWidget(QWidget):
             value = True  # Value doesn't matter for boolean
         elif operator in [SearchOperator.IS_EMPTY, SearchOperator.IS_NOT_EMPTY]:
             value = None
+        elif field in (SearchField.POSITION, SearchField.POSITION_FUZZY):
+            # Store resolved FEN (str) in value; hash is computed during search execution.
+            try:
+                import chess
+                raw = str(fen_text or "").strip()
+                raw_cf = raw.casefold()
+
+                # Resolve "(Current Position)" (and variants) via live provider.
+                wants_current = (not raw) or ("current position" in raw_cf) or ("current_position" in raw_cf)
+                if wants_current:
+                    cleaned = ""
+                    if callable(self._current_fen_provider):
+                        try:
+                            cleaned = str(self._current_fen_provider() or "").strip()
+                        except Exception:
+                            cleaned = ""
+                    if not cleaned:
+                        # No live current position available -> invalid criterion
+                        self._last_validation_error = "Position search failed: current position FEN could not be resolved."
+                        return None
+                    # Be defensive: FEN must be a single line.
+                    cleaned = cleaned.splitlines()[0].strip()
+                else:
+                    # Allow a UI suffix without breaking parsing.
+                    cleaned = raw.replace("(Current position)", "").replace("(Current Position)", "").strip()
+                    cleaned = cleaned.splitlines()[0].strip()
+                # Validate FEN eagerly so the dialog can show helpful errors.
+                chess.Board(cleaned)
+                value = cleaned
+            except Exception as e:
+                try:
+                    cleaned_dbg = str(locals().get("cleaned", "") or "").strip()
+                except Exception:
+                    cleaned_dbg = ""
+                snippet = cleaned_dbg[:120] + ("…" if len(cleaned_dbg) > 120 else "")
+                self._last_validation_error = f"Position search failed: invalid FEN ('{snippet}'). {type(e).__name__}: {e}"
+                return None
         elif field == SearchField.TAGS:
             value = list(self._selected_tags)
             if not value:
@@ -687,6 +767,11 @@ class CriteriaRowWidget(QWidget):
             logic_operator=logic_op,
             custom_tag_name=custom_tag if field == SearchField.CUSTOM_TAG else None
         )
+
+    def get_last_validation_error(self) -> str:
+        return str(getattr(self, "_last_validation_error", "") or "")
+
+    # (No dropdown/mode-switching for Position; the user can replace the token with a FEN.)
     
     def set_group_start(self, is_start: bool, group_level: int = 0) -> None:
         """Mark this row as a group start.
@@ -721,6 +806,8 @@ class CriteriaRowWidget(QWidget):
             SearchField.ANNOTATED: "Annotated",
             SearchField.TAGS: "Game tags",
             SearchField.CUSTOM_TAG: "Custom PGN header tag",
+            SearchField.POSITION: "Position",
+            SearchField.POSITION_FUZZY: "Position (fuzzy)",
         }
         field_text = field_map.get(criterion.field)
         if field_text:
@@ -762,6 +849,12 @@ class CriteriaRowWidget(QWidget):
                 if criterion.field == SearchField.TAGS and isinstance(criterion.value, list):
                     self._selected_tags = [str(x) for x in criterion.value if str(x).strip()]
                     self._sync_tags_picker_label()
+                elif criterion.field == SearchField.POSITION:
+                    # Handle legacy saved queries where value was a zobrist int.
+                    if isinstance(criterion.value, int):
+                        self.position_input.setText("(Current Position)")
+                    else:
+                        self.position_input.setText(str(criterion.value))
                 else:
                     self.value_input.setText(str(criterion.value))
         
@@ -895,6 +988,7 @@ class SearchDialog(QDialog):
     def __init__(self, config: Dict[str, Any], 
                  active_database: Optional[DatabaseModel],
                  all_databases: List[DatabaseModel],
+                 current_fen_provider: Optional[Callable[[], str]] = None,
                  parent=None) -> None:
         """Initialize the search dialog.
         
@@ -908,6 +1002,7 @@ class SearchDialog(QDialog):
         self.config = config
         self.active_database = active_database
         self.all_databases = all_databases
+        self._current_fen_provider = current_fen_provider
         self.search_query: Optional[SearchQuery] = None
         
         self._load_config()
@@ -1123,7 +1218,7 @@ class SearchDialog(QDialog):
         Args:
             is_group_start: If True, mark this row as a group start.
         """
-        row = CriteriaRowWidget(self.config, self)
+        row = CriteriaRowWidget(self.config, current_fen_provider=self._current_fen_provider, parent=self)
         row.removed.connect(lambda: self._remove_criterion_row(row))
         
         # Insert before stretch
@@ -1430,6 +1525,34 @@ class SearchDialog(QDialog):
             
             criteria.append(criterion)
         
+        # If nothing valid was produced, keep dialog open and do not overwrite last query.
+        if not criteria:
+            try:
+                from app.views.dialogs.message_dialog import MessageDialog
+
+                err = ""
+                for row in self.criteria_rows:
+                    try:
+                        e = row.get_last_validation_error()
+                        if e:
+                            err = e
+                            break
+                    except Exception:
+                        pass
+
+                MessageDialog.show_warning(
+                    self.config,
+                    "Search",
+                    err or "No valid search criteria provided.",
+                    self,
+                )
+            except Exception:
+                pass
+            # Ensure the UI never ends up with zero rows.
+            if not self.criteria_rows:
+                self._add_criterion_row(is_group_start=True)
+            return
+        
         # Determine scope
         scope = "active" if self.active_radio.isChecked() else "all"
         
@@ -1472,7 +1595,7 @@ class SearchDialog(QDialog):
         self.group_levels.clear()
         
         # Rebuild criteria rows from saved query
-        for i, criterion in enumerate(query.criteria):
+        for i, criterion in enumerate(query.criteria or []):
             # Add row (will be at index i)
             is_group_start = criterion.is_group_start
             self._add_criterion_row(is_group_start=is_group_start)
@@ -1495,4 +1618,8 @@ class SearchDialog(QDialog):
         
         # Update visual indicators
         self._update_group_indentation()
+
+        # If the last query was empty (or everything got filtered), show at least one row.
+        if not self.criteria_rows:
+            self._add_criterion_row(is_group_start=True)
 

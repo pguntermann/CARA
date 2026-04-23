@@ -1,8 +1,9 @@
 """Service for searching games in databases based on criteria."""
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from io import StringIO
 import chess.pgn
+import chess
 
 from app.models.database_model import GameData, DatabaseModel
 from app.models.search_criteria import SearchCriteria, SearchField, SearchOperator
@@ -35,9 +36,37 @@ class DatabaseSearchService:
         
         # Build criteria tree for evaluation
         criteria_tree = DatabaseSearchService._build_criteria_tree(criteria)
+
+        # Precompute position matches per database (exact + fuzzy).
+        position_hashes: List[int] = []
+        position_hashes_fuzzy: List[int] = []
+        for c in criteria:
+            if c.field in (SearchField.POSITION, SearchField.POSITION_FUZZY):
+                try:
+                    if isinstance(c.value, int):
+                        (position_hashes_fuzzy if c.field == SearchField.POSITION_FUZZY else position_hashes).append(int(c.value))
+                    elif isinstance(c.value, str) and c.value.strip():
+                        from chess.polyglot import zobrist_hash
+                        b = chess.Board(c.value.strip().splitlines()[0].strip())
+                        if c.field == SearchField.POSITION_FUZZY:
+                            cr0 = getattr(b, "castling_rights", 0)
+                            ep0 = getattr(b, "ep_square", None)
+                            try:
+                                b.castling_rights = 0
+                                b.ep_square = None
+                                position_hashes_fuzzy.append(int(zobrist_hash(b)))
+                            finally:
+                                b.castling_rights = cr0
+                                b.ep_square = ep0
+                        else:
+                            position_hashes.append(int(zobrist_hash(b)))
+                except Exception:
+                    pass
+        position_hashes = sorted(set(position_hashes))
+        position_hashes_fuzzy = sorted(set(position_hashes_fuzzy))
         
         # Collect matching games from all databases
-        matching_games: List[tuple[GameData, str]] = []
+        matching_games: List[tuple] = []
         
         for idx, database in enumerate(databases):
             # Get database name
@@ -45,13 +74,40 @@ class DatabaseSearchService:
                 db_name = database_names[idx]
             else:
                 db_name = f"Database {idx + 1}"
+
+            position_matches: Dict[int, Dict[int, int]] = {}
+            position_matches_fuzzy: Dict[int, Dict[int, int]] = {}
+            if position_hashes:
+                for h in position_hashes:
+                    position_matches[h] = database.get_position_matches(int(h))
+            if position_hashes_fuzzy:
+                for h in position_hashes_fuzzy:
+                    position_matches_fuzzy[h] = database.get_position_matches_fuzzy(int(h))
             
             games = database.get_all_games()
             for game in games:
-                if DatabaseSearchService._evaluate_criteria_tree(game, criteria_tree):
-                    matching_games.append((game, db_name))
+                ctx = {"position_matches": position_matches, "position_matches_fuzzy": position_matches_fuzzy}
+                if DatabaseSearchService._evaluate_criteria_tree(game, criteria_tree, ctx):
+                    # Provide ref_ply for Search Results if we matched by position.
+                    ref_ply = 0
+                    if position_hashes:
+                        for h in position_hashes:
+                            ply = position_matches.get(h, {}).get(id(game), 0)
+                            if ply:
+                                ref_ply = ply
+                                break
+                    if not ref_ply and position_hashes_fuzzy:
+                        for h in position_hashes_fuzzy:
+                            ply = position_matches_fuzzy.get(h, {}).get(id(game), 0)
+                            if ply:
+                                ref_ply = ply
+                                break
+                    if ref_ply:
+                        matching_games.append((game, db_name, ref_ply))
+                    else:
+                        matching_games.append((game, db_name))
         
-        return matching_games
+        return matching_games  # type: ignore[return-value]
     
     @staticmethod
     def _build_criteria_tree(criteria: List[SearchCriteria]) -> Dict[str, Any]:
@@ -74,7 +130,7 @@ class DatabaseSearchService:
         }
     
     @staticmethod
-    def _evaluate_criteria_tree(game: GameData, tree: Dict[str, Any]) -> bool:
+    def _evaluate_criteria_tree(game: GameData, tree: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> bool:
         """Evaluate if a game matches the criteria tree.
         
         Args:
@@ -89,12 +145,12 @@ class DatabaseSearchService:
         
         if tree.get("type") == "criteria_list":
             criteria = tree.get("criteria", [])
-            return DatabaseSearchService._evaluate_criteria_list(game, criteria)
+            return DatabaseSearchService._evaluate_criteria_list(game, criteria, context)
         
         return False
     
     @staticmethod
-    def _evaluate_criteria_list(game: GameData, criteria: List[SearchCriteria]) -> bool:
+    def _evaluate_criteria_list(game: GameData, criteria: List[SearchCriteria], context: Optional[Dict[str, Any]] = None) -> bool:
         """Evaluate a list of criteria against a game.
         
         Handles AND/OR logic and grouping using recursive evaluation.
@@ -110,7 +166,7 @@ class DatabaseSearchService:
             return True
         
         # Parse criteria into groups and evaluate recursively
-        return DatabaseSearchService._evaluate_criteria_recursive(game, criteria, 0, len(criteria))
+        return DatabaseSearchService._evaluate_criteria_recursive(game, criteria, 0, len(criteria), context=context)
     
     @staticmethod
     def _evaluate_criteria_recursive(
@@ -118,7 +174,9 @@ class DatabaseSearchService:
         criteria: List[SearchCriteria],
         start_idx: int,
         end_idx: int,
-        default_logic: str = "and"
+        default_logic: str = "and",
+        *,
+        context: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """Recursively evaluate criteria with grouping support.
         
@@ -165,7 +223,7 @@ class DatabaseSearchService:
                 
                 if group_end == -1:
                     # No matching end group found, treat as regular criterion
-                    matches = DatabaseSearchService._evaluate_criterion(game, criterion)
+                    matches = DatabaseSearchService._evaluate_criterion(game, criterion, context)
                     results.append(matches)
                     if criterion.logic_operator:
                         logic_operators.append(criterion.logic_operator.value)
@@ -195,7 +253,7 @@ class DatabaseSearchService:
                 group_criteria_logic = []
                 for j in range(group_start, group_end + 1):
                     # Evaluate this criterion
-                    matches = DatabaseSearchService._evaluate_criterion(game, criteria[j])
+                    matches = DatabaseSearchService._evaluate_criterion(game, criteria[j], context)
                     group_criteria_results.append(matches)
                     
                     # Get logic operator for combining with next criterion in group
@@ -255,7 +313,7 @@ class DatabaseSearchService:
                 continue
             
             # Regular criterion
-            matches = DatabaseSearchService._evaluate_criterion(game, criterion)
+            matches = DatabaseSearchService._evaluate_criterion(game, criterion, context)
             results.append(matches)
             
             # Get logic operator for combining this result with the NEXT result
@@ -304,7 +362,7 @@ class DatabaseSearchService:
         return result
     
     @staticmethod
-    def _evaluate_criterion(game: GameData, criterion: SearchCriteria) -> bool:
+    def _evaluate_criterion(game: GameData, criterion: SearchCriteria, context: Optional[Dict[str, Any]] = None) -> bool:
         """Evaluate a single criterion against a game.
         
         Args:
@@ -315,11 +373,45 @@ class DatabaseSearchService:
             True if game matches criterion, False otherwise.
         """
         # Get field value
-        field_value = DatabaseSearchService._get_field_value(game, criterion)
+        field_value = DatabaseSearchService._get_field_value(game, criterion, context)
         
         # Evaluate based on operator
         operator = criterion.operator
         value = criterion.value
+
+        # Position matches: lookup in precomputed database index (exact or fuzzy).
+        if criterion.field in (SearchField.POSITION, SearchField.POSITION_FUZZY):
+            try:
+                if isinstance(value, int):
+                    h = int(value)
+                elif isinstance(value, str) and value.strip():
+                    from chess.polyglot import zobrist_hash
+                    b = chess.Board(value.strip().splitlines()[0].strip())
+                    if criterion.field == SearchField.POSITION_FUZZY:
+                        cr0 = getattr(b, "castling_rights", 0)
+                        ep0 = getattr(b, "ep_square", None)
+                        try:
+                            b.castling_rights = 0
+                            b.ep_square = None
+                            h = int(zobrist_hash(b))
+                        finally:
+                            b.castling_rights = cr0
+                            b.ep_square = ep0
+                    else:
+                        h = int(zobrist_hash(b))
+                else:
+                    h = 0
+            except Exception:
+                return False
+            if not h:
+                return False
+            pm_key = "position_matches_fuzzy" if criterion.field == SearchField.POSITION_FUZZY else "position_matches"
+            pm = (context or {}).get(pm_key, {}) if context else {}
+            hits = pm.get(h, {}) if isinstance(pm, dict) else {}
+            is_hit = bool(hits.get(id(game), 0))
+            if operator == SearchOperator.NOT_EQUALS:
+                return not is_hit
+            return is_hit
 
         # Tags: only allow membership operators (whole-tag match, case-insensitive).
         if criterion.field == SearchField.TAGS:
@@ -457,7 +549,7 @@ class DatabaseSearchService:
         return False
     
     @staticmethod
-    def _get_field_value(game: GameData, criterion: SearchCriteria) -> Any:
+    def _get_field_value(game: GameData, criterion: SearchCriteria, context: Optional[Dict[str, Any]] = None) -> Any:
         """Get the value of a field from a game.
         
         Args:
@@ -512,6 +604,9 @@ class DatabaseSearchService:
                     return chess_game.headers.get(criterion.custom_tag_name, None)
             except Exception:
                 pass
+            return None
+        elif field == SearchField.POSITION:
+            # Evaluated via precomputed context in _evaluate_criterion.
             return None
         
         return None

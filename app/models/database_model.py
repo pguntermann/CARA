@@ -156,6 +156,15 @@ class DatabaseModel(QAbstractTableModel):
         db_panel_cfg = ui_cfg.get("panels", {}).get("database", {})
         self._pgn_preview_max_len: int = db_panel_cfg.get("pgn_col_max_chars", 250)
 
+        # Position indices (zobrist hash -> occurrences) for Position Search.
+        # hash -> list[(id(game), ply)]
+        self._position_index: Dict[int, List[Tuple[int, int]]] = {}
+        # id(game) -> list[(hash, ply)]
+        self._position_reverse: Dict[int, List[Tuple[int, int]]] = {}
+        # Fuzzy (ignore castling + en-passant)
+        self._position_index_fuzzy: Dict[int, List[Tuple[int, int]]] = {}
+        self._position_reverse_fuzzy: Dict[int, List[Tuple[int, int]]] = {}
+
     def set_config(self, config: Dict[str, Any]) -> None:
         """Update config and refresh cached theme-driven assets."""
         self._config = config or {}
@@ -308,7 +317,12 @@ class DatabaseModel(QAbstractTableModel):
             return game.source_database
         elif col == self.COL_REF_PLY:
             # 0 means "no specific reference ply" so display empty string
-            return game.ref_ply if getattr(game, "ref_ply", 0) > 0 else ""
+            ref_ply = int(getattr(game, "ref_ply", 0) or 0)
+            if ref_ply <= 0:
+                return ""
+            move_no = (ref_ply + 1) // 2
+            suffix = "..." if (ref_ply % 2) == 0 else "."
+            return f"{move_no}{suffix}"
         elif col == self.COL_TAGS:
             return getattr(game, "game_tags", "") or ""
         elif col == self.COL_PGN:
@@ -362,7 +376,7 @@ class DatabaseModel(QAbstractTableModel):
                 "Annotated",
                 "Notes",
                 "Source DB",
-                "Ref Ply",
+                "Move",
                 "Game tags",
                 "PGN",
             ]
@@ -371,7 +385,14 @@ class DatabaseModel(QAbstractTableModel):
         
         return None
     
-    def add_game(self, game: GameData, mark_unsaved: bool = True, tags: List[str] = None) -> None:
+    def add_game(
+        self,
+        game: GameData,
+        mark_unsaved: bool = True,
+        tags: List[str] = None,
+        position_hashes: Optional[List[int]] = None,
+        position_hashes_fuzzy: Optional[List[int]] = None,
+    ) -> None:
         """Add a game to the model.
         
         Args:
@@ -400,6 +421,8 @@ class DatabaseModel(QAbstractTableModel):
         if mark_unsaved:
             self._unsaved_games.add(game)
         self.endInsertRows()
+
+        self._position_index_add_game(game, position_hashes, position_hashes_fuzzy)
         
         # Cache tags from this game
         self._add_tags_to_cache(set(tags))
@@ -414,7 +437,14 @@ class DatabaseModel(QAbstractTableModel):
                                  [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole])
         self._emit_stats_relevant_data_change()
     
-    def add_games_batch(self, games: List[GameData], mark_unsaved: bool = True, tags_list: List[List[str]] = None) -> None:
+    def add_games_batch(
+        self,
+        games: List[GameData],
+        mark_unsaved: bool = True,
+        tags_list: List[List[str]] = None,
+        position_hashes_list: Optional[List[Optional[List[int]]]] = None,
+        position_hashes_fuzzy_list: Optional[List[Optional[List[int]]]] = None,
+    ) -> None:
         """Add multiple games to the model in a single batch operation.
         
         This is much more efficient than calling add_game() multiple times,
@@ -437,6 +467,10 @@ class DatabaseModel(QAbstractTableModel):
         
         if len(tags_list) != len(games):
             raise ValueError(f"tags_list length ({len(tags_list)}) must match games length ({len(games)})")
+        if position_hashes_list is not None and len(position_hashes_list) != len(games):
+            raise ValueError(f"position_hashes_list length ({len(position_hashes_list)}) must match games length ({len(games)})")
+        if position_hashes_fuzzy_list is not None and len(position_hashes_fuzzy_list) != len(games):
+            raise ValueError(f"position_hashes_fuzzy_list length ({len(position_hashes_fuzzy_list)}) must match games length ({len(games)})")
         
         # Set game numbers for all games
         start_count = len(self._games)
@@ -459,6 +493,17 @@ class DatabaseModel(QAbstractTableModel):
             self._unsaved_games.update(games)
         
         self.endInsertRows()
+
+        if position_hashes_list is None:
+            for g in games:
+                self._position_index_add_game(g, None, None)
+        else:
+            if position_hashes_fuzzy_list is None:
+                for g, h in zip(games, position_hashes_list):
+                    self._position_index_add_game(g, h, None)
+            else:
+                for g, h, hf in zip(games, position_hashes_list, position_hashes_fuzzy_list):
+                    self._position_index_add_game(g, h, hf)
         
         # Cache tags from all games in this batch (use provided tags)
         all_tags: Set[str] = set()
@@ -484,6 +529,10 @@ class DatabaseModel(QAbstractTableModel):
             self._games.clear()
             self._unsaved_games.clear()
             self._unique_tags.clear()
+            self._position_index.clear()
+            self._position_reverse.clear()
+            self._position_index_fuzzy.clear()
+            self._position_reverse_fuzzy.clear()
             self.endRemoveRows()
             self._emit_stats_relevant_data_change()
     
@@ -515,12 +564,168 @@ class DatabaseModel(QAbstractTableModel):
         for row in rows_to_remove:
             if 0 <= row < len(self._games):
                 game = self._games[row]
+                self._position_index_remove_game(game)
+                self._position_index_remove_game_fuzzy(game)
                 self._unsaved_games.discard(game)
                 # Emit signal for this single row removal
                 self.beginRemoveRows(parent, row, row)
                 self._games.pop(row)
                 self.endRemoveRows()
         self._emit_stats_relevant_data_change()
+
+    def get_position_matches(self, position_hash: int) -> Dict[int, int]:
+        """Return dict of id(game) -> first ply where this position occurs."""
+        try:
+            h = int(position_hash)
+        except Exception:
+            return {}
+        if not h:
+            return {}
+        out: Dict[int, int] = {}
+        for gid, ply in self._position_index.get(h, []):
+            if gid not in out:
+                out[gid] = int(ply)
+        return out
+
+    def get_position_matches_fuzzy(self, position_hash: int) -> Dict[int, int]:
+        """Return dict of id(game) -> first ply where this fuzzy position occurs."""
+        try:
+            h = int(position_hash)
+        except Exception:
+            return {}
+        if not h:
+            return {}
+        out: Dict[int, int] = {}
+        for gid, ply in self._position_index_fuzzy.get(h, []):
+            if gid not in out:
+                out[gid] = int(ply)
+        return out
+
+    def _position_index_remove_game(self, game: GameData) -> None:
+        gid = id(game)
+        entries = self._position_reverse.pop(gid, [])
+        if not entries:
+            return
+        for h, ply in entries:
+            bucket = self._position_index.get(int(h))
+            if not bucket:
+                continue
+            # Remove all entries for this gid.
+            bucket = [(g, p) for (g, p) in bucket if g != gid]
+            if bucket:
+                self._position_index[int(h)] = bucket
+            else:
+                self._position_index.pop(int(h), None)
+
+    def _position_index_remove_game_fuzzy(self, game: GameData) -> None:
+        gid = id(game)
+        entries = self._position_reverse_fuzzy.pop(gid, [])
+        if not entries:
+            return
+        for h, ply in entries:
+            bucket = self._position_index_fuzzy.get(int(h))
+            if not bucket:
+                continue
+            bucket = [(g, p) for (g, p) in bucket if g != gid]
+            if bucket:
+                self._position_index_fuzzy[int(h)] = bucket
+            else:
+                self._position_index_fuzzy.pop(int(h), None)
+
+    def _position_index_add_game(
+        self,
+        game: GameData,
+        position_hashes: Optional[List[int]],
+        position_hashes_fuzzy: Optional[List[int]],
+    ) -> None:
+        # Ensure idempotent (e.g. reindexing).
+        self._position_index_remove_game(game)
+        self._position_index_remove_game_fuzzy(game)
+        hashes = position_hashes
+        hashes_fuzzy = position_hashes_fuzzy
+        if not hashes or not hashes_fuzzy:
+            computed = self._compute_position_hashes_from_pgn(getattr(game, "pgn", "") or "")
+            if computed:
+                if not hashes:
+                    hashes = computed[0]
+                if not hashes_fuzzy:
+                    hashes_fuzzy = computed[1]
+        if not hashes:
+            return
+        gid = id(game)
+        rev: List[Tuple[int, int]] = []
+        for ply, h in enumerate(hashes):
+            try:
+                hh = int(h)
+            except Exception:
+                continue
+            if not hh:
+                continue
+            self._position_index.setdefault(hh, []).append((gid, int(ply)))
+            rev.append((hh, int(ply)))
+        if rev:
+            self._position_reverse[gid] = rev
+
+        if hashes_fuzzy:
+            revf: List[Tuple[int, int]] = []
+            for ply, h in enumerate(hashes_fuzzy):
+                try:
+                    hh = int(h)
+                except Exception:
+                    continue
+                if not hh:
+                    continue
+                self._position_index_fuzzy.setdefault(hh, []).append((gid, int(ply)))
+                revf.append((hh, int(ply)))
+            if revf:
+                self._position_reverse_fuzzy[gid] = revf
+
+    def _compute_position_hashes_from_pgn(self, pgn_text: str) -> Optional[Tuple[List[int], List[int]]]:
+        """Compute per-ply Zobrist hashes from a PGN main line.
+
+        Used as a fallback when hashes were not provided by the PGN loader.
+        """
+        try:
+            import chess
+            import chess.pgn
+            from io import StringIO
+            from chess.polyglot import zobrist_hash
+
+            if not pgn_text or not str(pgn_text).strip():
+                return None
+            pgn_io = StringIO(pgn_text)
+            g = chess.pgn.read_game(pgn_io)
+            if g is None:
+                return None
+            board = g.board()
+            hashes: List[int] = [int(zobrist_hash(board))]
+            # fuzzy: ignore castling/ep
+            cr0 = getattr(board, "castling_rights", 0)
+            ep0 = getattr(board, "ep_square", None)
+            try:
+                board.castling_rights = 0
+                board.ep_square = None
+                hashes_fuzzy: List[int] = [int(zobrist_hash(board))]
+            finally:
+                board.castling_rights = cr0
+                board.ep_square = ep0
+            node = g
+            while node.variations:
+                node = node.variation(0)
+                board.push(node.move)
+                hashes.append(int(zobrist_hash(board)))
+                cr0 = getattr(board, "castling_rights", 0)
+                ep0 = getattr(board, "ep_square", None)
+                try:
+                    board.castling_rights = 0
+                    board.ep_square = None
+                    hashes_fuzzy.append(int(zobrist_hash(board)))
+                finally:
+                    board.castling_rights = cr0
+                    board.ep_square = ep0
+            return (hashes, hashes_fuzzy)
+        except Exception:
+            return None
     
     def sort_games_to_top(self, games_to_top: List['GameData']) -> None:
         """Sort games to bring specified games to the top.
@@ -818,6 +1023,9 @@ class DatabaseModel(QAbstractTableModel):
         row = self.find_game(game)
         if row is None:
             return False
+
+        # Keep position index consistent with the game content.
+        self._position_index_add_game(game, None, None)
         
         # Auto-mark game as having unsaved changes
         self._unsaved_games.add(game)
@@ -847,6 +1055,9 @@ class DatabaseModel(QAbstractTableModel):
         """
         if not games:
             return
+
+        for game in games:
+            self._position_index_add_game(game, None, None)
         
         # Mark all games as having unsaved changes
         for game in games:

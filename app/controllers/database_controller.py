@@ -286,7 +286,9 @@ class DatabaseController:
             tags = game_dict.get("tags", [])
             if not tags:
                 raise ValueError(f"Tags missing from parsed game dict. This indicates a bug in PgnService._extract_game_data().")
-            model.add_game(game_data, tags=tags)
+            position_hashes = game_dict.get("position_hashes")
+            position_hashes_fuzzy = game_dict.get("position_hashes_fuzzy")
+            model.add_game(game_data, tags=tags, position_hashes=position_hashes, position_hashes_fuzzy=position_hashes_fuzzy)
             games_added += 1
         
         # The first game added is at start_count index
@@ -435,7 +437,14 @@ class DatabaseController:
             progress_service.hide_progress()
             return (False, f"Error saving PGN database: {str(e)}")
     
-    def add_pgn_database(self, file_path: str, games: List[GameData], tags_list: Optional[List[List[str]]] = None) -> DatabaseModel:
+    def add_pgn_database(
+        self,
+        file_path: str,
+        games: List[GameData],
+        tags_list: Optional[List[List[str]]] = None,
+        position_hashes_list: Optional[List[Optional[List[int]]]] = None,
+        position_hashes_fuzzy_list: Optional[List[Optional[List[int]]]] = None,
+    ) -> DatabaseModel:
         """Add a new PGN database from file.
         
         Args:
@@ -451,7 +460,13 @@ class DatabaseController:
         model = DatabaseModel(file_path=file_path, config=self.config)
         # Use batch addition for better performance
         # Don't mark as unsaved when loading from file (games are already saved)
-        model.add_games_batch(games, mark_unsaved=False, tags_list=tags_list)
+        model.add_games_batch(
+            games,
+            mark_unsaved=False,
+            tags_list=tags_list,
+            position_hashes_list=position_hashes_list,
+            position_hashes_fuzzy_list=position_hashes_fuzzy_list,
+        )
         
         # Add to panel model
         self.panel_model.add_database(model, file_path=file_path)
@@ -768,6 +783,8 @@ class DatabaseController:
             # Convert parsed games to GameData instances
             games = []
             tags_list = []  # Collect tags for batch addition
+            position_hashes_list = []  # Collect hashes for batch addition
+            position_hashes_fuzzy_list = []
             for file_pos, game_dict in enumerate(parse_result.games, start=1):
                 game_data = GameData(
                     game_number=0,  # Will be set by model when adding
@@ -794,6 +811,8 @@ class DatabaseController:
                 # Extract tags from parsed game dict (already available, no parsing needed)
                 tags = game_dict.get("tags", [])
                 tags_list.append(tags)
+                position_hashes_list.append(game_dict.get("position_hashes"))
+                position_hashes_fuzzy_list.append(game_dict.get("position_hashes_fuzzy"))
                 
                 # Update progress more frequently for better feedback
                 # Update every 10 games, or every game for first 10, or on last game
@@ -816,7 +835,13 @@ class DatabaseController:
             QApplication.processEvents()  # Process events to update status
             
             # Add database to panel model (pass tags to avoid re-parsing)
-            new_model = self.add_pgn_database(file_path, games, tags_list=tags_list)
+            new_model = self.add_pgn_database(
+                file_path,
+                games,
+                tags_list=tags_list,
+                position_hashes_list=position_hashes_list,
+                position_hashes_fuzzy_list=position_hashes_fuzzy_list,
+            )
             
             # Set the new database as active
             self.set_active_database(new_model)
@@ -1011,6 +1036,8 @@ class DatabaseController:
                 # Convert parsed games to GameData instances
                 game_data_list = []
                 tags_list = []  # Collect tags for batch addition
+                position_hashes_list = []
+                position_hashes_fuzzy_list = []
                 for file_pos, game_dict in enumerate(games, start=1):
                     game_data = GameData(
                         game_number=0,  # Will be set by model when adding
@@ -1037,6 +1064,8 @@ class DatabaseController:
                     # Extract tags from parsed game dict (already available, no parsing needed)
                     tags = game_dict.get("tags", [])
                     tags_list.append(tags)
+                    position_hashes_list.append(game_dict.get("position_hashes"))
+                    position_hashes_fuzzy_list.append(game_dict.get("position_hashes_fuzzy"))
                     games_added += 1
                     
                     # Update progress every 10 games or on last game of file
@@ -1050,7 +1079,13 @@ class DatabaseController:
                         QApplication.processEvents()
                 
                 # Add database to panel model (pass tags to avoid re-parsing)
-                new_model = self.add_pgn_database(file_path, game_data_list, tags_list=tags_list)
+                new_model = self.add_pgn_database(
+                    file_path,
+                    game_data_list,
+                    tags_list=tags_list,
+                    position_hashes_list=position_hashes_list,
+                    position_hashes_fuzzy_list=position_hashes_fuzzy_list,
+                )
                 
                 opened_count += 1
                 last_successful_database = new_model
@@ -1202,7 +1237,15 @@ class DatabaseController:
             # Don't mark as unsaved when reloading from file (games are already saved)
             # Extract tags from parsed game dicts (already available, no parsing needed)
             tags_list = [game_dict.get("tags", []) for game_dict in parse_result.games]
-            model.add_games_batch(games_data, mark_unsaved=False, tags_list=tags_list)
+            position_hashes_list = [game_dict.get("position_hashes") for game_dict in parse_result.games]
+            position_hashes_fuzzy_list = [game_dict.get("position_hashes_fuzzy") for game_dict in parse_result.games]
+            model.add_games_batch(
+                games_data,
+                mark_unsaved=False,
+                tags_list=tags_list,
+                position_hashes_list=position_hashes_list,
+                position_hashes_fuzzy_list=position_hashes_fuzzy_list,
+            )
             
             # Final progress update
             progress_service.set_progress(95)

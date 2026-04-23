@@ -22,6 +22,8 @@ class SearchField(Enum):
     ANNOTATED = "annotated"
     TAGS = "tags"
     CUSTOM_TAG = "custom_tag"  # For PGN tags not in standard columns
+    POSITION = "position"  # Exact position match (zobrist hash)
+    POSITION_FUZZY = "position_fuzzy"  # Position match ignoring castling + en-passant
 
 
 class SearchOperator(Enum):

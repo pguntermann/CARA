@@ -1013,6 +1013,42 @@ class PgnService:
             
             # Extract tag names from headers (already parsed, no extra cost)
             tag_names = list(headers.keys()) if headers else []
+
+            # Compute per-ply Zobrist hashes for Position Search (mainline only).
+            # This is done in the worker process during load for performance.
+            position_hashes: List[int] = []
+            position_hashes_fuzzy: List[int] = []
+            try:
+                from chess.polyglot import zobrist_hash
+                board = game.board()
+                position_hashes.append(int(zobrist_hash(board)))
+                # Fuzzy: ignore castling rights and en-passant square.
+                cr0 = getattr(board, "castling_rights", 0)
+                ep0 = getattr(board, "ep_square", None)
+                try:
+                    board.castling_rights = 0
+                    board.ep_square = None
+                    position_hashes_fuzzy.append(int(zobrist_hash(board)))
+                finally:
+                    board.castling_rights = cr0
+                    board.ep_square = ep0
+                node = game
+                while node.variations:
+                    node = node.variation(0)
+                    board.push(node.move)
+                    position_hashes.append(int(zobrist_hash(board)))
+                    cr0 = getattr(board, "castling_rights", 0)
+                    ep0 = getattr(board, "ep_square", None)
+                    try:
+                        board.castling_rights = 0
+                        board.ep_square = None
+                        position_hashes_fuzzy.append(int(zobrist_hash(board)))
+                    finally:
+                        board.castling_rights = cr0
+                        board.ep_square = ep0
+            except Exception:
+                position_hashes = []
+                position_hashes_fuzzy = []
             
             return {
                 "white": white,
@@ -1032,7 +1068,9 @@ class PgnService:
                 "has_notes": has_notes,
                 "game_tags_raw": game_tags_raw,
                 "game_tags": game_tags_display,
-                "tags": tag_names  # Tag names extracted during parsing
+                "tags": tag_names,  # Tag names extracted during parsing
+                "position_hashes": position_hashes,  # Per-ply zobrist hashes (ply 0..N)
+                "position_hashes_fuzzy": position_hashes_fuzzy,  # Per-ply hashes ignoring castling/ep
             }
             
         except Exception:
