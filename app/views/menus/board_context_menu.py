@@ -31,6 +31,7 @@ def build_board_context_menu(mw: Any, *, parent: Optional[Any] = None) -> QMenu:
     _add_action_attr("game_info_action")
     _add_action_attr("coordinates_action")
     _add_action_attr("turn_indicator_action")
+    _add_action_attr("castling_rights_widget_action")
     _add_action_attr("material_widget_action")
     _add_action_attr("game_tags_widget_action")
     menu.addSeparator()

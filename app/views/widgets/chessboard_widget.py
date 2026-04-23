@@ -32,6 +32,7 @@ from app.models.annotation_model import AnnotationModel, Annotation, AnnotationT
 from app.views.widgets.material_widget import MaterialWidget
 from app.views.widgets.evaluation_bar_widget import EvaluationBarWidget
 from app.views.widgets.game_tags_widget import GameTagsWidget
+from app.views.widgets.castling_rights_widget import CastlingRightsWidget
 from app.services.logging_service import LoggingService
 
 
@@ -73,6 +74,11 @@ class ChessBoardWidget(QWidget):
         self.game_tags_widget = GameTagsWidget(self.config, self)
         self.game_tags_widget.setParent(self)
         self.game_tags_widget.setVisible(True)
+
+        # Castling rights widget (pills) anchored near the turn indicator.
+        self.castling_rights_widget = CastlingRightsWidget(self.config, None, self)
+        self.castling_rights_widget.setParent(self)
+        self.castling_rights_widget.setVisible(False)
         
         # Create positional heat-map overlay (will be set later via set_positional_heatmap_model)
         self.positional_heatmap_overlay = None
@@ -1467,6 +1473,8 @@ class ChessBoardWidget(QWidget):
         model.material_widget_visibility_changed.connect(self._on_material_widget_visibility_changed)
         if hasattr(model, "game_tags_widget_visibility_changed"):
             model.game_tags_widget_visibility_changed.connect(self._on_game_tags_widget_visibility_changed)
+        if hasattr(model, "castling_rights_widget_visibility_changed"):
+            model.castling_rights_widget_visibility_changed.connect(self._on_castling_rights_widget_visibility_changed)
         if hasattr(model, 'turn_changed'):
             model.turn_changed.connect(self._on_turn_changed)
         
@@ -1502,15 +1510,25 @@ class ChessBoardWidget(QWidget):
         # Update game tags widget visibility if model has it
         if hasattr(model, "show_game_tags_widget"):
             self.set_game_tags_widget_visible(model.show_game_tags_widget)
+
+        # Update castling rights widget visibility if model has it
+        if hasattr(model, "show_castling_rights_widget"):
+            self.set_castling_rights_widget_visible(model.show_castling_rights_widget)
         
         # Connect material widget to board model
         self.material_widget.set_board_model(model)
+        # Connect castling rights widget to board model
+        try:
+            self.castling_rights_widget.set_model(model)
+        except Exception:
+            pass
         
         self.update()  # Trigger repaint
     
     def _on_position_changed(self) -> None:
         """Handle position change from model."""
         self._load_position_from_model()
+        self._update_castling_rights_widget_position()
         self.update()  # Trigger repaint
     
     def _on_flip_state_changed(self, is_flipped: bool) -> None:
@@ -1860,6 +1878,8 @@ class ChessBoardWidget(QWidget):
                 self._update_material_widget_position()
             # Game tags anchor to board geometry; eval bar toggles start_x/board_size like resize.
             self._update_game_tags_widget_position()
+            # Castling-rights widget anchors to board geometry too.
+            self._update_castling_rights_widget_position()
     
     def set_evaluation_bar_flipped(self, is_flipped: bool) -> None:
         """Set evaluation bar flip state.
@@ -1877,6 +1897,20 @@ class ChessBoardWidget(QWidget):
             show: True if material widget should be visible, False otherwise.
         """
         self.set_material_widget_visible(show)
+
+    def _on_castling_rights_widget_visibility_changed(self, show: bool) -> None:
+        """Handle castling rights widget visibility change from model."""
+        self.set_castling_rights_widget_visible(show)
+
+    def set_castling_rights_widget_visible(self, visible: bool) -> None:
+        """Set castling rights widget visibility."""
+        if getattr(self, "castling_rights_widget", None):
+            try:
+                self.castling_rights_widget.set_requested_visible(bool(visible))
+            except Exception:
+                self.castling_rights_widget.setVisible(bool(visible))
+            self._update_castling_rights_widget_position()
+            self.update()
     
     def set_material_widget_visible(self, visible: bool) -> None:
         """Set material widget visibility.
@@ -1897,6 +1931,8 @@ class ChessBoardWidget(QWidget):
                 self._update_material_widget_position()
             # Tag widget may be positioned under material; always refresh its position.
             self._update_game_tags_widget_position()
+            # Castling-rights widget anchors to board geometry too.
+            self._update_castling_rights_widget_position()
             # Update evaluation bar position if it's visible, since board dimensions changed
             if self.evaluation_bar and self.evaluation_bar.isVisible():
                 self._update_evaluation_bar_position()
@@ -1959,6 +1995,7 @@ class ChessBoardWidget(QWidget):
         QTimer.singleShot(0, self._update_evaluation_bar_position)
         QTimer.singleShot(0, self._update_material_widget_position)
         QTimer.singleShot(0, self._update_game_tags_widget_position)
+        QTimer.singleShot(0, self._update_castling_rights_widget_position)
     
     def resizeEvent(self, event) -> None:
         """Handle widget resize event to reposition evaluation bar.
@@ -1972,6 +2009,7 @@ class ChessBoardWidget(QWidget):
         self._update_evaluation_bar_position()
         self._update_material_widget_position()
         self._update_game_tags_widget_position()
+        self._update_castling_rights_widget_position()
         
         # Update overlay size
         if self.positional_heatmap_overlay:
@@ -2064,6 +2102,8 @@ class ChessBoardWidget(QWidget):
         # Tag widget affects available width (right slot) so evaluation bar might shift.
         if self.evaluation_bar and self.evaluation_bar.isVisible():
             self._update_evaluation_bar_position()
+        # Castling-rights widget anchors to board geometry too.
+        self._update_castling_rights_widget_position()
 
     def _update_game_tags_widget_position(self) -> None:
         """Update game tags widget position (upper right, under material widget)."""
@@ -2108,6 +2148,26 @@ class ChessBoardWidget(QWidget):
             tags_h = min(int(tags_h), int(available_h))
 
         self.game_tags_widget.setGeometry(int(tags_widget_x), int(y), tags_widget_width, int(tags_h))
+
+    def _update_castling_rights_widget_position(self) -> None:
+        """Update castling-rights widget position (bottom-right, near turn indicator)."""
+        if not getattr(self, "castling_rights_widget", None):
+            return
+        if not self.castling_rights_widget.isVisible():
+            return
+        dims = self._calculate_board_dimensions()
+        start_x = dims["start_x"]
+        start_y = dims["start_y"]
+        board_size = dims["board_size"]
+
+        board_cfg = (self.config.get("ui", {}) or {}).get("panels", {}).get("main", {}).get("board", {})
+        cfg = board_cfg.get("castling_rights_widget", {}) if isinstance(board_cfg.get("castling_rights_widget", {}), dict) else {}
+        pad = cfg.get("padding", [0, 0, 0, 10])  # [t,r,b,l]
+
+        x = start_x + board_size + self.border_size + int(pad[3])
+        # Align the widget bottom to the board's lower edge (squares area).
+        y = start_y + board_size - self.castling_rights_widget.height() - int(pad[2])
+        self.castling_rights_widget.move(int(x), int(y))
     
     def _draw_turn_indicator(self, painter: QPainter, board_start_x: int, board_start_y: int) -> None:
         """Draw turn indicator attached to bottom right of board.
@@ -2122,6 +2182,16 @@ class ChessBoardWidget(QWidget):
         # Padding: [top, right, bottom, left]
         indicator_x = board_start_x + self.board_size + self.border_size + self.indicator_padding[3]  # left padding
         indicator_y = board_start_y + self.board_size - self.indicator_size - self.indicator_padding[2]  # bottom padding
+
+        # If castling rights widget is visible, keep it bottom-aligned and push the turn indicator up above it.
+        try:
+            if getattr(self, "castling_rights_widget", None) and self.castling_rights_widget.isVisible():
+                board_cfg = (self.config.get("ui", {}) or {}).get("panels", {}).get("main", {}).get("board", {})
+                cfg = board_cfg.get("castling_rights_widget", {}) if isinstance(board_cfg.get("castling_rights_widget", {}), dict) else {}
+                gap = int(cfg.get("gap_to_turn_indicator", 6))
+                indicator_y = int(self.castling_rights_widget.y() - gap - self.indicator_size)
+        except Exception:
+            pass
         
         # Choose color based on turn
         if self._is_white_turn:

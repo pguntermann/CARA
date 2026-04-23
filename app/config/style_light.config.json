@@ -516,6 +516,29 @@
               "$ref": "$_COLOR_BLACK"
             }
           },
+          "castling_rights_widget": {
+            "pill_size": [24, 18],
+            "spacing_x": 6,
+            "spacing_y": 5,
+            "border_radius": 9,
+            "border_width": 0,
+            "padding": [0, 0, 0, 10],
+            "gap_to_turn_indicator": 12,
+            "gone_text": "-",
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "font_weight": "bold",
+            "white_background_color": [245, 245, 245],
+            "white_text_color": [25, 25, 25],
+            "white_border_color": [185, 185, 185],
+            "black_background_color": [168, 189, 220],
+            "black_text_color": [20, 20, 20],
+            "black_border_color": [120, 130, 150]
+          },
           "playedmove_arrow": {
             "color": [255, 255, 0]
           },

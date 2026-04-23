@@ -1713,6 +1713,10 @@ class MainWindow(QMainWindow):
     def _on_game_tags_widget_visibility_changed(self, show: bool) -> None:
         """Handle game tags widget visibility change to update menu toggle."""
         self._update_game_tags_widget_action_state(show)
+
+    def _on_castling_rights_widget_visibility_changed(self, show: bool) -> None:
+        """Handle castling rights widget visibility change to update menu toggle."""
+        self._update_castling_rights_widget_action_state(show)
     
     def _update_evaluation_bar_action_state(self, show: bool) -> None:
         """Update the evaluation bar visibility menu action toggle state.
@@ -1736,6 +1740,11 @@ class MainWindow(QMainWindow):
         """Update the game tags widget visibility menu action toggle state."""
         if hasattr(self, 'game_tags_widget_action'):
             self.game_tags_widget_action.setChecked(show)
+
+    def _update_castling_rights_widget_action_state(self, show: bool) -> None:
+        """Update the castling rights widget visibility menu action toggle state."""
+        if hasattr(self, "castling_rights_widget_action"):
+            self.castling_rights_widget_action.setChecked(show)
     
     def _update_positional_heatmap_action_state(self, show: bool) -> None:
         """Update the positional heat-map visibility menu action toggle state.
@@ -3650,6 +3659,12 @@ class MainWindow(QMainWindow):
         show_turn_indicator = board_visibility.get("show_turn_indicator", True)
         board_model.set_show_turn_indicator(show_turn_indicator)
         self._update_turn_indicator_action_state(show_turn_indicator)
+
+        # Show Castling Rights
+        show_castling_rights_widget = board_visibility.get("show_castling_rights_widget", True)
+        if hasattr(board_model, "set_show_castling_rights_widget"):
+            board_model.set_show_castling_rights_widget(show_castling_rights_widget)
+        self._update_castling_rights_widget_action_state(show_castling_rights_widget)
         
         # Show Material
         show_material_widget = board_visibility.get("show_material_widget", False)

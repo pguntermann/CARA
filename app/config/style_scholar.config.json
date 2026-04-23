@@ -566,6 +566,37 @@
               "$ref": "$_COLOR_DEEP_TEAL"
             }
           },
+          "castling_rights_widget": {
+            "pill_size": [24, 18],
+            "spacing_x": 6,
+            "spacing_y": 5,
+            "border_radius": 9,
+            "border_width": 0,
+            "padding": [0, 0, 0, 10],
+            "gap_to_turn_indicator": 12,
+            "gone_text": "-",
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "font_weight": "bold",
+            "white_background_color": {
+              "$ref": "$_COLOR_LATTE_DOT"
+            },
+            "white_text_color": [64, 44, 28],
+            "white_border_color": {
+              "$ref": "$_COLOR_LATTE_DOT"
+            },
+            "black_background_color": {
+              "$ref": "$_COLOR_DEEP_TEAL"
+            },
+            "black_text_color": [246, 238, 224],
+            "black_border_color": {
+              "$ref": "$_COLOR_DEEP_TEAL"
+            }
+          },
           "playedmove_arrow": {
             "color": {
               "$ref": "$_COLOR_TAG_GOLD"

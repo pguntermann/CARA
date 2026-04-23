@@ -32,6 +32,7 @@ class BoardModel(QObject):
     evaluation_bar_visibility_changed = pyqtSignal(bool)  # Emitted when evaluation bar visibility changes
     material_widget_visibility_changed = pyqtSignal(bool)  # Emitted when material widget visibility changes
     game_tags_widget_visibility_changed = pyqtSignal(bool)  # Emitted when game tags widget visibility changes
+    castling_rights_widget_visibility_changed = pyqtSignal(bool)  # Emitted when castling rights widget visibility changes
     turn_changed = pyqtSignal(bool)  # Emitted when turn changes (True=White, False=Black)
     last_move_changed = pyqtSignal(object)  # Emitted when last move changes (chess.Move or None)
     best_next_move_changed = pyqtSignal(object)  # Emitted when best next move changes (chess.Move or None)
@@ -68,6 +69,7 @@ class BoardModel(QObject):
         self._show_evaluation_bar = False  # Track if evaluation bar is visible
         self._show_material_widget = False  # Track if material widget is visible
         self._show_game_tags_widget = True  # Track if game tags widget is visible
+        self._show_castling_rights_widget = True  # Track if castling-rights widget is visible
         self._last_move: Optional[chess.Move] = None  # Track the last move made
         self._best_next_move: Optional[chess.Move] = None  # Track the best next move from manual analysis
         self._pv2_move: Optional[chess.Move] = None  # Track the PV2 move from manual analysis
@@ -561,6 +563,21 @@ class BoardModel(QObject):
     def toggle_game_tags_widget_visibility(self) -> None:
         """Toggle the visibility of the game tags widget."""
         self.set_show_game_tags_widget(not self._show_game_tags_widget)
+
+    @property
+    def show_castling_rights_widget(self) -> bool:
+        """Get whether castling rights widget is visible."""
+        return self._show_castling_rights_widget
+
+    def set_show_castling_rights_widget(self, show: bool) -> None:
+        """Set the visibility of the castling rights widget."""
+        if self._show_castling_rights_widget != show:
+            self._show_castling_rights_widget = show
+            self.castling_rights_widget_visibility_changed.emit(self._show_castling_rights_widget)
+
+    def toggle_castling_rights_widget_visibility(self) -> None:
+        """Toggle the visibility of the castling rights widget."""
+        self.set_show_castling_rights_widget(not self._show_castling_rights_widget)
     
     @property
     def last_move(self) -> Optional[chess.Move]:

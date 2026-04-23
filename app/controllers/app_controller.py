@@ -1174,6 +1174,14 @@ class AppController:
         self._update_board_visibility_setting("show_game_tags_widget", show_widget)
         status = "Game tags shown" if show_widget else "Game tags hidden"
         self.set_status(status)
+
+    def toggle_castling_rights_widget_visibility(self) -> None:
+        """Toggle the visibility of the castling rights widget."""
+        self.board_controller.toggle_castling_rights_widget_visibility()
+        show_widget = self.board_controller.get_board_model().show_castling_rights_widget
+        self._update_board_visibility_setting("show_castling_rights_widget", show_widget)
+        status = "Castling rights shown" if show_widget else "Castling rights hidden"
+        self.set_status(status)
     
     def toggle_positional_heatmap_visibility(self) -> None:
         """Toggle the visibility of positional heat-map.

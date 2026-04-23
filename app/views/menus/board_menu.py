@@ -36,6 +36,12 @@ def setup_board_menu(mw, menu_bar: QMenuBar) -> None:
     mw.turn_indicator_action.triggered.connect(mw.controller.toggle_turn_indicator_visibility)
     board_menu.addAction(mw.turn_indicator_action)
 
+    mw.castling_rights_widget_action = QAction("Show Castling Rights", mw)
+    mw.castling_rights_widget_action.setShortcut(QKeySequence("Alt+R"))
+    mw.castling_rights_widget_action.setCheckable(True)
+    mw.castling_rights_widget_action.triggered.connect(mw.controller.toggle_castling_rights_widget_visibility)
+    board_menu.addAction(mw.castling_rights_widget_action)
+
     mw.material_widget_action = QAction("Show Material", mw)
     mw.material_widget_action.setShortcut(QKeySequence("Alt+U"))
     mw.material_widget_action.setCheckable(True)
@@ -153,6 +159,9 @@ def setup_board_menu(mw, menu_bar: QMenuBar) -> None:
     board_model.flip_state_changed.connect(mw._on_board_flip_state_changed)
     board_model.coordinates_visibility_changed.connect(mw._on_coordinates_visibility_changed)
     board_model.turn_indicator_visibility_changed.connect(mw._on_turn_indicator_visibility_changed)
+    board_model.castling_rights_widget_visibility_changed.connect(
+        mw._on_castling_rights_widget_visibility_changed
+    )
     board_model.game_info_visibility_changed.connect(mw._on_game_info_visibility_changed)
     board_model.playedmove_arrow_visibility_changed.connect(
         mw._on_playedmove_arrow_visibility_changed
@@ -177,6 +186,7 @@ def setup_board_menu(mw, menu_bar: QMenuBar) -> None:
     mw._update_rotate_action_state(board_model.is_flipped)
     mw._update_coordinates_action_state(board_model.show_coordinates)
     mw._update_turn_indicator_action_state(board_model.show_turn_indicator)
+    mw._update_castling_rights_widget_action_state(board_model.show_castling_rights_widget)
     mw._update_game_info_action_state(board_model.show_game_info)
     mw._update_playedmove_arrow_action_state(board_model.show_playedmove_arrow)
     mw._update_bestnextmove_arrow_action_state(board_model.show_bestnextmove_arrow)

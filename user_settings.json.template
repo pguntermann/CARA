@@ -801,6 +801,7 @@
   "board_visibility": {
     "show_coordinates": true,
     "show_turn_indicator": true,
+    "show_castling_rights_widget": true,
     "show_game_info": true,
     "show_playedmove_arrow": true,
     "show_bestnextmove_arrow": true,
