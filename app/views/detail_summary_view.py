@@ -1329,8 +1329,10 @@ class DetailSummaryView(QWidget):
                 if widget:
                     # Disconnect any signals before deletion to prevent accessing deleted widget
                     try:
-                        # Disconnect any signal connections from this widget
-                        widget.setParent(None)
+                        # Do not detach the widget from its parent. Detaching a visible widget
+                        # turns it into a transient top-level window until deleteLater() runs,
+                        # which can show up as "random windows" during nested event loops.
+                        widget.hide()
                         widget.deleteLater()
                     except RuntimeError:
                         # Widget already deleted, ignore

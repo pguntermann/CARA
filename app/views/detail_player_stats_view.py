@@ -3342,7 +3342,10 @@ class DetailPlayerStatsView(QWidget):
                                 widget.clicked.disconnect()
                             except (RuntimeError, TypeError):
                                 pass
-                        widget.setParent(None)
+                        # Do not detach the widget from its parent. Detaching a visible widget
+                        # turns it into a transient top-level window until deleteLater() runs,
+                        # which can show up as "random windows" during nested event loops.
+                        widget.hide()
                         widget.deleteLater()
                     except RuntimeError:
                         pass
