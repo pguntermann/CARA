@@ -503,7 +503,7 @@
             "dark_color": [168, 189, 220]
           },
           "pieces": {
-            "svg_path": "app/resources/chesspieces/default",
+            "svg_path": "app/resources/chesspieces/kosal",
             "padding_ratio": 0.05
           },
           "turn_indicator": {

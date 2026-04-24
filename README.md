@@ -318,7 +318,9 @@ CARA relies on several open-source projects and resources:
   - [asteval](https://github.com/newville/asteval) (>= 0.9.31)
   - [charset-normalizer](https://github.com/Ousret/charset_normalizer) (>= 3.0.0)
 
-- **Chess Pieces**: Classic SVG set by [User:Cburnett](https://commons.wikimedia.org/wiki/User:Cburnett) hosted on [Wikimedia Commons](https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces), licensed under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) and the [GNU Free Documentation License 1.2](https://www.gnu.org/licenses/old-licenses/fdl-1.2.html)
+- **Chess Pieces**:
+  - Classic SVG set by [User:Cburnett](https://commons.wikimedia.org/wiki/User:Cburnett) hosted on [Wikimedia Commons](https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces), licensed under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) and the [GNU Free Documentation License 1.2](https://www.gnu.org/licenses/old-licenses/fdl-1.2.html)
+  - [Kosal Chess Piece Set](https://github.com/philatype/kosal) by philatype, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
 - **Opening Resources**:
   - **ECO Database**: Based on [eco.json](https://github.com/hayatbiralem/eco.json) by hayatbiralem (MIT License), compiled by Ömür Yanıkoğlu, with credit to Shane Hudson for the original SCID opening data
