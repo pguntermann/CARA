@@ -22,6 +22,7 @@ from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
 
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.views.style.style_manager import StyleManager
+from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_SAVE
 
 if __name__ != "__main__":
     from app.models.game_model import GameModel
@@ -300,8 +301,45 @@ class DetailNotesView(QWidget):
         for btn in group_symbols:
             toolbar_layout.addWidget(btn)
 
-        # Keep toolbar compact.
-        toolbar_layout.addStretch(0)
+        # Right-aligned Save button (re-uses existing Notes menu save handler).
+        notes_cfg = (
+            (self.config.get("ui", {}) or {})
+            .get("panels", {})
+            .get("detail", {})
+            .get("notes", {})
+        )
+        toolbar_cfg = notes_cfg.get("toolbar", {}) if isinstance(notes_cfg.get("toolbar", {}), dict) else {}
+        save_cfg = toolbar_cfg.get("save_button", {}) if isinstance(toolbar_cfg.get("save_button", {}), dict) else {}
+        save_icons_cfg = save_cfg.get("icons", {}) if isinstance(save_cfg.get("icons", {}), dict) else {}
+        save_svg = str(save_icons_cfg.get("save_svg", SVG_MENU_SAVE))
+        save_tint = save_cfg.get("icon_tint_rgb", notes_text_color)
+        save_icon_px = int(save_cfg.get("icon_size_px", 18) or 18)
+        save_tooltip = str(save_cfg.get("tooltip", "Save notes to current game"))
+
+        self._save_notes_button = QPushButton(toolbar)
+        self._save_notes_button.setToolTip(save_tooltip)
+        self._save_notes_button.setIcon(themed_icon_from_svg(save_svg, save_tint))
+        from PyQt6.QtCore import QSize
+
+        self._save_notes_button.setIconSize(QSize(save_icon_px, save_icon_px))
+        self._save_notes_button.clicked.connect(self._on_save_notes_clicked)
+
+        # Style the save button like other detail icon buttons (e.g. metadata +/-).
+        StyleManager.style_buttons(
+            [self._save_notes_button],
+            self.config,
+            bg_color=pane_bg,
+            border_color=[60, 60, 65],
+            text_color=notes_text_color,
+            font_family=font_family,
+            font_size=font_size,
+            min_height=24,
+        )
+
+        # Push save to the far right.
+        toolbar_layout.addStretch(1)
+        _add_separator()
+        toolbar_layout.addWidget(self._save_notes_button)
 
         # Start disabled until we have an active selection.
         for btn in buttons:
@@ -326,6 +364,20 @@ class DetailNotesView(QWidget):
         )
 
         layout.addWidget(toolbar, 0)
+
+    def _on_save_notes_clicked(self) -> None:
+        """Trigger the existing Notes menu save handler (MainWindow)."""
+        mw = QApplication.activeWindow()
+        if mw is None:
+            return
+        if hasattr(mw, "save_notes_action") and mw.save_notes_action is not None:
+            mw.save_notes_action.trigger()
+            return
+        if hasattr(mw, "_save_notes_to_current_game"):
+            try:
+                mw._save_notes_to_current_game()
+            except Exception:
+                return
 
     def _sync_format_toolbar_enabled_state(self) -> None:
         """Enable toolbar buttons only when the editor has a non-empty selection.

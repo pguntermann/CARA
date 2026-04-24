@@ -2120,6 +2120,18 @@
           },
           "blockquote_text_color": [210, 190, 130],
           "toolbar_separator_color": { "$ref": "$_COLOR_GRAPHITE_LINE" },
+          "toolbar": {
+            "save_button": {
+              "icon_tint_rgb": {
+                "$ref": "$_COLOR_COCOA_BROWN"
+              },
+              "icon_size_px": 18,
+              "tooltip": "Save notes to current game",
+              "icons": {
+                "save_svg": "app/resources/icons/save_database.svg"
+              }
+            }
+          },
           "inline_code_background_color": [90, 110, 160],
           "inline_code_background_alpha": 170,
           "inline_code_text_color": {
