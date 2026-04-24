@@ -313,8 +313,10 @@
         },
         "item_padding": [4, 20, 4, 14],
         "menu_horizontal_padding": 4,
-        "separator_height": 1,
-        "separator_color": [60, 60, 65],
+        "separator_height": 2,
+        "separator_color": {
+          "$ref": "$_COLOR_SEPERATOR_BACKGROUND"
+        },
         "separator_margin": [2, 4]
       },
       "tree_view": {
@@ -370,10 +372,16 @@
         "selection_text_color": {
           "$ref": "$_COLOR_NEAR_BLACK"
         },
+        "hover_background_color": {
+          "$ref": "$_COLOR_BACKGROUND_6"
+        },
+        "hover_text_color": {
+          "$ref": "$_COLOR_TEXT_5"
+        },
         "row_height": 20,
         "header_min_height": 20,
         "show_grid": false,
-        "show_focus_rect": true
+        "show_focus_rect": false
       },
       "tooltip": {
         "background_color": {
@@ -980,6 +988,7 @@
                 "text_color": {
                   "$ref": "$_COLOR_NEAR_BLACK"
                 },
+                "border_width": 0,
                 "border_radius": 3,
                 "padding": [6, 4, 6, 4],
                 "font_weight": "bold"
@@ -991,6 +1000,7 @@
                 "text_color": {
                   "$ref": "$_COLOR_NEAR_WHITE"
                 },
+                "border_width": 0,
                 "border_radius": 3,
                 "padding": [6, 4, 6, 4],
                 "font_weight": "bold"
@@ -1263,6 +1273,7 @@
                 12
               ],
               "border_radius": 6,
+              "border_width": 0,
               "colors": {
                 "critical": [255, 100, 100],
                 "high": [255, 150, 100],
@@ -1620,13 +1631,23 @@
             "empty_label_padding": 20
           },
           "multipv1_indicator": {
-            "width": 4
+            "width": 8
           },
           "multipv2_indicator": {
-            "width": 4
+            "width": 8
           },
           "multipv3_indicator": {
-            "width": 4
+            "width": 8
+          },
+          "pv_line_indicator": {
+            "gap": 6,
+            "inset_y": 0,
+            "radius": 4,
+            "hide_outer_left_border": true
+          },
+          "pv_line_frame": {
+            "border_width": 0,
+            "border_radius": 4
           },
           "statistics": {
             "position": "top",
@@ -1652,7 +1673,7 @@
               "offset_x": 20,
               "offset_y": 20,
               "border": {
-                "size": 8,
+                "size": 4,
                 "color": {
                   "$ref": "$_COLOR_BORDER"
                 }
@@ -1989,7 +2010,7 @@
             },
             "icons": {
               "add_svg": "app/resources/icons/menu_plus.svg",
-              "remove_svg": "app/resources/icons/menu_minus.svg"
+              "remove_svg": "app/resources/icons/menu_trash.svg"
             },
             "spacing": 8,
             "margins": [8, 8, 8, 8],
@@ -2240,7 +2261,7 @@
         "item_padding": [4, 20, 4, 8]
       },
       "separator": {
-        "height": 1,
+        "height": 2,
         "background_color": {
           "$ref": "$_COLOR_SEPERATOR_BACKGROUND"
         },

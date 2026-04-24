@@ -13,7 +13,7 @@ from app.controllers.metadata_controller import MetadataController
 from app.utils.table_export import table_to_delimited, get_copy_table_config
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.views.dialogs.add_pgn_header_dialog import AddPgnHeaderDialog
-from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_PLUS, SVG_MENU_MINUS
+from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_PLUS, SVG_MENU_TRASH
 
 
 class MetadataTableItemDelegate(QStyledItemDelegate):
@@ -177,7 +177,7 @@ class DetailMetadataView(QWidget):
         tint = button_cfg.get("icon_tint_rgb", [220, 220, 240])
 
         add_svg = icons_cfg.get("add_svg", SVG_MENU_PLUS)
-        remove_svg = icons_cfg.get("remove_svg", SVG_MENU_MINUS)
+        remove_svg = icons_cfg.get("remove_svg", SVG_MENU_TRASH)
 
         self.add_tag_button.setIcon(themed_icon_from_svg(add_svg, tint))
         self.remove_tag_button.setIcon(themed_icon_from_svg(remove_svg, tint))

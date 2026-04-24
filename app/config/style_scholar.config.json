@@ -359,8 +359,8 @@
         },
         "item_padding": [4, 20, 4, 14],
         "menu_horizontal_padding": 4,
-        "separator_height": 1,
-        "separator_color": { "$ref": "$_COLOR_GRAPHITE_LINE" },
+        "separator_height": 2,
+        "separator_color": { "$ref": "$_COLOR_WARM_STONE" },
         "separator_margin": [2, 4]
       },
       "tree_view": {
@@ -416,10 +416,16 @@
         "selection_text_color": {
           "$ref": "$_COLOR_INK_BODY"
         },
+        "hover_background_color": {
+          "$ref": "$_COLOR_KHAKI_DUST"
+        },
+        "hover_text_color": {
+          "$ref": "$_COLOR_MINK_BROWN"
+        },
         "row_height": 20,
         "header_min_height": 20,
         "show_grid": false,
-        "show_focus_rect": true
+        "show_focus_rect": false
       },
       "tooltip": {
         "background_color": {
@@ -1106,6 +1112,7 @@
                 "text_color": {
                   "$ref": "$_COLOR_PATINA_GREEN"
                 },
+                "border_width": 1,
                 "border_radius": 3,
                 "padding": [6, 4, 6, 4],
                 "font_weight": "bold"
@@ -1117,6 +1124,7 @@
                 "text_color": {
                   "$ref": "$_COLOR_FROST_MINT"
                 },
+                "border_width": 1,
                 "border_radius": 3,
                 "padding": [6, 4, 6, 4],
                 "font_weight": "bold"
@@ -1399,6 +1407,7 @@
                 12
               ],
               "border_radius": 6,
+              "border_width": 1,
               "colors": {
                 "critical": {
                   "$ref": "$_COLOR_TAG_CRIMSON"
@@ -1804,6 +1813,16 @@
           "multipv3_indicator": {
             "width": 4
           },
+          "pv_line_indicator": {
+            "gap": 6,
+            "inset_y": 2,
+            "radius": 3,
+            "hide_outer_left_border": false
+          },
+          "pv_line_frame": {
+            "border_width": 0,
+            "border_radius": 4
+          },
           "statistics": {
             "position": "top",
             "font_size": 9,
@@ -2183,7 +2202,7 @@
             },
             "icons": {
               "add_svg": "app/resources/icons/menu_plus.svg",
-              "remove_svg": "app/resources/icons/menu_minus.svg"
+              "remove_svg": "app/resources/icons/menu_trash.svg"
             },
             "spacing": 8,
             "margins": [8, 8, 8, 8],
@@ -2462,7 +2481,7 @@
         "item_padding": [4, 20, 4, 8]
       },
       "separator": {
-        "height": 1,
+        "height": 2,
         "background_color": {
           "$ref": "$_COLOR_WARM_STONE"
         },

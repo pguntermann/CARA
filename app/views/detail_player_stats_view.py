@@ -4253,6 +4253,7 @@ class DetailPlayerStatsView(QWidget):
         severity_indicator_config = section_config.get("severity_indicator", {})
         indicator_size = severity_indicator_config.get("size", [12, 12])
         indicator_border_radius = severity_indicator_config.get("border_radius", 6)
+        indicator_border_width = int(severity_indicator_config.get("border_width", 1))
 
         # Root item frame
         item = QFrame()
@@ -4273,10 +4274,16 @@ class DetailPlayerStatsView(QWidget):
 
         indicator = QWidget()
         indicator.setFixedSize(indicator_size[0], indicator_size[1])
+        bw = max(0, int(indicator_border_width))
+        border_css = (
+            f"border: {bw}px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});"
+            if bw > 0
+            else "border: none;"
+        )
         indicator.setStyleSheet(f"""
             QWidget {{
                 background-color: rgb({indicator_color[0]}, {indicator_color[1]}, {indicator_color[2]});
-                border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
+                {border_css}
                 border-radius: {indicator_border_radius}px;
             }}
         """)

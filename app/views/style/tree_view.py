@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import QTreeWidget, QHeaderView, QProxyStyle, QStyle
 
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.themed_icon import themed_icon_from_svg
+from app.views.delegates.no_focus_rect_delegate import NoFocusRectItemDelegate
 
 
 _CARA_BRANCH_STYLES: list[QProxyStyle] = []
@@ -102,6 +103,8 @@ def apply_tree_view_styling(
     grid_color = tree_config.get("grid_color", [60, 60, 65])
     selection_bg = tree_config.get("selection_background_color", [70, 90, 130])
     selection_text = tree_config.get("selection_text_color", [240, 240, 240])
+    hover_bg = tree_config.get("hover_background_color", selection_bg)
+    hover_text = tree_config.get("hover_text_color", selection_text)
 
     # Fonts
     font_family_raw = tree_config.get("font_family", "Helvetica Neue")
@@ -130,6 +133,13 @@ def apply_tree_view_styling(
     for tree in tree_views:
         if tree is None:
             continue
+
+        # Suppress the per-cell "current index" focus rectangle (robust vs. QSS alone).
+        # This keeps selection highlighting intact while removing the clicked-cell border.
+        try:
+            tree.setItemDelegate(NoFocusRectItemDelegate(tree))
+        except Exception:
+            pass
 
         tree.setFont(base_font)
         header = tree.header()
@@ -216,6 +226,8 @@ def apply_tree_view_styling(
         alt_bg_rgb = f"rgb({alt_background_color[0]}, {alt_background_color[1]}, {alt_background_color[2]})"
         sel_bg_rgb = f"rgb({selection_bg[0]}, {selection_bg[1]}, {selection_bg[2]})"
         sel_text_rgb = f"rgb({selection_text[0]}, {selection_text[1]}, {selection_text[2]})"
+        hover_bg_rgb = f"rgb({hover_bg[0]}, {hover_bg[1]}, {hover_bg[2]})"
+        hover_text_rgb = f"rgb({hover_text[0]}, {hover_text[1]}, {hover_text[2]})"
 
         parts = [
             "QHeaderView {",
@@ -234,6 +246,14 @@ def apply_tree_view_styling(
             "  padding: 2px 4px;",
             "}",
             "QTreeWidget::item:selected {",
+            f"  background-color: {sel_bg_rgb};",
+            f"  color: {sel_text_rgb};",
+            "}",
+            "QTreeWidget::item:hover {",
+            f"  background-color: {hover_bg_rgb};",
+            f"  color: {hover_text_rgb};",
+            "}",
+            "QTreeWidget::item:selected:hover {",
             f"  background-color: {sel_bg_rgb};",
             f"  color: {sel_text_rgb};",
             "}",

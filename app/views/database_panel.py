@@ -29,6 +29,7 @@ from app.models.database_panel_model import DatabasePanelModel
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.table_export import table_to_delimited, get_copy_table_config
 from app.utils.themed_icon import SVG_MENU_FOLDER_OPEN, themed_icon_from_svg
+from app.views.delegates.no_focus_rect_delegate import NoFocusRectItemDelegate
 
 
 class DatabasePanel(QWidget):
@@ -1600,8 +1601,14 @@ class DatabasePanel(QWidget):
                 background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
                 border: none;
             }}
+            QTableView::item:focus {{
+                outline: none;
+                border: none;
+            }}
         """
         table.setStyleSheet(stylesheet)
+        # Suppress the per-cell "current index" focus rectangle.
+        table.setItemDelegate(NoFocusRectItemDelegate(table))
         
         # Apply scrollbar styling using StyleManager
         from app.views.style import StyleManager

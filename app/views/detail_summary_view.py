@@ -1662,6 +1662,7 @@ class DetailSummaryView(QWidget):
         player_label_border_radius = side_config.get('border_radius', 3)
         player_label_padding = side_config.get('padding', [6, 4, 6, 4])
         player_label_font_weight = side_config.get('font_weight', 'bold')
+        player_label_border_width = int(side_config.get('border_width', 1))
         
         widget = QWidget()
         widget.setStyleSheet(f"""
@@ -1679,11 +1680,17 @@ class DetailSummaryView(QWidget):
         # Player name header with side-specific styling
         name_label = QLabel(player_name)
         name_label.setFont(label_font)
+        border_css = (
+            f"border: {max(0, player_label_border_width)}px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});"
+            if int(player_label_border_width) > 0
+            else "border: none;"
+        )
         name_label.setStyleSheet(f"""
             QLabel {{
                 background-color: rgb({player_label_bg.red()}, {player_label_bg.green()}, {player_label_bg.blue()});
                 color: rgb({player_label_text.red()}, {player_label_text.green()}, {player_label_text.blue()});
                 font-weight: {player_label_font_weight};
+                {border_css}
                 border-radius: {player_label_border_radius}px;
                 padding: {player_label_padding[0]}px {player_label_padding[1]}px {player_label_padding[2]}px {player_label_padding[3]}px;
             }}
@@ -1785,6 +1792,7 @@ class DetailSummaryView(QWidget):
         player_label_border_radius = side_config.get('border_radius', 3)
         player_label_padding = side_config.get('padding', [6, 4, 6, 4])
         player_label_font_weight = side_config.get('font_weight', 'bold')
+        player_label_border_width = int(side_config.get('border_width', 1))
         
         widget = QWidget()
         widget.setStyleSheet(f"""
@@ -1802,11 +1810,17 @@ class DetailSummaryView(QWidget):
         # Player name header with side-specific styling
         name_label = QLabel(player_name)
         name_label.setFont(label_font)
+        border_css = (
+            f"border: {max(0, player_label_border_width)}px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});"
+            if int(player_label_border_width) > 0
+            else "border: none;"
+        )
         name_label.setStyleSheet(f"""
             QLabel {{
                 background-color: rgb({player_label_bg.red()}, {player_label_bg.green()}, {player_label_bg.blue()});
                 color: rgb({player_label_text.red()}, {player_label_text.green()}, {player_label_text.blue()});
                 font-weight: {player_label_font_weight};
+                {border_css}
                 border-radius: {player_label_border_radius}px;
                 padding: {player_label_padding[0]}px {player_label_padding[1]}px {player_label_padding[2]}px {player_label_padding[3]}px;
             }}
@@ -1919,6 +1933,7 @@ class DetailSummaryView(QWidget):
         player_label_border_radius = side_config.get('border_radius', 3)
         player_label_padding = side_config.get('padding', [6, 4, 6, 4])
         player_label_font_weight = side_config.get('font_weight', 'bold')
+        player_label_border_width = int(side_config.get('border_width', 1))
         
         widget = QWidget()
         widget.setStyleSheet(f"""
@@ -1936,11 +1951,17 @@ class DetailSummaryView(QWidget):
         # Player name header with side-specific styling
         name_label = QLabel(player_name)
         name_label.setFont(label_font)
+        border_css = (
+            f"border: {max(0, player_label_border_width)}px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});"
+            if int(player_label_border_width) > 0
+            else "border: none;"
+        )
         name_label.setStyleSheet(f"""
             QLabel {{
                 background-color: rgb({player_label_bg.red()}, {player_label_bg.green()}, {player_label_bg.blue()});
                 color: rgb({player_label_text.red()}, {player_label_text.green()}, {player_label_text.blue()});
                 font-weight: {player_label_font_weight};
+                {border_css}
                 border-radius: {player_label_border_radius}px;
                 padding: {player_label_padding[0]}px {player_label_padding[1]}px {player_label_padding[2]}px {player_label_padding[3]}px;
             }}
@@ -2109,6 +2130,7 @@ class DetailSummaryView(QWidget):
         player_label_border_radius = side_config.get('border_radius', 3)
         player_label_padding = side_config.get('padding', [6, 4, 6, 4])
         player_label_font_weight = side_config.get('font_weight', 'bold')
+        player_label_border_width = int(side_config.get('border_width', 1))
         
         widget = QWidget()
         widget.setStyleSheet(f"""
@@ -2126,11 +2148,17 @@ class DetailSummaryView(QWidget):
         # Player name header with side-specific styling
         name_label = QLabel(player_name)
         name_label.setFont(label_font)
+        border_css = (
+            f"border: {max(0, player_label_border_width)}px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});"
+            if int(player_label_border_width) > 0
+            else "border: none;"
+        )
         name_label.setStyleSheet(f"""
             QLabel {{
                 background-color: rgb({player_label_bg.red()}, {player_label_bg.green()}, {player_label_bg.blue()});
                 color: rgb({player_label_text.red()}, {player_label_text.green()}, {player_label_text.blue()});
                 font-weight: {player_label_font_weight};
+                {border_css}
                 border-radius: {player_label_border_radius}px;
                 padding: {player_label_padding[0]}px {player_label_padding[1]}px {player_label_padding[2]}px {player_label_padding[3]}px;
             }}

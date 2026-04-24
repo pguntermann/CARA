@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 from app.utils.table_export import table_to_delimited, get_visual_column_indices, get_copy_table_config
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.views.delegates.no_focus_rect_delegate import NoFocusRectItemDelegate
 
 from app.models.moveslist_model import MovesListModel
 from app.models.game_model import GameModel
@@ -141,8 +142,14 @@ class DetailMovesListView(QWidget):
                 background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
                 border: none;
             }}
+            QTableView::item:focus {{
+                outline: none;
+                border: none;
+            }}
         """
         self.moves_table.setStyleSheet(stylesheet)
+        # Suppress the per-cell "current index" focus rectangle.
+        self.moves_table.setItemDelegate(NoFocusRectItemDelegate(self.moves_table))
         
         # Apply scrollbar styling using StyleManager
         from app.views.style import StyleManager
@@ -224,10 +231,14 @@ class DetailMovesListView(QWidget):
         class CommentColumnDelegate(QStyledItemDelegate):
             """Delegate for Comment column that formats text for display."""
             def paint(self, painter, option, index):
+                # Remove focus rect for the current cell.
+                from PyQt6.QtWidgets import QStyleOptionViewItem, QStyle
+                opt = QStyleOptionViewItem(option)
+                opt.state &= ~QStyle.StateFlag.State_HasFocus
                 # Disable text elision (no "..." truncation)
                 # This allows the full text to be displayed, wrapping naturally
-                option.textElideMode = Qt.TextElideMode.ElideNone
-                super().paint(painter, option, index)
+                opt.textElideMode = Qt.TextElideMode.ElideNone
+                super().paint(painter, opt, index)
             
             def displayText(self, value, locale):
                 """Format comment text for display by replacing newlines with spaces.

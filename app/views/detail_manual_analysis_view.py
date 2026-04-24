@@ -110,6 +110,18 @@ class DetailManualAnalysisView(QWidget):
         multipv3_indicator_config = manual_analysis_config.get('multipv3_indicator', {})
         self.multipv3_indicator_width = multipv3_indicator_config.get('width', 4)
         self.multipv3_indicator_enabled = multipv3_indicator_config.get('enabled', True)
+
+        # PV line indicator styling (separate indicator widget, not a left border)
+        indicator_style = manual_analysis_config.get("pv_line_indicator", {}) if isinstance(manual_analysis_config.get("pv_line_indicator", {}), dict) else {}
+        self.pv_indicator_gap = int(indicator_style.get("gap", 6))
+        self.pv_indicator_inset_y = int(indicator_style.get("inset_y", 2))
+        self.pv_indicator_radius = int(indicator_style.get("radius", 3))
+        self.pv_indicator_hide_outer_left_border = bool(indicator_style.get("hide_outer_left_border", False))
+
+        # PV line frame styling
+        line_frame_cfg = manual_analysis_config.get("pv_line_frame", {}) if isinstance(manual_analysis_config.get("pv_line_frame", {}), dict) else {}
+        self.pv_line_frame_border_width = int(line_frame_cfg.get("border_width", 1))
+        self.pv_line_frame_border_radius = int(line_frame_cfg.get("border_radius", 4))
         
         # Load arrow colors from board config (to match arrow colors)
         main_panel_config = ui_config.get('panels', {}).get('main', {})
@@ -1563,9 +1575,15 @@ class DetailManualAnalysisView(QWidget):
         widget = QFrame()
         # Set size policy to prevent vertical stretching
         widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(8, 4, 8, 4)
-        layout.setSpacing(4)
+        # Root layout: indicator stripe + content. Keep content padding, but let the stripe be flush.
+        root_layout = QHBoxLayout(widget)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(8, 4, 8, 4)
+        content_layout.setSpacing(4)
+        root_layout.addWidget(content, 1)
         
         # Get styling from config
         ui_config = self.config.get('ui', {})
@@ -1668,7 +1686,7 @@ class DetailManualAnalysisView(QWidget):
                         viewport_width = viewport.width()
                         if viewport_width > 0:
                             # Account for widget padding and margins
-                            widget_margins = layout.contentsMargins()
+                            widget_margins = content_layout.contentsMargins()
                             # Also account for container layout margins
                             container_margins = self.analysis_container_layout.contentsMargins() if hasattr(self, 'analysis_container_layout') else (0, 0, 0, 0)
                             # Get scrollbar width from global styles config
@@ -1860,6 +1878,9 @@ class DetailManualAnalysisView(QWidget):
                 current_fen = board_model.get_fen()
             board_controller = self._analysis_controller.get_board_controller()
         
+        line_layout: Optional[QHBoxLayout] = None
+        pv_widget: Optional[QWidget] = None
+        line_label: Optional[QLabel] = None
         # Create line widget with separate labels for each move if hover is enabled
         if (pv_moves and pv_hover_enabled and board_controller and current_fen):
             # Use separate labels for each move
@@ -1913,7 +1934,7 @@ class DetailManualAnalysisView(QWidget):
                 if viewport:
                     viewport_width = viewport.width()
                     if viewport_width > 0:
-                        widget_margins = layout.contentsMargins()
+                        widget_margins = content_layout.contentsMargins()
                         container_margins = self.analysis_container_layout.contentsMargins() if hasattr(self, 'analysis_container_layout') else (0, 0, 0, 0)
                         # Get scrollbar width from global styles config
                         styles_config = self.config.get('ui', {}).get('styles', {})
@@ -2043,9 +2064,8 @@ class DetailManualAnalysisView(QWidget):
             line_layout.addWidget(pv_widget)
             line_layout.addStretch()  # Add stretch to push everything to the left
             
-            line_widget = QWidget()
-            line_widget.setLayout(line_layout)
-            layout.addWidget(line_widget)
+            pv_widget = pv_widget  # type: ignore[assignment]
+            line_label = line_label  # type: ignore[assignment]
         else:
             # Fallback to standard QLabel if hover not available
             line_label = QLabel(line_text_html)
@@ -2064,7 +2084,21 @@ class DetailManualAnalysisView(QWidget):
             line_palette.setColor(line_label.foregroundRole(), QColor(norm_text[0], norm_text[1], norm_text[2]))
             line_label.setPalette(line_palette)
             line_label.update()
-            layout.addWidget(line_label)
+
+        # Ensure we always have a horizontal layout (so the indicator stripe can be attached).
+        if line_layout is None:
+            line_layout = QHBoxLayout()
+            line_layout.setContentsMargins(0, 0, 0, 0)
+            line_layout.setSpacing(0)
+            if line_label is not None:
+                line_layout.addWidget(line_label)
+            if pv_widget is not None:
+                line_layout.addWidget(pv_widget)
+            line_layout.addStretch()
+
+        line_widget = QWidget()
+        line_widget.setLayout(line_layout)
+        content_layout.addWidget(line_widget)
         
         # Check if this line should show an indicator based on multipv and arrow visibility
         show_indicator = False
@@ -2093,26 +2127,76 @@ class DetailManualAnalysisView(QWidget):
                     indicator_width = self.multipv3_indicator_width
                     indicator_color = self.pv3_arrow_color
         
-        # Apply frame styling
+        # Add PV indicator stripe widget (cleaner than using border-left with rounded frames)
+        bw = max(0, int(getattr(self, "pv_line_frame_border_width", 1)))
+        br = max(0, int(getattr(self, "pv_line_frame_border_radius", 4)))
+        outer_border_left_css = (
+            f"border-left: {bw}px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});"
+            if bw > 0
+            else "border-left: none;"
+        )
         if show_indicator:
-            # Apply colored left border for multipv line when arrow is visible
-            widget.setStyleSheet(f"""
-                QFrame {{
-                    background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
-                    border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
-                    border-left: {indicator_width}px solid rgb({indicator_color[0]}, {indicator_color[1]}, {indicator_color[2]});
-                    border-radius: 4px;
-                }}
-            """)
-        else:
-            # Standard styling with outer border
-            widget.setStyleSheet(f"""
-                QFrame {{
-                    background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
-                    border: 1px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});
-                    border-radius: 4px;
-                }}
-            """)
+            gap = max(0, int(getattr(self, "pv_indicator_gap", 6)))
+            inset_y = max(0, int(getattr(self, "pv_indicator_inset_y", 2)))
+            radius = max(0, int(getattr(self, "pv_indicator_radius", 3)))
+            hide_left = bool(getattr(self, "pv_indicator_hide_outer_left_border", False))
+            if hide_left:
+                outer_border_left_css = "border-left: 0px solid transparent;"
+
+            indicator_frame = QFrame()
+            indicator_frame.setFrameShape(QFrame.Shape.NoFrame)
+            indicator_frame.setFixedWidth(max(1, int(indicator_width)))
+            indicator_frame.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+            indicator_frame.setStyleSheet(
+                "QFrame {"
+                f"background-color: rgb({indicator_color[0]}, {indicator_color[1]}, {indicator_color[2]});"
+                "border: none;"
+                f"border-top-left-radius: {radius}px;"
+                f"border-bottom-left-radius: {radius}px;"
+                "border-top-right-radius: 0px;"
+                "border-bottom-right-radius: 0px;"
+                "}"
+            )
+
+            if inset_y > 0:
+                indicator_container = QWidget()
+                v = QVBoxLayout(indicator_container)
+                v.setContentsMargins(0, inset_y, 0, inset_y)
+                v.setSpacing(0)
+                v.addWidget(indicator_frame, 1)
+                root_layout.insertWidget(0, indicator_container)
+            else:
+                root_layout.insertWidget(0, indicator_frame)
+
+            # Apply a gap between stripe and content, without affecting inner PV label spacing.
+            root_layout.setSpacing(gap)
+
+        # Apply frame styling (indicator is a separate widget; optionally hide left border)
+        border_top = (
+            f"border-top: {bw}px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});"
+            if bw > 0
+            else "border-top: none;"
+        )
+        border_right = (
+            f"border-right: {bw}px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});"
+            if bw > 0
+            else "border-right: none;"
+        )
+        border_bottom = (
+            f"border-bottom: {bw}px solid rgb({norm_border[0]}, {norm_border[1]}, {norm_border[2]});"
+            if bw > 0
+            else "border-bottom: none;"
+        )
+        widget.setStyleSheet(f"""
+            QFrame {{
+                background-color: rgb({pane_bg[0]}, {pane_bg[1]}, {pane_bg[2]});
+                {border_top}
+                {border_right}
+                {border_bottom}
+                {outer_border_left_css}
+                border-radius: {br}px;
+            }}
+        """)
         
         widget.setProperty("multipv", line.multipv)
         return widget
