@@ -2909,6 +2909,9 @@
           }
         },
         "groups": {
+          "border_color": {
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
+          },
           "border_width": 1,
           "title_font_family": {
             "$ref": "$_FONT_FAMILY_PRIMARY"

@@ -1,6 +1,6 @@
 {
   "constants": {
-    "$_FONT_FAMILY_PRIMARY": "Verdana, Geneva, Tahoma, DejaVu Sans, Liberation Sans, Arial, sans-serif",
+    "$_FONT_FAMILY_PRIMARY": "Trebuchet MS, Tahoma, Geneva, DejaVu Sans, Liberation Sans, Arial, sans-serif",
     "$_FONT_FAMILY_MONO": "Cascadia Mono, SF Mono, Menlo, Monaco, Consolas, \"Liberation Mono\", \"DejaVu Sans Mono\", monospace",
     "$_FONT_FAMILY_MONO_2": "Courier New, Courier, monospace",
     "$_FONT_SIZE_BASE_SMALL": 10,
@@ -2623,7 +2623,7 @@
           "selected_font_weight": 700,
           "tab_height": 24,
           "pane_background": {
-            "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
           },
           "scroll_button_color": {
             "$ref": "$_COLOR_SCROLLBAR_BUTTON_COLOR"
@@ -2637,7 +2637,7 @@
           "colors": {
             "normal": {
               "background": {
-                "$ref": "$_COLOR_BACKGROUND_3"
+                "$ref": "$_COLOR_BACKGROUND_SECONDARY"
               },
               "text": {
                 "$ref": "$_COLOR_TEXT_SECONDARY"
@@ -2667,6 +2667,9 @@
           }
         },
         "groups": {
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_width": 1,
           "title_font_family": {
             "$ref": "$_FONT_FAMILY_PRIMARY"

@@ -2672,6 +2672,9 @@
           }
         },
         "groups": {
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
           "border_width": 1,
           "title_font_family": {
             "$ref": "$_FONT_FAMILY_PRIMARY"
