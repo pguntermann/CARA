@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- Template icon: keep fill as #ffffff so themed_icon can tint it -->
+  <path fill="#ffffff" d="M9 3h6l1 2h5v2H3V5h5l1-2zm1 6h2v10h-2V9zm4 0h2v10h-2V9zM7 9h2v10H7V9zm1 12h8c1.1 0 2-.9 2-2V9H6v10c0 1.1.9 2 2 2z"/>
+</svg>

@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QSpacerItem,
     QFrame,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize
 from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent, QFontMetrics
 from typing import Optional, Dict, Any, List, Tuple, Callable
 
@@ -27,6 +27,7 @@ from app.models.database_model import DatabaseModel
 
 from app.services.game_tags_service import GameTagsService
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_TRASH
 
 
 class _ChipWrapContainer(QWidget):
@@ -390,14 +391,14 @@ class CriteriaRowWidget(QWidget):
             "Position",
             "Position (fuzzy)",
         ])
-        self.field_combo.setFixedWidth(120)
+        self.field_combo.setFixedWidth(140)
         self.field_combo.currentTextChanged.connect(self._on_field_changed)
         layout.addWidget(self.field_combo)
         
         # Operator selector
         self.operator_combo = QComboBox()
-        self.operator_combo.addItems(["contains", "equals", "starts with", "ends with"])
-        self.operator_combo.setFixedWidth(140)  # Increased from 100
+        self.operator_combo.addItems(["contains", "not contains", "equals", "starts with", "ends with"])
+        self.operator_combo.setFixedWidth(130)
         layout.addWidget(self.operator_combo)
         
         # Value input
@@ -432,7 +433,10 @@ class CriteriaRowWidget(QWidget):
         layout.addWidget(self.custom_tag_input)
         
         # Remove button (smaller to match input field height)
-        self.remove_btn = QPushButton("Remove")
+        self.remove_btn = QPushButton()
+        self.remove_btn.setObjectName("criteria_remove_button")
+        self.remove_btn.setToolTip("Remove criterion")
+        self.remove_btn.setAccessibleName("Remove criterion")
         self.remove_btn.clicked.connect(self.removed.emit)
         layout.addWidget(self.remove_btn)
         
@@ -483,7 +487,7 @@ class CriteriaRowWidget(QWidget):
             self.position_input.setVisible(False)
         elif field_text == "Date":
             self.operator_combo.addItems([
-                "contains", "equals", "not equals", "before", "after"
+                "contains", "not contains", "equals", "not equals", "before", "after"
             ])
             self.value_input.setPlaceholderText("YYYY.MM.DD (use ?? for unknown)")
             self.value_input.setVisible(True)
@@ -491,14 +495,14 @@ class CriteriaRowWidget(QWidget):
             self.custom_tag_input.setVisible(False)
             self.position_input.setVisible(False)
         elif field_text == "Custom PGN header tag":
-            self.operator_combo.addItems(["contains", "equals", "not equals", "starts with", "ends with"])
+            self.operator_combo.addItems(["contains", "not contains", "equals", "not equals", "starts with", "ends with"])
             self.value_input.setVisible(True)
             self.value_input.setEnabled(True)
             self.value_input.setPlaceholderText("Value...")
             self.custom_tag_input.setVisible(True)
             self.position_input.setVisible(False)
         elif field_text == "Game tags":
-            self.operator_combo.addItems(["contains", "does not contain"])
+            self.operator_combo.addItems(["contains", "not contains"])
             self.value_input.setVisible(False)
             self.tags_picker_btn.setVisible(True)
             self._sync_tags_picker_label()
@@ -522,7 +526,7 @@ class CriteriaRowWidget(QWidget):
         else:
             # Text fields
             self.operator_combo.addItems([
-                "contains", "equals", "not equals", "starts with", "ends with", 
+                "contains", "not contains", "equals", "not equals", "starts with", "ends with", 
                 "is empty", "is not empty"
             ])
             self.value_input.setPlaceholderText("Value...")
@@ -562,6 +566,16 @@ class CriteriaRowWidget(QWidget):
             border_color,
             padding=3
         )
+
+        # Icon-only remove button (theme-configurable SVG + tint)
+        remove_svg = str(buttons_config.get("remove_button_icon_svg", SVG_MENU_TRASH))
+        remove_tint = buttons_config.get("remove_button_icon_tint_rgb", dialog_config.get("text_color", [200, 200, 200]))
+        icon_px = int(buttons_config.get("remove_button_icon_px", 18))
+        tooltip = str(buttons_config.get("remove_button_tooltip", "Remove criterion"))
+        self.remove_btn.setToolTip(tooltip)
+        self.remove_btn.setIcon(themed_icon_from_svg(remove_svg, remove_tint))
+        self.remove_btn.setText("")
+        self.remove_btn.setIconSize(QSize(icon_px, icon_px))
         
         # Apply combobox styling using StyleManager
         # Get selection colors from config (use defaults if not available)
@@ -614,18 +628,31 @@ class CriteriaRowWidget(QWidget):
         )
         
         # Set Remove button height to match input field height
-        # Use the combo box height as reference since it has the same styling
-        self.field_combo.updateGeometry()
-        combo_height = self.field_combo.sizeHint().height()
-        if combo_height <= 0:
+        # Use the smallest non-zero input height so the icon button never ends up taller
+        # than the other controls in the row (Qt style differences can make buttons taller).
+        for w in (self.field_combo, self.operator_combo, self.value_input, self.position_input):
+            try:
+                w.updateGeometry()
+            except Exception:
+                pass
+        height_candidates = [
+            int(self.field_combo.sizeHint().height() or 0),
+            int(self.operator_combo.sizeHint().height() or 0),
+            int(self.value_input.sizeHint().height() or 0),
+        ]
+        if self.position_input.isVisible():
+            height_candidates.append(int(self.position_input.sizeHint().height() or 0))
+        target_h = min([h for h in height_candidates if h > 0], default=0)
+        if target_h <= 0:
             # Fallback: calculate from font metrics
             from PyQt6.QtGui import QFontMetrics, QFont
             font = QFont(self.input_font_family, self.input_font_size)
             fm = QFontMetrics(font)
             text_height = fm.height()
-            combo_height = text_height + (self.input_padding[1] * 2) + 2
-        self.remove_btn.setFixedSize(self.small_button_width, combo_height)
-        self.tags_picker_btn.setFixedHeight(combo_height)
+            target_h = text_height + (self.input_padding[1] * 2) + 2
+
+        self.remove_btn.setFixedSize(int(target_h), int(target_h))
+        self.tags_picker_btn.setFixedHeight(int(target_h))
     
     def get_criterion(self) -> Optional[SearchCriteria]:
         """Get SearchCriteria from this row.
@@ -670,7 +697,7 @@ class CriteriaRowWidget(QWidget):
             "contains": SearchOperator.CONTAINS,
             "equals": SearchOperator.EQUALS,
             "not equals": SearchOperator.NOT_EQUALS,
-            "does not contain": SearchOperator.DOES_NOT_CONTAIN,
+            "not contains": SearchOperator.DOES_NOT_CONTAIN,
             "starts with": SearchOperator.STARTS_WITH,
             "ends with": SearchOperator.ENDS_WITH,
             "is empty": SearchOperator.IS_EMPTY,
@@ -820,7 +847,7 @@ class CriteriaRowWidget(QWidget):
             SearchOperator.CONTAINS: "contains",
             SearchOperator.EQUALS: "equals",
             SearchOperator.NOT_EQUALS: "not equals",
-            SearchOperator.DOES_NOT_CONTAIN: "does not contain",
+            SearchOperator.DOES_NOT_CONTAIN: "not contains",
             SearchOperator.STARTS_WITH: "starts with",
             SearchOperator.ENDS_WITH: "ends with",
             SearchOperator.IS_EMPTY: "is empty",
@@ -1449,7 +1476,8 @@ class SearchDialog(QDialog):
                 self.config,
                 input_bg,
                 input_border,
-                input_border_radius
+                input_border_radius,
+                include_scroll_area_border=False,
             )
             # Set palette on scroll area viewport to prevent macOS override
             viewport = self.criteria_scroll_area.viewport()
@@ -1468,7 +1496,7 @@ class SearchDialog(QDialog):
         # Get all main dialog buttons (exclude remove buttons from CriteriaRowWidget)
         all_buttons = self.findChildren(QPushButton)
         # Filter out remove buttons (they're styled separately in CriteriaRowWidget with smaller padding)
-        main_buttons = [btn for btn in all_buttons if btn.text() != "Remove"]
+        main_buttons = [btn for btn in all_buttons if btn.objectName() != "criteria_remove_button"]
         
         StyleManager.style_buttons(
             main_buttons,

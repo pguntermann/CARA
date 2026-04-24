@@ -3489,7 +3489,13 @@
           "width": 120,
           "height": 30,
           "small_width": 100,
-          "logic_combo_width": 82
+          "logic_combo_width": 82,
+          "remove_button_icon_svg": "app/resources/icons/menu_trash.svg",
+          "remove_button_icon_tint_rgb": {
+            "$ref": "$_COLOR_COCOA_BROWN"
+          },
+          "remove_button_icon_px": 18,
+          "remove_button_tooltip": "Remove criterion"
         },
         "labels": {
           "font_family": {

@@ -432,6 +432,12 @@ class DatabaseSearchService:
             if field_value is None:
                 return False
             return str(value).lower() in str(field_value).lower()
+
+        if operator == SearchOperator.DOES_NOT_CONTAIN:
+            # For empty fields, "not contains X" should match (mirrors NOT_EQUALS behavior).
+            if field_value is None:
+                return True
+            return str(value).lower() not in str(field_value).lower()
         
         elif operator == SearchOperator.EQUALS:
             if field_value is None:
@@ -665,7 +671,7 @@ class DatabaseSearchService:
             SearchOperator.DATE_CONTAINS: "contains",
             SearchOperator.IS_TRUE: "is",
             SearchOperator.IS_FALSE: "is not",
-            SearchOperator.DOES_NOT_CONTAIN: "does not contain",
+            SearchOperator.DOES_NOT_CONTAIN: "not contains",
         }
         
         parts = []
