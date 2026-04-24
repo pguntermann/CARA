@@ -1,5 +1,32 @@
 # Release Notes
 
+# CARA v2.7.5 - Positional Search, Castling Rights Widget, and Light Theme Update
+
+**Release Date:** 24.04.2026
+
+This release adds **positional search** capabilities to the **Search Games** dialog, introduces a new **toggleable castling-rights board widget** and further improves the **light theme** (including integration of the **Kosal** chess pieces SVG set by **philatype**). It also includes various small UI/UX refinements.
+
+## New Features
+
+- **Search Games – Positional search:** New search criterion to find games by position.
+- **Board widget – Castling rights:** New toggleable castling-rights widget.
+
+## Enhancements
+
+- **Light theme update:** Refined styling and visuals, including integration of the **Kosal** chess pieces by **philatype**. (https://github.com/philatype/kosal)
+- **Notes view:** Added a **Save notes to current game** button to the Notes toolbar.
+- **General UI polish:** Several small usability and layout improvements across dialogs and views.
+
+## Bug Fixes
+
+- **Bulk tag operations / view refresh:** Fixed a brief visual glitch where game summary / player stats sections could appear disjointed after bulk tag replacement.
+
+## Documentation
+
+- **HTML manual:** Updated to cover the new castling rights widget and positional search, with additional small improvements.
+
+---
+
 # CARA v2.7.4 - Maintenance Release
 
 **Release Date:** 22.04.2026
