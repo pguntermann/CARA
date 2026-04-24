@@ -94,9 +94,10 @@
                                 <li><a href="#game-information-display">4.3.2 Game Information Display</a></li>
                                 <li><a href="#evaluation-bar">4.3.3 Evaluation Bar</a></li>
                                 <li><a href="#material-widget">4.3.4 Material Widget</a></li>
-                                <li><a href="#game-tags-widget">4.3.5 Game Tags Widget</a></li>
-                                <li><a href="#turn-indicator">4.3.6 Turn Indicator</a></li>
-                                <li><a href="#positional-heatmap">4.3.7 Positional Heatmap</a></li>
+                                <li><a href="#castling-rights-widget">4.3.5 Castling Rights Widget</a></li>
+                                <li><a href="#game-tags-widget">4.3.6 Game Tags Widget</a></li>
+                                <li><a href="#turn-indicator">4.3.7 Turn Indicator</a></li>
+                                <li><a href="#positional-heatmap">4.3.8 Positional Heatmap</a></li>
                             </ul>
                         </li>
                         <li><a href="#database-panel">4.4 Database Panel</a>
@@ -655,6 +656,7 @@
                 <ul>
                     <li><strong>Coordinates:</strong> File and rank labels around the board edges. Toggle with <code>Alt+C</code> / <code>⌥+C</code> or <span class="menu-item">Board → Show Coordinates</span>.</li>
                     <li><strong>Turn Indicator:</strong> Shows whose turn it is to move. Toggle with <code>Alt+T</code> / <code>⌥+T</code> or <span class="menu-item">Board → Show Turn Indicator</span>.</li>
+                    <li><strong>Castling Rights:</strong> Shows castling availability for both sides (KQkq) as you navigate through the game. Toggle with <code>Alt+R</code> / <code>⌥+R</code> or <span class="menu-item">Board → Show Castling Rights</span>.</li>
                     <li><strong>Played Move Arrow:</strong> Highlights the last move made in the game. Toggle with <code>Alt+P</code> / <code>⌥+P</code> or <span class="menu-item">Board → Show Played Move</span>.</li>
                     <li><strong>Best Next Move Arrow (PV1):</strong> Shows the engine's recommended move during manual analysis mode. Toggle with <code>Alt+B</code> / <code>⌥+B</code> or <span class="menu-item">Board → Show Best Next Move</span>.</li>
                     <li><strong>PV2 and PV3 Arrows:</strong> Display alternative candidate moves from MultiPV analysis during manual analysis mode. Toggle with <code>Alt+2</code> / <code>⌥+2</code>, <code>Alt+3</code> / <code>⌥+3</code> or <span class="menu-item">Board → Show Next Best Move (PV2/PV3)</span>.</li>
@@ -695,15 +697,19 @@
                 </ul>
                 <p>Pieces are displayed using standard chess notation letters: <strong>P</strong> for Pawn, <strong>N</strong> for Knight, <strong>B</strong> for Bishop, <strong>R</strong> for Rook, and <strong>Q</strong> for Queen.</p>
                 
-                <h5 id="game-tags-widget">4.3.5 Game Tags Widget</h5>
+                <h5 id="castling-rights-widget">4.3.5 Castling Rights Widget</h5>
+                <p>The <strong>castling-rights widget</strong> shows which castling options are still available in the current position (KQ for White, kq for Black). It updates automatically as you navigate through the game.</p>
+                <p>Toggle visibility with <code>Alt+R</code> / <code>⌥+R</code> or <span class="menu-item">Board → Show Castling Rights</span>.</p>
+                
+                <h5 id="game-tags-widget">4.3.6 Game Tags Widget</h5>
                 <p>The <strong>Game Tags widget</strong> is shown next to the chessboard and displays the tags assigned to the active game.</p>
                 <p>To show or hide the widget, use <span class="menu-item">Board → Show Game Tags</span> (see <a href="#board-menu">section 6.3</a>).</p>
                 <img src="screenshots/game_tags_widget.png" alt="CARA Game Tags widget - Board-attached widget showing tags for the active game as bubbles" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
 
-                <h5 id="turn-indicator">4.3.6 Turn Indicator</h5>
+                <h5 id="turn-indicator">4.3.7 Turn Indicator</h5>
                 <p>The turn indicator shows which side is to move in the current position. Toggle with <code>Alt+T</code> / <code>⌥+T</code> or <span class="menu-item">Board → Show Turn Indicator</span>.</p>
                 
-                <h5 id="positional-heatmap">4.3.7 Positional Heatmap</h5>
+                <h5 id="positional-heatmap">4.3.8 Positional Heatmap</h5>
                 <p>The positional heatmap is a color-coded overlay that visualizes positional factors for each piece on the chessboard. It helps you quickly identify positional strengths and weaknesses by displaying colored gradients on squares containing pieces.<br>Toggle with <code>Alt+H</code> / <code>⌥+H</code> or <span class="menu-item">Board → Show Positional Heat-map</span>.</p>
                 
                 <img src="screenshots/positional_heatmap.png" alt="CARA Positional Heatmap - Color-coded overlay showing positional factors on the chessboard with green gradients for strong positions and red gradients for weak positions" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
@@ -1446,6 +1452,20 @@
                     <li><strong>Value:</strong> The value to search for (not required for "is empty", "is not empty", or boolean fields).</li>
                 </ul>
                 <p>For "Custom PGN Tag", you must also specify the tag name in an additional field that appears when this option is selected.</p>
+
+                <p>CARA also supports <strong>position-based search</strong> criteria:</p>
+                <ul>
+                    <li><strong>Position:</strong> Matches games that contain the exact position (strict match, including castling rights and en-passant state).</li>
+                    <li><strong>Position (fuzzy):</strong> Matches games that contain the position while <em>ignoring castling rights and en-passant</em>. This is useful when the same piece placement is reached through different move orders (transpositions) or when rights differ.</li>
+                </ul>
+                <p>For both position fields, enter either:</p>
+                <ul>
+                    <li>a full <strong>FEN</strong> string (single line), or</li>
+                    <li><code>(Current Position)</code> to use the currently displayed board position (leaving the field empty also uses the current position).</li>
+                </ul>
+                <div class="tip-box">
+                    <strong>Quick Tip:</strong> Use <span class="menu-item">Position (fuzzy)</span> first when you're looking for recurring motifs across transpositions, then switch to <span class="menu-item">Position</span> when you need an exact match.
+                </div>
                 
                 <h5 id="logical-operators">5.4.3 Logical Operators and Grouping</h5>
                 <p>Search criteria are combined using logical operators (AND/OR) to create complex queries. By default, criteria are combined with AND logic, meaning all criteria must match for a game to be included in the results.</p>
@@ -2153,53 +2173,57 @@
                 
                 <h5>6.3.4 Show Turn Indicator</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+T</code> / <code>⌥+T</code></p>
-                <p>Toggles the display of the turn indicator showing which side is to move.<br>See <a href="#turn-indicator">section 4.3.6</a> for more information.</p>
+                <p>Toggles the display of the turn indicator showing which side is to move.<br>See <a href="#turn-indicator">section 4.3.7</a> for more information.</p>
                 
-                <h5>6.3.5 Show Material</h5>
+                <h5>6.3.5 Show Castling Rights</h5>
+                <p><strong>Shortcut:</strong> <code>Alt+R</code> / <code>⌥+R</code></p>
+                <p>Toggles the display of the castling-rights widget (KQkq) next to the board, showing which castling options are still available in the current position.</p>
+                
+                <h5>6.3.6 Show Material</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+U</code> / <code>⌥+U</code></p>
                 <p>Toggles the display of the material widget showing captured pieces and material difference.<br>See <a href="#material-widget">section 4.3.4</a> for more information.</p>
                 
-                <h5>6.3.6 Show Game Tags</h5>
+                <h5>6.3.7 Show Game Tags</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+G</code></p>
                 <p>Toggles the visibility of the <a href="#game-tagging">Game Tags widget</a> next to the chessboard.</p>
                 
-                <h5>6.3.7 Show Evaluation Bar</h5>
+                <h5>6.3.8 Show Evaluation Bar</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+E</code> / <code>⌥+E</code></p>
                 <p>Toggles the display of the evaluation bar showing the engine's assessment of the current position.<br>See <a href="#evaluation-bar">section 4.3.3</a> for more information.</p>
                 
-                <h5>6.3.8 Show Positional Heat-map</h5>
+                <h5>6.3.9 Show Positional Heat-map</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+H</code> / <code>⌥+H</code></p>
-                <p>Toggles the display of the positional heatmap overlay showing positional factors through color-coded gradients.<br>See <a href="#positional-heatmap">section 4.3.7</a> for detailed information.</p>
+                <p>Toggles the display of the positional heatmap overlay showing positional factors through color-coded gradients.<br>See <a href="#positional-heatmap">section 4.3.8</a> for detailed information.</p>
                 
-                <h5>6.3.9 Show Played Move</h5>
+                <h5>6.3.10 Show Played Move</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+P</code> / <code>⌥+P</code></p>
                 <p>Toggles the display of an arrow on the chessboard indicating the last move played in the game.</p>
                 
-                <h5>6.3.10 Show Best Next Move</h5>
+                <h5>6.3.11 Show Best Next Move</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+B</code> / <code>⌥+B</code></p>
                 <p>Toggles the display of an arrow showing the engine's best recommended move (PV1) from manual analysis.</p>
                 
-                <h5>6.3.11 Show Next Best Move (PV2)</h5>
+                <h5>6.3.12 Show Next Best Move (PV2)</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+2</code> / <code>⌥+2</code></p>
                 <p>Toggles the display of an arrow showing the engine's second-best recommended move (PV2) from manual analysis.</p>
                 
-                <h5>6.3.12 Show Next Best Move (PV3)</h5>
+                <h5>6.3.13 Show Next Best Move (PV3)</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+3</code> / <code>⌥+3</code></p>
                 <p>Toggles the display of an arrow showing the engine's third-best recommended move (PV3) from manual analysis.</p>
                 
-                <h5>6.3.13 Show Best Alternative Move</h5>
+                <h5>6.3.14 Show Best Alternative Move</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+A</code> / <code>⌥+A</code></p>
                 <p>Toggles the display of an arrow showing the best alternative move found during game analysis (the move that should have been played instead of the actual move).</p>
 
-                <h5>6.3.14 Show Move Classification Icons</h5>
+                <h5>6.3.15 Show Move Classification Icons</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+4</code> / <code>⌥+4</code></p>
                 <p>Toggles small badges on the played move's destination square that show the move assessment (e.g. book move, best move, good move, brilliant, inaccuracy, mistake, miss, blunder). Available once the game has been analyzed.</p>
 
-                <h5>6.3.15 Show Annotations Layer</h5>
+                <h5>6.3.16 Show Annotations Layer</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+L</code> / <code>⌥+L</code></p>
                 <p>Toggles the visibility of the annotations layer on the chessboard, showing or hiding all custom annotations (text, arrows, circles, squares).<br>See <a href="#adding-annotations">section 5.8</a> for more information.</p>
 
-                <h5>6.3.16 Path trajectory style</h5>
+                <h5>6.3.17 Path trajectory style</h5>
                 <p>Selects the visual style for piece trajectory lines displayed during positional plan exploration:</p>
                 <ul>
                     <li><strong>Straight:</strong> Trajectory lines are drawn as straight segments between squares.</li>
