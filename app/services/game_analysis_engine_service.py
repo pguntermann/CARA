@@ -5,7 +5,7 @@ import time
 import queue
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
-from PyQt6.QtCore import QObject, QThread, QTimer, pyqtSignal
+from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
 from app.services.uci_communication_service import UCICommunicationService
 from app.services.logging_service import LoggingService
@@ -28,6 +28,7 @@ class GameAnalysisRequestHandle(QObject):
         # Expose thread signals for backwards compatibility.
         self.progress_update = thread.progress_update
         self.error_occurred = thread.error_occurred
+        self._request: Optional["AnalysisRequest"] = None
 
 
 class AnalysisRequest:
@@ -617,8 +618,9 @@ class GameAnalysisEngineService(QObject):
         # Start thread
         self.analysis_thread.start()
         
-        # Wait for thread to initialize engine (check if running flag is set)
-        # Use processEvents() to keep UI responsive while waiting
+        # Wait for thread to initialize engine (check if running flag is set).
+        # Do not pump the Qt event loop from worker threads (can cause re-entrancy and crashes).
+        from PyQt6.QtCore import QCoreApplication
         from PyQt6.QtWidgets import QApplication
         start_time = time.time()
         timeout = 10.0  # Increased timeout for slow host environments
@@ -627,8 +629,13 @@ class GameAnalysisEngineService(QObject):
             if not self.analysis_thread.isRunning():
                 return False
             
-            # Process Qt events to keep UI responsive
-            QApplication.processEvents()
+            # Only the GUI thread should pump events.
+            try:
+                app = QCoreApplication.instance()
+                if app is not None and QThread.currentThread() is app.thread():
+                    QApplication.processEvents()
+            except Exception:
+                pass
             time.sleep(0.05)  # Reduced sleep time, events are processed above
         
         # Log engine thread started
@@ -639,8 +646,8 @@ class GameAnalysisEngineService(QObject):
         
         return self.analysis_thread.running
     
-    def analyze_position(self, fen: str, move_number: int, progress_interval_ms: int = 500) -> Optional[GameAnalysisRequestHandle]:
-        """Queue a position for analysis.
+    def create_analysis_request(self, fen: str, move_number: int, progress_interval_ms: int = 500) -> Optional[GameAnalysisRequestHandle]:
+        """Create a per-request handle (not yet enqueued).
         
         Args:
             fen: FEN string of position to analyze.
@@ -648,27 +655,29 @@ class GameAnalysisEngineService(QObject):
             progress_interval_ms: Progress update interval in milliseconds.
             
         Returns:
-            Per-request signal proxy (for analysis_complete signal connections), or None on failure.
+            Handle to connect signals on. Call `enqueue_analysis_request(handle)` to enqueue.
         """
         # Start engine thread if not already running
         if not self.analysis_thread or not self.analysis_thread.isRunning():
             if not self.start_engine():
                 return None
         
-        # Create analysis request
         request = AnalysisRequest(fen, move_number, progress_interval_ms)
-        request.handle = GameAnalysisRequestHandle(self.analysis_thread)
-        
-        # Queue for analysis on the next Qt event loop turn.
-        # Some positions (terminal/mate short-circuit) can complete immediately; if we enqueue
-        # synchronously, the result may be emitted before callers connect their handlers.
-        try:
-            QTimer.singleShot(0, lambda req=request: self.analysis_thread.queue_analysis(req))
-        except Exception:
-            # Fallback: enqueue immediately.
-            self.analysis_thread.queue_analysis(request)
-        return request.handle
-    
+        handle = GameAnalysisRequestHandle(self.analysis_thread)
+        request.handle = handle
+        handle._request = request
+        return handle
+
+    def enqueue_analysis_request(self, handle: GameAnalysisRequestHandle) -> bool:
+        """Enqueue a previously created handle for analysis."""
+        if not self.analysis_thread or not self.analysis_thread.isRunning():
+            return False
+        req = getattr(handle, "_request", None)
+        if req is None:
+            return False
+        self.analysis_thread.queue_analysis(req)
+        return True
+
     def stop_current_analysis(self) -> None:
         """Stop only the current analysis without clearing queue or stopping thread."""
         if self.analysis_thread and self.analysis_thread.isRunning():

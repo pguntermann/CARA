@@ -1609,8 +1609,11 @@ class DetailManualAnalysisView(QWidget):
         if line.is_mate:
             if line.mate_moves > 0:
                 eval_str = f"M{line.mate_moves}"  # White mates
+            elif line.mate_moves < 0:
+                eval_str = f"-M{abs(line.mate_moves)}"  # Black mates
             else:
-                eval_str = f"M{abs(line.mate_moves)}"  # Black mates
+                # Mate 0 (checkmate on board): derive winner from score sign.
+                eval_str = "M0" if line.centipawns >= 0 else "-M0"
         else:
             # Convert centipawns to pawns and format
             pawns = line.centipawns / 100.0
@@ -2243,7 +2246,12 @@ class DetailManualAnalysisView(QWidget):
     def _format_pv_line_for_copy(self, line) -> str:
         """Format a single analysis line for clipboard: eval, depth, and full PV (plain text)."""
         if line.is_mate:
-            eval_str = f"M{line.mate_moves}" if line.mate_moves > 0 else f"M{abs(line.mate_moves)}"
+            if line.mate_moves > 0:
+                eval_str = f"M{line.mate_moves}"
+            elif line.mate_moves < 0:
+                eval_str = f"-M{abs(line.mate_moves)}"
+            else:
+                eval_str = "M0" if line.centipawns >= 0 else "-M0"
         else:
             pawns = line.centipawns / 100.0
             eval_str = f"+{pawns:.2f}" if pawns > 0 else f"{pawns:.2f}"

@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional
 import time
 
 from app.models.evaluation_model import EvaluationModel
+from app.services.logging_service import LoggingService
 
 
 class EvaluationBarWidget(QWidget):
@@ -161,6 +162,20 @@ class EvaluationBarWidget(QWidget):
         # Get target evaluation value (always from White's perspective)
         # Evaluation should not flip when board flips - it always represents the same position
         target_value = self._evaluation_model.get_evaluation_value(self.scale_max)
+
+        # Debug mate-0 mismatches (manual-analysis terminal positions)
+        try:
+            if bool(getattr(self._evaluation_model, "is_mate", False)) and int(getattr(self._evaluation_model, "mate_moves", 0)) == 0:
+                LoggingService.get_instance().debug(
+                    "EvalBarWidget target "
+                    f"widget_id={id(self)} visible={self.isVisible()} "
+                    f"centipawns={getattr(self._evaluation_model, 'centipawns', None)} "
+                    f"is_mate={getattr(self._evaluation_model, 'is_mate', None)} "
+                    f"mate_moves={getattr(self._evaluation_model, 'mate_moves', None)} "
+                    f"scale_max={self.scale_max} target_value={target_value} displayed={self._displayed_value}"
+                )
+        except Exception:
+            pass
         
         # Start animation to target value
         self._start_animation(target_value)
@@ -171,8 +186,13 @@ class EvaluationBarWidget(QWidget):
         Args:
             target_value: Target evaluation value to animate to.
         """
-        # If target is same as current, no animation needed
+        # If target is same as current, no animation needed, but still repaint.
+        # This matters for rapid terminal-position updates (e.g. mate-0 synthetic streams)
+        # where we may receive repeated identical values; skipping repaint can leave stale pixels.
         if abs(self._displayed_value - target_value) < 0.001:
+            self._displayed_value = target_value
+            self._target_value = target_value
+            self.update()
             return
         
         # Set target

@@ -187,6 +187,15 @@ class UCICommunicationService:
     def _emit_synthetic_terminal_stream(self) -> None:
         """Emit a minimal synthetic UCI output stream for a terminal position."""
         try:
+            # IMPORTANT: We may have pending output from a just-stopped previous search (bestmove/info).
+            # When switching to a terminal position, we synthesize output without sending new commands.
+            # Drain any queued output first so stale lines can't be mis-attributed to the terminal position.
+            try:
+                while True:
+                    self._stdout_queue.get_nowait()
+            except Exception:
+                pass
+
             # For checkmate: use "mate 0" (side to move is mated).
             # For stalemate: use neutral "cp 0".
             score_token = "mate 0" if bool(getattr(self, "_terminal_is_checkmate", False)) else "cp 0"

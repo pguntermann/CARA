@@ -2,6 +2,8 @@
 
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
+import time
+import threading
 
 from app.models.moveslist_model import MoveData
 from app.services.brilliant_move_detection_analysis_service import BrilliantMoveDetectionAnalysisService
@@ -134,6 +136,7 @@ def run_brilliant_move_detection(
 
     brilliant_count = 0
     candidates_checked = 0
+    total_t0 = time.perf_counter()
     try:
         candidate_moves: List[Tuple[int, Dict[str, Any], MoveData, bool, int]] = []
         for i, move_info in enumerate(move_infos):
@@ -233,6 +236,7 @@ def run_brilliant_move_detection(
                 f"Brilliant candidate: move {move_number} ({color}) {played_move_san}"
             )
 
+            cand_t0 = time.perf_counter()
             depths_show_error = 0
             brilliant_depths: List[int] = []
             brilliant_depth_bestmoves: List[Tuple[int, str]] = []
@@ -382,6 +386,15 @@ def run_brilliant_move_detection(
                 f"(depths: {sorted(brilliant_depths) if brilliant_depths else 'none'}), "
                 f"qualified={'yes' if qualified else 'no'}"
             )
+            try:
+                cand_ms = (time.perf_counter() - cand_t0) * 1000.0
+                logging_service.debug(
+                    f"Brilliant candidate timing: move {move_number} ({color}) "
+                    f"depths={shallow_depth_min}-{shallow_depth_max} "
+                    f"elapsed_ms={cand_ms:.1f}"
+                )
+            except Exception:
+                pass
 
             if depths_show_error >= min_depths_required:
                 current_assessment = move_data.assess_white if is_white_move else move_data.assess_black
@@ -411,6 +424,17 @@ def run_brilliant_move_detection(
         if service:
             service.cleanup()
 
+    try:
+        total_ms = (time.perf_counter() - total_t0) * 1000.0
+        logging_service.debug(
+            "Brilliant move detection timing: "
+            f"candidates_checked={candidates_checked} "
+            f"brilliant={brilliant_count} "
+            f"elapsed_ms={total_ms:.1f}"
+        )
+    except Exception:
+        pass
+
     if brilliant_count > 0:
         logging_service.info(
             f"Brilliant move detection completed: {brilliant_count} brilliant move(s) detected from {candidates_checked} candidates"
@@ -430,40 +454,69 @@ def _analyze_at_shallow_depth(
     time_limit_ms: int,
 ) -> Optional[Tuple[float, bool, int, str]]:
     """Analyze a position at shallow depth synchronously."""
-    from PyQt6.QtCore import QEventLoop, QTimer
-
-    loop = QEventLoop()
+    t0 = time.perf_counter()
     result_container: Dict[str, Any] = {"result": None, "error": None}
+    done = threading.Event()
+    # Ensure slots run immediately in the emitter thread; the brilliancy path does not
+    # run a Qt event loop in this waiting context.
+    from PyQt6.QtCore import Qt
 
     def on_analysis_complete(
         centipawns: float, is_mate: bool, mate_moves: int, best_move_san: str, analysis_depth: int
     ):
         if analysis_depth == depth:
             result_container["result"] = (centipawns, is_mate, mate_moves, best_move_san)
-            loop.quit()
+            done.set()
 
     def on_error(error_message: str):
         result_container["error"] = error_message
-        loop.quit()
+        done.set()
 
     analysis_thread = service.analyze_position(fen, move_number, depth)
     if not analysis_thread:
         return None
-    analysis_thread.analysis_complete.connect(on_analysis_complete)
-    analysis_thread.error_occurred.connect(on_error)
-    timeout_timer = QTimer()
-    timeout_timer.setSingleShot(True)
-    timeout_timer.timeout.connect(loop.quit)
-    timeout_timer.start(time_limit_ms * 2)
-    loop.exec()
+    analysis_thread.analysis_complete.connect(on_analysis_complete, type=Qt.ConnectionType.DirectConnection)
+    analysis_thread.error_occurred.connect(on_error, type=Qt.ConnectionType.DirectConnection)
+    # Wait for completion without a Qt nested event loop.
+    # The Qt signal will execute this handler in the emitter thread (default AutoConnection),
+    # and set the threading.Event. This avoids QEventLoop scheduling delays and re-entrancy.
+    timeout_s = (time_limit_ms * 2) / 1000.0
+    done.wait(timeout_s)
     try:
         analysis_thread.analysis_complete.disconnect(on_analysis_complete)
         analysis_thread.error_occurred.disconnect(on_error)
     except Exception:
         pass
+    if not done.is_set() and not result_container["error"]:
+        # Timeout: stop current engine search so the next request isn't delayed.
+        try:
+            # Log explicitly so timeouts are unambiguous in bulk runs.
+            # Avoid logging full FEN (large); include a short prefix for correlation.
+            fen_s = str(fen) if fen is not None else ""
+            fen_prefix = fen_s[:80] + ("…" if len(fen_s) > 80 else "")
+            LoggingService.get_instance().debug(
+                "Brilliancy shallow analysis TIMEOUT: "
+                f"depth={depth} movetime_ms={time_limit_ms} timeout_s={timeout_s:.2f} "
+                f"move_number={move_number} fen_prefix={fen_prefix}"
+            )
+        except Exception:
+            pass
+        try:
+            service.stop_current_analysis()
+        except Exception:
+            pass
     if result_container["error"]:
         LoggingService.get_instance().debug(
             f"Error analyzing at depth {depth}: {result_container['error']}"
         )
         return None
+    # Timing log for slow shallow analyses (helps identify stalls/backlog).
+    try:
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        if elapsed_ms >= max(250.0, float(time_limit_ms) * 1.2):
+            LoggingService.get_instance().debug(
+                f"Brilliancy shallow analysis timing: depth={depth} movetime_ms={time_limit_ms} elapsed_ms={elapsed_ms:.1f}"
+            )
+    except Exception:
+        pass
     return result_container["result"]

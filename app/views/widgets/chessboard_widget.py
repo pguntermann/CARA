@@ -63,6 +63,12 @@ class ChessBoardWidget(QWidget):
         self.evaluation_bar = EvaluationBarWidget(self.config, self._evaluation_model)
         self.evaluation_bar.setParent(self)
         self.evaluation_bar.setVisible(False)
+        try:
+            LoggingService.get_instance().debug(
+                f"ChessBoardWidget created eval_bar widget_id={id(self.evaluation_bar)} board_widget_id={id(self)}"
+            )
+        except Exception:
+            pass
         
         # Create material widget (attached to upper right of board)
         # Note: board_model will be set later in set_model()

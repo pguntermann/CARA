@@ -50,6 +50,9 @@ class ContinuousGameAnalysisWorker(QThread):
         self._queue_condition = queue_condition
         self._cancelled = False
         self._is_actively_analyzing = False
+        # Current game being analyzed (original index in the full games list).
+        # Read by the UI thread for status aggregation; write by this worker thread.
+        self._current_game_idx: Optional[int] = None
     
     def cancel(self) -> None:
         """Cancel the worker."""
@@ -91,6 +94,7 @@ class ContinuousGameAnalysisWorker(QThread):
                 )
             
             self._is_actively_analyzing = True
+            self._current_game_idx = original_idx
             try:
                 success = self.bulk_analysis_service.analyze_game(game, progress_callback)
                 self._game_finished_callback(game, original_idx, success)
@@ -98,6 +102,7 @@ class ContinuousGameAnalysisWorker(QThread):
                 self._game_finished_callback(game, original_idx, False)
             finally:
                 self._is_actively_analyzing = False
+                self._current_game_idx = None
 
 
 class BulkAnalysisThread(QThread):
@@ -171,6 +176,10 @@ class BulkAnalysisThread(QThread):
         self._parallel_games = 0
         self._threads_per_engine = 0
         self._analysis_services: List[BulkAnalysisService] = []  # Store for cleanup
+        # Incremental progress aggregation (avoid O(total_games) scans on UI thread).
+        self._games_being_analyzed = 0  # excludes skipped
+        self._game_progress_fraction: Dict[int, float] = {}  # original_idx -> [0.0..1.0]
+        self._overall_progress_sum = 0.0  # sum of fractions over analyzed+in-progress (size = _games_being_analyzed)
     
     def _get_next_game(self) -> Optional[Tuple[GameData, int]]:
         """Get next game from queue (thread-safe).
@@ -204,6 +213,17 @@ class BulkAnalysisThread(QThread):
                 'status_message': status_message,
                 'engine_info': engine_info
             }
+
+            # Update incremental overall progress sum for this game.
+            # This value is used by the UI thread for the progress bar and ETA computation.
+            if total_moves and total_moves > 0:
+                frac = max(0.0, min(1.0, float(game_move_index) / float(total_moves)))
+            else:
+                frac = 0.0
+            prev = self._game_progress_fraction.get(game_idx, 0.0)
+            if frac != prev:
+                self._game_progress_fraction[game_idx] = frac
+                self._overall_progress_sum += (frac - prev)
             
             # Accumulate depth/seldepth/NPS from all moves (cumulative across all games)
             if engine_info:
@@ -235,49 +255,53 @@ class BulkAnalysisThread(QThread):
         if self._cancelled:
             return
         
-        # Get data from thread-safe storage (quick lock)
+        # Get data from thread-safe storage (quick lock).
         with self._progress_lock:
-            game_progress_copy = self._game_progress.copy()
             analyzed_count = self._analyzed_count
             skipped_count = self._skipped_count
             start_time = self._start_time
+            overall_progress_sum = self._overall_progress_sum
+            games_being_analyzed = self._games_being_analyzed
         
         total_games = len(self.games)
         if total_games == 0:
             return
         
-        # Count games being analyzed (not skipped)
-        games_being_analyzed = total_games - skipped_count
-        if games_being_analyzed == 0:
+        if games_being_analyzed <= 0:
             dialog_status = f"All games already analyzed ({skipped_count} skipped)"
             progress_display_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {}).get('progress_display', {})
             decimal_precision = progress_display_config.get('decimal_precision', 4)
             progress_percent_str = f"100.{'0' * decimal_precision}%"
             self.progress_updated.emit(100.0, dialog_status, progress_percent_str)
             return
-        
-        # Find currently active games (games with progress but not completed)
-        with self._progress_lock:
-            completed_indices = self._completed_game_indices.copy()
-        
+
+        # Active games: only consider workers currently analyzing (<= parallel_games),
+        # to keep UI work bounded even for huge databases.
         active_progress_sum = 0.0
         active_count = 0
-        
-        for idx in range(total_games):
-            if idx in completed_indices:
-                continue  # Skip completed games
-            if idx in game_progress_copy:
-                prog = game_progress_copy[idx]
-                total_moves = prog.get('total_moves', 0)
-                if total_moves > 0:
-                    game_move_index = prog.get('game_move_index', 0)
-                    # Game is active if it has moves and hasn't completed all moves
-                    if game_move_index < total_moves:
-                        game_progress = game_move_index / total_moves
-                        active_progress_sum += game_progress
-                        active_count += 1
-        
-        # Calculate average progress of active games (with configurable decimal precision)
+        try:
+            workers = list(getattr(self, "_workers", []) or [])
+        except Exception:
+            workers = []
+        if workers:
+            with self._progress_lock:
+                prog_map = self._game_progress.copy()
+            for w in workers:
+                if not w.isRunning() or not getattr(w, "_is_actively_analyzing", False):
+                    continue
+                active_idx = getattr(w, "_current_game_idx", None)
+                if active_idx is None:
+                    continue
+                prog = prog_map.get(active_idx)
+                if not prog:
+                    continue
+                tm = prog.get("total_moves", 0) or 0
+                gi = prog.get("game_move_index", 0) or 0
+                if tm > 0 and gi < tm:
+                    active_progress_sum += (float(gi) / float(tm))
+                    active_count += 1
+
+        # Calculate average progress of active games (with configurable decimal precision).
         progress_display_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {}).get('progress_display', {})
         decimal_precision = progress_display_config.get('decimal_precision', 4)
         if active_count > 0:
@@ -325,7 +349,7 @@ class BulkAnalysisThread(QThread):
                 nps_str = str(int(avg_nps))
             avg_nps_str = f"Avg NPS: {nps_str}"
         
-        # Count completed games
+        # Count completed games (includes skipped).
         completed_count = analyzed_count + skipped_count
         
         # Calculate active workers and thread information dynamically
@@ -369,30 +393,8 @@ class BulkAnalysisThread(QThread):
         else:
             dialog_status = f"Preparing analysis of {games_being_analyzed} game{'s' if games_being_analyzed != 1 else ''} from total {total_games} games, {completed_count} game{'s' if completed_count != 1 else ''} completed."
         
-        # Calculate overall progress for progress bar
-        if games_being_analyzed > 0:
-            # Sum progress from all games being analyzed (excluding completed ones)
-            total_progress = 0
-            games_with_progress = 0
-            for idx in range(total_games):
-                if idx in completed_indices:
-                    # Completed games count as 100% progress
-                    total_progress += 1.0
-                    games_with_progress += 1
-                elif idx in game_progress_copy:
-                    prog = game_progress_copy[idx]
-                    total_moves = prog.get('total_moves', 0)
-                    if total_moves > 0:
-                        game_progress = prog.get('game_move_index', 0) / total_moves
-                        total_progress += game_progress
-                        games_with_progress += 1
-            
-            if games_with_progress > 0:
-                overall_progress = (total_progress / games_being_analyzed) * 100.0
-            else:
-                overall_progress = 0.0
-        else:
-            overall_progress = 100.0
+        # Overall progress for progress bar: incremental sum across analyzed + in-progress games.
+        overall_progress = (overall_progress_sum / float(games_being_analyzed)) * 100.0
         
         # Use floating point progress with configurable decimal precision
         progress_display_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {}).get('progress_display', {})
@@ -563,6 +565,11 @@ class BulkAnalysisThread(QThread):
             self._games_to_analyze = games_to_analyze
             self._original_indices = original_indices
             self._next_game_idx = 0
+            # Initialize incremental progress tracking for the analyzed subset.
+            with self._progress_lock:
+                self._games_being_analyzed = len(games_to_analyze)
+                self._game_progress_fraction = {}
+                self._overall_progress_sum = 0.0
             
             # Emit progress update
             self.progress_updated.emit(0.0, f"Creating {parallel_games} analysis service(s)...", initial_progress_str)
@@ -658,6 +665,12 @@ class BulkAnalysisThread(QThread):
         with self._progress_lock:
             # Mark this game index as completed
             self._completed_game_indices.add(original_idx)
+
+            # Ensure overall progress reaches 1.0 for completed games.
+            prev = self._game_progress_fraction.get(original_idx, 0.0)
+            if prev != 1.0:
+                self._game_progress_fraction[original_idx] = 1.0
+                self._overall_progress_sum += (1.0 - prev)
             
             if success:
                 self._analyzed_count += 1
@@ -986,7 +999,9 @@ class BulkAnalysisController(QObject):
         
         if target_model:
             # Update game in database model (this will refresh the view)
-            target_model.update_game(game)
+            # Bulk analysis updates can be frequent and PGN-heavy; avoid reindexing
+            # position search on every completion to prevent UI stalls.
+            target_model.update_game(game, reindex_positions=False)
             # Mark database as having unsaved changes to show flashing indicator
             if self.database_controller:
                 self.database_controller.mark_database_unsaved(target_model)
