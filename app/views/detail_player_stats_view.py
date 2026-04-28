@@ -2790,6 +2790,8 @@ class DetailPlayerStatsView(QWidget):
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        # NOTE: On macOS, applying a new stylesheet during theme switching can reset the
+        # scroll-area alignment briefly; we re-assert it again after styling below.
         self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         
         # Get background color for scroll area - use pane_background from tabs config
@@ -2808,15 +2810,27 @@ class DetailPlayerStatsView(QWidget):
             border_color,
             0  # No border radius
         )
+        # Re-assert alignment after styling (macOS can reset it on repolish).
+        try:
+            self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        except Exception:
+            pass
         
         # Content widget
         self.content_widget = QWidget()
         # Set minimum width to 0 to allow proper shrinking
         self.content_widget.setMinimumWidth(0)
-        self.content_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        # Important: keep the widget vertically expanding so that when only the selection header is
+        # present (e.g. during recalculation), the content stays anchored at the top of the viewport
+        # instead of the whole widget being vertically centered (observed on macOS).
+        self.content_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.content_layout = QVBoxLayout(self.content_widget)
         self.content_layout.setContentsMargins(margins[0], margins[1], margins[2], margins[3])
         self.content_layout.setSpacing(spacing)
+        try:
+            self.content_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        except Exception:
+            pass
         self._ensure_bottom_stretch()
         
         self.scroll_area.setWidget(self.content_widget)
@@ -3297,13 +3311,17 @@ class DetailPlayerStatsView(QWidget):
                 QSizePolicy.Policy.Expanding if expand else QSizePolicy.Policy.Fixed,
             )
             # With setWidgetResizable(True) Qt will stretch the content widget to viewport height.
-            # When content is shorter, clamp the content widget height to its sizeHint so slack
-            # cannot appear as a giant band between items.
+            # When content is shorter, we *want* the content widget to fill the viewport so the
+            # top section stays pinned at the top even if some platform/style temporarily resets
+            # QScrollArea alignment (observed on macOS during theme hot-switching).
+            #
+            # Extra space is consumed by the bottom spacer, so we still avoid gaps between items.
             if hasattr(self, "content_widget") and self.content_widget:
                 try:
                     if expand and content_h > 0:
-                        self.content_widget.setMinimumHeight(content_h)
-                        self.content_widget.setMaximumHeight(content_h)
+                        # Fill the viewport; leave maximum unconstrained.
+                        self.content_widget.setMinimumHeight(max(0, viewport_h))
+                        self.content_widget.setMaximumHeight(16777215)
                     else:
                         self.content_widget.setMinimumHeight(0)
                         self.content_widget.setMaximumHeight(16777215)
@@ -6950,6 +6968,21 @@ class DetailPlayerStatsView(QWidget):
             # Debounce: one coalesced update after resizes settle (avoids 0xc00000fd during bulk analysis)
             self._resize_debounce_timer.stop()
             self._resize_debounce_timer.start(self._resize_debounce_ms)
+        elif obj == self.scroll_area and event.type() in {
+            QEvent.Type.StyleChange,
+            QEvent.Type.Polish,
+            QEvent.Type.PolishRequest,
+        }:
+            # Theme switches trigger repolish; keep the scroll content pinned to the top immediately,
+            # so the selection header doesn't momentarily appear centered in the viewport on macOS.
+            try:
+                self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+            except Exception:
+                pass
+            try:
+                QTimer.singleShot(0, self._sync_bottom_stretch)
+            except Exception:
+                pass
         return super().eventFilter(obj, event)
     
     def _ensure_player_stats_time_series_context_menu_controller(self) -> None:
