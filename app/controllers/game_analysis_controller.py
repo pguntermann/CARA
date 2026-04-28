@@ -244,6 +244,23 @@ class GameAnalysisController(QObject):
         return getattr(self, '_candidate_selection', "best_move_only")
 
     @property
+    def exclude_already_winning_enabled(self) -> bool:
+        """Whether to exclude brilliant candidates when the side to move is already winning."""
+        if self.classification_model and hasattr(self.classification_model, "exclude_already_winning_enabled"):
+            return bool(self.classification_model.exclude_already_winning_enabled)
+        return True
+
+    @property
+    def exclude_already_winning_threshold_cpl(self) -> int:
+        """Absolute CPL threshold for 'already winning' (normalized to side-to-move)."""
+        if self.classification_model and hasattr(self.classification_model, "exclude_already_winning_threshold_cpl"):
+            try:
+                return int(self.classification_model.exclude_already_winning_threshold_cpl)
+            except Exception:
+                return 600
+        return 600
+
+    @property
     def is_analyzing(self) -> bool:
         """Check if analysis is currently running.
         
@@ -1516,6 +1533,8 @@ class GameAnalysisController(QObject):
             good_move_max_cpl=self.good_move_max_cpl,
             inaccuracy_max_cpl=self.inaccuracy_max_cpl,
             mistake_max_cpl=self.mistake_max_cpl,
+            exclude_already_winning_enabled=self.exclude_already_winning_enabled,
+            exclude_already_winning_threshold_cpl=self.exclude_already_winning_threshold_cpl,
             engine_path=engine_path,
             time_limit_ms=time_limit_ms,
             max_threads=max_threads,

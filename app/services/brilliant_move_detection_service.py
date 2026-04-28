@@ -44,6 +44,9 @@ def run_brilliant_move_detection(
     good_move_max_cpl: int,
     inaccuracy_max_cpl: int,
     mistake_max_cpl: int,
+    *,
+    exclude_already_winning_enabled: bool = True,
+    exclude_already_winning_threshold_cpl: int = 600,
     engine_path: Path,
     time_limit_ms: int,
     max_threads: Optional[int],
@@ -143,6 +146,53 @@ def run_brilliant_move_detection(
             if move_data is None:
                 continue
             current_assessment = move_data.assess_white if is_white_move else move_data.assess_black
+
+            # Optional filter: exclude candidate moves when the side to move is already winning
+            # by a configured threshold (pre-move eval, normalized by color).
+            if exclude_already_winning_enabled:
+                try:
+                    # Important: in this codebase the engine eval stored in move_infos is in the
+                    # engine/UCI convention (score from the side-to-move perspective). So we must NOT
+                    # flip based on color here; a positive score means the mover is already winning.
+                    if bool(move_info.get("is_mate_before", False)):
+                        mate_moves_before = move_info.get("mate_moves_before", None)
+                        mover_is_winning_mate = False
+                        try:
+                            mm = int(mate_moves_before)
+                            # Convention elsewhere: positive = white winning, negative = black winning,
+                            # 0 = checkmate for side to move (i.e. side to move is losing).
+                            if mm == 0:
+                                mover_is_winning_mate = False
+                            else:
+                                mover_is_winning_mate = (is_white_move and mm > 0) or (not is_white_move and mm < 0)
+                        except Exception:
+                            # If unknown, be conservative: don't exclude purely on missing metadata.
+                            mover_is_winning_mate = False
+
+                        if mover_is_winning_mate:
+                            logging_service.debug(
+                                f"Brilliant candidate excluded (already winning): move {move_number} "
+                                f"({'white' if is_white_move else 'black'}) {move_info.get('move_san', '')} "
+                                f"(mate before move)"
+                            )
+                            continue
+
+                    raw_eval_before = move_info.get("eval_before", None)
+                    if isinstance(raw_eval_before, (int, float)):
+                        # eval_before is stored as White POV centipawns (see GameAnalysisEngineService parsing),
+                        # so normalize to the side playing the move here.
+                        adv_stm = float(raw_eval_before) if is_white_move else -float(raw_eval_before)
+                        if adv_stm >= float(exclude_already_winning_threshold_cpl):
+                            logging_service.debug(
+                                f"Brilliant candidate excluded (already winning): move {move_number} "
+                                f"({'white' if is_white_move else 'black'}) {move_info.get('move_san', '')} "
+                                f"adv_stm={adv_stm:.0f}cp >= {int(exclude_already_winning_threshold_cpl)}cp"
+                            )
+                            continue
+                except Exception:
+                    # Best-effort filter; never block detection due to unexpected metadata.
+                    pass
+
             if candidate_selection == "best_or_good_move":
                 if current_assessment in ["Best Move", "Good Move"]:
                     candidate_moves.append((i, move_info, move_data, is_white_move, row_index))

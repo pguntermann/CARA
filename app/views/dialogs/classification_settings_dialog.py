@@ -652,6 +652,48 @@ class ClassificationSettingsDialog(QDialog):
         self.candidate_selection_combobox.setFixedWidth(combobox_width)
         self.candidate_selection_combobox.setToolTip(wrap_tooltip_text("Choose which candidate moves to check for brilliancy detection. Selecting \"Best or Good Move\" may increase detection time."))
         form_layout.addRow(create_label("Move Candidate:"), create_combobox_widget(self.candidate_selection_combobox))
+
+        # Exclude already winning (pre-move, normalized to side-to-move)
+        self.exclude_already_winning_checkbox = QCheckBox()
+        self.exclude_already_winning_checkbox.setChecked(
+            bool(self.current_brilliant.get("exclude_already_winning_enabled", True))
+        )
+        self.exclude_already_winning_checkbox.setToolTip(
+            wrap_tooltip_text(
+                "When enabled, a move will not be considered for brilliant detection if the side to move is already winning by at least the configured threshold (pre-move evaluation, normalized by color)."
+            )
+        )
+        form_layout.addRow(
+            create_label("Exclude already winning:"),
+            create_checkbox_widget(self.exclude_already_winning_checkbox),
+        )
+
+        self.exclude_already_winning_threshold_spinbox = QSpinBox()
+        self.exclude_already_winning_threshold_spinbox.setRange(0, 10000)
+        self.exclude_already_winning_threshold_spinbox.setValue(
+            int(self.current_brilliant.get("exclude_already_winning_threshold_cpl", 600))
+        )
+        self.exclude_already_winning_threshold_spinbox.setFixedWidth(input_width)
+        self.exclude_already_winning_threshold_spinbox.setToolTip(
+            wrap_tooltip_text(
+                "Absolute centipawn threshold. The detection logic normalizes this to the side playing the move (so it applies equally to White and Black)."
+            )
+        )
+        form_layout.addRow(
+            create_label("Winning threshold (CPL):"),
+            create_input_widget(self.exclude_already_winning_threshold_spinbox),
+        )
+
+        def _sync_exclude_winning_enabled() -> None:
+            try:
+                self.exclude_already_winning_threshold_spinbox.setEnabled(
+                    bool(self.exclude_already_winning_checkbox.isChecked())
+                )
+            except Exception:
+                pass
+
+        self.exclude_already_winning_checkbox.stateChanged.connect(lambda _s: _sync_exclude_winning_enabled())
+        _sync_exclude_winning_enabled()
         
         group.setLayout(form_layout)
         return group
@@ -930,6 +972,14 @@ class ClassificationSettingsDialog(QDialog):
         self.min_depths_show_error_spinbox.setValue(brilliant.get("min_depths_show_error", 3))
         candidate_selection = brilliant.get("candidate_selection", "best_move_only")
         self.candidate_selection_combobox.setCurrentIndex(0 if candidate_selection == "best_move_only" else 1)
+        if hasattr(self, "exclude_already_winning_checkbox"):
+            self.exclude_already_winning_checkbox.setChecked(
+                bool(brilliant.get("exclude_already_winning_enabled", True))
+            )
+        if hasattr(self, "exclude_already_winning_threshold_spinbox"):
+            self.exclude_already_winning_threshold_spinbox.setValue(
+                int(brilliant.get("exclude_already_winning_threshold_cpl", 600))
+            )
         
         # Hide progress bar and set final status through controller
         self.controller.hide_progress()
@@ -962,7 +1012,17 @@ class ClassificationSettingsDialog(QDialog):
                 "shallow_depth_min": self.shallow_depth_min_spinbox.value(),
                 "shallow_depth_max": self.shallow_depth_max_spinbox.value(),
                 "min_depths_show_error": self.min_depths_show_error_spinbox.value(),
-                "candidate_selection": "best_move_only" if self.candidate_selection_combobox.currentIndex() == 0 else "best_or_good_move"
+                "candidate_selection": "best_move_only" if self.candidate_selection_combobox.currentIndex() == 0 else "best_or_good_move",
+                "exclude_already_winning_enabled": bool(
+                    self.exclude_already_winning_checkbox.isChecked()
+                    if hasattr(self, "exclude_already_winning_checkbox")
+                    else True
+                ),
+                "exclude_already_winning_threshold_cpl": int(
+                    self.exclude_already_winning_threshold_spinbox.value()
+                    if hasattr(self, "exclude_already_winning_threshold_spinbox")
+                    else 600
+                ),
             }
         
         # Save via classification controller

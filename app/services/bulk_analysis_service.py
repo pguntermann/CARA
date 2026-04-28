@@ -140,6 +140,15 @@ class BulkAnalysisService(QObject):
             self.min_depths_show_error = self.classification_model.min_depths_show_error
             self.shallow_error_classifications = self.classification_model.shallow_error_classifications
             self.candidate_selection = self.classification_model.candidate_selection
+            self.exclude_already_winning_enabled = bool(
+                getattr(self.classification_model, "exclude_already_winning_enabled", True)
+            )
+            try:
+                self.exclude_already_winning_threshold_cpl = int(
+                    getattr(self.classification_model, "exclude_already_winning_threshold_cpl", 600)
+                )
+            except Exception:
+                self.exclude_already_winning_threshold_cpl = 600
         else:
             # Fallback to config defaults
             classification_config = self.config.get("game_analysis", {}).get("move_classification", {})
@@ -151,6 +160,15 @@ class BulkAnalysisService(QObject):
             self.min_depths_show_error = brilliant_criteria.get("min_depths_show_error", 3)
             self.shallow_error_classifications = brilliant_criteria.get("shallow_error_classifications", ["Mistake", "Blunder", "Miss"])
             self.candidate_selection = brilliant_criteria.get("candidate_selection", "best_move_only")
+            self.exclude_already_winning_enabled = bool(
+                brilliant_criteria.get("exclude_already_winning_enabled", True)
+            )
+            try:
+                self.exclude_already_winning_threshold_cpl = int(
+                    brilliant_criteria.get("exclude_already_winning_threshold_cpl", 600)
+                )
+            except Exception:
+                self.exclude_already_winning_threshold_cpl = 600
     
     def cancel(self) -> None:
         """Cancel the current analysis."""
@@ -218,6 +236,8 @@ class BulkAnalysisService(QObject):
             good_move_max_cpl=self.good_move_max_cpl,
             inaccuracy_max_cpl=self.inaccuracy_max_cpl,
             mistake_max_cpl=self.mistake_max_cpl,
+            exclude_already_winning_enabled=getattr(self, "exclude_already_winning_enabled", True),
+            exclude_already_winning_threshold_cpl=getattr(self, "exclude_already_winning_threshold_cpl", 600),
             engine_path=engine_path,
             time_limit_ms=time_limit_ms,
             max_threads=max_threads,

@@ -876,7 +876,9 @@
       "shallow_depth_min": 3,
       "shallow_depth_max": 7,
       "min_depths_show_error": 3,
-      "candidate_selection": "best_move_only"
+      "candidate_selection": "best_move_only",
+      "exclude_already_winning_enabled": true,
+      "exclude_already_winning_threshold_cpl": 600
     }
   },
   "manual_analysis": {
