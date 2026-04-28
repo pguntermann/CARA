@@ -1015,7 +1015,7 @@
   "player_stats_accuracy_distribution": {
     "skew_mode": "linear",
     "y_axis_mode": "count",
-    "bin_density": "more",
+    "bin_density": "auto",
     "color_preset": "amber",
     "distribution_line_curve": "smooth",
     "distribution_line_smooth_strength": 1.0,
@@ -1061,7 +1061,7 @@
       "player_stats_accuracy_distribution": {
         "skew_mode": "linear",
         "y_axis_mode": "count",
-        "bin_density": "more",
+        "bin_density": "auto",
         "color_preset": "amber",
         "distribution_line_curve": "smooth",
         "distribution_line_smooth_strength": 1.0,
