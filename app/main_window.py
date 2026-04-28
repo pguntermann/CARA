@@ -355,7 +355,6 @@ class MainWindow(QMainWindow):
     def _on_player_stats_reset_to_template_defaults(self) -> None:
         """Restore Player Stats menu settings from ``user_settings.json.template``."""
         from app.services.progress_service import ProgressService
-        from app.services.user_settings_service import UserSettingsService
 
         us_cfg = self.config.get("user_settings", {}) if isinstance(self.config.get("user_settings"), dict) else {}
         reset_cfg = us_cfg.get("player_stats_reset", {}) if isinstance(us_cfg.get("player_stats_reset"), dict) else {}
@@ -383,9 +382,9 @@ class MainWindow(QMainWindow):
         )
         if not confirmed:
             return
-        svc = UserSettingsService.get_instance()
         progress = ProgressService.get_instance()
-        if not svc.reset_player_stats_settings_from_template():
+        ok, _msg = self.controller.get_player_stats_profile_controller().reset_to_defaults()
+        if not ok:
             progress.set_status(status_failed)
             MessageDialog.show_warning(
                 self.config,
@@ -2287,6 +2286,29 @@ class MainWindow(QMainWindow):
         from app.views.menus.moves_list_menu import rebuild_moves_list_menu
 
         rebuild_moves_list_menu(self)
+
+    def _update_player_stats_menu(self) -> None:
+        """Rebuild the Player Stats menu (profiles + sections) and re-bind actions."""
+        try:
+            from app.views.menus.player_stats_menu import rebuild_player_stats_menu
+
+            if hasattr(self, "player_stats_menu"):
+                rebuild_player_stats_menu(self)
+        except Exception:
+            return
+
+        # Re-bind the new QAction instances to the sync controller.
+        try:
+            if hasattr(self, "detail_panel"):
+                psv = getattr(self.detail_panel, "player_stats_view", None)
+                actions = getattr(self, "_player_stats_section_actions", None)
+                if psv and actions:
+                    self.controller.get_menu_options_sync_controller().bind_player_stats(
+                        view=psv,
+                        section_actions=actions,
+                    )
+        except Exception:
+            pass
     
     def _on_profile_selected(self, profile_name: str) -> None:
         """Handle profile selection.
@@ -2306,6 +2328,93 @@ class MainWindow(QMainWindow):
             self._update_moves_list_column_visibility()
         else:
             self.controller.set_status(f"Failed to activate profile '{profile_name}'")
+
+    def _on_player_stats_profile_selected(self, profile_name: str) -> None:
+        """Activate a Player Stats profile."""
+        ctl = self.controller.get_player_stats_profile_controller()
+        success, message = ctl.set_active_profile(profile_name)
+        if success:
+            # Refresh section toggles + submenus to reflect active profile settings.
+            # Do this explicitly in addition to MenuOptionsSyncController sync because
+            # Player Stats caches visibility prefs internally.
+            try:
+                if hasattr(self, "detail_panel"):
+                    psv = getattr(self.detail_panel, "player_stats_view", None)
+                    if psv and hasattr(psv, "reload_player_stats_section_prefs_from_settings"):
+                        psv.reload_player_stats_section_prefs_from_settings()
+            except Exception:
+                pass
+            try:
+                self.controller.get_menu_options_sync_controller().sync_player_stats_from_settings()
+            except Exception:
+                pass
+            self._sync_player_stats_time_series_menu_from_settings()
+            self._sync_player_stats_activity_heatmap_menu_from_settings()
+            self._sync_player_stats_accuracy_distribution_menu_from_settings()
+            self._update_player_stats_menu()
+        self.controller.set_status(message)
+
+    def _save_player_stats_profile(self) -> None:
+        """Persist Player Stats profiles/settings to disk."""
+        ctl = self.controller.get_player_stats_profile_controller()
+        success, message = ctl.save_active_profile()
+        if success:
+            self._update_player_stats_menu()
+        self.controller.set_status(message)
+
+    def _save_player_stats_profile_as(self) -> None:
+        """Save current Player Stats settings as a new profile and activate it."""
+        from app.views.dialogs.input_dialog import InputDialog
+
+        name, ok = InputDialog.get_text(
+            self.config,
+            "Save Profile as...",
+            "Enter profile name:",
+            "",
+            self,
+        )
+        if not ok or not name:
+            return
+
+        ctl = self.controller.get_player_stats_profile_controller()
+        success, message = ctl.save_profile_as(name)
+        if success:
+            try:
+                self.controller.get_menu_options_sync_controller().sync_player_stats_from_settings()
+            except Exception:
+                pass
+            self._sync_player_stats_time_series_menu_from_settings()
+            self._sync_player_stats_activity_heatmap_menu_from_settings()
+            self._sync_player_stats_accuracy_distribution_menu_from_settings()
+            self._update_player_stats_menu()
+        self.controller.set_status(message)
+
+    def _remove_player_stats_profile(self) -> None:
+        """Remove the active Player Stats profile (Default is not removable)."""
+        ctl = self.controller.get_player_stats_profile_controller()
+        active = ctl.get_active_profile_name()
+        if active == "Default":
+            self.controller.set_status("Cannot remove default profile")
+            return
+
+        confirmed = self._show_confirmation_dialog(
+            "Remove Profile",
+            f"Are you sure you want to remove profile '{active}'?",
+        )
+        if not confirmed:
+            return
+
+        success, message = ctl.remove_profile(active)
+        if success:
+            try:
+                self.controller.get_menu_options_sync_controller().sync_player_stats_from_settings()
+            except Exception:
+                pass
+            self._sync_player_stats_time_series_menu_from_settings()
+            self._sync_player_stats_activity_heatmap_menu_from_settings()
+            self._sync_player_stats_accuracy_distribution_menu_from_settings()
+            self._update_player_stats_menu()
+        self.controller.set_status(message)
     
     def _on_active_profile_changed(self, profile_name: str) -> None:
         """Handle active profile change from model.
@@ -3585,6 +3694,20 @@ class MainWindow(QMainWindow):
                     )
                 else:
                     psv.reload_player_stats_section_prefs_from_settings()
+
+                # Initialize Player Stats working state from the active profile snapshot.
+                # The working-state keys are not persisted on exit; profiles are the source of truth.
+                try:
+                    from app.services.user_settings_service import UserSettingsService
+
+                    active_ps_profile = (
+                        UserSettingsService.get_instance().get_model().get_player_stats_active_profile()
+                    )
+                    self.controller.get_player_stats_profile_controller().set_active_profile(
+                        active_ps_profile
+                    )
+                except Exception:
+                    pass
 
         if hasattr(self, "_sync_player_stats_time_series_menu_from_settings"):
             self._sync_player_stats_time_series_menu_from_settings()

@@ -2619,6 +2619,10 @@ class DetailPlayerStatsView(QWidget):
         self._stats_recalculation_ui_pending = False
 
         self._player_stats_section_wrappers: Dict[str, QWidget] = {}
+        # Body-only sections add a separate QSpacerItem for bottom spacing; keep a handle so
+        # we can collapse that space when the section is hidden (otherwise large gaps remain).
+        self._player_stats_section_spacers: Dict[str, Tuple[Any, int]] = {}
+        self._bottom_stretch_item: Optional[Any] = None
         self._section_visibility_prefs: Dict[str, bool] = {}
         self._player_stats_menu_actions: Optional[Dict[str, Any]] = None
         self._player_stats_visibility_hint_label: Optional[QLabel] = None
@@ -2786,6 +2790,7 @@ class DetailPlayerStatsView(QWidget):
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         
         # Get background color for scroll area - use pane_background from tabs config
         tabs_config = panel_config.get('tabs', {})
@@ -2812,6 +2817,7 @@ class DetailPlayerStatsView(QWidget):
         self.content_layout = QVBoxLayout(self.content_widget)
         self.content_layout.setContentsMargins(margins[0], margins[1], margins[2], margins[3])
         self.content_layout.setSpacing(spacing)
+        self._ensure_bottom_stretch()
         
         self.scroll_area.setWidget(self.content_widget)
         layout.addWidget(self.scroll_area)
@@ -3165,18 +3171,137 @@ class DetailPlayerStatsView(QWidget):
         body.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         body.setProperty("player_stats_section_id", section_id)
         self.content_layout.addWidget(body)
-        self.content_layout.addSpacing(int(bottom_spacing_px))
+        # Use an explicit spacer item so we can collapse it when hidden.
+        from PyQt6.QtWidgets import QSpacerItem
+
+        h = int(bottom_spacing_px)
+        spacer = QSpacerItem(0, h, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        self.content_layout.addItem(spacer)
+        self._player_stats_section_spacers[str(section_id)] = (spacer, h)
         self._player_stats_section_wrappers[str(section_id)] = body
 
     def apply_player_stats_section_visibility_after_build(self) -> None:
         """Apply saved visibility to wrappers built in this session."""
         for sid, w in list(self._player_stats_section_wrappers.items()):
             try:
-                w.setVisible(self._player_stats_section_pref_visible(sid))
+                vis = bool(self._player_stats_section_pref_visible(sid))
+                try:
+                    w.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+                    if vis:
+                        w.setMaximumHeight(max(0, int(w.sizeHint().height())))
+                    else:
+                        w.setMaximumHeight(0)
+                except Exception:
+                    pass
+                w.setVisible(vis)
+                sp = self._player_stats_section_spacers.get(str(sid))
+                if sp:
+                    spacer, h = sp
+                    try:
+                        spacer.changeSize(0, h if vis else 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+                    except Exception:
+                        pass
             except RuntimeError:
                 pass
+        try:
+            self.content_layout.invalidate()
+            if hasattr(self, "content_widget") and self.content_widget:
+                self.content_widget.updateGeometry()
+        except Exception:
+            pass
         self._update_all_sections_hidden_placeholder()
         self._sync_player_stats_menu_actions()
+        self._ensure_bottom_stretch()
+        try:
+            self._sync_bottom_stretch()
+        except Exception:
+            pass
+
+    def _ensure_bottom_stretch(self) -> None:
+        """Ensure a bottom spacer exists and is sized appropriately.
+
+        We want top-aligned content when the stats are short (consume slack at bottom),
+        but we *do not* want a scrollable blank gap when content is taller than the viewport.
+        """
+        try:
+            from PyQt6.QtWidgets import QSpacerItem
+
+            lay = getattr(self, "content_layout", None)
+            if lay is None:
+                return
+
+            spacer = getattr(self, "_bottom_stretch_item", None)
+            if spacer is None:
+                spacer = QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+                lay.addItem(spacer)
+                self._bottom_stretch_item = spacer
+
+            self._sync_bottom_stretch()
+        except Exception:
+            pass
+
+    def _sync_bottom_stretch(self) -> None:
+        """Toggle bottom spacer expansion based on content vs viewport height."""
+        spacer = getattr(self, "_bottom_stretch_item", None)
+        lay = getattr(self, "content_layout", None)
+        sa = getattr(self, "scroll_area", None)
+        if spacer is None or lay is None or sa is None:
+            return
+        # When the disabled placeholder is visible, it should be able to expand and
+        # center itself within the viewport. Do not consume slack with the bottom spacer.
+        try:
+            ph = getattr(self, "disabled_placeholder", None)
+            if ph is not None and hasattr(ph, "isVisible") and ph.isVisible():
+                expand = False
+                spacer.changeSize(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+                lay.invalidate()
+                if hasattr(self, "content_widget") and self.content_widget:
+                    # Allow the content widget to fill the viewport so the placeholder can center.
+                    try:
+                        self.content_widget.setMinimumHeight(0)
+                        self.content_widget.setMaximumHeight(16777215)
+                    except Exception:
+                        pass
+                    self.content_widget.updateGeometry()
+                return
+        except Exception:
+            pass
+        try:
+            viewport_h = int(sa.viewport().height()) if sa.viewport() else 0
+        except Exception:
+            viewport_h = 0
+        try:
+            content_h = int(lay.sizeHint().height())
+        except Exception:
+            content_h = 0
+
+        # If content is taller than viewport, do not add any scrollable blank gap.
+        expand = bool(viewport_h > 0 and content_h > 0 and content_h < viewport_h)
+        try:
+            spacer.changeSize(
+                0,
+                0,
+                QSizePolicy.Policy.Minimum,
+                QSizePolicy.Policy.Expanding if expand else QSizePolicy.Policy.Fixed,
+            )
+            # With setWidgetResizable(True) Qt will stretch the content widget to viewport height.
+            # When content is shorter, clamp the content widget height to its sizeHint so slack
+            # cannot appear as a giant band between items.
+            if hasattr(self, "content_widget") and self.content_widget:
+                try:
+                    if expand and content_h > 0:
+                        self.content_widget.setMinimumHeight(content_h)
+                        self.content_widget.setMaximumHeight(content_h)
+                    else:
+                        self.content_widget.setMinimumHeight(0)
+                        self.content_widget.setMaximumHeight(16777215)
+                except Exception:
+                    pass
+            lay.invalidate()
+            if hasattr(self, "content_widget") and self.content_widget:
+                self.content_widget.updateGeometry()
+        except Exception:
+            pass
 
     def _some_player_stats_section_hidden_in_prefs(self) -> bool:
         return any(not self._player_stats_section_pref_visible(sid) for sid, _ in PLAYER_STATS_MENU_SECTIONS)
@@ -3258,6 +3383,43 @@ class DetailPlayerStatsView(QWidget):
             lbl.hide()
             return
         lbl.setText(full)
+        # Ensure the hint label sizes to its wrapped text (no giant empty band).
+        # We must base this on the current available width; otherwise QLabel can report a
+        # very large height depending on when sizeHint() is queried.
+        try:
+            lbl.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+            lbl.setMinimumHeight(0)
+            lbl.setMaximumHeight(16777215)
+            # Compute available width from the scroll area's viewport minus layout margins.
+            avail_w = 0
+            sa = getattr(self, "scroll_area", None)
+            lay = getattr(self, "content_layout", None)
+            try:
+                if sa is not None and sa.viewport() is not None:
+                    avail_w = int(sa.viewport().width())
+            except Exception:
+                avail_w = 0
+            try:
+                if avail_w and lay is not None:
+                    m = lay.contentsMargins()
+                    avail_w = int(avail_w - m.left() - m.right())
+            except Exception:
+                pass
+            if avail_w > 0:
+                lbl.setFixedWidth(avail_w)
+                # For word-wrapped QLabel the correct height depends on width.
+                # `heightForWidth()` is more reliable than `sizeHint()` here.
+                try:
+                    h = int(lbl.heightForWidth(avail_w))
+                except Exception:
+                    h = 0
+                if h <= 0:
+                    lbl.adjustSize()
+                    h = int(lbl.sizeHint().height())
+                if h > 0:
+                    lbl.setFixedHeight(h)
+        except Exception:
+            pass
         lbl.setVisible(True)
 
     def _update_all_sections_hidden_placeholder(self) -> None:
@@ -3289,6 +3451,7 @@ class DetailPlayerStatsView(QWidget):
         Also removes spacing items to prevent accumulation.
         """
         self._player_stats_section_wrappers.clear()
+        self._player_stats_section_spacers.clear()
         self._player_stats_visibility_hint_label = None
         # Clear stored widget references first to prevent access to deleted widgets
         self._move_accuracy_widget = None
@@ -3303,6 +3466,8 @@ class DetailPlayerStatsView(QWidget):
         self._endgame_tree_widget = None
         self._endgame_tree_decrease_button = None
         self._endgame_tree_increase_button = None
+
+        # Keep bottom stretch item; it is not part of section wrappers.
         
         # Find player selection widget index
         player_selection_index = -1
@@ -3454,7 +3619,8 @@ class DetailPlayerStatsView(QWidget):
             hint_label = QLabel("")
             hint_label.setWordWrap(True)
             hint_label.setMinimumWidth(0)
-            hint_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Maximum)
+            # Do not let the hint label soak up vertical slack in the scroll area.
+            hint_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
             hint_label.setFont(QFont(resolve_font_family(fam), hint_fs))
             hint_label.setStyleSheet(
                 f"color: rgb({hr}, {hg}, {hb}); background: transparent; border: none;"
@@ -3839,6 +4005,13 @@ class DetailPlayerStatsView(QWidget):
             # trailing stretch or stretch on a hidden placeholder would consume that space as a gap.
             # When visible (no stats / all sections hidden), Expanding size policy lets the label fill.
             self.content_layout.addWidget(self.disabled_placeholder, 0)
+
+        # Ensure excess height is always consumed at the bottom.
+        self._ensure_bottom_stretch()
+        try:
+            self._sync_bottom_stretch()
+        except Exception:
+            pass
     
     def _create_player_selection_section(self) -> None:
         """Create the player selection section."""
@@ -3875,6 +4048,10 @@ class DetailPlayerStatsView(QWidget):
                 border-radius: {border_radius}px;
             }}
         """)
+        # Prevent the selection header from soaking up extra vertical space when
+        # only a small number of sections are visible.
+        container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        container.setMinimumHeight(0)
         
         layout = QVBoxLayout(container)
         layout.setContentsMargins(section_margins[0], section_margins[1], section_margins[2], section_margins[3])
@@ -4597,7 +4774,8 @@ class DetailPlayerStatsView(QWidget):
         
         # Allow widget to expand horizontally to use available space
         # This ensures KPIs can move to the left when width is reduced
-        widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        # Overview is a compact KPI block; it should never absorb leftover viewport height.
+        widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         # Set minimum width to 0 to allow proper shrinking
         widget.setMinimumWidth(0)
         
@@ -4663,12 +4841,11 @@ class DetailPlayerStatsView(QWidget):
         # Remove any default styling that might add borders
         grid_widget.setStyleSheet("QWidget { border: none; background: transparent; }")
         grid_widget.setLayout(grid)
-        grid_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        grid_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         # Set minimum width to 0 so it can shrink when needed
         grid_widget.setMinimumWidth(0)
         
         layout.addWidget(grid_widget)  # Grid widget expands to fill available space
-        layout.addStretch()
         
         return widget
 
@@ -6747,6 +6924,10 @@ class DetailPlayerStatsView(QWidget):
         finally:
             self._updating_visibility = False
         self._debug_player_stats_horizontal_scroll_after_resize()
+        try:
+            self._sync_bottom_stretch()
+        except Exception:
+            pass
 
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
         """Event filter to monitor width changes for responsive layout."""

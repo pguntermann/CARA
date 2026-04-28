@@ -10,6 +10,7 @@ from app.controllers.board_controller import BoardController
 from app.controllers.database_controller import DatabaseController
 from app.controllers.game_controller import GameController
 from app.controllers.column_profile_controller import ColumnProfileController
+from app.controllers.player_stats_profile_controller import PlayerStatsProfileController
 from app.controllers.engine_controller import EngineController, TASK_EVALUATION, TASK_GAME_ANALYSIS, TASK_MANUAL_ANALYSIS, TASK_BRILLIANCY_DETECTION
 from app.controllers.evaluation_controller import EvaluationController
 from app.controllers.manual_analysis_controller import ManualAnalysisController
@@ -69,6 +70,9 @@ class AppController:
         
         # Initialize column profile controller
         self.column_profile_controller = ColumnProfileController()
+
+        # Initialize Player Stats profile controller
+        self.player_stats_profile_controller = PlayerStatsProfileController()
         
         # Initialize move classification controller (uses singleton service)
         self.move_classification_controller = MoveClassificationController(config, None)
@@ -814,6 +818,10 @@ class AppController:
             The ColumnProfileController instance for managing column profiles.
         """
         return self.column_profile_controller
+
+    def get_player_stats_profile_controller(self) -> PlayerStatsProfileController:
+        """Get controller for Player Stats profiles."""
+        return self.player_stats_profile_controller
     
     def get_engine_controller(self) -> EngineController:
         """Get the engine controller.

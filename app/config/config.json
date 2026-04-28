@@ -614,8 +614,8 @@
     "template_filename": "user_settings.json.template",
     "player_stats_reset": {
       "confirmation_title": "Reset Player Stats settings",
-      "confirmation_message": "Do you want to reset all Player Stats options to the application defaults?",
-      "status_success": "Player Stats options reset to application defaults.",
+      "confirmation_message": "This will overwrite the Default Player Stats profile with the application defaults and activate it. Continue?",
+      "status_success": "Default Player Stats profile reset to application defaults.",
       "status_failed": "Could not reset Player Stats options."
     }
   },

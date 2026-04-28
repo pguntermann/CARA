@@ -15,6 +15,8 @@ class UserSettingsModel(QObject):
     settings_changed = pyqtSignal()  # Emitted when any setting changes
     moves_list_profiles_changed = pyqtSignal()  # Emitted when column profiles change
     active_profile_changed = pyqtSignal(str)  # Emitted when active profile changes (profile_name)
+    player_stats_profiles_changed = pyqtSignal()  # Emitted when Player Stats profiles change
+    player_stats_active_profile_changed = pyqtSignal(str)  # Emitted when active Player Stats profile changes
     board_visibility_changed = pyqtSignal()  # Emitted when board visibility settings change
     pgn_visibility_changed = pyqtSignal()  # Emitted when PGN visibility settings change
     pgn_notation_changed = pyqtSignal()  # Emitted when PGN notation settings change
@@ -358,9 +360,7 @@ class UserSettingsModel(QObject):
             normalize_player_stats_activity_heatmap_settings,
         )
 
-        self._settings["player_stats_activity_heatmap"] = (
-            normalize_player_stats_activity_heatmap_settings(settings)
-        )
+        self._settings["player_stats_activity_heatmap"] = normalize_player_stats_activity_heatmap_settings(settings)
         self.player_stats_activity_heatmap_changed.emit()
         self.settings_changed.emit()
 
@@ -387,11 +387,49 @@ class UserSettingsModel(QObject):
             normalize_player_stats_accuracy_distribution_settings,
         )
 
-        self._settings["player_stats_accuracy_distribution"] = (
-            normalize_player_stats_accuracy_distribution_settings(settings)
-        )
+        self._settings["player_stats_accuracy_distribution"] = normalize_player_stats_accuracy_distribution_settings(settings)
         self.player_stats_accuracy_distribution_changed.emit()
         self.settings_changed.emit()
+
+    def get_player_stats_profiles(self) -> Dict[str, Any]:
+        """Get persisted Player Stats profiles map (name -> profile dict)."""
+        raw = self._settings.get("player_stats_profiles", {})
+        return raw.copy() if isinstance(raw, dict) else {}
+
+    def set_player_stats_profiles(self, profiles: Dict[str, Any]) -> None:
+        """Replace Player Stats profiles map."""
+        self._settings["player_stats_profiles"] = profiles.copy()
+        self.player_stats_profiles_changed.emit()
+        self.settings_changed.emit()
+
+    def get_player_stats_active_profile(self) -> str:
+        """Active Player Stats profile name."""
+        name = self._settings.get("player_stats_active_profile", "Default")
+        return str(name) if isinstance(name, str) and name.strip() else "Default"
+
+    def set_player_stats_active_profile(self, profile_name: str) -> None:
+        """Set active Player Stats profile name (does not validate existence)."""
+        new_name = str(profile_name or "").strip() or "Default"
+        if self._settings.get("player_stats_active_profile") != new_name:
+            self._settings["player_stats_active_profile"] = new_name
+            self.player_stats_active_profile_changed.emit(new_name)
+            self.settings_changed.emit()
+
+    def get_player_stats_profile_order(self) -> list:
+        """User-defined ordering of Player Stats profiles (excluding Default)."""
+        raw = self._settings.get("player_stats_profile_order", [])
+        return raw.copy() if isinstance(raw, list) else []
+
+    def set_player_stats_profile_order(self, order: list) -> None:
+        """Set ordering of Player Stats profiles (excluding Default)."""
+        self._settings["player_stats_profile_order"] = order.copy() if isinstance(order, list) else []
+        self.player_stats_profiles_changed.emit()
+        self.settings_changed.emit()
+
+    # Note: Player Stats profiles store snapshots under ``player_stats_profiles``.
+    # The live UI settings are stored in the top-level Player Stats keys. Switching
+    # profiles copies a snapshot into these top-level keys; saving writes them back
+    # into the active profile. This matches Moves List "explicit save" semantics.
 
     def update_player_stats_accuracy_distribution(self, partial: Dict[str, Any]) -> None:
         """Merge keys into Player Stats accuracy distribution settings."""

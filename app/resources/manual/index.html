@@ -1751,11 +1751,20 @@
                 <p><strong>Dates in PGN.</strong> Some sections (activity heatmap, date-based progression charts) use the game dates stored in the PGN headers. If dates are missing or incomplete, those sections may be hidden and a short notice will be shown on the top of view.</p>
 
                 <h5 id="ps-sections-visibility">5.7.2 Showing and hiding sections</h5>
-                <p>The tab is built from independent <strong>sections</strong> (Overview, charts, trees, lists). Use the <span class="menu-item">Player Stats</span> menu to toggle each section on or off. As with most user settings, your choices will be persisted to your user settings file when you exit the application, so when you open the app again later they will remain exactly as you left them.</p>
+                <p>The tab is built from independent <strong>sections</strong> (Overview, charts, trees, lists). Use the <span class="menu-item">Player Stats</span> menu to toggle each section on or off.</p>
+                <p><strong>Profiles.</strong> Player Stats uses a <strong>profile</strong> system (similar to Moves List column profiles) so you can keep multiple layouts/settings and switch between them:</p>
+                <ul>
+                    <li><strong>Switch profiles:</strong> Select a profile name at the top of the <span class="menu-item">Player Stats</span> menu to load its saved settings into the view.</li>
+                    <li><strong>Save Profile:</strong> Overwrites the currently active profile with the current Player Stats settings (section visibility and chart/detail options).</li>
+                    <li><strong>Save Profile as...</strong> Creates a new profile from the current settings.</li>
+                    <li><strong>Remove Profile:</strong> Deletes the active profile (except <strong>Default</strong>).</li>
+                    <li><strong>Default profile:</strong> Ships with the app, can be overwritten (via <span class="menu-item">Save Profile</span> or <span class="menu-item">Reset to defaults</span>) but cannot be removed.</li>
+                </ul>
+                <p><strong>Persistence.</strong> Changes you make while experimenting (toggling sections, changing submenu options) are applied immediately, but they are only persisted when you explicitly use <span class="menu-item">Save Profile</span> or <span class="menu-item">Save Profile as...</span>.</p>
                 <ul>
                     <li><span class="menu-item">Enable all</span> turns on every section in one step.</li>
                     <li><span class="menu-item">Disable all</span> turns off every section in one step.</li>
-                    <li><span class="menu-item">Reset to defaults</span> restores the application defaults, including which sections are visible and the detail options for those sections.</li>
+                    <li><span class="menu-item">Reset to defaults</span> overwrites the <strong>Default</strong> profile with the application defaults and activates it.</li>
                 </ul>
                 <p>Several sections also offer <strong>context-menu</strong> settings when you right-click inside that section (for example chart colors or time grouping).</p>
 
@@ -2429,15 +2438,29 @@
             <!-- Player Stats Menu -->
             <div class="outline-item">
                 <h4 id="player-stats-menu">6.9 Player Stats Menu</h4>
-                <p>The <span class="menu-item">Player Stats</span> menu on the menu bar controls the <strong>Player Stats</strong> tab in the detail panel: which sections are visible and several chart-specific options. The same nested settings also appear when you right-click inside the matching section on the tab. For what each block shows and how to use it, see <a href="#viewing-player-statistics">section 5.7 Viewing Player Statistics</a>.</p>
+                <p>The <span class="menu-item">Player Stats</span> menu on the menu bar controls the <strong>Player Stats</strong> tab in the detail panel. It contains two groups of actions:</p>
+                <ul>
+                    <li><strong>Profile actions</strong> (switch, save, save as, remove, reset).</li>
+                    <li><strong>Section and chart settings</strong> (visibility toggles plus section-specific submenus).</li>
+                </ul>
+                <p>The same nested chart settings also appear when you right-click inside the matching section on the tab. For what each block shows and how to use it, see <a href="#viewing-player-statistics">section 5.7 Viewing Player Statistics</a>.</p>
 
-                <h5>6.9.1 Reset to defaults</h5>
-                <p>Restores Player Stats options to the application template values after confirmation: section visibility, <span class="menu-item">Activity heatmap settings</span>, <span class="menu-item">Accuracy distribution settings</span>, and <span class="menu-item">Time series settings</span> (bins, binning mode, axis layout, gap segments, line style, smoothing, and related choices).</p>
+                <h5>6.9.1 Profiles</h5>
+                <p>Player Stats profiles store the full set of Player Stats customization options (which sections are visible plus the chart/detail settings). The app ships with a <strong>Default</strong> profile. You can overwrite <strong>Default</strong> but you cannot remove it.</p>
+                <ul>
+                    <li><span class="menu-item">Save Profile</span> overwrites the active profile with the current view settings.</li>
+                    <li><span class="menu-item">Save Profile as...</span> creates a new profile from the current settings.</li>
+                    <li><span class="menu-item">Remove Profile</span> deletes the active profile (disabled for <strong>Default</strong>).</li>
+                </ul>
+                <p>Switching profiles loads the saved snapshot into the tab immediately. However, changes are only persisted when you use <span class="menu-item">Save Profile</span> or <span class="menu-item">Save Profile as...</span>.</p>
 
-                <h5>6.9.2 Enable all and Disable all</h5>
+                <h5>6.9.2 Reset to defaults</h5>
+                <p>After confirmation, <span class="menu-item">Reset to defaults</span> overwrites the stored <strong>Default</strong> Player Stats profile with the application template values (section visibility, <span class="menu-item">Activity heatmap settings</span>, <span class="menu-item">Accuracy distribution settings</span>, and <span class="menu-item">Time series settings</span>) and then activates <strong>Default</strong>.</p>
+
+                <h5>6.9.3 Enable all and Disable all</h5>
                 <p><span class="menu-item">Enable all</span> and <span class="menu-item">Disable all</span> turn <strong>every</strong> section’s visibility on or off <strong>together</strong>, so you can quickly show the full page or clear it and then turn individual sections back on—handy when you want a simpler layout without flipping each toggle option one by one. They only update those section visibility toggles; they do not change the saved options inside <span class="menu-item">Activity heatmap settings</span>, <span class="menu-item">Accuracy distribution settings</span>, or <span class="menu-item">Time series settings</span>.</p>
 
-                <h5>6.9.3 Per-section visibility and detail settings</h5>
+                <h5>6.9.4 Per-section visibility and detail settings</h5>
                 <p>The remaining entries are toggle options for each Player Stats section (on means the section is shown on the tab). Three submenus supply extra display options where they apply: <span class="menu-item">Activity heatmap settings</span>, <span class="menu-item">Accuracy distribution settings</span>, and <span class="menu-item">Time series settings</span> (for the date-based progression charts). What each section shows is described in <a href="#viewing-player-statistics">section 5.7 Viewing Player Statistics</a>.</p>
             </div>
 

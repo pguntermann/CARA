@@ -217,6 +217,78 @@ class UserSettingsService:
                     changed = True
         
         return changed
+
+    def _migrate_player_stats_profiles(
+        self, current_settings: Dict[str, Any], template_settings: Dict[str, Any]
+    ) -> bool:
+        """Ensure Player Stats profile map exists and profiles have required sections.
+
+        Migration goals:
+        - If ``player_stats_profiles`` is missing, create it from the template's Default profile.
+        - Ensure ``Default`` exists (not removable).
+        - Ensure all profiles contain the expected subsections. Missing subsections are
+          filled from the template's Default profile.
+        """
+        changed = False
+
+        tmpl_profiles = template_settings.get("player_stats_profiles", {})
+        tmpl_default = tmpl_profiles.get("Default", {}) if isinstance(tmpl_profiles, dict) else {}
+
+        def _tmpl_section(key: str) -> Any:
+            if isinstance(tmpl_default, dict) and key in tmpl_default:
+                return self._deep_copy(tmpl_default.get(key))
+            # No legacy fallback: defaults come from template Default profile only.
+            return {}
+
+        profiles = current_settings.get("player_stats_profiles")
+        if not isinstance(profiles, dict) or not profiles:
+            # Create Default profile from template only.
+            profiles = {"Default": self._deep_copy(tmpl_default) if isinstance(tmpl_default, dict) else {}}
+            current_settings["player_stats_profiles"] = profiles
+            changed = True
+
+        # Ensure active profile key exists and points to something real.
+        active = current_settings.get("player_stats_active_profile")
+        if not isinstance(active, str) or not active.strip():
+            current_settings["player_stats_active_profile"] = "Default"
+            changed = True
+        else:
+            active = active.strip()
+            if active not in profiles:
+                current_settings["player_stats_active_profile"] = "Default"
+                changed = True
+
+        # Ensure profile order list exists.
+        order = current_settings.get("player_stats_profile_order")
+        if not isinstance(order, list):
+            current_settings["player_stats_profile_order"] = []
+            changed = True
+
+        # Ensure Default profile exists.
+        if "Default" not in profiles or not isinstance(profiles.get("Default"), dict):
+            profiles["Default"] = self._deep_copy(tmpl_default) if isinstance(tmpl_default, dict) else {}
+            changed = True
+
+        required_keys = [
+            "player_stats_section_visibility",
+            "player_stats_time_series",
+            "player_stats_activity_heatmap",
+            "player_stats_accuracy_distribution",
+        ]
+
+        # Fill missing sections for each profile.
+        for _name, pdata in list(profiles.items()):
+            if not isinstance(pdata, dict):
+                profiles[_name] = {}
+                pdata = profiles[_name]
+                changed = True
+            for k in required_keys:
+                if k not in pdata or not isinstance(pdata.get(k), dict):
+                    pdata[k] = _tmpl_section(k) if isinstance(_tmpl_section(k), dict) else {}
+                    changed = True
+
+        current_settings["player_stats_profiles"] = profiles
+        return changed
     
     @classmethod
     def get_instance(cls, settings_path: Optional[Path] = None) -> 'UserSettingsService':
@@ -377,6 +449,19 @@ class UserSettingsService:
             if self._migrate_column_profiles(profiles_dict, template_settings):
                 model.set_moves_list_profiles(profiles_dict)
                 needs_save = True
+
+        # Special handling for Player Stats profiles - ensure profile map exists and is normalized
+        current_settings = model.get_settings()
+        ps_settings = current_settings.copy() if isinstance(current_settings, dict) else {}
+        if self._migrate_player_stats_profiles(ps_settings, template_settings):
+            # Apply via dedicated setters to emit profile-related signals.
+            if isinstance(ps_settings.get("player_stats_profiles"), dict):
+                model.set_player_stats_profiles(ps_settings["player_stats_profiles"])
+            if isinstance(ps_settings.get("player_stats_active_profile"), str):
+                model.set_player_stats_active_profile(ps_settings["player_stats_active_profile"])
+            if isinstance(ps_settings.get("player_stats_profile_order"), list):
+                model.set_player_stats_profile_order(ps_settings["player_stats_profile_order"])
+            needs_save = True
         
         # Special handling for AI summary - ensure mutual exclusivity
         current_settings = model.get_settings()
@@ -407,6 +492,21 @@ class UserSettingsService:
         try:
             model = self.get_model()
             settings = model.to_dict()
+
+            # Player Stats profiles: do not persist working-state keys automatically.
+            # Only the snapshot map under ``player_stats_profiles`` is considered persistent.
+            # This prevents accidental overwrites on app exit; saving profiles is explicit.
+            try:
+                if isinstance(settings.get("player_stats_profiles"), dict):
+                    for k in (
+                        "player_stats_section_visibility",
+                        "player_stats_time_series",
+                        "player_stats_activity_heatmap",
+                        "player_stats_accuracy_distribution",
+                    ):
+                        settings.pop(k, None)
+            except Exception:
+                pass
             
             # Ensure directory exists
             self.settings_path.parent.mkdir(parents=True, exist_ok=True)
@@ -428,6 +528,60 @@ class UserSettingsService:
         except IOError as e:
             logging_service = LoggingService.get_instance()
             logging_service.error(f"Failed to save user settings: {e}", exc_info=e)
+            return False
+
+    def save_player_stats_profiles_only(self) -> bool:
+        """Persist only Player Stats profile-related keys.
+
+        This is used by explicit profile operations (Save / Save As / Remove) so they do not
+        incidentally persist unrelated pending settings changes that might be present in the
+        in-memory model.
+
+        Keys written (if present in model):
+        - ``player_stats_profiles``
+        - ``player_stats_active_profile``
+        - ``player_stats_profile_order``
+
+        Returns:
+            True if save was successful, False otherwise.
+        """
+        try:
+            model = self.get_model()
+            cur = model.get_settings()
+
+            # Read existing file content to preserve unrelated keys as-is.
+            if self.settings_path.exists():
+                try:
+                    with open(self.settings_path, "r", encoding="utf-8") as f:
+                        on_disk = json.load(f)
+                except (json.JSONDecodeError, IOError):
+                    on_disk = {}
+            else:
+                on_disk = {}
+
+            if not isinstance(on_disk, dict):
+                on_disk = {}
+
+            for k in ("player_stats_profiles", "player_stats_active_profile", "player_stats_profile_order"):
+                if k in cur:
+                    on_disk[k] = self._deep_copy(cur[k])
+
+            # Ensure directory exists
+            self.settings_path.parent.mkdir(parents=True, exist_ok=True)
+
+            temp_path = self.settings_path.with_suffix(".tmp")
+            with open(temp_path, "w", encoding="utf-8") as f:
+                json.dump(on_disk, f, indent=2, ensure_ascii=False)
+            temp_path.replace(self.settings_path)
+
+            logging_service = LoggingService.get_instance()
+            logging_service.info(
+                f"Player Stats profiles saved: path={self.settings_path}"
+            )
+            return True
+        except IOError as e:
+            logging_service = LoggingService.get_instance()
+            logging_service.error(f"Failed to save Player Stats profiles: {e}", exc_info=e)
             return False
     
     def get_settings(self) -> Dict[str, Any]:
@@ -625,17 +779,16 @@ class UserSettingsService:
         Section ids match ``PLAYER_STATS_MENU_SECTIONS`` in
         ``app.views.detail_player_stats_view`` (e.g. ``move_quality_progression``).
 
-        Written to disk when the application exits (see MainWindow ``closeEvent`` /
-        ``_save_user_settings`` → ``AppController.save_user_settings``).
+        This updates the in-memory working state only. When Player Stats profiles are enabled,
+        these working-state keys are intentionally *not* persisted automatically on exit.
         """
         self.get_model().update_player_stats_section_visibility(section_id, visible)
 
     def set_player_stats_section_visibility_map(self, visibility: Dict[str, bool]) -> None:
         """Replace the full Player Stats section visibility map in memory.
 
-        Keys are section ids from ``PLAYER_STATS_MENU_SECTIONS`` in
-        ``detail_player_stats_view``. Persisted on application exit like
-        ``update_player_stats_section_visibility``.
+        Keys are section ids from ``PLAYER_STATS_MENU_SECTIONS`` in ``detail_player_stats_view``.
+        This updates the in-memory working state only.
         """
         self.get_model().set_player_stats_section_visibility(visibility)
 
@@ -653,24 +806,72 @@ class UserSettingsService:
         if not tmpl:
             return False
         model = self.get_model()
-        if "player_stats_section_visibility" in tmpl:
-            raw_vis = tmpl["player_stats_section_visibility"]
-            if isinstance(raw_vis, dict):
+
+        # If profiles exist, prefer resetting the active profile from template Default profile.
+        tmpl_profiles = tmpl.get("player_stats_profiles", {})
+        tmpl_default = tmpl_profiles.get("Default", {}) if isinstance(tmpl_profiles, dict) else {}
+        if isinstance(model.get_settings().get("player_stats_profiles"), dict) and isinstance(tmpl_default, dict):
+            if "player_stats_section_visibility" in tmpl_default and isinstance(tmpl_default["player_stats_section_visibility"], dict):
+                raw_vis = tmpl_default["player_stats_section_visibility"]
                 vis = {str(k): bool(v) for k, v in raw_vis.items() if isinstance(v, bool)}
                 model.set_player_stats_section_visibility(vis)
-        if "player_stats_time_series" in tmpl:
-            ts = tmpl["player_stats_time_series"]
-            if isinstance(ts, dict):
-                model.set_player_stats_time_series(self._deep_copy(ts))
-        if "player_stats_activity_heatmap" in tmpl:
-            ah = tmpl["player_stats_activity_heatmap"]
-            if isinstance(ah, dict):
-                model.set_player_stats_activity_heatmap(self._deep_copy(ah))
-        if "player_stats_accuracy_distribution" in tmpl:
-            ad = tmpl["player_stats_accuracy_distribution"]
-            if isinstance(ad, dict):
-                model.set_player_stats_accuracy_distribution(self._deep_copy(ad))
+            if "player_stats_time_series" in tmpl_default and isinstance(tmpl_default["player_stats_time_series"], dict):
+                model.set_player_stats_time_series(self._deep_copy(tmpl_default["player_stats_time_series"]))
+            if "player_stats_activity_heatmap" in tmpl_default and isinstance(tmpl_default["player_stats_activity_heatmap"], dict):
+                model.set_player_stats_activity_heatmap(self._deep_copy(tmpl_default["player_stats_activity_heatmap"]))
+            if "player_stats_accuracy_distribution" in tmpl_default and isinstance(tmpl_default["player_stats_accuracy_distribution"], dict):
+                model.set_player_stats_accuracy_distribution(self._deep_copy(tmpl_default["player_stats_accuracy_distribution"]))
+        else:
+            if "player_stats_section_visibility" in tmpl:
+                raw_vis = tmpl["player_stats_section_visibility"]
+                if isinstance(raw_vis, dict):
+                    vis = {str(k): bool(v) for k, v in raw_vis.items() if isinstance(v, bool)}
+                    model.set_player_stats_section_visibility(vis)
+            if "player_stats_time_series" in tmpl:
+                ts = tmpl["player_stats_time_series"]
+                if isinstance(ts, dict):
+                    model.set_player_stats_time_series(self._deep_copy(ts))
+            if "player_stats_activity_heatmap" in tmpl:
+                ah = tmpl["player_stats_activity_heatmap"]
+                if isinstance(ah, dict):
+                    model.set_player_stats_activity_heatmap(self._deep_copy(ah))
+            if "player_stats_accuracy_distribution" in tmpl:
+                ad = tmpl["player_stats_accuracy_distribution"]
+                if isinstance(ad, dict):
+                    model.set_player_stats_accuracy_distribution(self._deep_copy(ad))
         return bool(self.save())
+
+    def get_player_stats_default_profile_from_template(self) -> Optional[Dict[str, Any]]:
+        """Return the template's Player Stats ``Default`` profile snapshot (deep-copied).
+
+        This is used by higher-level controllers (e.g. PlayerStatsProfileController) to implement
+        "Reset to defaults" without those controllers reading the template directly.
+
+        Returns:
+            The ``player_stats_profiles["Default"]`` dict from the template if present, otherwise None.
+        """
+        tmpl = self._load_template()
+        if not tmpl:
+            return None
+        tmpl_profiles = tmpl.get("player_stats_profiles", {})
+        if not isinstance(tmpl_profiles, dict):
+            return None
+        raw = tmpl_profiles.get("Default")
+        if not isinstance(raw, dict):
+            return None
+        return self._deep_copy(raw)
+
+    def update_player_stats_profiles(self, profiles: Dict[str, Any]) -> None:
+        """Replace the Player Stats profiles map in memory."""
+        self.get_model().set_player_stats_profiles(profiles)
+
+    def update_player_stats_active_profile(self, profile_name: str) -> None:
+        """Update active Player Stats profile name in memory."""
+        self.get_model().set_player_stats_active_profile(profile_name)
+
+    def update_player_stats_profile_order(self, order: list) -> None:
+        """Update Player Stats profile order in memory."""
+        self.get_model().set_player_stats_profile_order(order)
 
     def update_player_stats_time_series(self, partial: Dict[str, Any]) -> None:
         """Merge keys into Player Stats time-series user settings (binning / chart display)."""
