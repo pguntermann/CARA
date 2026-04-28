@@ -143,6 +143,74 @@ class UCICommunicationService:
         self._stdout_thread: Optional[threading.Thread] = None
         self._stdout_stop = threading.Event()
         self._read_buffer = b""
+        # Track last MultiPV value so we can emit consistent synthetic terminal results.
+        self._multipv: int = 1
+        # Terminal (no legal moves) short-circuit flags.
+        self._terminal_no_legal_moves: bool = False
+        self._terminal_is_checkmate: bool = False
+        self._terminal_is_black_to_move: bool = False
+
+    def _maybe_mark_terminal_position(self, fen: str) -> bool:
+        """Detect terminal positions (no legal moves) and mark the instance as terminal.
+
+        Some engines behave inconsistently (or crash / hang) when asked to analyze positions
+        where the game is already over (e.g. checkmate or stalemate). We detect that case
+        centrally and later emit a synthetic UCI stream.
+        """
+        try:
+            import chess
+
+            board = chess.Board(str(fen))
+            # Terminal = no legal moves (covers checkmate and stalemate).
+            if board.legal_moves.count() != 0:
+                self._terminal_no_legal_moves = False
+                return False
+            self._terminal_no_legal_moves = True
+            self._terminal_is_checkmate = bool(board.is_checkmate())
+            # board.turn True => white to move. We store "black to move" for sign conventions elsewhere.
+            self._terminal_is_black_to_move = bool(not board.turn)
+            try:
+                if _debug_lifecycle_enabled:
+                    ident = f"[{self.identifier}] " if self.identifier else ""
+                    kind = "checkmate" if self._terminal_is_checkmate else "stalemate"
+                    side = "black" if self._terminal_is_black_to_move else "white"
+                    LoggingService.get_instance().debug(
+                        f"[UCI TERMINAL] {ident}{kind} side_to_move={side} multipv={self._multipv}"
+                    )
+            except Exception:
+                pass
+            return True
+        except Exception:
+            self._terminal_no_legal_moves = False
+            return False
+
+    def _emit_synthetic_terminal_stream(self) -> None:
+        """Emit a minimal synthetic UCI output stream for a terminal position."""
+        try:
+            # For checkmate: use "mate 0" (side to move is mated).
+            # For stalemate: use neutral "cp 0".
+            score_token = "mate 0" if bool(getattr(self, "_terminal_is_checkmate", False)) else "cp 0"
+
+            # Include depth 0. Include MultiPV lines if MultiPV was set.
+            mp = int(self._multipv) if int(self._multipv) > 0 else 1
+            mp = min(mp, 3)  # callers use up to 3 in CARA
+            if mp <= 1:
+                self._stdout_queue.put(f"info depth 0 score {score_token}")
+            else:
+                for i in range(1, mp + 1):
+                    self._stdout_queue.put(f"info depth 0 multipv {i} score {score_token}")
+            self._stdout_queue.put("bestmove (none)")
+            try:
+                if _debug_lifecycle_enabled:
+                    ident = f"[{self.identifier}] " if self.identifier else ""
+                    LoggingService.get_instance().debug(
+                        f"[UCI TERMINAL] {ident}synthetic stream queued"
+                    )
+            except Exception:
+                pass
+        except Exception:
+            # Best-effort only; if this fails, callers will time out / error as before.
+            pass
 
     def _start_stdout_reader(self) -> None:
         """Start background reader thread (idempotent)."""
@@ -473,6 +541,13 @@ class UCICommunicationService:
         Returns:
             True if option set successfully (and readyok received if wait_for_ready is True), False otherwise.
         """
+        # Track MultiPV so terminal synthesis matches the current expected number of lines.
+        try:
+            if str(name).strip().lower() == "multipv":
+                self._multipv = int(value)
+        except Exception:
+            pass
+
         command = f"setoption name {name} value {value}"
         success = self.send_command(command)
         if not success:
@@ -516,6 +591,9 @@ class UCICommunicationService:
         Returns:
             True if position set successfully, False otherwise.
         """
+        # Central short-circuit: do not feed terminal positions (no legal moves) to engines.
+        if self._maybe_mark_terminal_position(fen):
+            return True
         command = f"position fen {fen}"
         return self.send_command(command)
     
@@ -531,6 +609,12 @@ class UCICommunicationService:
         Returns:
             True if search started successfully, False otherwise.
         """
+        # If we previously set a terminal (checkmate) position, emit a synthetic stream
+        # and do not send any UCI commands to the engine.
+        if bool(getattr(self, "_terminal_no_legal_moves", False)):
+            self._emit_synthetic_terminal_stream()
+            return True
+
         # Build go command, omitting parameters with value 0
         parts = ["go"]
         
@@ -562,6 +646,10 @@ class UCICommunicationService:
         Returns:
             True if stop command sent successfully, False otherwise.
         """
+        # If we're in a synthetic terminal position, there is no engine search to stop.
+        if bool(getattr(self, "_terminal_no_legal_moves", False)):
+            return True
+
         success = self.send_command("stop")
         if success:
             self._debug_lifecycle("STOPPED", "Search stopped")

@@ -5,10 +5,29 @@ import time
 import queue
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple, List
-from PyQt6.QtCore import QObject, QThread, pyqtSignal
+from PyQt6.QtCore import QObject, QThread, QTimer, pyqtSignal
 
 from app.services.uci_communication_service import UCICommunicationService
 from app.services.logging_service import LoggingService
+
+
+class GameAnalysisRequestHandle(QObject):
+    """Per-request handle for a queued analysis.
+
+    - `analysis_complete` is dedicated to this request (safe to connect/disconnect per request)
+    - `progress_update` and `error_occurred` are exposed from the persistent thread so
+      existing callers (bulk analysis) continue to work without modification.
+    """
+
+    analysis_complete = pyqtSignal(
+        float, bool, int, str, str, str, str, float, float, float, float, int, int, int, str
+    )
+
+    def __init__(self, thread: "GameAnalysisEngineThread") -> None:
+        super().__init__()
+        # Expose thread signals for backwards compatibility.
+        self.progress_update = thread.progress_update
+        self.error_occurred = thread.error_occurred
 
 
 class AnalysisRequest:
@@ -19,6 +38,7 @@ class AnalysisRequest:
         self.progress_interval_ms = progress_interval_ms
         self.completed = False
         self.result: Optional[Tuple[float, bool, int, str, str, int, int]] = None
+        self.handle: Optional[GameAnalysisRequestHandle] = None
 
 
 class GameAnalysisEngineThread(QThread):
@@ -348,6 +368,27 @@ class GameAnalysisEngineThread(QThread):
                     LoggingService.get_instance().debug(
                         f"[Game analysis complete] move_number={request.move_number} side_to_move={side} eval={final_score:.1f} pv2={pv2_score:.1f} pv3={pv3_score:.1f}"
                     )
+                    try:
+                        if getattr(request, "handle", None) is not None:
+                            request.handle.analysis_complete.emit(
+                                final_score,
+                                final_is_mate,
+                                final_mate_moves,
+                                best_move_san,
+                                pv1_string,
+                                pv2_move_san,
+                                pv3_move_san,
+                                pv2_score,
+                                pv3_score,
+                                pv2_score_black,
+                                pv3_score_black,
+                                self._current_depth,
+                                self._current_seldepth,
+                                self._current_nps,
+                                self.engine_name,
+                            )
+                    except Exception:
+                        pass
                     self.analysis_complete.emit(
                         final_score,
                         final_is_mate,
@@ -598,7 +639,7 @@ class GameAnalysisEngineService(QObject):
         
         return self.analysis_thread.running
     
-    def analyze_position(self, fen: str, move_number: int, progress_interval_ms: int = 500) -> GameAnalysisEngineThread:
+    def analyze_position(self, fen: str, move_number: int, progress_interval_ms: int = 500) -> Optional[GameAnalysisRequestHandle]:
         """Queue a position for analysis.
         
         Args:
@@ -607,7 +648,7 @@ class GameAnalysisEngineService(QObject):
             progress_interval_ms: Progress update interval in milliseconds.
             
         Returns:
-            GameAnalysisEngineThread instance (for signal connections).
+            Per-request signal proxy (for analysis_complete signal connections), or None on failure.
         """
         # Start engine thread if not already running
         if not self.analysis_thread or not self.analysis_thread.isRunning():
@@ -616,11 +657,17 @@ class GameAnalysisEngineService(QObject):
         
         # Create analysis request
         request = AnalysisRequest(fen, move_number, progress_interval_ms)
+        request.handle = GameAnalysisRequestHandle(self.analysis_thread)
         
-        # Queue for analysis
-        self.analysis_thread.queue_analysis(request)
-        
-        return self.analysis_thread
+        # Queue for analysis on the next Qt event loop turn.
+        # Some positions (terminal/mate short-circuit) can complete immediately; if we enqueue
+        # synchronously, the result may be emitted before callers connect their handlers.
+        try:
+            QTimer.singleShot(0, lambda req=request: self.analysis_thread.queue_analysis(req))
+        except Exception:
+            # Fallback: enqueue immediately.
+            self.analysis_thread.queue_analysis(request)
+        return request.handle
     
     def stop_current_analysis(self) -> None:
         """Stop only the current analysis without clearing queue or stopping thread."""
