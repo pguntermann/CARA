@@ -835,6 +835,79 @@ def _smooth_polyline_path(run: List[QPointF], *, strength: float = 1.0) -> Optio
     return path
 
 
+def _closest_point_on_segment(p: QPointF, a: QPointF, b: QPointF) -> Tuple[QPointF, float]:
+    """Return (closest_point, distance_squared) on segment a-b to point p."""
+    vx = b.x() - a.x()
+    vy = b.y() - a.y()
+    wx = p.x() - a.x()
+    wy = p.y() - a.y()
+    c1 = wx * vx + wy * vy
+    c2 = vx * vx + vy * vy
+    if c2 <= 0:
+        cx, cy = a.x(), a.y()
+    elif c1 <= 0:
+        cx, cy = a.x(), a.y()
+    elif c1 >= c2:
+        cx, cy = b.x(), b.y()
+    else:
+        t = c1 / c2
+        cx = a.x() + t * vx
+        cy = a.y() + t * vy
+    dx = p.x() - cx
+    dy = p.y() - cy
+    return QPointF(cx, cy), dx * dx + dy * dy
+
+
+def _sample_count_for_path(*, n_hint: int, base: int, per_point: int, cap: int) -> int:
+    n_hint = max(0, int(n_hint))
+    return max(base, min(cap, n_hint * per_point))
+
+
+def _closest_point_on_painter_path(
+    p: QPointF, path: QPainterPath, *, n_hint: int = 0
+) -> Tuple[Optional[QPointF], float]:
+    """Approximate closest point on a QPainterPath by sampling.
+
+    Qt doesn't provide an exact point-to-path distance API. For our usage (hover indicator),
+    the path is short, so sampling is fast and keeps the circle on the rendered curve.
+    """
+    try:
+        n_samples = _sample_count_for_path(n_hint=n_hint, base=80, per_point=18, cap=520)
+        best_dist_sq = float("inf")
+        best_pt: Optional[QPointF] = None
+        prev: Optional[QPointF] = None
+        for i in range(n_samples + 1):
+            t = float(i) / float(n_samples)
+            pt = path.pointAtPercent(t)
+            if prev is not None:
+                closest, dist_sq = _closest_point_on_segment(p, prev, pt)
+                if dist_sq < best_dist_sq:
+                    best_dist_sq = dist_sq
+                    best_pt = closest
+            prev = pt
+        return best_pt, best_dist_sq
+    except Exception:
+        return None, float("inf")
+
+
+def _painter_path_y_at_x(path: QPainterPath, x: float, *, n_hint: int = 0) -> Optional[float]:
+    """Approximate the curve y-value at a given plot x by sampling the path."""
+    try:
+        n_samples = _sample_count_for_path(n_hint=n_hint, base=80, per_point=22, cap=520)
+        best_dx = float("inf")
+        best_y: Optional[float] = None
+        for i in range(n_samples + 1):
+            t = float(i) / float(n_samples)
+            pt = path.pointAtPercent(t)
+            dx = abs(pt.x() - x)
+            if dx < best_dx:
+                best_dx = dx
+                best_y = float(pt.y())
+        return best_y
+    except Exception:
+        return None
+
+
 def _x_axis_week_minors_in_month_mode(
     chart_cfg: Dict[str, Any], span_days: int, week_ticks_base_enabled: bool
 ) -> bool:
@@ -1739,14 +1812,27 @@ class AccuracyOverTimeChartWidget(QWidget):
         best_dist_sq = float("inf")
         best_pixel: Optional[QPointF] = None
         best_vertex: Optional[int] = None
-        for i in range(len(points) - 1):
-            closest, dist_sq = self._closest_point_on_segment(mp, points[i], points[i + 1])
-            if dist_sq < best_dist_sq:
-                best_dist_sq = dist_sq
-                best_pixel = closest
-                d_i = (closest.x() - points[i].x()) ** 2 + (closest.y() - points[i].y()) ** 2
-                d_j = (closest.x() - points[i + 1].x()) ** 2 + (closest.y() - points[i + 1].y()) ** 2
-                best_vertex = i if d_i <= d_j else i + 1
+
+        # If we draw a smoothed curve, hit-test against that curve so the circle stays on the line.
+        if self._progression_line_smooth and self._line_style == Qt.PenStyle.SolidLine:
+            spath = _smooth_polyline_path(points, strength=self._progression_line_smooth_strength)
+            if spath is not None:
+                best_pixel, best_dist_sq = _closest_point_on_painter_path(mp, spath, n_hint=len(points))
+                if best_pixel is not None:
+                    # Tooltip stays bin-based; pick the nearest vertex to the closest point.
+                    best_vertex = min(
+                        range(len(points)),
+                        key=lambda i: (best_pixel.x() - points[i].x()) ** 2 + (best_pixel.y() - points[i].y()) ** 2,
+                    )
+        if best_pixel is None:
+            for i in range(len(points) - 1):
+                closest, dist_sq = self._closest_point_on_segment(mp, points[i], points[i + 1])
+                if dist_sq < best_dist_sq:
+                    best_dist_sq = dist_sq
+                    best_pixel = closest
+                    d_i = (closest.x() - points[i].x()) ** 2 + (closest.y() - points[i].y()) ** 2
+                    d_j = (closest.x() - points[i + 1].x()) ** 2 + (closest.y() - points[i + 1].y()) ** 2
+                    best_vertex = i if d_i <= d_j else i + 1
         if best_dist_sq <= threshold_sq and best_pixel is not None and best_vertex is not None:
             self._hover_pixel = best_pixel
             self._hover_vertex_index = best_vertex
@@ -2305,6 +2391,10 @@ class MoveQualityOverTimeChartWidget(QWidget):
                 painter.drawEllipse(run[0], r, r)
                 painter.setBrush(Qt.BrushStyle.NoBrush)
 
+        # Cache the per-series point runs we actually draw, so hover circles can reuse them
+        # without rebuilding + re-smoothing every paint call (avoids jerkiness).
+        series_runs: List[List[QPointF]] = [[] for _ in range(n_series)]
+
         if self._chart_style == "acpl_phase":
             # One polyline per phase over all bins that have a finite value (sparse endgame: skip
             # calendar gaps instead of breaking the line into invisible single-point runs).
@@ -2324,6 +2414,7 @@ class MoveQualityOverTimeChartWidget(QWidget):
                     py = bottom - ((v - min_y) / y_range * graph_height) if y_range > 0 else bottom
                     py = max(top, min(bottom, py))
                     run.append(QPointF(x, py))
+                series_runs[j] = list(run)
                 _flush_run(col, line_style, line_width, run)
         else:
             all_points: List[List[QPointF]] = [[] for _ in range(n_series)]
@@ -2340,6 +2431,7 @@ class MoveQualityOverTimeChartWidget(QWidget):
 
             for j in range(n_series):
                 points = all_points[j]
+                series_runs[j] = list(points)
                 col, line_style, line_width = (
                     self._series_visuals[j] if j < len(self._series_visuals) else self._default_pen
                 )
@@ -2377,11 +2469,25 @@ class MoveQualityOverTimeChartWidget(QWidget):
                 acc = self._hover_values[j]
                 if self._chart_style == "acpl_phase" and not math.isfinite(acc):
                     continue
-                hy = bottom - ((acc - min_y) / y_range * graph_height) if y_range > 0 else bottom
-                hy = max(top, min(bottom, hy))
                 col, line_style, lw = (
                     self._series_visuals[j] if j < len(self._series_visuals) else self._default_pen
                 )
+                # When this series is drawn with a smoothed path, place the hover circle on the curve.
+                # Otherwise fall back to value-based y (linear interpolation).
+                hy: float
+                hy_from_curve: Optional[float] = None
+                if self._progression_line_smooth and line_style == Qt.PenStyle.SolidLine:
+                    run = series_runs[j] if 0 <= j < len(series_runs) else []
+                    if len(run) >= 2:
+                        spath = _smooth_polyline_path(run, strength=self._progression_line_smooth_strength)
+                        if spath is not None:
+                            hy_from_curve = _painter_path_y_at_x(spath, hx, n_hint=len(run))
+                if hy_from_curve is not None:
+                    hy = float(hy_from_curve)
+                else:
+                    hy = bottom - ((acc - min_y) / y_range * graph_height) if y_range > 0 else bottom
+                    hy = max(top, min(bottom, hy))
+                hy = max(top, min(bottom, hy))
                 hover_pen = QPen(col, max(2, lw))
                 hover_pen.setStyle(line_style)
                 painter.setPen(hover_pen)
