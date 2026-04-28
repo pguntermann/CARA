@@ -2938,6 +2938,12 @@ class DetailPlayerStatsView(QWidget):
     def _handle_stats_recalculation_started(self) -> None:
         self._stats_recalculation_ui_pending = True
         self._sync_player_stats_activity_label()
+        # During theme switches the view can briefly show only the header + activity label.
+        # Ensure scroll alignment and clamping are applied in that transient state too.
+        try:
+            QTimer.singleShot(0, self._sync_bottom_stretch)
+        except Exception:
+            pass
 
     def _handle_bulk_analysis_blocks_stats_changed(self, blocking: bool) -> None:
         self._bulk_analysis_blocks_stats_ui = bool(blocking)
@@ -3247,6 +3253,12 @@ class DetailPlayerStatsView(QWidget):
         sa = getattr(self, "scroll_area", None)
         if spacer is None or lay is None or sa is None:
             return
+        # Be defensive: during theme switches / restyling some platform styles can reset scroll-area
+        # alignment; keep short content pinned to the top when we clamp the content widget height.
+        try:
+            sa.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        except Exception:
+            pass
         # When the disabled placeholder is visible, it should be able to expand and
         # center itself within the viewport. Do not consume slack with the bottom spacer.
         try:
