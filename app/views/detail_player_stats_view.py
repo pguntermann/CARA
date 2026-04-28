@@ -3206,9 +3206,16 @@ class DetailPlayerStatsView(QWidget):
             try:
                 vis = bool(self._player_stats_section_pref_visible(sid))
                 try:
-                    w.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+                    # Only clamp height when hiding.
+                    #
+                    # Rationale: Several Player Stats sections (notably the Activity heatmap) have
+                    # height-for-width dependent layouts. Their `sizeHint()` can change after the
+                    # scroll-area viewport width stabilizes (or after theme/font changes). Clamping
+                    # the visible section to an early `sizeHint().height()` can permanently truncate
+                    # the content until a later action forces a rebuild.
+                    w.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
                     if vis:
-                        w.setMaximumHeight(max(0, int(w.sizeHint().height())))
+                        w.setMaximumHeight(16777215)
                     else:
                         w.setMaximumHeight(0)
                 except Exception:
