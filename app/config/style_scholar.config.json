@@ -3277,7 +3277,7 @@
           "background_color": {
             "$ref": "$_COLOR_WHEAT_CREAM"
           },
-          "height": 120,
+          "height": 130,
           "columns": 2,
           "spacing": 8,
           "row_spacing": 4,
@@ -3287,7 +3287,19 @@
           "enabled": true,
           "spacing": 8,
           "width": 100,
-          "height": 24
+          "height": 24,
+          "select_all_button_icon_svg": "app/resources/icons/select_all_pgn_tags.svg",
+          "select_all_button_icon_tint_rgb": {
+            "$ref": "$_COLOR_COCOA_BROWN"
+          },
+          "select_all_button_icon_px": 18,
+          "select_all_button_tooltip": "Select all tags",
+          "deselect_all_button_icon_svg": "app/resources/icons/deselect_all_pgn_tags.svg",
+          "deselect_all_button_icon_tint_rgb": {
+            "$ref": "$_COLOR_COCOA_BROWN"
+          },
+          "deselect_all_button_icon_px": 18,
+          "deselect_all_button_tooltip": "Deselect all tags"
         }
       },
       "bulk_tag": {
