@@ -402,6 +402,8 @@ class PlayerStatsController(QObject):
         self._stats_worker: Optional[PlayerStatsCalculationWorker] = None
         self._recalc_pending: bool = False  # Coalesce recalc requests while worker is running
         self._bulk_analysis_active: bool = False  # When True, skip scheduling stats recalculation (except explicit end-of-bulk refresh)
+        # When True, bulk analysis caused DB changes while we were blocked; refresh dropdown once at end.
+        self._dropdown_refresh_pending: bool = False
         
         # Database change tracking
         self._connected_databases: List[DatabaseModel] = []
@@ -433,6 +435,7 @@ class PlayerStatsController(QObject):
         """Pause player-stats recalculation while bulk analysis runs; cancel any in-flight stats worker."""
         self._bulk_analysis_active = True
         self._recalc_pending = False
+        self._dropdown_refresh_pending = False
         self._cancel_stats_worker()
         self.bulk_analysis_blocks_stats_recalculation.emit(True)
     
@@ -442,6 +445,10 @@ class PlayerStatsController(QObject):
         self.bulk_analysis_blocks_stats_recalculation.emit(False)
         # Defer so BulkAnalysisController.is_analysis_running() is false before we start a new worker
         def _deferred_recalc() -> None:
+            # Refresh player dropdown once if bulk analysis changed the database.
+            if self._dropdown_refresh_pending:
+                self._dropdown_refresh_pending = False
+                self._schedule_dropdown_update()
             if self._current_player:
                 self._schedule_stats_recalculation()
         QTimer.singleShot(0, _deferred_recalc)
@@ -1720,6 +1727,12 @@ class PlayerStatsController(QObject):
     
     def _on_database_update_debounced(self) -> None:
         """Handle debounced database update - refresh dropdown and recalculate stats."""
+        # Bulk analysis updates the database frequently; avoid thrashing the dropdown during bulk runs.
+        # We'll refresh it once when bulk analysis finishes.
+        if self._bulk_analysis_active:
+            self._dropdown_refresh_pending = True
+            return
+        
         # Update dropdown asynchronously
         self._schedule_dropdown_update()
         

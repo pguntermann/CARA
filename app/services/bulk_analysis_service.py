@@ -5,10 +5,10 @@ import os
 import chess
 import chess.pgn
 import time
+import threading
 from typing import Optional, Dict, Any, List, Tuple
 from pathlib import Path
-from PyQt6.QtCore import QObject, pyqtSignal
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QObject, Qt, pyqtSignal
 
 from app.models.database_model import GameData
 from app.models.engine_model import EngineModel
@@ -140,6 +140,15 @@ class BulkAnalysisService(QObject):
             self.min_depths_show_error = self.classification_model.min_depths_show_error
             self.shallow_error_classifications = self.classification_model.shallow_error_classifications
             self.candidate_selection = self.classification_model.candidate_selection
+            self.exclude_already_winning_enabled = bool(
+                getattr(self.classification_model, "exclude_already_winning_enabled", True)
+            )
+            try:
+                self.exclude_already_winning_threshold_cpl = int(
+                    getattr(self.classification_model, "exclude_already_winning_threshold_cpl", 600)
+                )
+            except Exception:
+                self.exclude_already_winning_threshold_cpl = 600
         else:
             # Fallback to config defaults
             classification_config = self.config.get("game_analysis", {}).get("move_classification", {})
@@ -151,6 +160,15 @@ class BulkAnalysisService(QObject):
             self.min_depths_show_error = brilliant_criteria.get("min_depths_show_error", 3)
             self.shallow_error_classifications = brilliant_criteria.get("shallow_error_classifications", ["Mistake", "Blunder", "Miss"])
             self.candidate_selection = brilliant_criteria.get("candidate_selection", "best_move_only")
+            self.exclude_already_winning_enabled = bool(
+                brilliant_criteria.get("exclude_already_winning_enabled", True)
+            )
+            try:
+                self.exclude_already_winning_threshold_cpl = int(
+                    brilliant_criteria.get("exclude_already_winning_threshold_cpl", 600)
+                )
+            except Exception:
+                self.exclude_already_winning_threshold_cpl = 600
     
     def cancel(self) -> None:
         """Cancel the current analysis."""
@@ -218,6 +236,8 @@ class BulkAnalysisService(QObject):
             good_move_max_cpl=self.good_move_max_cpl,
             inaccuracy_max_cpl=self.inaccuracy_max_cpl,
             mistake_max_cpl=self.mistake_max_cpl,
+            exclude_already_winning_enabled=getattr(self, "exclude_already_winning_enabled", True),
+            exclude_already_winning_threshold_cpl=getattr(self, "exclude_already_winning_threshold_cpl", 600),
             engine_path=engine_path,
             time_limit_ms=time_limit_ms,
             max_threads=max_threads,
@@ -555,9 +575,19 @@ class BulkAnalysisService(QObject):
 
             # Brilliancy detection (if enabled)
             if self._brilliant_move_detection and move_infos_for_brilliancy and analyzed_moves and not self._cancelled:
+                t0 = time.perf_counter()
                 self._perform_brilliant_move_detection_bulk(
                     move_infos_for_brilliancy, analyzed_moves, progress_callback, total_moves
                 )
+                try:
+                    LoggingService.get_instance().debug(
+                        "BulkAnalysis post-step: brilliancy_detection "
+                        f"game_number={getattr(game, 'game_number', None)} "
+                        f"moves={len(analyzed_moves)} "
+                        f"elapsed_ms={(time.perf_counter() - t0) * 1000.0:.1f}"
+                    )
+                except Exception:
+                    pass
 
             # Store analysis results
             if analyzed_moves:
@@ -569,11 +599,23 @@ class BulkAnalysisService(QObject):
                             game.eco = move.eco
                         break
                 
+                t_store = time.perf_counter()
                 success = AnalysisDataStorageService.store_analysis_data(
                     game,
                     analyzed_moves,
                     self.config
                 )
+                try:
+                    LoggingService.get_instance().debug(
+                        "BulkAnalysis post-step: store_analysis_data "
+                        f"game_number={getattr(game, 'game_number', None)} "
+                        f"moves={len(analyzed_moves)} "
+                        f"pgn_len={len(getattr(game, 'pgn', '') or '')} "
+                        f"success={bool(success)} "
+                        f"elapsed_ms={(time.perf_counter() - t_store) * 1000.0:.1f}"
+                    )
+                except Exception:
+                    pass
                 
                 if success:
                     game.analyzed = True
@@ -582,6 +624,7 @@ class BulkAnalysisService(QObject):
                         try:
                             from app.services.game_auto_tagging_service import GameAutoTaggingService
 
+                            t_tag = time.perf_counter()
                             tagging_service = GameAutoTaggingService(self.config)
                             result = tagging_service.detect_tags(
                                 analyzed_moves,
@@ -593,6 +636,15 @@ class BulkAnalysisService(QObject):
                                 result.detected_tags,
                             )
                             tagging_service.apply_to_game_data(game, merged)
+                            try:
+                                LoggingService.get_instance().debug(
+                                    "BulkAnalysis post-step: auto_tagging "
+                                    f"game_number={getattr(game, 'game_number', None)} "
+                                    f"detected={len(getattr(result, 'detected_tags', []) or [])} "
+                                    f"elapsed_ms={(time.perf_counter() - t_tag) * 1000.0:.1f}"
+                                )
+                            except Exception:
+                                pass
                         except Exception as e:
                             logging_service = LoggingService.get_instance()
                             logging_service.warning(f"Auto-tagging skipped due to error: {e}", exc_info=e)
@@ -762,9 +814,9 @@ class BulkAnalysisService(QObject):
         if not self._engine_service:
             return None
         
-        # Queue analysis request
-        analysis_thread = self._engine_service.analyze_position(fen, move_number, self.progress_update_interval_ms)
-        if not analysis_thread:
+        # Create request handle, connect signals, then enqueue.
+        handle = self._engine_service.create_analysis_request(fen, move_number, self.progress_update_interval_ms)
+        if handle is None:
             return None
         
         # Wait for analysis to complete using signals
@@ -772,6 +824,7 @@ class BulkAnalysisService(QObject):
         last_progress_info = {"depth": 0, "seldepth": 0, "centipawns": 0.0, "engine_name": "", "threads": 0, "elapsed_ms": 0.0}
         last_progress_time = {"value": None}  # Use dict to allow modification in nested function
         first_progress_received = {"value": False}  # Track if we've received at least one progress update
+        done_event = threading.Event()
         
         def on_progress_update(depth, seldepth, centipawns, elapsed_ms, engine_name, threads, move_num, nps):
             """Handle progress update from engine."""
@@ -806,14 +859,25 @@ class BulkAnalysisService(QObject):
                 pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth, seldepth
             )
             result_container["completed"] = True
+            done_event.set()
         
         def on_error(error_message: str):
             result_container["completed"] = True
+            done_event.set()
         
-        # Connect signals
-        analysis_thread.progress_update.connect(on_progress_update)
-        analysis_thread.analysis_complete.connect(on_complete)
-        analysis_thread.error_occurred.connect(on_error)
+        # Connect signals with DirectConnection so we don't need to pump the Qt event loop here.
+        handle.progress_update.connect(on_progress_update, type=Qt.ConnectionType.DirectConnection)
+        handle.analysis_complete.connect(on_complete, type=Qt.ConnectionType.DirectConnection)
+        handle.error_occurred.connect(on_error, type=Qt.ConnectionType.DirectConnection)
+
+        if not self._engine_service.enqueue_analysis_request(handle):
+            try:
+                handle.progress_update.disconnect(on_progress_update)
+                handle.analysis_complete.disconnect(on_complete)
+                handle.error_occurred.disconnect(on_error)
+            except TypeError:
+                pass
+            return None
         
         # Wait for completion with progress-based timeout
         start_time = time.time()
@@ -839,8 +903,8 @@ class BulkAnalysisService(QObject):
         
         timeout_occurred = False
         
-        # Process events until complete
-        while not result_container["completed"] and not self._cancelled:
+        # Wait until complete without QApplication.processEvents() to avoid Qt re-entrancy/stack overflow.
+        while not done_event.is_set() and not self._cancelled:
             elapsed = time.time() - start_time
             
             # Only check progress timeout if we've received at least one progress update
@@ -878,26 +942,13 @@ class BulkAnalysisService(QObject):
                 self._engine_service.stop_current_analysis()
                 break
             
-            QApplication.processEvents()
-            time.sleep(0.01)
-        
-        # Grace period: give signal a chance to be delivered (Qt event processing delay)
-        if timeout_occurred and not result_container["completed"]:
-            grace_period = 0.5  # 500ms grace period
-            grace_start = time.time()
-            while (time.time() - grace_start) < grace_period:
-                QApplication.processEvents()
-                if result_container["completed"]:
-                    # Signal arrived during grace period - not a real timeout
-                    timeout_occurred = False
-                    break
-                time.sleep(0.01)
+            done_event.wait(0.01)
         
         # Disconnect signals
         try:
-            analysis_thread.progress_update.disconnect(on_progress_update)
-            analysis_thread.analysis_complete.disconnect(on_complete)
-            analysis_thread.error_occurred.disconnect(on_error)
+            handle.progress_update.disconnect(on_progress_update)
+            handle.analysis_complete.disconnect(on_complete)
+            handle.error_occurred.disconnect(on_error)
         except TypeError:
             pass
         

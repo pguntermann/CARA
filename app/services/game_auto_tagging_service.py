@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+import time
 
 from app.models.moveslist_model import MoveData
 from app.services.game_summary_service import GameSummaryService
@@ -74,6 +75,7 @@ class GameAutoTaggingService:
         enabled_tags: Optional[Sequence[str]] = None,
     ) -> AutoTaggingResult:
         """Return detected auto-tags based on evaluated move list."""
+        t0 = time.perf_counter()
         if not moves:
             return AutoTaggingResult(detected_tags=[], reasons={})
 
@@ -84,15 +86,21 @@ class GameAutoTaggingService:
 
         summary_service = GameSummaryService(self.config)
         total_moves = len(moves)
+        t_summary = time.perf_counter()
         summary = summary_service.calculate_summary(list(moves), total_moves, game_result=game_result)
+        summary_ms = (time.perf_counter() - t_summary) * 1000.0
 
         # evaluation_data: list[(ply_index, eval_cp)] where eval is from White's perspective.
+        t_eval = time.perf_counter()
         eval_points = list(summary.evaluation_data or [])
+        eval_extract_ms = (time.perf_counter() - t_eval) * 1000.0
         if not eval_points:
             return AutoTaggingResult(detected_tags=[], reasons={})
 
+        t_maps = time.perf_counter()
         eval_by_ply: Dict[int, float] = {int(ply): float(cp) for ply, cp in eval_points}
         plies_sorted = sorted(eval_by_ply.keys())
+        maps_ms = (time.perf_counter() - t_maps) * 1000.0
 
         def eval_at_or_after(ply: int) -> Optional[float]:
             for p in plies_sorted:
@@ -330,7 +338,22 @@ class GameAutoTaggingService:
                 ),
             )
 
-        return AutoTaggingResult(detected_tags=sorted(detected), reasons=reasons)
+        out = AutoTaggingResult(detected_tags=sorted(detected), reasons=reasons)
+        try:
+            total_ms = (time.perf_counter() - t0) * 1000.0
+            LoggingService.get_instance().debug(
+                "Auto-tagging timing: "
+                f"moves={len(moves)} "
+                f"eval_points={len(eval_points)} "
+                f"detected={len(out.detected_tags)} "
+                f"summary_ms={summary_ms:.1f} "
+                f"eval_extract_ms={eval_extract_ms:.1f} "
+                f"maps_ms={maps_ms:.1f} "
+                f"total_ms={total_ms:.1f}"
+            )
+        except Exception:
+            pass
+        return out
 
     def merge_with_existing_tags(self, existing_raw: str, detected: Iterable[str]) -> List[str]:
         """Replace any existing auto-tags with detected ones, keep all other tags."""

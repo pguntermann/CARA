@@ -409,7 +409,10 @@ class ManualAnalysisController:
         self._update_positional_plan()
         
         # Clear expected FEN - no longer expecting updates
-        self._expected_fen = None
+        # IMPORTANT: Do NOT clear _expected_fen here.
+        # We use _expected_fen as the current "target position" for the whole analysis session
+        # to reliably filter out late/stale engine updates from previous positions.
+        # It will be updated on each position change and cleared only when analysis stops.
     
     def _stop_service_in_background(self, keep_engine_alive: bool = False) -> None:
         """Stop analysis service in background (non-blocking).
@@ -583,12 +586,16 @@ class ManualAnalysisController:
             if engine:
                 engine_name = engine.name
         
-        # Format evaluation value
+        # Format evaluation value.
+        # Manual analysis engine thread already flips scores to White's perspective.
         if is_mate:
             if mate_moves > 0:
-                eval_str = f"M{mate_moves}"  # White mates
+                eval_str = f"M{mate_moves}"
+            elif mate_moves < 0:
+                eval_str = f"-M{abs(mate_moves)}"
             else:
-                eval_str = f"M{abs(mate_moves)}"  # Black mates
+                # Mate 0 (checkmate on board): derive winner from score sign.
+                eval_str = "M0" if centipawns >= 0 else "-M0"
         else:
             # Convert centipawns to pawns and format
             pawns = centipawns / 100.0

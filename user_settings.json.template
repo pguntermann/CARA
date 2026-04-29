@@ -876,7 +876,9 @@
       "shallow_depth_min": 3,
       "shallow_depth_max": 7,
       "min_depths_show_error": 3,
-      "candidate_selection": "best_move_only"
+      "candidate_selection": "best_move_only",
+      "exclude_already_winning_enabled": true,
+      "exclude_already_winning_threshold_cpl": 600
     }
   },
   "manual_analysis": {
@@ -1013,10 +1015,60 @@
   "player_stats_accuracy_distribution": {
     "skew_mode": "linear",
     "y_axis_mode": "count",
-    "bin_density": "more",
+    "bin_density": "auto",
     "color_preset": "amber",
     "distribution_line_curve": "smooth",
     "distribution_line_smooth_strength": 1.0,
     "x_axis_span": "full"
-  }
+  },
+  "player_stats_profiles": {
+    "Default": {
+      "player_stats_section_visibility": {
+        "overview": true,
+        "activity_heatmap": true,
+        "accuracy_distribution": true,
+        "move_accuracy": true,
+        "performance_by_phase": true,
+        "accuracy_vs_progress": true,
+        "accuracy_progression": true,
+        "move_quality_progression": true,
+        "acpl_phase_progression": true,
+        "openings": true,
+        "opening_tree": true,
+        "endgame_tree": true,
+        "games_by_performance": true,
+        "significant_moves": true,
+        "error_patterns": true
+      },
+      "player_stats_time_series": {
+        "target_progression_bins": 24,
+        "ordinal_fallback_mode": "equal_width",
+        "progression_x_axis_mode": "uniform_bins",
+        "compress_gap_max_segment_days": 14,
+        "progression_line_style": "smooth",
+        "progression_line_smooth_strength": 1.0
+      },
+      "player_stats_activity_heatmap": {
+        "week_starts_on": "sunday",
+        "color_preset": "ocean_blue",
+        "color_scale_max_mode": "auto",
+        "color_scale_max_fixed": 20,
+        "partial_dates": "include_stand_in",
+        "date_range": "games_12_months",
+        "show_day_numbers_in_cells": false,
+        "month_divider_mode": "week_anchor"
+      },
+      "player_stats_accuracy_distribution": {
+        "skew_mode": "linear",
+        "y_axis_mode": "count",
+        "bin_density": "auto",
+        "color_preset": "amber",
+        "distribution_line_curve": "smooth",
+        "distribution_line_smooth_strength": 1.0,
+        "x_axis_span": "full"
+      }
+    }
+  },
+  "player_stats_active_profile": "Default",
+  "player_stats_profile_order": []
 }

@@ -34,6 +34,7 @@ class EngineParametersService:
                     # Check write access to app root, fall back to user data directory if needed
                     cls._instance.parameters_path, _ = resolve_data_file_path("engine_parameters.json")
                     cls._instance._parameters: Dict[str, Any] = {}
+                    cls._instance._loaded: bool = False
         return cls._instance
     
     @classmethod
@@ -63,9 +64,14 @@ class EngineParametersService:
             Loaded parameters dictionary. If file doesn't exist, returns default parameters.
         """
         with self._lock:
+            # Idempotent: once loaded into memory, avoid repeated file I/O.
+            if bool(getattr(self, "_loaded", False)):
+                return self._parameters
+
             if not self.parameters_path.exists():
                 # File doesn't exist, return default parameters
                 self._parameters = self._deep_copy(self.DEFAULT_PARAMETERS)
+                self._loaded = True
                 return self._parameters
             
             try:
@@ -75,6 +81,7 @@ class EngineParametersService:
                 # Ensure parameters is a dictionary
                 if not isinstance(self._parameters, dict):
                     self._parameters = self._deep_copy(self.DEFAULT_PARAMETERS)
+                self._loaded = True
                 
                 # Log engine parameters loaded
                 logging_service = LoggingService.get_instance()
@@ -87,6 +94,7 @@ class EngineParametersService:
                 logging_service = LoggingService.get_instance()
                 logging_service.warning(f"Failed to load engine parameters: {e}. Using defaults.", exc_info=e)
                 self._parameters = self._deep_copy(self.DEFAULT_PARAMETERS)
+                self._loaded = True
                 return self._parameters
     
     def reload(self) -> Dict[str, Any]:
@@ -100,6 +108,7 @@ class EngineParametersService:
         with self._lock:
             # Clear cached parameters to force reload
             self._parameters = {}
+            self._loaded = False
             return self.load()
     
     def save(self, parameters: Optional[Dict[str, Any]] = None) -> bool:
@@ -114,6 +123,8 @@ class EngineParametersService:
         with self._lock:
             if parameters is not None:
                 self._parameters = parameters
+            # Persisting makes the in-memory state authoritative.
+            self._loaded = True
             
             try:
                 # Ensure directory exists
@@ -203,7 +214,7 @@ class EngineParametersService:
             Dictionary with task parameters (threads, depth, movetime, and engine-specific options).
         """
         service = EngineParametersService.get_instance()
-        service.load()  # Load if not already loaded
+        service.load()
         engine_path_str = str(engine_path)
         params = service.get_task_parameters(engine_path_str, task)
         

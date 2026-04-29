@@ -29,6 +29,8 @@ class MoveClassificationModel(QObject):
         self._min_depths_show_error: int = 3  # Min number of shallow depths that must show move as error
         self._shallow_error_classifications: List[str] = ["Mistake", "Blunder", "Miss"]  # Classifications that count as error at shallow depth (config-only)
         self._candidate_selection: str = "best_move_only"  # "best_move_only" or "best_or_good_move"
+        self._exclude_already_winning_enabled: bool = True
+        self._exclude_already_winning_threshold_cpl: int = 600
 
     # Assessment thresholds properties
     @property
@@ -72,6 +74,19 @@ class MoveClassificationModel(QObject):
         """Get candidate selection mode for brilliancy detection ("best_move_only" or "best_or_good_move")."""
         return self._candidate_selection
 
+    @property
+    def exclude_already_winning_enabled(self) -> bool:
+        """Whether to exclude brilliant candidates when side-to-move is already winning."""
+        return bool(self._exclude_already_winning_enabled)
+
+    @property
+    def exclude_already_winning_threshold_cpl(self) -> int:
+        """Absolute CPL threshold (normalized to side-to-move) that counts as 'already winning'."""
+        try:
+            return int(self._exclude_already_winning_threshold_cpl)
+        except Exception:
+            return 600
+
     def load_settings(self, assessment_thresholds: Dict[str, int], 
                       brilliant_criteria: Dict[str, Any]) -> None:
         """Load settings from dictionaries.
@@ -93,6 +108,12 @@ class MoveClassificationModel(QObject):
             brilliant_criteria.get("shallow_error_classifications", ["Mistake", "Blunder", "Miss"])
         )
         self._candidate_selection = brilliant_criteria.get("candidate_selection", "best_move_only")
+        self._exclude_already_winning_enabled = bool(
+            brilliant_criteria.get("exclude_already_winning_enabled", True)
+        )
+        self._exclude_already_winning_threshold_cpl = int(
+            brilliant_criteria.get("exclude_already_winning_threshold_cpl", 600)
+        )
 
         # Emit signal that settings changed
         self.settings_changed.emit()
@@ -148,6 +169,22 @@ class MoveClassificationModel(QObject):
             self._candidate_selection = criteria["candidate_selection"]
             changed = True
 
+        if (
+            "exclude_already_winning_enabled" in criteria
+            and bool(criteria["exclude_already_winning_enabled"]) != bool(self._exclude_already_winning_enabled)
+        ):
+            self._exclude_already_winning_enabled = bool(criteria["exclude_already_winning_enabled"])
+            changed = True
+
+        if "exclude_already_winning_threshold_cpl" in criteria:
+            try:
+                new_val = int(criteria["exclude_already_winning_threshold_cpl"])
+            except Exception:
+                new_val = self._exclude_already_winning_threshold_cpl
+            if new_val != self._exclude_already_winning_threshold_cpl:
+                self._exclude_already_winning_threshold_cpl = new_val
+                changed = True
+
         if changed:
             self.settings_changed.emit()
     
@@ -174,6 +211,8 @@ class MoveClassificationModel(QObject):
             "shallow_depth_max": self._shallow_depth_max,
             "min_depths_show_error": self._min_depths_show_error,
             "shallow_error_classifications": self._shallow_error_classifications,
-            "candidate_selection": self._candidate_selection
+            "candidate_selection": self._candidate_selection,
+            "exclude_already_winning_enabled": bool(self._exclude_already_winning_enabled),
+            "exclude_already_winning_threshold_cpl": int(self._exclude_already_winning_threshold_cpl),
         }
 

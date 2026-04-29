@@ -327,8 +327,6 @@ class ClassificationSettingsDialog(QDialog):
     def showEvent(self, event: QShowEvent) -> None:
         """Refresh values from model when shown (e.g. if changed elsewhere)."""
         super().showEvent(event)
-        self._apply_configured_dialog_size()
-        
         # Refresh values from model in case they were changed elsewhere
         classification_model = self.classification_controller.get_classification_model()
         self.current_thresholds = classification_model.get_assessment_thresholds()
@@ -347,6 +345,27 @@ class ClassificationSettingsDialog(QDialog):
         
         # Update CPL scale
         self._update_cpl_scale()
+        # Scholar/light theme can slightly change group-box content metrics/padding,
+        # so after the layout is realized we sync both columns to the same pixel height.
+        self._sync_group_box_heights()
+        self._apply_configured_dialog_size()
+    
+    def _sync_brilliant_group_height(self) -> None:
+        """Legacy helper (unused)."""
+        return
+
+    def _sync_group_box_heights(self) -> None:
+        """Force both group boxes to share the same height (pixel-accurate post-layout)."""
+        if not hasattr(self, "_thresholds_group") or not hasattr(self, "_brilliant_group"):
+            return
+        if self._thresholds_group is None or self._brilliant_group is None:
+            return
+
+        desired = max(self._thresholds_group.height(), self._brilliant_group.height())
+        self._thresholds_group.setMinimumHeight(desired)
+        self._brilliant_group.setMinimumHeight(desired)
+        self._thresholds_group.updateGeometry()
+        self._brilliant_group.updateGeometry()
     
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
@@ -363,20 +382,42 @@ class ClassificationSettingsDialog(QDialog):
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
         between_sections = layout_spacing + section_spacing
+
+        # Two-column layout to reduce height:
+        # - Left: Move Quality Thresholds + CPL Scale
+        # - Right: Brilliant Move Criteria
+        columns_layout = QHBoxLayout()
+        columns_layout.setContentsMargins(0, 0, 0, 0)
+        # Give visible horizontal breathing room between columns.
+        columns_layout.setSpacing(max(layout_spacing, section_spacing))
+        columns_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         
-        # Move Quality Thresholds group
-        thresholds_group = self._create_thresholds_group()
-        layout.addWidget(thresholds_group)
-        layout.addSpacing(between_sections)
+        left_column_layout = QVBoxLayout()
+        left_column_layout.setSpacing(between_sections)
+        left_column_layout.setContentsMargins(0, 0, 0, 0)
+        left_column_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         
-        # CPL Scale visualization
         self.cpl_scale_widget = self._create_cpl_scale_widget()
-        layout.addWidget(self.cpl_scale_widget)
-        layout.addSpacing(between_sections)
         
-        # Brilliant Move Criteria group
+        thresholds_group = self._create_thresholds_group(cpl_scale_widget=self.cpl_scale_widget)
+        left_column_layout.addWidget(thresholds_group)
+        self._thresholds_group = thresholds_group
+        
+        left_column_layout.addStretch(1)
+        
+        right_column_layout = QVBoxLayout()
+        right_column_layout.setSpacing(0)
+        right_column_layout.setContentsMargins(0, 0, 0, 0)
+        right_column_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        
         brilliant_group = self._create_brilliant_group()
-        layout.addWidget(brilliant_group)
+        self._brilliant_group = brilliant_group
+        right_column_layout.addWidget(brilliant_group)
+        right_column_layout.addStretch(1)
+        
+        columns_layout.addLayout(left_column_layout, 1)
+        columns_layout.addLayout(right_column_layout, 1)
+        layout.addLayout(columns_layout)
         
         # Buttons
         button_layout = QHBoxLayout()
@@ -400,7 +441,7 @@ class ClassificationSettingsDialog(QDialog):
         layout.addSpacing(self.bottom_button_top_padding)
         layout.addLayout(button_layout)
     
-    def _create_thresholds_group(self) -> QGroupBox:
+    def _create_thresholds_group(self, cpl_scale_widget: Optional[CPLScaleWidget] = None) -> QGroupBox:
         """Create the Move Quality Thresholds group box."""
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('classification_settings', {})
         groups_config = dialog_config.get('groups', {})
@@ -463,7 +504,16 @@ class ClassificationSettingsDialog(QDialog):
         # Initialize spinbox ranges after all spinboxes are created
         self._update_spinbox_ranges()
         
-        group.setLayout(form_layout)
+        if cpl_scale_widget is not None:
+            # Embed CPL graph at the top for visual consistency.
+            outer_layout = QVBoxLayout()
+            outer_layout.setContentsMargins(0, 0, 0, 0)
+            outer_layout.setSpacing(10)
+            outer_layout.addWidget(cpl_scale_widget)
+            outer_layout.addLayout(form_layout)
+            group.setLayout(outer_layout)
+        else:
+            group.setLayout(form_layout)
         return group
     
     def _create_cpl_scale_widget(self) -> CPLScaleWidget:
@@ -647,11 +697,54 @@ class ClassificationSettingsDialog(QDialog):
         self.candidate_selection_combobox.addItems(["Best Move only", "Best or Good Move"])
         candidate_selection = self.current_brilliant.get("candidate_selection", "best_move_only")
         self.candidate_selection_combobox.setCurrentIndex(0 if candidate_selection == "best_move_only" else 1)
-        # Make combobox wider to display full "Best or Good Move" text (about 75% wider)
-        combobox_width = int(input_width * 1.75)
+        # Make combobox wider to display full "Best or Good Move" text.
+        # In two-column layout this previously truncated on some DPI/theme combinations.
+        combobox_width = int(input_width * 2.0)
         self.candidate_selection_combobox.setFixedWidth(combobox_width)
         self.candidate_selection_combobox.setToolTip(wrap_tooltip_text("Choose which candidate moves to check for brilliancy detection. Selecting \"Best or Good Move\" may increase detection time."))
         form_layout.addRow(create_label("Move Candidate:"), create_combobox_widget(self.candidate_selection_combobox))
+
+        # Exclude already winning (pre-move, normalized to side-to-move)
+        self.exclude_already_winning_checkbox = QCheckBox()
+        self.exclude_already_winning_checkbox.setChecked(
+            bool(self.current_brilliant.get("exclude_already_winning_enabled", True))
+        )
+        self.exclude_already_winning_checkbox.setToolTip(
+            wrap_tooltip_text(
+                "When enabled, a move will not be considered for brilliant detection if the side to move is already winning by at least the configured threshold (pre-move evaluation, normalized by color)."
+            )
+        )
+        form_layout.addRow(
+            create_label("Exclude already winning:"),
+            create_checkbox_widget(self.exclude_already_winning_checkbox),
+        )
+
+        self.exclude_already_winning_threshold_spinbox = QSpinBox()
+        self.exclude_already_winning_threshold_spinbox.setRange(0, 10000)
+        self.exclude_already_winning_threshold_spinbox.setValue(
+            int(self.current_brilliant.get("exclude_already_winning_threshold_cpl", 600))
+        )
+        self.exclude_already_winning_threshold_spinbox.setFixedWidth(input_width)
+        self.exclude_already_winning_threshold_spinbox.setToolTip(
+            wrap_tooltip_text(
+                "Absolute centipawn threshold. The detection logic normalizes this to the side playing the move (so it applies equally to White and Black)."
+            )
+        )
+        form_layout.addRow(
+            create_label("Winning threshold (CPL):"),
+            create_input_widget(self.exclude_already_winning_threshold_spinbox),
+        )
+
+        def _sync_exclude_winning_enabled() -> None:
+            try:
+                self.exclude_already_winning_threshold_spinbox.setEnabled(
+                    bool(self.exclude_already_winning_checkbox.isChecked())
+                )
+            except Exception:
+                pass
+
+        self.exclude_already_winning_checkbox.stateChanged.connect(lambda _s: _sync_exclude_winning_enabled())
+        _sync_exclude_winning_enabled()
         
         group.setLayout(form_layout)
         return group
@@ -795,7 +888,12 @@ class ClassificationSettingsDialog(QDialog):
         
         # Use input border and background colors for checkbox indicator
         input_border_color = widget_border_color
-        input_bg_color = [dialog_bg_color[0] + input_background_offset, dialog_bg_color[1] + input_background_offset, dialog_bg_color[2] + input_background_offset]
+        # Clamp to valid 0..255 range to avoid QColor::fromRgb warnings on bright themes.
+        input_bg_color = [
+            max(0, min(255, int(dialog_bg_color[0] + input_background_offset))),
+            max(0, min(255, int(dialog_bg_color[1] + input_background_offset))),
+            max(0, min(255, int(dialog_bg_color[2] + input_background_offset))),
+        ]
         
         # Get font family from fields config
         fields_config = dialog_config.get('fields', {})
@@ -930,6 +1028,14 @@ class ClassificationSettingsDialog(QDialog):
         self.min_depths_show_error_spinbox.setValue(brilliant.get("min_depths_show_error", 3))
         candidate_selection = brilliant.get("candidate_selection", "best_move_only")
         self.candidate_selection_combobox.setCurrentIndex(0 if candidate_selection == "best_move_only" else 1)
+        if hasattr(self, "exclude_already_winning_checkbox"):
+            self.exclude_already_winning_checkbox.setChecked(
+                bool(brilliant.get("exclude_already_winning_enabled", True))
+            )
+        if hasattr(self, "exclude_already_winning_threshold_spinbox"):
+            self.exclude_already_winning_threshold_spinbox.setValue(
+                int(brilliant.get("exclude_already_winning_threshold_cpl", 600))
+            )
         
         # Hide progress bar and set final status through controller
         self.controller.hide_progress()
@@ -962,7 +1068,17 @@ class ClassificationSettingsDialog(QDialog):
                 "shallow_depth_min": self.shallow_depth_min_spinbox.value(),
                 "shallow_depth_max": self.shallow_depth_max_spinbox.value(),
                 "min_depths_show_error": self.min_depths_show_error_spinbox.value(),
-                "candidate_selection": "best_move_only" if self.candidate_selection_combobox.currentIndex() == 0 else "best_or_good_move"
+                "candidate_selection": "best_move_only" if self.candidate_selection_combobox.currentIndex() == 0 else "best_or_good_move",
+                "exclude_already_winning_enabled": bool(
+                    self.exclude_already_winning_checkbox.isChecked()
+                    if hasattr(self, "exclude_already_winning_checkbox")
+                    else True
+                ),
+                "exclude_already_winning_threshold_cpl": int(
+                    self.exclude_already_winning_threshold_spinbox.value()
+                    if hasattr(self, "exclude_already_winning_threshold_spinbox")
+                    else 600
+                ),
             }
         
         # Save via classification controller

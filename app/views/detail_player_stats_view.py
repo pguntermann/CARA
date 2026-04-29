@@ -835,6 +835,79 @@ def _smooth_polyline_path(run: List[QPointF], *, strength: float = 1.0) -> Optio
     return path
 
 
+def _closest_point_on_segment(p: QPointF, a: QPointF, b: QPointF) -> Tuple[QPointF, float]:
+    """Return (closest_point, distance_squared) on segment a-b to point p."""
+    vx = b.x() - a.x()
+    vy = b.y() - a.y()
+    wx = p.x() - a.x()
+    wy = p.y() - a.y()
+    c1 = wx * vx + wy * vy
+    c2 = vx * vx + vy * vy
+    if c2 <= 0:
+        cx, cy = a.x(), a.y()
+    elif c1 <= 0:
+        cx, cy = a.x(), a.y()
+    elif c1 >= c2:
+        cx, cy = b.x(), b.y()
+    else:
+        t = c1 / c2
+        cx = a.x() + t * vx
+        cy = a.y() + t * vy
+    dx = p.x() - cx
+    dy = p.y() - cy
+    return QPointF(cx, cy), dx * dx + dy * dy
+
+
+def _sample_count_for_path(*, n_hint: int, base: int, per_point: int, cap: int) -> int:
+    n_hint = max(0, int(n_hint))
+    return max(base, min(cap, n_hint * per_point))
+
+
+def _closest_point_on_painter_path(
+    p: QPointF, path: QPainterPath, *, n_hint: int = 0
+) -> Tuple[Optional[QPointF], float]:
+    """Approximate closest point on a QPainterPath by sampling.
+
+    Qt doesn't provide an exact point-to-path distance API. For our usage (hover indicator),
+    the path is short, so sampling is fast and keeps the circle on the rendered curve.
+    """
+    try:
+        n_samples = _sample_count_for_path(n_hint=n_hint, base=80, per_point=18, cap=520)
+        best_dist_sq = float("inf")
+        best_pt: Optional[QPointF] = None
+        prev: Optional[QPointF] = None
+        for i in range(n_samples + 1):
+            t = float(i) / float(n_samples)
+            pt = path.pointAtPercent(t)
+            if prev is not None:
+                closest, dist_sq = _closest_point_on_segment(p, prev, pt)
+                if dist_sq < best_dist_sq:
+                    best_dist_sq = dist_sq
+                    best_pt = closest
+            prev = pt
+        return best_pt, best_dist_sq
+    except Exception:
+        return None, float("inf")
+
+
+def _painter_path_y_at_x(path: QPainterPath, x: float, *, n_hint: int = 0) -> Optional[float]:
+    """Approximate the curve y-value at a given plot x by sampling the path."""
+    try:
+        n_samples = _sample_count_for_path(n_hint=n_hint, base=80, per_point=22, cap=520)
+        best_dx = float("inf")
+        best_y: Optional[float] = None
+        for i in range(n_samples + 1):
+            t = float(i) / float(n_samples)
+            pt = path.pointAtPercent(t)
+            dx = abs(pt.x() - x)
+            if dx < best_dx:
+                best_dx = dx
+                best_y = float(pt.y())
+        return best_y
+    except Exception:
+        return None
+
+
 def _x_axis_week_minors_in_month_mode(
     chart_cfg: Dict[str, Any], span_days: int, week_ticks_base_enabled: bool
 ) -> bool:
@@ -1739,14 +1812,27 @@ class AccuracyOverTimeChartWidget(QWidget):
         best_dist_sq = float("inf")
         best_pixel: Optional[QPointF] = None
         best_vertex: Optional[int] = None
-        for i in range(len(points) - 1):
-            closest, dist_sq = self._closest_point_on_segment(mp, points[i], points[i + 1])
-            if dist_sq < best_dist_sq:
-                best_dist_sq = dist_sq
-                best_pixel = closest
-                d_i = (closest.x() - points[i].x()) ** 2 + (closest.y() - points[i].y()) ** 2
-                d_j = (closest.x() - points[i + 1].x()) ** 2 + (closest.y() - points[i + 1].y()) ** 2
-                best_vertex = i if d_i <= d_j else i + 1
+
+        # If we draw a smoothed curve, hit-test against that curve so the circle stays on the line.
+        if self._progression_line_smooth and self._line_style == Qt.PenStyle.SolidLine:
+            spath = _smooth_polyline_path(points, strength=self._progression_line_smooth_strength)
+            if spath is not None:
+                best_pixel, best_dist_sq = _closest_point_on_painter_path(mp, spath, n_hint=len(points))
+                if best_pixel is not None:
+                    # Tooltip stays bin-based; pick the nearest vertex to the closest point.
+                    best_vertex = min(
+                        range(len(points)),
+                        key=lambda i: (best_pixel.x() - points[i].x()) ** 2 + (best_pixel.y() - points[i].y()) ** 2,
+                    )
+        if best_pixel is None:
+            for i in range(len(points) - 1):
+                closest, dist_sq = self._closest_point_on_segment(mp, points[i], points[i + 1])
+                if dist_sq < best_dist_sq:
+                    best_dist_sq = dist_sq
+                    best_pixel = closest
+                    d_i = (closest.x() - points[i].x()) ** 2 + (closest.y() - points[i].y()) ** 2
+                    d_j = (closest.x() - points[i + 1].x()) ** 2 + (closest.y() - points[i + 1].y()) ** 2
+                    best_vertex = i if d_i <= d_j else i + 1
         if best_dist_sq <= threshold_sq and best_pixel is not None and best_vertex is not None:
             self._hover_pixel = best_pixel
             self._hover_vertex_index = best_vertex
@@ -2305,6 +2391,10 @@ class MoveQualityOverTimeChartWidget(QWidget):
                 painter.drawEllipse(run[0], r, r)
                 painter.setBrush(Qt.BrushStyle.NoBrush)
 
+        # Cache the per-series point runs we actually draw, so hover circles can reuse them
+        # without rebuilding + re-smoothing every paint call (avoids jerkiness).
+        series_runs: List[List[QPointF]] = [[] for _ in range(n_series)]
+
         if self._chart_style == "acpl_phase":
             # One polyline per phase over all bins that have a finite value (sparse endgame: skip
             # calendar gaps instead of breaking the line into invisible single-point runs).
@@ -2324,6 +2414,7 @@ class MoveQualityOverTimeChartWidget(QWidget):
                     py = bottom - ((v - min_y) / y_range * graph_height) if y_range > 0 else bottom
                     py = max(top, min(bottom, py))
                     run.append(QPointF(x, py))
+                series_runs[j] = list(run)
                 _flush_run(col, line_style, line_width, run)
         else:
             all_points: List[List[QPointF]] = [[] for _ in range(n_series)]
@@ -2340,6 +2431,7 @@ class MoveQualityOverTimeChartWidget(QWidget):
 
             for j in range(n_series):
                 points = all_points[j]
+                series_runs[j] = list(points)
                 col, line_style, line_width = (
                     self._series_visuals[j] if j < len(self._series_visuals) else self._default_pen
                 )
@@ -2377,11 +2469,25 @@ class MoveQualityOverTimeChartWidget(QWidget):
                 acc = self._hover_values[j]
                 if self._chart_style == "acpl_phase" and not math.isfinite(acc):
                     continue
-                hy = bottom - ((acc - min_y) / y_range * graph_height) if y_range > 0 else bottom
-                hy = max(top, min(bottom, hy))
                 col, line_style, lw = (
                     self._series_visuals[j] if j < len(self._series_visuals) else self._default_pen
                 )
+                # When this series is drawn with a smoothed path, place the hover circle on the curve.
+                # Otherwise fall back to value-based y (linear interpolation).
+                hy: float
+                hy_from_curve: Optional[float] = None
+                if self._progression_line_smooth and line_style == Qt.PenStyle.SolidLine:
+                    run = series_runs[j] if 0 <= j < len(series_runs) else []
+                    if len(run) >= 2:
+                        spath = _smooth_polyline_path(run, strength=self._progression_line_smooth_strength)
+                        if spath is not None:
+                            hy_from_curve = _painter_path_y_at_x(spath, hx, n_hint=len(run))
+                if hy_from_curve is not None:
+                    hy = float(hy_from_curve)
+                else:
+                    hy = bottom - ((acc - min_y) / y_range * graph_height) if y_range > 0 else bottom
+                    hy = max(top, min(bottom, hy))
+                hy = max(top, min(bottom, hy))
                 hover_pen = QPen(col, max(2, lw))
                 hover_pen.setStyle(line_style)
                 painter.setPen(hover_pen)
@@ -2619,6 +2725,10 @@ class DetailPlayerStatsView(QWidget):
         self._stats_recalculation_ui_pending = False
 
         self._player_stats_section_wrappers: Dict[str, QWidget] = {}
+        # Body-only sections add a separate QSpacerItem for bottom spacing; keep a handle so
+        # we can collapse that space when the section is hidden (otherwise large gaps remain).
+        self._player_stats_section_spacers: Dict[str, Tuple[Any, int]] = {}
+        self._bottom_stretch_item: Optional[Any] = None
         self._section_visibility_prefs: Dict[str, bool] = {}
         self._player_stats_menu_actions: Optional[Dict[str, Any]] = None
         self._player_stats_visibility_hint_label: Optional[QLabel] = None
@@ -2786,6 +2896,9 @@ class DetailPlayerStatsView(QWidget):
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        # NOTE: On macOS, applying a new stylesheet during theme switching can reset the
+        # scroll-area alignment briefly; we re-assert it again after styling below.
+        self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         
         # Get background color for scroll area - use pane_background from tabs config
         tabs_config = panel_config.get('tabs', {})
@@ -2803,15 +2916,28 @@ class DetailPlayerStatsView(QWidget):
             border_color,
             0  # No border radius
         )
+        # Re-assert alignment after styling (macOS can reset it on repolish).
+        try:
+            self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        except Exception:
+            pass
         
         # Content widget
         self.content_widget = QWidget()
         # Set minimum width to 0 to allow proper shrinking
         self.content_widget.setMinimumWidth(0)
-        self.content_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        # Important: keep the widget vertically expanding so that when only the selection header is
+        # present (e.g. during recalculation), the content stays anchored at the top of the viewport
+        # instead of the whole widget being vertically centered (observed on macOS).
+        self.content_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.content_layout = QVBoxLayout(self.content_widget)
         self.content_layout.setContentsMargins(margins[0], margins[1], margins[2], margins[3])
         self.content_layout.setSpacing(spacing)
+        try:
+            self.content_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        except Exception:
+            pass
+        self._ensure_bottom_stretch()
         
         self.scroll_area.setWidget(self.content_widget)
         layout.addWidget(self.scroll_area)
@@ -2932,6 +3058,12 @@ class DetailPlayerStatsView(QWidget):
     def _handle_stats_recalculation_started(self) -> None:
         self._stats_recalculation_ui_pending = True
         self._sync_player_stats_activity_label()
+        # During theme switches the view can briefly show only the header + activity label.
+        # Ensure scroll alignment and clamping are applied in that transient state too.
+        try:
+            QTimer.singleShot(0, self._sync_bottom_stretch)
+        except Exception:
+            pass
 
     def _handle_bulk_analysis_blocks_stats_changed(self, blocking: bool) -> None:
         self._bulk_analysis_blocks_stats_ui = bool(blocking)
@@ -3165,18 +3297,154 @@ class DetailPlayerStatsView(QWidget):
         body.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         body.setProperty("player_stats_section_id", section_id)
         self.content_layout.addWidget(body)
-        self.content_layout.addSpacing(int(bottom_spacing_px))
+        # Use an explicit spacer item so we can collapse it when hidden.
+        from PyQt6.QtWidgets import QSpacerItem
+
+        h = int(bottom_spacing_px)
+        spacer = QSpacerItem(0, h, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        self.content_layout.addItem(spacer)
+        self._player_stats_section_spacers[str(section_id)] = (spacer, h)
         self._player_stats_section_wrappers[str(section_id)] = body
 
     def apply_player_stats_section_visibility_after_build(self) -> None:
         """Apply saved visibility to wrappers built in this session."""
         for sid, w in list(self._player_stats_section_wrappers.items()):
             try:
-                w.setVisible(self._player_stats_section_pref_visible(sid))
+                vis = bool(self._player_stats_section_pref_visible(sid))
+                try:
+                    # Only clamp height when hiding.
+                    #
+                    # Rationale: Several Player Stats sections (notably the Activity heatmap) have
+                    # height-for-width dependent layouts. Their `sizeHint()` can change after the
+                    # scroll-area viewport width stabilizes (or after theme/font changes). Clamping
+                    # the visible section to an early `sizeHint().height()` can permanently truncate
+                    # the content until a later action forces a rebuild.
+                    w.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+                    if vis:
+                        w.setMaximumHeight(16777215)
+                    else:
+                        w.setMaximumHeight(0)
+                except Exception:
+                    pass
+                w.setVisible(vis)
+                sp = self._player_stats_section_spacers.get(str(sid))
+                if sp:
+                    spacer, h = sp
+                    try:
+                        spacer.changeSize(0, h if vis else 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+                    except Exception:
+                        pass
             except RuntimeError:
                 pass
+        try:
+            self.content_layout.invalidate()
+            if hasattr(self, "content_widget") and self.content_widget:
+                self.content_widget.updateGeometry()
+        except Exception:
+            pass
         self._update_all_sections_hidden_placeholder()
         self._sync_player_stats_menu_actions()
+        self._ensure_bottom_stretch()
+        try:
+            self._sync_bottom_stretch()
+        except Exception:
+            pass
+
+    def _ensure_bottom_stretch(self) -> None:
+        """Ensure a bottom spacer exists and is sized appropriately.
+
+        We want top-aligned content when the stats are short (consume slack at bottom),
+        but we *do not* want a scrollable blank gap when content is taller than the viewport.
+        """
+        try:
+            from PyQt6.QtWidgets import QSpacerItem
+
+            lay = getattr(self, "content_layout", None)
+            if lay is None:
+                return
+
+            spacer = getattr(self, "_bottom_stretch_item", None)
+            if spacer is None:
+                spacer = QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+                lay.addItem(spacer)
+                self._bottom_stretch_item = spacer
+
+            self._sync_bottom_stretch()
+        except Exception:
+            pass
+
+    def _sync_bottom_stretch(self) -> None:
+        """Toggle bottom spacer expansion based on content vs viewport height."""
+        spacer = getattr(self, "_bottom_stretch_item", None)
+        lay = getattr(self, "content_layout", None)
+        sa = getattr(self, "scroll_area", None)
+        if spacer is None or lay is None or sa is None:
+            return
+        # Be defensive: during theme switches / restyling some platform styles can reset scroll-area
+        # alignment; keep short content pinned to the top when we clamp the content widget height.
+        try:
+            sa.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        except Exception:
+            pass
+        # When the disabled placeholder is visible, it should be able to expand and
+        # center itself within the viewport. Do not consume slack with the bottom spacer.
+        try:
+            ph = getattr(self, "disabled_placeholder", None)
+            if ph is not None and hasattr(ph, "isVisible") and ph.isVisible():
+                expand = False
+                spacer.changeSize(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+                lay.invalidate()
+                if hasattr(self, "content_widget") and self.content_widget:
+                    # Allow the content widget to fill the viewport so the placeholder can center.
+                    try:
+                        self.content_widget.setMinimumHeight(0)
+                        self.content_widget.setMaximumHeight(16777215)
+                    except Exception:
+                        pass
+                    self.content_widget.updateGeometry()
+                return
+        except Exception:
+            pass
+        try:
+            viewport_h = int(sa.viewport().height()) if sa.viewport() else 0
+        except Exception:
+            viewport_h = 0
+        try:
+            content_h = int(lay.sizeHint().height())
+        except Exception:
+            content_h = 0
+
+        # If content is taller than viewport, do not add any scrollable blank gap.
+        expand = bool(viewport_h > 0 and content_h > 0 and content_h < viewport_h)
+        try:
+            spacer.changeSize(
+                0,
+                0,
+                QSizePolicy.Policy.Minimum,
+                QSizePolicy.Policy.Expanding if expand else QSizePolicy.Policy.Fixed,
+            )
+            # With setWidgetResizable(True) Qt will stretch the content widget to viewport height.
+            # When content is shorter, we *want* the content widget to fill the viewport so the
+            # top section stays pinned at the top even if some platform/style temporarily resets
+            # QScrollArea alignment (observed on macOS during theme hot-switching).
+            #
+            # Extra space is consumed by the bottom spacer, so we still avoid gaps between items.
+            if hasattr(self, "content_widget") and self.content_widget:
+                try:
+                    if expand and content_h > 0:
+                        # Fill the viewport; leave maximum unconstrained.
+                        self.content_widget.setMinimumHeight(max(0, viewport_h))
+                        self.content_widget.setMaximumHeight(16777215)
+                    else:
+                        self.content_widget.setMinimumHeight(0)
+                        self.content_widget.setMaximumHeight(16777215)
+                except Exception:
+                    pass
+            lay.invalidate()
+            if hasattr(self, "content_widget") and self.content_widget:
+                self.content_widget.updateGeometry()
+        except Exception:
+            pass
 
     def _some_player_stats_section_hidden_in_prefs(self) -> bool:
         return any(not self._player_stats_section_pref_visible(sid) for sid, _ in PLAYER_STATS_MENU_SECTIONS)
@@ -3258,6 +3526,43 @@ class DetailPlayerStatsView(QWidget):
             lbl.hide()
             return
         lbl.setText(full)
+        # Ensure the hint label sizes to its wrapped text (no giant empty band).
+        # We must base this on the current available width; otherwise QLabel can report a
+        # very large height depending on when sizeHint() is queried.
+        try:
+            lbl.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+            lbl.setMinimumHeight(0)
+            lbl.setMaximumHeight(16777215)
+            # Compute available width from the scroll area's viewport minus layout margins.
+            avail_w = 0
+            sa = getattr(self, "scroll_area", None)
+            lay = getattr(self, "content_layout", None)
+            try:
+                if sa is not None and sa.viewport() is not None:
+                    avail_w = int(sa.viewport().width())
+            except Exception:
+                avail_w = 0
+            try:
+                if avail_w and lay is not None:
+                    m = lay.contentsMargins()
+                    avail_w = int(avail_w - m.left() - m.right())
+            except Exception:
+                pass
+            if avail_w > 0:
+                lbl.setFixedWidth(avail_w)
+                # For word-wrapped QLabel the correct height depends on width.
+                # `heightForWidth()` is more reliable than `sizeHint()` here.
+                try:
+                    h = int(lbl.heightForWidth(avail_w))
+                except Exception:
+                    h = 0
+                if h <= 0:
+                    lbl.adjustSize()
+                    h = int(lbl.sizeHint().height())
+                if h > 0:
+                    lbl.setFixedHeight(h)
+        except Exception:
+            pass
         lbl.setVisible(True)
 
     def _update_all_sections_hidden_placeholder(self) -> None:
@@ -3289,6 +3594,7 @@ class DetailPlayerStatsView(QWidget):
         Also removes spacing items to prevent accumulation.
         """
         self._player_stats_section_wrappers.clear()
+        self._player_stats_section_spacers.clear()
         self._player_stats_visibility_hint_label = None
         # Clear stored widget references first to prevent access to deleted widgets
         self._move_accuracy_widget = None
@@ -3303,6 +3609,8 @@ class DetailPlayerStatsView(QWidget):
         self._endgame_tree_widget = None
         self._endgame_tree_decrease_button = None
         self._endgame_tree_increase_button = None
+
+        # Keep bottom stretch item; it is not part of section wrappers.
         
         # Find player selection widget index
         player_selection_index = -1
@@ -3454,7 +3762,8 @@ class DetailPlayerStatsView(QWidget):
             hint_label = QLabel("")
             hint_label.setWordWrap(True)
             hint_label.setMinimumWidth(0)
-            hint_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Maximum)
+            # Do not let the hint label soak up vertical slack in the scroll area.
+            hint_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
             hint_label.setFont(QFont(resolve_font_family(fam), hint_fs))
             hint_label.setStyleSheet(
                 f"color: rgb({hr}, {hg}, {hb}); background: transparent; border: none;"
@@ -3839,6 +4148,13 @@ class DetailPlayerStatsView(QWidget):
             # trailing stretch or stretch on a hidden placeholder would consume that space as a gap.
             # When visible (no stats / all sections hidden), Expanding size policy lets the label fill.
             self.content_layout.addWidget(self.disabled_placeholder, 0)
+
+        # Ensure excess height is always consumed at the bottom.
+        self._ensure_bottom_stretch()
+        try:
+            self._sync_bottom_stretch()
+        except Exception:
+            pass
     
     def _create_player_selection_section(self) -> None:
         """Create the player selection section."""
@@ -3875,6 +4191,10 @@ class DetailPlayerStatsView(QWidget):
                 border-radius: {border_radius}px;
             }}
         """)
+        # Prevent the selection header from soaking up extra vertical space when
+        # only a small number of sections are visible.
+        container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        container.setMinimumHeight(0)
         
         layout = QVBoxLayout(container)
         layout.setContentsMargins(section_margins[0], section_margins[1], section_margins[2], section_margins[3])
@@ -4597,7 +4917,8 @@ class DetailPlayerStatsView(QWidget):
         
         # Allow widget to expand horizontally to use available space
         # This ensures KPIs can move to the left when width is reduced
-        widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        # Overview is a compact KPI block; it should never absorb leftover viewport height.
+        widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         # Set minimum width to 0 to allow proper shrinking
         widget.setMinimumWidth(0)
         
@@ -4663,12 +4984,11 @@ class DetailPlayerStatsView(QWidget):
         # Remove any default styling that might add borders
         grid_widget.setStyleSheet("QWidget { border: none; background: transparent; }")
         grid_widget.setLayout(grid)
-        grid_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        grid_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         # Set minimum width to 0 so it can shrink when needed
         grid_widget.setMinimumWidth(0)
         
         layout.addWidget(grid_widget)  # Grid widget expands to fill available space
-        layout.addStretch()
         
         return widget
 
@@ -6747,6 +7067,10 @@ class DetailPlayerStatsView(QWidget):
         finally:
             self._updating_visibility = False
         self._debug_player_stats_horizontal_scroll_after_resize()
+        try:
+            self._sync_bottom_stretch()
+        except Exception:
+            pass
 
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
         """Event filter to monitor width changes for responsive layout."""
@@ -6757,6 +7081,21 @@ class DetailPlayerStatsView(QWidget):
             # Debounce: one coalesced update after resizes settle (avoids 0xc00000fd during bulk analysis)
             self._resize_debounce_timer.stop()
             self._resize_debounce_timer.start(self._resize_debounce_ms)
+        elif obj == self.scroll_area and event.type() in {
+            QEvent.Type.StyleChange,
+            QEvent.Type.Polish,
+            QEvent.Type.PolishRequest,
+        }:
+            # Theme switches trigger repolish; keep the scroll content pinned to the top immediately,
+            # so the selection header doesn't momentarily appear centered in the viewport on macOS.
+            try:
+                self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+            except Exception:
+                pass
+            try:
+                QTimer.singleShot(0, self._sync_bottom_stretch)
+            except Exception:
+                pass
         return super().eventFilter(obj, event)
     
     def _ensure_player_stats_time_series_context_menu_controller(self) -> None:

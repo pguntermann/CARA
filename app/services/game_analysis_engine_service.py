@@ -11,6 +11,26 @@ from app.services.uci_communication_service import UCICommunicationService
 from app.services.logging_service import LoggingService
 
 
+class GameAnalysisRequestHandle(QObject):
+    """Per-request handle for a queued analysis.
+
+    - `analysis_complete` is dedicated to this request (safe to connect/disconnect per request)
+    - `progress_update` and `error_occurred` are exposed from the persistent thread so
+      existing callers (bulk analysis) continue to work without modification.
+    """
+
+    analysis_complete = pyqtSignal(
+        float, bool, int, str, str, str, str, float, float, float, float, int, int, int, str
+    )
+
+    def __init__(self, thread: "GameAnalysisEngineThread") -> None:
+        super().__init__()
+        # Expose thread signals for backwards compatibility.
+        self.progress_update = thread.progress_update
+        self.error_occurred = thread.error_occurred
+        self._request: Optional["AnalysisRequest"] = None
+
+
 class AnalysisRequest:
     """Request for analyzing a position."""
     def __init__(self, fen: str, move_number: int, progress_interval_ms: int = 500):
@@ -19,6 +39,7 @@ class AnalysisRequest:
         self.progress_interval_ms = progress_interval_ms
         self.completed = False
         self.result: Optional[Tuple[float, bool, int, str, str, int, int]] = None
+        self.handle: Optional[GameAnalysisRequestHandle] = None
 
 
 class GameAnalysisEngineThread(QThread):
@@ -348,6 +369,27 @@ class GameAnalysisEngineThread(QThread):
                     LoggingService.get_instance().debug(
                         f"[Game analysis complete] move_number={request.move_number} side_to_move={side} eval={final_score:.1f} pv2={pv2_score:.1f} pv3={pv3_score:.1f}"
                     )
+                    try:
+                        if getattr(request, "handle", None) is not None:
+                            request.handle.analysis_complete.emit(
+                                final_score,
+                                final_is_mate,
+                                final_mate_moves,
+                                best_move_san,
+                                pv1_string,
+                                pv2_move_san,
+                                pv3_move_san,
+                                pv2_score,
+                                pv3_score,
+                                pv2_score_black,
+                                pv3_score_black,
+                                self._current_depth,
+                                self._current_seldepth,
+                                self._current_nps,
+                                self.engine_name,
+                            )
+                    except Exception:
+                        pass
                     self.analysis_complete.emit(
                         final_score,
                         final_is_mate,
@@ -576,8 +618,9 @@ class GameAnalysisEngineService(QObject):
         # Start thread
         self.analysis_thread.start()
         
-        # Wait for thread to initialize engine (check if running flag is set)
-        # Use processEvents() to keep UI responsive while waiting
+        # Wait for thread to initialize engine (check if running flag is set).
+        # Do not pump the Qt event loop from worker threads (can cause re-entrancy and crashes).
+        from PyQt6.QtCore import QCoreApplication
         from PyQt6.QtWidgets import QApplication
         start_time = time.time()
         timeout = 10.0  # Increased timeout for slow host environments
@@ -586,8 +629,13 @@ class GameAnalysisEngineService(QObject):
             if not self.analysis_thread.isRunning():
                 return False
             
-            # Process Qt events to keep UI responsive
-            QApplication.processEvents()
+            # Only the GUI thread should pump events.
+            try:
+                app = QCoreApplication.instance()
+                if app is not None and QThread.currentThread() is app.thread():
+                    QApplication.processEvents()
+            except Exception:
+                pass
             time.sleep(0.05)  # Reduced sleep time, events are processed above
         
         # Log engine thread started
@@ -598,8 +646,8 @@ class GameAnalysisEngineService(QObject):
         
         return self.analysis_thread.running
     
-    def analyze_position(self, fen: str, move_number: int, progress_interval_ms: int = 500) -> GameAnalysisEngineThread:
-        """Queue a position for analysis.
+    def create_analysis_request(self, fen: str, move_number: int, progress_interval_ms: int = 500) -> Optional[GameAnalysisRequestHandle]:
+        """Create a per-request handle (not yet enqueued).
         
         Args:
             fen: FEN string of position to analyze.
@@ -607,21 +655,29 @@ class GameAnalysisEngineService(QObject):
             progress_interval_ms: Progress update interval in milliseconds.
             
         Returns:
-            GameAnalysisEngineThread instance (for signal connections).
+            Handle to connect signals on. Call `enqueue_analysis_request(handle)` to enqueue.
         """
         # Start engine thread if not already running
         if not self.analysis_thread or not self.analysis_thread.isRunning():
             if not self.start_engine():
                 return None
         
-        # Create analysis request
         request = AnalysisRequest(fen, move_number, progress_interval_ms)
-        
-        # Queue for analysis
-        self.analysis_thread.queue_analysis(request)
-        
-        return self.analysis_thread
-    
+        handle = GameAnalysisRequestHandle(self.analysis_thread)
+        request.handle = handle
+        handle._request = request
+        return handle
+
+    def enqueue_analysis_request(self, handle: GameAnalysisRequestHandle) -> bool:
+        """Enqueue a previously created handle for analysis."""
+        if not self.analysis_thread or not self.analysis_thread.isRunning():
+            return False
+        req = getattr(handle, "_request", None)
+        if req is None:
+            return False
+        self.analysis_thread.queue_analysis(req)
+        return True
+
     def stop_current_analysis(self) -> None:
         """Stop only the current analysis without clearing queue or stopping thread."""
         if self.analysis_thread and self.analysis_thread.isRunning():

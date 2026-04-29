@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QFrame,
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QSignalBlocker
 from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent, QFontMetrics, QResizeEvent
 from typing import Optional, Dict, Any, List
 
@@ -27,6 +27,7 @@ from app.controllers.bulk_replace_controller import BulkReplaceController
 from app.models.database_model import DatabaseModel
 from app.utils.bulk_operation_summary import format_bulk_operation_summary_plain
 from app.utils.path_display_utils import truncate_path_for_display, truncate_text_middle
+from app.utils.themed_icon import themed_icon_from_svg
 
 
 class BulkReplaceDialog(QDialog):
@@ -48,6 +49,7 @@ class BulkReplaceDialog(QDialog):
         self.controller = bulk_replace_controller
         self.database = database
         self.selected_game_indices = selected_game_indices if selected_game_indices else []
+        self._quick_select_icon_buttons: List[QPushButton] = []
         
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         
@@ -60,6 +62,33 @@ class BulkReplaceDialog(QDialog):
         # After styling, layout may invalidate; apply size once loaded UI + styles are stable
         self._apply_configured_dialog_size()
         self.setWindowTitle("Bulk Replace")
+
+    def _on_tag_checkbox_state_changed(self, _: int) -> None:
+        """Recompute quick-select button enabled state when any checkbox changes."""
+        self._update_quick_select_buttons_enabled()
+
+    def _update_quick_select_buttons_enabled(self) -> None:
+        """Enable/disable quick-select buttons based on current checkbox selection.
+
+        - If no checkbox is checked: disable Deselect All
+        - If all checkboxes are checked: disable Select All
+        """
+        if not self.quick_select_enabled:
+            return
+        if not hasattr(self, "select_all_button") or not hasattr(self, "deselect_all_button"):
+            return
+        if not getattr(self, "tag_checkboxes", None):
+            base_enabled = getattr(self, "apply_button", None).isEnabled() if hasattr(self, "apply_button") else True
+            self.select_all_button.setEnabled(False and base_enabled)
+            self.deselect_all_button.setEnabled(False and base_enabled)
+            return
+
+        any_checked = any(cb.isChecked() for cb in self.tag_checkboxes.values())
+        all_checked = all(cb.isChecked() for cb in self.tag_checkboxes.values())
+
+        base_enabled = getattr(self, "apply_button", None).isEnabled() if hasattr(self, "apply_button") else True
+        self.select_all_button.setEnabled(base_enabled and (not all_checked))
+        self.deselect_all_button.setEnabled(base_enabled and any_checked)
     
     def _load_config(self) -> None:
         """Load configuration values from config.json."""
@@ -335,43 +364,60 @@ class BulkReplaceDialog(QDialog):
         self.tag_label.setFont(QFont(self.label_font_family, self.label_font_size))
         self.tag_label.setMinimumWidth(label_min_width)
         
-        # Create container widget for tags section (buttons above scroll area)
+        tag_label_container = QWidget()
+        # Arrange "Tags:" text and the quick-select buttons in a single top row
+        # so the buttons sit immediately left of the scroll area (without affecting
+        # the value-column alignment).
+        tag_label_container_layout = QHBoxLayout(tag_label_container)
+        tag_label_container_layout.setContentsMargins(0, 0, 0, 0)
+        # Keep compact spacing inside the label column.
+        tag_label_container_layout.setSpacing(8)
+        tag_label_container_layout.addWidget(
+            self.tag_label,
+            0,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+        )
+        
+        if self.quick_select_enabled:
+            quick_select_buttons_layout = QVBoxLayout()
+            quick_select_buttons_layout.setContentsMargins(0, 0, 0, 0)
+            quick_select_buttons_layout.setSpacing(8)
+            quick_select_buttons_layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+            
+            # Ensure square icon button geometry deterministically.
+            # (We set this early to prevent any intermediate layout from stretching.)
+            icon_button_size = self.button_height
+            self.select_all_button = QPushButton()
+            self.select_all_button.setAccessibleName("Select All")
+            self.select_all_button.clicked.connect(self._on_select_all_clicked)
+            self._quick_select_icon_buttons.append(self.select_all_button)
+            quick_select_buttons_layout.addWidget(
+                self.select_all_button,
+                0,
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+            )
+            
+            self.deselect_all_button = QPushButton()
+            self.deselect_all_button.setAccessibleName("Deselect All")
+            self.deselect_all_button.clicked.connect(self._on_deselect_all_clicked)
+            self._quick_select_icon_buttons.append(self.deselect_all_button)
+            quick_select_buttons_layout.addWidget(
+                self.deselect_all_button,
+                0,
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+            )
+            quick_select_buttons_layout.addStretch(1)
+
+            # Push the icon button column to the right edge of the label cell.
+            tag_label_container_layout.addStretch(1)
+            tag_label_container_layout.addLayout(quick_select_buttons_layout)
+        
+        # Create container widget for tags section. The scroll area remains in the
+        # value column so it stays aligned with the other controls.
         tags_container = QWidget()
         tags_container_layout = QVBoxLayout(tags_container)
         tags_container_layout.setContentsMargins(0, 0, 0, 0)
         tags_container_layout.setSpacing(0)
-        # Ensure container has proper size policy and fixed height to prevent growth
-        # Calculate fixed height for container: buttons (if enabled) + spacing + scroll area height
-        # Add extra padding to ensure scroll area and scrollbar are fully visible
-        container_fixed_height = self.tags_list_height + 8  # Add 8px extra for scrollbar clearance
-        if self.quick_select_enabled:
-            container_fixed_height += self.quick_select_height + 10  # button height + spacing
-        # Use setFixedHeight to prevent any growth - form layout cannot override this
-        tags_container.setFixedHeight(container_fixed_height)
-        tags_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)  # Fixed height prevents growth
-        
-        # Quick selection buttons (ABOVE scroll area): helpers on the left (same as Bulk Clean PGN)
-        if self.quick_select_enabled:
-            quick_select_layout = QHBoxLayout()
-            quick_select_layout.setSpacing(self.quick_select_spacing)
-            quick_select_layout.setContentsMargins(0, 0, 0, 0)
-            
-            self.select_all_button = QPushButton("Select All")
-            self.select_all_button.setFixedSize(self.quick_select_width, self.quick_select_height)
-            self.select_all_button.clicked.connect(self._on_select_all_clicked)
-            quick_select_layout.addWidget(self.select_all_button)
-            
-            self.deselect_all_button = QPushButton("Deselect All")
-            self.deselect_all_button.setFixedSize(self.quick_select_width, self.quick_select_height)
-            self.deselect_all_button.clicked.connect(self._on_deselect_all_clicked)
-            quick_select_layout.addWidget(self.deselect_all_button)
-            
-            quick_select_layout.addStretch()
-            
-            tags_container_layout.addLayout(quick_select_layout)
-            
-            # Add explicit spacing between buttons and scroll area
-            tags_container_layout.addSpacing(10)
         
         # Create scrollable area for tag checkboxes
         tags_scroll_area = QScrollArea()
@@ -404,6 +450,7 @@ class BulkReplaceDialog(QDialog):
         tags_widget.setPalette(tags_palette)
         tags_grid = QGridLayout(tags_widget)
         tags_grid.setSpacing(self.tags_list_spacing)
+        tags_grid.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         # Use configurable margins for proper padding: [left, top, right, bottom]
         tags_grid.setContentsMargins(
             self.tags_list_margins[0],  # left
@@ -425,12 +472,16 @@ class BulkReplaceDialog(QDialog):
             # Default: White and Black are checked
             if tag in ["White", "Black"]:
                 checkbox.setChecked(True)
+            checkbox.stateChanged.connect(self._on_tag_checkbox_state_changed)
             self.tag_checkboxes[tag] = checkbox
             tags_grid.addWidget(checkbox, row, col)
             col += 1
             if col >= self.tags_list_columns:
                 col = 0
                 row += 1
+        
+        # Initial quick-select enabled state from current checkbox defaults.
+        self._update_quick_select_buttons_enabled()
         
         # Set widget size policy - expand horizontally, minimum vertically
         tags_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
@@ -442,11 +493,13 @@ class BulkReplaceDialog(QDialog):
         self._tags_widget = tags_widget
         self._tags_scroll_area = tags_scroll_area
         
-        tags_container_layout.addWidget(tags_scroll_area)
+        tags_container.setFixedHeight(scroll_area_height)
+        tags_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        tags_container_layout.addWidget(tags_scroll_area, 0, Qt.AlignmentFlag.AlignTop)
         self.tags_scroll_area = tags_scroll_area
         
-        # Add tags label and container to form layout
-        replace_layout.addRow(self.tag_label, tags_container)
+        # Add tags label/button column and scroll area to form layout
+        replace_layout.addRow(tag_label_container, tags_container)
         
         # Overwrite + copy mode checkboxes on one row (layout-sensitive)
         self.overwrite_all_check = QCheckBox("Overwrite values")
@@ -616,20 +669,43 @@ class BulkReplaceDialog(QDialog):
             min_height=button_height
         )
         
+        dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("bulk_replace", {})
+        
         # Apply styling to quick select buttons if they exist (different dimensions)
-        if self.quick_select_enabled and hasattr(self, 'select_all_button'):
-            quick_select_buttons = [self.select_all_button, self.deselect_all_button]
+        if self._quick_select_icon_buttons:
+            # Match EngineConfigurationDialog: icon buttons are square based on the
+            # main button height, not the quick_select_height config.
+            icon_button_size = button_height
             StyleManager.style_buttons(
-                quick_select_buttons,
+                self._quick_select_icon_buttons,
                 self.config,
                 bg_color,
                 border_color,
-                min_width=self.quick_select_width,
-                min_height=self.quick_select_height
+                min_width=None,
+                min_height=icon_button_size
             )
+            
+            # Icon-only quick-select buttons, matching engine configuration dialog.
+            quick_select_cfg = dialog_config["quick_select_buttons"]
+            labels_tc = dialog_config.get("labels", {}).get("text_color", [200, 200, 200])
+            tint = (int(labels_tc[0]), int(labels_tc[1]), int(labels_tc[2]))
+            icon_px = max(16, min(22, icon_button_size - 8))
+            svg_paths = [
+                quick_select_cfg["select_all_button_icon_svg"],
+                quick_select_cfg["deselect_all_button_icon_svg"],
+            ]
+            tooltips = [
+                quick_select_cfg["select_all_button_tooltip"],
+                quick_select_cfg["deselect_all_button_tooltip"],
+            ]
+            for i, btn in enumerate(self._quick_select_icon_buttons):
+                btn.setIcon(themed_icon_from_svg(svg_paths[i], tint))
+                btn.setText("")
+                btn.setIconSize(QSize(icon_px, icon_px))
+                btn.setToolTip(tooltips[i])
+                btn.setFixedSize(icon_button_size, icon_button_size)
         
         # Get selection colors from config (use defaults if not available)
-        dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("bulk_replace", {})
         inputs_config = dialog_config.get("inputs", {})
         selection_bg = inputs_config.get('selection_background_color', [70, 90, 130])
         selection_text = inputs_config.get('selection_text_color', [240, 240, 240])
@@ -835,6 +911,7 @@ class BulkReplaceDialog(QDialog):
 
         self._update_tags_widget_size()
         self._apply_configured_dialog_size()
+        self._enforce_quick_select_square()
     
     def _update_path_label_truncation(self) -> None:
         """Re-truncate path and name using actual width and font (DPI-aware)."""
@@ -894,12 +971,16 @@ class BulkReplaceDialog(QDialog):
     def _on_select_all_clicked(self) -> None:
         """Handle Select All button click."""
         for checkbox in self.tag_checkboxes.values():
-            checkbox.setChecked(True)
+            with QSignalBlocker(checkbox):
+                checkbox.setChecked(True)
+        self._update_quick_select_buttons_enabled()
     
     def _on_deselect_all_clicked(self) -> None:
         """Handle Deselect All button click."""
         for checkbox in self.tag_checkboxes.values():
-            checkbox.setChecked(False)
+            with QSignalBlocker(checkbox):
+                checkbox.setChecked(False)
+        self._update_quick_select_buttons_enabled()
     
     def _get_selected_tags(self) -> List[str]:
         """Get list of selected tag names.
@@ -1031,6 +1112,23 @@ class BulkReplaceDialog(QDialog):
         super().resizeEvent(event)
         self._update_path_label_truncation()
         self._update_tags_widget_size()
+        self._enforce_quick_select_square()
+    
+    def _enforce_quick_select_square(self) -> None:
+        """Force quick-select buttons back to square size after Qt layout passes.
+
+        We observed that Qt recalculates minimumSize/geometry after resize/show,
+        making the buttons visually non-square on some DPI/layout combinations.
+        Re-applying fixed sizing keeps them deterministic.
+        """
+        if not self._quick_select_icon_buttons:
+            return
+        size = self.button_height
+        for btn in self._quick_select_icon_buttons:
+            btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            btn.setMinimumSize(size, size)
+            btn.setMaximumSize(size, size)
+            btn.setFixedSize(size, size)
     
     def _show_success_dialog(self, title: str, message: str) -> None:
         """Show a styled success dialog.

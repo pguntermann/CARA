@@ -5,6 +5,7 @@ from PyQt6.QtGui import QIcon, QPixmap, QPainter, QBrush, QColor
 from typing import Optional, List, Dict, Any, Set, Tuple
 from datetime import datetime
 from collections import Counter
+import time
 
 from app.utils.time_control_utils import get_tc_type
 
@@ -422,7 +423,29 @@ class DatabaseModel(QAbstractTableModel):
             self._unsaved_games.add(game)
         self.endInsertRows()
 
+        # Position-indexing can be expensive; log once for the single-game reindex.
+        start_ts = time.perf_counter()
+        try:
+            from app.services.logging_service import LoggingService
+            LoggingService.get_instance().debug(
+                "Position search index: start indexing game "
+                f"game_number={getattr(game, 'game_number', None)} "
+                f"plies={(len(position_hashes) if position_hashes else None)} "
+                f"computed_from_pgn={(not position_hashes or not position_hashes_fuzzy)}"
+            )
+        except Exception:
+            pass
         self._position_index_add_game(game, position_hashes, position_hashes_fuzzy)
+        elapsed_ms = int((time.perf_counter() - start_ts) * 1000)
+        try:
+            from app.services.logging_service import LoggingService
+            LoggingService.get_instance().debug(
+                "Position search index: completed indexing game "
+                f"game_number={getattr(game, 'game_number', None)} "
+                f"elapsed_ms={elapsed_ms}"
+            )
+        except Exception:
+            pass
         
         # Cache tags from this game
         self._add_tags_to_cache(set(tags))
@@ -493,6 +516,19 @@ class DatabaseModel(QAbstractTableModel):
             self._unsaved_games.update(games)
         
         self.endInsertRows()
+        
+        # Position-indexing can be expensive; log once before and once after.
+        start_ts = time.perf_counter()
+        try:
+            from app.services.logging_service import LoggingService
+            LoggingService.get_instance().debug(
+                "Position search index: start indexing batch "
+                f"games_added={len(games)} "
+                f"position_hashes_list_provided={(position_hashes_list is not None)} "
+                f"position_hashes_fuzzy_list_provided={(position_hashes_fuzzy_list is not None)}"
+            )
+        except Exception:
+            pass
 
         if position_hashes_list is None:
             for g in games:
@@ -504,6 +540,17 @@ class DatabaseModel(QAbstractTableModel):
             else:
                 for g, h, hf in zip(games, position_hashes_list, position_hashes_fuzzy_list):
                     self._position_index_add_game(g, h, hf)
+
+        elapsed_ms = int((time.perf_counter() - start_ts) * 1000)
+        try:
+            from app.services.logging_service import LoggingService
+            LoggingService.get_instance().debug(
+                "Position search index: completed indexing batch "
+                f"games_indexed={len(games)} "
+                f"elapsed_ms={elapsed_ms}"
+            )
+        except Exception:
+            pass
         
         # Cache tags from all games in this batch (use provided tags)
         all_tags: Set[str] = set()
@@ -643,15 +690,18 @@ class DatabaseModel(QAbstractTableModel):
         self._position_index_remove_game_fuzzy(game)
         hashes = position_hashes
         hashes_fuzzy = position_hashes_fuzzy
+        computed_from_pgn = False
         if not hashes or not hashes_fuzzy:
             computed = self._compute_position_hashes_from_pgn(getattr(game, "pgn", "") or "")
             if computed:
+                computed_from_pgn = True
                 if not hashes:
                     hashes = computed[0]
                 if not hashes_fuzzy:
                     hashes_fuzzy = computed[1]
         if not hashes:
             return
+
         gid = id(game)
         rev: List[Tuple[int, int]] = []
         for ply, h in enumerate(hashes):
@@ -1007,15 +1057,22 @@ class DatabaseModel(QAbstractTableModel):
         except ValueError:
             return None
     
-    def update_game(self, game: 'GameData') -> bool:
+    def update_game(self, game: 'GameData', *, reindex_positions: bool = True) -> bool:
         """Update a game in the model and notify views.
         
         This method finds the game, updates it, and emits dataChanged
         signal for all columns to refresh the table view. Automatically
         marks the game as having unsaved changes.
+
+        Note: Updating the position-search index can be expensive because it may
+        require parsing the full PGN and hashing every ply. Callers that update
+        many games in rapid succession (e.g. bulk analysis) can pass
+        `reindex_positions=False` and perform a full reindex later if needed.
         
         Args:
             game: GameData instance to update (must already be in the model).
+            reindex_positions: If True (default), update the position-search index
+                for this game based on its current PGN.
             
         Returns:
             True if game was found and updated, False otherwise.
@@ -1024,8 +1081,29 @@ class DatabaseModel(QAbstractTableModel):
         if row is None:
             return False
 
-        # Keep position index consistent with the game content.
-        self._position_index_add_game(game, None, None)
+        # Keep position index consistent with the game content (optional).
+        if reindex_positions:
+            start_ts = time.perf_counter()
+            try:
+                from app.services.logging_service import LoggingService
+                LoggingService.get_instance().debug(
+                    "Position search index: start indexing game "
+                    f"game_number={getattr(game, 'game_number', None)} "
+                    "plies=None computed_from_pgn=True"
+                )
+            except Exception:
+                pass
+            self._position_index_add_game(game, None, None)
+            elapsed_ms = int((time.perf_counter() - start_ts) * 1000)
+            try:
+                from app.services.logging_service import LoggingService
+                LoggingService.get_instance().debug(
+                    "Position search index: completed indexing game "
+                    f"game_number={getattr(game, 'game_number', None)} "
+                    f"elapsed_ms={elapsed_ms}"
+                )
+            except Exception:
+                pass
         
         # Auto-mark game as having unsaved changes
         self._unsaved_games.add(game)
@@ -1044,7 +1122,7 @@ class DatabaseModel(QAbstractTableModel):
         self._emit_stats_relevant_data_change()
         return True
     
-    def batch_update_games(self, games: List['GameData']) -> None:
+    def batch_update_games(self, games: List['GameData'], *, reindex_positions: bool = True) -> None:
         """Batch update multiple games and emit a single dataChanged signal.
         
         This is more efficient than calling update_game() multiple times,
@@ -1052,12 +1130,35 @@ class DatabaseModel(QAbstractTableModel):
         
         Args:
             games: List of GameData instances to update (must already be in the model).
+            reindex_positions: If True (default), update the position-search index
+                for each game based on its current PGN.
         """
         if not games:
             return
-
-        for game in games:
-            self._position_index_add_game(game, None, None)
+        
+        if reindex_positions:
+            start_ts = time.perf_counter()
+            try:
+                from app.services.logging_service import LoggingService
+                LoggingService.get_instance().debug(
+                    "Position search index: start indexing batch "
+                    f"games_updated={len(games)} "
+                    "reindex_positions=True"
+                )
+            except Exception:
+                pass
+            for game in games:
+                self._position_index_add_game(game, None, None)
+            elapsed_ms = int((time.perf_counter() - start_ts) * 1000)
+            try:
+                from app.services.logging_service import LoggingService
+                LoggingService.get_instance().debug(
+                    "Position search index: completed indexing batch "
+                    f"games_updated={len(games)} "
+                    f"elapsed_ms={elapsed_ms}"
+                )
+            except Exception:
+                pass
         
         # Mark all games as having unsaved changes
         for game in games:

@@ -162,10 +162,25 @@ class EvaluationModel(QObject):
         Args:
             line: AnalysisLine instance from manual analysis model.
         """
-        self._centipawns = line.centipawns
-        self._is_mate = line.is_mate
-        self._mate_moves = line.mate_moves
-        self._depth = line.depth
+        new_centipawns = float(getattr(line, "centipawns", 0.0) or 0.0)
+        new_is_mate = bool(getattr(line, "is_mate", False))
+        new_mate_moves = int(getattr(line, "mate_moves", 0) or 0)
+        new_depth = int(getattr(line, "depth", 0) or 0)
+
+        changed = (
+            self._centipawns != new_centipawns
+            or self._is_mate != new_is_mate
+            or self._mate_moves != new_mate_moves
+            or self._depth != new_depth
+            or self._is_evaluating is not True
+        )
+
+        self._centipawns = new_centipawns
+        self._is_mate = new_is_mate
+        self._mate_moves = new_mate_moves
+        self._depth = new_depth
         self._is_evaluating = True  # Mark as evaluating if we have data
-        self.evaluation_changed.emit()
+
+        if changed:
+            self.evaluation_changed.emit()
 

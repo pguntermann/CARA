@@ -1272,8 +1272,8 @@ class DatabaseController:
         """Save a PGN database to a new file and create a new database entry.
         
         This method handles file path validation, saving the database, creating
-        a new database entry in the panel model, and reloading the original
-        database from disk to discard unsaved changes.
+        a new database entry in the panel model, and setting the new database
+        as active.
         
         Args:
             model: DatabaseModel instance to save.
@@ -1284,14 +1284,6 @@ class DatabaseController:
             If success is True, message indicates success.
             If success is False, message contains error description.
         """
-        # Get the original database's file path before creating the new one
-        original_identifier = self.panel_model.find_database_by_model(model)
-        original_file_path = None
-        if original_identifier and original_identifier != "clipboard":
-            original_info = self.panel_model.get_database(original_identifier)
-            if original_info:
-                original_file_path = original_info.file_path
-        
         from app.services.progress_service import ProgressService
         from PyQt6.QtWidgets import QApplication
         progress_service = ProgressService.get_instance()
@@ -1299,104 +1291,35 @@ class DatabaseController:
         # Ensure .pgn extension
         if not file_path.lower().endswith('.pgn'):
             file_path += '.pgn'
+
+        # Avoid clobbering an already-open database entry (identifier is file path).
+        try:
+            existing = self.get_database_by_file_path(file_path)
+        except Exception:
+            existing = None
+        if existing is not None:
+            return (False, "Cannot save as: Target file is already open in a database tab")
         
         # Save to file (this will mark the model as saved)
         # Note: save_pgn_to_file already shows progress, so we don't need to show it here
         success, message = self.save_pgn_to_file(model, file_path)
         
         if success:
-            # Show progress for post-save operations
-            # Get games and sort by game_number (same order as saved to file)
-            games = model.get_all_games()
-            games.sort(key=lambda game: game.game_number)
-            total_games = len(games)
-            
+            # Create a new database entry by opening the freshly-saved file. This keeps the
+            # "Save As" operation simple, avoids per-game copying/signaling, and ensures we
+            # reuse the standard PGN parsing path (including tag + position hash extraction).
             progress_service.show_progress()
-            progress_service.set_indeterminate(False)
-            progress_service.set_progress(0)
-            progress_service.set_status("Creating new database entry...")
-            QApplication.processEvents()  # Process events to show progress bar
-            
-            # Mark the original database (e.g., clipboard) as saved since we saved it
-            # This is important for "Save As" on clipboard database
-            self.panel_model.mark_database_saved(model)
-            
-            # Create a new database model with copied data
-            new_model = DatabaseModel(file_path=file_path, config=self.config)
-            
-            # Copy all games from the original model to the new model
-            # Set file_position based on their order in the newly saved file (1-based)
-            for file_pos, game in enumerate(games, start=1):
-                # Create a new GameData instance with the same data
-                new_game = GameData(
-                    game_number=0,  # Will be set by model when adding
-                    white=game.white,
-                    black=game.black,
-                    result=game.result,
-                    date=game.date,
-                    moves=game.moves,
-                    eco=game.eco,
-                    pgn=game.pgn,
-                    event=game.event,
-                    site=game.site,
-                    white_elo=game.white_elo,
-                    black_elo=game.black_elo,
-                    time_control=getattr(game, "time_control", ""),
-                    game_tags_raw=getattr(game, "game_tags_raw", ""),
-                    game_tags=getattr(game, "game_tags", ""),
-                    analyzed=game.analyzed,
-                    annotated=getattr(game, "annotated", False),
-                    has_notes=getattr(game, "has_notes", False),
-                    file_position=file_pos,  # Set file position based on order in new file
-                )
-                # Extract tags from existing game's PGN (game is being copied, not parsed)
-                tags = new_model._extract_tags_from_game(new_game)
-                # Mark as saved since these games are being saved to the new file
-                new_model.add_game(new_game, mark_unsaved=False, tags=tags)
-                
-                # Update progress every 10 games or on last game
-                should_update = (
-                    file_pos <= 10 or  # First 10 games for immediate feedback
-                    file_pos % 10 == 0 or  # Every 10 games after that
-                    file_pos == total_games  # Always on last game
-                )
-                
-                if should_update:
-                    progress_percent = int((file_pos / total_games) * 50)  # First 50% for copying
-                    progress_service.report_progress(
-                        f"Copying game {file_pos}/{total_games}...",
-                        progress_percent
-                    )
-                    QApplication.processEvents()  # Process events to update progress bar
-            
-            # Add the new database to the panel model
-            progress_service.set_status("Adding database to panel...")
-            progress_service.set_progress(60)
-            QApplication.processEvents()  # Process events to update status
-            
-            self.panel_model.add_database(new_model, file_path=file_path)
-            
-            # Reload the original database from disk to discard unsaved changes
-            if original_file_path:
-                progress_service.set_status("Reloading original database...")
-                progress_service.set_progress(80)
-                QApplication.processEvents()  # Process events to update status
-                
-                reload_success, reload_message = self.reload_database_from_file(model, original_file_path)
-                if not reload_success:
-                    # Log warning but don't fail the save operation
-                    message += f" (Warning: {reload_message})"
-            
-            # Set the new database as active
-            progress_service.set_status("Finalizing...")
-            progress_service.set_progress(90)
-            QApplication.processEvents()  # Process events to update status
-            
-            self.set_active_database(new_model)
-            
-            # Hide progress
-            progress_service.hide_progress()
-            QApplication.processEvents()  # Process events to hide progress bar
+            progress_service.set_indeterminate(True)
+            progress_service.set_status("Opening saved copy...")
+            QApplication.processEvents()
+
+            open_ok, open_msg, _first_game = self.open_pgn_database(file_path)
+            if not open_ok:
+                # The save succeeded, but opening the copy failed (e.g. I/O/parse issue).
+                # Keep the original save message and append the failure reason.
+                return (True, f"{message} (Warning: {open_msg})")
+            # Preserve original save message (it includes the target file path).
+            return (True, message)
         
         return (success, message)
     

@@ -2,6 +2,8 @@
 
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
+import time
+import threading
 
 from app.models.moveslist_model import MoveData
 from app.services.brilliant_move_detection_analysis_service import BrilliantMoveDetectionAnalysisService
@@ -44,6 +46,9 @@ def run_brilliant_move_detection(
     good_move_max_cpl: int,
     inaccuracy_max_cpl: int,
     mistake_max_cpl: int,
+    *,
+    exclude_already_winning_enabled: bool = True,
+    exclude_already_winning_threshold_cpl: int = 600,
     engine_path: Path,
     time_limit_ms: int,
     max_threads: Optional[int],
@@ -131,6 +136,7 @@ def run_brilliant_move_detection(
 
     brilliant_count = 0
     candidates_checked = 0
+    total_t0 = time.perf_counter()
     try:
         candidate_moves: List[Tuple[int, Dict[str, Any], MoveData, bool, int]] = []
         for i, move_info in enumerate(move_infos):
@@ -143,6 +149,53 @@ def run_brilliant_move_detection(
             if move_data is None:
                 continue
             current_assessment = move_data.assess_white if is_white_move else move_data.assess_black
+
+            # Optional filter: exclude candidate moves when the side to move is already winning
+            # by a configured threshold (pre-move eval, normalized by color).
+            if exclude_already_winning_enabled:
+                try:
+                    # Important: in this codebase the engine eval stored in move_infos is in the
+                    # engine/UCI convention (score from the side-to-move perspective). So we must NOT
+                    # flip based on color here; a positive score means the mover is already winning.
+                    if bool(move_info.get("is_mate_before", False)):
+                        mate_moves_before = move_info.get("mate_moves_before", None)
+                        mover_is_winning_mate = False
+                        try:
+                            mm = int(mate_moves_before)
+                            # Convention elsewhere: positive = white winning, negative = black winning,
+                            # 0 = checkmate for side to move (i.e. side to move is losing).
+                            if mm == 0:
+                                mover_is_winning_mate = False
+                            else:
+                                mover_is_winning_mate = (is_white_move and mm > 0) or (not is_white_move and mm < 0)
+                        except Exception:
+                            # If unknown, be conservative: don't exclude purely on missing metadata.
+                            mover_is_winning_mate = False
+
+                        if mover_is_winning_mate:
+                            logging_service.debug(
+                                f"Brilliant candidate excluded (already winning): move {move_number} "
+                                f"({'white' if is_white_move else 'black'}) {move_info.get('move_san', '')} "
+                                f"(mate before move)"
+                            )
+                            continue
+
+                    raw_eval_before = move_info.get("eval_before", None)
+                    if isinstance(raw_eval_before, (int, float)):
+                        # eval_before is stored as White POV centipawns (see GameAnalysisEngineService parsing),
+                        # so normalize to the side playing the move here.
+                        adv_stm = float(raw_eval_before) if is_white_move else -float(raw_eval_before)
+                        if adv_stm >= float(exclude_already_winning_threshold_cpl):
+                            logging_service.debug(
+                                f"Brilliant candidate excluded (already winning): move {move_number} "
+                                f"({'white' if is_white_move else 'black'}) {move_info.get('move_san', '')} "
+                                f"adv_stm={adv_stm:.0f}cp >= {int(exclude_already_winning_threshold_cpl)}cp"
+                            )
+                            continue
+                except Exception:
+                    # Best-effort filter; never block detection due to unexpected metadata.
+                    pass
+
             if candidate_selection == "best_or_good_move":
                 if current_assessment in ["Best Move", "Good Move"]:
                     candidate_moves.append((i, move_info, move_data, is_white_move, row_index))
@@ -183,6 +236,7 @@ def run_brilliant_move_detection(
                 f"Brilliant candidate: move {move_number} ({color}) {played_move_san}"
             )
 
+            cand_t0 = time.perf_counter()
             depths_show_error = 0
             brilliant_depths: List[int] = []
             brilliant_depth_bestmoves: List[Tuple[int, str]] = []
@@ -332,6 +386,15 @@ def run_brilliant_move_detection(
                 f"(depths: {sorted(brilliant_depths) if brilliant_depths else 'none'}), "
                 f"qualified={'yes' if qualified else 'no'}"
             )
+            try:
+                cand_ms = (time.perf_counter() - cand_t0) * 1000.0
+                logging_service.debug(
+                    f"Brilliant candidate timing: move {move_number} ({color}) "
+                    f"depths={shallow_depth_min}-{shallow_depth_max} "
+                    f"elapsed_ms={cand_ms:.1f}"
+                )
+            except Exception:
+                pass
 
             if depths_show_error >= min_depths_required:
                 current_assessment = move_data.assess_white if is_white_move else move_data.assess_black
@@ -361,6 +424,17 @@ def run_brilliant_move_detection(
         if service:
             service.cleanup()
 
+    try:
+        total_ms = (time.perf_counter() - total_t0) * 1000.0
+        logging_service.debug(
+            "Brilliant move detection timing: "
+            f"candidates_checked={candidates_checked} "
+            f"brilliant={brilliant_count} "
+            f"elapsed_ms={total_ms:.1f}"
+        )
+    except Exception:
+        pass
+
     if brilliant_count > 0:
         logging_service.info(
             f"Brilliant move detection completed: {brilliant_count} brilliant move(s) detected from {candidates_checked} candidates"
@@ -380,40 +454,69 @@ def _analyze_at_shallow_depth(
     time_limit_ms: int,
 ) -> Optional[Tuple[float, bool, int, str]]:
     """Analyze a position at shallow depth synchronously."""
-    from PyQt6.QtCore import QEventLoop, QTimer
-
-    loop = QEventLoop()
+    t0 = time.perf_counter()
     result_container: Dict[str, Any] = {"result": None, "error": None}
+    done = threading.Event()
+    # Ensure slots run immediately in the emitter thread; the brilliancy path does not
+    # run a Qt event loop in this waiting context.
+    from PyQt6.QtCore import Qt
 
     def on_analysis_complete(
         centipawns: float, is_mate: bool, mate_moves: int, best_move_san: str, analysis_depth: int
     ):
         if analysis_depth == depth:
             result_container["result"] = (centipawns, is_mate, mate_moves, best_move_san)
-            loop.quit()
+            done.set()
 
     def on_error(error_message: str):
         result_container["error"] = error_message
-        loop.quit()
+        done.set()
 
     analysis_thread = service.analyze_position(fen, move_number, depth)
     if not analysis_thread:
         return None
-    analysis_thread.analysis_complete.connect(on_analysis_complete)
-    analysis_thread.error_occurred.connect(on_error)
-    timeout_timer = QTimer()
-    timeout_timer.setSingleShot(True)
-    timeout_timer.timeout.connect(loop.quit)
-    timeout_timer.start(time_limit_ms * 2)
-    loop.exec()
+    analysis_thread.analysis_complete.connect(on_analysis_complete, type=Qt.ConnectionType.DirectConnection)
+    analysis_thread.error_occurred.connect(on_error, type=Qt.ConnectionType.DirectConnection)
+    # Wait for completion without a Qt nested event loop.
+    # The Qt signal will execute this handler in the emitter thread (default AutoConnection),
+    # and set the threading.Event. This avoids QEventLoop scheduling delays and re-entrancy.
+    timeout_s = (time_limit_ms * 2) / 1000.0
+    done.wait(timeout_s)
     try:
         analysis_thread.analysis_complete.disconnect(on_analysis_complete)
         analysis_thread.error_occurred.disconnect(on_error)
     except Exception:
         pass
+    if not done.is_set() and not result_container["error"]:
+        # Timeout: stop current engine search so the next request isn't delayed.
+        try:
+            # Log explicitly so timeouts are unambiguous in bulk runs.
+            # Avoid logging full FEN (large); include a short prefix for correlation.
+            fen_s = str(fen) if fen is not None else ""
+            fen_prefix = fen_s[:80] + ("…" if len(fen_s) > 80 else "")
+            LoggingService.get_instance().debug(
+                "Brilliancy shallow analysis TIMEOUT: "
+                f"depth={depth} movetime_ms={time_limit_ms} timeout_s={timeout_s:.2f} "
+                f"move_number={move_number} fen_prefix={fen_prefix}"
+            )
+        except Exception:
+            pass
+        try:
+            service.stop_current_analysis()
+        except Exception:
+            pass
     if result_container["error"]:
         LoggingService.get_instance().debug(
             f"Error analyzing at depth {depth}: {result_container['error']}"
         )
         return None
+    # Timing log for slow shallow analyses (helps identify stalls/backlog).
+    try:
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        if elapsed_ms >= max(250.0, float(time_limit_ms) * 1.2):
+            LoggingService.get_instance().debug(
+                f"Brilliancy shallow analysis timing: depth={depth} movetime_ms={time_limit_ms} elapsed_ms={elapsed_ms:.1f}"
+            )
+    except Exception:
+        pass
     return result_container["result"]

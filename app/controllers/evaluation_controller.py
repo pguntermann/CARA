@@ -266,8 +266,11 @@ class EvaluationController:
         if is_mate:
             if mate_moves > 0:
                 eval_str = f"M{mate_moves}"  # White mates
+            elif mate_moves < 0:
+                eval_str = f"-M{abs(mate_moves)}"  # Black mates
             else:
-                eval_str = f"M{abs(mate_moves)}"  # Black mates
+                # Mate 0 (checkmate on board): derive winner from score sign.
+                eval_str = "M0" if centipawns >= 0 else "-M0"
         else:
             # Convert centipawns to pawns and format
             pawns = centipawns / 100.0
@@ -414,12 +417,113 @@ class EvaluationController:
         if not self.manual_analysis_controller:
             return
         
+        # If the current position is terminal (checkmate/stalemate), derive the eval bar value
+        # directly from the FEN. This avoids transient stale "info score mate 1" lines from a
+        # just-stopped previous search being interpreted as the current position when navigating
+        # back/forward around checkmate while manual analysis is active.
+        try:
+            import chess
+
+            fen = getattr(self.manual_analysis_controller, "_expected_fen", None)
+            if not fen:
+                try:
+                    service = getattr(self.manual_analysis_controller, "analysis_service", None)
+                    thread = getattr(service, "analysis_thread", None) if service else None
+                    fen = getattr(thread, "current_fen", None) if thread else None
+                except Exception:
+                    fen = None
+            if fen:
+                board = chess.Board(str(fen))
+                if board.legal_moves.count() == 0:
+                    if board.is_checkmate():
+                        side_to_move_is_black = bool(not board.turn)
+                        # side-to-move is mated: if black to move then white wins (+), else black wins (-)
+                        cp = 10000.0 if side_to_move_is_black else -10000.0
+                        if not (
+                            self.evaluation_model.is_mate
+                            and self.evaluation_model.mate_moves == 0
+                            and self.evaluation_model.centipawns == cp
+                            and self.evaluation_model.depth == 0
+                            and self.evaluation_model.is_evaluating
+                        ):
+                            self.evaluation_model.centipawns = cp
+                            self.evaluation_model.is_mate = True
+                            self.evaluation_model.mate_moves = 0
+                            self.evaluation_model.depth = 0
+                            self.evaluation_model.is_evaluating = True
+                            self.evaluation_model.evaluation_changed.emit()
+                        return
+                    # Stalemate/other terminal: neutral
+                    if not (
+                        self.evaluation_model.is_mate is False
+                        and self.evaluation_model.mate_moves == 0
+                        and self.evaluation_model.centipawns == 0.0
+                        and self.evaluation_model.depth == 0
+                        and self.evaluation_model.is_evaluating
+                    ):
+                        self.evaluation_model.centipawns = 0.0
+                        self.evaluation_model.is_mate = False
+                        self.evaluation_model.mate_moves = 0
+                        self.evaluation_model.depth = 0
+                        self.evaluation_model.is_evaluating = True
+                        self.evaluation_model.evaluation_changed.emit()
+                    return
+        except Exception:
+            pass
+
         analysis_model = self.manual_analysis_controller.get_analysis_model()
         best_line = analysis_model.get_best_line()
         
         if best_line:
-            # Update evaluation model from best line
+            # Update evaluation model from best line.
+            # Special-case mate 0: UCI "mate 0" means side-to-move is checkmated. When navigating
+            # around terminal positions, some engines / synthetic streams can yield ambiguous
+            # centipawn signs; derive the winner from the current target FEN instead.
+            if bool(getattr(best_line, "is_mate", False)) and int(getattr(best_line, "mate_moves", 0)) == 0:
+                try:
+                    import chess
+
+                    fen = getattr(self.manual_analysis_controller, "_expected_fen", None)
+                    if not fen:
+                        try:
+                            service = getattr(self.manual_analysis_controller, "analysis_service", None)
+                            thread = getattr(service, "analysis_thread", None) if service else None
+                            fen = getattr(thread, "current_fen", None) if thread else None
+                        except Exception:
+                            fen = None
+                    if fen:
+                        board = chess.Board(str(fen))
+                        side_to_move_is_black = bool(not board.turn)
+                        # side-to-move is mated: if black to move then white wins (+), else black wins (-)
+                        self.evaluation_model.centipawns = 10000.0 if side_to_move_is_black else -10000.0
+                        self.evaluation_model.is_mate = True
+                        self.evaluation_model.mate_moves = 0
+                        self.evaluation_model.depth = int(getattr(best_line, "depth", 0) or 0)
+                        self.evaluation_model.is_evaluating = True
+                        self.evaluation_model.evaluation_changed.emit()
+                        try:
+                            LoggingService.get_instance().debug(
+                                "EvalBar(manual) mate0 applied "
+                                f"side_to_move={'black' if side_to_move_is_black else 'white'} "
+                                f"centipawns={self.evaluation_model.centipawns} "
+                                f"fen_prefix={(str(fen)[:40] + ('…' if len(str(fen)) > 40 else ''))}"
+                            )
+                        except Exception:
+                            pass
+                        return
+                except Exception:
+                    pass
             self.evaluation_model.update_from_analysis_line(best_line)
+            if bool(getattr(best_line, "is_mate", False)):
+                try:
+                    LoggingService.get_instance().debug(
+                        "EvalBar(manual) line "
+                        f"mate_moves={getattr(best_line, 'mate_moves', None)} "
+                        f"centipawns={getattr(best_line, 'centipawns', None)} "
+                        f"depth={getattr(best_line, 'depth', None)}"
+                    )
+                except Exception:
+                    pass
         else:
             # No best line yet - reset evaluation
             self.evaluation_model.reset()

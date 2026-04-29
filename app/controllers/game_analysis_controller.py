@@ -244,6 +244,23 @@ class GameAnalysisController(QObject):
         return getattr(self, '_candidate_selection', "best_move_only")
 
     @property
+    def exclude_already_winning_enabled(self) -> bool:
+        """Whether to exclude brilliant candidates when the side to move is already winning."""
+        if self.classification_model and hasattr(self.classification_model, "exclude_already_winning_enabled"):
+            return bool(self.classification_model.exclude_already_winning_enabled)
+        return True
+
+    @property
+    def exclude_already_winning_threshold_cpl(self) -> int:
+        """Absolute CPL threshold for 'already winning' (normalized to side-to-move)."""
+        if self.classification_model and hasattr(self.classification_model, "exclude_already_winning_threshold_cpl"):
+            try:
+                return int(self.classification_model.exclude_already_winning_threshold_cpl)
+            except Exception:
+                return 600
+        return 600
+
+    @property
     def is_analyzing(self) -> bool:
         """Check if analysis is currently running.
         
@@ -687,11 +704,11 @@ class GameAnalysisController(QObject):
                 import logging
                 logging.error(f"Position mismatch: move_info is_white_move={expected_turn}, but board_before.turn={board_before.turn}")
             
-            # Queue analysis for position before
-            thread = self._engine_service.analyze_position(
+            # Create request, connect, then enqueue (avoids race on instant terminal completions).
+            thread = self._engine_service.create_analysis_request(
                 fen_before,
                 move_info["move_number"],
-                self.progress_update_interval_ms
+                self.progress_update_interval_ms,
             )
             
             if not thread:
@@ -709,6 +726,9 @@ class GameAnalysisController(QObject):
                 lambda eval_cp, is_mate, mate_moves, best_move, pv1, pv2, pv3, pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth, seldepth, nps, engine_name: 
                 self._on_best_move_analysis_complete(move_info, best_move, pv2, pv3, eval_cp, is_mate, mate_moves, depth, seldepth, pv2_score, pv3_score, pv2_score_black, pv3_score_black)
             )
+            if not self._engine_service.enqueue_analysis_request(thread):
+                self._on_analysis_error("Failed to queue position for analysis")
+                return
         
         # Setup progress timer for periodic updates
         if self._progress_timer:
@@ -721,11 +741,11 @@ class GameAnalysisController(QObject):
         """Analyze position after the move to get evaluation and best move for next iteration."""
         fen_after = move_info["fen_after"]
         
-        # Queue position after for analysis
-        thread = self._engine_service.analyze_position(
+        # Create request, connect, then enqueue (avoids race on instant terminal completions).
+        thread = self._engine_service.create_analysis_request(
             fen_after,
             move_info["move_number"],
-            self.progress_update_interval_ms
+            self.progress_update_interval_ms,
         )
         
         if not thread:
@@ -743,6 +763,9 @@ class GameAnalysisController(QObject):
             lambda eval_cp, is_mate, mate_moves, best_move, pv1, pv2, pv3, pv2_score, pv3_score, pv2_score_black, pv3_score_black, depth, seldepth, nps, engine_name: 
             self._on_move_analysis_complete(move_info, eval_cp, is_mate, mate_moves, depth, seldepth, pv2_score, pv3_score, pv2_score_black, pv3_score_black, best_move, pv2, pv3)
         )
+        if not self._engine_service.enqueue_analysis_request(thread):
+            self._on_analysis_error("Failed to queue position for analysis")
+            return
     
     def _on_best_move_analysis_complete(self, move_info: Dict[str, Any], best_move_san: str, 
                                        pv2_move_san: str, pv3_move_san: str,
@@ -1516,6 +1539,8 @@ class GameAnalysisController(QObject):
             good_move_max_cpl=self.good_move_max_cpl,
             inaccuracy_max_cpl=self.inaccuracy_max_cpl,
             mistake_max_cpl=self.mistake_max_cpl,
+            exclude_already_winning_enabled=self.exclude_already_winning_enabled,
+            exclude_already_winning_threshold_cpl=self.exclude_already_winning_threshold_cpl,
             engine_path=engine_path,
             time_limit_ms=time_limit_ms,
             max_threads=max_threads,

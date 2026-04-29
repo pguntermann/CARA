@@ -442,7 +442,7 @@ class BulkAnalysisDialog(QDialog):
         # Prepare services using controller (with status updates)
         def status_callback(message: str) -> None:
             self.status_label.setText(message)
-            QApplication.processEvents()  # Allow UI to update
+            # Avoid nested event-loop pumping; Qt will repaint naturally.
         
         self.controller.prepare_services_for_analysis(status_callback)
         
@@ -481,7 +481,6 @@ class BulkAnalysisDialog(QDialog):
         self.progress_bar.setValue(int(progress_percent))
         self.progress_percent_label.setText(progress_percent_str)
         self.status_label.setText(status_message)
-        QApplication.processEvents()
     
     def _on_status_update_requested(self) -> None:
         """Handle status update request from analysis thread (called from main thread)."""
@@ -502,7 +501,6 @@ class BulkAnalysisDialog(QDialog):
         """Handle game analyzed signal."""
         # Update database model through controller
         self.controller.update_game_in_database(game, None)  # Database model determined by controller
-        QApplication.processEvents()
     
     def _on_analysis_finished(self, success: bool, message: str) -> None:
         """Handle analysis finished signal."""
@@ -530,7 +528,7 @@ class BulkAnalysisDialog(QDialog):
             # Update status bar through controller - ALWAYS set status BEFORE hiding progress
             # This ensures the status is visible even if this is called after _on_cancel
             self.controller.set_progress_status(status_message)
-            QApplication.processEvents()  # Ensure status bar updates
+            # Avoid nested event-loop pumping; Qt will repaint naturally.
             
             # Re-enable controls for retry
             self.selected_games_radio.setEnabled(True)
@@ -554,7 +552,7 @@ class BulkAnalysisDialog(QDialog):
             
             # Update status bar immediately through controller
             self.controller.set_progress_status("Bulk Analysis: Cancelling...")
-            QApplication.processEvents()  # Ensure UI updates
+            # Avoid nested event-loop pumping; Qt will repaint naturally.
             
             # Wait for thread to finish
             self.controller.wait_for_analysis()
@@ -563,7 +561,7 @@ class BulkAnalysisDialog(QDialog):
             # Set status BEFORE hiding progress to ensure it's visible
             self.controller.set_progress_status("Bulk Analysis: Cancelled by user")
             self.status_label.setText("Cancelled by user")
-            QApplication.processEvents()  # Ensure UI updates
+            # Avoid nested event-loop pumping; Qt will repaint naturally.
             
             # Hide progress service AFTER setting status
             self.controller.hide_progress()
