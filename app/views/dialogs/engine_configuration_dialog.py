@@ -331,14 +331,12 @@ class EngineConfigurationDialog(QDialog):
         
         # Common parameters section
         common_group = QGroupBox("Common Parameters")
-        common_layout = QFormLayout()
+        # Compact 3-column layout (label above field) to reduce vertical height
+        # on low-resolution screens.
+        common_layout = QHBoxLayout()
         common_layout_spacing = tabs_layout_config.get('common_layout_spacing', 10)
         common_layout.setSpacing(common_layout_spacing)
-        # Set field growth policy to make fields expand
-        common_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
-        # Set alignment for macOS compatibility (left-align labels and form)
-        common_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
-        common_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        common_layout.setContentsMargins(0, 0, 0, 0)
         
         # Get saved parameters for this task (with fallback to recommended defaults)
         recommended_defaults = self.controller.get_recommended_defaults(task)
@@ -352,30 +350,48 @@ class EngineConfigurationDialog(QDialog):
         movetime_value = saved_params.get("movetime", recommended_defaults.get("movetime", 0))
         
         # Threads
+        threads_label = QLabel("Threads:")
+        threads_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
         threads_edit = QLineEdit()
         threads_edit.setText(str(threads_value))
         threads_edit.setValidator(QIntValidator(1, 512))
         threads_edit.setToolTip("Number of threads for engine analysis (1-512)")
         threads_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        common_layout.addRow("Threads:", threads_edit)
+        threads_col = QVBoxLayout()
+        threads_col.setSpacing(4)
+        threads_col.setContentsMargins(0, 0, 0, 0)
+        threads_col.addWidget(threads_label, 0, Qt.AlignmentFlag.AlignLeft)
+        threads_col.addWidget(threads_edit, 0)
         self.task_widgets[task]["threads"] = threads_edit
         
         # Depth
+        depth_label = QLabel("Max Depth:")
+        depth_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
         depth_edit = QLineEdit()
         depth_edit.setText(str(depth_value))
         depth_edit.setValidator(QIntValidator(0, 100))
         depth_edit.setToolTip("Maximum search depth")
         depth_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        common_layout.addRow("Max Depth:", depth_edit)
+        depth_col = QVBoxLayout()
+        depth_col.setSpacing(4)
+        depth_col.setContentsMargins(0, 0, 0, 0)
+        depth_col.addWidget(depth_label, 0, Qt.AlignmentFlag.AlignLeft)
+        depth_col.addWidget(depth_edit, 0)
         self.task_widgets[task]["depth"] = depth_edit
         
         # Movetime (in milliseconds)
+        movetime_label = QLabel("Move Time:")
+        movetime_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
         movetime_edit = QLineEdit()
         movetime_edit.setText(str(movetime_value))
         movetime_edit.setValidator(QIntValidator(0, 3600000))  # 1 hour max
         movetime_edit.setToolTip("Maximum time per move (ply) in milliseconds")
         movetime_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        common_layout.addRow("Move Time:", movetime_edit)
+        movetime_col = QVBoxLayout()
+        movetime_col.setSpacing(4)
+        movetime_col.setContentsMargins(0, 0, 0, 0)
+        movetime_col.addWidget(movetime_label, 0, Qt.AlignmentFlag.AlignLeft)
+        movetime_col.addWidget(movetime_edit, 0)
         self.task_widgets[task]["movetime"] = movetime_edit
         
         # Disable depth and movetime inputs based on task requirements
@@ -387,14 +403,30 @@ class EngineConfigurationDialog(QDialog):
             # Disable both depth and movetime for Evaluation and Manual Analysis
             depth_edit.setEnabled(False)
             depth_edit.setToolTip("Depth is not used for this task type (infinite/continuous analysis)")
+            depth_label.setEnabled(False)
             movetime_edit.setEnabled(False)
             movetime_edit.setToolTip("Move time is not used for this task type (infinite/continuous analysis)")
+            movetime_label.setEnabled(False)
         elif task == self.TASK_GAME_ANALYSIS or task == self.TASK_BRILLIANCY_DETECTION:
             # Disable depth only (movetime is used for Game Analysis and Brilliancy Detection)
             depth_edit.setEnabled(False)
             depth_edit.setToolTip("Depth is not used for this task type (move time / shallow depths from config)")
+            depth_label.setEnabled(False)
             movetime_edit.setEnabled(True)
             movetime_edit.setToolTip("Maximum time per move (ply) in milliseconds")
+            movetime_label.setEnabled(True)
+        
+        # Wrap columns into widgets so the outer layout can size them evenly.
+        threads_widget = QWidget()
+        threads_widget.setLayout(threads_col)
+        depth_widget = QWidget()
+        depth_widget.setLayout(depth_col)
+        movetime_widget = QWidget()
+        movetime_widget.setLayout(movetime_col)
+        
+        common_layout.addWidget(threads_widget, 1)
+        common_layout.addWidget(depth_widget, 1)
+        common_layout.addWidget(movetime_widget, 1)
         
         common_group.setLayout(common_layout)
         tab_layout.addWidget(common_group)
@@ -1306,14 +1338,18 @@ class EngineConfigurationDialog(QDialog):
                 title_padding=group_title_padding,
                 content_margins=group_content_margins
             )
-            # Reduce top spacing for Engine-Specific Parameters so Copy/Paste sit close to the title (all tabs)
+            # Reduce top spacing for specific groups that need denser content placement.
             left, right, bottom = group_content_margins[0], group_content_margins[2], group_content_margins[3]
+            common_params_content_top = groups_config.get('common_params_content_margin_top', 6)
             engine_params_content_top = groups_config.get('engine_params_content_margin_top', 2)
             for group_box in group_boxes:
-                if group_box.title() == "Engine-Specific Parameters":
-                    layout = group_box.layout()
-                    if layout:
-                        layout.setContentsMargins(left, engine_params_content_top, right, bottom)
+                layout = group_box.layout()
+                if not layout:
+                    continue
+                if group_box.title() == "Common Parameters":
+                    layout.setContentsMargins(left, common_params_content_top, right, bottom)
+                elif group_box.title() == "Engine-Specific Parameters":
+                    layout.setContentsMargins(left, engine_params_content_top, right, bottom)
             # Force layout recalculation by accessing layout properties
             # This ensures margins are properly applied and spacing is consistent across tabs
             for group_box in group_boxes:
