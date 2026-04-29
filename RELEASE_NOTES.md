@@ -1,5 +1,38 @@
 # Release Notes
 
+# CARA v2.7.6 - Player Stats Profiles, UI Improvements, and Bug Fixes
+
+**Release Date:** 29.04.2026
+
+This release introduces **Player Stats Profiles**, allowing users to maintain multiple player stats configurations and switch between them (similar to the Moves List profiles). It also includes a number of **UI improvements** across dialogs and views as well as several **bug fixes**.
+
+## New Features
+
+- **Player Stats Profiles:** Create and switch between different Player Stats configurations via a profile system. (For example: Different profile for analyzing human players and chess computer performances)
+
+## Enhancements
+
+- **Brilliant move detection:** Added new "Exclude already winning" option with configurable threshold, configurable in the Classification Settings dialog and default enabled with CPL threshold of 600cpl.
+- **Player Stats Time-Progression Charts:** Improved tooltip hover behavior on time series / progression charts, so the indicator follows the smoothed line.
+- **Dialog layouts** Multiple dialogs were refined for better usability on low-resolution displays and/or very high DPI scaling (including engine configuration, classification settings, and bulk PGN tag replacement dialogs).
+- **Engine / UCI efficiency:** Improved handling of terminal positions to avoid unnecessary engine queries and false indications (different UCI engines behave differently to receiving an already terminal position, so the app handles terminal position itself in order to assure correct indication)
+- **Save-as flow:** Simplified and improved the “Save PGN Database as…” behavior, resulting in faster saving.
+- **Accuracy distribution chart:** Updated the default profile (default) bin-density setting to 'auto' instead of 'more'.
+
+## Bug Fixes
+
+- **Bulk analysis:** Fixed a potential rare crash in bulk analysis under certain conditions.
+- **Manual analysis:** Fixed incorrect mate notation display in some scenarios.
+- **Evaluation bar:** Fixed rare edge cases where the evaluation bar could show incorrect evaluations, especially when navigating back and forth from a terminal position.
+- **Player Stats View:** Fixed unnecessary refresh behavior of the player selection dropdown and fixed several layout issues.
+- **Engine configuration dialog:** Fixed path display/eliding behavior in the engine configuration dialog.
+
+## Documentation
+
+- **HTML manual:** Updated the manual as part of the release update (Player stats profiles).
+
+---
+
 # CARA v2.7.5 - Positional Search, Castling Rights Widget, and Light Theme Update
 
 **Release Date:** 24.04.2026
