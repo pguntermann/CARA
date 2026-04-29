@@ -3873,6 +3873,18 @@
         "quick_select_buttons": {
           "enabled": true,
           "spacing": 8,
+          "select_all_button_icon_svg": "app/resources/icons/select_all_pgn_tags.svg",
+          "select_all_button_icon_tint_rgb": {
+            "$ref": "$_COLOR_COCOA_BROWN"
+          },
+          "select_all_button_icon_px": 18,
+          "select_all_button_tooltip": "Select all",
+          "deselect_all_button_icon_svg": "app/resources/icons/deselect_all_pgn_tags.svg",
+          "deselect_all_button_icon_tint_rgb": {
+            "$ref": "$_COLOR_COCOA_BROWN"
+          },
+          "deselect_all_button_icon_px": 18,
+          "deselect_all_button_tooltip": "Deselect all",
           "width": 100,
           "height": 24
         }

@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QWidget,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSize, QSignalBlocker
 from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent, QResizeEvent
 from typing import Optional, Dict, Any
 
@@ -20,6 +20,7 @@ from app.controllers.bulk_clean_pgn_controller import BulkCleanPgnController
 from app.models.database_model import DatabaseModel
 from app.utils.bulk_operation_summary import format_bulk_operation_summary_html
 from app.utils.path_display_utils import truncate_path_for_display, truncate_text_middle
+from app.utils.themed_icon import themed_icon_from_svg
 
 
 class BulkCleanPgnDialog(QDialog):
@@ -42,6 +43,7 @@ class BulkCleanPgnDialog(QDialog):
         
         # Track operation state
         self._operation_in_progress = False
+        self._controls_enabled = True
         
         self._load_config()
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
@@ -113,6 +115,17 @@ class BulkCleanPgnDialog(QDialog):
         self.quick_select_spacing = quick_select_config.get("spacing", 8)
         self.quick_select_width = quick_select_config.get("width", 100)
         self.quick_select_height = quick_select_config.get("height", 24)
+
+        # Icon-only quick-select buttons (SVG paths + tint + px + tooltips)
+        self.quick_select_select_svg = quick_select_config.get("select_all_button_icon_svg")
+        self.quick_select_select_tint_rgb = quick_select_config.get("select_all_button_icon_tint_rgb")
+        self.quick_select_select_icon_px = int(quick_select_config.get("select_all_button_icon_px", 18))
+        self.quick_select_select_tooltip = quick_select_config.get("select_all_button_tooltip", "Select all")
+
+        self.quick_select_deselect_svg = quick_select_config.get("deselect_all_button_icon_svg")
+        self.quick_select_deselect_tint_rgb = quick_select_config.get("deselect_all_button_icon_tint_rgb")
+        self.quick_select_deselect_icon_px = int(quick_select_config.get("deselect_all_button_icon_px", 18))
+        self.quick_select_deselect_tooltip = quick_select_config.get("deselect_all_button_tooltip", "Deselect all")
     
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
@@ -233,24 +246,35 @@ class BulkCleanPgnDialog(QDialog):
         if self.quick_select_enabled:
             quick_select_layout = QHBoxLayout()
             quick_select_layout.setSpacing(self.quick_select_spacing)
+            quick_select_left_margin = max(0, options_content_margins[0] - 2)
             quick_select_layout.setContentsMargins(
-                options_content_margins[0],
+                quick_select_left_margin,
                 0,
                 options_content_margins[2],
                 0
             )
+            # Keep the icon buttons aligned with the checkbox column below.
+            quick_select_layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             
-            self.select_all_button = QPushButton("Select All")
-            self.select_all_button.setFixedSize(self.quick_select_width, self.quick_select_height)
+            self.select_all_button = QPushButton()
+            self.select_all_button.setFixedSize(self.button_height, self.button_height)
+            self.select_all_button.setText("")
+            self.select_all_button.setAccessibleName("Select All")
             self.select_all_button.clicked.connect(self._on_select_all_clicked)
-            quick_select_layout.addWidget(self.select_all_button)
+            quick_select_layout.addWidget(
+                self.select_all_button,
+                alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+            )
             
-            self.deselect_all_button = QPushButton("Deselect All")
-            self.deselect_all_button.setFixedSize(self.quick_select_width, self.quick_select_height)
+            self.deselect_all_button = QPushButton()
+            self.deselect_all_button.setFixedSize(self.button_height, self.button_height)
+            self.deselect_all_button.setText("")
+            self.deselect_all_button.setAccessibleName("Deselect All")
             self.deselect_all_button.clicked.connect(self._on_deselect_all_clicked)
-            quick_select_layout.addWidget(self.deselect_all_button)
-            
-            quick_select_layout.addStretch()
+            quick_select_layout.addWidget(
+                self.deselect_all_button,
+                alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+            )
             
             options_container_layout.addLayout(quick_select_layout)
             
@@ -269,18 +293,49 @@ class BulkCleanPgnDialog(QDialog):
             options_content_margins[2],
             options_content_margins[3]
         )
+        options_layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         
         # Create checkboxes for each cleaning option
         self.remove_comments_check = QCheckBox("Remove Comments")
         self.remove_variations_check = QCheckBox("Remove Variations")
         self.remove_non_standard_tags_check = QCheckBox("Remove Non-Standard Tags")
         self.remove_annotations_check = QCheckBox("Remove Annotations")
+
+        # Track for quick-select enabled/disabled state
+        self._clean_checkboxes = [
+            self.remove_comments_check,
+            self.remove_variations_check,
+            self.remove_non_standard_tags_check,
+            self.remove_annotations_check,
+        ]
+        for cb in self._clean_checkboxes:
+            cb.stateChanged.connect(self._on_clean_checkbox_state_changed)
         
         # Arrange checkboxes in 2 columns: 3 in first column, 1 in second column
-        options_layout.addWidget(self.remove_comments_check, 0, 0)
-        options_layout.addWidget(self.remove_variations_check, 1, 0)
-        options_layout.addWidget(self.remove_non_standard_tags_check, 2, 0)
-        options_layout.addWidget(self.remove_annotations_check, 0, 1)
+        options_layout.addWidget(
+            self.remove_comments_check,
+            0,
+            0,
+            alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+        )
+        options_layout.addWidget(
+            self.remove_variations_check,
+            1,
+            0,
+            alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+        )
+        options_layout.addWidget(
+            self.remove_non_standard_tags_check,
+            2,
+            0,
+            alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+        )
+        options_layout.addWidget(
+            self.remove_annotations_check,
+            0,
+            1,
+            alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+        )
         
         options_container_layout.addLayout(options_layout)
         options_group.setLayout(QVBoxLayout())
@@ -416,6 +471,7 @@ class BulkCleanPgnDialog(QDialog):
         # Apply quick select button styling
         if self.quick_select_enabled and hasattr(self, 'select_all_button'):
             self._apply_quick_select_button_styling()
+            self._update_quick_select_buttons_enabled()
     
     def showEvent(self, event: QShowEvent) -> None:
         """Override showEvent to run path truncation with actual label size (DPI-aware)."""
@@ -423,10 +479,24 @@ class BulkCleanPgnDialog(QDialog):
         self._apply_configured_dialog_size()
         self._update_path_label_truncation()
         self._apply_configured_dialog_size()
+        self._enforce_quick_select_square()
     
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
         self._update_path_label_truncation()
+        self._enforce_quick_select_square()
+
+    def _enforce_quick_select_square(self) -> None:
+        """Keep quick-select icon buttons square after Qt layout passes."""
+        if not self.quick_select_enabled:
+            return
+        if not hasattr(self, "select_all_button") or not hasattr(self, "deselect_all_button"):
+            return
+        size = self.button_height
+        for btn in (self.select_all_button, self.deselect_all_button):
+            btn.setFixedSize(size, size)
+            btn.setMinimumSize(size, size)
+            btn.setMaximumSize(size, size)
     
     def _update_path_label_truncation(self) -> None:
         """Re-truncate path and name using actual width and font (DPI-aware)."""
@@ -489,12 +559,45 @@ class BulkCleanPgnDialog(QDialog):
         bg_color_list = [bg_color[0], bg_color[1], bg_color[2]]
         border_color_list = [border_color[0], border_color[1], border_color[2]]
         quick_select_buttons = [self.select_all_button, self.deselect_all_button]
+
+        icon_button_size = self.button_height
         StyleManager.style_buttons(
             quick_select_buttons,
             self.config,
             bg_color_list,
-            border_color_list
+            border_color_list,
+            min_width=None,
+            min_height=icon_button_size,
         )
+
+        # Icon-only behavior: set SVG icons with style-config tint.
+        # This mirrors BulkReplaceDialog and EngineConfigurationDialog patterns.
+        select_tint = (
+            int(self.quick_select_select_tint_rgb[0]),
+            int(self.quick_select_select_tint_rgb[1]),
+            int(self.quick_select_select_tint_rgb[2]),
+        )
+        deselect_tint = (
+            int(self.quick_select_deselect_tint_rgb[0]),
+            int(self.quick_select_deselect_tint_rgb[1]),
+            int(self.quick_select_deselect_tint_rgb[2]),
+        )
+
+        # Keep rendered icon sizes aligned with themed_icon_from_svg pixmap sizes (16/20/22/24/32).
+        # This avoids Qt scaling artifacts on some themes.
+        icon_px = max(16, min(22, icon_button_size - 8))
+
+        self.select_all_button.setIcon(themed_icon_from_svg(self.quick_select_select_svg, select_tint))
+        self.select_all_button.setText("")
+        self.select_all_button.setToolTip(self.quick_select_select_tooltip)
+        self.select_all_button.setIconSize(QSize(icon_px, icon_px))
+        self.select_all_button.setFixedSize(icon_button_size, icon_button_size)
+
+        self.deselect_all_button.setIcon(themed_icon_from_svg(self.quick_select_deselect_svg, deselect_tint))
+        self.deselect_all_button.setText("")
+        self.deselect_all_button.setToolTip(self.quick_select_deselect_tooltip)
+        self.deselect_all_button.setIconSize(QSize(icon_px, icon_px))
+        self.deselect_all_button.setFixedSize(icon_button_size, icon_button_size)
     
     def _on_apply_clicked(self) -> None:
         """Handle apply button click."""
@@ -537,8 +640,8 @@ class BulkCleanPgnDialog(QDialog):
         )
         
         # Re-enable controls
-        self._set_controls_enabled(True)
         self._operation_in_progress = False
+        self._set_controls_enabled(True)
         
         if not result.success:
             from app.views.dialogs.message_dialog import MessageDialog
@@ -563,17 +666,17 @@ class BulkCleanPgnDialog(QDialog):
     
     def _on_select_all_clicked(self) -> None:
         """Handle Select All button click."""
-        self.remove_comments_check.setChecked(True)
-        self.remove_variations_check.setChecked(True)
-        self.remove_non_standard_tags_check.setChecked(True)
-        self.remove_annotations_check.setChecked(True)
+        for cb in self._clean_checkboxes:
+            with QSignalBlocker(cb):
+                cb.setChecked(True)
+        self._update_quick_select_buttons_enabled()
     
     def _on_deselect_all_clicked(self) -> None:
         """Handle Deselect All button click."""
-        self.remove_comments_check.setChecked(False)
-        self.remove_variations_check.setChecked(False)
-        self.remove_non_standard_tags_check.setChecked(False)
-        self.remove_annotations_check.setChecked(False)
+        for cb in self._clean_checkboxes:
+            with QSignalBlocker(cb):
+                cb.setChecked(False)
+        self._update_quick_select_buttons_enabled()
     
     def _on_cancel_clicked(self) -> None:
         """Handle Cancel button click."""
@@ -591,7 +694,31 @@ class BulkCleanPgnDialog(QDialog):
         self.remove_annotations_check.setEnabled(enabled)
         self.apply_button.setEnabled(enabled)
         self.cancel_button.setEnabled(enabled)
-        if self.quick_select_enabled and hasattr(self, 'select_all_button'):
-            self.select_all_button.setEnabled(enabled)
-            self.deselect_all_button.setEnabled(enabled)
+        self._controls_enabled = enabled
+        self._update_quick_select_buttons_enabled()
+
+    def _on_clean_checkbox_state_changed(self, _state: int) -> None:
+        """Update quick-select buttons when checkbox selection changes."""
+        self._update_quick_select_buttons_enabled()
+
+    def _update_quick_select_buttons_enabled(self) -> None:
+        """Enable/disable quick-select icon buttons based on checkbox selection."""
+        if not getattr(self, "quick_select_enabled", False):
+            return
+        if not hasattr(self, "select_all_button") or not hasattr(self, "deselect_all_button"):
+            return
+        if not hasattr(self, "_clean_checkboxes"):
+            return
+
+        any_checked = any(cb.isChecked() for cb in self._clean_checkboxes)
+        all_checked = all(cb.isChecked() for cb in self._clean_checkboxes)
+
+        # If controls are disabled (e.g. operation in progress), force both off.
+        controls_enabled = getattr(self, "_controls_enabled", True)
+
+        # Requirement:
+        # - If all checked => Select All disabled
+        # - If none checked => Deselect All disabled
+        self.select_all_button.setEnabled(controls_enabled and (not all_checked))
+        self.deselect_all_button.setEnabled(controls_enabled and any_checked)
 
