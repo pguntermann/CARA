@@ -327,8 +327,6 @@ class ClassificationSettingsDialog(QDialog):
     def showEvent(self, event: QShowEvent) -> None:
         """Refresh values from model when shown (e.g. if changed elsewhere)."""
         super().showEvent(event)
-        self._apply_configured_dialog_size()
-        
         # Refresh values from model in case they were changed elsewhere
         classification_model = self.classification_controller.get_classification_model()
         self.current_thresholds = classification_model.get_assessment_thresholds()
@@ -347,6 +345,11 @@ class ClassificationSettingsDialog(QDialog):
         
         # Update CPL scale
         self._update_cpl_scale()
+        self._apply_configured_dialog_size()
+    
+    def _sync_brilliant_group_height(self) -> None:
+        """Legacy helper (unused)."""
+        return
     
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
@@ -363,20 +366,44 @@ class ClassificationSettingsDialog(QDialog):
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
         between_sections = layout_spacing + section_spacing
+
+        # Two-column layout to reduce height:
+        # - Left: Move Quality Thresholds + CPL Scale
+        # - Right: Brilliant Move Criteria
+        columns_layout = QHBoxLayout()
+        columns_layout.setContentsMargins(0, 0, 0, 0)
+        # Give visible horizontal breathing room between columns.
+        columns_layout.setSpacing(max(layout_spacing, section_spacing))
+        columns_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         
-        # Move Quality Thresholds group
-        thresholds_group = self._create_thresholds_group()
-        layout.addWidget(thresholds_group)
-        layout.addSpacing(between_sections)
+        left_column_layout = QVBoxLayout()
+        left_column_layout.setSpacing(between_sections)
+        left_column_layout.setContentsMargins(0, 0, 0, 0)
+        left_column_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         
-        # CPL Scale visualization
         self.cpl_scale_widget = self._create_cpl_scale_widget()
-        layout.addWidget(self.cpl_scale_widget)
-        layout.addSpacing(between_sections)
         
-        # Brilliant Move Criteria group
+        thresholds_group = self._create_thresholds_group(cpl_scale_widget=self.cpl_scale_widget)
+        left_column_layout.addWidget(thresholds_group)
+        self._thresholds_group = thresholds_group
+        
+        left_column_layout.addStretch(1)
+        
+        right_column_layout = QVBoxLayout()
+        right_column_layout.setSpacing(0)
+        right_column_layout.setContentsMargins(0, 0, 0, 0)
+        right_column_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        
         brilliant_group = self._create_brilliant_group()
-        layout.addWidget(brilliant_group)
+        self._brilliant_group = brilliant_group
+        # Match the right group height to the full thresholds group (including embedded graph).
+        brilliant_group.setMinimumHeight(thresholds_group.sizeHint().height())
+        right_column_layout.addWidget(brilliant_group)
+        right_column_layout.addStretch(1)
+        
+        columns_layout.addLayout(left_column_layout, 1)
+        columns_layout.addLayout(right_column_layout, 1)
+        layout.addLayout(columns_layout)
         
         # Buttons
         button_layout = QHBoxLayout()
@@ -400,7 +427,7 @@ class ClassificationSettingsDialog(QDialog):
         layout.addSpacing(self.bottom_button_top_padding)
         layout.addLayout(button_layout)
     
-    def _create_thresholds_group(self) -> QGroupBox:
+    def _create_thresholds_group(self, cpl_scale_widget: Optional[CPLScaleWidget] = None) -> QGroupBox:
         """Create the Move Quality Thresholds group box."""
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('classification_settings', {})
         groups_config = dialog_config.get('groups', {})
@@ -463,7 +490,16 @@ class ClassificationSettingsDialog(QDialog):
         # Initialize spinbox ranges after all spinboxes are created
         self._update_spinbox_ranges()
         
-        group.setLayout(form_layout)
+        if cpl_scale_widget is not None:
+            # Embed CPL graph at the top for visual consistency.
+            outer_layout = QVBoxLayout()
+            outer_layout.setContentsMargins(0, 0, 0, 0)
+            outer_layout.setSpacing(10)
+            outer_layout.addWidget(cpl_scale_widget)
+            outer_layout.addLayout(form_layout)
+            group.setLayout(outer_layout)
+        else:
+            group.setLayout(form_layout)
         return group
     
     def _create_cpl_scale_widget(self) -> CPLScaleWidget:
@@ -647,8 +683,9 @@ class ClassificationSettingsDialog(QDialog):
         self.candidate_selection_combobox.addItems(["Best Move only", "Best or Good Move"])
         candidate_selection = self.current_brilliant.get("candidate_selection", "best_move_only")
         self.candidate_selection_combobox.setCurrentIndex(0 if candidate_selection == "best_move_only" else 1)
-        # Make combobox wider to display full "Best or Good Move" text (about 75% wider)
-        combobox_width = int(input_width * 1.75)
+        # Make combobox wider to display full "Best or Good Move" text.
+        # In two-column layout this previously truncated on some DPI/theme combinations.
+        combobox_width = int(input_width * 2.0)
         self.candidate_selection_combobox.setFixedWidth(combobox_width)
         self.candidate_selection_combobox.setToolTip(wrap_tooltip_text("Choose which candidate moves to check for brilliancy detection. Selecting \"Best or Good Move\" may increase detection time."))
         form_layout.addRow(create_label("Move Candidate:"), create_combobox_widget(self.candidate_selection_combobox))

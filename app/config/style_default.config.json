@@ -2402,7 +2402,7 @@
         "builtin_hidden_chip_color": [75, 75, 82]
       },
       "classification_settings": {
-        "width": 480,
+        "width": 920,
         "bottom_button_top_padding": 50,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
