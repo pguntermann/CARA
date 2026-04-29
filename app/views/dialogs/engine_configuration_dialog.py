@@ -172,7 +172,10 @@ class EngineConfigurationDialog(QDialog):
         spacing_after_header = layout_config.get('spacing_after_header', 8)
         
         layout = QVBoxLayout(self)
-        layout.setSpacing(layout_spacing)
+        # Use explicit spacing instead of QVBoxLayout's automatic spacing.
+        # Otherwise we stack `layout_spacing` + the explicit `bottom_button_top_padding`,
+        # making the footer area look slightly too tall.
+        layout.setSpacing(0)
         # Prevent layout from resizing the dialog
         layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetNoConstraint)
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
@@ -253,6 +256,7 @@ class EngineConfigurationDialog(QDialog):
         header_layout.addWidget(path_row_widget)
 
         layout.addWidget(self._engine_header_widget)
+        layout.addSpacing(layout_spacing)
         
         # Tab widget for tasks (scroll areas use config-fixed heights; dialog height follows layout)
         self.tab_widget = QTabWidget()
