@@ -345,11 +345,27 @@ class ClassificationSettingsDialog(QDialog):
         
         # Update CPL scale
         self._update_cpl_scale()
+        # Scholar/light theme can slightly change group-box content metrics/padding,
+        # so after the layout is realized we sync both columns to the same pixel height.
+        self._sync_group_box_heights()
         self._apply_configured_dialog_size()
     
     def _sync_brilliant_group_height(self) -> None:
         """Legacy helper (unused)."""
         return
+
+    def _sync_group_box_heights(self) -> None:
+        """Force both group boxes to share the same height (pixel-accurate post-layout)."""
+        if not hasattr(self, "_thresholds_group") or not hasattr(self, "_brilliant_group"):
+            return
+        if self._thresholds_group is None or self._brilliant_group is None:
+            return
+
+        desired = max(self._thresholds_group.height(), self._brilliant_group.height())
+        self._thresholds_group.setMinimumHeight(desired)
+        self._brilliant_group.setMinimumHeight(desired)
+        self._thresholds_group.updateGeometry()
+        self._brilliant_group.updateGeometry()
     
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
@@ -396,8 +412,6 @@ class ClassificationSettingsDialog(QDialog):
         
         brilliant_group = self._create_brilliant_group()
         self._brilliant_group = brilliant_group
-        # Match the right group height to the full thresholds group (including embedded graph).
-        brilliant_group.setMinimumHeight(thresholds_group.sizeHint().height())
         right_column_layout.addWidget(brilliant_group)
         right_column_layout.addStretch(1)
         
@@ -874,7 +888,12 @@ class ClassificationSettingsDialog(QDialog):
         
         # Use input border and background colors for checkbox indicator
         input_border_color = widget_border_color
-        input_bg_color = [dialog_bg_color[0] + input_background_offset, dialog_bg_color[1] + input_background_offset, dialog_bg_color[2] + input_background_offset]
+        # Clamp to valid 0..255 range to avoid QColor::fromRgb warnings on bright themes.
+        input_bg_color = [
+            max(0, min(255, int(dialog_bg_color[0] + input_background_offset))),
+            max(0, min(255, int(dialog_bg_color[1] + input_background_offset))),
+            max(0, min(255, int(dialog_bg_color[2] + input_background_offset))),
+        ]
         
         # Get font family from fields config
         fields_config = dialog_config.get('fields', {})
