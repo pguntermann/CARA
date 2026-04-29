@@ -140,19 +140,21 @@ class EngineConfigurationDialog(QDialog):
         """Re-truncate path using label's actual width and font (DPI-aware)."""
         path_label = self._engine_path_label
         font = self._engine_path_font
-        w = path_label.width()
+        # Prefer the label's inner content width; this avoids over-eliding when
+        # the layout width already accounts for padding/spacing.
+        w = path_label.contentsRect().width()
         if w > 0:
-            path_max_width_px = max(80, w - 8)
+            path_max_width_px = max(1, int(w))
         else:
             dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('engine_configuration', {})
             layout_margins = dialog_config.get('layout', {}).get('margins', [10, 10, 10, 10])
+            dialog_outer_w = self.width() if self.width() > 0 else int(getattr(self, 'dialog_width', dialog_config.get('width', 600)))
             path_max_width_px = max(
-                80,
-                int(getattr(self, 'dialog_width', dialog_config.get('width', 600)))
+                1,
+                dialog_outer_w
                 - layout_margins[0]
                 - layout_margins[2]
                 - getattr(self, '_engine_path_lead_spacer', 0)
-                - 8,
             )
         path_display = truncate_path_for_display(
             self.engine_path, max_width_px=path_max_width_px, font=font
@@ -225,12 +227,11 @@ class EngineConfigurationDialog(QDialog):
         path_row.addWidget(path_spacer)
 
         initial_path_max = max(
-            80,
+            1,
             int(self.dialog_width)
             - layout_margins[0]
             - layout_margins[2]
             - spacer_w
-            - 8,
         )
         path_display = truncate_path_for_display(
             self.engine_path, max_width_px=initial_path_max, font=path_font
