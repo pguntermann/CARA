@@ -12,6 +12,8 @@ The project started from a desire for a tool that stays out of the way during re
 
 ![CARA Application Overview](app/resources/manual/screenshots/app_overview.png)
 
+> **Related project:** Also check out [Chess Recorder](https://github.com/pguntermann/ChessRecorder) — An iOS App to record chess games with speech recognition.
+
 **Contents:**
 
 [Download](#download) · [Features](#features) · [System requirements](#system-requirements) · [Installation](#installation) · [Usage](#usage) · [Documentation](#documentation) · [Keyboard shortcuts](#keyboard-shortcuts) · [License](#license) · [Contributing](#contributing) · [Contact](#contact) · [Acknowledgments](#acknowledgments) · [Special mentions](#special-mentions)
