@@ -15,7 +15,7 @@ from app.services.logging_service import LoggingService
 class ManualAnalysisEngineThread(QThread):
     """Thread for communicating with UCI engine for manual analysis with multipv support."""
     
-    line_update = pyqtSignal(int, float, bool, int, int, int, int, str)  # multipv, centipawns, is_mate, mate_moves, depth, nps, hashfull (-1 for not available), pv (empty string for not available)
+    line_update = pyqtSignal(int, float, bool, int, int, int, int, str, int, int, int)  # multipv, centipawns, is_mate, mate_moves, depth, nps, hashfull, pv, wdl_white, wdl_draw, wdl_black (-1 = N/A; white-POV permille)
     error_occurred = pyqtSignal(str)  # error_message
     
     def __init__(self, engine_path: Path, multipv: int = 1, update_interval_ms: int = 100, max_threads: Optional[int] = None, engine_options: Optional[Dict[str, Any]] = None, max_depth: int = 0, movetime: int = 0) -> None:
@@ -47,7 +47,7 @@ class ManualAnalysisEngineThread(QThread):
         self._os_thread_id: Optional[int] = None  # OS thread ID (set in run())
         self._is_black_to_move = False  # Track side to move for evaluation flipping
         self._last_update_time: Dict[int, float] = {}  # Track last signal emission time per multipv for throttling
-        self._pending_updates: Dict[int, tuple[float, bool, int, int, int, int, str]] = {}  # Pending updates per multipv
+        self._pending_updates: Dict[int, tuple[float, bool, int, int, int, int, str, int, int, int]] = {}  # Pending updates per multipv
         self._seen_explicit_multipv: bool = False  # Track if we've seen explicit multipv lines after restart
         self._pending_lines_without_multipv: list = []  # Queue for lines without explicit multipv after restart
         self._next_multipv_to_assign: int = 1  # Next multipv to assign to lines without explicit multipv
@@ -309,6 +309,9 @@ class ManualAnalysisEngineThread(QThread):
             
             for option_name, option_value in self.engine_options.items():
                 if option_name not in ["Threads", "MultiPV"]:
+                    # UCI check options expect lowercase true/false
+                    if isinstance(option_value, bool):
+                        option_value = "true" if option_value else "false"
                     self.uci.set_option(option_name, option_value, wait_for_ready=False)
             
             if not self.uci.confirm_ready():
@@ -422,7 +425,7 @@ class ManualAnalysisEngineThread(QThread):
                     if score is not None:
                         centipawns, is_mate, mate_moves = score
                         
-                        # Flip evaluation if Black is to move
+                        # Flip evaluation if Black is to move (normalize to White POV)
                         adjusted_centipawns = centipawns
                         adjusted_is_mate = is_mate
                         adjusted_mate_moves = mate_moves
@@ -430,6 +433,16 @@ class ManualAnalysisEngineThread(QThread):
                             adjusted_centipawns = -centipawns
                             if is_mate:
                                 adjusted_mate_moves = -mate_moves
+
+                        # UCI wdl is side-to-move POV; normalize to White / Draw / Black permille
+                        wdl_raw = self._parse_wdl(line)
+                        wdl_white, wdl_draw, wdl_black = -1, -1, -1
+                        if wdl_raw is not None:
+                            stm_win, stm_draw, stm_loss = wdl_raw
+                            if self._is_black_to_move:
+                                wdl_white, wdl_draw, wdl_black = stm_loss, stm_draw, stm_win
+                            else:
+                                wdl_white, wdl_draw, wdl_black = stm_win, stm_draw, stm_loss
                         
                         emit_depth = depth if depth is not None else 0
                         nps_value = nps if nps is not None else self._current_nps
@@ -442,7 +455,11 @@ class ManualAnalysisEngineThread(QThread):
                             continue
                         
                         # Throttle updates to avoid flooding the UI thread
-                        self._pending_updates[multipv] = (adjusted_centipawns, adjusted_is_mate, adjusted_mate_moves, emit_depth, nps_value, hashfull_value, pv_value)
+                        self._pending_updates[multipv] = (
+                            adjusted_centipawns, adjusted_is_mate, adjusted_mate_moves,
+                            emit_depth, nps_value, hashfull_value, pv_value,
+                            wdl_white, wdl_draw, wdl_black,
+                        )
                         
                         current_time = time.time() * 1000.0
                         last_update_time = self._last_update_time.get(multipv, 0.0)
@@ -450,7 +467,8 @@ class ManualAnalysisEngineThread(QThread):
                         
                         if time_since_last_update >= self.update_interval_ms:
                             if self.running and not self._stop_requested:
-                                self.line_update.emit(multipv, adjusted_centipawns, adjusted_is_mate, adjusted_mate_moves, emit_depth, nps_value, hashfull_value, pv_value)
+                                pending = self._pending_updates[multipv]
+                                self.line_update.emit(multipv, *pending)
                                 self._last_update_time[multipv] = current_time
                                 del self._pending_updates[multipv]
                 
@@ -670,11 +688,34 @@ class ManualAnalysisEngineThread(QThread):
             pass
         return None
 
+    def _parse_wdl(self, line: str) -> Optional[tuple[int, int, int]]:
+        """Parse UCI WDL from an info line (side-to-move perspective, permille).
+        
+        Args:
+            line: Info line from engine.
+            
+        Returns:
+            Tuple of (win, draw, loss) permille values, or None if not present.
+        """
+        parts = line.split()
+        try:
+            if "wdl" not in parts:
+                return None
+            idx = parts.index("wdl")
+            if idx + 3 >= len(parts):
+                return None
+            win = int(parts[idx + 1])
+            draw = int(parts[idx + 2])
+            loss = int(parts[idx + 3])
+            return (win, draw, loss)
+        except (ValueError, IndexError):
+            return None
+
 
 class ManualAnalysisEngineService(QObject):
     """Service for managing continuous UCI engine analysis with multipv support."""
     
-    line_update = pyqtSignal(int, float, bool, int, int, int, int, str)  # multipv, centipawns, is_mate, mate_moves, depth, nps, hashfull (-1 for not available), pv (empty string for not available)
+    line_update = pyqtSignal(int, float, bool, int, int, int, int, str, int, int, int)  # multipv, centipawns, is_mate, mate_moves, depth, nps, hashfull, pv, wdl_white, wdl_draw, wdl_black (-1 = N/A; white-POV permille)
     error_occurred = pyqtSignal(str)  # error_message
     
     def __init__(self, config: Dict[str, Any]) -> None:
@@ -730,6 +771,10 @@ class ManualAnalysisEngineService(QObject):
         for key, value in task_params.items():
             if key not in ["threads", "depth", "movetime"]:
                 engine_options[key] = value
+
+        # Auto-enable UCI WDL reporting when the engine advertises the option and
+        # the task params did not already set it (real engine WDL for the UI bar).
+        engine_options = self._ensure_show_wdl_option(engine_path, engine_options)
         
         # Create and start new analysis thread
         self.current_engine_path = engine_path
@@ -746,6 +791,37 @@ class ManualAnalysisEngineService(QObject):
         logging_service.info(f"Manual analysis engine started: path={engine_path}, multipv={final_multipv}, depth={max_depth}, threads={max_threads}, movetime={movetime}ms{options_str}")
         
         return True
+
+    def _ensure_show_wdl_option(self, engine_path: Path, engine_options: Dict[str, Any]) -> Dict[str, Any]:
+        """Enable UCI_ShowWDL when supported and not already configured for the task.
+        
+        Args:
+            engine_path: Path to the engine executable.
+            engine_options: Mutable options dict built from task parameters.
+            
+        Returns:
+            Options dict, possibly with UCI_ShowWDL set to true.
+        """
+        if "UCI_ShowWDL" in engine_options:
+            # Normalize bools to UCI lowercase strings
+            value = engine_options["UCI_ShowWDL"]
+            if isinstance(value, bool):
+                engine_options = dict(engine_options)
+                engine_options["UCI_ShowWDL"] = "true" if value else "false"
+            return engine_options
+
+        from app.services.engine_parameters_service import EngineParametersService
+        options = EngineParametersService.get_instance().get_engine_options(str(engine_path))
+        supports_show_wdl = any(
+            isinstance(opt, dict) and opt.get("name") == "UCI_ShowWDL"
+            for opt in (options or [])
+        )
+        if not supports_show_wdl:
+            return engine_options
+
+        updated = dict(engine_options)
+        updated["UCI_ShowWDL"] = "true"
+        return updated
     
     def update_position(self, fen: str) -> None:
         """Update analysis position.

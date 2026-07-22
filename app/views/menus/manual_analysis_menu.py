@@ -54,6 +54,12 @@ def setup_manual_analysis_menu(mw, menu_bar: QMenuBar) -> None:
     mw.enable_miniature_preview_action.triggered.connect(mw._on_enable_miniature_preview_toggled)
     manual_analysis_menu.addAction(mw.enable_miniature_preview_action)
 
+    mw.show_wdl_probabilities_action = QAction("Show W/D/L probabilities", mw)
+    mw.show_wdl_probabilities_action.setCheckable(True)
+    mw.show_wdl_probabilities_action.setChecked(True)
+    mw.show_wdl_probabilities_action.triggered.connect(mw._on_show_wdl_probabilities_toggled)
+    manual_analysis_menu.addAction(mw.show_wdl_probabilities_action)
+
     mw.miniature_preview_scale_menu = manual_analysis_menu.addMenu(
         "Set miniature preview scale factor"
     )

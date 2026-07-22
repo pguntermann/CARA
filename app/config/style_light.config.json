@@ -1667,6 +1667,31 @@
             "background_color": [55, 85, 135],
             "padding": [8, 4, 8, 4]
           },
+          "win_probability": {
+            "show_title": true,
+            "show_labels": true,
+            "title": "Win probability",
+            "bar_height": 8,
+            "segment_gap": 1,
+            "border_radius": 3,
+            "border_width": 1,
+            "spacing": 6,
+            "padding": [8, 6, 8, 6],
+            "font_size": 9,
+            "white_color": [250, 250, 252],
+            "draw_color": [160, 175, 200],
+            "black_color": [20, 20, 23],
+            "border_color": {
+              "$ref": "$_COLOR_BORDER"
+            },
+            "background_color": [55, 85, 135],
+            "label_color": {
+              "$ref": "$_COLOR_ON_ACCENT"
+            },
+            "title_color": {
+              "$ref": "$_COLOR_ON_ACCENT"
+            }
+          },
           "evaluation_difference": {
             "positive_color": [100, 255, 100],
             "negative_color": [255, 100, 100]

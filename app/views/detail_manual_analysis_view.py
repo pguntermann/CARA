@@ -14,6 +14,7 @@ from app.controllers.manual_analysis_controller import ManualAnalysisController
 from app.controllers.engine_controller import TASK_MANUAL_ANALYSIS
 from app.views.dialogs.message_dialog import MessageDialog
 from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_PLAY, SVG_MENU_STOP, SVG_MENU_FREEZE
+from app.views.widgets.win_probability_bar_widget import WinProbabilityBarWidget
 
 
 class DetailManualAnalysisView(QWidget):
@@ -255,6 +256,10 @@ class DetailManualAnalysisView(QWidget):
         if self.statistics_enabled and self.statistics_position == 'top':
             self.statistics_bar = self._create_statistics_bar()
             layout.addWidget(self.statistics_bar)
+
+        # Win probability (UCI WDL) — above PV lines; hidden until PV1 reports wdl
+        self.win_probability_bar = WinProbabilityBarWidget(self.config)
+        layout.addWidget(self.win_probability_bar)
         
         # Analysis lines display area (scrollable) - directly under control bar
         self.analysis_area = self._create_analysis_area()
@@ -1105,6 +1110,9 @@ class DetailManualAnalysisView(QWidget):
                 self._analysis_model.lines_changed.disconnect(self._on_lines_changed)
                 self._analysis_model.is_analyzing_changed.disconnect(self._on_is_analyzing_changed)
                 self._analysis_model.is_frozen_changed.disconnect(self._on_is_frozen_changed)
+                self._analysis_model.show_wdl_probabilities_changed.disconnect(
+                    self._on_show_wdl_probabilities_changed
+                )
             except TypeError:
                 # Signal was not connected, ignore
                 pass
@@ -1118,6 +1126,7 @@ class DetailManualAnalysisView(QWidget):
             model.lines_changed.connect(self._on_lines_changed)
             model.is_analyzing_changed.connect(self._on_is_analyzing_changed)
             model.is_frozen_changed.connect(self._on_is_frozen_changed)
+            model.show_wdl_probabilities_changed.connect(self._on_show_wdl_probabilities_changed)
             
             # Connect to board model for arrow visibility changes
             if self._analysis_controller:
@@ -1130,6 +1139,7 @@ class DetailManualAnalysisView(QWidget):
             # Initialize with current state (immediate update)
             self._on_is_analyzing_changed(model.is_analyzing)
             self._on_is_frozen_changed(model.is_frozen)
+            self._on_show_wdl_probabilities_changed(model.show_wdl_probabilities)
             self._on_lines_changed()
             self._on_analysis_changed(immediate=True)
     
@@ -1393,6 +1403,8 @@ class DetailManualAnalysisView(QWidget):
             # Hide statistics bar when analysis stops
             if self.statistics_bar:
                 self.statistics_bar.setVisible(False)
+            if hasattr(self, "win_probability_bar") and self.win_probability_bar:
+                self.win_probability_bar.set_wdl(None)
         self.start_stop_button.blockSignals(False)
         self._refresh_start_stop_button_icon(is_analyzing=is_analyzing)
 
@@ -1544,6 +1556,7 @@ class DetailManualAnalysisView(QWidget):
         
         # Update statistics bar
         self._update_statistics_bar()
+        self._update_win_probability_bar()
         
         # Get all analysis lines
         lines = self._analysis_model.lines
@@ -2456,3 +2469,20 @@ class DetailManualAnalysisView(QWidget):
             self.statistics_bar.setVisible(True)
         else:
             self.statistics_bar.setVisible(False)
+
+    def _update_win_probability_bar(self) -> None:
+        """Refresh PV1 UCI WDL bar (hidden when unavailable, disabled, or analysis stopped)."""
+        if not hasattr(self, "win_probability_bar") or self.win_probability_bar is None:
+            return
+        if not self._analysis_model or not self._is_analyzing:
+            self.win_probability_bar.set_wdl(None)
+            return
+        if not self._analysis_model.show_wdl_probabilities:
+            self.win_probability_bar.set_wdl(None)
+            return
+        self.win_probability_bar.set_wdl(self._analysis_model.get_pv1_wdl())
+
+    def _on_show_wdl_probabilities_changed(self, _enabled: bool) -> None:
+        """Handle Show W/D/L probabilities preference change from model."""
+        self._update_win_probability_bar()
+   

@@ -546,7 +546,7 @@ class ManualAnalysisController:
             new_multipv = self.analysis_model.multipv - 1
             self.set_multipv(new_multipv)
     
-    def _on_line_update(self, multipv: int, centipawns: float, is_mate: bool, mate_moves: int, depth: int, nps: int, hashfull: int, pv: str) -> None:
+    def _on_line_update(self, multipv: int, centipawns: float, is_mate: bool, mate_moves: int, depth: int, nps: int, hashfull: int, pv: str, wdl_white: int = -1, wdl_draw: int = -1, wdl_black: int = -1) -> None:
         """Handle analysis line update from service.
         
         Args:
@@ -558,6 +558,9 @@ class ManualAnalysisController:
             nps: Nodes per second (-1 if not available).
             hashfull: Hash table usage 0-1000 (-1 if not available).
             pv: Principal variation as space-separated moves (empty string if not available).
+            wdl_white: White win permille (white POV), or -1 if not available.
+            wdl_draw: Draw permille, or -1 if not available.
+            wdl_black: Black win permille (white POV), or -1 if not available.
         """
         # Check if this update matches the expected FEN
         # This prevents stale updates from previous positions from updating the lines
@@ -584,7 +587,10 @@ class ManualAnalysisController:
             return
         
         # Update model (this will trigger UI updates)
-        self.analysis_model.update_line(multipv, centipawns, is_mate, mate_moves, depth, pv, nps, hashfull)
+        self.analysis_model.update_line(
+            multipv, centipawns, is_mate, mate_moves, depth, pv, nps, hashfull,
+            wdl_white, wdl_draw, wdl_black,
+        )
         
         # Update progress bar with analysis details (use best line for status)
         # Use a timer to defer the status update, allowing UI to process events

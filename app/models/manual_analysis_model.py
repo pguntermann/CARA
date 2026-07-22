@@ -18,6 +18,10 @@ class AnalysisLine:
     pv: str = ""  # Principal variation as space-separated moves
     nps: int = -1  # Nodes per second (-1 if not available)
     hashfull: int = -1  # Hash table usage 0-1000 (-1 if not available)
+    # White-POV UCI WDL permille (0-1000); -1 if engine did not report WDL
+    wdl_white: int = -1
+    wdl_draw: int = -1
+    wdl_black: int = -1
 
 
 class ManualAnalysisModel(QObject):
@@ -33,6 +37,7 @@ class ManualAnalysisModel(QObject):
     is_analyzing_changed = pyqtSignal(bool)  # Emitted when analysis state changes (is_analyzing)
     is_frozen_changed = pyqtSignal(bool)  # Emitted when freeze state changes (hold PV display)
     enable_miniature_preview_changed = pyqtSignal(bool)  # Emitted when miniature preview setting changes
+    show_wdl_probabilities_changed = pyqtSignal(bool)  # Emitted when WDL bar visibility preference changes
     miniature_preview_scale_factor_changed = pyqtSignal(float)  # Emitted when miniature preview scale factor changes
     
     def __init__(self) -> None:
@@ -45,6 +50,7 @@ class ManualAnalysisModel(QObject):
         self._start_time: Optional[float] = None  # Timestamp when analysis started (None if not analyzing)
         self._last_update_time: Optional[float] = None  # Timestamp of last engine update (None if none yet)
         self._enable_miniature_preview: bool = True  # Enable miniature board preview on PV hover
+        self._show_wdl_probabilities: bool = True  # Show PV1 UCI W/D/L bar when available
         self._miniature_preview_scale_factor: float = 1.25  # Matches template default; menu presets 1.0–2.0
     
     @property
@@ -173,7 +179,8 @@ class ManualAnalysisModel(QObject):
     
     def update_line(self, multipv: int, centipawns: float, is_mate: bool,
                     mate_moves: int, depth: int, pv: str = "",
-                    nps: int = -1, hashfull: int = -1) -> None:
+                    nps: int = -1, hashfull: int = -1,
+                    wdl_white: int = -1, wdl_draw: int = -1, wdl_black: int = -1) -> None:
         """Update an analysis line.
         
         Args:
@@ -185,6 +192,9 @@ class ManualAnalysisModel(QObject):
             pv: Principal variation as space-separated moves.
             nps: Nodes per second (-1 if not available).
             hashfull: Hash table usage 0-1000 (-1 if not available).
+            wdl_white: White win permille (white POV), or -1 if not available.
+            wdl_draw: Draw permille, or -1 if not available.
+            wdl_black: Black win permille (white POV), or -1 if not available.
         """
         # Check if line already exists - if so, always allow updates (even if multipv > current)
         # This handles the case where engine sends updates before model multipv is updated
@@ -199,17 +209,40 @@ class ManualAnalysisModel(QObject):
             line.pv = pv
             line.nps = nps
             line.hashfull = hashfull
+            # WDL is displayed for PV1 only; keep last known values if this update omits wdl
+            if multipv == 1 and wdl_white >= 0 and wdl_draw >= 0 and wdl_black >= 0:
+                line.wdl_white = wdl_white
+                line.wdl_draw = wdl_draw
+                line.wdl_black = wdl_black
             self._last_update_time = time.time()
             self.analysis_changed.emit()
         else:
             # Line doesn't exist - only create if within current multipv range
             # This prevents stale engine updates from recreating removed lines
             if multipv <= self._multipv:
-                line = AnalysisLine(multipv, centipawns, is_mate, mate_moves, depth, pv, nps, hashfull)
+                line = AnalysisLine(
+                    multipv, centipawns, is_mate, mate_moves, depth, pv, nps, hashfull,
+                    wdl_white if multipv == 1 else -1,
+                    wdl_draw if multipv == 1 else -1,
+                    wdl_black if multipv == 1 else -1,
+                )
                 self._lines.append(line)
                 self._last_update_time = time.time()
                 self.analysis_changed.emit()
             # If line doesn't exist and multipv > current, silently ignore
+
+    def get_pv1_wdl(self) -> Optional[tuple[int, int, int]]:
+        """Get white-POV WDL permille from PV1 when available.
+        
+        Returns:
+            (white, draw, black) permille tuple, or None if not available.
+        """
+        line = self.get_line(1)
+        if line is None:
+            return None
+        if line.wdl_white < 0 or line.wdl_draw < 0 or line.wdl_black < 0:
+            return None
+        return (line.wdl_white, line.wdl_draw, line.wdl_black)
     
     def get_best_line(self) -> Optional[AnalysisLine]:
         """Get the best analysis line (multipv 1).
@@ -254,6 +287,26 @@ class ManualAnalysisModel(QObject):
         if self._enable_miniature_preview != value:
             self._enable_miniature_preview = value
             self.enable_miniature_preview_changed.emit(value)
+
+    @property
+    def show_wdl_probabilities(self) -> bool:
+        """Get whether the PV1 W/D/L probability bar should be shown.
+        
+        Returns:
+            True if the WDL bar is enabled, False otherwise.
+        """
+        return self._show_wdl_probabilities
+
+    @show_wdl_probabilities.setter
+    def show_wdl_probabilities(self, value: bool) -> None:
+        """Set whether the PV1 W/D/L probability bar should be shown.
+        
+        Args:
+            value: True to show the bar when WDL is available, False to hide it.
+        """
+        if self._show_wdl_probabilities != value:
+            self._show_wdl_probabilities = value
+            self.show_wdl_probabilities_changed.emit(value)
     
     @property
     def miniature_preview_scale_factor(self) -> float:

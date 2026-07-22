@@ -3167,6 +3167,16 @@ class MainWindow(QMainWindow):
             manual_analysis_model = manual_analysis_controller.get_analysis_model()
             if manual_analysis_model:
                 manual_analysis_model.enable_miniature_preview = enabled
+
+    def _on_show_wdl_probabilities_toggled(self) -> None:
+        """Handle Show W/D/L probabilities toggle from menu."""
+        enabled = self.show_wdl_probabilities_action.isChecked()
+        self._update_manual_analysis_setting("show_wdl_probabilities", enabled)
+        manual_analysis_controller = self.controller.get_manual_analysis_controller()
+        if manual_analysis_controller:
+            manual_analysis_model = manual_analysis_controller.get_analysis_model()
+            if manual_analysis_model:
+                manual_analysis_model.show_wdl_probabilities = enabled
     
     def _on_miniature_preview_scale_factor_selected(self, scale_factor: float) -> None:
         """Handle miniature preview scale factor selection from menu.
@@ -4024,6 +4034,15 @@ class MainWindow(QMainWindow):
                 manual_analysis_model.enable_miniature_preview = enable_miniature_preview
         if hasattr(self, 'enable_miniature_preview_action'):
             self.enable_miniature_preview_action.setChecked(enable_miniature_preview)
+
+        # Show W/D/L probabilities (default on)
+        show_wdl_probabilities = manual_analysis_settings.get("show_wdl_probabilities", True)
+        if manual_analysis_controller:
+            manual_analysis_model = manual_analysis_controller.get_analysis_model()
+            if manual_analysis_model:
+                manual_analysis_model.show_wdl_probabilities = show_wdl_probabilities
+        if hasattr(self, "show_wdl_probabilities_action"):
+            self.show_wdl_probabilities_action.setChecked(show_wdl_probabilities)
         
         # Miniature preview scale factor
         scale_factor = manual_analysis_settings.get("miniature_preview_scale_factor", 1.25)

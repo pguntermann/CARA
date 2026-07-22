@@ -243,6 +243,9 @@
             "format": "compact",
             "separator": " | "
           },
+          "win_probability": {
+            "enabled": true
+          },
           "evaluation_difference": {
             "enabled": true,
             "show_delta": true,
