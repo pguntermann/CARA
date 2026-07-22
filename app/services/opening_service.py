@@ -28,6 +28,8 @@ class OpeningService:
         self.config = config
         self._eco_base: Optional[Dict[str, Any]] = None
         self._eco_interpolated: Optional[Dict[str, Any]] = None
+        # Placement + side-to-move index (ignores EP and clocks), matching Chess Recorder.
+        self._openings_by_book_key: Dict[str, Dict[str, Any]] = {}
         self._loaded = False
     
     def load(self) -> None:
@@ -61,6 +63,11 @@ class OpeningService:
                 self._eco_interpolated = json.load(f)
         else:
             self._eco_interpolated = {}
+
+        self._openings_by_book_key = self._build_book_key_index(
+            self._eco_base or {},
+            self._eco_interpolated or {},
+        )
         
         self._loaded = True
         
@@ -69,10 +76,47 @@ class OpeningService:
         logging_service = LoggingService.get_instance()
         base_count = len(self._eco_base) if self._eco_base else 0
         interpolated_count = len(self._eco_interpolated) if self._eco_interpolated else 0
-        logging_service.info(f"Opening book loaded: path={ecolists_path}, base_positions={base_count}, interpolated_positions={interpolated_count}")
+        logging_service.info(
+            f"Opening book loaded: path={ecolists_path}, base_positions={base_count}, "
+            f"interpolated_positions={interpolated_count}, book_keys={len(self._openings_by_book_key)}"
+        )
+
+    @staticmethod
+    def book_key(fen: str) -> str:
+        """Normalize a FEN to placement + side-to-move (ignore EP and clocks).
+        
+        Args:
+            fen: Full or partial FEN string.
+            
+        Returns:
+            Book key used for clock-independent opening lookup.
+        """
+        fields = fen.split(" ")
+        if len(fields) >= 2:
+            return f"{fields[0]} {fields[1]}"
+        return fen
+
+    def _build_book_key_index(
+        self,
+        eco_base: Dict[str, Any],
+        eco_interpolated: Dict[str, Any],
+    ) -> Dict[str, Dict[str, Any]]:
+        """Build placement+STM index; interpolated entries override base on collision."""
+        indexed: Dict[str, Dict[str, Any]] = {}
+        for fen, entry in eco_base.items():
+            if isinstance(entry, dict):
+                indexed[self.book_key(fen)] = entry
+        for fen, entry in eco_interpolated.items():
+            if isinstance(entry, dict):
+                indexed[self.book_key(fen)] = entry
+        return indexed
     
     def lookup_opening(self, fen: str) -> Optional[Dict[str, Any]]:
         """Look up opening information for a FEN position.
+        
+        Tries an exact full-FEN match first (interpolated, then base), then falls
+        back to a placement + side-to-move key so positions that re-enter book at
+        a different move clock still resolve.
         
         Args:
             fen: FEN position string.
@@ -90,8 +134,9 @@ class OpeningService:
         # Then check base files
         if self._eco_base and fen in self._eco_base:
             return self._eco_base[fen]
-        
-        return None
+
+        # Clock/EP-independent fallback (Chess Recorder bookKey behavior)
+        return self._openings_by_book_key.get(self.book_key(fen))
     
     def get_opening_info(self, fen: str) -> Tuple[Optional[str], Optional[str]]:
         """Get ECO code and opening name for a FEN position.
@@ -175,4 +220,3 @@ class OpeningService:
         except Exception:
             # If parsing fails, return None
             return None
-
