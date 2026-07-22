@@ -1,5 +1,27 @@
 # Release Notes
 
+# CARA v2.7.7 - Opening Explorer, Manual Analysis Freeze, and W/D/L Bar
+
+**Release Date:** 22.07.2026
+
+This release adds a new **Opening Explorer** detail tab (inspired by a similar feature of my iOS side-project Chess Recorder) for browsing the path to the current position and book continuations, introduces **Freeze Analysis** and an optional **W/D/L probability bar** in Manual Analysis, and updates the HTML user manual (including revised detail-tab shortcuts). It also fixes a small bug in the opening service lookup.
+
+## New Features
+
+- **Opening Explorer:** New detail-panel tab to browse the opening path that led to the current position and expand ECO book continuations from here. Embedded mini boards follow the main board’s piece set, colors, and orientation. Open via **View → Opening Explorer** (`F4`). You can directly jump to the respective opening lookup on Lichess.
+- **Manual Analysis – Freeze Analysis:** Hold the currently displayed PV lines and statistics while the engine continues searching in the background; unfreeze to resume live updates.
+- **Manual Analysis – W/D/L probabilities:** Optional win/draw/loss bar for the best line (PV1) when the assigned engine reports UCI WDL (engines that support `UCI_ShowWDL` - for example Stockfish and Lc0). Labeled “Win probability (best engine play)” to clarify that values reflect strong engine self-play style outcomes, not human opening statistics.
+
+## Bug Fixes
+
+- **Opening service:** More reliable handling when a line leaves book and later re-enters a known ECO position.
+
+## Documentation
+
+- **HTML manual:** Documented Opening Explorer, Freeze Analysis, and the W/D/L bar; corrected F-key mappings for all detail tabs.
+
+---
+
 # CARA v2.7.6 - Player Stats Profiles, UI Improvements, and Bug Fixes
 
 **Release Date:** 29.04.2026
