@@ -3538,7 +3538,8 @@ class MainWindow(QMainWindow):
         """Switch to the specified detail panel tab.
         
         Args:
-            index: Tab index (0=Moves List, 1=Metadata, 2=Manual Analysis, 3=Game Summary, 4=Player Stats, 5=Annotations, 6=AI Summary, 7=Notes).
+            index: Tab index (0=Moves List, 1=Metadata, 2=Manual Analysis, 3=Opening Explorer,
+                   4=Game Summary, 5=Player Stats, 6=Annotations, 7=AI Summary, 8=Notes).
         """
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'tab_widget'):
             tab_widget = self.detail_panel.tab_widget
@@ -4220,7 +4221,7 @@ class MainWindow(QMainWindow):
             # Switch to Moves List tab if enabled (do this immediately after successful start)
             if hasattr(self, 'switch_to_moves_list_action') and self.switch_to_moves_list_action.isChecked():
                 if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'tab_widget'):
-                    # Find Moves List tab index (should be index 0: Moves List=0, Metadata=1, Manual Analysis=2, Game Summary=3)
+                    # Find Moves List tab by title (index may shift when tabs are added)
                     tab_widget = self.detail_panel.tab_widget
                     for i in range(tab_widget.count()):
                         if tab_widget.tabText(i) == "Moves List":
@@ -4340,7 +4341,7 @@ class MainWindow(QMainWindow):
         # Switch to Game Summary tab if enabled
         if hasattr(self, 'switch_to_summary_action') and self.switch_to_summary_action.isChecked():
             if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'tab_widget'):
-                # Find Game Summary tab index (should be index 3: Moves List=0, Metadata=1, Manual Analysis=2, Game Summary=3)
+                # Find Game Summary tab by title (index may shift when tabs are added)
                 tab_widget = self.detail_panel.tab_widget
                 for i in range(tab_widget.count()):
                     if tab_widget.tabText(i) == "Game Summary":

@@ -44,6 +44,8 @@ For a structured overview of everything CARA can do, see **[Key Features](https:
 
 - **Manual Analysis**: Perform continuous engine analysis on any position with MultiPV support. You can navigate through game positions while maintaining continuous analysis of the current position. Hovering over principal variation moves displays a beautiful optional miniature board showing the resulting position. Positional plan exploration extracts piece trajectories from PV lines, visualizing how pieces move through the engine's recommended plan on the chessboard. You can explore positional plans for up to three PV lines (PV1, PV2, PV3) independently, with configurable options for the number of pieces to track and exploration depth.
 
+- **Opening Explorer**: Browse the opening path that led to the current position and expand book continuations from here. Embedded mini boards follow the main board's piece set, colors, and orientation. Open via **View → Opening Explorer** (`F4`).
+
 - **Annotations**: Powerful free-form annotation system for marking positions, ideas, and analysis insights. Unlike other chess applications, text can be freely positioned anywhere on the board, adjusted in size and rotated. In addition to text, you can add arrows, circles, and square highlighting with customizable colors. Annotations are position-specific, attached to individual moves in the game, and are compressed and serialized in a PGN metadata tag to keep the PGN move notation clean. This flexible annotation system enables you to create rich, personalized study materials and analysis notes.
 
 - **AI Summary**: Interactive chat to discuss positions with an LLM, with context from engine analysis, classifications, and evaluations. Supports **OpenAI**, **Anthropic**, and **custom OpenAI-compatible APIs** (including **local LLMs**). See the [user manual](https://pguntermann.github.io/CARA/manual.html) for configuration details.
@@ -186,7 +188,7 @@ For detailed instructions, see the [user manual](https://pguntermann.github.io/C
 
 4. **Start the game analysis**: Press `Ctrl+G` / `⌘+G` (or use **Game Analysis → Start Game Analysis**) to begin analyzing the game. Watch as the moves list fills in with evaluation data, move classifications, CPL values, and best move alternatives as the analysis progresses. Progress and estimated time remaining are shown in the status bar.
 
-5. **Review the results**: Once analysis completes, you can review the per-move analysis directly in the Moves List, or press `F4` to switch to the Game Summary tab for a condensed overview showing key statistics, the evaluation graph, critical moments, and detected game highlights.
+5. **Review the results**: Once analysis completes, you can review the per-move analysis directly in the Moves List, or press `F5` to switch to the Game Summary tab for a condensed overview showing key statistics, the evaluation graph, critical moments, and detected game highlights.
 
 ### Configuration Files
 
@@ -254,7 +256,9 @@ CARA was built in large part by an AI model under the author's direction. The au
 - `Ctrl+G` / `⌘+G`: Start game analysis
 - `Escape`: Cancel analysis
 - `F1`: Switch to Moves List tab
-- `F4`: Switch to Game Summary tab
+- `F3`: Switch to Manual Analysis tab
+- `F4`: Switch to Opening Explorer tab
+- `F5`: Switch to Game Summary tab
 - `Ctrl+Shift+K` / `⌘+Shift+K`: Configure classification settings
 - `Ctrl+O` / `⌘+O`: Open PGN database
 - `Ctrl+V` / `⌘+V`: Paste PGN to Clipboard database

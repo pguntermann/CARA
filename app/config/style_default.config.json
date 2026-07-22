@@ -1710,6 +1710,70 @@
             }
           }
         },
+        "opening_explorer": {
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "row_spacing": 8,
+          "section_spacing": 12,
+          "padding": [8, 8, 8, 8],
+          "show_move_arrows": true,
+          "max_continuation_depth": 8,
+          "expand_button": {
+            "size": 28,
+            "font_size": 16
+          },
+          "lichess_link": {
+            "enabled": true,
+            "tooltip": "Open this opening on Lichess"
+          },
+          "path_section": {
+            "collapsed_by_default": false
+          },
+          "placeholder": {
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_4"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_LARGE"
+            },
+            "padding": 20
+          },
+          "mini_board": {
+            "size": 128,
+            "border": {
+              "size": 2,
+              "color": {
+                "$ref": "$_COLOR_BUTTON_BORDER"
+              }
+            }
+          },
+          "colors": {
+            "title": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            },
+            "text": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            },
+            "muted": {
+              "$ref": "$_COLOR_TEXT_4"
+            },
+            "gap": [200, 160, 100],
+            "row_background": {
+              "$ref": "$_COLOR_BACKGROUND_3"
+            },
+            "row_border": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            },
+            "current_badge_background": {
+              "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            },
+            "current_badge_text": [240, 240, 240]
+          }
+        },
         "annotations": {
           "placeholder": {
             "text_color": {

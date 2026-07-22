@@ -12,9 +12,19 @@ from app.services.logging_service import LoggingService
 
 
 class MiniChessBoardWidget(QWidget):
-    """Mini chessboard widget displaying only pieces (no arrows, coordinates, etc.)."""
+    """Mini chessboard widget displaying pieces (popup or embedded), following main-board style."""
     
-    def __init__(self, config: Dict[str, Any], fen: str, is_flipped: bool = False, scale_factor: float = 1.0) -> None:
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        fen: str,
+        is_flipped: bool = False,
+        scale_factor: float = 1.0,
+        *,
+        embedded: bool = False,
+        size_override: Optional[int] = None,
+        mini_board_config: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """Initialize the mini chessboard widget.
         
         Args:
@@ -22,6 +32,10 @@ class MiniChessBoardWidget(QWidget):
             fen: FEN string representing the position to display.
             is_flipped: Whether the board should be displayed flipped (matching main board).
             scale_factor: Scale factor for board size (1.0 = default, 1.25 = 1.25x, etc.).
+            embedded: If True, behave as a normal child widget (no ToolTip/popup flags).
+            size_override: Optional base board size in pixels (before scale_factor).
+            mini_board_config: Optional mini-board style overrides (size/border); falls back
+                to manual_analysis.pv_hover.mini_board when omitted.
         """
         super().__init__()
         self.config = config
@@ -30,16 +44,19 @@ class MiniChessBoardWidget(QWidget):
         self._move_to_show: Optional[chess.Move] = None
         self._show_arrow = False
         self._scale_factor = scale_factor
+        self._embedded = embedded
+        self._size_override = size_override
+        self._mini_board_config_override = mini_board_config
         self._load_config()
         self._setup_board()
         self._load_position_from_fen(fen)
-        
-        # Set widget flags for popup behavior
-        # Use ToolTip instead of Popup to prevent it from being destroyed when parent is hidden
-        self.setWindowFlags(Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint)
-        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)  # Don't auto-delete
+
+        if not embedded:
+            # Popup / PV-hover behavior
+            self.setWindowFlags(Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint)
+            self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+            self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+            self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
     
     def _load_config(self) -> None:
         """Load configuration for the mini chessboard."""
@@ -47,12 +64,12 @@ class MiniChessBoardWidget(QWidget):
         panel_config = ui_config.get('panels', {}).get('main', {})
         board_config = panel_config.get('board', {})
         
-        # Square colors
+        # Square colors (main board)
         squares_config = board_config.get('squares', {})
         self.light_square_color = squares_config.get('light_color', [240, 217, 181])
         self.dark_square_color = squares_config.get('dark_color', [181, 136, 99])
         
-        # Pieces
+        # Pieces (main board)
         pieces_config = board_config.get('pieces', {})
         self.svg_path = pieces_config.get('svg_path', 'app/resources/chesspieces/default')
         self.piece_padding_ratio = max(0.0, min(0.5, float(pieces_config.get('padding_ratio', 0.1))))
@@ -62,20 +79,28 @@ class MiniChessBoardWidget(QWidget):
         self.border_size = border_config.get('size', 2)
         self.border_color = border_config.get('color', [60, 60, 65])
         
-        # Get mini-board specific config
-        manual_analysis_config = ui_config.get('panels', {}).get('detail', {}).get('manual_analysis', {})
-        pv_hover_config = manual_analysis_config.get('pv_hover', {})
-        mini_board_config = pv_hover_config.get('mini_board', {})
-        mini_border = mini_board_config.get('border', {})
-        if 'size' in mini_border:
-            self.border_size = int(mini_border['size'])
-        if 'color' in mini_border:
-            self.border_color = mini_border['color']
+        # Mini-board specific overrides (PV hover by default; callers may pass explorer config)
+        if self._mini_board_config_override is not None:
+            mini_board_config = self._mini_board_config_override
+        else:
+            manual_analysis_config = ui_config.get('panels', {}).get('detail', {}).get('manual_analysis', {})
+            pv_hover_config = manual_analysis_config.get('pv_hover', {})
+            mini_board_config = pv_hover_config.get('mini_board', {})
+        mini_border = mini_board_config.get('border', {}) if isinstance(mini_board_config, dict) else {}
+        if isinstance(mini_border, dict):
+            if 'size' in mini_border:
+                self.border_size = int(mini_border['size'])
+            if 'color' in mini_border:
+                self.border_color = mini_border['color']
         
-        # Size (default 120x120) - apply scale factor
-        base_size = mini_board_config.get('size', 120)
-        self.board_size = base_size * self._scale_factor
-        self.square_size = self.board_size / 8
+        # Size: keep an integer square size (board divisible by 8) to avoid aliasing seams.
+        if self._size_override is not None:
+            base_size = int(self._size_override)
+        else:
+            base_size = int(mini_board_config.get('size', 120)) if isinstance(mini_board_config, dict) else 120
+        scaled = max(8, int(round(base_size * float(self._scale_factor))))
+        self.square_size = max(1, scaled // 8)
+        self.board_size = self.square_size * 8
         
         # Get best next move arrow color (same as main board)
         bestnextmove_arrow_config = board_config.get('bestnextmove_arrow', {})
@@ -204,7 +229,9 @@ class MiniChessBoardWidget(QWidget):
     def paintEvent(self, event) -> None:
         """Paint the mini chessboard."""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        # Antialias arrows/SVG; keep square fills crisp on pixel boundaries.
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
         
         # Calculate board start position (accounting for border)
         board_start_x = self.border_size
@@ -236,6 +263,7 @@ class MiniChessBoardWidget(QWidget):
                 painter.fillRect(square_rect, QBrush(square_color))
         
         # Draw pieces
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         self._draw_pieces(painter, board_start_x, board_start_y)
         
         # Draw arrow if enabled and move is set

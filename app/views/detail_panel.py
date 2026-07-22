@@ -12,6 +12,7 @@ from app.views.detail_moveslist_view import DetailMovesListView
 from app.views.detail_metadata_view import DetailMetadataView
 from app.views.detail_summary_view import DetailSummaryView
 from app.views.detail_manual_analysis_view import DetailManualAnalysisView
+from app.views.detail_opening_explorer_view import DetailOpeningExplorerView
 from app.views.detail_annotation_view import DetailAnnotationView
 from app.views.detail_ai_chat_view import DetailAIChatView
 from app.views.detail_notes_view import DetailNotesView
@@ -309,6 +310,18 @@ class DetailPanel(QWidget):
             engine_model=self._engine_model
         )
         self.tab_widget.addTab(self.manual_analysis_view, "Manual Analysis")
+
+        # Opening Explorer tab
+        opening_service = None
+        if self._game_controller is not None:
+            opening_service = getattr(self._game_controller, "opening_service", None)
+        self.opening_explorer_view = DetailOpeningExplorerView(
+            self.config,
+            game_model=self._game_model,
+            game_controller=self._game_controller,
+            opening_service=opening_service,
+        )
+        self.tab_widget.addTab(self.opening_explorer_view, "Opening Explorer")
         
         # Game Summary tab - initialize with game model and moves list model if available
         self.summary_view = DetailSummaryView(
@@ -418,6 +431,12 @@ class DetailPanel(QWidget):
         # Connect manual analysis view to game model if it exists
         if hasattr(self, 'manual_analysis_view'):
             self.manual_analysis_view.set_game_model(model)
+        
+        # Connect opening explorer
+        if hasattr(self, 'opening_explorer_view'):
+            self.opening_explorer_view.set_game_model(model)
+            if self._game_controller is not None:
+                self.opening_explorer_view.set_game_controller(self._game_controller)
         
         # Connect manual analysis view to engine model if it exists
         if hasattr(self, 'manual_analysis_view') and self._engine_model:

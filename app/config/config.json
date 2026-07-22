@@ -264,6 +264,19 @@
           "update_interval_ms": 100,
           "max_depth": null
         },
+        "opening_explorer": {
+          "enabled": true,
+          "show_move_arrows": true,
+          "max_continuation_depth": 8,
+          "placeholder_text_no_game": "No game selected.",
+          "lichess_link": {
+            "enabled": true,
+            "tooltip": "Open this opening on Lichess"
+          },
+          "path_section": {
+            "collapsed_by_default": false
+          }
+        },
         "ai_chat": {
           "tokens": {
             "minimum": 256,

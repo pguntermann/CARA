@@ -32,34 +32,40 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
     mw.view_manual_analysis_action.triggered.connect(lambda: mw._switch_detail_tab(2))
     view_menu.addAction(mw.view_manual_analysis_action)
 
+    mw.view_opening_explorer_action = QAction("Opening Explorer", mw)
+    mw.view_opening_explorer_action.setShortcut(QKeySequence("F4"))
+    mw.view_opening_explorer_action.setCheckable(True)
+    mw.view_opening_explorer_action.triggered.connect(lambda: mw._switch_detail_tab(3))
+    view_menu.addAction(mw.view_opening_explorer_action)
+
     mw.view_game_summary_action = QAction("Game Summary", mw)
-    mw.view_game_summary_action.setShortcut(QKeySequence("F4"))
+    mw.view_game_summary_action.setShortcut(QKeySequence("F5"))
     mw.view_game_summary_action.setCheckable(True)
-    mw.view_game_summary_action.triggered.connect(lambda: mw._switch_detail_tab(3))
+    mw.view_game_summary_action.triggered.connect(lambda: mw._switch_detail_tab(4))
     view_menu.addAction(mw.view_game_summary_action)
 
     mw.view_player_stats_action = QAction("Player Stats", mw)
-    mw.view_player_stats_action.setShortcut(QKeySequence("F5"))
+    mw.view_player_stats_action.setShortcut(QKeySequence("F6"))
     mw.view_player_stats_action.setCheckable(True)
-    mw.view_player_stats_action.triggered.connect(lambda: mw._switch_detail_tab(4))
+    mw.view_player_stats_action.triggered.connect(lambda: mw._switch_detail_tab(5))
     view_menu.addAction(mw.view_player_stats_action)
 
     mw.view_annotations_action = QAction("Annotations", mw)
-    mw.view_annotations_action.setShortcut(QKeySequence("F6"))
+    mw.view_annotations_action.setShortcut(QKeySequence("F7"))
     mw.view_annotations_action.setCheckable(True)
-    mw.view_annotations_action.triggered.connect(lambda: mw._switch_detail_tab(5))
+    mw.view_annotations_action.triggered.connect(lambda: mw._switch_detail_tab(6))
     view_menu.addAction(mw.view_annotations_action)
 
     mw.view_ai_summary_action = QAction("AI Summary", mw)
-    mw.view_ai_summary_action.setShortcut(QKeySequence("F7"))
+    mw.view_ai_summary_action.setShortcut(QKeySequence("F8"))
     mw.view_ai_summary_action.setCheckable(True)
-    mw.view_ai_summary_action.triggered.connect(lambda: mw._switch_detail_tab(6))
+    mw.view_ai_summary_action.triggered.connect(lambda: mw._switch_detail_tab(7))
     view_menu.addAction(mw.view_ai_summary_action)
 
     mw.view_notes_action = QAction("Notes", mw)
-    mw.view_notes_action.setShortcut(QKeySequence("F8"))
+    mw.view_notes_action.setShortcut(QKeySequence("F9"))
     mw.view_notes_action.setCheckable(True)
-    mw.view_notes_action.triggered.connect(lambda: mw._switch_detail_tab(7))
+    mw.view_notes_action.triggered.connect(lambda: mw._switch_detail_tab(8))
     view_menu.addAction(mw.view_notes_action)
 
     view_menu.addSeparator()
@@ -74,6 +80,7 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
         mw.view_moves_list_action,
         mw.view_metadata_action,
         mw.view_manual_analysis_action,
+        mw.view_opening_explorer_action,
         mw.view_game_summary_action,
         mw.view_player_stats_action,
         mw.view_annotations_action,
