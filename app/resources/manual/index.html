@@ -114,11 +114,12 @@
                                 <li><a href="#moves-list">4.5.1 Moves List</a></li>
                                 <li><a href="#metadata">4.5.2 PGN header tags</a></li>
                                 <li><a href="#manual-analysis">4.5.3 Manual Analysis</a></li>
-                                <li><a href="#game-summary">4.5.4 Game Summary</a></li>
-                                <li><a href="#player-stats">4.5.5 Player Stats</a></li>
-                                <li><a href="#annotations">4.5.6 Annotations</a></li>
-                                <li><a href="#ai-summary">4.5.7 AI Summary</a></li>
-                                <li><a href="#notes">4.5.8 Notes</a></li>
+                                <li><a href="#opening-explorer">4.5.4 Opening Explorer</a></li>
+                                <li><a href="#game-summary">4.5.5 Game Summary</a></li>
+                                <li><a href="#player-stats">4.5.6 Player Stats</a></li>
+                                <li><a href="#annotations">4.5.7 Annotations</a></li>
+                                <li><a href="#ai-summary">4.5.8 AI Summary</a></li>
+                                <li><a href="#notes">4.5.9 Notes</a></li>
                             </ul>
                         </li>
                         <li><a href="#keyboard-shortcuts">4.6 Keyboard Shortcuts</a></li>
@@ -173,9 +174,10 @@
                         <li><a href="#manual-analysis-task">5.6 Manual Analysis</a>
                             <ul>
                                 <li><a href="#starting-manual-analysis">5.6.1 Starting Manual Analysis</a></li>
-                                <li><a href="#multipv-analysis">5.6.2 MultiPV Analysis</a></li>
-                                <li><a href="#exploring-variations">5.6.3 Exploring Variations</a></li>
-                                <li><a href="#positional-plan-exploration">5.6.4 Positional Plan Exploration</a></li>
+                                <li><a href="#freeze-and-wdl">5.6.2 Freeze Analysis and W/D/L probabilities</a></li>
+                                <li><a href="#multipv-analysis">5.6.3 MultiPV Analysis</a></li>
+                                <li><a href="#exploring-variations">5.6.4 Exploring Variations</a></li>
+                                <li><a href="#positional-plan-exploration">5.6.5 Positional Plan Exploration</a></li>
                             </ul>
                         </li>
                         <li><a href="#viewing-player-statistics">5.7 Viewing Player Statistics</a>
@@ -296,7 +298,9 @@
                     
                     <li><strong>Player Statistics:</strong> A dedicated <strong>Player Stats</strong> tab aggregates results across many <em>analyzed</em> games for one player at a time: overview figures, an optional <strong>activity heatmap</strong> (when you played), accuracy and move-quality charts, date-based progression charts, openings and endgame summaries, best and worst games, significant moves, and automatic error-pattern hints. You can show or hide each section to tailor the page. See <a href="#viewing-player-statistics">section 5.7</a> for a full walkthrough.</li>
                     
-                    <li><strong>Manual Analysis:</strong> Perform continuous engine analysis on any position with MultiPV support. You can navigate through game positions while maintaining continuous analysis of the current position. Hovering over principal variation moves displays a beautiful optional miniature board showing the resulting position. Positional plan exploration extracts piece trajectories from PV lines, visualizing how pieces move through the engine's recommended plan on the chessboard. You can explore positional plans for up to three PV lines (PV1, PV2, PV3) independently, with configurable options for the number of pieces to track and exploration depth.</li>
+                    <li><strong>Manual Analysis:</strong> Perform continuous engine analysis on any position with MultiPV support. You can navigate through game positions while maintaining continuous analysis of the current position. Hovering over principal variation moves displays a beautiful optional miniature board showing the resulting position. You can freeze the displayed PV lines while the engine keeps searching, and—when the assigned engine reports UCI W/D/L—optionally show a win/draw/loss probability bar for the best line. Positional plan exploration extracts piece trajectories from PV lines, visualizing how pieces move through the engine's recommended plan on the chessboard. You can explore positional plans for up to three PV lines (PV1, PV2, PV3) independently, with configurable options for the number of pieces to track and exploration depth.</li>
+                    
+                    <li><strong>Opening Explorer:</strong> Browse the opening path that led to the current position and expand book continuations from here using CARA's ECO opening database. Embedded mini boards follow the main board's piece set, colors, and orientation. Jump to a position on the path or open the corresponding Lichess opening explorer page. Access via <span class="menu-item">View → Opening Explorer</span> (<code>F4</code>).</li>
                     
                     <li><strong>Annotations:</strong> Powerful free-form annotation system for marking positions, ideas, and analysis insights. Unlike other chess applications, text can be freely positioned anywhere on the board, adjusted in size and rotated. In addition to text, you can add arrows, circles, and square highlighting with customizable colors. Annotations are position-specific, attached to individual moves in the game, and are compressed and serialized in a PGN metadata tag to keep the PGN move notation clean. This flexible annotation system enables you to create rich, personalized study materials and analysis notes.</li>
                     
@@ -633,7 +637,7 @@
                 
                 <ul>
                     <li><strong>Main Panel</strong> (left): Displays the chessboard along with game information, evaluation bar, material widget, turn indicator, and other board-related widgets. This is the primary visual interface for reviewing games and positions.</li>
-                    <li><strong>Detail Panel</strong> (right): Contains the PGN notation pane at the top, displaying the game's move notation, and tabbed views below for detailed analysis, including the Moves List, PGN header tags, Manual Analysis, Game Summary, Player Stats, Annotations, AI Summary, and Notes. This panel provides in-depth information and analysis tools.</li>
+                    <li><strong>Detail Panel</strong> (right): Contains the PGN notation pane at the top, displaying the game's move notation, and tabbed views below for detailed analysis, including the Moves List, PGN header tags, Manual Analysis, Opening Explorer, Game Summary, Player Stats, Annotations, AI Summary, and Notes. This panel provides in-depth information and analysis tools.</li>
                     <li><strong>Database Panel</strong> (bottom): Manages your game collections with tabs for multiple PGN databases, searchable game tables, and column customization. This panel can be collapsed to maximize space for the main and detail panels.</li>
                 </ul>
                 
@@ -858,7 +862,7 @@
                 <p>With <span class="menu-item">PGN → Show Comments</span> enabled, <strong>double-click</strong> inside a <strong>main-line</strong> comment (text in curly braces on the main line) to open the move-comments editor for that full move. For what the dialog contains and how changes are saved, see <a href="#editing-move-comments">Editing move comments</a> in <a href="#moves-list">section 4.5.1</a>.</p>
                 <p><strong>Context menu:</strong> You can also <strong>right-click</strong> inside the PGN notation pane to open a context menu with quick access to common PGN actions. These entries mirror the corresponding options from the menu bar.</p>
                 
-                <img src="screenshots/detail_panel.png" alt="CARA Detail Panel - Right-side panel showing PGN notation pane at the top and tabbed views below (Moves List, Metadata, Manual Analysis, Game Summary, Player Stats, Annotations, AI Summary, Notes) for detailed game analysis" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+                <img src="screenshots/detail_panel.png" alt="CARA Detail Panel - Right-side panel showing PGN notation pane at the top and tabbed views below (Moves List, Metadata, Manual Analysis, Opening Explorer, Game Summary, Player Stats, Annotations, AI Summary, Notes) for detailed game analysis" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
                 <p>You can control what elements are displayed in the PGN Notation Pane using the PGN menu. The following options are available:</p>
                 <ul>
@@ -919,10 +923,14 @@
                 <p><strong>MultiPV Analysis:</strong> The standard analysis mode displays multiple candidate moves and their evaluations. You can analyze any number of principal variation lines simultaneously, each displaying the engine's recommended moves, evaluations, and depths. The first three PV lines (PV1, PV2, PV3) have color-coded indicators in the analysis display that match the colors of the corresponding arrows on the chessboard when enabled. This visual connection helps you quickly identify which analysis line corresponds to which arrow on the board. Right-clicking on a PV line opens a context menu so you can copy that PV line or all PV lines to the clipboard. The following options are available:</p>
                 <ul>
                     <li><span class="menu-item">Manual Analysis → Start Manual Analysis</span> (<code>Alt+M</code> / <code>⌥+M</code>): Start or stop continuous engine analysis of the current position</li>
+                    <li><span class="menu-item">Manual Analysis → Freeze Analysis</span>: Hold the currently displayed PV lines and statistics while the engine continues searching in the background. Unfreeze to resume live updates</li>
                     <li><span class="menu-item">Manual Analysis → Add PV Line</span> (<code>Alt+N</code> / <code>⌥+N</code>): Add an additional principal variation line</li>
                     <li><span class="menu-item">Manual Analysis → Remove PV Line</span> (<code>Alt+R</code> / <code>⌥+R</code>): Remove the last added PV line (requires at least two lines)</li>
                     <li><span class="menu-item">Manual Analysis → Enable miniature preview</span>: Toggle display of a miniature board preview when hovering over PV moves</li>
+                    <li><span class="menu-item">Manual Analysis → Show W/D/L probabilities</span>: When enabled and the assigned engine reports UCI W/D/L for the best line (PV1), show a win/draw/loss probability bar above the PV lines</li>
                 </ul>
+                
+                <p><strong>Win / Draw / Loss bar:</strong> Engines that support <code>UCI_ShowWDL</code> (for example recent Stockfish and Lc0 builds) can report white/draw/black probabilities for the best principal variation. CARA displays these as a stacked bar labeled “Win probability (best engine play)”. These values reflect strong engine self-play outcomes from the current position under best play—not human opening statistics or a claim of perfect play. If the engine does not emit WDL, the bar stays hidden.</p>
                 
                 <p><strong>Positional Plan Exploration:</strong> This unique feature helps you understand the engine's positional plans by visualizing where the engine wants to move specific pieces and how they coordinate through the recommended sequence. Instead of just seeing individual moves, you can see the complete trajectory of each piece—where it starts, where it moves to, and the path it takes through multiple moves. The system automatically identifies the pieces that move most frequently in each PV line and tracks their movement patterns. Each of these selected pieces is assigned a distinct color and highlighted in that color in the PV display, while on the chessboard, their trajectories are visualized as colored lines connecting the squares each piece visits through the engine's suggested sequence. This helps you recognize positional themes, piece coordination patterns, and strategic plans that might not be immediately obvious from traditional engine analysis alone.</p>
                 
@@ -937,8 +945,19 @@
                     <li><span class="menu-item">Manual Analysis → Max Exploration depth</span>: Set the exploration depth for piece trajectories (2-4 moves ahead), determining how many moves into the future the trajectory visualization extends</li>
                 </ul>
                 
-                <h5 id="game-summary">4.5.4 Game Summary</h5>
-                <p>The Game Summary tab provides a comprehensive overview of the current game by synthesizing data from the Game Analysis function into key performance indicators (KPIs) and valuable insights. Access this tab using <span class="menu-item">View → Game Summary</span> or press <code>F4</code>.</p>
+                <h5 id="opening-explorer">4.5.4 Opening Explorer</h5>
+                <p>The Opening Explorer tab helps you study the opening path to the current position and book continuations from here. Access this tab using <span class="menu-item">View → Opening Explorer</span> or press <code>F4</code>.</p>
+                
+                <img src="screenshots/opening_explorer.png" alt="CARA Opening Explorer - Path to the current position and expandable book continuations with embedded mini boards" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+                
+                <p>The view has two main parts:</p>
+                <ul>
+                    <li><strong>Lines until here:</strong> The sequence of book (and out-of-book) steps from the start position to the active ply. Each step can show a small board in the current theme (piece set, colors, and orientation match the main board). Click a step to jump to that position in the game. Use the ↗ control to open the corresponding position in the Lichess opening explorer in your browser.</li>
+                    <li><strong>Lines from here:</strong> Continuations suggested by CARA's ECO opening database from the current position. Expand a move to browse deeper book lines.</li>
+                </ul>
+                
+                <h5 id="game-summary">4.5.5 Game Summary</h5>
+                <p>The Game Summary tab provides a comprehensive overview of the current game by synthesizing data from the Game Analysis function into key performance indicators (KPIs) and valuable insights. Access this tab using <span class="menu-item">View → Game Summary</span> or press <code>F5</code>.</p>
                 
                 <div class="tip-box">
                     <strong>Quick Tip:</strong> The Game Summary is only available after running game analysis using <span class="menu-item">Game Analysis → Start Game Analysis</span> (<code>Ctrl+G</code> / <code>⌘+G</code>).
@@ -987,23 +1006,23 @@
                     <strong>Quick Tip:</strong> To analyze multiple games at once, use <span class="menu-item">Game Analysis → Bulk Analyze Database...</span>. The dialog lets you choose between analyzing all games or only selected games. When you start the analysis, progress and estimated time remaining are displayed in the status bar. You can cancel the analysis at any time and resume it later.
                 </div>
                 
-                <h5 id="player-stats">4.5.5 Player Stats</h5>
-                <p>The <strong>Player Stats</strong> tab answers questions about a player across <em>many games</em> at once (not to be confused with <strong>Game Summary</strong>, which describes a single game). Open it with <span class="menu-item">View → Player Stats</span> or press <code>F5</code>.</p>
+                <h5 id="player-stats">4.5.6 Player Stats</h5>
+                <p>The <strong>Player Stats</strong> tab answers questions about a player across <em>many games</em> at once (not to be confused with <strong>Game Summary</strong>, which describes a single game). Open it with <span class="menu-item">View → Player Stats</span> or press <code>F6</code>.</p>
                 <p>In short: pick a <strong>Source</strong> (which set of games to use) and a <strong>player</strong>. Only players with at least <strong>two analyzed games</strong> in that source appear in the list, because the figures are meant to reflect a pattern rather than a single outing.</p>
                 <p>The page is made of separate <strong>sections</strong> you can turn on or off; several charts offer their own display options. For prerequisites, every section, chart interactions (such as opening games from a heatmap or a pattern), and settings in everyday language, read <a href="#viewing-player-statistics">section 5.7 Viewing Player Statistics</a>.</p>
                 <img src="screenshots/player_stats_getting_started.png" alt="CARA Player Stats tab — Source and player selection at the top; scrollable sections below" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
-                <h5 id="annotations">4.5.6 Annotations</h5>
+                <h5 id="annotations">4.5.7 Annotations</h5>
                 <p>The Annotations tab provides tools for creating and managing custom CARA annotations on the chessboard. Unlike regular PGN annotations, CARA annotations include free-form text that can be positioned anywhere on the board, adjusted in size and rotated.</p>
                 
                 <p>You can also add arrows, circles, and square highlighting with customizable colors. Annotations are position-specific, attached to individual moves in the game, and are compressed and serialized in a PGN metadata tag to keep the PGN move notation clean.</p>
                 
-                <p>Access this tab using <span class="menu-item">View → Annotations</span> or press <code>F6</code>.</p>
+                <p>Access this tab using <span class="menu-item">View → Annotations</span> or press <code>F7</code>.</p>
                 
                 <img src="screenshots/annotations.png" alt="CARA Annotations View - Tools for creating custom annotations on the chessboard including text, arrows, circles, and square highlighting" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
-                <h5 id="ai-summary">4.5.7 AI Summary</h5>
-                <p>The AI Summary tab provides an interactive chat interface for discussing any position in a game with a Large Language Model (LLM). The AI model has access to extensive game data, including detailed engine analysis, move classifications, evaluation metrics, and positional information, enabling it to provide accurate assessments of the game, played moves, and current position. You can ask questions about the game, request explanations of moves, or generate summaries. Access this tab using <span class="menu-item">View → AI Summary</span> or press <code>F7</code>.</p>
+                <h5 id="ai-summary">4.5.8 AI Summary</h5>
+                <p>The AI Summary tab provides an interactive chat interface for discussing any position in a game with a Large Language Model (LLM). The AI model has access to extensive game data, including detailed engine analysis, move classifications, evaluation metrics, and positional information, enabling it to provide accurate assessments of the game, played moves, and current position. You can ask questions about the game, request explanations of moves, or generate summaries. Access this tab using <span class="menu-item">View → AI Summary</span> or press <code>F8</code>.</p>
                 <p>CARA supports OpenAI, Anthropic, and custom OpenAI-compatible endpoints. Configure your provider and API key through the AI Model Settings dialog; see <a href="#ai-summary-menu">section 6.12</a>. See <a href="#custom-ai-endpoint">section 7.9</a> for more information on setting up a custom endpoint.</p>
                 
                 <img src="screenshots/ai_summary.png" alt="CARA AI Summary View - Interactive chat interface for discussing game positions with an AI model that has access to engine analysis and game data" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
@@ -1012,7 +1031,7 @@
                     <strong>Quick Tip:</strong> To use the AI Summary feature, configure at least one provider—<strong>OpenAI</strong>, <strong>Anthropic</strong>, or a <strong>custom endpoint</strong> (e.g. local LLM)—in <span class="menu-item">AI Summary → AI Model Settings...</span>.
                 </div>
                 
-                <h5 id="notes">4.5.8 Notes</h5>
+                <h5 id="notes">4.5.9 Notes</h5>
                 <p>Use the Notes tab to keep your own comments, plans, or post-mortem thoughts with a game.</p>
                 
                 <p>When you type move notation (e.g. <code>1. e4</code>, <code>13... Rb7</code>), CARA recognizes it and formats it for you. Moves that were actually played in the current game become <strong>clickable links</strong>—click one to jump to that position. Other move notation (for example from variations or lines you're discussing) is shown in <strong>bold</strong> only, so it still stands out but doesn't link. That way you can refer to specific moves or positions and jump straight to them when the move is in the game.</p>
@@ -1031,7 +1050,7 @@
                 
                 <p>To attach your text to the current game, use <span class="menu-item">Notes → Save Notes to current game</span> (<code>Ctrl+Alt+N</code>). To remove the notes for the current game, use <span class="menu-item">Notes → Clear Notes for current game</span> (<code>Ctrl+Shift+E</code>). Notes are written to the PGN when you save the database.</p>
                 
-                <p>Open the Notes tab from <span class="menu-item">View → Notes</span> or press <code>F8</code>.</p>
+                <p>Open the Notes tab from <span class="menu-item">View → Notes</span> or press <code>F9</code>.</p>
                 
                 <img src="screenshots/notes_view.png" alt="CARA Notes View - Plain-text editor for game notes with move notation linking; Notes menu and View menu provide access and shortcuts" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
             </div>
@@ -1078,11 +1097,12 @@
                     <li><code>F1</code>: Switch to Moves List tab</li>
                     <li><code>F2</code>: Switch to PGN header tags tab</li>
                     <li><code>F3</code>: Switch to Manual Analysis tab</li>
-                    <li><code>F4</code>: Switch to Game Summary tab</li>
-                    <li><code>F5</code>: Switch to Player Stats tab</li>
-                    <li><code>F6</code>: Switch to Annotations tab</li>
-                    <li><code>F7</code>: Switch to AI Summary tab</li>
-                    <li><code>F8</code>: Switch to Notes tab</li>
+                    <li><code>F4</code>: Switch to Opening Explorer tab</li>
+                    <li><code>F5</code>: Switch to Game Summary tab</li>
+                    <li><code>F6</code>: Switch to Player Stats tab</li>
+                    <li><code>F7</code>: Switch to Annotations tab</li>
+                    <li><code>F8</code>: Switch to AI Summary tab</li>
+                    <li><code>F9</code>: Switch to Notes tab</li>
                 </ul>
                 
                 <h5>4.6.5 Game Analysis</h5>
@@ -1180,7 +1200,7 @@
                     Press <code>Ctrl+G</code> / <code>⌘+G</code> (or use <span class="menu-item">Game Analysis → Start Game Analysis</span>) to begin analyzing the game. Watch as the moves list fills in with evaluation data, move classifications, CPL values, and best move alternatives as the analysis progresses. Progress and estimated time remaining are shown in the status bar.</li>
                     
                     <li><strong>Review the results:</strong><br>
-                    Once analysis completes, you can review the per-move analysis directly in the Moves List, or press <code>F4</code> to switch to the Game Summary tab for a condensed overview showing key statistics, the evaluation graph, critical moments, and detected game highlights.</li>
+                    Once analysis completes, you can review the per-move analysis directly in the Moves List, or press <code>F5</code> to switch to the Game Summary tab for a condensed overview showing key statistics, the evaluation graph, critical moments, and detected game highlights.</li>
                 </ol>
             </div>
         </section>
@@ -1540,7 +1560,7 @@
                     <strong>Quick Tip:</strong> The thresholds used for move classification (e.g., what CPL value constitutes a "Mistake" vs. "Blunder") can be customized in the Classification Settings dialog. Access it via <span class="menu-item">Game Analysis → Configure Classification Settings...</span> (<code>Ctrl+Shift+K</code> / <code>⌘+Shift+K</code>).
                 </div>
                 
-                <p>You can review this information in the Moves List, or switch to the <span class="menu-item">Game Summary</span> tab (<code>F4</code>) for a condensed overview of key game moments, statistics, and highlights.</p>
+                <p>You can review this information in the Moves List, or switch to the <span class="menu-item">Game Summary</span> tab (<code>F5</code>) for a condensed overview of key game moments, statistics, and highlights.</p>
                 
                 <h5 id="brilliant-move-detection">5.5.3 Brilliant Move Detection</h5>
                 <p>CARA includes a brilliancy detection system that identifies exceptional moves by analyzing them at shallow engine depths.</p>
@@ -1699,7 +1719,11 @@
                 </ol>
                 <p>Analysis continues automatically as you navigate to different positions in the game. To stop analysis, use the same menu item or keyboard shortcut again.</p>
                 
-                <h5 id="multipv-analysis">5.6.2 MultiPV Analysis</h5>
+                <h5 id="freeze-and-wdl">5.6.2 Freeze Analysis and W/D/L probabilities</h5>
+                <p><strong>Freeze Analysis:</strong> While analysis is running, use <span class="menu-item">Manual Analysis → Freeze Analysis</span> (or the Freeze button on the Manual Analysis tab) to hold the currently displayed PV lines and statistics. The engine keeps searching in the background; unfreeze to resume live UI updates. This is useful when you want to study a stable snapshot without the lines changing under your cursor.</p>
+                <p><strong>Show W/D/L probabilities:</strong> Enable <span class="menu-item">Manual Analysis → Show W/D/L probabilities</span> to display a win/draw/loss bar for the best line (PV1) when the assigned engine reports UCI WDL (engines that advertise <code>UCI_ShowWDL</code>). The bar is labeled “Win probability (best engine play)” because the figures come from the engine’s own WDL model—strong self-play style outcomes—not from human databases. If the engine does not report WDL, the bar remains hidden.</p>
+                
+                <h5 id="multipv-analysis">5.6.3 MultiPV Analysis</h5>
                 <p>Manual Analysis supports MultiPV (Multiple Principal Variations), allowing you to see multiple candidate moves simultaneously. By default, analysis shows one principal variation line (PV1). You can add additional lines to compare different candidate moves:</p>
                 <img src="screenshots/manual_analysis.png" alt="CARA Manual Analysis View - MultiPV analysis display showing principal variation lines with evaluations, depths, and move sequences" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 <ul>
@@ -1708,14 +1732,14 @@
                 </ul>
                 <p>Each PV line displays the engine's recommended move sequence, evaluation, search depth, and performance metrics. The first three PV lines (PV1, PV2, PV3) have color-coded indicators that match the colors of the corresponding arrows on the chessboard when enabled, helping you visually connect the analysis lines to the board arrows.</p>
                 
-                <h5 id="exploring-variations">5.6.3 Exploring Variations</h5>
+                <h5 id="exploring-variations">5.6.4 Exploring Variations</h5>
                 <p>You can explore variations by hovering over moves in the PV lines:</p>
                 <ul>
                     <li><strong>Miniature Board Preview:</strong> Enable <span class="menu-item">Manual Analysis → Enable miniature preview</span> to display a small board preview when hovering over moves in the PV lines. This shows the resulting position if that move were played.</li>
                     <li><strong>PV Arrows on Board:</strong> The PV1, PV2, and PV3 arrows on the chessboard (toggle with <code>Alt+B</code> / <code>⌥+B</code>, <code>Alt+2</code> / <code>⌥+2</code>, <code>Alt+3</code> / <code>⌥+3</code>) show the recommended moves from each analysis line, making it easy to see candidate moves visually.</li>
                 </ul>
                 
-                <h5 id="positional-plan-exploration">5.6.4 Positional Plan Exploration</h5>
+                <h5 id="positional-plan-exploration">5.6.5 Positional Plan Exploration</h5>
                 <p>Positional Plan Exploration visualizes how pieces move through the engine's recommended sequence, helping you understand strategic plans and piece coordination. Instead of just seeing individual moves, you can see complete piece trajectories—where pieces start, where they move, and the path they take through multiple moves.</p>
                 <p>To explore positional plans:</p>
                 <ol>
@@ -1731,7 +1755,7 @@
 
             <div class="outline-item">
                 <h4 id="viewing-player-statistics">5.7 Viewing Player Statistics</h4>
-                <p>The <strong>Player Stats</strong> tab helps you see how a player tends to perform across many games: habits over time, typical accuracy, weak spots, played opening variants, and much more. Open it with <span class="menu-item">View → Player Stats</span> or <code>F5</code>.</p>
+                <p>The <strong>Player Stats</strong> tab helps you see how a player tends to perform across many games: habits over time, typical accuracy, weak spots, played opening variants, and much more. Open it with <span class="menu-item">View → Player Stats</span> or <code>F6</code>.</p>
                 <div class="tip-box">
                     <strong>Quick Tip:</strong> Right-click a section to copy just that section or the full stats text.
                 </div>
@@ -1959,7 +1983,7 @@
 
             <div class="outline-item">
                 <h4 id="adding-annotations">5.8 Adding Annotations</h4>
-                <p>CARA annotations allow you to add custom markings to the chessboard, including text, arrows, circles, and square highlighting. Unlike regular PGN annotations, CARA annotations are not added to PGN notation as special encoded comments but are kept separate. Text can be freely positioned, sized, and rotated. Access the Annotations tab using <span class="menu-item">View → Annotations</span> or press <code>F6</code>.</p>
+                <p>CARA annotations allow you to add custom markings to the chessboard, including text, arrows, circles, and square highlighting. Unlike regular PGN annotations, CARA annotations are not added to PGN notation as special encoded comments but are kept separate. Text can be freely positioned, sized, and rotated. Access the Annotations tab using <span class="menu-item">View → Annotations</span> or press <code>F7</code>.</p>
                 
                 <img src="screenshots/annotations.png" alt="CARA Annotations View - Tools for creating custom annotations on the chessboard including text, arrows, circles, and square highlighting" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
@@ -2405,33 +2429,39 @@
                 <p><strong>Shortcut:</strong> <code>Alt+M</code> / <code>⌥+M</code></p>
                 <p>Starts or stops continuous engine analysis of the current position. When enabled, the engine analyzes the current position and displays principal variation lines with evaluations, depths, and move sequences. Analysis continues automatically as you navigate to different positions. Use the same menu item or shortcut again to stop analysis.<br>See <a href="#starting-manual-analysis">section 5.6.1</a> for detailed instructions.</p>
                 
-                <h5>6.8.2 Add PV Line</h5>
+                <h5>6.8.2 Freeze Analysis</h5>
+                <p>Holds the currently displayed PV lines and statistics while the engine continues searching in the background. Available only while manual analysis is running. Uncheck to resume live updates.<br>See <a href="#freeze-and-wdl">section 5.6.2</a> for more information.</p>
+                
+                <h5>6.8.3 Add PV Line</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+N</code> / <code>⌥+N</code></p>
-                <p>Adds an additional principal variation line to the MultiPV analysis display. This allows you to compare multiple candidate moves simultaneously. You can add as many lines as needed.<br>See <a href="#multipv-analysis">section 5.6.2</a> for more information.</p>
+                <p>Adds an additional principal variation line to the MultiPV analysis display. This allows you to compare multiple candidate moves simultaneously. You can add as many lines as needed.<br>See <a href="#multipv-analysis">section 5.6.3</a> for more information.</p>
                 
-                <h5>6.8.3 Remove PV Line</h5>
+                <h5>6.8.4 Remove PV Line</h5>
                 <p><strong>Shortcut:</strong> <code>Alt+R</code> / <code>⌥+R</code></p>
-                <p>Removes the last added principal variation line from the MultiPV analysis display.<br>See <a href="#multipv-analysis">section 5.6.2</a> for more information.</p>
+                <p>Removes the last added principal variation line from the MultiPV analysis display.<br>See <a href="#multipv-analysis">section 5.6.3</a> for more information.</p>
                 
-                <h5>6.8.4 Enable miniature preview</h5>
-                <p>Toggles the miniature board preview feature. When enabled, hovering over moves in any PV line displays a small chessboard preview showing the position after that move. This helps you quickly visualize the resulting position.<br>See <a href="#exploring-variations">section 5.6.3</a> for more information.</p>
+                <h5>6.8.5 Enable miniature preview</h5>
+                <p>Toggles the miniature board preview feature. When enabled, hovering over moves in any PV line displays a small chessboard preview showing the position after that move. This helps you quickly visualize the resulting position.<br>See <a href="#exploring-variations">section 5.6.4</a> for more information.</p>
                 
-                <h5>6.8.5 Explore PV1 Positional Plans</h5>
-                <p>Toggles positional plan exploration for the first principal variation line. When enabled, the chessboard displays colored trajectory lines showing how pieces move through the engine's recommended sequence. Only one plan can be active at a time.<br>See <a href="#positional-plan-exploration">section 5.6.4</a> for detailed instructions.</p>
+                <h5>6.8.6 Show W/D/L probabilities</h5>
+                <p>When enabled, shows a win/draw/loss probability bar for the best principal variation (PV1) if the assigned engine reports UCI WDL. The values reflect strong engine self-play style outcomes (“best engine play”), not human opening statistics. The bar is hidden when the engine does not provide WDL.<br>See <a href="#freeze-and-wdl">section 5.6.2</a> for more information.</p>
                 
-                <h5>6.8.6 Explore PV2 Positional Plans</h5>
-                <p>Toggles positional plan exploration for the second principal variation line. When enabled, the chessboard displays colored trajectory lines showing how pieces move through the engine's recommended sequence. Only one plan can be active at a time.<br>See <a href="#positional-plan-exploration">section 5.6.4</a> for detailed instructions.</p>
+                <h5>6.8.7 Explore PV1 Positional Plans</h5>
+                <p>Toggles positional plan exploration for the first principal variation line. When enabled, the chessboard displays colored trajectory lines showing how pieces move through the engine's recommended sequence. Only one plan can be active at a time.<br>See <a href="#positional-plan-exploration">section 5.6.5</a> for detailed instructions.</p>
                 
-                <h5>6.8.7 Explore PV3 Positional Plans</h5>
-                <p>Toggles positional plan exploration for the third principal variation line. When enabled, the chessboard displays colored trajectory lines showing how pieces move through the engine's recommended sequence. Only one plan can be active at a time.<br>See <a href="#positional-plan-exploration">section 5.6.4</a> for detailed instructions.</p>
+                <h5>6.8.8 Explore PV2 Positional Plans</h5>
+                <p>Toggles positional plan exploration for the second principal variation line. When enabled, the chessboard displays colored trajectory lines showing how pieces move through the engine's recommended sequence. Only one plan can be active at a time.<br>See <a href="#positional-plan-exploration">section 5.6.5</a> for detailed instructions.</p>
                 
-                <h5>6.8.8 Max number of pieces to explore</h5>
-                <p>Sets how many pieces to track in the positional plan exploration visualization. Options are 1, 2, or 3 pieces. The system automatically selects the pieces that move most frequently in the active PV line up to this limit. Each tracked piece is assigned a distinct color and displayed with trajectory lines on the chessboard.<br>See <a href="#positional-plan-exploration">section 5.6.4</a> for more information.</p>
+                <h5>6.8.9 Explore PV3 Positional Plans</h5>
+                <p>Toggles positional plan exploration for the third principal variation line. When enabled, the chessboard displays colored trajectory lines showing how pieces move through the engine's recommended sequence. Only one plan can be active at a time.<br>See <a href="#positional-plan-exploration">section 5.6.5</a> for detailed instructions.</p>
                 
-                <h5>6.8.9 Max Exploration depth</h5>
-                <p>Sets the exploration depth for piece trajectories in positional plan exploration. Options are 2, 3, or 4 moves ahead. This determines how many moves into the future the trajectory visualization extends, showing the complete path each piece takes through the engine's recommended sequence.<br>See <a href="#positional-plan-exploration">section 5.6.4</a> for more information.</p>
+                <h5>6.8.10 Max number of pieces to explore</h5>
+                <p>Sets how many pieces to track in the positional plan exploration visualization. Options are 1, 2, or 3 pieces. The system automatically selects the pieces that move most frequently in the active PV line up to this limit. Each tracked piece is assigned a distinct color and displayed with trajectory lines on the chessboard.<br>See <a href="#positional-plan-exploration">section 5.6.5</a> for more information.</p>
                 
-                <h5>6.8.10 Hide other arrows during plan exploration</h5>
+                <h5>6.8.11 Max Exploration depth</h5>
+                <p>Sets the exploration depth for piece trajectories in positional plan exploration. Options are 2, 3, or 4 moves ahead. This determines how many moves into the future the trajectory visualization extends, showing the complete path each piece takes through the engine's recommended sequence.<br>See <a href="#positional-plan-exploration">section 5.6.5</a> for more information.</p>
+                
+                <h5>6.8.12 Hide other arrows during plan exploration</h5>
                 <p>Toggles whether other board arrows (played move, best alternative move, PV arrows) are hidden when positional plan exploration is active. When enabled, only the piece trajectory lines are displayed, providing a cleaner view focused on the positional plan visualization.</p>
             </div>
 
@@ -2566,35 +2596,39 @@
 
                 <h5>6.14.3 Moves List</h5>
                 <p><strong>Shortcut:</strong> <code>F1</code></p>
-                <p>Switches the Detail Panel to the <strong>Moves List</strong> tab.<br>See <a href="#moves-list-tab">section 4.5.1</a> for more information.</p>
+                <p>Switches the Detail Panel to the <strong>Moves List</strong> tab.<br>See <a href="#moves-list">section 4.5.1</a> for more information.</p>
 
                 <h5>6.14.4 PGN header tags</h5>
                 <p><strong>Shortcut:</strong> <code>F2</code></p>
-                <p>Switches the Detail Panel to the <strong>PGN header tags</strong> tab.<br>See <a href="#pgn-header-tags-tab">section 4.5.2</a> for more information.</p>
+                <p>Switches the Detail Panel to the <strong>PGN header tags</strong> tab.<br>See <a href="#metadata">section 4.5.2</a> for more information.</p>
 
                 <h5>6.14.5 Manual Analysis</h5>
                 <p><strong>Shortcut:</strong> <code>F3</code></p>
-                <p>Switches the Detail Panel to the <strong>Manual Analysis</strong> tab.<br>See <a href="#manual-analysis-tab">section 4.5.3</a> for more information.</p>
+                <p>Switches the Detail Panel to the <strong>Manual Analysis</strong> tab.<br>See <a href="#manual-analysis">section 4.5.3</a> for more information.</p>
 
-                <h5>6.14.6 Game Summary</h5>
+                <h5>6.14.6 Opening Explorer</h5>
                 <p><strong>Shortcut:</strong> <code>F4</code></p>
-                <p>Switches the Detail Panel to the <strong>Game Summary</strong> tab.<br>See <a href="#game-summary-tab">section 4.5.4</a> for more information.</p>
+                <p>Switches the Detail Panel to the <strong>Opening Explorer</strong> tab.<br>See <a href="#opening-explorer">section 4.5.4</a> for more information.</p>
 
-                <h5>6.14.7 Player Stats</h5>
+                <h5>6.14.7 Game Summary</h5>
                 <p><strong>Shortcut:</strong> <code>F5</code></p>
-                <p>Switches the Detail Panel to the <strong>Player Stats</strong> tab.<br>See <a href="#player-stats-tab">section 4.5.5</a> for more information.</p>
+                <p>Switches the Detail Panel to the <strong>Game Summary</strong> tab.<br>See <a href="#game-summary">section 4.5.5</a> for more information.</p>
 
-                <h5>6.14.8 Annotations</h5>
+                <h5>6.14.8 Player Stats</h5>
                 <p><strong>Shortcut:</strong> <code>F6</code></p>
-                <p>Switches the Detail Panel to the <strong>Annotations</strong> tab.<br>See <a href="#annotations-tab">section 4.5.6</a> for more information.</p>
+                <p>Switches the Detail Panel to the <strong>Player Stats</strong> tab.<br>See <a href="#player-stats">section 4.5.6</a> for more information.</p>
 
-                <h5>6.14.9 AI Summary</h5>
+                <h5>6.14.9 Annotations</h5>
                 <p><strong>Shortcut:</strong> <code>F7</code></p>
-                <p>Switches the Detail Panel to the <strong>AI Summary</strong> tab.<br>See <a href="#ai-summary-tab">section 4.5.7</a> for more information.</p>
+                <p>Switches the Detail Panel to the <strong>Annotations</strong> tab.<br>See <a href="#annotations">section 4.5.7</a> for more information.</p>
 
-                <h5>6.14.10 Notes</h5>
+                <h5>6.14.10 AI Summary</h5>
                 <p><strong>Shortcut:</strong> <code>F8</code></p>
-                <p>Switches the Detail Panel to the <strong>Notes</strong> tab.<br>See <a href="#notes-tab">section 4.5.8</a> for more information.</p>
+                <p>Switches the Detail Panel to the <strong>AI Summary</strong> tab.<br>See <a href="#ai-summary">section 4.5.8</a> for more information.</p>
+
+                <h5>6.14.11 Notes</h5>
+                <p><strong>Shortcut:</strong> <code>F9</code></p>
+                <p>Switches the Detail Panel to the <strong>Notes</strong> tab.<br>See <a href="#notes">section 4.5.9</a> for more information.</p>
             </div>
 
             <!-- Help Menu -->
@@ -2635,11 +2669,12 @@
                     <li><code>F1</code>: Switch to Moves List tab</li>
                     <li><code>F2</code>: Switch to PGN header tags tab</li>
                     <li><code>F3</code>: Switch to Manual Analysis tab</li>
-                    <li><code>F4</code>: Switch to Game Summary tab</li>
-                    <li><code>F5</code>: Switch to Player Stats tab</li>
-                    <li><code>F6</code>: Switch to Annotations tab</li>
-                    <li><code>F7</code>: Switch to AI Summary tab</li>
-                    <li><code>F8</code>: Switch to Notes tab</li>
+                    <li><code>F4</code>: Switch to Opening Explorer tab</li>
+                    <li><code>F5</code>: Switch to Game Summary tab</li>
+                    <li><code>F6</code>: Switch to Player Stats tab</li>
+                    <li><code>F7</code>: Switch to Annotations tab</li>
+                    <li><code>F8</code>: Switch to AI Summary tab</li>
+                    <li><code>F9</code>: Switch to Notes tab</li>
                 </ul>
                 
                 <h5>6.16.3 Game Analysis</h5>
