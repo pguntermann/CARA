@@ -13,7 +13,7 @@ from app.models.manual_analysis_model import ManualAnalysisModel
 from app.controllers.manual_analysis_controller import ManualAnalysisController
 from app.controllers.engine_controller import TASK_MANUAL_ANALYSIS
 from app.views.dialogs.message_dialog import MessageDialog
-from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_PLAY, SVG_MENU_STOP
+from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_PLAY, SVG_MENU_STOP, SVG_MENU_FREEZE
 
 
 class DetailManualAnalysisView(QWidget):
@@ -58,11 +58,14 @@ class DetailManualAnalysisView(QWidget):
         
         # Connect button signals
         self.start_stop_button.toggled.connect(self._on_start_stop_toggled)
+        self.freeze_button.toggled.connect(self._on_freeze_toggled)
         self.add_line_button.clicked.connect(self._on_add_line_clicked)
         self.remove_line_button.clicked.connect(self._on_remove_line_clicked)
 
-        # Apply initial start/stop icon (text is set in _setup_ui)
+        # Apply initial start/stop and freeze icons (text is set in _setup_ui)
         self._refresh_start_stop_button_icon(is_analyzing=self._is_analyzing)
+        self._refresh_freeze_button_icon()
+        self._update_freeze_button_state(is_analyzing=self._is_analyzing, is_frozen=False)
         
         # Connect to models if provided
         if game_model:
@@ -205,6 +208,23 @@ class DetailManualAnalysisView(QWidget):
 
         self.start_stop_button.setIcon(themed_icon_from_svg(svg_path, tint))
         self.start_stop_button.setIconSize(QSize(18, 18))
+
+    def _refresh_freeze_button_icon(self) -> None:
+        """Set the freeze button icon from style config."""
+        if not hasattr(self, "freeze_button"):
+            return
+
+        ui_config = self.config.get("ui", {})
+        manual_cfg = (
+            ui_config.get("panels", {}).get("detail", {}).get("manual_analysis", {})
+        )
+        freeze_cfg = (manual_cfg.get("buttons", {}) or {}).get("freeze", {})
+        tint = freeze_cfg.get("icon_tint_rgb", [220, 220, 240])
+        icons_cfg = freeze_cfg.get("icons", {})
+        svg_path = icons_cfg.get("freeze_svg", SVG_MENU_FREEZE)
+
+        self.freeze_button.setIcon(themed_icon_from_svg(svg_path, tint))
+        self.freeze_button.setIconSize(QSize(18, 18))
     
     def _setup_ui(self) -> None:
         """Setup the manual analysis UI."""
@@ -277,6 +297,14 @@ class DetailManualAnalysisView(QWidget):
         self.start_stop_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         # Button styling will be applied in _apply_styling()
         row1_layout.addWidget(self.start_stop_button, alignment=Qt.AlignmentFlag.AlignVCenter)
+
+        # Freeze Analysis button (holds current PV lines while engine keeps searching)
+        self.freeze_button = QPushButton("Freeze")
+        self.freeze_button.setCheckable(True)
+        self.freeze_button.setChecked(False)
+        self.freeze_button.setEnabled(False)
+        self.freeze_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        row1_layout.addWidget(self.freeze_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         
         # Get button group spacing from config
         button_group_spacing = control_config.get('button_group_spacing', 16)
@@ -755,9 +783,9 @@ class DetailManualAnalysisView(QWidget):
         text_color_list = [norm_text[0], norm_text[1], norm_text[2]]
         
         # Collect all buttons
-        all_buttons = [self.start_stop_button, self.add_line_button, self.remove_line_button]
+        all_buttons = [self.start_stop_button, self.freeze_button, self.add_line_button, self.remove_line_button]
         icon_buttons = [self.add_line_button, self.remove_line_button]  # Buttons with single character icons
-        text_buttons = []  # Buttons with text labels
+        text_buttons = []  # Compact labeled toggles (explore/pieces/depth) — share one width
         
         # Add exploration buttons if they exist
         if hasattr(self, 'explore_pv1_button'):
@@ -802,6 +830,12 @@ class DetailManualAnalysisView(QWidget):
         # Calculate and set appropriate widths for text buttons based on their content
         button_font = QFont(font_family, int(font_size))
         font_metrics = QFontMetrics(button_font)
+        
+        # Freeze sits with Start/Stop and has an icon — size to its own label, not the compact toggles
+        freeze_text_width = font_metrics.horizontalAdvance(self.freeze_button.text())
+        freeze_icon_space = 18 + 8  # icon size + gap before text
+        freeze_width = freeze_text_width + (button_padding_value * 2) + 10 + freeze_icon_space
+        self.freeze_button.setFixedWidth(int(freeze_width))
         
         # Calculate width needed for each text button and use the maximum
         max_text_width = 0
@@ -1064,6 +1098,7 @@ class DetailManualAnalysisView(QWidget):
                 self._analysis_model.analysis_changed.disconnect(self._on_analysis_changed)
                 self._analysis_model.lines_changed.disconnect(self._on_lines_changed)
                 self._analysis_model.is_analyzing_changed.disconnect(self._on_is_analyzing_changed)
+                self._analysis_model.is_frozen_changed.disconnect(self._on_is_frozen_changed)
             except TypeError:
                 # Signal was not connected, ignore
                 pass
@@ -1076,6 +1111,7 @@ class DetailManualAnalysisView(QWidget):
             model.analysis_changed.connect(self._on_analysis_changed)
             model.lines_changed.connect(self._on_lines_changed)
             model.is_analyzing_changed.connect(self._on_is_analyzing_changed)
+            model.is_frozen_changed.connect(self._on_is_frozen_changed)
             
             # Connect to board model for arrow visibility changes
             if self._analysis_controller:
@@ -1087,6 +1123,7 @@ class DetailManualAnalysisView(QWidget):
             
             # Initialize with current state (immediate update)
             self._on_is_analyzing_changed(model.is_analyzing)
+            self._on_is_frozen_changed(model.is_frozen)
             self._on_lines_changed()
             self._on_analysis_changed(immediate=True)
     
@@ -1155,6 +1192,16 @@ class DetailManualAnalysisView(QWidget):
         else:
             # Stop analysis
             self._analysis_controller.stop_analysis()
+    
+    def _on_freeze_toggled(self, checked: bool) -> None:
+        """Handle freeze button toggle.
+        
+        Args:
+            checked: True if button is checked (freeze), False if unchecked (unfreeze).
+        """
+        if not self._analysis_controller:
+            return
+        self._analysis_controller.set_frozen(checked)
     
     def _on_add_line_clicked(self) -> None:
         """Handle add line button click."""
@@ -1343,15 +1390,47 @@ class DetailManualAnalysisView(QWidget):
         self.start_stop_button.blockSignals(False)
         self._refresh_start_stop_button_icon(is_analyzing=is_analyzing)
 
+        is_frozen = bool(self._analysis_model.is_frozen) if self._analysis_model else False
+        self._update_freeze_button_state(is_analyzing=is_analyzing, is_frozen=is_frozen)
+
         # Keep the statistics label updated (Time / Last update age) even when engine doesn't emit new lines.
-        if is_analyzing:
+        # When frozen, leave the snapshot as-is so depth/time/nps stay consistent with the held lines.
+        if is_analyzing and not is_frozen:
             if self.statistics_enabled and self.statistics_show_time:
                 self._statistics_refresh_timer.start()
         else:
             self._statistics_refresh_timer.stop()
 
+    def _on_is_frozen_changed(self, is_frozen: bool) -> None:
+        """Handle freeze state change from model.
+        
+        Args:
+            is_frozen: True if analysis display is frozen, False otherwise.
+        """
+        is_analyzing = bool(self._analysis_model.is_analyzing) if self._analysis_model else False
+        self._update_freeze_button_state(is_analyzing=is_analyzing, is_frozen=is_frozen)
+
+        if is_analyzing and not is_frozen:
+            if self.statistics_enabled and self.statistics_show_time:
+                self._statistics_refresh_timer.start()
+        else:
+            self._statistics_refresh_timer.stop()
+
+    def _update_freeze_button_state(self, is_analyzing: bool, is_frozen: bool) -> None:
+        """Enable/check the freeze button from model state without re-emitting toggled."""
+        if not hasattr(self, "freeze_button"):
+            return
+        self.freeze_button.blockSignals(True)
+        self.freeze_button.setEnabled(is_analyzing)
+        self.freeze_button.setChecked(bool(is_frozen) and is_analyzing)
+        self.freeze_button.blockSignals(False)
+        self._refresh_freeze_button_icon()
+
     def _on_statistics_refresh_tick(self) -> None:
         if not self._analysis_model or not self._is_analyzing:
+            self._statistics_refresh_timer.stop()
+            return
+        if self._analysis_model.is_frozen:
             self._statistics_refresh_timer.stop()
             return
         if not self.statistics_enabled or not self.statistics_show_time:

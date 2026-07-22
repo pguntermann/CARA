@@ -31,6 +31,7 @@ class ManualAnalysisModel(QObject):
     analysis_changed = pyqtSignal()  # Emitted when any analysis line changes
     lines_changed = pyqtSignal()  # Emitted when number of lines changes
     is_analyzing_changed = pyqtSignal(bool)  # Emitted when analysis state changes (is_analyzing)
+    is_frozen_changed = pyqtSignal(bool)  # Emitted when freeze state changes (hold PV display)
     enable_miniature_preview_changed = pyqtSignal(bool)  # Emitted when miniature preview setting changes
     miniature_preview_scale_factor_changed = pyqtSignal(float)  # Emitted when miniature preview scale factor changes
     
@@ -39,6 +40,7 @@ class ManualAnalysisModel(QObject):
         super().__init__()
         self._lines: List[AnalysisLine] = []
         self._is_analyzing: bool = False
+        self._is_frozen: bool = False  # When True, hold current PV lines/stats; ignore engine updates
         self._multipv: int = 2  # Number of lines to analyze
         self._start_time: Optional[float] = None  # Timestamp when analysis started (None if not analyzing)
         self._last_update_time: Optional[float] = None  # Timestamp of last engine update (None if none yet)
@@ -81,6 +83,29 @@ class ManualAnalysisModel(QObject):
                 self._start_time = None
                 self._last_update_time = None
             self.is_analyzing_changed.emit(value)
+    
+    @property
+    def is_frozen(self) -> bool:
+        """Get whether analysis display is frozen.
+        
+        When frozen, the current PV lines and related stats stay fixed while
+        the engine may continue searching in the background.
+        
+        Returns:
+            True if frozen, False otherwise.
+        """
+        return self._is_frozen
+    
+    @is_frozen.setter
+    def is_frozen(self, value: bool) -> None:
+        """Set freeze state for the analysis display.
+        
+        Args:
+            value: True to freeze current lines/stats, False to resume updates.
+        """
+        if self._is_frozen != value:
+            self._is_frozen = value
+            self.is_frozen_changed.emit(value)
     
     @property
     def multipv(self) -> int:
@@ -252,10 +277,14 @@ class ManualAnalysisModel(QObject):
     
     def reset(self) -> None:
         """Reset analysis to default state."""
+        was_frozen = self._is_frozen
         self._lines.clear()
         self._is_analyzing = False
+        self._is_frozen = False
         self._start_time = None
         self._last_update_time = None
         self.analysis_changed.emit()
         self.lines_changed.emit()
+        if was_frozen:
+            self.is_frozen_changed.emit(False)
 

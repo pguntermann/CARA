@@ -475,6 +475,10 @@ class ManualAnalysisController:
         if not self.analysis_model.is_analyzing:
             return
         
+        # New position invalidates a frozen snapshot
+        if self.analysis_model.is_frozen:
+            self.analysis_model.is_frozen = False
+        
         # Clear old lines now, right before updating position
         # This minimizes the time lines are missing (they'll be repopulated as engine updates arrive)
         self.analysis_model._lines.clear()
@@ -498,6 +502,10 @@ class ManualAnalysisController:
         Args:
             multipv: Number of lines to analyze (1-based, minimum 1).
         """
+        # Changing line count invalidates a frozen snapshot — resume live updates
+        if self.analysis_model.is_frozen:
+            self.analysis_model.is_frozen = False
+
         # Update model FIRST for immediate UI feedback
         # This ensures the UI displays the correct number of lines immediately
         self.analysis_model.multipv = multipv
@@ -507,6 +515,19 @@ class ManualAnalysisController:
         if self.analysis_model.is_analyzing:
             # Update service - this will trigger engine restart with new multipv
             self.analysis_service.set_multipv(multipv)
+    
+    def set_frozen(self, frozen: bool) -> None:
+        """Freeze or unfreeze the current analysis display.
+        
+        When frozen, PV lines, depth/nps/status, board arrows, plans, and the
+        eval bar stay on the last snapshot while the engine keeps searching.
+        
+        Args:
+            frozen: True to freeze, False to resume accepting updates.
+        """
+        if frozen and not self.analysis_model.is_analyzing:
+            return
+        self.analysis_model.is_frozen = frozen
     
     def add_pv_line(self) -> None:
         """Add an additional PV line by incrementing multipv."""
@@ -558,6 +579,10 @@ class ManualAnalysisController:
                     # This update is for a different position or we're updating - ignore it
                     return
         
+        # Frozen display: keep current PV/stats; engine continues searching in background
+        if self.analysis_model.is_frozen:
+            return
+        
         # Update model (this will trigger UI updates)
         self.analysis_model.update_line(multipv, centipawns, is_mate, mate_moves, depth, pv, nps, hashfull)
         
@@ -578,6 +603,9 @@ class ManualAnalysisController:
             hashfull: Hash table usage 0-1000 (-1 if not available).
             pv: Principal variation as space-separated moves (empty string if not available).
         """
+        if self.analysis_model.is_frozen:
+            return
+
         # Get engine name for status
         engine_id = self.engine_controller.get_engine_assignment(TASK_MANUAL_ANALYSIS)
         engine_name = "Engine"

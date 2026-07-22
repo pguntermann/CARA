@@ -48,6 +48,7 @@ SVG_ZOOM_OUT = "app/resources/icons/zoom_out.svg"
 SVG_MENU_RESET = "app/resources/icons/menu_reset.svg"
 SVG_MENU_SAVE = "app/resources/icons/save_database.svg"
 SVG_MENU_STOP = "app/resources/icons/menu_stop.svg"
+SVG_MENU_FREEZE = "app/resources/icons/menu_freeze.svg"
 SVG_MENU_VIDEO = "app/resources/icons/menu_video.svg"
 SVG_SIMPLE_X = "app/resources/icons/x.svg"
 

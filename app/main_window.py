@@ -3132,6 +3132,16 @@ class MainWindow(QMainWindow):
 
         manual_analysis_controller.start_analysis()
     
+    def _on_freeze_manual_analysis_toggled(self, checked: bool = False) -> None:
+        """Handle freeze/unfreeze manual analysis from menu."""
+        manual_analysis_controller = self.controller.get_manual_analysis_controller()
+        if not manual_analysis_controller:
+            return
+        # Prefer the action's checked state when triggered from the menu
+        if hasattr(self, "freeze_manual_analysis_action"):
+            checked = self.freeze_manual_analysis_action.isChecked()
+        manual_analysis_controller.set_frozen(checked)
+    
     def _on_add_pv_line(self) -> None:
         """Handle add PV line from menu."""
         manual_analysis_controller = self.controller.get_manual_analysis_controller()
@@ -3415,6 +3425,17 @@ class MainWindow(QMainWindow):
         """
         self._update_manual_analysis_action_states(is_analyzing, None)
     
+    def _on_manual_analysis_frozen_changed(self, is_frozen: bool) -> None:
+        """Handle freeze state change to update menu toggle.
+        
+        Args:
+            is_frozen: True if analysis display is frozen, False otherwise.
+        """
+        if hasattr(self, "freeze_manual_analysis_action"):
+            self.freeze_manual_analysis_action.blockSignals(True)
+            self.freeze_manual_analysis_action.setChecked(is_frozen)
+            self.freeze_manual_analysis_action.blockSignals(False)
+    
     def _on_manual_analysis_lines_changed(self) -> None:
         """Handle manual analysis lines change to update menu actions."""
         manual_analysis_controller = self.controller.get_manual_analysis_controller()
@@ -3441,6 +3462,16 @@ class MainWindow(QMainWindow):
                 set_menubar_themable_action_icon(
                     self, self.start_manual_analysis_action, SVG_MENU_PLAY
                 )
+
+        if hasattr(self, "freeze_manual_analysis_action"):
+            self.freeze_manual_analysis_action.setEnabled(is_analyzing)
+            frozen = False
+            if is_analyzing:
+                manual_analysis_controller = self.controller.get_manual_analysis_controller()
+                frozen = manual_analysis_controller.get_analysis_model().is_frozen
+            self.freeze_manual_analysis_action.blockSignals(True)
+            self.freeze_manual_analysis_action.setChecked(frozen)
+            self.freeze_manual_analysis_action.blockSignals(False)
         
         # Get multipv if not provided
         if multipv is None:

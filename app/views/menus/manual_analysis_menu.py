@@ -6,6 +6,7 @@ from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenuBar
 
 from app.utils.themed_icon import (
+    SVG_MENU_FREEZE,
     SVG_MENU_MINUS,
     SVG_MENU_PLAY,
     SVG_MENU_PLUS,
@@ -22,6 +23,14 @@ def setup_manual_analysis_menu(mw, menu_bar: QMenuBar) -> None:
     set_menubar_themable_action_icon(mw, mw.start_manual_analysis_action, SVG_MENU_PLAY)
     mw.start_manual_analysis_action.triggered.connect(mw._on_start_manual_analysis_toggled)
     manual_analysis_menu.addAction(mw.start_manual_analysis_action)
+
+    mw.freeze_manual_analysis_action = QAction("Freeze Analysis", mw)
+    mw.freeze_manual_analysis_action.setCheckable(True)
+    mw.freeze_manual_analysis_action.setChecked(False)
+    mw.freeze_manual_analysis_action.setEnabled(False)
+    set_menubar_themable_action_icon(mw, mw.freeze_manual_analysis_action, SVG_MENU_FREEZE)
+    mw.freeze_manual_analysis_action.triggered.connect(mw._on_freeze_manual_analysis_toggled)
+    manual_analysis_menu.addAction(mw.freeze_manual_analysis_action)
 
     manual_analysis_menu.addSeparator()
 
@@ -149,6 +158,7 @@ def setup_manual_analysis_menu(mw, menu_bar: QMenuBar) -> None:
     manual_analysis_controller = mw.controller.get_manual_analysis_controller()
     manual_analysis_model = manual_analysis_controller.get_analysis_model()
     manual_analysis_model.is_analyzing_changed.connect(mw._on_manual_analysis_state_changed)
+    manual_analysis_model.is_frozen_changed.connect(mw._on_manual_analysis_frozen_changed)
     manual_analysis_model.lines_changed.connect(mw._on_manual_analysis_lines_changed)
 
     mw._update_manual_analysis_action_states(manual_analysis_model.is_analyzing, manual_analysis_model.multipv)

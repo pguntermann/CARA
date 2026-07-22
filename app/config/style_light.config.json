@@ -1602,6 +1602,14 @@
                 "start_svg": "app/resources/icons/menu_play.svg",
                 "stop_svg": "app/resources/icons/menu_stop.svg"
               }
+            },
+            "freeze": {
+              "icon_tint_rgb": {
+                "$ref": "$_COLOR_TEXT_PRIMARY"
+              },
+              "icons": {
+                "freeze_svg": "app/resources/icons/menu_freeze.svg"
+              }
             }
           },
           "multipv_buttons": {
