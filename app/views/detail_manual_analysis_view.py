@@ -210,7 +210,7 @@ class DetailManualAnalysisView(QWidget):
         self.start_stop_button.setIconSize(QSize(18, 18))
 
     def _refresh_freeze_button_icon(self) -> None:
-        """Set the freeze button icon from style config."""
+        """Set the freeze button icon from style config (tint follows checked state)."""
         if not hasattr(self, "freeze_button"):
             return
 
@@ -219,7 +219,13 @@ class DetailManualAnalysisView(QWidget):
             ui_config.get("panels", {}).get("detail", {}).get("manual_analysis", {})
         )
         freeze_cfg = (manual_cfg.get("buttons", {}) or {}).get("freeze", {})
-        tint = freeze_cfg.get("icon_tint_rgb", [220, 220, 240])
+        # Match start/stop: dark/primary tint when unchecked, on-accent when checked.
+        legacy_tint = freeze_cfg.get("icon_tint_rgb")
+        if not isinstance(legacy_tint, (list, tuple)) or len(legacy_tint) < 3:
+            legacy_tint = [220, 220, 240]
+        unchecked_tint = freeze_cfg.get("icon_tint_rgb", legacy_tint)
+        checked_tint = freeze_cfg.get("checked_icon_tint_rgb", unchecked_tint)
+        tint = checked_tint if self.freeze_button.isChecked() else unchecked_tint
         icons_cfg = freeze_cfg.get("icons", {})
         svg_path = icons_cfg.get("freeze_svg", SVG_MENU_FREEZE)
 

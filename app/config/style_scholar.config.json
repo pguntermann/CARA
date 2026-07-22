@@ -1781,6 +1781,9 @@
               "icon_tint_rgb": {
                 "$ref": "$_COLOR_COCOA_BROWN"
               },
+              "checked_icon_tint_rgb": {
+                "$ref": "$_COLOR_FROST_MINT"
+              },
               "icons": {
                 "freeze_svg": "app/resources/icons/menu_freeze.svg"
               }

@@ -1607,6 +1607,9 @@
               "icon_tint_rgb": {
                 "$ref": "$_COLOR_TEXT_PRIMARY"
               },
+              "checked_icon_tint_rgb": {
+                "$ref": "$_COLOR_ON_ACCENT"
+              },
               "icons": {
                 "freeze_svg": "app/resources/icons/menu_freeze.svg"
               }
