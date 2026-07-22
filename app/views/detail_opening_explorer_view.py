@@ -241,6 +241,24 @@ class DetailOpeningExplorerView(QWidget):
             f"DetailOpeningExplorerView {{ background-color: rgb({bg[0]}, {bg[1]}, {bg[2]}); }}"
         )
         self._content.setStyleSheet(f"background-color: rgb({bg[0]}, {bg[1]}, {bg[2]});")
+
+        # Match other detail tabs (Summary, Player Stats, AI Chat, etc.)
+        from app.views.style import StyleManager
+        scroll_cfg = self._explorer_config().get("scroll_area", {})
+        border_offset = int(scroll_cfg.get("border_color_offset", 20))
+        border_color = [
+            min(255, bg[0] + border_offset),
+            min(255, bg[1] + border_offset),
+            min(255, bg[2] + border_offset),
+        ]
+        StyleManager.style_scroll_area(
+            self._scroll,
+            self.config,
+            bg,
+            border_color,
+            0,  # No border radius (frame is NoFrame)
+        )
+
         title_c = self._title_color
         title_font = QFont(self._font_family, int(self._title_font_size))
         title_font.setBold(True)
