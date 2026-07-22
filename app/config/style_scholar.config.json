@@ -1846,7 +1846,7 @@
           "win_probability": {
             "show_title": true,
             "show_labels": true,
-            "title": "Win probability",
+            "title": "Win probability (best engine play)",
             "bar_height": 8,
             "segment_gap": 1,
             "border_radius": 3,

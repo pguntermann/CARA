@@ -307,12 +307,24 @@ class ManualAnalysisEngineThread(QThread):
             
             self.uci.set_option("MultiPV", self.multipv, wait_for_ready=False)
             
+            # Apply engine options, but leave UCI_ShowWDL for last. Engines like Lc0 may
+            # load ConfigFile defaults that reset ShowWDL; applying it last keeps WDL on.
+            show_wdl_value = None
             for option_name, option_value in self.engine_options.items():
-                if option_name not in ["Threads", "MultiPV"]:
-                    # UCI check options expect lowercase true/false
-                    if isinstance(option_value, bool):
-                        option_value = "true" if option_value else "false"
-                    self.uci.set_option(option_name, option_value, wait_for_ready=False)
+                if option_name in ["Threads", "MultiPV"]:
+                    continue
+                if option_name == "UCI_ShowWDL":
+                    show_wdl_value = option_value
+                    continue
+                # UCI check options expect lowercase true/false
+                if isinstance(option_value, bool):
+                    option_value = "true" if option_value else "false"
+                self.uci.set_option(option_name, option_value, wait_for_ready=False)
+
+            if show_wdl_value is not None:
+                if isinstance(show_wdl_value, bool):
+                    show_wdl_value = "true" if show_wdl_value else "false"
+                self.uci.set_option("UCI_ShowWDL", show_wdl_value, wait_for_ready=False)
             
             if not self.uci.confirm_ready():
                 self.error_occurred.emit("Engine did not respond with readyok after setting options")
@@ -811,7 +823,12 @@ class ManualAnalysisEngineService(QObject):
             return engine_options
 
         from app.services.engine_parameters_service import EngineParametersService
-        options = EngineParametersService.get_instance().get_engine_options(str(engine_path))
+        service = EngineParametersService.get_instance()
+        service.load()
+        options = service.get_engine_options(str(engine_path))
+        if not options:
+            # Windows path key mismatch (slash/case) — try normalized lookup
+            options = self._engine_options_for_path(service, engine_path)
         supports_show_wdl = any(
             isinstance(opt, dict) and opt.get("name") == "UCI_ShowWDL"
             for opt in (options or [])
@@ -822,6 +839,26 @@ class ManualAnalysisEngineService(QObject):
         updated = dict(engine_options)
         updated["UCI_ShowWDL"] = "true"
         return updated
+
+    @staticmethod
+    def _engine_options_for_path(service: Any, engine_path: Path) -> list:
+        """Resolve engine option list with tolerant path matching."""
+        target = str(engine_path)
+        target_norm = str(Path(engine_path).resolve()) if engine_path.exists() else target
+        parameters = getattr(service, "_parameters", {}) or {}
+        for key, entry in parameters.items():
+            if not isinstance(entry, dict):
+                continue
+            if key == target or key == target_norm:
+                return entry.get("options", []) or []
+            try:
+                if Path(key).resolve() == Path(target_norm).resolve():
+                    return entry.get("options", []) or []
+            except OSError:
+                continue
+            if key.replace("/", "\\").lower() == target.replace("/", "\\").lower():
+                return entry.get("options", []) or []
+        return []
     
     def update_position(self, fen: str) -> None:
         """Update analysis position.

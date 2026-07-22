@@ -39,7 +39,7 @@ class WinProbabilityBarWidget(QWidget):
         self._enabled = bool(behavior.get("enabled", True))
         self._show_title = bool(style.get("show_title", True))
         self._show_labels = bool(style.get("show_labels", True))
-        self._title_text = str(style.get("title", "Win probability"))
+        self._title_text = str(style.get("title", "Win probability (best engine play)"))
         self._bar_height = int(style.get("bar_height", 8))
         self._segment_gap = int(style.get("segment_gap", 1))
         self._border_radius = int(style.get("border_radius", 3))

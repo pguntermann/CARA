@@ -133,11 +133,15 @@ class ManualAnalysisController:
             return self.game_controller.board_controller
         return None
     
-    def start_analysis(self, fen: Optional[str] = None) -> bool:
+    def start_analysis(self, fen: Optional[str] = None, *, defer_service_start: bool = True) -> bool:
         """Start analysis for a position.
         
         Args:
             fen: FEN string of position to analyze.
+            defer_service_start: If True (default), start the engine service on the next
+                event-loop tick for UI responsiveness. If False, start immediately — required
+                after a synchronous stop when switching engines so a queued stop cannot kill
+                the newly started engine (which also dropped UCI WDL until a manual restart).
             
         Returns:
             True if analysis started, False if no manual analysis engine configured.
@@ -261,18 +265,27 @@ class ManualAnalysisController:
         logging_service = LoggingService.get_instance()
         logging_service.info(f"Manual analysis started: engine={engine.name}, FEN={fen[:50]}..., multipv={multipv}")
         
-        # Start service in background (non-blocking) using QTimer
-        # This allows the UI to update immediately before the service starts
-        QTimer.singleShot(0, lambda: self.analysis_service.start_analysis(engine_path, fen, multipv))
+        # Start service — deferred by default so the UI can paint; immediate when restarting
+        # after a synchronous stop (engine switch) to avoid racing a queued stop_analysis.
+        if defer_service_start:
+            QTimer.singleShot(
+                0,
+                lambda p=engine_path, f=fen, m=multipv: self.analysis_service.start_analysis(p, f, m),
+            )
+        else:
+            self.analysis_service.start_analysis(engine_path, fen, multipv)
         
         return True
     
-    def stop_analysis(self, synchronous: bool = False) -> None:
+    def stop_analysis(self, synchronous: bool = False, restore_evaluation: bool = True) -> None:
         """Stop current analysis.
         
         Args:
             synchronous: If True, stop synchronously (wait for cleanup to complete).
                         If False, stop asynchronously using QTimer (default, for UI responsiveness).
+            restore_evaluation: If True and the evaluation bar is visible, switch it back to the
+                        evaluation engine after stopping. Set False when immediately restarting
+                        manual analysis (e.g. engine switch) to avoid a stop/start race.
         """
         # Stop debounce timer
         self._position_update_timer.stop()
@@ -297,15 +310,15 @@ class ManualAnalysisController:
         
         # Stop service - synchronously or asynchronously based on parameter
         if synchronous:
-            # Synchronous stop (for shutdown) - call directly
+            # Synchronous stop (for shutdown / engine switch) - call directly
             self._stop_service_in_background(keep_engine_alive=False)
         else:
             # Asynchronous stop (for normal UI interaction) - use QTimer
             QTimer.singleShot(0, lambda: self._stop_service_in_background(keep_engine_alive=False))
         
         # If evaluation bar is visible and using manual analysis, switch it back to evaluation engine
-        # Skip this during synchronous shutdown to avoid restarting evaluation
-        if not synchronous and self._evaluation_controller:
+        # Skip during synchronous shutdown, and when caller will restart manual analysis immediately
+        if restore_evaluation and not synchronous and self._evaluation_controller:
             board_model = self.game_controller.board_controller.get_board_model()
             if board_model.show_evaluation_bar:
                 # Switch evaluation bar back to evaluation engine
@@ -442,9 +455,8 @@ class ManualAnalysisController:
         
         # Check if engine changed
         if engine_id != self._current_engine_id:
-            # Engine changed - restart with new engine
-            self.stop_analysis()
-            self.start_analysis(fen)
+            # Engine changed - restart with new engine (sync to preserve UCI WDL setup)
+            self._restart_analysis_with_assigned_engine(fen)
             return
         
         # Store pending position and start/restart debounce timer
@@ -759,6 +771,19 @@ class ManualAnalysisController:
             # If restart fails, stop analysis
             self.stop_analysis()
     
+    def _restart_analysis_with_assigned_engine(self, fen: str) -> None:
+        """Stop the current engine synchronously and start the assigned one.
+        
+        Async stop+start races: a queued stop can tear down the newly started engine
+        (or leave it without a clean UCI_ShowWDL apply), so WDL disappears until the
+        user manually stops and starts again.
+        
+        Args:
+            fen: Position to analyze with the newly assigned engine.
+        """
+        self.stop_analysis(synchronous=True, restore_evaluation=False)
+        self.start_analysis(fen, defer_service_start=False)
+
     def _on_engine_assignment_changed(self) -> None:
         """Handle engine assignment change from engine model.
         
@@ -776,11 +801,8 @@ class ManualAnalysisController:
         if engine_id != self._current_engine_id:
             # Engine changed - restart with new engine
             if self.game_controller and self.game_controller.board_controller:
-                # Get current position from board controller
                 fen = self.game_controller.board_controller.get_position_fen()
-                # Stop current analysis and start with new engine
-                self.stop_analysis()
-                self.start_analysis(fen)
+                self._restart_analysis_with_assigned_engine(fen)
             else:
                 # No board controller - just stop
                 self.stop_analysis()

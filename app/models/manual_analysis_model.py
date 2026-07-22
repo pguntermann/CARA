@@ -330,6 +330,7 @@ class ManualAnalysisModel(QObject):
     
     def reset(self) -> None:
         """Reset analysis to default state."""
+        was_analyzing = self._is_analyzing
         was_frozen = self._is_frozen
         self._lines.clear()
         self._is_analyzing = False
@@ -338,6 +339,9 @@ class ManualAnalysisModel(QObject):
         self._last_update_time = None
         self.analysis_changed.emit()
         self.lines_changed.emit()
+        # Emit explicitly: assigning _is_analyzing directly skips the property setter
+        if was_analyzing:
+            self.is_analyzing_changed.emit(False)
         if was_frozen:
             self.is_frozen_changed.emit(False)
 

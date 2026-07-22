@@ -1408,6 +1408,9 @@ class DetailManualAnalysisView(QWidget):
         self.start_stop_button.blockSignals(False)
         self._refresh_start_stop_button_icon(is_analyzing=is_analyzing)
 
+        # Re-show WDL when analysis resumes (e.g. after an engine switch restart)
+        self._update_win_probability_bar()
+
         is_frozen = bool(self._analysis_model.is_frozen) if self._analysis_model else False
         self._update_freeze_button_state(is_analyzing=is_analyzing, is_frozen=is_frozen)
 
