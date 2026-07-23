@@ -1,33 +1,112 @@
-"""Service for formatting PGN text to HTML with colors and styles."""
+"""Service for formatting PGN text to HTML with colors and styles.
+
+Main-line moves and comments are tagged with stable ``href`` anchors
+(``cara-ply:N`` / ``cara-cmt:N``) so the PGN view can build a one-way
+plaintext range map after ``setHtml`` — no invisible Unicode sentinels.
+"""
 
 import re
 import io
-from typing import Dict, Any, Tuple, List, Optional
+from dataclasses import dataclass
+from typing import Dict, Any, Tuple, List, Optional, Sequence
 from app.services.logging_service import LoggingService
 
-# Invisible sentinel for PGN move highlighting: no visible characters.
-# Encode ply as a run of U+200B (zero-width space) wrapped in ZWNJ+ZWJ so the view can find the move.
-# Format: PREFIX + (U+200B repeated ply times) + SUFFIX. All characters are zero-width/invisible.
-PGN_PLY_SENTINEL_PREFIX = "\u200C\u200D"   # zero-width non-joiner, zero-width joiner
-PGN_PLY_SENTINEL_SUFFIX = "\u200D\u200C"   # zero-width joiner, zero-width non-joiner
-_PLY_SENTINEL_ZERO_WIDTH = "\u200B"         # zero-width space (one per ply)
+# Stable interaction anchors embedded in formatted HTML (visible text only; identity in href).
+PGN_PLY_HREF_PREFIX = "cara-ply:"
+PGN_COMMENT_HREF_PREFIX = "cara-cmt:"
 
-
-def make_ply_sentinel(ply: int) -> str:
-    """Return the invisible sentinel string for the given ply (1-based)."""
-    return PGN_PLY_SENTINEL_PREFIX + (_PLY_SENTINEL_ZERO_WIDTH * ply) + PGN_PLY_SENTINEL_SUFFIX
-
-
-# Invisible sentinel for main-line PGN comments (double-click → move row). Distinct from ply sentinels.
-PGN_COMMENT_SENTINEL_PREFIX = "\u2060\u200C"  # word joiner + ZWNJ
+# Legacy invisible sentinels (older builds). Still stripped on clipboard copy.
+PGN_PLY_SENTINEL_PREFIX = "\u200C\u200D"
+PGN_PLY_SENTINEL_SUFFIX = "\u200D\u200C"
+_PLY_SENTINEL_ZERO_WIDTH = "\u200B"
+PGN_COMMENT_SENTINEL_PREFIX = "\u2060\u200C"
 PGN_COMMENT_SENTINEL_SUFFIX = "\u200C\u2060"
 
 
-def make_comment_sentinel(ply: int) -> str:
-    """Return invisible marker encoding 1-based half-move ply for a main-line comment (ply > 0)."""
-    if ply <= 0:
-        return ""
-    return PGN_COMMENT_SENTINEL_PREFIX + (_PLY_SENTINEL_ZERO_WIDTH * ply) + PGN_COMMENT_SENTINEL_SUFFIX
+@dataclass(frozen=True)
+class PgnTextRange:
+    """Half-open plaintext range ``[start, end)`` in the rendered QTextDocument."""
+
+    ply: int
+    start: int
+    end: int
+
+
+@dataclass(frozen=True)
+class PgnRangeMap:
+    """One-way index of interactive regions after HTML → document render."""
+
+    moves: Tuple[PgnTextRange, ...] = ()
+    comments: Tuple[PgnTextRange, ...] = ()
+
+    def move_ply_at(self, position: int) -> int:
+        for item in self.moves:
+            if item.start <= position < item.end:
+                return item.ply
+        return 0
+
+    def comment_ply_at(self, position: int) -> Optional[int]:
+        for item in self.comments:
+            if item.start <= position < item.end:
+                return item.ply
+        return None
+
+    def move_range(self, ply: int) -> Optional[PgnTextRange]:
+        for item in self.moves:
+            if item.ply == ply:
+                return item
+        return None
+
+
+def ply_href(ply: int) -> str:
+    """Return the HTML href for a 1-based main-line ply."""
+    return f"{PGN_PLY_HREF_PREFIX}{int(ply)}"
+
+
+def comment_href(ply: int) -> str:
+    """Return the HTML href for a main-line comment owned by 1-based ply."""
+    return f"{PGN_COMMENT_HREF_PREFIX}{int(ply)}"
+
+
+def parse_ply_href(href: str) -> Optional[int]:
+    if not href or not href.startswith(PGN_PLY_HREF_PREFIX):
+        return None
+    try:
+        ply = int(href[len(PGN_PLY_HREF_PREFIX) :])
+    except ValueError:
+        return None
+    return ply if ply > 0 else None
+
+
+def parse_comment_href(href: str) -> Optional[int]:
+    if not href or not href.startswith(PGN_COMMENT_HREF_PREFIX):
+        return None
+    try:
+        ply = int(href[len(PGN_COMMENT_HREF_PREFIX) :])
+    except ValueError:
+        return None
+    return ply if ply > 0 else None
+
+
+def build_pgn_range_map_from_fragments(
+    fragments: Sequence[Tuple[int, int, str]],
+) -> PgnRangeMap:
+    """Build a range map from ``(start, length, href)`` document fragments."""
+    moves: List[PgnTextRange] = []
+    comments: List[PgnTextRange] = []
+    for start, length, href in fragments:
+        if length <= 0:
+            continue
+        ply = parse_ply_href(href)
+        if ply is not None:
+            moves.append(PgnTextRange(ply=ply, start=start, end=start + length))
+            continue
+        cply = parse_comment_href(href)
+        if cply is not None:
+            comments.append(PgnTextRange(ply=cply, start=start, end=start + length))
+    moves.sort(key=lambda r: (r.ply, r.start))
+    comments.sort(key=lambda r: (r.start, r.ply))
+    return PgnRangeMap(moves=tuple(moves), comments=tuple(comments))
 
 
 # Game outcomes in move text: 1-0 / 0-1 / 1/2-1/2 use word boundaries. "*" is not a word character,
@@ -46,54 +125,6 @@ PGN_MAINLINE_SAN_PATTERN = re.compile(
     r"(?:O-O-O|O-O)"
     r")(?=\s|$|[!?]|\d|<)"
 )
-
-
-def _parse_comment_sentinel_at(text: str, prefix_at: int) -> Optional[int]:
-    """Decode ply from comment sentinel starting at ``prefix_at``, or None if not a valid sentinel."""
-    n = len(text)
-    p = prefix_at + len(PGN_COMMENT_SENTINEL_PREFIX)
-    zw = 0
-    while p < n and text[p] == _PLY_SENTINEL_ZERO_WIDTH:
-        zw += 1
-        p += 1
-    suf = PGN_COMMENT_SENTINEL_SUFFIX
-    if p + len(suf) > n or text[p : p + len(suf)] != suf:
-        return None
-    return zw if zw > 0 else None
-
-
-def _find_pgn_comment_brace_end(text: str, open_brace_idx: int) -> int:
-    """Return index of closing ``}`` for PGN comment starting at ``open_brace_idx``, or -1."""
-    depth = 0
-    k = open_brace_idx
-    n = len(text)
-    while k < n:
-        if text[k] == "{":
-            depth += 1
-        elif text[k] == "}":
-            depth -= 1
-            if depth == 0:
-                return k
-        k += 1
-    return -1
-
-
-def find_mainline_comment_ply_at_plaintext_position(text: str, position: int) -> Optional[int]:
-    """If ``position`` lies inside a main-line comment with a sentinel, return owning 1-based ply."""
-    if not text or position < 0:
-        return None
-    pos = min(position, len(text) - 1)
-    search_end = pos + 1
-    p = text.rfind(PGN_COMMENT_SENTINEL_PREFIX, 0, search_end)
-    while p != -1:
-        if p > 0 and text[p - 1] == "{":
-            ply = _parse_comment_sentinel_at(text, p)
-            open_idx = p - 1
-            end_idx = _find_pgn_comment_brace_end(text, open_idx)
-            if ply is not None and end_idx != -1 and open_idx <= pos <= end_idx:
-                return ply
-        p = text.rfind(PGN_COMMENT_SENTINEL_PREFIX, 0, p)
-    return None
 
 
 def _normalize_pgn_header_tags_one_per_line(text: str, tag_pattern: re.Pattern[str]) -> str:
@@ -115,14 +146,14 @@ def clean_pgn_text(text: str) -> str:
     """Clean and format PGN text for copying to clipboard.
     
     This function:
-    1. Removes invisible sentinel characters used for move identification/highlighting and main-line comments
+    1. Removes legacy invisible sentinel characters (older CARA builds)
     2. Puts each metadata tag on its own line when they were concatenated on one line
     3. Separates metadata tags from move notation (adds CRLF between them)
     4. Applies fixed-width formatting using export config settings
     5. Normalizes line endings to CRLF
     
     Args:
-        text: PGN text that may contain invisible sentinel characters.
+        text: PGN text that may contain legacy invisible sentinel characters.
         
     Returns:
         Cleaned and formatted PGN text safe for copying to clipboard.
@@ -130,18 +161,12 @@ def clean_pgn_text(text: str) -> str:
     if not text:
         return text
     
-    # Step 1: Remove invisible sentinel characters first (before processing)
-    # Remove sentinel pattern: ZWNJ+ZWJ + (zero-width spaces) + ZWJ+ZWNJ
-    # Pattern matches: PREFIX + (zero or more zero-width spaces) + SUFFIX
+    # Step 1: Remove legacy invisible sentinel characters (older builds)
     pattern = re.escape(PGN_PLY_SENTINEL_PREFIX) + r'\u200B*' + re.escape(PGN_PLY_SENTINEL_SUFFIX)
     text = re.sub(pattern, '', text)
     comment_pat = re.escape(PGN_COMMENT_SENTINEL_PREFIX) + r'\u200B*' + re.escape(PGN_COMMENT_SENTINEL_SUFFIX)
     text = re.sub(comment_pat, '', text)
-    
-    # Also remove any remaining standalone invisible characters that might have been left
-    # This ensures we catch any edge cases where sentinels might be malformed
-    # Also remove line separator (U+2028) and paragraph separator (U+2029) which might appear
-    text = re.sub(r'[\u200B\u200C\u200D\u2028\u2029]', '', text)
+    text = re.sub(r'[\u200B\u200C\u200D\u2028\u2029\u2060]', '', text)
     
     # Step 2: Separate metadata tags from move notation and ensure blank line between them
     # Pattern to match metadata tags: [Key "Value"]
@@ -1266,6 +1291,26 @@ class PgnFormatterService:
                 style_parts.append("font-style: italic")
             style = "; ".join(style_parts)
             return f'<span style="{style}">{escaped_text}</span>'
+
+        def styled_anchor(
+            text: str,
+            href: str,
+            color: list,
+            bold: bool = False,
+            italic: bool = False,
+        ) -> str:
+            """Create an interaction anchor (move/comment) with the same styling as spans."""
+            escaped_text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            style_parts = [
+                f"color: rgb({color[0]}, {color[1]}, {color[2]})",
+                "text-decoration: none",
+            ]
+            if bold:
+                style_parts.append("font-weight: bold")
+            if italic:
+                style_parts.append("font-style: italic")
+            style = "; ".join(style_parts)
+            return f'<a href="{href}" style="{style}">{escaped_text}</a>'
         
         # Start with the PGN text
         formatted = pgn_text
@@ -1423,8 +1468,20 @@ class PgnFormatterService:
                                 formatted, start, (int(header_color[0]), int(header_color[1]), int(header_color[2]))
                             )
                             if ply_own is not None:
-                                comment_text = "{" + make_comment_sentinel(ply_own) + comment_text[1:]
-                            result_parts.append(span(comment_text, comment_color, italic=comment_italic))
+                                # Outer span keeps comment color for later HTML passes;
+                                # inner href anchor carries the real styles (Qt ignores color: inherit).
+                                inner = styled_anchor(
+                                    comment_text,
+                                    comment_href(ply_own),
+                                    comment_color,
+                                    italic=comment_italic,
+                                )
+                                result_parts.append(
+                                    f'<span style="color: rgb({comment_color[0]}, {comment_color[1]}, {comment_color[2]})">'
+                                    f"{inner}</span>"
+                                )
+                            else:
+                                result_parts.append(span(comment_text, comment_color, italic=comment_italic))
                             i = end
                             found_end = True
                             break
@@ -1671,7 +1728,7 @@ class PgnFormatterService:
         in_comment_span = False
         comment_span_depth = 0
         span_stack: List[str] = []
-        main_line_ply = 1  # Increment before use so 1st move gets sentinel(2); view searches for sentinel(ply+1)
+        main_line_ply = 0  # 1-based; incremented when each main-line SAN is wrapped
         
         def _recompute_move_span_flags() -> None:
             nonlocal in_variation_span, in_header_span, in_comment_span, comment_span_depth
@@ -1749,9 +1806,13 @@ class PgnFormatterService:
                     # Don't format if immediately after a digit (could be part of move number)
                     if not (i > 0 and formatted[i-1].isdigit()):
                         move_san = match.group(1)
-                        main_line_ply += 1  # 1st move -> sentinel(2), 2nd -> sentinel(3); view uses ply+1 to find
-                        sentinel = make_ply_sentinel(main_line_ply)
-                        move_formatted = span(sentinel + move_san, move_color, move_bold)
+                        main_line_ply += 1
+                        move_formatted = styled_anchor(
+                            move_san,
+                            ply_href(main_line_ply),
+                            move_color,
+                            move_bold,
+                        )
                         result_parts.append(move_formatted)
                         i = match.end()
                     else:
@@ -2273,7 +2334,7 @@ class PgnFormatterService:
             Formatted text with moves individually styled.
         """
         # Pattern to match moves in variations (must include castling so variation castling gets
-        # variation styling and does not consume a main-line sentinel, which would break navigation to the last move).
+        # variation styling and is not later treated as a main-line move anchor).
         # Matches: optional move number (e.g., "13.", "13. ", or "13... "), then move SAN, preserving whitespace after.
         move_pattern = re.compile(
             r'(?:(\d+\.\s*)|(\d+\.\.\.\s*))?'  # Optional move number; \s* allows "13.Ned3" to be captured

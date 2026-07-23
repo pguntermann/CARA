@@ -1,16 +1,16 @@
 """PGN Notation view for detail panel."""
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QMenu
-from PyQt6.QtGui import QPalette, QColor, QFont, QTextCursor, QTextCharFormat, QMouseEvent, QContextMenuEvent, QAction, QKeyEvent, QKeySequence, QShortcut
-from PyQt6.QtCore import Qt, QRegularExpression
+from PyQt6.QtGui import QPalette, QColor, QFont, QTextCursor, QTextCharFormat, QMouseEvent, QContextMenuEvent, QAction, QKeyEvent, QKeySequence, QShortcut, QTextDocument
+from PyQt6.QtCore import Qt
 from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING, Callable
-import re
 
 from app.services.pgn_formatter_service import (
     PgnFormatterService,
-    make_ply_sentinel,
+    PgnRangeMap,
+    build_pgn_range_map_from_fragments,
     clean_pgn_text,
-    find_mainline_comment_ply_at_plaintext_position,
+    ply_href,
 )
 from app.models.game_model import GameModel
 from app.utils.font_utils import resolve_font_family, scale_font_size
@@ -18,6 +18,27 @@ from app.views.style.style_manager import StyleManager
 
 if TYPE_CHECKING:
     from app.controllers.game_controller import GameController
+
+
+def _range_map_from_document(document: Optional[QTextDocument]) -> PgnRangeMap:
+    """Extract move/comment ranges from cara-* href anchors in the rendered document."""
+    if document is None:
+        return PgnRangeMap()
+    fragments: List[Tuple[int, int, str]] = []
+    block = document.begin()
+    while block.isValid():
+        it = block.begin()
+        while not it.atEnd():
+            frag = it.fragment()
+            if frag.isValid():
+                fmt = frag.charFormat()
+                if fmt.isAnchor():
+                    href = fmt.anchorHref() or ""
+                    if href:
+                        fragments.append((frag.position(), frag.length(), href))
+            it += 1
+        block = block.next()
+    return build_pgn_range_map_from_fragments(fragments)
 
 
 class ClickablePgnTextEdit(QTextEdit):
@@ -189,11 +210,9 @@ class ClickablePgnTextEdit(QTextEdit):
         menu.exec(event.globalPos())
     
     def copy(self) -> None:
-        """Override copy method to clean invisible sentinel characters before copying.
+        """Override copy to normalize PGN text before placing it on the clipboard.
         
-        This intercepts both keyboard shortcuts (Ctrl+C) and context menu copy actions,
-        removes invisible sentinel characters used for move identification, and places
-        the cleaned text on the clipboard.
+        This intercepts both keyboard shortcuts (Ctrl+C) and context menu copy actions.
         """
         # Get selected text or all text if no selection
         cursor = self.textCursor()
@@ -211,7 +230,7 @@ class ClickablePgnTextEdit(QTextEdit):
                 # Fallback to toPlainText() if parent view not available
                 text_to_copy = self.toPlainText()
         
-        # Clean and format the text (removes invisible chars, adds CRLF, applies fixed-width)
+        # Clean and format the text (header layout, CRLF, fixed-width export)
         cleaned_text = clean_pgn_text(text_to_copy)
         
         # Set clipboard directly (don't call super().copy() to avoid copying uncleaned text)
@@ -247,6 +266,7 @@ class DetailPgnView(QWidget):
         self._current_pgn_text: str = ""  # Store plain PGN text for re-formatting
         self._current_formatted_html: str = ""  # Store formatted HTML for highlighting
         self._move_info: List[Tuple[str, int, bool]] = []  # List of (move_san, move_number, is_white) tuples for each ply
+        self._range_map: PgnRangeMap = PgnRangeMap()  # Move/comment ranges from rendered anchors
         self._active_move_ply: int = 0  # Current active move ply (0 = starting position)
         self._last_highlighted_start: int = -1  # Track last highlighted position for clearing
         self._last_highlighted_length: int = 0
@@ -388,6 +408,7 @@ class DetailPgnView(QWidget):
             # Use original move info (from unfiltered PGN) for highlighting
             self._current_formatted_html = formatted_html
             self._move_info = original_move_info
+            self._range_map = _range_map_from_document(self.pgn_text.document())
             
             # Re-apply highlighting for current active move
             # Use QTimer to ensure the HTML is rendered before highlighting
@@ -397,6 +418,7 @@ class DetailPgnView(QWidget):
             self.pgn_text.setPlainText("")
             self._current_formatted_html = ""
             self._move_info = []
+            self._range_map = PgnRangeMap()
             self._last_highlighted_start = -1
             self._last_highlighted_length = 0
     
@@ -546,142 +568,69 @@ class DetailPgnView(QWidget):
         return (self._current_formatted_html, settings)
     
     def _highlight_active_move(self) -> None:
-        """Highlight the active move in the PGN text by finding it directly in the document."""
-        # Ensure document is ready
+        """Highlight the active move using the one-way range map (no sentinel scan)."""
         if not self.pgn_text.document():
             return
-        
+
+        # Restore base HTML so prior highlight/format mutations cannot drop href anchors.
+        if self._current_formatted_html:
+            try:
+                self.pgn_text.setHtml(self._current_formatted_html)
+            except Exception:
+                pass
+            self._range_map = _range_map_from_document(self.pgn_text.document())
+        else:
+            self._range_map = PgnRangeMap()
+
+        self._last_highlighted_start = -1
+        self._last_highlighted_length = 0
+
+        if self._active_move_ply <= 0:
+            return
+
         document = self.pgn_text.document()
         document_length = document.characterCount()
-        
-        # If document is empty, nothing to highlight
-        if document_length == 0:
+        if document_length <= 0:
             return
-        
-        # Special case: When ply is 0 (starting position), force-clear all highlighting
-        if self._active_move_ply == 0:
-            # Clear any existing highlighting by re-applying the HTML (which restores formatting)
-            # This preserves the PGN formatting while removing the highlight
-            if self._current_formatted_html:
-                try:
-                    # Re-apply the HTML to restore original formatting (without highlight)
-                    self.pgn_text.setHtml(self._current_formatted_html)
-                except Exception:
-                    # If re-applying fails, try to clear just the background/foreground colors
-                    # by iterating through the document and clearing only highlight colors
-                    try:
-                        cursor = QTextCursor(document)
-                        cursor.movePosition(QTextCursor.MoveOperation.Start)
-                        while not cursor.atEnd():
-                            format = cursor.charFormat()
-                            # Only clear if there's a background color (indicating highlighting)
-                            bg_color = format.background()
-                            if bg_color.isValid() and bg_color.alpha() > 0:
-                                # Clear background to remove highlighting
-                                format.setBackground(QColor())  # Clear background
-                                cursor.setCharFormat(format)
-                            cursor.movePosition(QTextCursor.MoveOperation.NextCharacter)
-                    except Exception:
-                        # If all else fails, just reset stored positions
-                        pass
-            
-            # Reset stored positions
-            self._last_highlighted_start = -1
-            self._last_highlighted_length = 0
-            return  # No move to highlight at starting position
-        
-        # Clear previous highlighting - check if positions are valid first
-        if self._last_highlighted_start >= 0 and self._last_highlighted_length > 0:
-            # Check if the stored positions are still valid
-            if self._last_highlighted_start < document_length:
-                # Calculate end position, but cap it at document length
-                end_position = min(self._last_highlighted_start + self._last_highlighted_length, document_length)
-                if end_position > self._last_highlighted_start:
-                    try:
-                        cursor = QTextCursor(document)
-                        cursor.setPosition(self._last_highlighted_start)
-                        cursor.setPosition(end_position, QTextCursor.MoveMode.KeepAnchor)
-                        
-                        # Create default format to clear highlighting
-                        default_format = QTextCharFormat()
-                        cursor.setCharFormat(default_format)
-                    except Exception:
-                        # If setting position fails, just reset the stored positions
-                        pass
-            
-            # Reset stored positions after clearing (or if they were invalid)
-            self._last_highlighted_start = -1
-            self._last_highlighted_length = 0
-        
-        # Get active move position if available
-        # Check bounds: ensure move_info has enough entries and active_move_ply is valid
-        if (self._active_move_ply > 0 and 
-            len(self._move_info) > 0 and 
-            self._active_move_ply <= len(self._move_info)):
-            # Get highlight colors from config
-            ui_config = self.config.get('ui', {})
-            panel_config = ui_config.get('panels', {}).get('detail', {})
-            pgn_config = panel_config.get('pgn_notation', {})
-            formatting = pgn_config.get('formatting', {})
-            active_move_config = formatting.get('active_move', {})
-            
-            # Find the move using the invisible ply sentinel embedded by the formatter.
-            # Formatter emits sentinel(ply+1) before the ply-th move (1st move gets sentinel(2), etc.).
-            sentinel = make_ply_sentinel(self._active_move_ply + 1)
-            regex = QRegularExpression(re.escape(sentinel))
-            search_cursor = QTextCursor(document)
-            search_cursor.movePosition(QTextCursor.MoveOperation.Start)
-            found_cursor = document.find(regex, search_cursor)
-            found = False
-            cursor = QTextCursor(document)
-            if not found_cursor.isNull():
-                # Select from end of sentinel to end of move (SAN + optional !? etc.)
-                cursor.setPosition(found_cursor.selectionEnd())
-                move_end = cursor.position()
-                while move_end < document_length:
-                    ch = document.characterAt(move_end)
-                    if ch in ' \t\n<>()':
-                        break
-                    move_end += 1
-                cursor.setPosition(found_cursor.selectionEnd())
-                cursor.setPosition(move_end, QTextCursor.MoveMode.KeepAnchor)
-                found = True
 
-            if found:
-                # Found the move - select it
-                move_start = cursor.selectionStart()
-                move_end = cursor.selectionEnd()
-                
-                # Validate positions are within document bounds
-                if move_start >= 0 and move_end >= move_start and move_end <= document_length:
-                    # Use main line move highlight styling from config
-                    # Note: The active move is always a main-line move (users can only navigate to main-line moves).
-                    # The move is already formatted with main line styling by the formatter service.
-                    # We just add the highlight on top.
-                    bg_color = active_move_config.get('background_color', [100, 120, 180])
-                    text_color = active_move_config.get('text_color', [255, 255, 255])
-                    bold = active_move_config.get('bold', True)
-                    italic = False
-                    
-                    # Create highlight format
-                    highlight_format = QTextCharFormat()
-                    highlight_format.setBackground(QColor(bg_color[0], bg_color[1], bg_color[2]))
-                    highlight_format.setForeground(QColor(text_color[0], text_color[1], text_color[2]))
-                    if bold:
-                        highlight_format.setFontWeight(QFont.Weight.Bold)
-                    if italic:
-                        highlight_format.setFontItalic(True)
-                    
-                    # Apply formatting
-                    cursor.setCharFormat(highlight_format)
-                    
-                    # Scroll to the highlighted move
-                    self.pgn_text.setTextCursor(cursor)
-                    self.pgn_text.ensureCursorVisible()
-                    
-                    # Store for clearing next time (only if valid)
-                    self._last_highlighted_start = move_start
-                    self._last_highlighted_length = move_end - move_start
+        move_range = self._range_map.move_range(self._active_move_ply)
+        if move_range is None:
+            return
+
+        move_start = move_range.start
+        move_end = move_range.end
+        if move_start < 0 or move_end <= move_start or move_end > document_length:
+            return
+
+        ui_config = self.config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        pgn_config = panel_config.get('pgn_notation', {})
+        formatting = pgn_config.get('formatting', {})
+        active_move_config = formatting.get('active_move', {})
+
+        bg_color = active_move_config.get('background_color', [100, 120, 180])
+        text_color = active_move_config.get('text_color', [255, 255, 255])
+        bold = active_move_config.get('bold', True)
+
+        cursor = QTextCursor(document)
+        cursor.setPosition(move_start)
+        cursor.setPosition(move_end, QTextCursor.MoveMode.KeepAnchor)
+
+        highlight_format = QTextCharFormat()
+        highlight_format.setBackground(QColor(bg_color[0], bg_color[1], bg_color[2]))
+        highlight_format.setForeground(QColor(text_color[0], text_color[1], text_color[2]))
+        if bold:
+            highlight_format.setFontWeight(QFont.Weight.Bold)
+        # Preserve move identity so clicks still resolve after highlighting.
+        highlight_format.setAnchor(True)
+        highlight_format.setAnchorHref(ply_href(self._active_move_ply))
+
+        cursor.setCharFormat(highlight_format)
+        self.pgn_text.setTextCursor(cursor)
+        self.pgn_text.ensureCursorVisible()
+
+        self._last_highlighted_start = move_start
+        self._last_highlighted_length = move_end - move_start
     
     def get_pgn_text(self) -> str:
         """Get the current PGN text content.
@@ -698,8 +647,9 @@ class DetailPgnView(QWidget):
         document = self.pgn_text.document()
         if not document or position < 0 or position >= document.characterCount():
             return None
-        plain = document.toPlainText()
-        ply = find_mainline_comment_ply_at_plaintext_position(plain, position)
+        if not self._range_map.comments:
+            self._range_map = _range_map_from_document(document)
+        ply = self._range_map.comment_ply_at(position)
         if ply is None:
             return None
         return (ply - 1) // 2
@@ -732,7 +682,7 @@ class DetailPgnView(QWidget):
     def _find_mainline_move_at_position(self, position: int) -> int:
         """Find ply index of main-line move at given document position.
         
-        Uses the invisible ply sentinel embedded by the formatter.
+        Uses the one-way range map built from ``cara-ply`` href anchors.
         Returns 0 if no main-line move found at position.
         
         Args:
@@ -741,36 +691,17 @@ class DetailPgnView(QWidget):
         Returns:
             Ply index (1-based) if main-line move found, 0 otherwise.
         """
-        if not self.pgn_text.document() or not self._move_info:
+        if not self.pgn_text.document():
             return 0
         
         document = self.pgn_text.document()
         document_length = document.characterCount()
         if document_length == 0 or position < 0 or position >= document_length:
             return 0
-        
-        search_cursor = QTextCursor(document)
-        search_cursor.movePosition(QTextCursor.MoveOperation.Start)
-        
-        # Formatter emits sentinel(ply+1) before the ply-th move (1st move gets sentinel(2), etc.)
-        for ply in range(1, len(self._move_info) + 1):
-            sentinel_ply = ply + 1
-            sentinel = make_ply_sentinel(sentinel_ply)
-            regex = QRegularExpression(re.escape(sentinel))
-            found_cursor = document.find(regex, search_cursor)
-            if found_cursor.isNull():
-                break
-            move_start = found_cursor.selectionEnd()
-            move_end = move_start
-            while move_end < document_length:
-                ch = document.characterAt(move_end)
-                if ch in ' \t\n<>()':
-                    break
-                move_end += 1
-            if move_start <= position <= move_end:
-                return ply
-            search_cursor.setPosition(move_end)
-        
-        return 0
+
+        if not self._range_map.moves:
+            self._range_map = _range_map_from_document(document)
+
+        return self._range_map.move_ply_at(position)
 
 
