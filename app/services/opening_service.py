@@ -398,6 +398,26 @@ class OpeningService:
             self.load()
         return self._build_path(fens, sans, ucis)
 
+    def last_in_book_index(self, fens: List[str]) -> int:
+        """Return the highest FEN index that is in the opening book (or standard start).
+
+        Scans the full line (including after out-of-book gaps) so a later rejoin
+        updates the index. Used to cap the SAN summary while the current ply is
+        out of book.
+        """
+        if not fens:
+            return 0
+        if not self._loaded:
+            self.load()
+        last = 0
+        for index, fen in enumerate(fens):
+            match = self.lookup_opening_display(fen)
+            if match is None and index == 0 and self.is_standard_start_fen(fen):
+                match = OPENING_STARTING
+            if match is not None:
+                last = index
+        return last
+
     def _build_path(
         self,
         fens: List[str],

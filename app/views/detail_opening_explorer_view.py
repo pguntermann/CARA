@@ -939,14 +939,24 @@ class DetailOpeningExplorerView(QWidget):
 
         next_uci: Optional[str] = None
         next_san: Optional[str] = None
-        if game is not None:
+        if game is not None and in_book:
             _fens_n, sans_n, ucis_n = self._opening_service.replay_mainline_to_ply(pgn, ply + 1)
             if len(ucis_n) > len(ucis):
                 next_uci = ucis_n[-1]
                 next_san = sans_n[-1] if sans_n else None
 
-        summary_moves = _format_san_line(sans)
-        if current_display is not None:
+        # While out of book, don't keep appending middlegame SANs to the summary —
+        # only show moves through the last book position on the line (rejoins included).
+        if in_book:
+            summary_moves = _format_san_line(sans)
+        else:
+            book_end = self._opening_service.last_in_book_index(fens)
+            summary_moves = _format_san_line(sans[:book_end])
+        if current_display is not None and in_book:
+            summary = f"{summary_moves}  ·  {current_display.label}"
+        elif path and not in_book:
+            summary = f"{summary_moves}  ·  {path[-1].display.label}  ·  Out of book"
+        elif current_display is not None:
             summary = f"{summary_moves}  ·  {current_display.label}"
         else:
             summary = f"{summary_moves}  ·  Out of book"
