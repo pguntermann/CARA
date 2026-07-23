@@ -269,12 +269,19 @@
           "show_move_arrows": true,
           "max_continuation_depth": 8,
           "placeholder_text_no_game": "No game selected.",
+          "focus_dim_opacity": 0.38,
+          "density": {
+            "default": "gallery"
+          },
           "lichess_link": {
             "enabled": true,
             "tooltip": "Open this opening on Lichess"
           },
           "path_section": {
-            "collapsed_by_default": false
+            "collapsed_by_default": false,
+            "expanded_tail_count": 4,
+            "animation_duration_ms": 180,
+            "fade_duration_ms": 120
           }
         },
         "ai_chat": {

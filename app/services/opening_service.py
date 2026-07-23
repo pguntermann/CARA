@@ -328,6 +328,14 @@ class OpeningService:
 
         return self.lichess_analysis_url(fen)
 
+    @staticmethod
+    def is_standard_start_fen(fen: str) -> bool:
+        """True for the standard starting position (ECO tables omit it)."""
+        try:
+            return OpeningService.book_key(fen) == OpeningService.book_key(chess.Board().fen())
+        except Exception:
+            return False
+
     def replay_mainline_to_ply(
         self, pgn: str, ply_index: int
     ) -> Tuple[List[str], List[str], List[str]]:
@@ -401,10 +409,10 @@ class OpeningService:
         out_of_book_start: Optional[int] = None
 
         for index, fen in enumerate(fens):
-            if index == 0:
-                match = self.lookup_opening_display(fen) or OPENING_STARTING
-            else:
-                match = self.lookup_opening_display(fen)
+            match = self.lookup_opening_display(fen)
+            # ECO omits the real start; only force that label for the standard start FEN.
+            if match is None and index == 0 and self.is_standard_start_fen(fen):
+                match = OPENING_STARTING
 
             if match is None:
                 if out_of_book_start is None and index > 0:
@@ -439,10 +447,16 @@ class OpeningService:
             last_display = match
 
         if not steps and fens:
+            fen0 = fens[0]
+            display = self.lookup_opening_display(fen0)
+            if display is None and self.is_standard_start_fen(fen0):
+                display = OPENING_STARTING
+            if display is None:
+                display = OPENING_UNKNOWN
             steps = [
                 OpeningPathStep(
-                    fen=fens[0],
-                    display=OPENING_STARTING,
+                    fen=fen0,
+                    display=display,
                     ply_index=0,
                 )
             ]

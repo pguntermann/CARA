@@ -1731,8 +1731,15 @@
             "tooltip": "Open this opening on Lichess"
           },
           "path_section": {
-            "collapsed_by_default": false
+            "collapsed_by_default": false,
+            "expanded_tail_count": 4,
+            "animation_duration_ms": 180,
+            "fade_duration_ms": 120
           },
+          "density": {
+            "default": "gallery"
+          },
+          "focus_dim_opacity": 0.38,
           "placeholder": {
             "text_color": {
               "$ref": "$_COLOR_TEXT_4"
@@ -1771,7 +1778,20 @@
             "current_badge_background": {
               "$ref": "$_COLOR_BACKGROUND_ACTIVE"
             },
-            "current_badge_text": [240, 240, 240]
+            "current_badge_text": [240, 240, 240],
+            "played_next_badge_background": [90, 120, 80],
+            "played_next_badge_text": [240, 240, 240],
+            "current_row_border": [110, 140, 190],
+            "chip_background": {
+              "$ref": "$_COLOR_BACKGROUND_3"
+            },
+            "chip_border": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            },
+            "chip_active_background": {
+              "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            },
+            "chip_active_text": [240, 240, 240]
           }
         },
         "annotations": {
