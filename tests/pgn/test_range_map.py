@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import unittest
+
+# Must be set before QApplication is created (CI / headless have no xcb display).
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication, QTextEdit
 

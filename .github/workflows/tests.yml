@@ -34,5 +34,7 @@ jobs:
       - name: Run tests
         env:
           CI: "true"
+          # Headless runners have no display; offscreen avoids xcb plugin abort.
+          QT_QPA_PLATFORM: "offscreen"
         run: |
           python -m unittest discover -s tests -p "test_*.py" -v
