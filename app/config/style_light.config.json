@@ -105,6 +105,15 @@
   },
   "ui": {
     "styles": {
+      "mini_board": {
+        "size": 160,
+        "border": {
+          "size": 4,
+          "color": {
+            "$ref": "$_COLOR_BORDER"
+          }
+        }
+      },
       "scrollbar": {
         "width": 6,
         "background_color": {
@@ -945,6 +954,41 @@
               "$ref": "$_FONT_SIZE_BASE_MEDIUM"
             }
           },
+          "highlights": {
+            "view_mode": {
+              "font_size": {
+                "$ref": "$_FONT_SIZE_BASE_SMALL"
+              },
+              "text": {
+                "$ref": "$_COLOR_TEXT_3"
+              },
+              "muted": {
+                "$ref": "$_COLOR_TEXT_4"
+              },
+              "border": {
+                "$ref": "$_COLOR_BORDER"
+              },
+              "inactive_background": {
+                "$ref": "$_COLOR_BACKGROUND_3"
+              },
+              "active_background": {
+                "$ref": "$_COLOR_ACCENT_PRIMARY"
+              },
+              "active_text": {
+                "$ref": "$_COLOR_ON_ACCENT"
+              }
+            }
+          },
+          "key_statistics": {
+            "elo_separator": {
+              "enabled": true,
+              "color": {
+                "$ref": "$_COLOR_BORDER"
+              },
+              "height": 1,
+              "margins": [6, 4]
+            }
+          },
           "layout": {
             "spacing": 15,
             "section_spacing": 20,
@@ -1704,17 +1748,8 @@
           },
           "pv_hover": {
             "hover_delay_ms": 50,
-            "mini_board": {
-              "size": 160,
-              "offset_x": 20,
-              "offset_y": 20,
-              "border": {
-                "size": 4,
-                "color": {
-                  "$ref": "$_COLOR_BORDER"
-                }
-              }
-            }
+            "offset_x": 20,
+            "offset_y": 20
           }
         },
         "opening_explorer": {
@@ -1744,7 +1779,59 @@
             "fade_duration_ms": 120
           },
           "density": {
-            "default": "gallery"
+            "default": "gallery",
+            "presets": {
+              "compact": {
+                "mini_size": 96,
+                "hero_size": 112,
+                "row_spacing": 6,
+                "flow_boards": false
+              },
+              "comfortable": {
+                "mini_size": 128,
+                "hero_size": 160,
+                "row_spacing": 8,
+                "flow_boards": false
+              },
+              "gallery": {
+                "mini_size": 140,
+                "hero_size": 180,
+                "row_spacing": 10,
+                "flow_boards": true
+              }
+            }
+          },
+          "layout": {
+            "path_header_spacing": 6,
+            "path_compact_spacing": 6,
+            "breadcrumb_spacing": 4,
+            "path_step": {
+              "margins": [8, 6, 8, 6],
+              "spacing": 10,
+              "text_spacing": 2,
+              "title_row_spacing": 4,
+              "border_radius": 4,
+              "border_width": 1,
+              "current_border_width": 2,
+              "badge_border_radius": 3,
+              "badge_padding": [1, 6],
+              "gallery": {
+                "text_top_margin": 2,
+                "tile_extra_width": 24,
+                "tile_extra_height": 56,
+                "current_title_badge_reserve": 36
+              }
+            },
+            "continuation": {
+              "root_spacing": 4,
+              "header_margins": [8, 6, 8, 6],
+              "header_spacing": 8,
+              "header_border_radius": 4,
+              "header_border_width": 1,
+              "header_highlight_border_width": 2,
+              "children_left_indent": 18,
+              "children_spacing": 6
+            }
           },
           "focus_dim_opacity": 0.38,
           "placeholder": {
@@ -1755,15 +1842,6 @@
               "$ref": "$_FONT_SIZE_BASE_LARGE"
             },
             "padding": 20
-          },
-          "mini_board": {
-            "size": 128,
-            "border": {
-              "size": 2,
-              "color": {
-                "$ref": "$_COLOR_BORDER"
-              }
-            }
           },
           "colors": {
             "title": {

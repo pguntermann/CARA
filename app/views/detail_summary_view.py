@@ -2,7 +2,7 @@
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
-    QGridLayout, QSizePolicy, QSplitter, QMenu, QApplication
+    QGridLayout, QSizePolicy, QSplitter, QMenu, QApplication, QToolButton, QButtonGroup,
 )
 from PyQt6.QtCore import Qt, QEvent, QRect, QRectF, QPointF, QPoint, QVariantAnimation, QEasingCurve
 from PyQt6.QtGui import (
@@ -17,15 +17,22 @@ from PyQt6.QtGui import (
 )
 from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING, Callable
 import math
+import chess
 
 from app.models.game_model import GameModel
 from app.models.moveslist_model import MoveData
 from app.services.game_summary_service import GameSummary, GameHighlight
 from app.controllers.game_controller import GameController
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.tooltip_utils import wrap_tooltip_text
+from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
 
 if TYPE_CHECKING:
     from app.controllers.game_summary_controller import GameSummaryController
+
+
+_HIGHLIGHTS_MODE_ORDER = ("list", "cards")
+_HIGHLIGHTS_MODE_LABELS = (("list", "List"), ("cards", "Cards"))
 
 
 class ClickableMoveLabel(QLabel):
@@ -1026,6 +1033,17 @@ class DetailSummaryView(QWidget):
         self._latest_moves: List[MoveData] = []
         self.current_summary: Optional[GameSummary] = None
         self._last_unavailable_reason: str = "not_analyzed"
+        self._highlight_mini_boards: List[MiniChessBoardWidget] = []
+        self._highlights_mode_buttons: Dict[str, QToolButton] = {}
+        highlights_cfg = (
+            self.config.get("ui", {})
+            .get("panels", {})
+            .get("detail", {})
+            .get("summary", {})
+            .get("highlights", {})
+        )
+        default_mode = str(highlights_cfg.get("view_mode", {}).get("default", "list")).lower()
+        self._highlights_mode = default_mode if default_mode in _HIGHLIGHTS_MODE_ORDER else "list"
         
         # Get summary config
         ui_config = self.config.get('ui', {})
@@ -1185,9 +1203,52 @@ class DetailSummaryView(QWidget):
         Args:
             game_controller: The GameController instance.
         """
+        self._disconnect_board_flip()
         self._game_controller = game_controller
         if hasattr(self, 'evaluation_graph') and self.evaluation_graph:
             self.evaluation_graph.set_navigation_callback(self._navigate_to_ply_from_graph)
+        self._connect_board_flip()
+
+    def _board_model(self):
+        if self._game_controller is None:
+            return None
+        board_controller = getattr(self._game_controller, "board_controller", None)
+        if board_controller is None:
+            return None
+        return board_controller.get_board_model()
+
+    def _connect_board_flip(self) -> None:
+        board_model = self._board_model()
+        if board_model is None:
+            return
+        try:
+            board_model.flip_state_changed.connect(self._on_board_flip_changed)
+        except TypeError:
+            pass
+
+    def _disconnect_board_flip(self) -> None:
+        board_model = self._board_model()
+        if board_model is None:
+            return
+        try:
+            board_model.flip_state_changed.disconnect(self._on_board_flip_changed)
+        except TypeError:
+            pass
+
+    def _on_board_flip_changed(self, *_args) -> None:
+        is_flipped = False
+        board_model = self._board_model()
+        if board_model is not None:
+            is_flipped = bool(board_model.is_flipped)
+        for board in self._highlight_mini_boards:
+            try:
+                board.set_flipped(is_flipped)
+            except Exception:
+                pass
+
+    def _is_board_flipped(self) -> bool:
+        board_model = self._board_model()
+        return bool(board_model.is_flipped) if board_model is not None else False
 
     def _navigate_to_ply_from_graph(self, ply: int) -> None:
         """Navigate to the ply selected by clicking the evaluation graph."""
@@ -1419,7 +1480,7 @@ class DetailSummaryView(QWidget):
                 text_color, label_font, value_font, section_bg_color, border_color,
                 is_white=True
             )
-            stats_layout.addWidget(white_stats_widget)
+            stats_layout.addWidget(white_stats_widget, 1)
         
         # Black statistics - defensive check for None stats
         if self.current_summary and self.current_summary.black_stats:
@@ -1428,7 +1489,7 @@ class DetailSummaryView(QWidget):
                 text_color, label_font, value_font, section_bg_color, border_color,
                 is_white=False
             )
-            stats_layout.addWidget(black_stats_widget)
+            stats_layout.addWidget(black_stats_widget, 1)
         
         stats_container = QWidget()
         stats_container.setLayout(stats_layout)
@@ -1459,7 +1520,7 @@ class DetailSummaryView(QWidget):
                 text_color, label_font, section_bg_color, border_color,
                 is_white=True
             )
-            classification_layout.addWidget(white_pie_widget)
+            classification_layout.addWidget(white_pie_widget, 1)
         
         # Black pie chart - defensive check for None stats
         if self.current_summary and self.current_summary.black_stats:
@@ -1478,7 +1539,7 @@ class DetailSummaryView(QWidget):
                 text_color, label_font, section_bg_color, border_color,
                 is_white=False
             )
-            classification_layout.addWidget(black_pie_widget)
+            classification_layout.addWidget(black_pie_widget, 1)
         
         classification_container = QWidget()
         classification_container.setLayout(classification_layout)
@@ -1511,7 +1572,7 @@ class DetailSummaryView(QWidget):
                 total_moves=total_moves,
                 moves=moves
             )
-            phase_layout.addWidget(white_phase_widget)
+            phase_layout.addWidget(white_phase_widget, 1)
         
         # Black phase analysis - defensive check for None phase stats
         if (self.current_summary and 
@@ -1532,7 +1593,7 @@ class DetailSummaryView(QWidget):
                 total_moves=total_moves,
                 moves=moves
             )
-            phase_layout.addWidget(black_phase_widget)
+            phase_layout.addWidget(black_phase_widget, 1)
         
         phase_container = QWidget()
         phase_container.setLayout(phase_layout)
@@ -1543,31 +1604,33 @@ class DetailSummaryView(QWidget):
         
         # Game Highlights Section
         if self.current_summary and self.current_summary.highlights:
-            self._add_section_header("Game Highlights", header_font, header_text_color)
+            self._highlight_mini_boards = []
+            # Same left/right inset as the committed highlights layout so the
+            # bordered box lines up with the 2-column sections above/below.
+            pad_l = int(section_margins[0]) if len(section_margins) > 0 else 10
+            pad_r = int(section_margins[2]) if len(section_margins) > 2 else pad_l
+
+            highlights_header = self._create_highlights_header(
+                header_font, header_text_color, left_margin=0, right_margin=pad_r
+            )
+            self.content_layout.addWidget(highlights_header)
+
             highlights_widget = self._create_highlights_widget(
                 self.current_summary.highlights,
                 self.current_summary.opening_end,
                 self.current_summary.middlegame_end,
                 text_color, label_font, value_font, section_bg_color, border_color
             )
-            
-            # Create a container with matching left/right padding to align with 2-column sections
-            # The critical moments widgets have section_margins, so we add matching padding
-            highlights_container = QWidget()
-            highlights_container_layout = QVBoxLayout(highlights_container)
-            # Add same-size left and right padding matching the left margin of section_margins
-            # This aligns the content with the visual boundaries of the 2-column sections
-            padding = section_margins[3]  # Left margin from section_margins (typically same as right)
-            highlights_container_layout.setContentsMargins(padding, 0, padding, 0)
-            highlights_container_layout.setSpacing(0)
-            
-            # Ensure highlights_widget doesn't force expansion
             highlights_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
             highlights_widget.setMinimumWidth(0)
-            
+
+            highlights_container = QWidget()
+            highlights_container_layout = QVBoxLayout(highlights_container)
+            highlights_container_layout.setContentsMargins(pad_l, 0, pad_r, 0)
+            highlights_container_layout.setSpacing(0)
             highlights_container_layout.addWidget(highlights_widget)
             highlights_container.setProperty("section_name", "Game Highlights")
-            
+
             self.content_layout.addWidget(highlights_container)
             self.content_layout.addSpacing(section_spacing)
         
@@ -1587,7 +1650,7 @@ class DetailSummaryView(QWidget):
                 text_color, label_font, value_font, section_bg_color, border_color,
                 is_white=True
             )
-            critical_layout.addWidget(white_critical_widget)
+            critical_layout.addWidget(white_critical_widget, 1)
         
         # Black critical moments - defensive check for None lists
         if (self.current_summary and 
@@ -1600,7 +1663,7 @@ class DetailSummaryView(QWidget):
                 text_color, label_font, value_font, section_bg_color, border_color,
                 is_white=False
             )
-            critical_layout.addWidget(black_critical_widget)
+            critical_layout.addWidget(black_critical_widget, 1)
         
         critical_container = QWidget()
         critical_container.setLayout(critical_layout)
@@ -1700,36 +1763,96 @@ class DetailSummaryView(QWidget):
         # Statistics grid
         grid = QGridLayout()
         grid.setSpacing(grid_spacing)
+        grid.setColumnStretch(1, 1)
+        key_stats_cfg = summary_config.get("key_statistics", {})
+        elo_separator_cfg = key_stats_cfg.get("elo_separator", {})
         
         # ACPL - defensive check for None/invalid values
         avg_cpl = stats.average_cpl if stats.average_cpl is not None else 0.0
-        self._add_stat_row(grid, 0, "Average CPL:", f"{avg_cpl:.1f}", label_font, value_font, text_color)
+        self._add_stat_row(grid, 0, "Average CPL:", f"{avg_cpl:.1f}", label_font, value_font, text_color,
+                           value_alignment=Qt.AlignmentFlag.AlignRight)
         # Accuracy - defensive check for None/invalid values
         accuracy = stats.accuracy if stats.accuracy is not None else 0.0
-        self._add_stat_row(grid, 1, "Accuracy:", f"{accuracy:.1f}%", label_font, value_font, text_color)
+        self._add_stat_row(grid, 1, "Accuracy:", f"{accuracy:.1f}%", label_font, value_font, text_color,
+                           value_alignment=Qt.AlignmentFlag.AlignRight)
         # Estimated Elo - defensive check for None/invalid values
         est_elo = stats.estimated_elo if stats.estimated_elo is not None else 0
-        self._add_stat_row(grid, 2, "Est. Elo:", str(est_elo), label_font, value_font, text_color)
+        self._add_stat_row(grid, 2, "Est. Elo:", str(est_elo), label_font, value_font, text_color,
+                           value_alignment=Qt.AlignmentFlag.AlignRight)
+        self._add_stat_separator(grid, 3, elo_separator_cfg, border_color)
         # Total Moves - defensive check for None/invalid values
         total_moves = stats.total_moves if stats.total_moves is not None else 0
-        self._add_stat_row(grid, 3, "Total Moves:", str(total_moves), label_font, value_font, text_color)
+        self._add_stat_row(grid, 4, "Total Moves:", str(total_moves), label_font, value_font, text_color,
+                           value_alignment=Qt.AlignmentFlag.AlignRight)
         # Best Move % - defensive check for None/invalid values
         best_move_pct = stats.best_move_percentage if stats.best_move_percentage is not None else 0.0
-        self._add_stat_row(grid, 4, "Best Move %:", f"{best_move_pct:.1f}%", label_font, value_font, text_color)
+        self._add_stat_row(grid, 5, "Best Move %:", f"{best_move_pct:.1f}%", label_font, value_font, text_color,
+                           value_alignment=Qt.AlignmentFlag.AlignRight)
         # Top3-Move Accuracy - defensive check for None/invalid values
         top3_move_pct = stats.top3_move_percentage if stats.top3_move_percentage is not None else 0.0
-        self._add_stat_row(grid, 5, "Top3-Move Accuracy:", f"{top3_move_pct:.1f}%", label_font, value_font, text_color)
+        self._add_stat_row(grid, 6, "Top3-Move Accuracy:", f"{top3_move_pct:.1f}%", label_font, value_font, text_color,
+                           value_alignment=Qt.AlignmentFlag.AlignRight)
         # Blunder Rate - defensive check for None/invalid values
         blunder_rate = stats.blunder_rate if stats.blunder_rate is not None else 0.0
-        self._add_stat_row(grid, 6, "Blunder Rate:", f"{blunder_rate:.1f}%", label_font, value_font, text_color)
+        self._add_stat_row(grid, 7, "Blunder Rate:", f"{blunder_rate:.1f}%", label_font, value_font, text_color,
+                           value_alignment=Qt.AlignmentFlag.AlignRight)
         
         layout.addLayout(grid)
         layout.addStretch()
         
         return widget
     
+    def _add_stat_separator(
+        self,
+        grid: QGridLayout,
+        row: int,
+        separator_cfg: Dict[str, Any],
+        fallback_color: QColor,
+    ) -> None:
+        """Add a horizontal separator row spanning the statistics grid."""
+        if isinstance(separator_cfg, dict) and separator_cfg.get("enabled", True) is False:
+            return
+
+        color_rgb = separator_cfg.get("color") if isinstance(separator_cfg, dict) else None
+        if isinstance(color_rgb, list) and len(color_rgb) >= 3:
+            sep_color = QColor(int(color_rgb[0]), int(color_rgb[1]), int(color_rgb[2]))
+        else:
+            sep_color = fallback_color
+
+        height = 1
+        margins = [6, 4]
+        if isinstance(separator_cfg, dict):
+            height = max(1, int(separator_cfg.get("height", 1) or 1))
+            raw_margins = separator_cfg.get("margins", [6, 4])
+            if isinstance(raw_margins, list) and len(raw_margins) >= 2:
+                margins = [int(raw_margins[0]), int(raw_margins[1])]
+
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Plain)
+        line.setFixedHeight(height)
+        line.setStyleSheet(
+            f"""
+            QFrame {{
+                background-color: rgb({sep_color.red()}, {sep_color.green()}, {sep_color.blue()});
+                border: none;
+                max-height: {height}px;
+                min-height: {height}px;
+            }}
+            """
+        )
+
+        wrap = QWidget()
+        wrap.setStyleSheet("background: transparent; border: none;")
+        wrap_layout = QVBoxLayout(wrap)
+        wrap_layout.setContentsMargins(0, margins[0], 0, margins[1])
+        wrap_layout.setSpacing(0)
+        wrap_layout.addWidget(line)
+        grid.addWidget(wrap, row, 0, 1, 2)
+
     def _add_stat_row(self, grid: QGridLayout, row: int, label_text: str, value_text: str,
-                     label_font: QFont, value_font: QFont, text_color: QColor) -> None:
+                     label_font: QFont, value_font: QFont, text_color: QColor,
+                     value_alignment: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignLeft) -> None:
         """Add a statistics row to a grid.
         
         Args:
@@ -1740,6 +1863,7 @@ class DetailSummaryView(QWidget):
             label_font: Font for label.
             value_font: Font for value.
             text_color: Text color.
+            value_alignment: Horizontal alignment for the value label.
         """
         label = QLabel(label_text)
         label.setFont(label_font)
@@ -1748,6 +1872,7 @@ class DetailSummaryView(QWidget):
         
         value = QLabel(value_text)
         value.setFont(value_font)
+        value.setAlignment(value_alignment | Qt.AlignmentFlag.AlignVCenter)
         value.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
         grid.addWidget(value, row, 1)
     
@@ -1971,6 +2096,7 @@ class DetailSummaryView(QWidget):
         # Phase statistics grid
         grid = QGridLayout()
         grid.setSpacing(grid_spacing)
+        grid.setColumnStretch(1, 1)
         
         row = 0
         for phase_name, phase_stats in [("Opening", opening), ("Middlegame", middlegame), ("Endgame", endgame)]:
@@ -2070,11 +2196,17 @@ class DetailSummaryView(QWidget):
             else:
                 phase_accuracy = phase_stats.accuracy if phase_stats.accuracy is not None else 0.0
                 accuracy_str = f"{phase_accuracy:.1f}%"
-            self._add_stat_row(grid, row, "  Accuracy:", accuracy_str, label_font, value_font, text_color)
+            self._add_stat_row(
+                grid, row, "  Accuracy:", accuracy_str, label_font, value_font, text_color,
+                value_alignment=Qt.AlignmentFlag.AlignRight,
+            )
             row += 1
             # ACPL - defensive check for None/invalid values
             phase_acpl = phase_stats.average_cpl if phase_stats.average_cpl is not None else 0.0
-            self._add_stat_row(grid, row, "  ACPL:", f"{phase_acpl:.1f}", label_font, value_font, text_color)
+            self._add_stat_row(
+                grid, row, "  ACPL:", f"{phase_acpl:.1f}", label_font, value_font, text_color,
+                value_alignment=Qt.AlignmentFlag.AlignRight,
+            )
             row += 1
             
             # Add spacing after ACPL (before next phase header) - but not after the last phase
@@ -2290,6 +2422,146 @@ class DetailSummaryView(QWidget):
         
         return widget
     
+    def _create_highlights_header(
+        self,
+        header_font: QFont,
+        color: QColor,
+        left_margin: int = 0,
+        right_margin: int = 0,
+    ) -> QWidget:
+        """Header row for Game Highlights with List | Cards switch."""
+        row = QWidget()
+        row.setStyleSheet("background: transparent; border: none;")
+        layout = QHBoxLayout(row)
+        # Match the highlights box inset so List|Cards lines up with its border.
+        layout.setContentsMargins(max(0, int(left_margin)), 0, max(0, int(right_margin)), 0)
+        layout.setSpacing(8)
+
+        header = QLabel("Game Highlights")
+        header.setFont(header_font)
+        header.setStyleSheet(f"color: rgb({color.red()}, {color.green()}, {color.blue()}); border: none;")
+        layout.addWidget(header, 1)
+
+        switch = QWidget()
+        switch_layout = QHBoxLayout(switch)
+        switch_layout.setContentsMargins(0, 0, 0, 0)
+        switch_layout.setSpacing(0)
+        group = QButtonGroup(row)
+        group.setExclusive(True)
+        self._highlights_mode_buttons = {}
+
+        summary_cfg = self.config.get("ui", {}).get("panels", {}).get("detail", {}).get("summary", {})
+        view_mode_cfg = summary_cfg.get("highlights", {}).get("view_mode", {})
+        colors_cfg = summary_cfg.get("colors", {})
+
+        def _rgb(value, fallback: List[int]) -> List[int]:
+            if isinstance(value, list) and len(value) >= 3:
+                return [int(value[0]), int(value[1]), int(value[2])]
+            return list(fallback)
+
+        text_rgb = _rgb(view_mode_cfg.get("text"), _rgb(colors_cfg.get("text"), [200, 200, 200]))
+        muted = _rgb(view_mode_cfg.get("muted"), [max(0, c - 40) for c in text_rgb])
+        border = _rgb(view_mode_cfg.get("border"), _rgb(colors_cfg.get("border"), [60, 60, 65]))
+        inactive_bg = _rgb(
+            view_mode_cfg.get("inactive_background"),
+            _rgb(colors_cfg.get("section_background"), [45, 45, 50]),
+        )
+        active_bg = _rgb(view_mode_cfg.get("active_background"), [70, 90, 130])
+        active_tc = _rgb(
+            view_mode_cfg.get("active_text"),
+            _rgb(colors_cfg.get("header_text"), [240, 240, 240]),
+        )
+        font_pt = max(8, int(scale_font_size(view_mode_cfg.get("font_size", 10))))
+
+        tooltip_cfg = self.config.get("ui", {}).get("styles", {}).get("tooltip", {})
+        tip_bg = tooltip_cfg.get("background_color", [45, 45, 50])
+        tip_fg = tooltip_cfg.get("text_color", [220, 220, 220])
+        tip_border = tooltip_cfg.get("border_color", [60, 60, 65])
+        if not isinstance(tip_bg, list) or len(tip_bg) < 3:
+            tip_bg = [45, 45, 50]
+        if not isinstance(tip_fg, list) or len(tip_fg) < 3:
+            tip_fg = [220, 220, 220]
+        if not isinstance(tip_border, list) or len(tip_border) < 3:
+            tip_border = [60, 60, 65]
+        tip_border_width = int(tooltip_cfg.get("border_width", 1))
+        tip_radius = int(tooltip_cfg.get("border_radius", 5))
+        tip_padding = int(tooltip_cfg.get("padding", 10))
+        # Widget stylesheets can override app QToolTip styling; embed tip rules here.
+        tooltip_ss = f"""
+                QToolTip {{
+                    background-color: rgb({int(tip_bg[0])}, {int(tip_bg[1])}, {int(tip_bg[2])});
+                    color: rgb({int(tip_fg[0])}, {int(tip_fg[1])}, {int(tip_fg[2])});
+                    border: {tip_border_width}px solid rgb({int(tip_border[0])}, {int(tip_border[1])}, {int(tip_border[2])});
+                    border-radius: {tip_radius}px;
+                    padding: {tip_padding}px;
+                }}
+        """
+
+        for i, (mode, label) in enumerate(_HIGHLIGHTS_MODE_LABELS):
+            btn = QToolButton()
+            btn.setText(label)
+            btn.setCheckable(True)
+            btn.setAutoRaise(False)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setToolTip(wrap_tooltip_text(f"Highlights layout: {label}"))
+            group.addButton(btn)
+            self._highlights_mode_buttons[mode] = btn
+            switch_layout.addWidget(btn)
+            btn.clicked.connect(lambda checked=False, m=mode: self._on_highlights_mode_selected(m))
+
+            radius_left = "4px" if i == 0 else "0px"
+            radius_right = "4px" if i == len(_HIGHLIGHTS_MODE_LABELS) - 1 else "0px"
+            margin_left = "-1px" if i > 0 else "0px"
+            btn.setStyleSheet(
+                f"""
+                QToolButton {{
+                    color: rgb({muted[0]}, {muted[1]}, {muted[2]});
+                    background-color: rgb({inactive_bg[0]}, {inactive_bg[1]}, {inactive_bg[2]});
+                    border: 1px solid rgb({border[0]}, {border[1]}, {border[2]});
+                    border-top-left-radius: {radius_left};
+                    border-bottom-left-radius: {radius_left};
+                    border-top-right-radius: {radius_right};
+                    border-bottom-right-radius: {radius_right};
+                    margin-left: {margin_left};
+                    padding: 3px 10px;
+                    font-size: {font_pt}pt;
+                }}
+                QToolButton:hover {{
+                    color: rgb({text_rgb[0]}, {text_rgb[1]}, {text_rgb[2]});
+                }}
+                QToolButton:checked {{
+                    color: rgb({active_tc[0]}, {active_tc[1]}, {active_tc[2]});
+                    background-color: rgb({active_bg[0]}, {active_bg[1]}, {active_bg[2]});
+                    border-color: rgb({active_bg[0]}, {active_bg[1]}, {active_bg[2]});
+                    font-weight: bold;
+                }}
+                {tooltip_ss}
+                """
+            )
+
+        self._update_highlights_mode_switch()
+        layout.addWidget(switch, 0, Qt.AlignmentFlag.AlignVCenter)
+        return row
+
+    def _update_highlights_mode_switch(self) -> None:
+        for mode, btn in self._highlights_mode_buttons.items():
+            btn.blockSignals(True)
+            btn.setChecked(mode == self._highlights_mode)
+            btn.blockSignals(False)
+
+    def _on_highlights_mode_selected(self, mode: str) -> None:
+        if mode not in _HIGHLIGHTS_MODE_ORDER or mode == self._highlights_mode:
+            self._update_highlights_mode_switch()
+            return
+        self._highlights_mode = mode
+        self._update_highlights_mode_switch()
+        if self.current_summary is not None:
+            self._clear_content()
+            self._build_summary_content(
+                total_moves=len(self._latest_moves),
+                moves=self._latest_moves,
+            )
+
     def _create_highlights_widget(self, highlights: List, opening_end: int, middlegame_end: int,
                                  text_color: QColor, label_font: QFont, value_font: QFont,
                                  bg_color: QColor, border_color: QColor) -> QWidget:
@@ -2340,64 +2612,243 @@ class DetailSummaryView(QWidget):
             opening_highlights = [h for h in highlights if h.move_number <= opening_end]
             middlegame_highlights = [h for h in highlights if opening_end < h.move_number < middlegame_end]
             endgame_highlights = [h for h in highlights if h.move_number >= middlegame_end]
-        
-        # Calculate minimum move column width once for consistent alignment
+
+        phases = (
+            ("Opening Phase", opening_highlights),
+            ("Middlegame Phase", middlegame_highlights),
+            ("Endgame Phase", endgame_highlights),
+        )
+        cards_mode = self._highlights_mode == "cards"
         font_metrics = QFontMetrics(value_font)
         sample_text = "99. O-O-O ... O-O-O"
-        min_move_width = font_metrics.horizontalAdvance(sample_text) + 8  # Add some padding
-        
-        # Opening Phase
-        if opening_highlights:
-            opening_header = QLabel("Opening Phase")
-            opening_header.setFont(label_font)
-            opening_header.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); font-weight: bold; border: none;")
-            layout.addWidget(opening_header)
-            
-            opening_layout = QVBoxLayout()
-            opening_layout.setSpacing(5)
-            for highlight in opening_highlights:
-                highlight_widget = self._create_highlight_item(highlight, text_color, value_font, min_move_width)
-                opening_layout.addWidget(highlight_widget)
-            layout.addLayout(opening_layout)
-            
-            if middlegame_highlights or endgame_highlights:
+        min_move_width = font_metrics.horizontalAdvance(sample_text) + 8
+
+        for phase_idx, (phase_name, phase_highlights) in enumerate(phases):
+            if not phase_highlights:
+                continue
+            if phase_idx > 0 and any(phases[i][1] for i in range(phase_idx)):
                 layout.addSpacing(section_spacing)
-        
-        # Middlegame Phase
-        if middlegame_highlights:
-            middlegame_header = QLabel("Middlegame Phase")
-            middlegame_header.setFont(label_font)
-            middlegame_header.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); font-weight: bold; border: none;")
-            layout.addWidget(middlegame_header)
-            
-            middlegame_layout = QVBoxLayout()
-            middlegame_layout.setSpacing(5)
-            for highlight in middlegame_highlights:
-                highlight_widget = self._create_highlight_item(highlight, text_color, value_font, min_move_width)
-                middlegame_layout.addWidget(highlight_widget)
-            layout.addLayout(middlegame_layout)
-            
-            if endgame_highlights:
-                layout.addSpacing(section_spacing)
-        
-        # Endgame Phase
-        if endgame_highlights:
-            endgame_header = QLabel("Endgame Phase")
-            endgame_header.setFont(label_font)
-            endgame_header.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); font-weight: bold; border: none;")
-            layout.addWidget(endgame_header)
-            
-            endgame_layout = QVBoxLayout()
-            endgame_layout.setSpacing(5)
-            for highlight in endgame_highlights:
-                highlight_widget = self._create_highlight_item(highlight, text_color, value_font, min_move_width)
-                endgame_layout.addWidget(highlight_widget)
-            layout.addLayout(endgame_layout)
-        
+
+            phase_header = QLabel(phase_name)
+            phase_header.setFont(label_font)
+            phase_header.setStyleSheet(
+                f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+                "font-weight: bold; border: none; background: transparent;"
+            )
+            layout.addWidget(phase_header)
+
+            if cards_mode:
+                cards_col = QVBoxLayout()
+                cards_col.setSpacing(8)
+                is_flipped = self._is_board_flipped()
+                highlights_cfg = (
+                    self.config.get("ui", {})
+                    .get("panels", {})
+                    .get("detail", {})
+                    .get("summary", {})
+                    .get("highlights", {})
+                )
+                cards_cfg = highlights_cfg.get("cards", {}) if isinstance(highlights_cfg, dict) else {}
+                mini_size = int(
+                    self.config.get("ui", {}).get("styles", {}).get("mini_board", {}).get("size", 160)
+                )
+                show_arrows = bool(cards_cfg.get("show_move_arrows", True)) if isinstance(cards_cfg, dict) else True
+                for highlight in phase_highlights:
+                    cards_col.addWidget(
+                        self._create_highlight_card(
+                            highlight,
+                            text_color=text_color,
+                            value_font=value_font,
+                            bg_color=bg_color,
+                            border_color=border_color,
+                            mini_size=mini_size,
+                            show_arrows=show_arrows,
+                            is_flipped=is_flipped,
+                        )
+                    )
+                layout.addLayout(cards_col)
+            else:
+                phase_layout = QVBoxLayout()
+                phase_layout.setSpacing(5)
+                for highlight in phase_highlights:
+                    phase_layout.addWidget(
+                        self._create_highlight_item(highlight, text_color, value_font, min_move_width)
+                    )
+                layout.addLayout(phase_layout)
+
         layout.addStretch()
-        
         return widget
-    
+
+    def _move_data_for_number(self, move_number: int) -> Optional[MoveData]:
+        for move in self._latest_moves:
+            if int(getattr(move, "move_number", -1)) == int(move_number):
+                return move
+        return None
+
+    def _fen_and_move_for_highlight(
+        self, highlight
+    ) -> Tuple[Optional[str], Optional[chess.Move]]:
+        """Return (fen_after, played_move) for the highlight's primary half-move."""
+        md = self._move_data_for_number(highlight.move_number)
+        if md is None:
+            return None, None
+
+        if highlight.is_white:
+            fen_after = (md.fen_white or "").strip() or None
+            san = (md.white_move or "").strip()
+            if highlight.move_number <= 1:
+                fen_before = chess.Board().fen()
+            else:
+                prev = self._move_data_for_number(highlight.move_number - 1)
+                fen_before = (prev.fen_black if prev and prev.fen_black else "") or chess.Board().fen()
+        else:
+            fen_after = (md.fen_black or "").strip() or None
+            san = (md.black_move or "").strip()
+            fen_before = (md.fen_white or "").strip() or None
+
+        move_obj: Optional[chess.Move] = None
+        if fen_before and san:
+            try:
+                board = chess.Board(fen_before)
+                move_obj = board.parse_san(san)
+            except Exception:
+                move_obj = None
+        return fen_after, move_obj
+
+    def _create_highlight_card(
+        self,
+        highlight,
+        *,
+        text_color: QColor,
+        value_font: QFont,
+        bg_color: QColor,
+        border_color: QColor,
+        mini_size: int,
+        show_arrows: bool,
+        is_flipped: bool,
+    ) -> QWidget:
+        """Horizontal card: mini board on the left, move + wrapping description on the right."""
+        card = QFrame()
+        card.setCursor(Qt.CursorShape.PointingHandCursor)
+        # Expanding fills the section width; min width 0 so long descriptions
+        # cannot inflate the whole Game Summary pane wider than siblings.
+        card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        card.setMinimumWidth(0)
+        card.setStyleSheet(
+            f"""
+            QFrame {{
+                background-color: rgb({bg_color.red()}, {bg_color.green()}, {bg_color.blue()});
+                border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
+                border-radius: 4px;
+            }}
+            """
+        )
+        layout = QHBoxLayout(card)
+        layout.setContentsMargins(8, 8, 10, 8)
+        layout.setSpacing(10)
+
+        fen, move_obj = self._fen_and_move_for_highlight(highlight)
+        if fen:
+            board = MiniChessBoardWidget(
+                self.config,
+                fen,
+                is_flipped=is_flipped,
+                embedded=True,
+                size_override=mini_size,
+            )
+            if show_arrows and move_obj is not None:
+                try:
+                    board.set_move(move_obj, True)
+                except Exception:
+                    pass
+            self._highlight_mini_boards.append(board)
+            layout.addWidget(board, 0, Qt.AlignmentFlag.AlignTop)
+        else:
+            placeholder = QLabel("No board")
+            placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            placeholder.setFixedSize(mini_size, mini_size)
+            placeholder.setStyleSheet(
+                f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+                "border: none; background: transparent;"
+            )
+            layout.addWidget(placeholder, 0, Qt.AlignmentFlag.AlignTop)
+
+        text_col = QVBoxLayout()
+        text_col.setContentsMargins(0, 0, 0, 0)
+        text_col.setSpacing(4)
+        move_row = self._create_highlight_move_row(highlight, text_color, value_font, 10_000)
+        move_row.setMinimumWidth(0)
+        text_col.addWidget(move_row, 0, Qt.AlignmentFlag.AlignTop)
+
+        description_label = QLabel(highlight.description)
+        description_label.setFont(value_font)
+        description_label.setWordWrap(True)
+        description_label.setStyleSheet(
+            f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+            "border: none; background: transparent;"
+        )
+        # Ignored: take width from the layout and wrap; do not push parents wider.
+        description_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        description_label.setMinimumWidth(0)
+        text_col.addWidget(description_label, 1)
+        text_col.addStretch(0)
+        layout.addLayout(text_col, 1)
+
+        def _activate(_event=None, h=highlight) -> None:
+            if self._game_controller is None:
+                return
+            ply = h.move_number * 2 - 1 if h.is_white else h.move_number * 2
+            try:
+                if ply >= 0:
+                    self._game_controller.navigate_to_ply(ply)
+            except Exception:
+                pass
+
+        card.mouseReleaseEvent = lambda event, cb=_activate: (  # type: ignore[method-assign]
+            cb() if event.button() == Qt.MouseButton.LeftButton else None
+        )
+        return card
+
+    def _create_highlight_move_row(
+        self, highlight, text_color: QColor, value_font: QFont, max_width: int
+    ) -> QWidget:
+        move_container = QWidget()
+        move_container.setStyleSheet("border: none; background: transparent;")
+        move_layout = QHBoxLayout(move_container)
+        move_layout.setContentsMargins(0, 0, 0, 0)
+        move_layout.setSpacing(4)
+        move_container.setMaximumWidth(max_width)
+
+        def _add_move_label(text: str, move_number: int, is_white: bool) -> None:
+            label = ClickableMoveLabel(text, move_number, is_white, self._game_controller)
+            label.setFont(value_font)
+            label.setFrameShape(QLabel.Shape.NoFrame)
+            label.setStyleSheet(
+                f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+                "border: none; background: transparent; padding: 0px; margin: 0px; text-decoration: underline;"
+            )
+            move_layout.addWidget(label)
+
+        if " ... " in highlight.move_notation:
+            parts = highlight.move_notation.split(" ... ")
+            if len(parts) == 2:
+                _add_move_label(parts[0], highlight.move_number, highlight.is_white)
+                separator = QLabel("...")
+                separator.setFont(value_font)
+                separator.setStyleSheet(
+                    f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+                    "border: none; background: transparent;"
+                )
+                move_layout.addWidget(separator)
+                _add_move_label(parts[1], highlight.move_number, not highlight.is_white)
+            else:
+                _add_move_label(highlight.move_notation, highlight.move_number, highlight.is_white)
+        else:
+            _add_move_label(highlight.move_notation, highlight.move_number, highlight.is_white)
+
+        move_layout.addStretch(1)
+        return move_container
+
     def _create_highlight_item(self, highlight, text_color: QColor, value_font: QFont, min_move_width: int) -> QWidget:
         """Create a single highlight item widget.
         
@@ -2424,75 +2875,11 @@ class DetailSummaryView(QWidget):
         bullet.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
         layout.addWidget(bullet, 0, 0, Qt.AlignmentFlag.AlignTop)
         
-        # Move notation (clickable) contained in its own widget for consistent width
-        move_container = QWidget()
-        move_container.setStyleSheet("border: none; background: transparent;")
-        move_layout = QHBoxLayout(move_container)
-        move_layout.setContentsMargins(0, 0, 0, 0)
-        move_layout.setSpacing(4)
+        move_container = self._create_highlight_move_row(
+            highlight, text_color, value_font, max(min_move_width, 80)
+        )
         move_container.setMinimumWidth(min_move_width)
         move_container.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
-        
-        # Parse move_notation to extract clickable parts
-        # Format: "12. Nxc3" or "18. Rxd8 ... Rxd8" (for exchanges)
-        if " ... " in highlight.move_notation:
-            # Multi-move highlight (exchange sequence)
-            parts = highlight.move_notation.split(" ... ")
-            if len(parts) == 2:
-                # First move (white)
-                move_label1 = ClickableMoveLabel(
-                    parts[0],  # e.g., "18. Rxd8"
-                    highlight.move_number,
-                    highlight.is_white,
-                    self._game_controller
-                )
-                move_label1.setFont(value_font)
-                move_label1.setFrameShape(QLabel.Shape.NoFrame)
-                move_label1.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent; padding: 0px; margin: 0px; text-decoration: underline;")
-                move_layout.addWidget(move_label1)
-                
-                # Separator
-                separator = QLabel("...")
-                separator.setFont(value_font)
-                separator.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
-                move_layout.addWidget(separator)
-                
-                # Second move (black)
-                move_label2 = ClickableMoveLabel(
-                    parts[1],  # e.g., "Rxd8"
-                    highlight.move_number,
-                    not highlight.is_white,  # Opposite color for second move
-                    self._game_controller
-                )
-                move_label2.setFont(value_font)
-                move_label2.setFrameShape(QLabel.Shape.NoFrame)
-                move_label2.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent; padding: 0px; margin: 0px; text-decoration: underline;")
-                move_layout.addWidget(move_label2)
-            else:
-                # Fallback: treat as single move
-                move_label = ClickableMoveLabel(
-                    highlight.move_notation,
-                    highlight.move_number,
-                    highlight.is_white,
-                    self._game_controller
-                )
-                move_label.setFont(value_font)
-                move_label.setFrameShape(QLabel.Shape.NoFrame)
-                move_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent; padding: 0px; margin: 0px; text-decoration: underline;")
-                move_layout.addWidget(move_label)
-        else:
-            # Single move highlight
-            move_label = ClickableMoveLabel(
-                highlight.move_notation,
-                highlight.move_number,
-                highlight.is_white,
-                self._game_controller
-            )
-            move_label.setFont(value_font)
-            move_label.setFrameShape(QLabel.Shape.NoFrame)
-            move_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent; padding: 0px; margin: 0px; text-decoration: underline;")
-            move_layout.addWidget(move_label)
-        
         layout.addWidget(move_container, 0, 1, Qt.AlignmentFlag.AlignTop)
         
         # Description text (non-clickable) with word wrap
@@ -2500,7 +2887,8 @@ class DetailSummaryView(QWidget):
         description_label.setFont(value_font)
         description_label.setWordWrap(True)
         description_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
-        description_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        description_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        description_label.setMinimumWidth(0)
         layout.addWidget(description_label, 0, 2, Qt.AlignmentFlag.AlignTop)
         layout.setColumnStretch(2, 1)
         

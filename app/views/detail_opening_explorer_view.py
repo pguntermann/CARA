@@ -33,7 +33,7 @@ from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
 
 _DENSITY_ORDER = ("compact", "comfortable", "gallery")
-_DENSITY_PRESETS: Dict[str, Dict[str, Any]] = {
+_DENSITY_FALLBACK_PRESETS: Dict[str, Dict[str, Any]] = {
     "compact": {
         "mini_size": 96,
         "hero_size": 112,
@@ -53,6 +53,38 @@ _DENSITY_PRESETS: Dict[str, Dict[str, Any]] = {
         "flow_boards": True,
     },
 }
+
+
+def _as_box(value: Any, default: Sequence[int]) -> tuple[int, int, int, int]:
+    """Normalize a 4-int margins/padding list from config."""
+    if isinstance(value, (list, tuple)) and len(value) >= 4:
+        return (int(value[0]), int(value[1]), int(value[2]), int(value[3]))
+    return (int(default[0]), int(default[1]), int(default[2]), int(default[3]))
+
+
+def _as_pair(value: Any, default: Sequence[int]) -> tuple[int, int]:
+    """Normalize a 2-int padding pair from config."""
+    if isinstance(value, (list, tuple)) and len(value) >= 2:
+        return (int(value[0]), int(value[1]))
+    return (int(default[0]), int(default[1]))
+
+
+def _mini_board_border_size(config: Dict[str, Any]) -> int:
+    """Outer frame width from shared ui.styles.mini_board (px each side)."""
+    border = (
+        config.get("ui", {})
+        .get("styles", {})
+        .get("mini_board", {})
+        .get("border", {})
+    )
+    if isinstance(border, dict) and "size" in border:
+        return max(0, int(border["size"]))
+    return 4
+
+
+def _mini_board_outer_size(config: Dict[str, Any], board_size: int) -> int:
+    """Full mini-board widget size including border on both sides."""
+    return int(board_size) + 2 * _mini_board_border_size(config)
 
 
 def _open_lichess_url(url: str) -> None:
@@ -298,14 +330,48 @@ class DetailOpeningExplorerView(QWidget):
 
         density_cfg = cfg.get("density", {})
         default_density = str(density_cfg.get("default", "gallery")).lower()
+        presets_cfg = density_cfg.get("presets", {})
+        self._density_presets: Dict[str, Dict[str, Any]] = {}
+        for mode in _DENSITY_ORDER:
+            fallback = _DENSITY_FALLBACK_PRESETS[mode]
+            raw = presets_cfg.get(mode, {}) if isinstance(presets_cfg, dict) else {}
+            if not isinstance(raw, dict):
+                raw = {}
+            self._density_presets[mode] = {
+                "mini_size": int(raw.get("mini_size", fallback["mini_size"])),
+                "hero_size": int(raw.get("hero_size", fallback["hero_size"])),
+                "row_spacing": int(raw.get("row_spacing", fallback["row_spacing"])),
+                "flow_boards": bool(raw.get("flow_boards", fallback["flow_boards"])),
+            }
+
+        layout_cfg = cfg.get("layout", {})
+        if not isinstance(layout_cfg, dict):
+            layout_cfg = {}
+        self._path_header_spacing = int(layout_cfg.get("path_header_spacing", 6))
+        self._path_compact_spacing = int(layout_cfg.get("path_compact_spacing", 6))
+        self._breadcrumb_spacing = int(layout_cfg.get("breadcrumb_spacing", 4))
+
+        path_step_cfg = layout_cfg.get("path_step", {})
+        if not isinstance(path_step_cfg, dict):
+            path_step_cfg = {}
+        gallery_cfg = path_step_cfg.get("gallery", {})
+        if not isinstance(gallery_cfg, dict):
+            gallery_cfg = {}
+        self._gallery_tile_extra_width = int(gallery_cfg.get("tile_extra_width", 24))
+        self._gallery_tile_extra_height = int(gallery_cfg.get("tile_extra_height", 56))
+
         if not hasattr(self, "_density_mode"):
-            self._density_mode = default_density if default_density in _DENSITY_PRESETS else "gallery"
+            self._density_mode = default_density if default_density in self._density_presets else "gallery"
         self._apply_density_preset()
-        # Theme mini-board size feeds the comfortable preset baseline.
-        cfg_mini = cfg.get("mini_board", {}).get("size")
+        # Shared mini-board size feeds the comfortable preset baseline.
+        cfg_mini = (
+            self.config.get("ui", {}).get("styles", {}).get("mini_board", {}).get("size")
+        )
         if cfg_mini is not None and self._density_mode == "comfortable":
+            comfort = self._density_presets.get("comfortable", _DENSITY_FALLBACK_PRESETS["comfortable"])
+            hero_extra = int(comfort["hero_size"]) - int(comfort["mini_size"])
             self._mini_size = int(cfg_mini)
-            self._hero_size = int(cfg_mini) + 32
+            self._hero_size = int(cfg_mini) + max(0, hero_extra)
 
         placeholder = cfg.get("placeholder", {})
         self._placeholder_text_color = placeholder.get("text_color", [150, 150, 150])
@@ -313,11 +379,14 @@ class DetailOpeningExplorerView(QWidget):
         self._placeholder_padding = int(placeholder.get("padding", 20))
 
     def _apply_density_preset(self) -> None:
-        preset = _DENSITY_PRESETS.get(self._density_mode, _DENSITY_PRESETS["comfortable"])
+        preset = self._density_presets.get(
+            self._density_mode,
+            self._density_presets.get("comfortable", _DENSITY_FALLBACK_PRESETS["comfortable"]),
+        )
         self._mini_size = int(preset["mini_size"])
         self._hero_size = int(preset["hero_size"])
         self._row_spacing = int(preset["row_spacing"])
-        self._horizontal_path = bool(preset.get("flow_boards", preset.get("horizontal_path", False)))
+        self._horizontal_path = bool(preset.get("flow_boards", False))
         self._flow_boards = self._horizontal_path
 
     def _continuation_colors(self) -> Dict[str, Any]:
@@ -363,7 +432,7 @@ class DetailOpeningExplorerView(QWidget):
         self._path_header_row.setCursor(Qt.CursorShape.PointingHandCursor)
         path_header_layout = QHBoxLayout(self._path_header_row)
         path_header_layout.setContentsMargins(0, 0, 0, 0)
-        path_header_layout.setSpacing(6)
+        path_header_layout.setSpacing(self._path_header_spacing)
 
         self._path_toggle = QToolButton()
         self._path_toggle.setCheckable(True)
@@ -405,14 +474,14 @@ class DetailOpeningExplorerView(QWidget):
         self._path_compact.setVisible(False)
         compact_layout = QVBoxLayout(self._path_compact)
         compact_layout.setContentsMargins(0, 0, 0, 0)
-        compact_layout.setSpacing(6)
+        compact_layout.setSpacing(self._path_compact_spacing)
 
         self._path_summary = QLabel("")
         self._path_summary.setWordWrap(True)
         self._path_summary.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         compact_layout.addWidget(self._path_summary)
 
-        self._breadcrumb_wrap = _BreadcrumbWrap(spacing=4)
+        self._breadcrumb_wrap = _BreadcrumbWrap(spacing=self._breadcrumb_spacing)
         self._breadcrumb_wrap.setVisible(False)
         compact_layout.addWidget(self._breadcrumb_wrap)
 
@@ -604,7 +673,7 @@ class DetailOpeningExplorerView(QWidget):
             btn.blockSignals(False)
 
     def _on_density_selected(self, mode: str) -> None:
-        if mode not in _DENSITY_PRESETS or mode == self._density_mode:
+        if mode not in self._density_presets or mode == self._density_mode:
             self._update_density_switch()
             return
         self._density_mode = mode
@@ -1037,8 +1106,10 @@ class DetailOpeningExplorerView(QWidget):
                 self._current_path_row = row
 
         if self._flow_boards:
-            tile_w = int(self._mini_size + 24)
-            tile_h = int(self._mini_size + 52)
+            board_outer = _mini_board_outer_size(self.config, self._mini_size)
+            # Card chrome: horizontal margins + configured gallery tile extras.
+            tile_w = int(board_outer + self._gallery_tile_extra_width)
+            tile_h = int(board_outer + self._gallery_tile_extra_height)
             self._path_flow.set_uniform_size(QSize(tile_w, tile_h))
             self._path_flow.set_items(path_flow_items)
         else:
@@ -1160,29 +1231,53 @@ class _OpeningStepRow(QFrame):
 
         bg = colors["row_bg"]
         border = colors["row_border"]
-        border_w = 2 if is_current else 1
+        layout_cfg = explorer_cfg.get("layout", {})
+        if not isinstance(layout_cfg, dict):
+            layout_cfg = {}
+        step_cfg = layout_cfg.get("path_step", {})
+        if not isinstance(step_cfg, dict):
+            step_cfg = {}
+        gallery_cfg = step_cfg.get("gallery", {})
+        if not isinstance(gallery_cfg, dict):
+            gallery_cfg = {}
+
+        margins = _as_box(step_cfg.get("margins"), (8, 6, 8, 6))
+        spacing = int(step_cfg.get("spacing", 10))
+        text_spacing = int(step_cfg.get("text_spacing", 2))
+        title_row_spacing = int(step_cfg.get("title_row_spacing", 4))
+        border_radius = int(step_cfg.get("border_radius", 4))
+        border_w = int(
+            step_cfg.get("current_border_width", 2)
+            if is_current
+            else step_cfg.get("border_width", 1)
+        )
+        badge_radius = int(step_cfg.get("badge_border_radius", 3))
+        badge_pad = _as_pair(step_cfg.get("badge_padding"), (1, 6))
+        text_top = int(gallery_cfg.get("text_top_margin", 2)) if compact_horizontal else 0
+        badge_reserve = int(gallery_cfg.get("current_title_badge_reserve", 36))
+        tile_extra_w = int(gallery_cfg.get("tile_extra_width", 24))
+        tile_extra_h = int(gallery_cfg.get("tile_extra_height", 56))
+
         self.setStyleSheet(
             f"""
             _OpeningStepRow {{
                 background-color: rgb({bg[0]}, {bg[1]}, {bg[2]});
                 border: {border_w}px solid rgb({border[0]}, {border[1]}, {border[2]});
-                border-radius: 4px;
+                border-radius: {border_radius}px;
             }}
             """
         )
 
         layout = QVBoxLayout(self) if compact_horizontal else QHBoxLayout(self)
-        layout.setContentsMargins(8, 6, 8, 6)
-        layout.setSpacing(8 if compact_horizontal else 10)
+        layout.setContentsMargins(*margins)
+        layout.setSpacing(spacing)
 
-        mini_cfg = explorer_cfg.get("mini_board", {})
         board = MiniChessBoardWidget(
             config,
             fen,
             is_flipped=is_flipped,
             embedded=True,
             size_override=mini_size,
-            mini_board_config=mini_cfg if isinstance(mini_cfg, dict) else {},
         )
         if move_uci and show_arrow:
             try:
@@ -1192,16 +1287,21 @@ class _OpeningStepRow(QFrame):
         layout.addWidget(board, alignment=Qt.AlignmentFlag.AlignHCenter if compact_horizontal else Qt.AlignmentFlag.AlignTop)
 
         text_col = QVBoxLayout()
-        text_col.setSpacing(2)
+        text_col.setContentsMargins(0, text_top, 0, 0)
+        text_col.setSpacing(text_spacing)
         title_row = QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 0, 0)
+        title_row.setSpacing(title_row_spacing)
         title_label = QLabel(title)
         title_label.setFont(QFont(colors["font_family"], int(colors["font_size"])))
         if compact_horizontal:
             title_label.setWordWrap(False)
-            title_label.setMaximumWidth(max(40, mini_size))
+            # Leave room for the "Now" badge when present.
+            title_w = max(40, mini_size - (badge_reserve if is_current else 0))
+            title_label.setMaximumWidth(title_w)
             metrics = title_label.fontMetrics()
             title_label.setText(
-                metrics.elidedText(title, Qt.TextElideMode.ElideRight, max(40, mini_size))
+                metrics.elidedText(title, Qt.TextElideMode.ElideRight, title_w)
             )
         else:
             title_label.setWordWrap(True)
@@ -1215,7 +1315,7 @@ class _OpeningStepRow(QFrame):
             bt = colors["badge_text"]
             badge.setStyleSheet(
                 f"color: rgb({bt[0]}, {bt[1]}, {bt[2]}); background-color: rgb({bb[0]}, {bb[1]}, {bb[2]});"
-                " border-radius: 3px; padding: 1px 6px;"
+                f" border-radius: {badge_radius}px; padding: {badge_pad[0]}px {badge_pad[1]}px;"
             )
             title_row.addWidget(badge, 0, Qt.AlignmentFlag.AlignTop)
         text_col.addLayout(title_row)
@@ -1241,8 +1341,9 @@ class _OpeningStepRow(QFrame):
             )
 
         if compact_horizontal:
-            # Uniform card tile for gallery grid.
-            self.setFixedSize(mini_size + 24, mini_size + 52)
+            # Uniform card tile for gallery grid (include mini-board border).
+            board_outer = _mini_board_outer_size(config, mini_size)
+            self.setFixedSize(board_outer + tile_extra_w, board_outer + tile_extra_h)
             # One card-level tooltip only (child tooltips look unstyled / native).
             tip = title if not subtitle or subtitle == "Start" else f"{title}\n{subtitle}"
             self.setToolTip(tip)
@@ -1299,7 +1400,14 @@ class _ContinuationNode(QWidget):
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(4)
+        cont_layout = explorer_cfg.get("layout", {})
+        if not isinstance(cont_layout, dict):
+            cont_layout = {}
+        cont_cfg = cont_layout.get("continuation", {})
+        if not isinstance(cont_cfg, dict):
+            cont_cfg = {}
+        self._cont_layout_cfg = cont_cfg
+        root.setSpacing(int(cont_cfg.get("root_spacing", 4)))
 
         header = QFrame()
         self._header = header
@@ -1309,8 +1417,8 @@ class _ContinuationNode(QWidget):
         header.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self._apply_header_chrome(highlighted=False)
         h = QHBoxLayout(header)
-        h.setContentsMargins(8, 6, 8, 6)
-        h.setSpacing(8)
+        h.setContentsMargins(*_as_box(cont_cfg.get("header_margins"), (8, 6, 8, 6)))
+        h.setSpacing(int(cont_cfg.get("header_spacing", 8)))
 
         expand_size = int(colors.get("expand_button_size", 28))
         expand_font = int(colors.get("expand_font_size", 16))
@@ -1358,14 +1466,12 @@ class _ContinuationNode(QWidget):
             self._expand.toggled.connect(self._on_toggled)
         h.addWidget(self._expand, 0, Qt.AlignmentFlag.AlignVCenter)
 
-        mini_cfg = explorer_cfg.get("mini_board", {})
         board = MiniChessBoardWidget(
             config,
             continuation.fen_after,
             is_flipped=is_flipped,
             embedded=True,
             size_override=mini_size,
-            mini_board_config=mini_cfg if isinstance(mini_cfg, dict) else {},
         )
         if show_arrow:
             try:
@@ -1386,9 +1492,18 @@ class _ContinuationNode(QWidget):
             badge.setFont(QFont(colors["font_family"], max(8, int(colors["font_size"]) - 1)))
             bb = colors.get("played_next_badge_bg", [90, 120, 80])
             bt = colors.get("played_next_badge_text", [240, 240, 240])
+            step_cfg = (
+                explorer_cfg.get("layout", {}).get("path_step", {})
+                if isinstance(explorer_cfg.get("layout"), dict)
+                else {}
+            )
+            if not isinstance(step_cfg, dict):
+                step_cfg = {}
+            badge_radius = int(step_cfg.get("badge_border_radius", 3))
+            badge_pad = _as_pair(step_cfg.get("badge_padding"), (1, 6))
             badge.setStyleSheet(
                 f"color: rgb({bt[0]}, {bt[1]}, {bt[2]}); background-color: rgb({bb[0]}, {bb[1]}, {bb[2]});"
-                " border-radius: 3px; padding: 1px 6px;"
+                f" border-radius: {badge_radius}px; padding: {badge_pad[0]}px {badge_pad[1]}px;"
             )
             move_row.addWidget(badge, 0)
         move_row.addStretch(1)
@@ -1418,21 +1533,28 @@ class _ContinuationNode(QWidget):
 
         self._children_host = QWidget()
         self._children_layout = QVBoxLayout(self._children_host)
-        self._children_layout.setContentsMargins(18, 0, 0, 0)
-        self._children_layout.setSpacing(6)
+        indent = int(self._cont_layout_cfg.get("children_left_indent", 18))
+        self._children_layout.setContentsMargins(indent, 0, 0, 0)
+        self._children_layout.setSpacing(int(self._cont_layout_cfg.get("children_spacing", 6)))
         self._children_host.setVisible(False)
         root.addWidget(self._children_host)
 
     def _apply_header_chrome(self, *, highlighted: bool, accent: Optional[List[int]] = None) -> None:
         bg = self._base_bg
         border = accent if highlighted and accent else self._base_border
-        width = 2 if highlighted else 1
+        cfg = getattr(self, "_cont_layout_cfg", {})
+        width = int(
+            cfg.get("header_highlight_border_width", 2)
+            if highlighted
+            else cfg.get("header_border_width", 1)
+        )
+        radius = int(cfg.get("header_border_radius", 4))
         self._header.setStyleSheet(
             f"""
             QFrame {{
                 background-color: rgb({bg[0]}, {bg[1]}, {bg[2]});
                 border: {width}px solid rgb({border[0]}, {border[1]}, {border[2]});
-                border-radius: 4px;
+                border-radius: {radius}px;
             }}
             """
         )

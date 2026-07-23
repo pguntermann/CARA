@@ -66,10 +66,10 @@ class HoverablePvLabel(QLabel):
         pv_hover_config = manual_analysis_config.get('pv_hover', {})
         self._hover_delay = pv_hover_config.get('hover_delay_ms', 50)
         
-        # Get mini-board position offset from config
-        mini_board_config = pv_hover_config.get('mini_board', {})
-        self._offset_x = mini_board_config.get('offset_x', 20)
-        self._offset_y = mini_board_config.get('offset_y', 20)
+        # Popup position offset (board size/border come from ui.styles.mini_board)
+        legacy_mini = pv_hover_config.get('mini_board', {}) if isinstance(pv_hover_config.get('mini_board'), dict) else {}
+        self._offset_x = pv_hover_config.get('offset_x', legacy_mini.get('offset_x', 20))
+        self._offset_y = pv_hover_config.get('offset_y', legacy_mini.get('offset_y', 20))
         
         # Enable mouse tracking
         self.setMouseTracking(True)

@@ -35,7 +35,7 @@ class MiniChessBoardWidget(QWidget):
             embedded: If True, behave as a normal child widget (no ToolTip/popup flags).
             size_override: Optional base board size in pixels (before scale_factor).
             mini_board_config: Optional mini-board style overrides (size/border); falls back
-                to manual_analysis.pv_hover.mini_board when omitted.
+                to ui.styles.mini_board when omitted.
         """
         super().__init__()
         self.config = config
@@ -74,19 +74,19 @@ class MiniChessBoardWidget(QWidget):
         self.svg_path = pieces_config.get('svg_path', 'app/resources/chesspieces/default')
         self.piece_padding_ratio = max(0.0, min(0.5, float(pieces_config.get('padding_ratio', 0.1))))
         
-        # Border (defaults match main board; mini_board.border can override)
-        border_config = board_config.get('border', {})
-        self.border_size = border_config.get('size', 2)
-        self.border_color = border_config.get('color', [60, 60, 65])
-        
-        # Mini-board specific overrides (PV hover by default; callers may pass explorer config)
+        # Shared miniature-board style (ui.styles.mini_board); callers may override.
         if self._mini_board_config_override is not None:
             mini_board_config = self._mini_board_config_override
         else:
-            manual_analysis_config = ui_config.get('panels', {}).get('detail', {}).get('manual_analysis', {})
-            pv_hover_config = manual_analysis_config.get('pv_hover', {})
-            mini_board_config = pv_hover_config.get('mini_board', {})
-        mini_border = mini_board_config.get('border', {}) if isinstance(mini_board_config, dict) else {}
+            mini_board_config = ui_config.get('styles', {}).get('mini_board', {})
+        if not isinstance(mini_board_config, dict):
+            mini_board_config = {}
+
+        # Border: shared mini-board style, then main-board fallbacks.
+        border_config = board_config.get('border', {})
+        self.border_size = border_config.get('size', 2)
+        self.border_color = border_config.get('color', [60, 60, 65])
+        mini_border = mini_board_config.get('border', {})
         if isinstance(mini_border, dict):
             if 'size' in mini_border:
                 self.border_size = int(mini_border['size'])
@@ -97,7 +97,7 @@ class MiniChessBoardWidget(QWidget):
         if self._size_override is not None:
             base_size = int(self._size_override)
         else:
-            base_size = int(mini_board_config.get('size', 120)) if isinstance(mini_board_config, dict) else 120
+            base_size = int(mini_board_config.get('size', 160))
         scaled = max(8, int(round(base_size * float(self._scale_factor))))
         self.square_size = max(1, scaled // 8)
         self.board_size = self.square_size * 8

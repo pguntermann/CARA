@@ -79,7 +79,13 @@
             "endgame_moves": 10
           },
           "highlights": {
-            "max_per_phase": 7
+            "max_per_phase": 7,
+            "view_mode": {
+              "default": "list"
+            },
+            "cards": {
+              "show_move_arrows": true
+            }
           }
         },
         "player_stats": {
