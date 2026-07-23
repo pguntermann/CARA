@@ -348,16 +348,20 @@ class MiniChessBoardWidget(QWidget):
         to_x = board_start_x + to_file * self.square_size + self.square_size / 2
         to_y = board_start_y + to_visual_rank * self.square_size + self.square_size / 2
         
-        # Set up pen for arrow
+        # Set up pen for arrow — width scales with square size so supersampled
+        # PDF renders (and scaled UI boards) keep a readable stroke weight.
         arrow_color = QColor(color[0], color[1], color[2])
+        line_width = max(2.5, float(self.square_size) * 0.16)
         pen = QPen(arrow_color)
-        pen.setWidth(2)  # Slightly thinner for mini-board
+        pen.setWidthF(line_width)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         painter.setPen(pen)
         painter.setBrush(QBrush(arrow_color))
         
         # Draw arrow line from source to destination
         # Shorten the line to leave space for arrowhead
-        arrowhead_size = self.square_size * 0.15
+        arrowhead_size = self.square_size * 0.22
         dx = to_x - from_x
         dy = to_y - from_y
         length = (dx * dx + dy * dy) ** 0.5
@@ -371,18 +375,21 @@ class MiniChessBoardWidget(QWidget):
             shortened_to_y = to_y - unit_y * arrowhead_size
             
             # Draw line
-            painter.drawLine(int(from_x), int(from_y), int(shortened_to_x), int(shortened_to_y))
+            painter.drawLine(
+                QPointF(from_x, from_y),
+                QPointF(shortened_to_x, shortened_to_y),
+            )
             
             # Draw arrowhead (triangle pointing to destination)
             arrowhead_points = QPolygonF([
                 QPointF(to_x, to_y),
                 QPointF(
-                    shortened_to_x - unit_y * arrowhead_size * 0.5,
-                    shortened_to_y + unit_x * arrowhead_size * 0.5
+                    shortened_to_x - unit_y * arrowhead_size * 0.55,
+                    shortened_to_y + unit_x * arrowhead_size * 0.55
                 ),
                 QPointF(
-                    shortened_to_x + unit_y * arrowhead_size * 0.5,
-                    shortened_to_y - unit_x * arrowhead_size * 0.5
+                    shortened_to_x + unit_y * arrowhead_size * 0.55,
+                    shortened_to_y - unit_x * arrowhead_size * 0.55
                 )
             ])
             painter.drawPolygon(arrowhead_points)

@@ -3,6 +3,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
     QGridLayout, QSizePolicy, QSplitter, QMenu, QApplication, QToolButton, QButtonGroup,
+    QFileDialog, QMessageBox,
 )
 from PyQt6.QtCore import Qt, QEvent, QRect, QRectF, QPointF, QPoint, QVariantAnimation, QEasingCurve
 from PyQt6.QtGui import (
@@ -2946,6 +2947,10 @@ class DetailSummaryView(QWidget):
         copy_full_action = menu.addAction("Copy summary to clipboard")
         copy_full_action.triggered.connect(self._copy_full_summary_to_clipboard)
 
+        menu.addSeparator()
+        export_pdf_action = menu.addAction("Export PDF Report")
+        export_pdf_action.triggered.connect(self._export_pdf_report)
+
         from app.views.style.context_menu import try_wire_context_menu_shared_action_icons
 
         try_wire_context_menu_shared_action_icons(menu)
@@ -3006,4 +3011,42 @@ class DetailSummaryView(QWidget):
             from app.services.progress_service import ProgressService
             progress_service = ProgressService.get_instance()
             progress_service.set_status("Copied game summary to clipboard")
+
+    def _export_pdf_report(self) -> None:
+        """Export a printable PDF report for the current analyzed game."""
+        if not self.current_summary:
+            return
+
+        game = self._game_model.active_game if self._game_model else None
+        from app.services.game_report_pdf_service import GameReportPDFService, default_pdf_filename
+
+        suggested = default_pdf_filename(game)
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export PDF Report",
+            suggested,
+            "PDF Files (*.pdf);;All Files (*)",
+        )
+        if not path:
+            return
+
+        try:
+            service = GameReportPDFService(self.config)
+            out = service.export(
+                path,
+                summary=self.current_summary,
+                moves=self._latest_moves,
+                game=game,
+            )
+        except Exception as exc:
+            QMessageBox.warning(
+                self,
+                "Export PDF Report",
+                f"Could not create the PDF report.\n\n{exc}",
+            )
+            return
+
+        from app.services.progress_service import ProgressService
+
+        ProgressService.get_instance().set_status(f"Exported PDF report: {out.name}")
 

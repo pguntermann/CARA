@@ -1113,6 +1113,62 @@
               "margins": [6, 4]
             }
           },
+          "pdf_report": {
+            "title": "GAME REPORT",
+            "footer_text": "Generated with CARA ({version})\nthe free Open Source Chess Analysis and Review Application for Windows, macOS and Linux\nhttps://pguntermann.github.io/CARA/",
+            "page_size": "letter",
+            "margin": 48,
+            "section_spacing": 18,
+            "board_size": 112,
+            "highlight_board_size": 72,
+            "board_render_scale": 4,
+            "max_comment_diagrams": 3,
+            "logo_path": "appicon.svg",
+            "logo_size": 52,
+            "logo_render_scale": 8,
+            "include_symbols": true,
+            "eval_chart_height": 110,
+            "pie_size": 108,
+            "pie_slice_border_width": 1.75,
+            "fonts": {
+              "family": "Helvetica",
+              "title_size": 14,
+              "heading_size": 10,
+              "body_size": 9,
+              "accuracy_size": 16
+            },
+            "colors": {
+              "text": [55, 40, 30],
+              "muted": [120, 100, 85],
+              "accent": {
+                "$ref": "$_COLOR_DEEP_TEAL"
+              },
+              "rule": [200, 185, 165],
+              "card_fill": [250, 246, 238],
+              "pie_slice_border": [255, 255, 255],
+              "assessments": {
+                "book_move": [128, 120, 110],
+                "brilliant": [208, 148, 38],
+                "best_move": [32, 118, 88],
+                "good_move": [70, 150, 185],
+                "inaccuracy": [200, 155, 25],
+                "mistake": [210, 115, 45],
+                "miss": [150, 70, 160],
+                "blunder": [185, 45, 50]
+              },
+              "eval_graph": {
+                "background": [255, 255, 255],
+                "grid": [230, 222, 210],
+                "axis": [120, 100, 85],
+                "line": {
+                  "$ref": "$_COLOR_DEEP_TEAL"
+                },
+                "zero_line": [180, 165, 145],
+                "phase_line": [90, 130, 140],
+                "border": [200, 185, 165]
+              }
+            }
+          },
           "layout": {
             "spacing": 15,
             "section_spacing": 20,
