@@ -1954,9 +1954,9 @@ class PgnFormatterService:
         
         formatted = ''.join(result_parts)
         
-        # Format results (1-0, 0-1, 1/2-1/2, *) - but skip if inside HTML tags, headers, or variations
-        # Note: We need to track variation depth because results can be inside comment spans
-        # that are themselves inside variation spans. Use a stack to track which spans are variation spans.
+        # Format results (1-0, 0-1, 1/2-1/2, *) - skip inside HTML tags, headers, comments, or variations.
+        # Comment outer wrappers often carry only color (italic lives on the inner href anchor), so
+        # detect comments via comment_color_css rather than italic alone.
         results_config = formatting.get('results', {})
         result_color = results_config.get('color', [255, 255, 100])
         result_bold = results_config.get('bold', True)
@@ -1965,17 +1965,24 @@ class PgnFormatterService:
         i = 0
         in_tag = False
         in_header_span = False
-        span_stack = []  # Stack to track span types: True if variation span, False otherwise
+        in_variation_span = False
+        comment_span_depth = 0
+        span_stack: List[str] = []
+        
+        def _recompute_result_span_flags() -> None:
+            nonlocal in_header_span, in_variation_span, comment_span_depth
+            in_header_span = any(span == 'header' for span in span_stack)
+            in_variation_span = any(span == 'variation' for span in span_stack)
+            comment_span_depth = sum(1 for span in span_stack if span == 'comment')
         
         while i < len(formatted):
             if formatted[i] == '<':
                 # Check if this is a closing span tag first
                 if i + 7 < len(formatted) and formatted[i:i+7] == '</span>':
-                    # Closing span tag - pop from stack
                     if span_stack:
                         span_stack.pop()
+                        _recompute_result_span_flags()
                     in_tag = False
-                    in_header_span = False
                     result_parts.append('</span>')
                     i += 7
                     continue
@@ -1983,29 +1990,20 @@ class PgnFormatterService:
                 elif i + 5 < len(formatted) and formatted[i:i+5] == '<span':
                     in_tag = True
                     tag_end = formatted.find('>', i)
+                    span_type = 'other'
                     if tag_end != -1:
                         tag_content = formatted[i:tag_end+1]
-                        # Check if it's a header span
                         if header_color_css in tag_content:
-                            in_header_span = True
-                            span_stack.append(False)  # Header span
-                        # Check if it's a variation span (has variation color and italic, but not comment color)
-                        elif ('color: rgb(180, 180, 180)' in tag_content or 'font-style: italic' in tag_content) and 'color: rgb(180, 200, 255)' not in tag_content:
-                            span_stack.append(True)  # Variation span
-                        # Check if it's a comment span with italic (comment inside variation)
-                        elif 'color: rgb(180, 200, 255)' in tag_content and 'font-style: italic' in tag_content:
-                            # Comment span with italic means it's inside a variation - treat as variation context
-                            span_stack.append(True)  # Comment in variation - treat as variation
-                        # Check if it's any span with italic style (means it's in a variation)
-                        elif 'font-style: italic' in tag_content:
-                            # Any span with italic is in a variation context
-                            span_stack.append(True)
-                        else:
-                            # Other span (comment, move number, etc.) - keep existing variation context
-                            # If we're already in a variation, this span is also in variation context
-                            span_stack.append(True in span_stack if span_stack else False)
+                            span_type = 'header'
+                        elif comment_color_css in tag_content:
+                            span_type = 'comment'
+                        elif ('color: rgb(180, 180, 180)' in tag_content or 'font-style: italic' in tag_content):
+                            span_type = 'variation'
+                        span_stack.append(span_type)
+                        _recompute_result_span_flags()
                     else:
-                        span_stack.append(False)
+                        span_stack.append('other')
+                        _recompute_result_span_flags()
                     result_parts.append(formatted[i])
                     i += 1
                 else:
@@ -2017,8 +2015,7 @@ class PgnFormatterService:
                 in_tag = False
                 result_parts.append(formatted[i])
                 i += 1
-            elif not in_tag and not in_header_span and not (True in span_stack):
-                # Only format results if we're not in a variation context (check stack)
+            elif not in_tag and not in_header_span and not in_variation_span and comment_span_depth == 0:
                 match = PGN_MOVE_RESULT_RE.match(formatted, i)
                 if match:
                     result_formatted = span(match.group(0), result_color, result_bold)
