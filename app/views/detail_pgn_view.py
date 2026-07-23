@@ -10,7 +10,6 @@ from app.services.pgn_formatter_service import (
     PgnRangeMap,
     build_pgn_range_map_from_fragments,
     clean_pgn_text,
-    ply_href,
 )
 from app.models.game_model import GameModel
 from app.utils.font_utils import resolve_font_family, scale_font_size
@@ -264,12 +263,10 @@ class DetailPgnView(QWidget):
         self._game_model: Optional[GameModel] = None
         self._game_controller: Optional['GameController'] = None
         self._current_pgn_text: str = ""  # Store plain PGN text for re-formatting
-        self._current_formatted_html: str = ""  # Store formatted HTML for highlighting
+        self._current_formatted_html: str = ""  # Store formatted HTML (debug / re-display)
         self._move_info: List[Tuple[str, int, bool]] = []  # List of (move_san, move_number, is_white) tuples for each ply
         self._range_map: PgnRangeMap = PgnRangeMap()  # Move/comment ranges from rendered anchors
         self._active_move_ply: int = 0  # Current active move ply (0 = starting position)
-        self._last_highlighted_start: int = -1  # Track last highlighted position for clearing
-        self._last_highlighted_length: int = 0
         self._show_metadata: bool = True  # Whether to show metadata tags in PGN view
         self._show_comments: bool = True  # Whether to show comments in PGN view
         self._show_variations: bool = True  # Whether to show variations in PGN view
@@ -404,23 +401,22 @@ class DetailPgnView(QWidget):
                 pgn_notation_settings=self._pgn_notation_settings  # Pass user settings
             )
             self.pgn_text.setHtml(formatted_html)
-            # Store formatted HTML and move info for highlighting
-            # Use original move info (from unfiltered PGN) for highlighting
+            # Store formatted HTML and move info; range map is built once from clean HTML
+            # (ExtraSelections highlight does not mutate document formats).
             self._current_formatted_html = formatted_html
             self._move_info = original_move_info
             self._range_map = _range_map_from_document(self.pgn_text.document())
-            
-            # Re-apply highlighting for current active move
-            # Use QTimer to ensure the HTML is rendered before highlighting
+            self.pgn_text.setExtraSelections([])
+
+            # Re-apply highlighting for current active move after HTML is laid out
             from PyQt6.QtCore import QTimer
             QTimer.singleShot(0, self._highlight_active_move)
         else:
             self.pgn_text.setPlainText("")
+            self.pgn_text.setExtraSelections([])
             self._current_formatted_html = ""
             self._move_info = []
             self._range_map = PgnRangeMap()
-            self._last_highlighted_start = -1
-            self._last_highlighted_length = 0
     
     def set_show_metadata(self, show: bool) -> None:
         """Set whether to show metadata tags in PGN view.
@@ -568,38 +564,30 @@ class DetailPgnView(QWidget):
         return (self._current_formatted_html, settings)
     
     def _highlight_active_move(self) -> None:
-        """Highlight the active move using the one-way range map (no sentinel scan)."""
+        """Highlight the active move via ExtraSelections (document HTML stays unchanged)."""
         if not self.pgn_text.document():
+            self.pgn_text.setExtraSelections([])
             return
 
-        # Restore base HTML so prior highlight/format mutations cannot drop href anchors.
-        if self._current_formatted_html:
-            try:
-                self.pgn_text.setHtml(self._current_formatted_html)
-            except Exception:
-                pass
-            self._range_map = _range_map_from_document(self.pgn_text.document())
-        else:
-            self._range_map = PgnRangeMap()
-
-        self._last_highlighted_start = -1
-        self._last_highlighted_length = 0
-
         if self._active_move_ply <= 0:
+            self.pgn_text.setExtraSelections([])
             return
 
         document = self.pgn_text.document()
         document_length = document.characterCount()
         if document_length <= 0:
+            self.pgn_text.setExtraSelections([])
             return
 
         move_range = self._range_map.move_range(self._active_move_ply)
         if move_range is None:
+            self.pgn_text.setExtraSelections([])
             return
 
         move_start = move_range.start
         move_end = move_range.end
         if move_start < 0 or move_end <= move_start or move_end > document_length:
+            self.pgn_text.setExtraSelections([])
             return
 
         ui_config = self.config.get('ui', {})
@@ -621,16 +609,17 @@ class DetailPgnView(QWidget):
         highlight_format.setForeground(QColor(text_color[0], text_color[1], text_color[2]))
         if bold:
             highlight_format.setFontWeight(QFont.Weight.Bold)
-        # Preserve move identity so clicks still resolve after highlighting.
-        highlight_format.setAnchor(True)
-        highlight_format.setAnchorHref(ply_href(self._active_move_ply))
 
-        cursor.setCharFormat(highlight_format)
-        self.pgn_text.setTextCursor(cursor)
+        selection = QTextEdit.ExtraSelection()
+        selection.cursor = cursor
+        selection.format = highlight_format
+        self.pgn_text.setExtraSelections([selection])
+
+        # Scroll to the active move without replacing the document selection permanently
+        visible = QTextCursor(document)
+        visible.setPosition(move_start)
+        self.pgn_text.setTextCursor(visible)
         self.pgn_text.ensureCursorVisible()
-
-        self._last_highlighted_start = move_start
-        self._last_highlighted_length = move_end - move_start
     
     def get_pgn_text(self) -> str:
         """Get the current PGN text content.
@@ -647,8 +636,6 @@ class DetailPgnView(QWidget):
         document = self.pgn_text.document()
         if not document or position < 0 or position >= document.characterCount():
             return None
-        if not self._range_map.comments:
-            self._range_map = _range_map_from_document(document)
         ply = self._range_map.comment_ply_at(position)
         if ply is None:
             return None
@@ -698,9 +685,6 @@ class DetailPgnView(QWidget):
         document_length = document.characterCount()
         if document_length == 0 or position < 0 or position >= document_length:
             return 0
-
-        if not self._range_map.moves:
-            self._range_map = _range_map_from_document(document)
 
         return self._range_map.move_ply_at(position)
 

@@ -1,4 +1,4 @@
-"""Tests for PGN display range map (href anchors, no Unicode sentinels)."""
+"""Tests for PGN display range map (href anchors)."""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ class TestPgnRangeMap(unittest.TestCase):
         self.assertEqual(rm.comment_ply_at(22), 1)
         self.assertEqual(rm.move_range(2).start, 30)
 
-    def test_formatter_emits_anchors_not_sentinels(self) -> None:
+    def test_formatter_emits_anchors(self) -> None:
         pgn = '1. e4 {note} e5 *'
         html, move_info = PgnFormatterService.format_pgn_to_html(pgn, self.config)
         self.assertEqual(len(move_info), 2)

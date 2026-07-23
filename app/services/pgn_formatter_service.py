@@ -2,7 +2,7 @@
 
 Main-line moves and comments are tagged with stable ``href`` anchors
 (``cara-ply:N`` / ``cara-cmt:N``) so the PGN view can build a one-way
-plaintext range map after ``setHtml`` — no invisible Unicode sentinels.
+plaintext range map after ``setHtml``.
 """
 
 import re
@@ -14,13 +14,6 @@ from app.services.logging_service import LoggingService
 # Stable interaction anchors embedded in formatted HTML (visible text only; identity in href).
 PGN_PLY_HREF_PREFIX = "cara-ply:"
 PGN_COMMENT_HREF_PREFIX = "cara-cmt:"
-
-# Legacy invisible sentinels (older builds). Still stripped on clipboard copy.
-PGN_PLY_SENTINEL_PREFIX = "\u200C\u200D"
-PGN_PLY_SENTINEL_SUFFIX = "\u200D\u200C"
-_PLY_SENTINEL_ZERO_WIDTH = "\u200B"
-PGN_COMMENT_SENTINEL_PREFIX = "\u2060\u200C"
-PGN_COMMENT_SENTINEL_SUFFIX = "\u200C\u2060"
 
 
 @dataclass(frozen=True)
@@ -146,14 +139,13 @@ def clean_pgn_text(text: str) -> str:
     """Clean and format PGN text for copying to clipboard.
     
     This function:
-    1. Removes legacy invisible sentinel characters (older CARA builds)
-    2. Puts each metadata tag on its own line when they were concatenated on one line
-    3. Separates metadata tags from move notation (adds CRLF between them)
-    4. Applies fixed-width formatting using export config settings
-    5. Normalizes line endings to CRLF
+    1. Puts each metadata tag on its own line when they were concatenated on one line
+    2. Separates metadata tags from move notation (adds CRLF between them)
+    3. Applies fixed-width formatting using export config settings
+    4. Normalizes line endings to CRLF
     
     Args:
-        text: PGN text that may contain legacy invisible sentinel characters.
+        text: PGN text from the notation pane or selection.
         
     Returns:
         Cleaned and formatted PGN text safe for copying to clipboard.
@@ -161,14 +153,7 @@ def clean_pgn_text(text: str) -> str:
     if not text:
         return text
     
-    # Step 1: Remove legacy invisible sentinel characters (older builds)
-    pattern = re.escape(PGN_PLY_SENTINEL_PREFIX) + r'\u200B*' + re.escape(PGN_PLY_SENTINEL_SUFFIX)
-    text = re.sub(pattern, '', text)
-    comment_pat = re.escape(PGN_COMMENT_SENTINEL_PREFIX) + r'\u200B*' + re.escape(PGN_COMMENT_SENTINEL_SUFFIX)
-    text = re.sub(comment_pat, '', text)
-    text = re.sub(r'[\u200B\u200C\u200D\u2028\u2029\u2060]', '', text)
-    
-    # Step 2: Separate metadata tags from move notation and ensure blank line between them
+    # Separate metadata tags from move notation and ensure blank line between them
     # Pattern to match metadata tags: [Key "Value"]
     metadata_tag_pattern = re.compile(r'\[([A-Za-z0-9][A-Za-z0-9_]*)\s+"([^"]*)"\]')
     text = _normalize_pgn_header_tags_one_per_line(text, metadata_tag_pattern)
