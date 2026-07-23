@@ -1,5 +1,28 @@
 # Release Notes
 
+# CARA v2.7.8 - Opening Explorer Layouts, Game Summary Cards, and PDF Game Report
+
+**Release Date:** 23.07.2026
+
+This release expands the **Opening Explorer** with Compact, Comfort, and Gallery layouts and generally improved UX, adds an optional **Cards** view for Game Summary highlights, and introduces a **PDF Game Report** export from the Game Summary context menu. It also includes a long-overdue refactor of the PGN formatter and rendering code.
+
+## New Features
+
+- **Opening Explorer:** Choose **Compact**, **Comfort**, or **Gallery** for the played opening path. 
+- **Game Summary – Highlights Cards view:** Toggle **List | Cards** on Game Highlights. Cards show miniature boards and follow the main board’s orientation; List remains the default.
+- **PDF Game Report:** From the Game Summary context menu, **Export PDF Report** creates a multi-page printable report (overview, accuracy/classification, evaluation chart, highlights, critical moments, and annotated PGN with selected mini boards).
+
+## Enhancements
+
+- **Miniature boards:** Shared style-config styling for mini boards across Opening Explorer, highlight cards, PV hover, and related widgets.
+
+
+## Bug Fixes
+
+- **PGN formatter:** Refactor of the PGN formatter and rendering code, resulting in overall better performance when working with complex PGNs.
+
+---
+
 # CARA v2.7.7 - Opening Explorer, Manual Analysis Freeze, and W/D/L Bar
 
 **Release Date:** 22.07.2026
