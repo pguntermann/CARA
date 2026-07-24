@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import QPoint, Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QKeyEvent, QMouseEvent
-from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QFrame, QLabel, QVBoxLayout, QWidget
 
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.pgn_variation_path import Path
@@ -117,6 +117,7 @@ class BranchSelectOverlay(QFrame):
         *,
         anchor_global=None,
         selected_index: int = 0,
+        constrain_widget: Optional[QWidget] = None,
     ) -> None:
         self._choices = [(tuple(path), str(san)) for path, san in choices]
         if not self._choices:
@@ -126,13 +127,55 @@ class BranchSelectOverlay(QFrame):
         self._rebuild_labels()
         self.adjustSize()
         if anchor_global is not None:
-            self.move(anchor_global)
+            self.move(
+                self._clamp_global_pos(
+                    QPoint(anchor_global),
+                    constrain_widget=constrain_widget,
+                )
+            )
         self.show()
         self.raise_()
         self.activateWindow()
         self.setFocus(Qt.FocusReason.PopupFocusReason)
         # Ensure arrow keys reach this popup even when the PGN pane keeps focus (common on Windows).
         self.grabKeyboard()
+
+    def _clamp_global_pos(
+        self,
+        pos: QPoint,
+        *,
+        constrain_widget: Optional[QWidget] = None,
+    ) -> QPoint:
+        """Keep the overlay fully visible inside the pane (if given) and the screen."""
+        margin = 4
+        w = max(1, self.width())
+        h = max(1, self.height())
+        x = int(pos.x())
+        y = int(pos.y())
+
+        def _clamp_to_rect(left: int, top: int, width: int, height: int) -> None:
+            nonlocal x, y
+            if width <= 0 or height <= 0:
+                return
+            max_x = left + width - w - margin
+            max_y = top + height - h - margin
+            x = min(x, max_x)
+            y = min(y, max_y)
+            x = max(x, left + margin)
+            y = max(y, top + margin)
+
+        if constrain_widget is not None:
+            top_left = constrain_widget.mapToGlobal(QPoint(0, 0))
+            _clamp_to_rect(top_left.x(), top_left.y(), constrain_widget.width(), constrain_widget.height())
+
+        screen = QApplication.screenAt(QPoint(x, y)) or QApplication.screenAt(pos)
+        if screen is None:
+            screen = QApplication.primaryScreen()
+        if screen is not None:
+            geo = screen.availableGeometry()
+            _clamp_to_rect(geo.left(), geo.top(), geo.width(), geo.height())
+
+        return QPoint(x, y)
 
     def hide_overlay(self) -> None:
         was_visible = self.isVisible()

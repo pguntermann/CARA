@@ -839,7 +839,12 @@ class DetailPgnView(QWidget):
     def _show_branch_overlay(self, choices: Sequence[Tuple[Path, str]]) -> None:
         anchor = self._overlay_anchor_global_pos()
         self._branch_overlay.refresh_style(self.config)
-        self._branch_overlay.show_choices(choices, anchor_global=anchor, selected_index=0)
+        self._branch_overlay.show_choices(
+            choices,
+            anchor_global=anchor,
+            selected_index=0,
+            constrain_widget=self.pgn_text.viewport(),
+        )
         self._set_branch_nav_shortcuts_enabled(True)
 
     def _overlay_anchor_global_pos(self) -> QPoint:
