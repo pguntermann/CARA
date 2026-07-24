@@ -866,8 +866,9 @@ class DetailPgnView(QWidget):
         if move_range is not None:
             cursor.setPosition(move_range.end)
         rect = self.pgn_text.cursorRect(cursor)
+        # cursorRect is in viewport coordinates (QTextEdit), not widget coords.
         local = rect.bottomRight()
-        return self.pgn_text.mapToGlobal(local)
+        return self.pgn_text.viewport().mapToGlobal(local)
 
     def _on_branch_choice_activated(self, path: object) -> None:
         if self._game_controller is None:

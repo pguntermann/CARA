@@ -20,12 +20,9 @@ class BranchSelectOverlay(QFrame):
 
     def __init__(self, config: Dict[str, Any], parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.setWindowFlags(
-            Qt.WindowType.Tool
-            | Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-        )
-        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, False)
+        # Stay a child widget (not a Tool/Popup top-level). On Wayland, compositors
+        # ignore client-side move() for top-level surfaces and often center them.
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         self._choices: List[Tuple[Path, str]] = []
@@ -127,12 +124,17 @@ class BranchSelectOverlay(QFrame):
         self._rebuild_labels()
         self.adjustSize()
         if anchor_global is not None:
-            self.move(
-                self._clamp_global_pos(
-                    QPoint(anchor_global),
-                    constrain_widget=constrain_widget,
-                )
+            global_pos = self._clamp_global_pos(
+                QPoint(anchor_global),
+                constrain_widget=constrain_widget,
             )
+            parent = self.parentWidget()
+            if parent is not None:
+                # Parent-local coords — required for child widgets, and the only
+                # reliable placement path under Wayland.
+                self.move(parent.mapFromGlobal(global_pos))
+            else:
+                self.move(global_pos)
         self.show()
         self.raise_()
         self.activateWindow()
