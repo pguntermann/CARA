@@ -35,6 +35,8 @@ from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
 _DENSITY_ORDER = ("compact", "comfortable", "gallery")
 # Coalesce move + board.position signals (and rapid ply steps) without feeling laggy.
 _REFRESH_COALESCE_MS = 25
+# If the board view never emits navigation_settled (no widget connected), still refresh.
+_REFRESH_SETTLED_FALLBACK_MS = 450
 _DENSITY_FALLBACK_PRESETS: Dict[str, Dict[str, Any]] = {
     "compact": {
         "mini_size": 96,
@@ -262,6 +264,7 @@ class DetailOpeningExplorerView(QWidget):
         self._path_layout_is_flow = False
         self._current_path_row: Optional[QWidget] = None
         self._focused_continuation: Optional[QWidget] = None
+        self._refresh_dirty = False
         self._refresh_timer = QTimer(self)
         self._refresh_timer.setSingleShot(True)
         self._refresh_timer.setInterval(_REFRESH_COALESCE_MS)
@@ -803,19 +806,19 @@ class DetailOpeningExplorerView(QWidget):
         if model is not None:
             model.active_game_changed.connect(self._on_game_or_ply_changed)
             model.active_move_changed.connect(self._on_game_or_ply_changed)
-        self.refresh()
+        self._request_refresh()
 
     def set_game_controller(self, game_controller) -> None:
-        self._disconnect_board_flip()
+        self._disconnect_board_signals()
         self._game_controller = game_controller
         if game_controller is not None and self._opening_service is None:
             self._opening_service = getattr(game_controller, "opening_service", None)
-        self._connect_board_flip()
-        self.refresh()
+        self._connect_board_signals()
+        self._request_refresh()
 
     def set_opening_service(self, opening_service: OpeningService) -> None:
         self._opening_service = opening_service
-        self.refresh()
+        self._request_refresh()
 
     def _board_model(self):
         if self._game_controller is None:
@@ -825,12 +828,12 @@ class DetailOpeningExplorerView(QWidget):
             return None
         return board_controller.get_board_model()
 
-    def _connect_board_flip(self) -> None:
+    def _connect_board_signals(self) -> None:
         board_model = self._board_model()
         if board_model is None:
             return
         try:
-            board_model.flip_state_changed.connect(self._on_game_or_ply_changed)
+            board_model.flip_state_changed.connect(self._on_flip_changed)
         except TypeError:
             pass
         try:
@@ -838,26 +841,73 @@ class DetailOpeningExplorerView(QWidget):
             board_model.position_changed.connect(self._on_game_or_ply_changed)
         except TypeError:
             pass
+        try:
+            board_model.navigation_settled.connect(self._on_navigation_settled)
+        except TypeError:
+            pass
 
-    def _disconnect_board_flip(self) -> None:
+    def _disconnect_board_signals(self) -> None:
         board_model = self._board_model()
         if board_model is None:
             return
         try:
-            board_model.flip_state_changed.disconnect(self._on_game_or_ply_changed)
+            board_model.flip_state_changed.disconnect(self._on_flip_changed)
         except TypeError:
             pass
         try:
             board_model.position_changed.disconnect(self._on_game_or_ply_changed)
         except TypeError:
             pass
+        try:
+            board_model.navigation_settled.disconnect(self._on_navigation_settled)
+        except TypeError:
+            pass
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self.on_became_visible()
+
+    def on_became_visible(self) -> None:
+        """Refresh immediately if content went stale while this tab was hidden."""
+        if self._refresh_dirty:
+            self.refresh()
 
     def _on_game_or_ply_changed(self, *_args) -> None:
-        self._schedule_refresh()
-
-    def _schedule_refresh(self) -> None:
-        """Restart coalesce timer so duplicate / bursty signals share one refresh."""
+        """Mark stale; defer rebuild until the board finishes any piece-move animation."""
+        self._refresh_dirty = True
+        if not self.isVisible():
+            self._refresh_timer.stop()
+            return
+        # Prefer navigation_settled; this is only a safety net if that never arrives.
+        self._refresh_timer.setInterval(_REFRESH_SETTLED_FALLBACK_MS)
         self._refresh_timer.start()
+
+    def _on_flip_changed(self, *_args) -> None:
+        """Flip does not animate pieces — refresh as soon as the tab is visible."""
+        self._refresh_dirty = True
+        if not self.isVisible():
+            self._refresh_timer.stop()
+            return
+        self._refresh_timer.setInterval(_REFRESH_COALESCE_MS)
+        self._refresh_timer.start()
+
+    def _on_navigation_settled(self) -> None:
+        """Board view finished applying the position (post animation) — coalesce refresh."""
+        if not self._refresh_dirty:
+            return
+        if not self.isVisible():
+            self._refresh_timer.stop()
+            return
+        self._refresh_timer.setInterval(_REFRESH_COALESCE_MS)
+        self._refresh_timer.start()
+
+    def _request_refresh(self) -> None:
+        """Refresh now if visible; otherwise wait until the tab is shown."""
+        self._refresh_dirty = True
+        if self.isVisible():
+            self.refresh()
+        else:
+            self._refresh_timer.stop()
 
     def _clear_layout(self, layout) -> None:
         while layout.count():
@@ -970,6 +1020,7 @@ class DetailOpeningExplorerView(QWidget):
     def refresh(self) -> None:
         if self._refresh_timer.isActive():
             self._refresh_timer.stop()
+        self._refresh_dirty = False
         self._stop_path_anim()
         self._fade_continuations_in()
         self._ensure_path_layout_orientation()

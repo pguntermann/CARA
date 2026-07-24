@@ -20,6 +20,10 @@ class BoardModel(QObject):
     
     # Signals emitted when board state changes
     position_changed = pyqtSignal()  # Emitted when board position changes
+    # Emitted when the board view has finished applying a position change
+    # (including any piece-move animation). Listeners that do heavy UI work
+    # should prefer this over position_changed.
+    navigation_settled = pyqtSignal()
     flip_state_changed = pyqtSignal(bool)  # Emitted when board flip state changes
     coordinates_visibility_changed = pyqtSignal(bool)  # Emitted when coordinates visibility changes
     turn_indicator_visibility_changed = pyqtSignal(bool)  # Emitted when turn indicator visibility changes
@@ -130,6 +134,10 @@ class BoardModel(QObject):
         # Emit turn_changed if turn actually changed
         if old_turn is not None and old_turn != new_turn:
             self.turn_changed.emit(new_turn == chess.WHITE)
+    
+    def notify_navigation_settled(self) -> None:
+        """Notify listeners that the board view has finished applying a position change."""
+        self.navigation_settled.emit()
     
     def reset_to_starting_position(self) -> None:
         """Reset board to standard starting position."""

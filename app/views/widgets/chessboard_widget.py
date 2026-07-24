@@ -1696,6 +1696,12 @@ class ChessBoardWidget(QWidget):
             self._start_piece_move_animation(anim_pieces)
         else:
             self.update()
+            self._notify_navigation_settled()
+
+    def _notify_navigation_settled(self) -> None:
+        """Tell listeners the board view is done applying the latest position change."""
+        if self._board_model is not None:
+            self._board_model.notify_navigation_settled()
 
     def _on_flip_state_changed(self, is_flipped: bool) -> None:
         """Handle flip state change from model.
@@ -1869,6 +1875,7 @@ class ChessBoardWidget(QWidget):
         self._move_anim_progress = 1.0
         self._load_position_from_model()
         self.update()
+        self._notify_navigation_settled()
 
     def _square_to_row_col(self, square: int) -> Tuple[int, int]:
         """Map a chess square to the widget's board row/col (respecting flip)."""

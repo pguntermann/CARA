@@ -7,8 +7,11 @@ from PyQt6.QtCore import Qt, QRect, QRectF, QPointF
 from pathlib import Path
 import chess
 import sys
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from app.services.logging_service import LoggingService
+
+# Shared across all mini boards: piece-set directory -> SVG renderers.
+_SVG_RENDERER_CACHE: Dict[str, Dict[Tuple[str, str], QSvgRenderer]] = {}
 
 
 class MiniChessBoardWidget(QWidget):
@@ -119,9 +122,7 @@ class MiniChessBoardWidget(QWidget):
         self._load_pieces()
     
     def _load_pieces(self) -> None:
-        """Load chess piece SVG files from the configured path."""
-        import sys
-        
+        """Load chess piece SVG files from the configured path (shared cache)."""
         # Resolve path relative to repository root (stable regardless of module location)
         repo_root = Path(__file__).resolve().parents[3]
         svg_path = Path(self.svg_path)
@@ -131,31 +132,38 @@ class MiniChessBoardWidget(QWidget):
         if not pieces_dir.exists():
             app_root = Path(__file__).resolve().parents[2]
             pieces_dir = svg_path if svg_path.is_absolute() else (app_root / svg_path)
-        
+
         if not pieces_dir.exists():
             logging_service = LoggingService.get_instance()
             logging_service.warning(f"Chess pieces directory not found: {pieces_dir}")
             self.piece_renderers = {}
             return
-        
-        # Piece type mapping: (color, piece_type) -> filename
+
+        cache_key = str(pieces_dir.resolve())
+        cached = _SVG_RENDERER_CACHE.get(cache_key)
+        if cached is not None:
+            self.piece_renderers = cached
+            return
+
         piece_types = ['p', 'r', 'n', 'b', 'q', 'k']
         colors = ['w', 'b']
-        
-        self.piece_renderers = {}
-        
+        renderers: Dict[Tuple[str, str], QSvgRenderer] = {}
+
         for color in colors:
             for piece_type in piece_types:
                 filename = f"{color}{piece_type}.svg"
                 file_path = pieces_dir / filename
-                
+
                 if file_path.exists():
                     renderer = QSvgRenderer(str(file_path))
                     if renderer.isValid():
-                        self.piece_renderers[(color, piece_type)] = renderer
+                        renderers[(color, piece_type)] = renderer
                     else:
                         logging_service = LoggingService.get_instance()
                         logging_service.warning(f"Invalid SVG file: {file_path}")
+
+        _SVG_RENDERER_CACHE[cache_key] = renderers
+        self.piece_renderers = renderers
     
     def _load_position_from_fen(self, fen: str) -> None:
         """Load board position from FEN string.

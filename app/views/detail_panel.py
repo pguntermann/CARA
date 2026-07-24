@@ -393,6 +393,15 @@ class DetailPanel(QWidget):
             self.notes_view.set_game_model(self._game_model)
         if self._notes_controller:
             self.notes_view.set_notes_controller(self._notes_controller)
+
+        self.tab_widget.currentChanged.connect(self._on_detail_tab_changed)
+    
+    def _on_detail_tab_changed(self, index: int) -> None:
+        """When Opening Explorer becomes current, flush any deferred refresh."""
+        if not hasattr(self, "opening_explorer_view"):
+            return
+        if self.tab_widget.widget(index) is self.opening_explorer_view:
+            self.opening_explorer_view.on_became_visible()
     
     def set_game_model(self, model: GameModel) -> None:
         """Set the game model to observe.
