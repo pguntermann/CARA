@@ -2768,6 +2768,18 @@ class MainWindow(QMainWindow):
         status = "shown" if checked else "hidden"
         self.controller.set_status(f"Variations {status} in PGN view")
 
+    def _on_indent_variations_toggled(self, checked: bool) -> None:
+        """Handle Indent variations toggle (display-only layout)."""
+        self._update_pgn_visibility_setting("indent_variations", checked)
+        if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
+            pgn_view = self.detail_panel.pgn_view
+            if hasattr(pgn_view, 'set_indent_variations'):
+                pgn_view.set_indent_variations(checked)
+                if hasattr(pgn_view, '_current_pgn_text'):
+                    pgn_view.set_pgn_text(pgn_view._current_pgn_text)
+        status = "enabled" if checked else "disabled"
+        self.controller.set_status(f"Variation indent layout {status}")
+
     def _on_navigate_variations_toggled(self, checked: bool) -> None:
         """Handle Enable navigating into variations toggle."""
         self._update_pgn_visibility_setting("navigate_variations", checked)
@@ -3941,6 +3953,7 @@ class MainWindow(QMainWindow):
         show_metadata = pgn_visibility.get("show_metadata", True)
         show_comments = pgn_visibility.get("show_comments", True)
         show_variations = pgn_visibility.get("show_variations", True)
+        indent_variations = pgn_visibility.get("indent_variations", False)
         navigate_variations = pgn_visibility.get("navigate_variations", False)
         show_annotations = pgn_visibility.get("show_annotations", True)
         show_results = pgn_visibility.get("show_results", True)
@@ -3964,6 +3977,8 @@ class MainWindow(QMainWindow):
                 pgn_view.set_show_comments(show_comments)
             if hasattr(pgn_view, 'set_show_variations'):
                 pgn_view.set_show_variations(show_variations)
+            if hasattr(pgn_view, 'set_indent_variations'):
+                pgn_view.set_indent_variations(indent_variations)
             if hasattr(pgn_view, 'set_navigate_variations_enabled'):
                 pgn_view.set_navigate_variations_enabled(navigate_variations)
             if hasattr(pgn_view, 'set_show_annotations'):
@@ -3980,6 +3995,8 @@ class MainWindow(QMainWindow):
         self.show_metadata_action.setChecked(show_metadata)
         self.show_comments_action.setChecked(show_comments)
         self.show_variations_action.setChecked(show_variations)
+        if hasattr(self, 'indent_variations_action'):
+            self.indent_variations_action.setChecked(indent_variations)
         if hasattr(self, 'navigate_variations_action'):
             self.navigate_variations_action.setChecked(navigate_variations)
         self.show_annotations_action.setChecked(show_annotations)
@@ -4171,6 +4188,7 @@ class MainWindow(QMainWindow):
                     "show_metadata": pgn_view._show_metadata,
                     "show_comments": pgn_view._show_comments if hasattr(pgn_view, '_show_comments') else True,
                     "show_variations": pgn_view._show_variations if hasattr(pgn_view, '_show_variations') else True,
+                    "indent_variations": pgn_view._indent_variations if hasattr(pgn_view, '_indent_variations') else False,
                     "navigate_variations": (
                         self.controller.get_game_controller().is_navigate_variations_enabled()
                         if hasattr(self, 'controller') else False

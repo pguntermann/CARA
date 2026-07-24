@@ -26,6 +26,7 @@ def append_pgn_menu_items_to_context_menu(menu: QMenu, mw: Any, *, config: dict)
 
     menu.addSeparator()
 
+    _add("indent_variations_action")
     _add("navigate_variations_action")
 
     menu.addSeparator()

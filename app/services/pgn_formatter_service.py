@@ -1287,7 +1287,13 @@ class PgnFormatterService:
         return mainline_ply
     
     @staticmethod
-    def format_pgn_to_html(pgn_text: str, config: Dict[str, Any], active_move_ply: int = 0, pgn_notation_settings: Optional[Dict[str, Any]] = None) -> Tuple[str, List[Tuple[str, int, bool]]]:
+    def format_pgn_to_html(
+        pgn_text: str,
+        config: Dict[str, Any],
+        active_move_ply: int = 0,
+        pgn_notation_settings: Optional[Dict[str, Any]] = None,
+        indent_variations: bool = False,
+    ) -> Tuple[str, List[Tuple[str, int, bool]]]:
         """Format plain PGN text to HTML with colors and styles.
         
         Args:
@@ -1296,6 +1302,8 @@ class PgnFormatterService:
             active_move_ply: Ply index of the active move to highlight (0 = starting position).
             pgn_notation_settings: Optional user settings for PGN notation (overrides config.json).
                 If provided, should contain 'use_symbols_for_nags' and 'show_nag_text' keys.
+            indent_variations: If True, display each variation on a new line indented by depth
+                (display-only; does not change export/copy PGN).
             
         Returns:
             Tuple of (formatted_html, move_info) where:
@@ -1689,6 +1697,7 @@ class PgnFormatterService:
             nags_config,
             styled_anchor=styled_anchor,
             variation_path_queue=variation_path_queue,
+            indent_variations=indent_variations,
         )
         
         # Format move numbers (e.g., 1., 2., 12., etc.) - but skip if inside HTML tags, headers, or variations
@@ -2204,6 +2213,7 @@ class PgnFormatterService:
         nags_config: Optional[Dict[str, Any]] = None,
         styled_anchor=None,
         variation_path_queue: Optional[List[Tuple[Tuple[int, ...], str]]] = None,
+        indent_variations: bool = False,
     ) -> str:
         """Format variations by parsing individual moves within them.
         
@@ -2214,10 +2224,12 @@ class PgnFormatterService:
             span_func: Function to create HTML spans.
             comment_color: Color used for comment spans (to avoid reformatting comment content).
             header_color: Color used for header spans (to avoid reformatting header content).
+            indent_variations: If True, put each variation on a new indented line.
             
         Returns:
             Formatted text with variation moves individually styled.
         """
+        INDENT_NBSP = '&nbsp;' * 4
         result_parts = []
         i = 0
         in_header = False  # Track if we're inside a header [Key "Value"]
@@ -2369,10 +2381,15 @@ class PgnFormatterService:
                                 found_end = True
                                 break
                             
+                            if indent_variations:
+                                result_parts.append('<br>')
+                                result_parts.append(INDENT_NBSP)  # one indent step for top-level sideline
+
                             # Format the opening parenthesis with variation styling
                             result_parts.append(span_func('(', variation_color, italic=variation_italic))
-                            
-                            # Format moves within the variation
+
+                            # Always format moves in document order so cara-path anchors stay aligned
+                            # with collect_variation_move_paths (indent is visual-only below).
                             formatted_variation = PgnFormatterService._format_moves_in_variation(
                                 variation_content,
                                 variation_color,
@@ -2381,11 +2398,20 @@ class PgnFormatterService:
                                 styled_anchor=styled_anchor,
                                 variation_path_queue=variation_path_queue,
                             )
+                            if indent_variations:
+                                formatted_variation = PgnFormatterService._insert_nested_variation_indents(
+                                    formatted_variation,
+                                    base_level=1,
+                                )
                             
                             result_parts.append(formatted_variation)
                             
                             # Format the closing parenthesis with variation styling
                             result_parts.append(span_func(')', variation_color, italic=variation_italic))
+
+                            if indent_variations:
+                                # Put following mainline on its own line after a top-level sideline.
+                                result_parts.append('<br>')
                             
                             i = end
                             found_end = True
@@ -2404,6 +2430,72 @@ class PgnFormatterService:
                 result_parts.append(formatted[i])
                 i += 1
         
+        return ''.join(result_parts)
+
+    @staticmethod
+    def _insert_nested_variation_indents(text: str, base_level: int = 1) -> str:
+        """Visual-only: insert ``<br>`` + indent before nested variation ``(`` outside tags.
+
+        Does not touch move/path anchors — call after ``_format_moves_in_variation``.
+        ``base_level`` is the enclosing sideline depth (1 = inside a top-level variation).
+        """
+        INDENT_NBSP = '&nbsp;' * 4
+        result_parts: List[str] = []
+        i = 0
+        depth = 0
+        while i < len(text):
+            if text[i] == '<':
+                tag_end = text.find('>', i)
+                if tag_end == -1:
+                    result_parts.append(text[i:])
+                    break
+                tag_start = i
+                tag_name_match = re.match(r'<(\w+)', text[i:tag_end + 1])
+                if tag_name_match:
+                    tag_name = tag_name_match.group(1)
+                    closing_tag = f'</{tag_name}>'
+                    closing_pos = text.find(closing_tag, tag_end + 1)
+                    if closing_pos != -1:
+                        result_parts.append(text[tag_start:closing_pos + len(closing_tag)])
+                        i = closing_pos + len(closing_tag)
+                        continue
+                result_parts.append(text[i:tag_end + 1])
+                i = tag_end + 1
+                continue
+
+            if text[i] == '(':
+                # Sidelines start with a move number; skip tags/whitespace when peeking
+                # (style attrs are too long for a fixed-window HTML strip).
+                j = i + 1
+                while j < len(text):
+                    if text[j].isspace():
+                        j += 1
+                        continue
+                    if text[j] == '<':
+                        tag_end = text.find('>', j)
+                        if tag_end == -1:
+                            break
+                        j = tag_end + 1
+                        continue
+                    break
+                is_sideline = j < len(text) and re.match(r'\d+\.', text[j:j + 12])
+                if is_sideline:
+                    result_parts.append('<br>')
+                    result_parts.append(INDENT_NBSP * (base_level + depth + 1))
+                result_parts.append('(')
+                depth += 1
+                i += 1
+                continue
+
+            if text[i] == ')':
+                depth = max(0, depth - 1)
+                result_parts.append(')')
+                i += 1
+                continue
+
+            result_parts.append(text[i])
+            i += 1
+
         return ''.join(result_parts)
     
     @staticmethod

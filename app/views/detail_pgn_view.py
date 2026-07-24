@@ -282,6 +282,7 @@ class DetailPgnView(QWidget):
         self._show_metadata: bool = True  # Whether to show metadata tags in PGN view
         self._show_comments: bool = True  # Whether to show comments in PGN view
         self._show_variations: bool = True  # Whether to show variations in PGN view
+        self._indent_variations: bool = False  # Traditional indented variation layout (display-only)
         self._show_annotations: bool = True  # Whether to show annotations in PGN view
         self._show_results: bool = True  # Whether to show results in PGN view
         self._show_non_standard_tags: bool = False  # Whether to show non-standard tags like [%evp], [%mdl] in comments
@@ -424,7 +425,8 @@ class DetailPgnView(QWidget):
                 pgn_text_to_format, 
                 self.config, 
                 0,  # Don't highlight in HTML formatting
-                pgn_notation_settings=self._pgn_notation_settings  # Pass user settings
+                pgn_notation_settings=self._pgn_notation_settings,  # Pass user settings
+                indent_variations=self._indent_variations,
             )
             self.pgn_text.setHtml(formatted_html)
             # Store formatted HTML and move info; range map is built once from clean HTML
@@ -472,6 +474,10 @@ class DetailPgnView(QWidget):
             if not is_mainline_path(self._active_path):
                 self._game_controller.return_to_mainline_ancestor()
             self._branch_overlay.hide_overlay()
+
+    def set_indent_variations(self, indent: bool) -> None:
+        """Set whether to show variations in traditional indented layout (display-only)."""
+        self._indent_variations = bool(indent)
     
     def set_show_annotations(self, show: bool) -> None:
         """Set whether to show annotations in PGN view.
@@ -619,6 +625,7 @@ class DetailPgnView(QWidget):
             'show_metadata': self._show_metadata,
             'show_comments': self._show_comments,
             'show_variations': self._show_variations,
+            'indent_variations': self._indent_variations,
             'show_annotations': self._show_annotations,
             'show_results': self._show_results,
             'show_non_standard_tags': self._show_non_standard_tags,

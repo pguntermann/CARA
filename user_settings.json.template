@@ -827,6 +827,7 @@
     "show_metadata": true,
     "show_comments": true,
     "show_variations": true,
+    "indent_variations": false,
     "navigate_variations": false,
     "show_annotations": true,
     "show_results": true,

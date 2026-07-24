@@ -1407,6 +1407,7 @@ class AppController:
                 "show_metadata": pgn_visibility.get('show_metadata', True),
                 "show_comments": pgn_visibility.get('show_comments', True),
                 "show_variations": pgn_visibility.get('show_variations', True),
+                "indent_variations": pgn_visibility.get('indent_variations', False),
                 "navigate_variations": pgn_visibility.get('navigate_variations', False),
                 "show_annotations": pgn_visibility.get('show_annotations', True),
                 "show_results": pgn_visibility.get('show_results', True),
