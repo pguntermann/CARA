@@ -55,6 +55,7 @@ class ClickablePgnTextEdit(QTextEdit):
         self._click_handler: Optional[Callable[[int], int]] = None
         self._move_checker: Optional[Callable[[int], int]] = None
         self._comment_double_click_handler: Optional[Callable[[int], bool]] = None
+        self._key_handler: Optional[Callable[[QKeyEvent], bool]] = None
         
         # Install a shortcut to override default Ctrl+C behavior
         # This ensures our custom copy() method is called even if Qt handles the shortcut
@@ -141,6 +142,10 @@ class ClickablePgnTextEdit(QTextEdit):
         
         super().mouseMoveEvent(event)
     
+    def set_key_handler(self, handler: Optional[Callable[[QKeyEvent], bool]]) -> None:
+        """Set an optional key handler; return True if the event was consumed."""
+        self._key_handler = handler
+
     def keyPressEvent(self, event: QKeyEvent) -> None:
         """Override key press to intercept Ctrl+C (or Cmd+C on macOS) and use our custom copy.
         
@@ -152,6 +157,10 @@ class ClickablePgnTextEdit(QTextEdit):
         if event.key() == Qt.Key.Key_C and (event.modifiers() & Qt.KeyboardModifier.ControlModifier):
             # Call our custom copy method
             self.copy()
+            event.accept()
+            return
+
+        if self._key_handler is not None and self._key_handler(event):
             event.accept()
             return
         
@@ -280,6 +289,17 @@ class DetailPgnView(QWidget):
         self._open_move_comment_row: Optional[Callable[[int], None]] = None
         self._branch_overlay = BranchSelectOverlay(self.config, parent=self)
         self._branch_overlay.choice_activated.connect(self._on_branch_choice_activated)
+        self._branch_overlay.dismissed.connect(self._on_branch_overlay_dismissed)
+        # Application-wide Up/Down while the overlay is open (enabled only then so PGN
+        # scrolling and other views keep normal arrow-key behavior otherwise).
+        self._branch_nav_up = QShortcut(QKeySequence(Qt.Key.Key_Up), self)
+        self._branch_nav_up.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        self._branch_nav_up.setEnabled(False)
+        self._branch_nav_up.activated.connect(lambda: self.handle_variation_nav_vertical(-1))
+        self._branch_nav_down = QShortcut(QKeySequence(Qt.Key.Key_Down), self)
+        self._branch_nav_down.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        self._branch_nav_down.setEnabled(False)
+        self._branch_nav_down.activated.connect(lambda: self.handle_variation_nav_vertical(1))
         self._setup_ui()
         
         # Load initial PGN notation settings from user settings
@@ -319,6 +339,7 @@ class DetailPgnView(QWidget):
         # Set move checker for cursor changes (without navigating)
         self.pgn_text.set_move_checker(self._find_navigable_move_at_position)
         self.pgn_text.set_comment_double_click_handler(self._handle_pgn_comment_double_click)
+        self.pgn_text.set_key_handler(self._handle_pgn_key_while_branch_overlay)
         
         # Configure PGN text styling
         pgn_font_family = resolve_font_family(pgn_config.get('font_family', 'Courier New'))
@@ -791,10 +812,35 @@ class DetailPgnView(QWidget):
         self._branch_overlay.move_selection(delta)
         return True
 
+    def _set_branch_nav_shortcuts_enabled(self, enabled: bool) -> None:
+        self._branch_nav_up.setEnabled(enabled)
+        self._branch_nav_down.setEnabled(enabled)
+
+    def _on_branch_overlay_dismissed(self) -> None:
+        self._set_branch_nav_shortcuts_enabled(False)
+
+    def _handle_pgn_key_while_branch_overlay(self, event: QKeyEvent) -> bool:
+        """Consume arrow/confirm keys in the PGN pane while the branch overlay is open."""
+        if not self._branch_overlay.is_open():
+            return False
+        key = event.key()
+        if key == Qt.Key.Key_Up:
+            return self.handle_variation_nav_vertical(-1)
+        if key == Qt.Key.Key_Down:
+            return self.handle_variation_nav_vertical(1)
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self._branch_overlay.activate_selected()
+            return True
+        if key == Qt.Key.Key_Escape:
+            self._branch_overlay.hide_overlay()
+            return True
+        return False
+
     def _show_branch_overlay(self, choices: Sequence[Tuple[Path, str]]) -> None:
         anchor = self._overlay_anchor_global_pos()
         self._branch_overlay.refresh_style(self.config)
         self._branch_overlay.show_choices(choices, anchor_global=anchor, selected_index=0)
+        self._set_branch_nav_shortcuts_enabled(True)
 
     def _overlay_anchor_global_pos(self) -> QPoint:
         """Place the overlay near the current active move in the PGN pane."""

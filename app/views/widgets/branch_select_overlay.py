@@ -129,10 +129,15 @@ class BranchSelectOverlay(QFrame):
             self.move(anchor_global)
         self.show()
         self.raise_()
+        self.activateWindow()
         self.setFocus(Qt.FocusReason.PopupFocusReason)
+        # Ensure arrow keys reach this popup even when the PGN pane keeps focus (common on Windows).
+        self.grabKeyboard()
 
     def hide_overlay(self) -> None:
         was_visible = self.isVisible()
+        if was_visible:
+            self.releaseKeyboard()
         self.hide()
         self._choices = []
         self._selected = 0
