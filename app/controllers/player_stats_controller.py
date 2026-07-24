@@ -719,6 +719,151 @@ class PlayerStatsController(QObject):
             "Blunder", match_startswith=False, max_moves=max_moves, sort_cpl_ascending=False
         )
 
+    def _significant_move_rows_for_assessment(
+        self,
+        assessment_match: str,
+        *,
+        match_startswith: bool,
+        max_moves: int,
+        sort_cpl_ascending: bool,
+    ) -> List[Dict[str, Any]]:
+        """Build PDF rows for top moves of one assessment type (no DB source mapping)."""
+        if not self._current_player or max_moves <= 0:
+            return []
+
+        analyzed_games = getattr(self, "_current_analyzed_games", []) or []
+        if not analyzed_games:
+            return []
+
+        try:
+            import chess as _chess
+            starting_fen = _chess.STARTING_FEN
+        except Exception:
+            starting_fen = (
+                "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+            )
+
+        # (cpl, game, move_number, san, is_white, fen_after, fen_before)
+        records: List[Tuple[float, "GameData", int, str, bool, str, str]] = []
+        player = self._current_player
+
+        for gi, game in enumerate(analyzed_games):
+            if not getattr(game, "analyzed", False):
+                continue
+            is_white_game = game.white == player
+            moves = self._analysis_moves_for_session_game(gi, game)
+            if not moves:
+                continue
+            moves_by_number = {
+                int(getattr(m, "move_number", 0) or 0): m for m in moves
+            }
+
+            if is_white_game:
+                cpl_field, assess_field, move_field = "cpl_white", "assess_white", "white_move"
+            else:
+                cpl_field, assess_field, move_field = "cpl_black", "assess_black", "black_move"
+
+            for move in moves:
+                move_str = (getattr(move, move_field, "") or "").strip()
+                if not move_str:
+                    continue
+                assessment = getattr(move, assess_field, "") or ""
+                if match_startswith:
+                    if not assessment.startswith(assessment_match):
+                        continue
+                elif assessment != assessment_match:
+                    continue
+                cpl_str = getattr(move, cpl_field, "")
+                if not cpl_str:
+                    continue
+                try:
+                    cpl = float(cpl_str)
+                except (ValueError, TypeError):
+                    continue
+                move_number = int(getattr(move, "move_number", 0) or 0)
+                if move_number <= 0:
+                    continue
+
+                if is_white_game:
+                    fen_after = (getattr(move, "fen_white", "") or "").strip()
+                    if move_number <= 1:
+                        fen_before = starting_fen
+                    else:
+                        prev = moves_by_number.get(move_number - 1)
+                        fen_before = (
+                            (getattr(prev, "fen_black", "") or "").strip()
+                            if prev is not None
+                            else ""
+                        )
+                else:
+                    fen_after = (getattr(move, "fen_black", "") or "").strip()
+                    fen_before = (getattr(move, "fen_white", "") or "").strip()
+
+                records.append(
+                    (
+                        cpl,
+                        game,
+                        move_number,
+                        move_str,
+                        is_white_game,
+                        fen_after,
+                        fen_before,
+                    )
+                )
+
+        if not records:
+            return []
+        records.sort(key=lambda x: x[0], reverse=not sort_cpl_ascending)
+
+        rows: List[Dict[str, Any]] = []
+        for cpl, game, move_number, san, is_white, fen_after, fen_before in records[
+            :max_moves
+        ]:
+            opponent = game.black if is_white else game.white
+            notation = f"{move_number}. {san}" if is_white else f"{move_number}... {san}"
+            rows.append(
+                {
+                    "move": notation,
+                    "san": san,
+                    "opponent": str(opponent or "—"),
+                    "color": "White" if is_white else "Black",
+                    "date": str(getattr(game, "date", "") or "—"),
+                    "cpl": float(cpl),
+                    "fen": fen_after,
+                    "fen_before": fen_before,
+                }
+            )
+        return rows
+
+    def get_significant_moves_for_report(
+        self,
+        *,
+        max_brilliant: int,
+        max_misses: int,
+        max_blunders: int,
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """Return Brilliant / Misses / Blunders exemplar rows for the PDF report."""
+        return {
+            "brilliant": self._significant_move_rows_for_assessment(
+                "Brilliant",
+                match_startswith=True,
+                max_moves=max_brilliant,
+                sort_cpl_ascending=True,
+            ),
+            "misses": self._significant_move_rows_for_assessment(
+                "Miss",
+                match_startswith=False,
+                max_moves=max_misses,
+                sort_cpl_ascending=False,
+            ),
+            "blunders": self._significant_move_rows_for_assessment(
+                "Blunder",
+                match_startswith=False,
+                max_moves=max_blunders,
+                sort_cpl_ascending=False,
+            ),
+        }
+
     def _analysis_moves_for_session_game(
         self, game_index: int, game: "GameData"
     ) -> Optional[List[MoveData]]:
@@ -1082,6 +1227,71 @@ class PlayerStatsController(QObject):
         start = n - worst_count
         accuracies = [acc for _, acc, _ in ranked[start:]]
         return worst_count, min(accuracies), max(accuracies)
+
+    @staticmethod
+    def _player_relative_result(game: "GameData", player_name: str) -> str:
+        """Map PGN result to Win/Draw/Loss from the player's side."""
+        raw = (getattr(game, "result", None) or "").strip()
+        is_white = getattr(game, "white", None) == player_name
+        if raw in ("1-0", "1–0"):
+            return "Win" if is_white else "Loss"
+        if raw in ("0-1", "0–1"):
+            return "Win" if not is_white else "Loss"
+        if raw in ("1/2-1/2", "1/2–1/2", "½-½", "0.5-0.5"):
+            return "Draw"
+        return raw or "—"
+
+    def _game_performance_row(
+        self, average_cpl: float, accuracy: float, game: "GameData"
+    ) -> Dict[str, Any]:
+        """Build a PDF/table row dict for one ranked game."""
+        player = self._current_player or ""
+        is_white = getattr(game, "white", None) == player
+        opponent = getattr(game, "black", "") if is_white else getattr(game, "white", "")
+        return {
+            "date": str(getattr(game, "date", "") or "—"),
+            "opponent": str(opponent or "—"),
+            "color": "White" if is_white else "Black",
+            "result": self._player_relative_result(game, player),
+            "eco": str(getattr(game, "eco", "") or "—"),
+            "accuracy": float(accuracy) if accuracy is not None else None,
+            "acpl": float(average_cpl) if average_cpl is not None else None,
+        }
+
+    def get_games_by_performance_for_report(
+        self, max_best: int, max_worst: int
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """Return Best/Worst game rows for the PDF Games by Performance section.
+
+        Best rows are lowest CPL first; worst rows are highest CPL first.
+        Worst set is disjoint from Best (same reservation as the UI View buttons).
+        """
+        empty: Dict[str, List[Dict[str, Any]]] = {"best": [], "worst": []}
+        ranked = self._get_ranked_games_by_cpl()
+        if not ranked:
+            return empty
+
+        best_count = min(max(0, int(max_best)), len(ranked))
+        best_rows = [
+            self._game_performance_row(cpl, acc, game)
+            for cpl, acc, game in ranked[:best_count]
+        ]
+
+        n = len(ranked)
+        reserved_for_best = min(max(0, int(max_best)), n)
+        worst_available = max(0, n - reserved_for_best)
+        worst_count = min(max(0, int(max_worst)), worst_available)
+        if worst_count <= 0:
+            return {"best": best_rows, "worst": []}
+
+        start = n - worst_count
+        # Ascending CPL among the worst slice → reverse so highest CPL leads.
+        worst_slice = list(reversed(ranked[start:]))
+        worst_rows = [
+            self._game_performance_row(cpl, acc, game)
+            for cpl, acc, game in worst_slice
+        ]
+        return {"best": best_rows, "worst": worst_rows}
 
     def get_last_unavailable_reason(self) -> str:
         """Get the most recent reason for unavailability."""

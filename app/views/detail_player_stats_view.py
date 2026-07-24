@@ -7401,3 +7401,128 @@ class DetailPlayerStatsView(QWidget):
             if self._stats_controller:
                 self._stats_controller.set_status("Copied player statistics to clipboard")
 
+    def _export_pdf_report(self) -> None:
+        """Export a print-optimized PDF report for the current player stats."""
+        if not self.current_stats:
+            return
+
+        from PyQt6.QtWidgets import QFileDialog
+        from app.services.player_stats_pdf_service import (
+            PlayerStatsPDFService,
+            default_player_stats_pdf_filename,
+        )
+
+        current_player = (
+            self._stats_controller.get_current_player() if self._stats_controller else None
+        ) or "Player"
+        suggested = default_player_stats_pdf_filename(current_player)
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export PDF Report",
+            suggested,
+            "PDF Files (*.pdf)",
+        )
+        if not path:
+            return
+
+        profile_name = None
+        try:
+            from app.services.user_settings_service import UserSettingsService
+
+            profile_name = (
+                UserSettingsService.get_instance()
+                .get_model()
+                .get_player_stats_active_profile()
+            )
+        except Exception:
+            profile_name = None
+
+        try:
+            opening_tree_data = None
+            games_by_performance = None
+            significant_moves = None
+            if self._stats_controller:
+                try:
+                    ui_config = self.config.get("ui", {})
+                    panel_config = ui_config.get("panels", {}).get("detail", {})
+                    player_stats_config = panel_config.get("player_stats", {})
+                    tree_config = player_stats_config.get("opening_tree", {})
+                    max_depth = int(tree_config.get("max_depth", 12))
+                    min_games = int(tree_config.get("min_games", 1))
+                    opening_tree_data = self._stats_controller.get_opening_tree(
+                        max_depth=max_depth, min_games=min_games
+                    )
+                except Exception:
+                    opening_tree_data = None
+                try:
+                    top_games_config = (
+                        self.config.get("ui", {})
+                        .get("panels", {})
+                        .get("detail", {})
+                        .get("player_stats", {})
+                        .get("top_games", {})
+                    )
+                    max_best = int(top_games_config.get("max_best", 3))
+                    max_worst = int(top_games_config.get("max_worst", 3))
+                    games_by_performance = (
+                        self._stats_controller.get_games_by_performance_for_report(
+                            max_best, max_worst
+                        )
+                    )
+                except Exception:
+                    games_by_performance = None
+                try:
+                    ps_cfg = (
+                        self.config.get("ui", {})
+                        .get("panels", {})
+                        .get("detail", {})
+                        .get("player_stats", {})
+                    )
+                    sig_cfg = ps_cfg.get("significant_moves", {}) or {}
+                    pdf_cap = int(
+                        (ps_cfg.get("pdf_report", {}) or {}).get(
+                            "max_significant_moves_per_category", 5
+                        )
+                    )
+                    def _cap(section_key: str, legacy_key: Optional[str] = None) -> int:
+                        section = sig_cfg.get(section_key) or (
+                            ps_cfg.get(legacy_key, {}) if legacy_key else {}
+                        )
+                        ui_max = int((section or {}).get("max_moves", 999))
+                        return max(0, min(ui_max, pdf_cap))
+
+                    significant_moves = (
+                        self._stats_controller.get_significant_moves_for_report(
+                            max_brilliant=_cap("brilliant_moves", "brilliant_moves"),
+                            max_misses=_cap("misses"),
+                            max_blunders=_cap("blunders"),
+                        )
+                    )
+                except Exception:
+                    significant_moves = None
+
+            PlayerStatsPDFService(self.config).export(
+                path,
+                stats=self.current_stats,
+                patterns=self.current_patterns or [],
+                player_name=current_player,
+                section_visibility=self._section_visibility_prefs,
+                profile_name=profile_name,
+                top_games_summary=self._get_top_games_summary_for_copy(),
+                games_by_performance=games_by_performance,
+                significant_moves=significant_moves,
+                opening_tree_summary_lines=self._build_opening_tree_summary_lines() or None,
+                opening_tree_data=opening_tree_data,
+            )
+            if self._stats_controller:
+                self._stats_controller.set_status(f"PDF report saved: {path}")
+        except Exception as e:
+            if self._stats_controller:
+                self._stats_controller.set_status(f"PDF export failed: {e}")
+            else:
+                from app.services.logging_service import LoggingService
+
+                LoggingService.get_instance().error(
+                    f"Player stats PDF export failed: {e}", exc_info=e
+                )
+

@@ -34,6 +34,10 @@ def build_player_stats_context_menu(
     copy_full_action = menu.addAction("Copy stats to clipboard")
     copy_full_action.triggered.connect(view._copy_full_stats_to_clipboard)
 
+    menu.addSeparator()
+    export_pdf_action = menu.addAction("Export PDF Report")
+    export_pdf_action.triggered.connect(view._export_pdf_report)
+
     from app.views.menus.player_stats_activity_heatmap_menu import (
         PLAYER_STATS_ACTIVITY_HEATMAP_CONTEXT_SECTIONS,
     )

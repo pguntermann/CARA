@@ -113,6 +113,9 @@ class OpeningService:
         self._eco_interpolated: Optional[Dict[str, Any]] = None
         # Placement + side-to-move index (ignores EP and clocks), matching Chess Recorder.
         self._openings_by_book_key: Dict[str, Dict[str, Any]] = {}
+        # Lazy reverse indexes for diagram lookup (ECO → FEN, ECO+name → FEN).
+        self._fen_by_eco: Optional[Dict[str, str]] = None
+        self._fen_by_eco_name: Optional[Dict[Tuple[str, str], str]] = None
         self._loaded = False
     
     def load(self) -> None:
@@ -250,6 +253,57 @@ class OpeningService:
             name = opening.get('name', None)
             return (eco, name)
         return (None, None)
+
+    def _ensure_fen_reverse_indexes(self) -> None:
+        """Build ECO / ECO+name → FEN maps (shortest move-list wins per key)."""
+        if self._fen_by_eco is not None and self._fen_by_eco_name is not None:
+            return
+        if not self._loaded:
+            self.load()
+
+        by_eco: Dict[str, Tuple[int, str]] = {}
+        by_eco_name: Dict[Tuple[str, str], Tuple[int, str]] = {}
+        for book in (self._eco_base or {}, self._eco_interpolated or {}):
+            for fen, entry in book.items():
+                if not isinstance(entry, dict):
+                    continue
+                eco = str(entry.get("eco") or "").strip()
+                if not eco:
+                    continue
+                name = str(entry.get("name") or "").strip()
+                move_len = len(str(entry.get("moves") or ""))
+                prev = by_eco.get(eco)
+                if prev is None or move_len < prev[0]:
+                    by_eco[eco] = (move_len, fen)
+                if name:
+                    key = (eco, name)
+                    prev_n = by_eco_name.get(key)
+                    if prev_n is None or move_len < prev_n[0]:
+                        by_eco_name[key] = (move_len, fen)
+
+        self._fen_by_eco = {eco: fen for eco, (_n, fen) in by_eco.items()}
+        self._fen_by_eco_name = {key: fen for key, (_n, fen) in by_eco_name.items()}
+
+    def find_representative_fen(
+        self, eco: Optional[str], name: Optional[str] = None
+    ) -> Optional[str]:
+        """Return a book FEN that best matches ``eco`` / ``name`` for diagrams.
+
+        Prefers an exact ECO+name match; otherwise the ECO entry with the
+        shortest move list (root-ish position for that code). Returns ``None``
+        when the book has no entry for the ECO.
+        """
+        eco_key = str(eco or "").strip()
+        if not eco_key or eco_key.lower() == "unknown":
+            return None
+        self._ensure_fen_reverse_indexes()
+        assert self._fen_by_eco is not None and self._fen_by_eco_name is not None
+        name_key = str(name or "").strip()
+        if name_key:
+            fen = self._fen_by_eco_name.get((eco_key, name_key))
+            if fen:
+                return fen
+        return self._fen_by_eco.get(eco_key)
 
     def is_book_position(self, fen: str) -> bool:
         """Return True if the FEN resolves to a known opening (exact or book-key)."""
