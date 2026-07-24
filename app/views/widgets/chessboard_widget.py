@@ -907,6 +907,9 @@ class ChessBoardWidget(QWidget):
     
     def _draw_move_classification_badge(self, painter: QPainter, board_start_x: int, board_start_y: int) -> None:
         """Draw the move classification badge (colored circle + icon) on the last move's destination square."""
+        # Classifications are mainline analysis only — omit on sidelines (same as best-alt arrow).
+        if not is_mainline_path(self._game_model.get_active_path()):
+            return
         active_ply = self._game_model.get_active_move_ply()
         if active_ply <= 0:
             return

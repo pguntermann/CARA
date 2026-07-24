@@ -1592,6 +1592,16 @@ class MainWindow(QMainWindow):
             ply_index: Ply index of the active move (0 = starting position).
         """
         self._update_best_alternative_move(ply_index)
+
+    def _on_active_path_changed_for_best_alternative(self, _path) -> None:
+        """Refresh best-alternative arrow when entering/leaving variations.
+
+        ``active_move_changed`` often does not fire off-mainline (consumer ply
+        freezes at the mainline ancestor), so path changes must clear/restore
+        the arrow explicitly.
+        """
+        game_model = self.controller.get_game_controller().get_game_model()
+        self._update_best_alternative_move(game_model.get_active_move_ply())
     
     def _on_active_move_changed_for_material(self, ply_index: int) -> None:
         """Handle active move change to notify material widget.
@@ -1933,6 +1943,7 @@ class MainWindow(QMainWindow):
         # Connect to game model to update best alternative move when position changes
         game_model = self.controller.get_game_controller().get_game_model()
         game_model.active_move_changed.connect(self._on_active_move_changed)
+        game_model.active_path_changed.connect(self._on_active_path_changed_for_best_alternative)
         game_model.active_game_changed.connect(self._on_active_game_changed)
         
         # Connect to game model to notify material widget when at starting position

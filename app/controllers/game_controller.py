@@ -589,6 +589,11 @@ class GameController:
             moveslist_model: MovesListModel instance containing move data.
         """
         board_model = self.board_controller.get_board_model()
+
+        # Analysis best-alternatives are mainline-only; omit the arrow on sidelines.
+        if not is_mainline_path(self.game_model.get_active_path()):
+            board_model.set_best_alternative_move(None)
+            return
         
         # If at starting position (ply_index = 0), clear the best alternative move
         if ply_index == 0:

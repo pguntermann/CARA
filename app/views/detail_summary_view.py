@@ -75,11 +75,20 @@ class ClickableMoveLabel(QLabel):
                 # Navigate to this ply - defensive check for valid ply_index
                 if ply_index >= 0:
                     self.game_controller.navigate_to_ply(ply_index)
+                event.accept()
+                return
             except (AttributeError, RuntimeError):
                 # Game controller or widget deleted, ignore
                 pass
         
         super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        """Accept left-button release so parent card handlers do not override navigation."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
 
 class EvaluationGraphWidget(QWidget):
@@ -2805,9 +2814,21 @@ class DetailSummaryView(QWidget):
             except Exception:
                 pass
 
-        card.mouseReleaseEvent = lambda event, cb=_activate: (  # type: ignore[method-assign]
-            cb() if event.button() == Qt.MouseButton.LeftButton else None
-        )
+        def _on_card_release(event, card_widget=card, activate=_activate) -> None:
+            if event.button() != Qt.MouseButton.LeftButton:
+                return
+            # Prefer explicit move links (e.g. second ply in "Xa ... Yb") over the
+            # card's primary-ply shortcut — list view has no card-level handler.
+            pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+            child = card_widget.childAt(pos)
+            widget = child
+            while widget is not None and widget is not card_widget:
+                if isinstance(widget, ClickableMoveLabel):
+                    return
+                widget = widget.parentWidget()
+            activate()
+
+        card.mouseReleaseEvent = _on_card_release  # type: ignore[method-assign]
         return card
 
     def _create_highlight_move_row(
