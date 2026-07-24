@@ -24,6 +24,7 @@ import chess
 from typing import Dict, Any, Optional, List, TYPE_CHECKING
 
 from app.models.board_model import BoardModel
+from app.utils.pgn_variation_path import is_mainline_path
 
 if TYPE_CHECKING:
     from app.models.moveslist_model import MovesListModel
@@ -128,6 +129,7 @@ class ChessBoardWidget(QWidget):
         self._pv2_move: Optional[chess.Move] = None
         self._pv3_move: Optional[chess.Move] = None
         self._best_alternative_move: Optional[chess.Move] = None
+        self._viewing_variation: bool = False
         
         # Connect to model if provided
         # Set model after setup so it can load position from model
@@ -181,6 +183,31 @@ class ChessBoardWidget(QWidget):
         # Played move arrow
         playedmove_arrow_config = board_config.get('playedmove_arrow', {})
         self.playedmove_arrow_color = playedmove_arrow_config.get('color', [255, 255, 0])
+
+        # Variation appearance (frame, squares, last-move cue when off mainline)
+        variation_config = board_config.get('variation_appearance', {}) or {}
+        self.variation_appearance_enabled = bool(variation_config.get('enabled', False))
+        variation_border = variation_config.get('border', {}) or {}
+        self.variation_border_size = variation_border.get('size', self.border_size)
+        self.variation_border_color = variation_border.get('color', self.border_color)
+        variation_squares = variation_config.get('squares', {}) or {}
+        self.variation_light_square_color = variation_squares.get(
+            'light_color', self.light_square_color
+        )
+        self.variation_dark_square_color = variation_squares.get(
+            'dark_color', self.dark_square_color
+        )
+        variation_arrow = variation_config.get('playedmove_arrow', {}) or {}
+        self.variation_playedmove_arrow_color = variation_arrow.get(
+            'color', self.playedmove_arrow_color
+        )
+        last_move_hl = variation_config.get('last_move_highlight', {}) or {}
+        self.variation_last_move_highlight_color = last_move_hl.get(
+            'color', [255, 170, 50]
+        )
+        self.variation_last_move_highlight_opacity = float(
+            last_move_hl.get('opacity', 0.4)
+        )
         
         # Best next move arrow
         bestnextmove_arrow_config = board_config.get('bestnextmove_arrow', {})
@@ -259,6 +286,62 @@ class ChessBoardWidget(QWidget):
         # Markers for trajectory 3
         numbered_markers_3_config = positional_plans_config.get('numbered_markers_3', {})
         self.marker_3_background_color = numbered_markers_3_config.get('background_color', [255, 150, 0])
+
+    def _variation_style_active(self) -> bool:
+        return bool(
+            self.variation_appearance_enabled
+            and self._viewing_variation
+        )
+
+    def _effective_border_size(self) -> int:
+        if self._variation_style_active():
+            return int(self.variation_border_size)
+        return int(self.border_size)
+
+    def _effective_border_color(self) -> List[int]:
+        if self._variation_style_active():
+            return list(self.variation_border_color)
+        return list(self.border_color)
+
+    def _effective_light_square_color(self) -> List[int]:
+        if self._variation_style_active():
+            return list(self.variation_light_square_color)
+        return list(self.light_square_color)
+
+    def _effective_dark_square_color(self) -> List[int]:
+        if self._variation_style_active():
+            return list(self.variation_dark_square_color)
+        return list(self.dark_square_color)
+
+    def _effective_playedmove_arrow_color(self) -> List[int]:
+        if self._variation_style_active():
+            return list(self.variation_playedmove_arrow_color)
+        return list(self.playedmove_arrow_color)
+
+    def _sync_variation_appearance(self) -> None:
+        """Update variation styling from the active game path."""
+        viewing = False
+        if (
+            self.variation_appearance_enabled
+            and self._game_model is not None
+            and self._game_model.active_game is not None
+        ):
+            path = self._game_model.get_active_path()
+            viewing = not is_mainline_path(path)
+        if self._viewing_variation == viewing:
+            return
+        self._viewing_variation = viewing
+        self._cached_dimensions = None
+        self.update()
+
+    def _on_active_path_for_variation_appearance(self, path: object) -> None:
+        self._sync_variation_appearance()
+        # Always redraw so path-keyed annotations refresh even when FEN/appearance
+        # flags are unchanged (e.g. rare transpositions).
+        self.update()
+
+    def _on_active_game_for_variation_appearance(self, game) -> None:
+        self._sync_variation_appearance()
     
     def _get_text_annotation_font(self, absolute_text_size: int) -> QFont:
         """Get font for text annotations, using user preferences if available.
@@ -356,12 +439,14 @@ class ChessBoardWidget(QWidget):
         coordinates_visible = self.show_coordinates
         
         # Check if cache is valid
+        border_size = self._effective_border_size()
         if (self._cached_dimensions is not None and
             self._cached_widget_size == widget_size and
             self._cached_eval_bar_visible == eval_bar_visible and
             self._cached_material_widget_visible == material_widget_visible and
             self._cached_game_tags_widget_visible == game_tags_widget_visible and
-            self._cached_coordinates_visible == coordinates_visible):
+            self._cached_coordinates_visible == coordinates_visible and
+            getattr(self, '_cached_border_size', None) == border_size):
             return self._cached_dimensions
         
         # Calculate coordinate border width
@@ -414,8 +499,8 @@ class ChessBoardWidget(QWidget):
         # Calculate starting position
         # Center the board (with coordinate border) horizontally in the available space
         # Total width needed: coordinate border + board border + board squares
-        total_board_width = coord_border_width + self.border_size * 2 + board_size
-        total_board_height = self.border_size * 2 + board_size
+        total_board_width = coord_border_width + border_size * 2 + board_size
+        total_board_height = border_size * 2 + board_size
         
         # Center horizontally (accounting for evaluation bar on the left)
         board_group_start_x = padding_left + eval_bar_width + (available_width_no_coord - total_board_width) // 2
@@ -426,7 +511,7 @@ class ChessBoardWidget(QWidget):
         # Board border starts right after coordinate border
         board_border_start = coord_border_start + coord_border_width
         # Board squares start after board border
-        start_x = board_border_start + self.border_size
+        start_x = board_border_start + border_size
         
         # Center vertically
         start_y = padding_top + (available_height_no_coord - total_board_height) // 2
@@ -445,11 +530,13 @@ class ChessBoardWidget(QWidget):
             'eval_bar_width': eval_bar_width,
             'right_widget_width': right_widget_width,
             'available_width_no_coord': available_width_no_coord,
-            'available_height_no_coord': available_height_no_coord
+            'available_height_no_coord': available_height_no_coord,
+            'border_size': border_size,
         }
         self._cached_widget_size = widget_size
         self._cached_eval_bar_visible = eval_bar_visible
         self._cached_material_widget_visible = material_widget_visible
+        self._cached_border_size = border_size
         self._cached_game_tags_widget_visible = game_tags_widget_visible
         self._cached_coordinates_visible = coordinates_visible
         
@@ -480,21 +567,25 @@ class ChessBoardWidget(QWidget):
         coord_border_start = dims['coord_border_start']
         board_border_start = dims['board_border_start']
         coord_border_width = self.coord_border_width if self.show_coordinates else 0
+        border_size = dims.get('border_size', self._effective_border_size())
+        border_color_rgb = self._effective_border_color()
+        light_rgb = self._effective_light_square_color()
+        dark_rgb = self._effective_dark_square_color()
         
         # Draw border
-        if self.border_size > 0:
+        if border_size > 0:
             border_rect = QRect(
                 board_border_start,
-                start_y - self.border_size,
-                self.board_size + self.border_size * 2,
-                self.board_size + self.border_size * 2
+                start_y - border_size,
+                self.board_size + border_size * 2,
+                self.board_size + border_size * 2
             )
-            border_color = QColor(self.border_color[0], self.border_color[1], self.border_color[2])
+            border_color = QColor(border_color_rgb[0], border_color_rgb[1], border_color_rgb[2])
             painter.fillRect(border_rect, QBrush(border_color))
         
         # Draw squares
-        light_color = QColor(self.light_square_color[0], self.light_square_color[1], self.light_square_color[2])
-        dark_color = QColor(self.dark_square_color[0], self.dark_square_color[1], self.dark_square_color[2])
+        light_color = QColor(light_rgb[0], light_rgb[1], light_rgb[2])
+        dark_color = QColor(dark_rgb[0], dark_rgb[1], dark_rgb[2])
         
         for row in range(self.square_count):
             for col in range(self.square_count):
@@ -509,6 +600,10 @@ class ChessBoardWidget(QWidget):
                 
                 square_rect = QRect(square_x, square_y, self.square_size, self.square_size)
                 painter.fillRect(square_rect, QBrush(square_color))
+
+        # Variation last-move square highlight (from/to)
+        if self._variation_style_active() and self._last_move is not None:
+            self._draw_variation_last_move_highlight(painter, start_x, start_y)
         
         # Draw coordinates in border area if enabled
         if self.show_coordinates:
@@ -531,7 +626,13 @@ class ChessBoardWidget(QWidget):
         # Hide if plan exploration is active and hide_other_arrows is enabled
         if (self.show_playedmove_arrow and self._last_move is not None and
             not should_hide_other_arrows):
-            self._draw_arrow(painter, self._last_move, self.playedmove_arrow_color, start_x, start_y)
+            self._draw_arrow(
+                painter,
+                self._last_move,
+                self._effective_playedmove_arrow_color(),
+                start_x,
+                start_y,
+            )
         
         # Draw best next move arrow (PV1) if visible and best next move exists
         # Hide if plan exploration is active and hide_other_arrows is enabled
@@ -1269,8 +1370,8 @@ class ChessBoardWidget(QWidget):
         
         # Draw file letters (a-h) in bottom border
         # Position letters right at the top edge of the coordinate border area
-        file_top = board_start_y + self.board_size + self.border_size + coord_padding
-        file_bottom = board_start_y + self.board_size + self.border_size + self.coord_border_width - coord_padding
+        file_top = board_start_y + self.board_size + self._effective_border_size() + coord_padding
+        file_bottom = board_start_y + self.board_size + self._effective_border_size() + self.coord_border_width - coord_padding
         
         for col in range(self.square_count):
             if is_flipped:
@@ -1295,7 +1396,7 @@ class ChessBoardWidget(QWidget):
         # Add spacing similar to file letters (coord_padding from board border)
         coord_border_left = coord_border_start
         # Calculate right edge of coordinate border (where board border starts)
-        coord_border_right = board_start_x - self.border_size
+        coord_border_right = board_start_x - self._effective_border_size()
         
         for row in range(self.square_count):
             if is_flipped:
@@ -2061,8 +2162,8 @@ class ChessBoardWidget(QWidget):
         board_size = dims['board_size']
         
         # Calculate top of board visual area (including border) for alignment
-        # The border is drawn at start_y - self.border_size, so that's the top of the board visual area
-        board_top_y = start_y - self.border_size
+        # The border is drawn at start_y - border_size, so that's the top of the board visual area
+        board_top_y = start_y - self._effective_border_size()
         
         # Get material widget config
         board_config = self.config.get("ui", {}).get("panels", {}).get("main", {}).get("board", {})
@@ -2121,7 +2222,7 @@ class ChessBoardWidget(QWidget):
         start_y = dims["start_y"]
         board_size = dims["board_size"]
 
-        board_top_y = start_y - self.border_size
+        board_top_y = start_y - self._effective_border_size()
         board_config = self.config.get("ui", {}).get("panels", {}).get("main", {}).get("board", {})
         tags_config = board_config.get("game_tags_widget", {})
         tags_padding = tags_config.get("padding", [10, 10, 15, 10])  # [top, right, bottom, left]
@@ -2170,7 +2271,7 @@ class ChessBoardWidget(QWidget):
         cfg = board_cfg.get("castling_rights_widget", {}) if isinstance(board_cfg.get("castling_rights_widget", {}), dict) else {}
         pad = cfg.get("padding", [0, 0, 0, 10])  # [t,r,b,l]
 
-        x = start_x + board_size + self.border_size + int(pad[3])
+        x = start_x + board_size + self._effective_border_size() + int(pad[3])
         # Align the widget bottom to the board's lower edge (squares area).
         y = start_y + board_size - self.castling_rights_widget.height() - int(pad[2])
         self.castling_rights_widget.move(int(x), int(y))
@@ -2186,7 +2287,7 @@ class ChessBoardWidget(QWidget):
         # Position indicator to the right of the board, aligned with bottom
         # Calculate indicator position: right of board + left padding
         # Padding: [top, right, bottom, left]
-        indicator_x = board_start_x + self.board_size + self.border_size + self.indicator_padding[3]  # left padding
+        indicator_x = board_start_x + self.board_size + self._effective_border_size() + self.indicator_padding[3]  # left padding
         indicator_y = board_start_y + self.board_size - self.indicator_size - self.indicator_padding[2]  # bottom padding
 
         # If castling rights widget is visible, keep it bottom-aligned and push the turn indicator up above it.
@@ -2303,12 +2404,73 @@ class ChessBoardWidget(QWidget):
             self.update()
     
     def set_game_model(self, game_model) -> None:
-        """Set the game model for getting current ply.
+        """Set the game model for getting current ply / variation state.
         
         Args:
             game_model: GameModel instance.
         """
+        if self._game_model is not None:
+            try:
+                self._game_model.active_path_changed.disconnect(
+                    self._on_active_path_for_variation_appearance
+                )
+            except TypeError:
+                pass
+            try:
+                self._game_model.active_game_changed.disconnect(
+                    self._on_active_game_for_variation_appearance
+                )
+            except TypeError:
+                pass
+
         self._game_model = game_model
+        if game_model is not None:
+            game_model.active_path_changed.connect(
+                self._on_active_path_for_variation_appearance
+            )
+            game_model.active_game_changed.connect(
+                self._on_active_game_for_variation_appearance
+            )
+        self._sync_variation_appearance()
+
+    def _annotations_for_active_path(self) -> list:
+        """Return annotations for the active variation path (empty if unavailable)."""
+        if not self._annotation_model or not self._game_model:
+            return []
+        from app.utils.pgn_variation_path import encode_path
+        return self._annotation_model.get_annotations(
+            encode_path(self._game_model.get_active_path())
+        )
+
+    def _draw_variation_last_move_highlight(
+        self, painter: QPainter, board_start_x: int, board_start_y: int
+    ) -> None:
+        """Draw themed from/to square overlays for the last variation move."""
+        if self._last_move is None:
+            return
+        opacity = max(0.0, min(1.0, float(self.variation_last_move_highlight_opacity)))
+        if opacity <= 0.0:
+            return
+
+        color = self.variation_last_move_highlight_color
+        overlay = QColor(int(color[0]), int(color[1]), int(color[2]))
+        overlay.setAlpha(int(round(255 * opacity)))
+
+        is_flipped = bool(self._board_model and self._board_model.is_flipped)
+        for square in (self._last_move.from_square, self._last_move.to_square):
+            file_idx = chess.square_file(square)
+            rank_idx = chess.square_rank(square)
+            if is_flipped:
+                file_idx = 7 - file_idx
+                rank_idx = 7 - rank_idx
+            visual_row = 7 - rank_idx
+            square_rect = QRect(
+                board_start_x + file_idx * self.square_size,
+                board_start_y + visual_row * self.square_size,
+                self.square_size,
+                self.square_size,
+            )
+            painter.fillRect(square_rect, QBrush(overlay))
     
     def set_moveslist_model(self, moveslist_model: Optional["MovesListModel"]) -> None:
         """Set the moves list model for move classification badges.
@@ -2334,12 +2496,10 @@ class ChessBoardWidget(QWidget):
         if not self._annotation_model.show_annotations:
             return  # Annotations are hidden, don't draw them
         
-        # Get current ply from game model
         if not self._game_model:
             return
         
-        ply_index = self._game_model.get_active_move_ply()
-        annotations = self._annotation_model.get_annotations(ply_index)
+        annotations = self._annotations_for_active_path()
         
         for annotation in annotations:
             color = QColor(annotation.color[0], annotation.color[1], annotation.color[2])
@@ -2891,8 +3051,7 @@ class ChessBoardWidget(QWidget):
                 self._calculate_board_dimensions()
             
             start_x, start_y = self._cached_dimensions['start_x'], self._cached_dimensions['start_y']
-            ply_index = self._game_model.get_active_move_ply()
-            annotations = self._annotation_model.get_annotations(ply_index)
+            annotations = self._annotations_for_active_path()
             
             new_hovered_id = None
             for annotation in annotations:
@@ -2971,8 +3130,7 @@ class ChessBoardWidget(QWidget):
                 self._calculate_board_dimensions()
             
             start_x, start_y = self._cached_dimensions['start_x'], self._cached_dimensions['start_y']
-            ply_index = self._game_model.get_active_move_ply()
-            annotations = self._annotation_model.get_annotations(ply_index)
+            annotations = self._annotations_for_active_path()
             
             for annotation in annotations:
                 if (annotation.annotation_id == self._hovered_text_id and 
@@ -3022,8 +3180,7 @@ class ChessBoardWidget(QWidget):
             self._calculate_board_dimensions()
         
         start_x, start_y = self._cached_dimensions['start_x'], self._cached_dimensions['start_y']
-        ply_index = self._game_model.get_active_move_ply()
-        annotations = self._annotation_model.get_annotations(ply_index)
+        annotations = self._annotations_for_active_path()
         
         for annotation in annotations:
             if (annotation.annotation_id == self._pending_click_annotation_id and 
@@ -3105,8 +3262,7 @@ class ChessBoardWidget(QWidget):
                 self._calculate_board_dimensions()
             
             start_x, start_y = self._cached_dimensions['start_x'], self._cached_dimensions['start_y']
-            ply_index = self._game_model.get_active_move_ply()
-            annotations = self._annotation_model.get_annotations(ply_index)
+            annotations = self._annotations_for_active_path()
             
             for annotation in annotations:
                 if (annotation.annotation_id == self._hovered_text_id and 
@@ -3149,8 +3305,7 @@ class ChessBoardWidget(QWidget):
             self._calculate_board_dimensions()
         
         start_x, start_y = self._cached_dimensions['start_x'], self._cached_dimensions['start_y']
-        ply_index = self._game_model.get_active_move_ply()
-        annotations = self._annotation_model.get_annotations(ply_index)
+        annotations = self._annotations_for_active_path()
         
         for annotation in annotations:
             if (annotation.annotation_id == self._editing_text_id and 

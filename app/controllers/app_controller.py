@@ -1062,31 +1062,30 @@ class AppController:
         board_model = self.board_controller.get_board_model()
         board_model.position_changed.connect(self._on_board_position_changed)
         board_model.evaluation_bar_visibility_changed.connect(self._on_evaluation_bar_visibility_changed)
-        # When a game is active, drive evaluation from active_move_changed (game tree FEN)
-        # so we get reliable updates when navigating (e.g. PGN click), same as manual analysis
+        # When a game is active, drive evaluation from active_path_changed (game tree FEN)
+        # so we get reliable updates when navigating (including variations).
         game_model = self.game_controller.get_game_model()
-        game_model.active_move_changed.connect(self._on_active_move_changed_for_evaluation)
+        game_model.active_path_changed.connect(self._on_active_path_changed_for_evaluation)
 
-    def _on_active_move_changed_for_evaluation(self, ply_index: int) -> None:
-        """Update evaluation from game tree when active move changes (reliable for PGN navigation)."""
+    def _on_active_path_changed_for_evaluation(self, path: object) -> None:
+        """Update evaluation from game tree when the active variation path changes."""
         board_model = self.board_controller.get_board_model()
         if not board_model.show_evaluation_bar:
             return
         game_model = self.game_controller.get_game_model()
         active_game = game_model.active_game if game_model else None
-        if not active_game or ply_index < 0:
+        if not active_game:
             return
+
+        active_path = tuple(int(i) for i in path) if path is not None else ()
         try:
             import chess.pgn
-            pgn_io = StringIO(active_game.pgn)
-            chess_game = chess.pgn.read_game(pgn_io)
-            if chess_game:
-                node = chess_game
-                for _ in range(ply_index):
-                    if not node.variations:
-                        break
-                    node = node.variation(0)
-                fen = node.board().fen()
+            from app.utils.pgn_variation_path import node_at_path
+
+            chess_game = chess.pgn.read_game(StringIO(active_game.pgn))
+            if chess_game is not None:
+                node = node_at_path(chess_game, active_path)
+                fen = node.board().fen() if node is not None else self.board_controller.get_position_fen()
             else:
                 fen = self.board_controller.get_position_fen()
         except Exception:
@@ -1098,7 +1097,7 @@ class AppController:
         board_model = self.board_controller.get_board_model()
         if not board_model.show_evaluation_bar:
             return
-        # When a game is active, evaluation is driven by active_move_changed (game tree FEN)
+        # When a game is active, evaluation is driven by active_path_changed (game tree FEN)
         game_model = self.game_controller.get_game_model()
         if game_model.active_game is not None:
             return
@@ -1408,6 +1407,7 @@ class AppController:
                 "show_metadata": pgn_visibility.get('show_metadata', True),
                 "show_comments": pgn_visibility.get('show_comments', True),
                 "show_variations": pgn_visibility.get('show_variations', True),
+                "navigate_variations": pgn_visibility.get('navigate_variations', False),
                 "show_annotations": pgn_visibility.get('show_annotations', True),
                 "show_results": pgn_visibility.get('show_results', True),
                 "show_non_standard_tags": pgn_visibility.get('show_non_standard_tags', False)

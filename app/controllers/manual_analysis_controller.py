@@ -1,9 +1,11 @@
 """Manual analysis controller for managing position analysis with multipv support."""
 
+from io import StringIO
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Sequence
 from PyQt6.QtCore import QTimer
 import chess
+import chess.pgn
 
 from app.models.manual_analysis_model import ManualAnalysisModel, AnalysisLine
 from app.services.manual_analysis_engine_service import ManualAnalysisEngineService
@@ -11,6 +13,7 @@ from app.services.progress_service import ProgressService
 from app.services.pv_plan_parser_service import PvPlanParserService
 from app.services.logging_service import LoggingService
 from app.controllers.engine_controller import TASK_MANUAL_ANALYSIS, TASK_EVALUATION
+from app.utils.pgn_variation_path import node_at_path
 
 
 class ManualAnalysisController:
@@ -76,10 +79,10 @@ class ManualAnalysisController:
         engine_model = self.engine_controller.get_engine_model()
         engine_model.assignment_changed.connect(self._on_engine_assignment_changed)
         
-        # Connect to game model to detect position changes
+        # Connect to game model to detect position changes (including variations)
         if self.game_controller:
             game_model = self.game_controller.get_game_model()
-            game_model.active_move_changed.connect(self._on_active_move_changed)
+            game_model.active_path_changed.connect(self._on_active_path_changed)
         
         # Initialize PV plan parser service
         manual_analysis_config = config.get("ui", {}).get("panels", {}).get("detail", {}).get("manual_analysis", {})
@@ -189,42 +192,8 @@ class ManualAnalysisController:
         
         # Get FEN if not provided
         if fen is None:
-            # Get current position from board controller
-            # IMPORTANT: We need to analyze the position AFTER the active move has been played
-            if self.game_controller and self.game_controller.board_controller:
-                board_fen = self.game_controller.board_controller.get_position_fen()
-                
-                # Get the active game and ply_index to ensure we're getting the position AFTER the move
-                game_model = self.game_controller.get_game_model()
-                active_game = game_model.active_game if game_model else None
-                ply_index = game_model.get_active_move_ply() if game_model else 0
-                
-                if active_game and ply_index > 0:
-                    try:
-                        import chess.pgn
-                        from io import StringIO
-                        
-                        # Parse the PGN
-                        pgn_io = StringIO(active_game.pgn)
-                        chess_game = chess.pgn.read_game(pgn_io)
-                        
-                        if chess_game:
-                            # Navigate to the position AFTER ply_index moves
-                            node = chess_game
-                            for i in range(ply_index):
-                                if not node.variations:
-                                    break
-                                node = node.variation(0)
-                            
-                            # Get the FEN after ply_index moves (this is what we want to analyze)
-                            fen = node.board().fen()
-                        else:
-                            fen = board_fen
-                    except Exception:
-                        fen = board_fen
-                else:
-                    fen = board_fen
-            else:
+            fen = self._fen_for_active_path()
+            if fen is None:
                 # Failed - reset UI
                 self.analysis_model.is_analyzing = False
                 self.analysis_model.reset()
@@ -810,57 +779,47 @@ class ManualAnalysisController:
             # Engine was unassigned - stop analysis
             self.stop_analysis()
     
-    def _on_active_move_changed(self, ply_index: int) -> None:
-        """Handle active move change from game model.
+    def _fen_for_active_path(self) -> Optional[str]:
+        """Resolve the FEN for the active variation path (fallback: board FEN)."""
+        board_fen: Optional[str] = None
+        if self.game_controller and self.game_controller.board_controller:
+            board_fen = self.game_controller.board_controller.get_position_fen()
+
+        if not self.game_controller:
+            return board_fen
+
+        game_model = self.game_controller.get_game_model()
+        active_game = game_model.active_game if game_model else None
+        if not active_game or not game_model:
+            return board_fen
+
+        path: Sequence[int] = game_model.get_active_path()
+        try:
+            chess_game = chess.pgn.read_game(StringIO(active_game.pgn))
+            if chess_game is None:
+                return board_fen
+            node = node_at_path(chess_game, path)
+            if node is None:
+                return board_fen
+            return node.board().fen()
+        except Exception:
+            return board_fen
+
+    def _on_active_path_changed(self, path: object) -> None:
+        """Handle active variation path change from game model.
         
         Args:
-            ply_index: Ply index of the active move (0 = starting position).
+            path: Active path tuple (child indices from the game root).
         """
         # Only update position if analysis is running
         if not self.analysis_model.is_analyzing:
             return
         
-        # IMPORTANT: We need to analyze the position AFTER the active move has been played
-        # The board controller's FEN might not be updated yet when this signal fires,
-        # so we should ALWAYS get the FEN from the game tree based on ply_index
-        if self.game_controller and self.game_controller.board_controller:
-            game_model = self.game_controller.get_game_model()
-            active_game = game_model.active_game if game_model else None
-            
-            if active_game and ply_index >= 0:
-                # Get FEN from game tree - this is the most reliable source
-                # and ensures we get the position AFTER ply_index moves
-                try:
-                    import chess.pgn
-                    from io import StringIO
-                    
-                    # Parse the PGN
-                    pgn_io = StringIO(active_game.pgn)
-                    chess_game = chess.pgn.read_game(pgn_io)
-                    
-                    if chess_game:
-                        # Navigate to the position AFTER ply_index moves
-                        # This is the position we want to analyze
-                        node = chess_game
-                        for i in range(ply_index):
-                            if not node.variations:
-                                break
-                            node = node.variation(0)
-                        
-                        # Get the FEN after ply_index moves (this is what we want to analyze)
-                        fen = node.board().fen()
-                    else:
-                        # Fallback to board FEN if parsing fails
-                        fen = self.game_controller.board_controller.get_position_fen()
-                except Exception:
-                    # If parsing fails, use board FEN (should still be correct)
-                    fen = self.game_controller.board_controller.get_position_fen()
-            else:
-                # No active game or at starting position - use board FEN
-                fen = self.game_controller.board_controller.get_position_fen()
-            
-            # Update position in analysis
-            self.update_position(fen)
+        # Prefer tree FEN at the active path — board FEN can lag the path signal.
+        fen = self._fen_for_active_path()
+        if fen is None:
+            return
+        self.update_position(fen)
     
     def set_explore_pv_plan(self, pv_number: int) -> None:
         """Set which PV plan to explore (0 = none, 1-3 = PV1-PV3).

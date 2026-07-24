@@ -14,6 +14,7 @@ from app.views.widgets.chessboard_widget import ChessBoardWidget
 from app.controllers.annotation_controller import AnnotationController
 from app.models.annotation_model import AnnotationType
 from app.utils.font_utils import scale_font_size
+from app.utils.pgn_variation_path import encode_path
 
 
 class NonResizableSplitterHandle(QSplitterHandle):
@@ -877,9 +878,9 @@ class DetailAnnotationView(QWidget):
                             # For text tool, check if text already exists at this position
                             if self._current_tool == "text":
                                 if self._game_model and self._annotation_controller:
-                                    ply_index = self._game_model.get_active_move_ply()
+                                    path_key = encode_path(self._game_model.get_active_path())
                                     annotation_model = self._annotation_controller.get_annotation_model()
-                                    annotations = annotation_model.get_annotations(ply_index)
+                                    annotations = annotation_model.get_annotations(path_key)
                                     # Check if there's any text annotation on this square
                                     has_text = False
                                     for annotation in annotations:
@@ -1104,10 +1105,10 @@ class DetailAnnotationView(QWidget):
         if self._annotation_controller:
             annotation_model = self._annotation_controller.get_annotation_model()
             all_annotations = annotation_model.get_all_annotations()
-            updated_plies = set()
+            updated_keys = set()
             
-            # Update annotations for all plies
-            for ply_index, annotations in all_annotations.items():
+            # Update annotations for all paths
+            for path_key, annotations in all_annotations.items():
                 annotations_updated = False
                 
                 for annotation in annotations:
@@ -1117,10 +1118,10 @@ class DetailAnnotationView(QWidget):
                         annotation.color = [new_color.red(), new_color.green(), new_color.blue()]
                         annotations_updated = True
                 
-                # Emit signal to update views for this ply if annotations were updated
+                # Emit signal to update views for this path if annotations were updated
                 if annotations_updated:
-                    updated_plies.add(ply_index)
-                    annotation_model.annotations_changed.emit(ply_index)
+                    updated_keys.add(path_key)
+                    annotation_model.annotations_changed.emit(path_key)
     
     def _update_toolbar_wrapping(self) -> None:
         """Update tool button wrapping to multiple rows based on available width."""
@@ -1329,50 +1330,51 @@ class DetailAnnotationView(QWidget):
         if self._annotation_controller:
             self._annotation_controller.clear_current_annotations()
     
-    def _on_annotations_changed(self, ply_index: int) -> None:
+    def _active_annotation_key(self) -> str:
+        if not self._game_model:
+            return ""
+        return encode_path(self._game_model.get_active_path())
+
+    def _on_annotations_changed(self, path_key: str) -> None:
         """Handle annotations changed signal.
         
         Args:
-            ply_index: Ply index that changed.
+            path_key: Encoded variation path that changed.
         """
         self._update_annotation_count_display()
-        # Update list if this is the current ply
-        if self._game_model and ply_index == self._game_model.get_active_move_ply():
+        if path_key == self._active_annotation_key():
             self._populate_annotation_list()
     
-    def _on_annotation_added(self, ply_index: int, annotation_id: str) -> None:
+    def _on_annotation_added(self, path_key: str, annotation_id: str) -> None:
         """Handle annotation added signal.
         
         Args:
-            ply_index: Ply index.
+            path_key: Encoded variation path.
             annotation_id: ID of added annotation.
         """
         self._update_annotation_count_display()
-        # Update list if this is the current ply
-        if self._game_model and ply_index == self._game_model.get_active_move_ply():
+        if path_key == self._active_annotation_key():
             self._populate_annotation_list()
     
-    def _on_annotation_removed(self, ply_index: int, annotation_id: str) -> None:
+    def _on_annotation_removed(self, path_key: str, annotation_id: str) -> None:
         """Handle annotation removed signal.
         
         Args:
-            ply_index: Ply index.
+            path_key: Encoded variation path.
             annotation_id: ID of removed annotation.
         """
         self._update_annotation_count_display()
-        # Update list if this is the current ply
-        if self._game_model and ply_index == self._game_model.get_active_move_ply():
+        if path_key == self._active_annotation_key():
             self._populate_annotation_list()
     
-    def _on_annotations_cleared(self, ply_index: int) -> None:
+    def _on_annotations_cleared(self, path_key: str) -> None:
         """Handle annotations cleared signal.
         
         Args:
-            ply_index: Ply index.
+            path_key: Encoded variation path.
         """
         self._update_annotation_count_display()
-        # Update list if this is the current ply
-        if self._game_model and ply_index == self._game_model.get_active_move_ply():
+        if path_key == self._active_annotation_key():
             self._populate_annotation_list()
     
     def _update_annotation_count_display(self) -> None:
@@ -1381,9 +1383,9 @@ class DetailAnnotationView(QWidget):
             self.annotation_count_value.setText("0")
             return
         
-        ply_index = self._game_model.get_active_move_ply()
+        path_key = self._active_annotation_key()
         annotation_model = self._annotation_controller.get_annotation_model()
-        annotations = annotation_model.get_annotations(ply_index)
+        annotations = annotation_model.get_annotations(path_key)
         count = len(annotations)
         self.annotation_count_value.setText(str(count))
     
@@ -1398,9 +1400,9 @@ class DetailAnnotationView(QWidget):
         if not self._annotation_controller or not self._game_model:
             return
         
-        ply_index = self._game_model.get_active_move_ply()
+        path_key = self._active_annotation_key()
         annotation_model = self._annotation_controller.get_annotation_model()
-        annotations = annotation_model.get_annotations(ply_index)
+        annotations = annotation_model.get_annotations(path_key)
         
         if not annotations:
             # Show empty state message
@@ -1419,18 +1421,18 @@ class DetailAnnotationView(QWidget):
         
         # Create list items for each annotation
         for annotation in annotations:
-            item_widget = self._create_annotation_list_item(annotation, ply_index)
+            item_widget = self._create_annotation_list_item(annotation, path_key)
             self.annotation_list_layout.addWidget(item_widget)
         
         # Add stretch at the end
         self.annotation_list_layout.addStretch()
     
-    def _create_annotation_list_item(self, annotation, ply_index: int) -> QWidget:
+    def _create_annotation_list_item(self, annotation, path_key: str) -> QWidget:
         """Create a list item widget for an annotation.
         
         Args:
             annotation: Annotation instance.
-            ply_index: Current ply index.
+            path_key: Encoded variation path for the annotation.
             
         Returns:
             QWidget representing the annotation list item.
@@ -1469,7 +1471,7 @@ class DetailAnnotationView(QWidget):
         delete_btn.setFixedSize(24, 24)
         delete_btn.setToolTip("Delete annotation")
         delete_btn.clicked.connect(lambda checked, ann_id=annotation.annotation_id: 
-                                   self._on_delete_annotation(ann_id, ply_index))
+                                   self._on_delete_annotation(ann_id, path_key))
         
         # Style delete button using StyleManager (if styling values are available)
         if hasattr(self, '_list_item_button_bg'):
@@ -1525,18 +1527,18 @@ class DetailAnnotationView(QWidget):
         
         return type_name
     
-    def _on_delete_annotation(self, annotation_id: str, ply_index: int) -> None:
+    def _on_delete_annotation(self, annotation_id: str, path_key: str) -> None:
         """Handle delete annotation button click.
         
         Args:
             annotation_id: ID of annotation to delete.
-            ply_index: Ply index of the annotation.
+            path_key: Encoded variation path of the annotation.
         """
         if not self._annotation_controller:
             return
         
         annotation_model = self._annotation_controller.get_annotation_model()
-        annotation_model.remove_annotation(ply_index, annotation_id)
+        annotation_model.remove_annotation(path_key, annotation_id)
     
     def set_game_model(self, game_model: GameModel) -> None:
         """Set the game model to observe.
@@ -1546,14 +1548,14 @@ class DetailAnnotationView(QWidget):
         """
         if self._game_model:
             # Disconnect from old model
-            self._game_model.active_move_changed.disconnect(self._on_active_move_changed)
+            self._game_model.active_path_changed.disconnect(self._on_active_path_changed)
             self._game_model.active_game_changed.disconnect(self._on_active_game_changed)
         
         self._game_model = game_model
         
         if game_model:
-            # Connect to active move changes to update annotation count
-            game_model.active_move_changed.connect(self._on_active_move_changed)
+            # Connect to active path changes to update annotation count/list
+            game_model.active_path_changed.connect(self._on_active_path_changed)
             # Connect to active game changes to update disabled state
             game_model.active_game_changed.connect(self._on_active_game_changed)
             self._update_annotation_count_display()
@@ -1568,22 +1570,17 @@ class DetailAnnotationView(QWidget):
             # No game model - disable view
             self._update_disabled_state(False)
     
-    def _on_active_move_changed(self, ply_index: int) -> None:
-        """Handle active move change.
-        
-        Args:
-            ply_index: New active ply index.
-        """
-        # Reset annotation start square when move changes
+    def _on_active_path_changed(self, path: object) -> None:
+        """Handle active variation path change."""
+        # Reset annotation start square when position changes
         self._annotation_start_square = None
         self._annotation_preview_square = None
         # Clear arrow preview
         if self._board_widget:
             self._board_widget.set_arrow_preview(None, None, None, 1.0)
             self._board_widget.update()
-        # Update annotation count for new move
+        # Update annotation count/list for new path
         self._update_annotation_count_display()
-        # Update annotation list for new move
         self._populate_annotation_list()
     
     def _on_active_game_changed(self, game) -> None:
@@ -1759,9 +1756,9 @@ class DetailAnnotationView(QWidget):
             # If there is, don't open dialog (let board widget handle editing via double-click)
             # If there isn't, open dialog to add new text
             if self._game_model and self._annotation_controller:
-                ply_index = self._game_model.get_active_move_ply()
+                path_key = self._active_annotation_key()
                 annotation_model = self._annotation_controller.get_annotation_model()
-                annotations = annotation_model.get_annotations(ply_index)
+                annotations = annotation_model.get_annotations(path_key)
                 
                 # Check if there's any text annotation on this square
                 has_text = False

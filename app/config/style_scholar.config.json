@@ -617,6 +617,34 @@
               "$ref": "$_COLOR_TAG_GOLD"
             }
           },
+          "variation_appearance": {
+            "enabled": true,
+            "border": {
+              "size": 12,
+              "color": {
+                "$ref": "$_COLOR_BRONZE_RUST"
+              }
+            },
+            "squares": {
+              "light_color": {
+                "$ref": "$_COLOR_WHEAT_CREAM"
+              },
+              "dark_color": {
+                "$ref": "$_COLOR_TOBACCO"
+              }
+            },
+            "playedmove_arrow": {
+              "color": {
+                "$ref": "$_COLOR_BRONZE_RUST"
+              }
+            },
+            "last_move_highlight": {
+              "color": {
+                "$ref": "$_COLOR_PEACH_HIGHLIGHT"
+              },
+              "opacity": 0.45
+            }
+          },
           "bestnextmove_arrow": {
             "color": {
               "$ref": "$_COLOR_DEEP_TEAL"
@@ -903,6 +931,47 @@
                 "$ref": "$_COLOR_NIGHT_BROWN"
               },
               "bold": true
+            }
+          },
+          "branch_select": {
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "border_radius": 6,
+            "border_width": 1,
+            "padding": [8, 10, 8, 10],
+            "row_spacing": 2,
+            "min_width": 96,
+            "colors": {
+              "background": {
+                "$ref": "$_COLOR_PAPYRUS_WHITE"
+              },
+              "border": {
+                "$ref": "$_COLOR_FOREST_OUTLINE"
+              },
+              "text": {
+                "$ref": "$_COLOR_INK_BODY"
+              },
+              "muted": {
+                "$ref": "$_COLOR_DRIFTWOOD"
+              },
+              "selected_background": {
+                "$ref": "$_COLOR_PEACH_HIGHLIGHT"
+              },
+              "selected_text": {
+                "$ref": "$_COLOR_NIGHT_BROWN"
+              }
+            },
+            "separator": {
+              "enabled": true,
+              "height": 1,
+              "margin": [4, 4, 4, 4],
+              "color": {
+                "$ref": "$_COLOR_TAN_MOCHA"
+              }
             }
           }
         },

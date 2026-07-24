@@ -559,6 +559,24 @@
           "playedmove_arrow": {
             "color": [255, 255, 0]
           },
+          "variation_appearance": {
+            "enabled": true,
+            "border": {
+              "size": 8,
+              "color": [180, 120, 60]
+            },
+            "squares": {
+              "light_color": [242, 234, 222],
+              "dark_color": [175, 145, 115]
+            },
+            "playedmove_arrow": {
+              "color": [220, 120, 30]
+            },
+            "last_move_highlight": {
+              "color": [230, 140, 50],
+              "opacity": 0.4
+            }
+          },
           "bestnextmove_arrow": {
             "color": [0, 0, 255]
           },
@@ -799,6 +817,47 @@
                 "$ref": "$_COLOR_TEXT_5"
               },
               "bold": true
+            }
+          },
+          "branch_select": {
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "border_radius": 6,
+            "border_width": 1,
+            "padding": [8, 10, 8, 10],
+            "row_spacing": 2,
+            "min_width": 96,
+            "colors": {
+              "background": {
+                "$ref": "$_COLOR_BACKGROUND_3"
+              },
+              "border": {
+                "$ref": "$_COLOR_BORDER"
+              },
+              "text": {
+                "$ref": "$_COLOR_TEXT_PRIMARY"
+              },
+              "muted": {
+                "$ref": "$_COLOR_TEXT_SECONDARY"
+              },
+              "selected_background": {
+                "$ref": "$_COLOR_ACTIVE_MOVE_BACKGROUND"
+              },
+              "selected_text": {
+                "$ref": "$_COLOR_TEXT_5"
+              }
+            },
+            "separator": {
+              "enabled": true,
+              "height": 1,
+              "margin": [4, 4, 4, 4],
+              "color": {
+                "$ref": "$_COLOR_BORDER"
+              }
             }
           }
         },

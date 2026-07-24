@@ -56,6 +56,14 @@ def setup_pgn_menu(mw, menu_bar: QMenuBar) -> None:
 
     pgn_menu.addSeparator()
 
+    mw.navigate_variations_action = QAction("Enable navigating into variations", mw)
+    mw.navigate_variations_action.setCheckable(True)
+    mw.navigate_variations_action.setChecked(False)
+    mw.navigate_variations_action.triggered.connect(mw._on_navigate_variations_toggled)
+    pgn_menu.addAction(mw.navigate_variations_action)
+
+    pgn_menu.addSeparator()
+
     mw.nag_display_menu = pgn_menu.addMenu("Display NAG move assessments as...")
     mw._apply_menu_styling(mw.nag_display_menu)
 

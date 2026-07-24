@@ -16,6 +16,13 @@ from app.models.column_profile_model import (COL_NUM, COL_WHITE, COL_BLACK, COL_
 if TYPE_CHECKING:
     from app.models.annotation_model import AnnotationModel
 
+from app.utils.pgn_variation_path import (
+    decode_path,
+    encode_path,
+    is_mainline_path,
+    mainline_path_for_ply,
+)
+
 
 class MoveData:
     """Represents a single move's data."""
@@ -273,8 +280,12 @@ class MovesListModel(QAbstractTableModel):
             self._highlight_annotated_moves = on
             self._emit_all_rows_changed()
 
-    def _on_annotations_changed(self, ply_index: int) -> None:
-        """Handle annotation model change; emit dataChanged for the affected row."""
+    def _on_annotations_changed(self, path_key: str) -> None:
+        """Handle annotation model change; emit dataChanged for the affected mainline row."""
+        path = decode_path(path_key)
+        if path is None or not is_mainline_path(path):
+            return
+        ply_index = len(path)
         row = (ply_index - 1) // 2 if ply_index > 0 else -1
         if 0 <= row < len(self._moves):
             top_left = self.index(row, 0)
@@ -290,7 +301,7 @@ class MovesListModel(QAbstractTableModel):
         self.dataChanged.emit(top_left, bottom_right)
 
     def _get_annotation_highlight_for_ply(self, ply_index: int) -> Optional[QColor]:
-        """Get the dominant annotation color for a single ply, or None if no annotations or feature off.
+        """Get the dominant annotation color for a single mainline ply, or None if no annotations or feature off.
 
         Dominant color is the average RGB of all annotations on that ply, lightened for readability.
 
@@ -303,7 +314,8 @@ class MovesListModel(QAbstractTableModel):
         if not self._highlight_annotated_moves or self._annotation_model is None:
             return None
         colors: List[List[int]] = []
-        for ann in self._annotation_model.get_annotations(ply_index):
+        path_key = encode_path(mainline_path_for_ply(ply_index))
+        for ann in self._annotation_model.get_annotations(path_key):
             if ann.color and len(ann.color) >= 3:
                 colors.append(ann.color)
         if not colors:

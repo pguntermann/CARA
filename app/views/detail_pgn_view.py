@@ -2,8 +2,8 @@
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QMenu
 from PyQt6.QtGui import QPalette, QColor, QFont, QTextCursor, QTextCharFormat, QMouseEvent, QContextMenuEvent, QAction, QKeyEvent, QKeySequence, QShortcut, QTextDocument
-from PyQt6.QtCore import Qt
-from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING, Callable
+from PyQt6.QtCore import Qt, QPoint
+from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING, Callable, Sequence
 
 from app.services.pgn_formatter_service import (
     PgnFormatterService,
@@ -13,7 +13,9 @@ from app.services.pgn_formatter_service import (
 )
 from app.models.game_model import GameModel
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.pgn_variation_path import Path, is_mainline_path
 from app.views.style.style_manager import StyleManager
+from app.views.widgets.branch_select_overlay import BranchSelectOverlay
 
 if TYPE_CHECKING:
     from app.controllers.game_controller import GameController
@@ -267,6 +269,7 @@ class DetailPgnView(QWidget):
         self._move_info: List[Tuple[str, int, bool]] = []  # List of (move_san, move_number, is_white) tuples for each ply
         self._range_map: PgnRangeMap = PgnRangeMap()  # Move/comment ranges from rendered anchors
         self._active_move_ply: int = 0  # Current active move ply (0 = starting position)
+        self._active_path: Path = ()
         self._show_metadata: bool = True  # Whether to show metadata tags in PGN view
         self._show_comments: bool = True  # Whether to show comments in PGN view
         self._show_variations: bool = True  # Whether to show variations in PGN view
@@ -275,6 +278,8 @@ class DetailPgnView(QWidget):
         self._show_non_standard_tags: bool = False  # Whether to show non-standard tags like [%evp], [%mdl] in comments
         self._pgn_notation_settings: Dict[str, Any] = {}  # PGN notation settings (use_symbols_for_nags, show_nag_text)
         self._open_move_comment_row: Optional[Callable[[int], None]] = None
+        self._branch_overlay = BranchSelectOverlay(self.config, parent=self)
+        self._branch_overlay.choice_activated.connect(self._on_branch_choice_activated)
         self._setup_ui()
         
         # Load initial PGN notation settings from user settings
@@ -312,7 +317,7 @@ class DetailPgnView(QWidget):
         # Set click handler to find moves and navigate
         self.pgn_text.set_click_handler(self._handle_pgn_click)
         # Set move checker for cursor changes (without navigating)
-        self.pgn_text.set_move_checker(self._find_mainline_move_at_position)
+        self.pgn_text.set_move_checker(self._find_navigable_move_at_position)
         self.pgn_text.set_comment_double_click_handler(self._handle_pgn_comment_double_click)
         
         # Configure PGN text styling
@@ -441,6 +446,11 @@ class DetailPgnView(QWidget):
             show: True to show variations, False to hide them.
         """
         self._show_variations = show
+        if not show and self._game_controller is not None:
+            # Viewing a sideline while variations are hidden → snap to mainline.
+            if not is_mainline_path(self._active_path):
+                self._game_controller.return_to_mainline_ancestor()
+            self._branch_overlay.hide_overlay()
     
     def set_show_annotations(self, show: bool) -> None:
         """Set whether to show annotations in PGN view.
@@ -493,17 +503,28 @@ class DetailPgnView(QWidget):
         """
         if self._game_model:
             # Disconnect from old model
-            self._game_model.active_move_changed.disconnect(self._on_active_move_changed)
-            self._game_model.metadata_updated.disconnect(self._on_metadata_updated)
+            try:
+                self._game_model.active_move_changed.disconnect(self._on_active_move_changed)
+            except TypeError:
+                pass
+            try:
+                self._game_model.active_path_changed.disconnect(self._on_active_path_changed)
+            except TypeError:
+                pass
+            try:
+                self._game_model.metadata_updated.disconnect(self._on_metadata_updated)
+            except TypeError:
+                pass
         
         self._game_model = model
         
         # Connect to model signals
         model.active_move_changed.connect(self._on_active_move_changed)
+        model.active_path_changed.connect(self._on_active_path_changed)
         model.metadata_updated.connect(self._on_metadata_updated)
         
         # Initialize with current active move if any
-        self._on_active_move_changed(model.get_active_move_ply())
+        self._on_active_path_changed(model.get_active_path())
     
     def set_game_controller(self, controller: 'GameController') -> None:
         """Set the game controller for navigating to specific plies.
@@ -512,6 +533,15 @@ class DetailPgnView(QWidget):
             controller: The GameController instance.
         """
         self._game_controller = controller
+
+    def set_navigate_variations_enabled(self, enabled: bool) -> None:
+        """Enable/disable variation navigation UI (overlay + path clicks)."""
+        if self._game_controller is not None:
+            self._game_controller.set_navigate_variations_enabled(enabled)
+        if not enabled:
+            self._branch_overlay.hide_overlay()
+            if self._game_controller is not None:
+                self._game_controller.return_to_mainline_ancestor()
     
     def set_open_move_comment_row_callback(
         self, callback: Optional[Callable[[int], None]]
@@ -520,13 +550,24 @@ class DetailPgnView(QWidget):
         self._open_move_comment_row = callback
     
     def _on_active_move_changed(self, ply_index: int) -> None:
-        """Handle active move change from model.
-        
-        Args:
-            ply_index: Ply index of the active move (0 = starting position).
-        """
+        """Handle active move change from model (mainline consumer ply)."""
         self._active_move_ply = ply_index
+        if self._game_model is not None:
+            self._active_path = self._game_model.get_active_path()
         self._highlight_active_move()
+
+    def _on_active_path_changed(self, path: object) -> None:
+        """Handle active variation path changes."""
+        if isinstance(path, tuple):
+            self._active_path = tuple(int(i) for i in path)
+        else:
+            self._active_path = ()
+        if self._game_model is not None:
+            self._active_move_ply = self._game_model.get_active_move_ply()
+        self._highlight_active_move()
+        # Path changes from outside dismiss an open chooser.
+        if self._branch_overlay.is_open():
+            self._branch_overlay.hide_overlay()
     
     def _on_metadata_updated(self) -> None:
         """Handle metadata update from model - refresh PGN display.
@@ -569,23 +610,26 @@ class DetailPgnView(QWidget):
             self.pgn_text.setExtraSelections([])
             return
 
-        if self._active_move_ply <= 0:
-            self.pgn_text.setExtraSelections([])
-            return
-
         document = self.pgn_text.document()
         document_length = document.characterCount()
         if document_length <= 0:
             self.pgn_text.setExtraSelections([])
             return
 
-        move_range = self._range_map.move_range(self._active_move_ply)
-        if move_range is None:
+        move_start = None
+        move_end = None
+        if self._active_path and not is_mainline_path(self._active_path):
+            path_range = self._range_map.path_range(self._active_path)
+            if path_range is not None:
+                move_start, move_end = path_range.start, path_range.end
+        elif self._active_move_ply > 0:
+            move_range = self._range_map.move_range(self._active_move_ply)
+            if move_range is not None:
+                move_start, move_end = move_range.start, move_range.end
+
+        if move_start is None or move_end is None:
             self.pgn_text.setExtraSelections([])
             return
-
-        move_start = move_range.start
-        move_end = move_range.end
         if move_start < 0 or move_end <= move_start or move_end > document_length:
             self.pgn_text.setExtraSelections([])
             return
@@ -657,13 +701,21 @@ class DetailPgnView(QWidget):
         Returns:
             Ply index if main-line move found, 0 otherwise.
         """
-        # Find which main-line move (if any) contains this position
+        self._branch_overlay.hide_overlay()
+
+        path = self._range_map.path_at(click_pos)
+        if (
+            path is not None
+            and self._game_controller is not None
+            and self._game_controller.is_navigate_variations_enabled()
+            and self._show_variations
+        ):
+            self._game_controller.navigate_to_path(path)
+            return 0
+
         ply_index = self._find_mainline_move_at_position(click_pos)
-        
         if ply_index > 0 and self._game_controller:
-            # Navigate to this ply
             self._game_controller.navigate_to_ply(ply_index)
-        
         return ply_index
     
     def _find_mainline_move_at_position(self, position: int) -> int:
@@ -688,4 +740,80 @@ class DetailPgnView(QWidget):
 
         return self._range_map.move_ply_at(position)
 
+    def _find_navigable_move_at_position(self, position: int) -> int:
+        """Return non-zero when the cursor is over a clickable mainline or variation move."""
+        if self._find_mainline_move_at_position(position) > 0:
+            return 1
+        if (
+            self._game_controller is not None
+            and self._game_controller.is_navigate_variations_enabled()
+            and self._show_variations
+            and self._range_map.path_at(position) is not None
+        ):
+            return 1
+        return 0
+
+    def handle_variation_nav_forward(self) -> bool:
+        """Handle Right-key navigation when variation navigation is enabled.
+
+        Returns True if the event was consumed (overlay shown/committed or path advanced).
+        """
+        if self._game_controller is None or not self._game_controller.is_navigate_variations_enabled():
+            return False
+        if not self._show_variations:
+            return False
+
+        if self._branch_overlay.is_open():
+            self._branch_overlay.activate_selected()
+            return True
+
+        choices = self._game_controller.get_forward_branch_choices()
+        if len(choices) > 1:
+            self._show_branch_overlay(choices)
+            return True
+        if len(choices) == 1:
+            return self._game_controller.navigate_to_path(choices[0][0])
+        return False
+
+    def handle_variation_nav_back(self) -> bool:
+        """Handle Left-key navigation when variation navigation is enabled."""
+        if self._game_controller is None or not self._game_controller.is_navigate_variations_enabled():
+            return False
+        if self._branch_overlay.is_open():
+            self._branch_overlay.hide_overlay()
+            return True
+        return self._game_controller.navigate_to_previous_move()
+
+    def handle_variation_nav_vertical(self, delta: int) -> bool:
+        """Handle Up/Down while the branch overlay is open."""
+        if not self._branch_overlay.is_open():
+            return False
+        self._branch_overlay.move_selection(delta)
+        return True
+
+    def _show_branch_overlay(self, choices: Sequence[Tuple[Path, str]]) -> None:
+        anchor = self._overlay_anchor_global_pos()
+        self._branch_overlay.refresh_style(self.config)
+        self._branch_overlay.show_choices(choices, anchor_global=anchor, selected_index=0)
+
+    def _overlay_anchor_global_pos(self) -> QPoint:
+        """Place the overlay near the current active move in the PGN pane."""
+        document = self.pgn_text.document()
+        cursor = QTextCursor(document)
+        move_range = None
+        if self._active_path and not is_mainline_path(self._active_path):
+            move_range = self._range_map.path_range(self._active_path)
+        elif self._active_move_ply > 0:
+            move_range = self._range_map.move_range(self._active_move_ply)
+        if move_range is not None:
+            cursor.setPosition(move_range.end)
+        rect = self.pgn_text.cursorRect(cursor)
+        local = rect.bottomRight()
+        return self.pgn_text.mapToGlobal(local)
+
+    def _on_branch_choice_activated(self, path: object) -> None:
+        if self._game_controller is None:
+            return
+        if isinstance(path, tuple):
+            self._game_controller.navigate_to_path(path)
 

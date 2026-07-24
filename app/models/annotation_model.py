@@ -1,9 +1,14 @@
 """Annotation model for storing chessboard annotations."""
 
 from PyQt6.QtCore import QObject, pyqtSignal
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any, Sequence, Union
+from dataclasses import dataclass
 from enum import Enum
+
+from app.utils.pgn_variation_path import (
+    encode_path,
+    mainline_path_for_ply,
+)
 
 
 class AnnotationType(Enum):
@@ -36,143 +41,123 @@ class Annotation:
     shadow: Optional[bool] = None  # Whether to add black shadow for readability (default False)
 
 
+AnnotationKey = str  # encode_path(...) — "" = starting position, "0.1.0" = variation path
+
+
+def normalize_annotation_key(path_or_key: Union[str, int, Sequence[int], None]) -> AnnotationKey:
+    """Normalize a path, legacy ply index, or encoded key to an annotation storage key."""
+    if path_or_key is None:
+        return ""
+    if isinstance(path_or_key, str):
+        return path_or_key
+    if isinstance(path_or_key, int):
+        return encode_path(mainline_path_for_ply(path_or_key))
+    return encode_path(tuple(int(i) for i in path_or_key))
+
+
 class AnnotationModel(QObject):
-    """Model for storing chessboard annotations per move.
+    """Model for storing chessboard annotations per variation path.
     
     This model holds annotation state and emits
     signals when annotations change. Views observe these signals to update
     the UI automatically.
     """
     
-    # Signals emitted when annotations change
-    annotations_changed = pyqtSignal(int)  # Emitted when annotations change for a ply (ply_index)
-    annotation_added = pyqtSignal(int, str)  # Emitted when annotation is added (ply_index, annotation_id)
-    annotation_removed = pyqtSignal(int, str)  # Emitted when annotation is removed (ply_index, annotation_id)
-    annotations_cleared = pyqtSignal(int)  # Emitted when all annotations cleared for a ply (ply_index)
-    annotations_visibility_changed = pyqtSignal(bool)  # Emitted when annotation layer visibility changes
+    # Signals emit the encoded path key ("" = start, "0.1.0" = sideline, etc.)
+    annotations_changed = pyqtSignal(str)
+    annotation_added = pyqtSignal(str, str)  # path_key, annotation_id
+    annotation_removed = pyqtSignal(str, str)  # path_key, annotation_id
+    annotations_cleared = pyqtSignal(str)  # path_key
+    annotations_visibility_changed = pyqtSignal(bool)
     
     def __init__(self) -> None:
         """Initialize the annotation model."""
         super().__init__()
-        # Store annotations per ply: {ply_index: [Annotation, ...]}
-        self._annotations: Dict[int, List[Annotation]] = {}
-        # Visibility state for annotation layer
-        self._show_annotations: bool = True  # Default to showing annotations
+        # Store annotations per path key: {encode_path(path): [Annotation, ...]}
+        self._annotations: Dict[AnnotationKey, List[Annotation]] = {}
+        self._show_annotations: bool = True
     
-    def get_annotations(self, ply_index: int) -> List[Annotation]:
-        """Get annotations for a specific ply.
-        
-        Args:
-            ply_index: Ply index (0 = starting position, 1 = after first move, etc.).
-            
-        Returns:
-            List of annotations for the ply, empty list if none.
-        """
-        return self._annotations.get(ply_index, [])
+    def get_annotations(self, path_or_key: Union[str, int, Sequence[int]]) -> List[Annotation]:
+        """Get annotations for a variation path (or legacy ply index)."""
+        key = normalize_annotation_key(path_or_key)
+        return self._annotations.get(key, [])
     
-    def add_annotation(self, ply_index: int, annotation: Annotation) -> None:
-        """Add an annotation for a specific ply.
+    def add_annotation(
+        self, path_or_key: Union[str, int, Sequence[int]], annotation: Annotation
+    ) -> None:
+        """Add an annotation for a variation path."""
+        key = normalize_annotation_key(path_or_key)
+        if key not in self._annotations:
+            self._annotations[key] = []
         
-        Args:
-            ply_index: Ply index (0 = starting position, 1 = after first move, etc.).
-            annotation: Annotation to add.
-        """
-        if ply_index not in self._annotations:
-            self._annotations[ply_index] = []
-        
-        self._annotations[ply_index].append(annotation)
-        self.annotation_added.emit(ply_index, annotation.annotation_id)
-        self.annotations_changed.emit(ply_index)
+        self._annotations[key].append(annotation)
+        self.annotation_added.emit(key, annotation.annotation_id)
+        self.annotations_changed.emit(key)
     
-    def remove_annotation(self, ply_index: int, annotation_id: str) -> bool:
-        """Remove an annotation by ID.
-        
-        Args:
-            ply_index: Ply index.
-            annotation_id: ID of annotation to remove.
-            
-        Returns:
-            True if annotation was found and removed, False otherwise.
-        """
-        if ply_index not in self._annotations:
+    def remove_annotation(
+        self, path_or_key: Union[str, int, Sequence[int]], annotation_id: str
+    ) -> bool:
+        """Remove an annotation by ID for a variation path."""
+        key = normalize_annotation_key(path_or_key)
+        if key not in self._annotations:
             return False
         
-        annotations = self._annotations[ply_index]
+        annotations = self._annotations[key]
         for i, ann in enumerate(annotations):
             if ann.annotation_id == annotation_id:
                 annotations.pop(i)
-                self.annotation_removed.emit(ply_index, annotation_id)
-                self.annotations_changed.emit(ply_index)
+                self.annotation_removed.emit(key, annotation_id)
+                self.annotations_changed.emit(key)
                 return True
         
         return False
     
-    def clear_annotations(self, ply_index: int) -> None:
-        """Clear all annotations for a specific ply.
-        
-        Args:
-            ply_index: Ply index.
-        """
-        if ply_index in self._annotations:
-            self._annotations[ply_index] = []
-            self.annotations_cleared.emit(ply_index)
-            self.annotations_changed.emit(ply_index)
+    def clear_annotations(self, path_or_key: Union[str, int, Sequence[int]]) -> None:
+        """Clear all annotations for a variation path."""
+        key = normalize_annotation_key(path_or_key)
+        if key in self._annotations:
+            self._annotations[key] = []
+            self.annotations_cleared.emit(key)
+            self.annotations_changed.emit(key)
     
     def clear_all_annotations(self) -> None:
-        """Clear all annotations for all plies."""
-        for ply_index in list(self._annotations.keys()):
-            self.clear_annotations(ply_index)
+        """Clear all annotations for all paths."""
+        for key in list(self._annotations.keys()):
+            self.clear_annotations(key)
     
-    def set_annotations(self, ply_index: int, annotations: List[Annotation]) -> None:
-        """Set annotations for a specific ply (replaces existing).
-        
-        Args:
-            ply_index: Ply index.
-            annotations: List of annotations to set.
-        """
-        self._annotations[ply_index] = annotations.copy()
-        self.annotations_changed.emit(ply_index)
+    def set_annotations(
+        self, path_or_key: Union[str, int, Sequence[int]], annotations: List[Annotation]
+    ) -> None:
+        """Set annotations for a variation path (replaces existing)."""
+        key = normalize_annotation_key(path_or_key)
+        self._annotations[key] = annotations.copy()
+        self.annotations_changed.emit(key)
     
-    def get_all_annotations(self) -> Dict[int, List[Annotation]]:
-        """Get all annotations for all plies.
-        
-        Returns:
-            Dictionary mapping ply_index to list of annotations.
-        """
-        return {ply: anns.copy() for ply, anns in self._annotations.items()}
+    def get_all_annotations(self) -> Dict[AnnotationKey, List[Annotation]]:
+        """Get all annotations keyed by encoded path."""
+        return {key: anns.copy() for key, anns in self._annotations.items()}
     
-    def set_all_annotations(self, annotations: Dict[int, List[Annotation]]) -> None:
-        """Set all annotations (replaces existing).
-        
-        Args:
-            annotations: Dictionary mapping ply_index to list of annotations.
-        """
-        self._annotations = {ply: anns.copy() for ply, anns in annotations.items()}
-        # Emit signal for all affected plies
-        for ply_index in self._annotations.keys():
-            self.annotations_changed.emit(ply_index)
+    def set_all_annotations(
+        self, annotations: Dict[Union[str, int], List[Annotation]]
+    ) -> None:
+        """Set all annotations (replaces existing). Keys may be path strings or legacy plies."""
+        self._annotations = {
+            normalize_annotation_key(key): anns.copy()
+            for key, anns in annotations.items()
+        }
+        for key in self._annotations.keys():
+            self.annotations_changed.emit(key)
     
     @property
     def show_annotations(self) -> bool:
-        """Get whether annotations are visible.
-        
-        Returns:
-            True if annotations are visible, False otherwise.
-        """
+        """Get whether annotations are visible."""
         return self._show_annotations
     
     def set_show_annotations(self, show: bool) -> None:
-        """Set annotation layer visibility.
-        
-        Args:
-            show: True to show annotations, False to hide them.
-        """
-        # Always update the value and emit signal, even if same value
-        # This ensures views are updated when model is connected
+        """Set annotation layer visibility."""
         self._show_annotations = show
         self.annotations_visibility_changed.emit(show)
     
     def toggle_annotations_visibility(self) -> None:
         """Toggle annotation layer visibility."""
         self.set_show_annotations(not self._show_annotations)
-

@@ -26,6 +26,10 @@ def append_pgn_menu_items_to_context_menu(menu: QMenu, mw: Any, *, config: dict)
 
     menu.addSeparator()
 
+    _add("navigate_variations_action")
+
+    menu.addSeparator()
+
     # Submenu: NAG display mode (reuse actions; rebuild submenu for this menu instance)
     nag_menu = menu.addMenu("Display NAG move assessments as...")
     from app.views.style import StyleManager

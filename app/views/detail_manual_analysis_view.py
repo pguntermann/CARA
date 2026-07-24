@@ -6,6 +6,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QEvent, QPropertyAnimation, QEasingCurve, QTimer, QPoint, QSize
 from PyQt6.QtGui import QPalette, QColor, QFont, QFontMetrics
 from typing import Dict, Any, Optional
+from io import StringIO
+import chess
+import chess.pgn
 
 from app.models.game_model import GameModel
 from app.models.engine_model import EngineModel
@@ -14,6 +17,7 @@ from app.controllers.manual_analysis_controller import ManualAnalysisController
 from app.controllers.engine_controller import TASK_MANUAL_ANALYSIS
 from app.views.dialogs.message_dialog import MessageDialog
 from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_PLAY, SVG_MENU_STOP, SVG_MENU_FREEZE
+from app.utils.pgn_variation_path import node_at_path
 from app.views.widgets.win_probability_bar_widget import WinProbabilityBarWidget
 
 
@@ -965,33 +969,65 @@ class DetailManualAnalysisView(QWidget):
         """
         if self._game_model:
             # Disconnect from old model
-            self._game_model.active_move_changed.disconnect(self._on_active_move_changed)
+            self._game_model.active_path_changed.disconnect(self._on_active_path_changed)
             self._game_model.active_game_changed.disconnect(self._on_active_game_changed)
         
         self._game_model = model
         
         # Connect to model signals
-        model.active_move_changed.connect(self._on_active_move_changed)
+        model.active_path_changed.connect(self._on_active_path_changed)
         model.active_game_changed.connect(self._on_active_game_changed)
         
         # Initialize with current state
-        self._on_active_move_changed(model.get_active_move_ply())
+        self._refresh_position_label()
     
-    def _on_active_move_changed(self, ply_index: int) -> None:
-        """Handle active move change from model.
-        
-        Args:
-            ply_index: Ply index of the active move (0 = starting position).
-        """
-        if ply_index == 0:
-            position_text = "Position: Starting Position (White to move)"
+    def _on_active_path_changed(self, path: object) -> None:
+        """Handle active variation path change from model."""
+        self._refresh_position_label()
+    
+    def _refresh_position_label(self) -> None:
+        """Update the position label from the active path / board turn."""
+        if not self._game_model or not self._game_model.active_game:
+            self.position_label.setText("Position: No game loaded")
+            return
+
+        path = self._game_model.get_active_path()
+        board: Optional[chess.Board] = None
+        try:
+            chess_game = chess.pgn.read_game(StringIO(self._game_model.active_game.pgn))
+            if chess_game is not None:
+                node = node_at_path(chess_game, path)
+                if node is not None:
+                    board = node.board()
+        except Exception:
+            board = None
+
+        if board is None and self._board_model is not None:
+            try:
+                board = chess.Board(self._board_model.get_fen())
+            except Exception:
+                board = None
+
+        if board is None:
+            # Fallback from path depth alone
+            depth = len(path)
+            if depth == 0:
+                self.position_label.setText("Position: Starting Position (White to move)")
+            else:
+                move_number = (depth // 2) + 1
+                side_to_move = "White" if (depth % 2 == 0) else "Black"
+                self.position_label.setText(
+                    f"Position: Move {move_number} ({side_to_move} to move)"
+                )
+            return
+
+        side_to_move = "White" if board.turn == chess.WHITE else "Black"
+        if len(path) == 0 and board.fullmove_number == 1 and board.turn == chess.WHITE:
+            self.position_label.setText("Position: Starting Position (White to move)")
         else:
-            # Calculate move number and side to move
-            move_number = (ply_index // 2) + 1
-            side_to_move = "White" if (ply_index % 2 == 0) else "Black"
-            position_text = f"Position: Move {move_number} ({side_to_move} to move)"
-        
-        self.position_label.setText(position_text)
+            self.position_label.setText(
+                f"Position: Move {board.fullmove_number} ({side_to_move} to move)"
+            )
     
     def _on_active_game_changed(self, game) -> None:
         """Handle active game change from model.
@@ -999,13 +1035,7 @@ class DetailManualAnalysisView(QWidget):
         Args:
             game: GameData instance or None.
         """
-        # Reset position display when game changes
-        if game is None:
-            self.position_label.setText("Position: No game loaded")
-        else:
-            # Update position based on current ply
-            if self._game_model:
-                self._on_active_move_changed(self._game_model.get_active_move_ply())
+        self._refresh_position_label()
     
     def set_engine_model(self, model: EngineModel) -> None:
         """Set the engine model to observe for engine assignment changes.

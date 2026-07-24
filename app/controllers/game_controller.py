@@ -1,6 +1,6 @@
 """Game controller for managing active game operations."""
 
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, Sequence
 from dataclasses import dataclass
 import re
 
@@ -12,6 +12,15 @@ from app.models.game_model import GameModel
 from app.models.database_model import GameData
 from app.models.moveslist_model import MoveData, MovesListModel
 from app.utils.material_tracker import get_captured_piece_letter, calculate_material_count, count_pieces
+from app.utils.pgn_variation_path import (
+    Path,
+    forward_choices,
+    is_mainline_path,
+    mainline_path_for_ply,
+    mainline_rejoin_path,
+    node_at_path,
+    parent_path,
+)
 from app.controllers.board_controller import BoardController
 from app.services.opening_service import OpeningService
 from app.services.logging_service import LoggingService
@@ -141,7 +150,27 @@ class GameController:
         
         # Initialize game model
         self.game_model = GameModel()
-    
+        self._navigate_variations_enabled: bool = False
+        # After reaching the end of a sideline, the first Right is a no-op that
+        # arms rejoining; the next Right jumps to the mainline move at the fork.
+        self._rejoin_mainline_armed: bool = False
+
+    def _clear_rejoin_mainline_arm(self) -> None:
+        self._rejoin_mainline_armed = False
+
+    def set_navigate_variations_enabled(self, enabled: bool) -> None:
+        """Enable/disable keyboard/path navigation into PGN variations."""
+        self._navigate_variations_enabled = bool(enabled)
+        if not self._navigate_variations_enabled and not is_mainline_path(
+            self.game_model.get_active_path()
+        ):
+            self.return_to_mainline_ancestor()
+        if not self._navigate_variations_enabled:
+            self._clear_rejoin_mainline_arm()
+
+    def is_navigate_variations_enabled(self) -> bool:
+        return self._navigate_variations_enabled
+
     def get_game_model(self) -> GameModel:
         """Get the game model.
         
@@ -158,6 +187,7 @@ class GameController:
         """
         # Set the active game in the model
         self.game_model.set_active_game(game)
+        self._clear_rejoin_mainline_arm()
         
         # Reset active move to starting position
         self.game_model.set_active_move_ply(0)
@@ -247,10 +277,14 @@ class GameController:
     def clear_active_game(self) -> None:
         """Clear the active game."""
         self.game_model.clear_active_game()
+        self._clear_rejoin_mainline_arm()
         # Active move is already reset in clear_active_game()
     
     def navigate_to_next_move(self) -> bool:
-        """Navigate to the next move in the active game.
+        """Navigate one ply forward along the active path (mainline when disabled).
+        
+        At the end of a sideline, the first call arms a rejoin (no movement); the
+        next call jumps to the mainline move at the divergence point.
         
         Returns:
             True if navigation was successful, False if already at last move or no game.
@@ -260,41 +294,50 @@ class GameController:
             return False
         
         try:
-            # Parse the PGN to get the game
-            pgn_io = io.StringIO(game.pgn)
-            chess_game = chess.pgn.read_game(pgn_io)
-            
+            chess_game = self._parse_active_chess_game()
             if chess_game is None:
                 return False
-            
-            # Count total plies in the game
-            total_plies = 0
-            node = chess_game
-            while node.variations:
-                node = node.variation(0)
-                total_plies += 1
-            
-            # Get current ply index
-            current_ply = self.game_model.get_active_move_ply()
-            
-            # Check if we can move forward
-            if current_ply >= total_plies:
-                return False
-            
-            # Move to next ply
-            new_ply = current_ply + 1
-            self.game_model.set_active_move_ply(new_ply)
-            
-            # Update board position to the new move
-            self._update_board_to_ply(chess_game, new_ply)
-            
-            return True
+
+            path = self.game_model.get_active_path()
+            if not self._navigate_variations_enabled:
+                path = mainline_path_for_ply(self.game_model.get_active_move_ply())
+
+            choices = forward_choices(chess_game, path)
+            if choices:
+                self._clear_rejoin_mainline_arm()
+                if self._navigate_variations_enabled and len(choices) > 1:
+                    # Caller (PGN view) should show the branch overlay instead of auto-advancing.
+                    return False
+                return self.navigate_to_path(choices[0][0])
+
+            # End of the current line.
+            if self._navigate_variations_enabled and not is_mainline_path(path):
+                if not self._rejoin_mainline_armed:
+                    self._rejoin_mainline_armed = True
+                    return False
+                self._clear_rejoin_mainline_arm()
+                rejoin = mainline_rejoin_path(path)
+                if rejoin is None or node_at_path(chess_game, rejoin) is None:
+                    return False
+                return self.navigate_to_path(rejoin)
+
+            self._clear_rejoin_mainline_arm()
+            return False
             
         except Exception:
             return False
+
+    def get_forward_branch_choices(self) -> List[Tuple[Path, str]]:
+        """Return forward move choices from the active path (empty if none / disabled)."""
+        if not self._navigate_variations_enabled:
+            return []
+        chess_game = self._parse_active_chess_game()
+        if chess_game is None:
+            return []
+        return forward_choices(chess_game, self.game_model.get_active_path())
     
     def navigate_to_previous_move(self) -> bool:
-        """Navigate to the previous move in the active game.
+        """Navigate one ply backward along the active path.
         
         Returns:
             True if navigation was successful, False if already at first move or no game.
@@ -304,34 +347,25 @@ class GameController:
             return False
         
         try:
-            # Parse the PGN to get the game
-            pgn_io = io.StringIO(game.pgn)
-            chess_game = chess.pgn.read_game(pgn_io)
-            
+            chess_game = self._parse_active_chess_game()
             if chess_game is None:
                 return False
-            
-            # Get current ply index
-            current_ply = self.game_model.get_active_move_ply()
-            
-            # Check if we can move backward
-            if current_ply <= 0:
+
+            path = self.game_model.get_active_path()
+            if not self._navigate_variations_enabled:
+                path = mainline_path_for_ply(self.game_model.get_active_move_ply())
+
+            if not path:
                 return False
-            
-            # Move to previous ply
-            new_ply = current_ply - 1
-            self.game_model.set_active_move_ply(new_ply)
-            
-            # Update board position to the new move
-            self._update_board_to_ply(chess_game, new_ply)
-            
-            return True
+
+            self._clear_rejoin_mainline_arm()
+            return self.navigate_to_path(parent_path(path))
             
         except Exception:
             return False
     
     def navigate_to_ply(self, ply_index: int) -> bool:
-        """Navigate to a specific ply index in the active game.
+        """Navigate to a specific mainline ply index in the active game.
         
         Args:
             ply_index: Ply index (0 = starting position, 1 = after first move, etc.).
@@ -339,39 +373,46 @@ class GameController:
         Returns:
             True if navigation was successful, False if no game or invalid ply.
         """
+        return self.navigate_to_path(mainline_path_for_ply(ply_index))
+
+    def navigate_to_path(self, path: Sequence[int]) -> bool:
+        """Navigate to a variation path and update the board."""
         game = self.game_model.active_game
         if game is None:
             return False
-        
         try:
-            # Parse the PGN to get the game
-            pgn_io = io.StringIO(game.pgn)
-            chess_game = chess.pgn.read_game(pgn_io)
-            
+            chess_game = self._parse_active_chess_game()
             if chess_game is None:
                 return False
-            
-            # Count total plies in the game
-            total_plies = 0
-            node = chess_game
-            while node.variations:
-                node = node.variation(0)
-                total_plies += 1
-            
-            # Check if ply_index is valid
-            if ply_index < 0 or ply_index > total_plies:
+            target = tuple(int(i) for i in path)
+            if node_at_path(chess_game, target) is None:
                 return False
-            
-            # Set active move ply
-            self.game_model.set_active_move_ply(ply_index)
-            
-            # Update board position to the new move
-            self._update_board_to_ply(chess_game, ply_index)
-            
+            if not self._navigate_variations_enabled and not is_mainline_path(target):
+                return False
+            if target != self.game_model.get_active_path():
+                self._clear_rejoin_mainline_arm()
+            self.game_model.set_active_path(target)
+            self._update_board_to_path(chess_game, target)
             return True
-            
         except Exception:
             return False
+
+    def return_to_mainline_ancestor(self) -> bool:
+        """Snap back to the mainline ancestor of the current path (or stay if already there)."""
+        path = self.game_model.get_active_path()
+        if is_mainline_path(path):
+            return self.navigate_to_path(path)
+        ancestor = mainline_path_for_ply(self.game_model.get_active_move_ply())
+        return self.navigate_to_path(ancestor)
+
+    def _parse_active_chess_game(self) -> Optional[chess.pgn.Game]:
+        game = self.game_model.active_game
+        if game is None or not game.pgn:
+            return None
+        try:
+            return chess.pgn.read_game(io.StringIO(game.pgn))
+        except Exception:
+            return None
 
     def get_move_notation_to_ply_map(self) -> Dict[str, int]:
         """Build a map of move notation string -> ply index for the active game (for move linking).
@@ -404,11 +445,11 @@ class GameController:
         return result
 
     def validate_and_clamp_active_move_ply(self) -> bool:
-        """Validate and clamp the active move ply to the current game length.
+        """Validate and clamp the active path to the current game tree.
         
         This should be called after the PGN is permanently modified to ensure
-        the active_move_ply is still valid. If it's out of bounds, it will be
-        clamped to the maximum valid ply.
+        the active path is still valid. If it's out of bounds, it will be
+        clamped toward the longest valid prefix / mainline end.
         
         Returns:
             True if validation/clamping was successful, False if no game or parsing failed.
@@ -418,109 +459,68 @@ class GameController:
             return False
         
         try:
-            # Parse the PGN to get the game
-            pgn_io = io.StringIO(game.pgn)
-            chess_game = chess.pgn.read_game(pgn_io)
-            
+            chess_game = self._parse_active_chess_game()
             if chess_game is None:
-                # If parsing fails, don't modify state - just return False
                 return False
-            
-            # Count total plies in the game
-            total_plies = 0
-            node = chess_game
-            while node.variations:
-                node = node.variation(0)
-                total_plies += 1
-            
-            # Get current ply index
-            current_ply = self.game_model.get_active_move_ply()
-            
-            # Only clamp if out of bounds - don't change if already valid
-            if current_ply < 0:
-                new_ply = 0
-            elif current_ply > total_plies:
-                new_ply = total_plies
-            else:
-                # Already valid, just update board position to current ply
-                # Don't change active_move_ply to avoid unnecessary signal emissions
-                self._update_board_to_ply(chess_game, current_ply)
-                return True
-            
-            # Only update if we actually need to clamp
-            if new_ply != current_ply:
-                self.game_model.set_active_move_ply(new_ply)
-                # Update board position to the clamped ply
-                self._update_board_to_ply(chess_game, new_ply)
-            
+
+            path = self.game_model.get_active_path()
+            if not self._navigate_variations_enabled:
+                path = mainline_path_for_ply(self.game_model.get_active_move_ply())
+
+            # Shrink path until valid.
+            while path and node_at_path(chess_game, path) is None:
+                path = parent_path(path)
+
+            if not self._navigate_variations_enabled:
+                # Stay on mainline end if needed.
+                total = 0
+                node = chess_game
+                while node.variations:
+                    node = node.variation(0)
+                    total += 1
+                ply = min(len(path), total)
+                path = mainline_path_for_ply(ply)
+
+            self.game_model.set_active_path(path)
+            self._update_board_to_path(chess_game, path)
             return True
             
         except Exception:
-            # If anything fails, don't modify state - just return False
             return False
     
     def _update_board_to_ply(self, chess_game: chess.pgn.Game, ply_index: int) -> None:
-        """Update board position to a specific ply index.
-        
-        Args:
-            chess_game: The parsed chess game.
-            ply_index: Ply index (0 = starting position, 1 = after first move, etc.).
-        """
+        """Update board position to a mainline ply index."""
+        self._update_board_to_path(chess_game, mainline_path_for_ply(ply_index))
+
+    def _update_board_to_path(self, chess_game: chess.pgn.Game, path: Sequence[int]) -> None:
+        """Update board position to a variation path."""
         try:
-            if ply_index == 0:
-                # Reset to starting position
+            target = tuple(int(i) for i in path)
+            if not target:
                 headers = chess_game.headers
                 if headers.get("SetUp") == "1" and "FEN" in headers:
                     fen = headers.get("FEN")
                     self.board_controller.set_fen_with_validation(fen, last_move=None)
                 else:
                     self.board_controller.reset_board()
-            else:
-                # Navigate to the ply_index-th move
-                # When ply_index = 1, we want to show the position after the first move
-                # and highlight that first move (e.g., e4)
-                # When ply_index = 2, we want to show the position after the second move
-                # and highlight that second move (e.g., e6)
-                node = chess_game
-                last_move = None
-                
-                # Navigate through the game tree to reach the target ply
-                # We need to capture the move that was played to reach the target position
-                # In python-chess, each node has a .move property that is the move that led TO this node
-                # So after navigating to a node, node.move is the move that got us there
-                # But we need to capture it BEFORE moving, so we get it from the variation
-                for i in range(ply_index):
-                    if not node.variations:
-                        break
-                    # Get the move that leads FROM the current node TO the next node
-                    # node.variation(0) returns the child node
-                    # node.variation(0).move gives us the move property of the child node
-                    # which is the move that leads FROM the current node TO the child
-                    # This is the move that was played to reach the next position
-                    # CRITICAL: We capture the move BEFORE moving to ensure we get the correct one
-                    move_played = node.variation(0).move
-                    # Move to the next node
-                    node = node.variation(0)
-                    # Store the move - this will be overwritten each iteration
-                    # The final value will be the move that got us to the target position
-                    # For ply_index = 1: i=0, we get e4 (move from root to first child), move to node after e4, last_move = e4
-                    # For ply_index = 2: i=0 gets e4, i=1 gets e6 (move from node after e4 to node after e6), last_move = e6
-                    last_move = move_played
-                
-                # Get the FEN from the node's board position (after the move)
-                fen = node.board().fen()
-                
-                # CRITICAL: last_move should be the move that was played to reach THIS position
-                # If we're at ply_index = 1, last_move should be e4 (the first move)
-                # If we're at ply_index = 2, last_move should be e6 (the second move)
-                # The arrow should show the move that got us to where we are, not the next move
-                self.board_controller.set_fen_with_validation(fen, last_move=last_move)
+                return
+
+            node: chess.pgn.GameNode = chess_game
+            last_move = None
+            for idx in target:
+                if idx < 0 or idx >= len(node.variations):
+                    break
+                move_played = node.variation(idx).move
+                node = node.variation(idx)
+                last_move = move_played
+
+            fen = node.board().fen()
+            self.board_controller.set_fen_with_validation(fen, last_move=last_move)
         except Exception:
-            # If navigation fails, reset to starting position
             self.board_controller.reset_board()
     
     def _navigate_to_ply_in_game(self, chess_game: chess.pgn.Game, ply_index: int) -> Optional[chess.pgn.GameNode]:
-        """Navigate to a specific ply index in a chess game.
+        """Navigate to a specific mainline ply index in a chess game.
         
         Args:
             chess_game: The parsed chess game.
@@ -529,16 +529,7 @@ class GameController:
         Returns:
             The game node at the specified ply index, or None if invalid.
         """
-        if ply_index < 0:
-            return None
-        
-        node = chess_game
-        for i in range(ply_index):
-            if not node.variations:
-                return None
-            node = node.variation(0)
-        
-        return node
+        return node_at_path(chess_game, mainline_path_for_ply(ply_index))
     
     def _parse_move_from_san_at_position(self, board: chess.Board, san_string: str) -> Optional[chess.Move]:
         """Parse a move from SAN notation at a specific board position.

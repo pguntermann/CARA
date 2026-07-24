@@ -9,11 +9,15 @@ import re
 import io
 from dataclasses import dataclass
 from typing import Dict, Any, Tuple, List, Optional, Sequence
+
+import chess.pgn
+
 from app.services.logging_service import LoggingService
 
 # Stable interaction anchors embedded in formatted HTML (visible text only; identity in href).
 PGN_PLY_HREF_PREFIX = "cara-ply:"
 PGN_COMMENT_HREF_PREFIX = "cara-cmt:"
+PGN_PATH_HREF_PREFIX = "cara-path:"
 
 
 @dataclass(frozen=True)
@@ -26,11 +30,21 @@ class PgnTextRange:
 
 
 @dataclass(frozen=True)
+class PgnPathRange:
+    """Half-open plaintext range for a variation path move."""
+
+    path: Tuple[int, ...]
+    start: int
+    end: int
+
+
+@dataclass(frozen=True)
 class PgnRangeMap:
     """One-way index of interactive regions after HTML → document render."""
 
     moves: Tuple[PgnTextRange, ...] = ()
     comments: Tuple[PgnTextRange, ...] = ()
+    path_moves: Tuple[PgnPathRange, ...] = ()
 
     def move_ply_at(self, position: int) -> int:
         for item in self.moves:
@@ -44,9 +58,22 @@ class PgnRangeMap:
                 return item.ply
         return None
 
+    def path_at(self, position: int) -> Optional[Tuple[int, ...]]:
+        for item in self.path_moves:
+            if item.start <= position < item.end:
+                return item.path
+        return None
+
     def move_range(self, ply: int) -> Optional[PgnTextRange]:
         for item in self.moves:
             if item.ply == ply:
+                return item
+        return None
+
+    def path_range(self, path: Sequence[int]) -> Optional[PgnPathRange]:
+        target = tuple(int(i) for i in path)
+        for item in self.path_moves:
+            if item.path == target:
                 return item
         return None
 
@@ -59,6 +86,13 @@ def ply_href(ply: int) -> str:
 def comment_href(ply: int) -> str:
     """Return the HTML href for a main-line comment owned by 1-based ply."""
     return f"{PGN_COMMENT_HREF_PREFIX}{int(ply)}"
+
+
+def path_href(path: Sequence[int]) -> str:
+    """Return the HTML href for a variation path."""
+    from app.utils.pgn_variation_path import encode_path
+
+    return f"{PGN_PATH_HREF_PREFIX}{encode_path(path)}"
 
 
 def parse_ply_href(href: str) -> Optional[int]:
@@ -81,12 +115,34 @@ def parse_comment_href(href: str) -> Optional[int]:
     return ply if ply > 0 else None
 
 
+def parse_path_href(href: str) -> Optional[Tuple[int, ...]]:
+    if not href or not href.startswith(PGN_PATH_HREF_PREFIX):
+        return None
+    from app.utils.pgn_variation_path import decode_path
+
+    return decode_path(href[len(PGN_PATH_HREF_PREFIX) :])
+
+
+def _end_of_anchor_element(text: str, start: int) -> Optional[int]:
+    """If ``text[start:]`` begins with ``<a ...>``, return index after matching ``</a>``."""
+    if start < 0 or start >= len(text) or not text.startswith("<a", start):
+        return None
+    tag_end = text.find(">", start)
+    if tag_end == -1:
+        return None
+    close = text.find("</a>", tag_end + 1)
+    if close == -1:
+        return None
+    return close + len("</a>")
+
+
 def build_pgn_range_map_from_fragments(
     fragments: Sequence[Tuple[int, int, str]],
 ) -> PgnRangeMap:
     """Build a range map from ``(start, length, href)`` document fragments."""
     moves: List[PgnTextRange] = []
     comments: List[PgnTextRange] = []
+    path_moves: List[PgnPathRange] = []
     for start, length, href in fragments:
         if length <= 0:
             continue
@@ -97,9 +153,16 @@ def build_pgn_range_map_from_fragments(
         cply = parse_comment_href(href)
         if cply is not None:
             comments.append(PgnTextRange(ply=cply, start=start, end=start + length))
+            continue
+        path = parse_path_href(href)
+        if path is not None:
+            path_moves.append(PgnPathRange(path=path, start=start, end=start + length))
     moves.sort(key=lambda r: (r.ply, r.start))
     comments.sort(key=lambda r: (r.start, r.ply))
-    return PgnRangeMap(moves=tuple(moves), comments=tuple(comments))
+    path_moves.sort(key=lambda r: (r.start, r.path))
+    return PgnRangeMap(
+        moves=tuple(moves), comments=tuple(comments), path_moves=tuple(path_moves)
+    )
 
 
 # Game outcomes in move text: 1-0 / 0-1 / 1/2-1/2 use word boundaries. "*" is not a word character,
@@ -1605,8 +1668,27 @@ class PgnFormatterService:
         
         # Format variations: wrap parentheses and format moves within them
         # NAG text is already styled above, so variation formatter will skip it
+        # Build sideline path queue (PGN order) so variation SANs can get cara-path anchors.
+        variation_path_queue: List[Tuple[Tuple[int, ...], str]] = []
+        try:
+            parsed_game = chess.pgn.read_game(io.StringIO(pgn_text))
+            if parsed_game is not None:
+                from app.utils.pgn_variation_path import collect_variation_move_paths
+
+                variation_path_queue = list(collect_variation_move_paths(parsed_game))
+        except Exception:
+            variation_path_queue = []
+
         formatted = PgnFormatterService._format_variations_with_moves(
-            formatted, variation_color, variation_italic, span, comment_color, header_color, nags_config
+            formatted,
+            variation_color,
+            variation_italic,
+            span,
+            comment_color,
+            header_color,
+            nags_config,
+            styled_anchor=styled_anchor,
+            variation_path_queue=variation_path_queue,
         )
         
         # Format move numbers (e.g., 1., 2., 12., etc.) - but skip if inside HTML tags, headers, or variations
@@ -1640,6 +1722,13 @@ class PgnFormatterService:
         
         while i < len(formatted):
             if formatted[i] == '<':
+                # Skip already-anchored variation (or other) moves as whole elements.
+                if formatted.startswith('<a', i):
+                    end = _end_of_anchor_element(formatted, i)
+                    if end is not None:
+                        result_parts.append(formatted[i:end])
+                        i = end
+                        continue
                 # Check if this is a closing span tag first
                 if i + 7 < len(formatted) and formatted[i:i+7] == '</span>':
                     # Closing span tag - update span stack/flags
@@ -1726,6 +1815,14 @@ class PgnFormatterService:
         
         while i < len(formatted):
             if formatted[i] == '<':
+                # Variation SANs are already <a href="cara-path:..."> — copy whole element,
+                # otherwise their text would be re-anchored as main-line cara-ply.
+                if formatted.startswith('<a', i):
+                    end = _end_of_anchor_element(formatted, i)
+                    if end is not None:
+                        result_parts.append(formatted[i:end])
+                        i = end
+                        continue
                 # Check if this is a closing span tag first
                 if i + 7 < len(formatted) and formatted[i:i+7] == '</span>':
                     # Closing span tag - update span stack/flags
@@ -1977,6 +2074,12 @@ class PgnFormatterService:
         
         while i < len(formatted):
             if formatted[i] == '<':
+                if formatted.startswith('<a', i):
+                    end = _end_of_anchor_element(formatted, i)
+                    if end is not None:
+                        result_parts.append(formatted[i:end])
+                        i = end
+                        continue
                 # Check if this is a closing span tag first
                 if i + 7 < len(formatted) and formatted[i:i+7] == '</span>':
                     if span_stack:
@@ -2098,7 +2201,9 @@ class PgnFormatterService:
         span_func,
         comment_color: list,
         header_color: list,
-        nags_config: Optional[Dict[str, Any]] = None
+        nags_config: Optional[Dict[str, Any]] = None,
+        styled_anchor=None,
+        variation_path_queue: Optional[List[Tuple[Tuple[int, ...], str]]] = None,
     ) -> str:
         """Format variations by parsing individual moves within them.
         
@@ -2269,7 +2374,12 @@ class PgnFormatterService:
                             
                             # Format moves within the variation
                             formatted_variation = PgnFormatterService._format_moves_in_variation(
-                                variation_content, variation_color, variation_italic, span_func
+                                variation_content,
+                                variation_color,
+                                variation_italic,
+                                span_func,
+                                styled_anchor=styled_anchor,
+                                variation_path_queue=variation_path_queue,
                             )
                             
                             result_parts.append(formatted_variation)
@@ -2301,7 +2411,9 @@ class PgnFormatterService:
         text: str,
         variation_color: list,
         variation_italic: bool,
-        span_func
+        span_func,
+        styled_anchor=None,
+        variation_path_queue: Optional[List[Tuple[Tuple[int, ...], str]]] = None,
     ) -> str:
         """Format individual moves in variation text.
         
@@ -2311,10 +2423,14 @@ class PgnFormatterService:
             variation_color: Color for variation moves.
             variation_italic: Whether variation moves should be italic.
             span_func: Function to create HTML spans.
+            styled_anchor: Optional anchor factory for ``cara-path`` hrefs.
+            variation_path_queue: Sideline ``(path, san)`` entries in PGN order.
             
         Returns:
             Formatted text with moves individually styled.
         """
+        from app.utils.pgn_variation_path import strip_san_suffixes
+
         # Pattern to match moves in variations (must include castling so variation castling gets
         # variation styling and is not later treated as a main-line move anchor).
         # Matches: optional move number (e.g., "13.", "13. ", or "13... "), then move SAN, preserving whitespace after.
@@ -2398,8 +2514,21 @@ class PgnFormatterService:
                         if move_number.rstrip() != move_number:
                             result_parts.append(' ')
                     
-                    # Format move SAN with variation styling
-                    result_parts.append(span_func(move_san, variation_color, italic=variation_italic))
+                    # Format move SAN — attach cara-path when the sideline queue aligns.
+                    move_html = None
+                    if styled_anchor is not None and variation_path_queue:
+                        expected_path, expected_san = variation_path_queue[0]
+                        if strip_san_suffixes(move_san) == strip_san_suffixes(expected_san):
+                            variation_path_queue.pop(0)
+                            move_html = styled_anchor(
+                                move_san,
+                                path_href(expected_path),
+                                variation_color,
+                                italic=variation_italic,
+                            )
+                    if move_html is None:
+                        move_html = span_func(move_san, variation_color, italic=variation_italic)
+                    result_parts.append(move_html)
                     
                     # Preserve trailing whitespace
                     if trailing_whitespace:

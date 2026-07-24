@@ -302,7 +302,7 @@
                     
                     <li><strong>Opening Explorer:</strong> Browse the opening path that led to the current position and expand book continuations from here using CARA's ECO opening database. Embedded mini boards follow the main board's piece set, colors, and orientation. Jump to a position on the path or open the corresponding Lichess opening explorer page. Access via <span class="menu-item">View → Opening Explorer</span> (<code>F4</code>).</li>
                     
-                    <li><strong>Annotations:</strong> Powerful free-form annotation system for marking positions, ideas, and analysis insights. Unlike other chess applications, text can be freely positioned anywhere on the board, adjusted in size and rotated. In addition to text, you can add arrows, circles, and square highlighting with customizable colors. Annotations are position-specific, attached to individual moves in the game, and are compressed and serialized in a PGN metadata tag to keep the PGN move notation clean. This flexible annotation system enables you to create rich, personalized study materials and analysis notes.</li>
+                    <li><strong>Annotations:</strong> Powerful free-form annotation system for marking positions, ideas, and analysis insights. Unlike other chess applications, text can be freely positioned anywhere on the board, adjusted in size and rotated. In addition to text, you can add arrows, circles, and square highlighting with customizable colors. Annotations are position-specific, attached to the current path in the game tree (mainline or variation), and are compressed and serialized in a PGN metadata tag to keep the PGN move notation clean. This flexible annotation system enables you to create rich, personalized study materials and analysis notes.</li>
                     
                     <li><strong>UCI Engine Integration:</strong> CARA uses the UCI (Universal Chess Interface) protocol, so you can use any UCI-compatible chess engine (for example Stockfish, Lc0, Komodo, Shredder). The system supports multiple engine setups with per-task configuration, allowing you to assign different engines to different analysis tasks: evaluation (for the evaluation bar), game analysis, manual analysis, and brilliancy detection. Each task can have its own engine and task-specific parameters such as thread count, depth limits, time limits, and engine-specific options. You can use a single engine for all tasks or mix and match—for example, a fast engine for evaluation and a stronger one for deep game analysis. Each engine operation runs in dedicated threads, keeping the interface responsive. If you’re not sure what to install, see <a href="#recommended-engines">section 7.10 “Recommended Chess Engines”</a>.</li>
                     
@@ -622,7 +622,7 @@
                 <p>The interface is designed to be intuitive and efficient. You can resize panels by dragging the splitter handles between them, customize which information is displayed, and use keyboard shortcuts for quick navigation. The application automatically updates all views when you navigate through a game, ensuring that the chessboard, move lists, evaluations, and statistics stay synchronized.</p>
                 
                 <div class="tip-box">
-                    <strong>Quick Tip:</strong> Use the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys to navigate through game moves. This is the primary and most efficient way to review games move-by-move. The board, moves list, and all analysis views update automatically as you navigate.
+                    <strong>Quick Tip:</strong> Use the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys to navigate through game moves. This is the primary and most efficient way to review games move-by-move. The board, moves list, and all analysis views update automatically as you navigate. With <span class="menu-item">PGN → Enable navigating into variations</span> turned on, the arrows follow the active line (including sidelines) and can open a branch selector when several continuations exist—see <a href="#detail-panel">section 4.5</a>.
                 </div>
                 
                 <p>CARA separates behavioral configuration from visual styling. Use <code>config.json</code> for things like import/export behavior, logging, and formulas. Use the theme / style config files in <code>app/config/</code> for colors, fonts, spacing, and other UI appearance settings.</p>
@@ -654,6 +654,8 @@
                 
                 <p>Rotate the board 180 degrees using the <code>X</code> key or <span class="menu-item">Board → Rotate Board</span>. Rotation is visual only and does not change the position—FEN notation always represents positions from White's perspective.</p>
 
+                <p>When you are viewing a <strong>variation</strong> (sideline) position with variation navigation enabled, the board uses a distinct theme appearance—typically a different frame color, square colors, and last-move highlight—so it is clear you are off the main line. These colors are defined in the theme / style config files under <code>ui.panels.main.board.variation_appearance</code> (see <a href="#customizing-themes">section 7.1.4</a>).</p>
+
                 <p><strong>Context menu:</strong> You can also <strong>right-click</strong> on the chessboard to open a context menu with quick access to common actions. These entries mirror the corresponding options from the menu bar.</p>
                 
                 <p>The following visual indicators can be toggled on or off:</p>
@@ -680,7 +682,7 @@
                 <p>Toggle visibility with <code>Alt+I</code> / <code>⌥+I</code> or <span class="menu-item">Board → Show Game Info</span>.</p>
                 
                 <h5 id="evaluation-bar">4.3.3 Evaluation Bar</h5>
-                <p>The evaluation bar appears on the left side of the chessboard and shows the engine's evaluation of the current position. The bar uses white and black colors: positive values (White advantage) are shown in white extending upward from the center, negative values (Black advantage) are shown in black extending downward from the center. The scale ranges from -1000 to +1000 centipawns, with division marks at 100, 200, 300, 500, and 1000 centipawns to help gauge the evaluation magnitude. Toggle with <code>Alt+E</code> / <code>⌥+E</code> or <span class="menu-item">Board → Show Evaluation Bar</span>. When the evaluation bar is shown, the status bar displays detailed engine information including the engine name, search depth, evaluation score, principal variation, and performance metrics such as nodes per second and hash table usage.</p>
+                <p>The evaluation bar appears on the left side of the chessboard and shows the engine's evaluation of the current position. The bar uses white and black colors: positive values (White advantage) are shown in white extending upward from the center, negative values (Black advantage) are shown in black extending downward from the center. The scale ranges from -1000 to +1000 centipawns, with division marks at 100, 200, 300, 500, and 1000 centipawns to help gauge the evaluation magnitude. Toggle with <code>Alt+E</code> / <code>⌥+E</code> or <span class="menu-item">Board → Show Evaluation Bar</span>. When the evaluation bar is shown, the status bar displays detailed engine information including the engine name, search depth, evaluation score, principal variation, and performance metrics such as nodes per second and hash table usage. The bar always evaluates the position currently shown on the board—including variation (sideline) positions when you navigate into them.</p>
                 
                 <p><strong>Note:</strong> The evaluation bar requires a chess engine to be assigned to the evaluation task. See <a href="#configuring-engines">section 5.1</a> for instructions on configuring engines.</p>
                 
@@ -858,7 +860,17 @@
                     <strong>Quick Tip:</strong> You can customize the display format for NAG move assessments (symbols vs. text) using the PGN menu (Display NAG move assessments as...). Colors and fonts are adjusted through the theme / style config files. See <a href="#customizing-themes">section 7.1.4 “Theme / Style Files”</a> for advanced customization options.
                 </div>
                 
-                <p>As you navigate through the game using the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys, the active move is highlighted in the PGN notation. A <strong>single click</strong> on any main-line move jumps to that position. Single clicks on variation moves, comment text, or metadata tags do not change the current position.</p>
+                <p>As you navigate through the game using the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys, the active move is highlighted in the PGN notation. A <strong>single click</strong> on any main-line move jumps to that position.</p>
+                <p><strong>Navigating into variations:</strong> By default, <code>←</code> / <code>→</code> and clicks stay on the main line—single clicks on variation moves do not change the position. Enable <span class="menu-item">PGN → Enable navigating into variations</span> (also available from the PGN notation context menu) to browse sidelines:</p>
+                <ul>
+                    <li><strong>Click</strong> a variation move in the PGN pane to jump to that sideline position.</li>
+                    <li><code>→</code> (Right Arrow) advances along the active line. When several continuations exist from the current node, a small <strong>branch selector</strong> appears: use <code>↑</code> / <code>↓</code> to highlight a choice, <code>→</code> / <code>Enter</code> to take it, and <code>←</code> / <code>Esc</code> to dismiss the overlay. The mainline continuation is listed first, separated visually from the sideline options.</li>
+                    <li><code>←</code> (Left Arrow) steps back along the active path (including within a variation).</li>
+                    <li>At the <strong>end of a variation</strong>, the first <code>→</code> does nothing; a second <code>→</code> jumps to the mainline move at the fork (the move that was played in the game instead of the variation start).</li>
+                    <li>While on a sideline, the chessboard uses its variation appearance (see <a href="#chessboard">section 4.3.1</a>). Manual analysis and the evaluation bar follow the variation position as well.</li>
+                    <li>The Moves List and other mainline-oriented views stay on the mainline ancestor while you browse a sideline.</li>
+                </ul>
+                <p>Turning variation navigation off (or hiding variations with <span class="menu-item">PGN → Show Variations</span>) snaps you back to the mainline ancestor of the current path if you were on a sideline.</p>
                 <p>With <span class="menu-item">PGN → Show Comments</span> enabled, <strong>double-click</strong> inside a <strong>main-line</strong> comment (text in curly braces on the main line) to open the move-comments editor for that full move. For what the dialog contains and how changes are saved, see <a href="#editing-move-comments">Editing move comments</a> in <a href="#moves-list">section 4.5.1</a>.</p>
                 <p><strong>Context menu:</strong> You can also <strong>right-click</strong> inside the PGN notation pane to open a context menu with quick access to common PGN actions. These entries mirror the corresponding options from the menu bar.</p>
                 
@@ -872,6 +884,7 @@
                     <li><span class="menu-item">PGN → Show Non-Standard Tags</span> (<code>Ctrl+Shift+T</code> / <code>⌘+Shift+T</code>): Toggle display of non-standard tags like [%evp] and [%mdl] within comments</li>
                     <li><span class="menu-item">PGN → Show Annotations</span> (<code>Ctrl+Shift+A</code> / <code>⌘+Shift+A</code>): Toggle display of move annotations, including symbol-based annotations (!, !!, ?, ??, !?, ?!) and NAGs (Numeric Annotation Glyphs).</li>
                     <li><span class="menu-item">PGN → Show Results</span> (<code>Ctrl+R</code> / <code>⌘+R</code>): Toggle display of game results (1-0, 0-1, 1/2-1/2)</li>
+                    <li><span class="menu-item">PGN → Enable navigating into variations</span>: Allow keyboard and click navigation into PGN sidelines (branch selector, variation board appearance)</li>
                     <li><span class="menu-item">PGN → Display NAG move assessments as...</span>: Choose between displaying NAGs as symbols (??, ?, ?! ..) or as text descriptions</li>
                 </ul>
                 
@@ -914,7 +927,7 @@
                 <p>To edit a tag value, double-click on the value cell in the table and type the new value. Tag names cannot be edited, but you can remove a tag and add a new one with a different name if needed. To add a new tag, click the <strong>Add</strong> button at the top of the metadata view, enter the tag name and value in the dialog, then click OK. To remove a tag, select the tag row in the table and click the <strong>Remove</strong> button. You will be asked to confirm the removal. Note that some tags (such as CARA analysis and annotation tags) are read-only and cannot be edited or removed.</p>
                 
                 <h5 id="manual-analysis">4.5.3 Manual Analysis</h5>
-                <p>The Manual Analysis tab provides continuous engine analysis of the current position with MultiPV (Multiple Principal Variations) support. Access this tab using <span class="menu-item">View → Manual Analysis</span> or press <code>F3</code>.</p>
+                <p>The Manual Analysis tab provides continuous engine analysis of the current position with MultiPV (Multiple Principal Variations) support. Access this tab using <span class="menu-item">View → Manual Analysis</span> or press <code>F3</code>. While analysis is running, the engine follows the position shown on the board—including variation (sideline) positions when <span class="menu-item">PGN → Enable navigating into variations</span> is on.</p>
                 
                 <p><strong>Note:</strong> Manual analysis requires a chess engine to be assigned to the manual analysis task. See <a href="#configuring-engines">section 5.1</a> for instructions on configuring engines.</p>
                 
@@ -1015,7 +1028,7 @@
                 <h5 id="annotations">4.5.7 Annotations</h5>
                 <p>The Annotations tab provides tools for creating and managing custom CARA annotations on the chessboard. Unlike regular PGN annotations, CARA annotations include free-form text that can be positioned anywhere on the board, adjusted in size and rotated.</p>
                 
-                <p>You can also add arrows, circles, and square highlighting with customizable colors. Annotations are position-specific, attached to individual moves in the game, and are compressed and serialized in a PGN metadata tag to keep the PGN move notation clean.</p>
+                <p>You can also add arrows, circles, and square highlighting with customizable colors. Annotations are position-specific, attached to the current path in the game tree (mainline or variation), and are compressed and serialized in a PGN metadata tag to keep the PGN move notation clean.</p>
                 
                 <p>Access this tab using <span class="menu-item">View → Annotations</span> or press <code>F7</code>.</p>
                 
@@ -1060,8 +1073,11 @@
                 
                 <h5>4.6.1 Navigation</h5>
                 <ul>
-                    <li><code>←</code> (Left Arrow): Navigate to the previous move in the game</li>
-                    <li><code>→</code> (Right Arrow): Navigate to the next move in the game</li>
+                    <li><code>←</code> (Left Arrow): Navigate to the previous move along the active path (main line, or within a variation when variation navigation is enabled)</li>
+                    <li><code>→</code> (Right Arrow): Navigate to the next move along the active path; with variation navigation enabled, opens the branch selector when multiple continuations exist</li>
+                    <li><code>↑</code> / <code>↓</code>: While the branch selector is open, move the highlight among choices</li>
+                    <li><code>Enter</code>: While the branch selector is open, take the highlighted continuation (<code>→</code> also confirms)</li>
+                    <li><code>Esc</code>: Dismiss the branch selector without moving (<code>←</code> also dismisses)</li>
                 </ul>
                 
                 <h5>4.6.2 Board Controls</h5>
@@ -1703,13 +1719,13 @@
 
             <div class="outline-item">
                 <h4 id="manual-analysis-task">5.6 Manual Analysis</h4>
-                <p>Manual Analysis provides continuous engine analysis of any position, allowing you to explore candidate moves and understand the engine's recommendations in real-time. Unlike game analysis which processes all moves in a game, manual analysis focuses on the current position and updates continuously as you navigate through the game.</p>
+                <p>Manual Analysis provides continuous engine analysis of any position, allowing you to explore candidate moves and understand the engine's recommendations in real-time. Unlike game analysis which processes all moves in a game, manual analysis focuses on the current board position and updates continuously as you navigate—including into PGN variations when variation navigation is enabled (see <a href="#detail-panel">section 4.5</a>).</p>
                 
                 <h5 id="starting-manual-analysis">5.6.1 Starting Manual Analysis</h5>
                 <p>To start analyzing the current position:</p>
                 <ol>
                     <li><strong>Navigate to the position:</strong><br>
-                    Use the arrow keys or click moves in the Moves List to navigate to the position you want to analyze.</li>
+                    Use the arrow keys or click moves in the Moves List or PGN pane to navigate to the position you want to analyze. With <span class="menu-item">PGN → Enable navigating into variations</span> enabled, you can also click variation moves or use the branch selector to analyze a sideline position.</li>
                     
                     <li><strong>Switch to Manual Analysis tab:</strong><br>
                     Navigate to the <span class="menu-item">Manual Analysis</span> tab in the Detail Panel (<code>F3</code>).</li>
@@ -2010,13 +2026,13 @@
                 <p>Changes are saved to your user settings when you click "Save" and will persist across sessions.</p>
                 
                 <h5 id="managing-annotations">5.8.3 Managing Annotations</h5>
-                <p>Annotations are automatically attached to the current move (position) in the game. As you navigate through the game, annotations for each position are shown or hidden automatically.</p>
+                <p>Annotations are automatically attached to the current board position in the game tree, including positions reached through variations. As you navigate the mainline or sidelines, annotations for each path are shown or hidden automatically.</p>
                 <p>You can manage annotations using the following options:</p>
                 <ul>
                     <li><strong>Save Annotations:</strong> Use <span class="menu-item">Annotations → Save Annotations to current game</span> (<code>Ctrl+Alt+S</code>) to save all annotations to the active game. Annotations are compressed and stored in a PGN metadata tag, keeping the PGN move notation clean.</li>
                     <li><strong>Clear Move Annotations:</strong> Use <span class="menu-item">Annotations → Clear all Annotations for current move</span> (<code>Ctrl+Alt+D</code>) to remove all annotations for the current position.</li>
                     <li><strong>Clear All Annotations:</strong> Use <span class="menu-item">Annotations → Clear all Annotations for current game</span> (<code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>) to remove all annotations from the entire game.</li>
-                    <li><strong>Highlight in Moves List:</strong> Use <span class="menu-item">Annotations → Highlight annotated moves in moves list</span> to highlight the White and Black move cells in the Moves List with the dominant annotation color for moves that have annotations, so you can quickly see which moves are annotated.</li>
+                    <li><strong>Highlight in Moves List:</strong> Use <span class="menu-item">Annotations → Highlight annotated moves in moves list</span> to highlight the White and Black move cells in the Moves List with the dominant annotation color for mainline moves that have annotations, so you can quickly see which moves are annotated. Annotations on variation paths do not appear in the Moves List highlight.</li>
                     <li><strong>Toggle Visibility:</strong> Use <span class="menu-item">Board → Show Annotations</span> (<code>Alt+L</code> / <code>⌥+L</code>) to show or hide the annotation layer on the chessboard.</li>
                 </ul>
                 
@@ -2320,7 +2336,10 @@
                 <p><strong>Shortcut:</strong> <code>Ctrl+R</code> / <code>⌘+R</code></p>
                 <p>Toggles the display of game results (1-0, 0-1, 1/2-1/2) in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.5.7 Display NAG move assessments as...</h5>
+                <h5 id="enable-navigating-variations">6.5.7 Enable navigating into variations</h5>
+                <p>When enabled, <code>←</code> / <code>→</code> navigation and clicks in the PGN Notation Pane can enter variation (sideline) lines. At a branching point, <code>→</code> opens a branch selector (<code>↑</code> / <code>↓</code> to choose, <code>→</code> or <code>Enter</code> to confirm, <code>←</code> or <code>Esc</code> to cancel). At the end of a sideline, a second <code>→</code> rejoins the mainline move at the fork. The chessboard uses a distinct variation appearance while off the main line; manual analysis and the evaluation bar follow the sideline position. The Moves List stays on the mainline ancestor. Hiding variations or turning this option off snaps back to the mainline ancestor if you were on a sideline.<br>See <a href="#detail-panel">section 4.5</a> for a full description of the workflow.</p>
+                
+                <h5>6.5.8 Display NAG move assessments as...</h5>
                 <p>This submenu allows you to choose how NAG (Numeric Annotation Glyph) move assessments are displayed in the PGN Notation Pane:</p>
                 <ul>
                     <li><span class="menu-item">Symbols (??, ?, ?! ..)</span>: Displays common NAGs as symbols (!, !!, ?, ??, !?, ?!) and other NAGs as numbers</li>
@@ -2328,16 +2347,16 @@
                 </ul>
                 <p>The selected option is saved in your user settings and persists between application sessions.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.5.8 Remove Comments</h5>
+                <h5>6.5.9 Remove Comments</h5>
                 <p>Permanently removes all comments from the active game's PGN notation. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.5.9 Remove Variations</h5>
+                <h5>6.5.10 Remove Variations</h5>
                 <p>Permanently removes all move variations from the active game's PGN notation. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.5.10 Remove Non-Standard Tags</h5>
+                <h5>6.5.11 Remove Non-Standard Tags</h5>
                 <p>Permanently removes non-standard tags (like [%evp] and [%mdl]) from comments in the active game's PGN. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.5.11 Remove Annotations</h5>
+                <h5>6.5.12 Remove Annotations</h5>
                 <p>Permanently removes all move annotations (symbols and NAGs) from the active game's PGN notation. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
             </div>
 
@@ -2659,8 +2678,11 @@
                 <h5>6.16.1 Game Navigation</h5>
                 <p>Essential shortcuts for navigating through games:</p>
                 <ul>
-                    <li><code>Right Arrow</code>: Navigate to next move</li>
-                    <li><code>Left Arrow</code>: Navigate to previous move</li>
+                    <li><code>→</code> (Right Arrow): Navigate to next move along the active path; with variation navigation enabled, opens the branch selector when multiple continuations exist (also confirms a highlighted branch)</li>
+                    <li><code>←</code> (Left Arrow): Navigate to previous move along the active path; dismisses the branch selector if it is open</li>
+                    <li><code>↑</code> / <code>↓</code>: Move the highlight in the branch selector</li>
+                    <li><code>Enter</code>: Confirm the highlighted branch in the branch selector</li>
+                    <li><code>Esc</code>: Dismiss the branch selector</li>
                 </ul>
                 
                 <h5>6.16.2 Detail Panel Tabs</h5>
@@ -3002,7 +3024,7 @@
                     <li><strong>moves_list_profiles:</strong> Column profile definitions with visibility, width, and order settings for each profile</li>
                     <li><strong>active_profile:</strong> The currently active column profile name</li>
                     <li><strong>board_visibility:</strong> Toggle states for board display elements (coordinates, arrows, evaluation bar, etc.)</li>
-                    <li><strong>pgn_visibility:</strong> Toggle states for PGN notation display options</li>
+                    <li><strong>pgn_visibility:</strong> Toggle states for PGN notation display options (including <code>navigate_variations</code> for <span class="menu-item">PGN → Enable navigating into variations</span>)</li>
                     <li><strong>game_analysis:</strong> Game analysis preferences (return to PLY 0, switch tabs, etc.)</li>
                     <li><strong>manual_analysis:</strong> Manual analysis settings (max pieces to explore, exploration depth, etc.)</li>
                     <li><strong>engines:</strong> List of configured engines with their paths and metadata</li>
@@ -3062,7 +3084,7 @@
                 <h5>7.4.2 Annotation Tags</h5>
                 <p>When annotations are saved to a game, CARA stores them in a similar compressed format:</p>
                 <ul>
-                    <li><strong>[CARAAnnotations "..."]:</strong> Contains compressed, base64-encoded JSON data with all annotation objects (text, arrows, circles, squares) organized by move (ply index)</li>
+                    <li><strong>[CARAAnnotations "..."]:</strong> Contains compressed, base64-encoded JSON data with all annotation objects (text, arrows, circles, squares) organized by variation path (format v2; older files keyed by ply index are still loaded and converted)</li>
                     <li><strong>[CARAAnnotationsInfo "..."]:</strong> Contains metadata about the annotations (app version, creation date/time)</li>
                     <li><strong>[CARAAnnotationsChecksum "..."]:</strong> SHA-256 checksum for data integrity validation</li>
                 </ul>

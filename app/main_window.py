@@ -1832,6 +1832,8 @@ class MainWindow(QMainWindow):
         # Wire per-game tag bubbles widget (board overlay) to models/controllers
         if board_widget is not None and hasattr(board_widget, "game_tags_widget") and board_widget.game_tags_widget:
             board_widget.game_tags_widget.set_context(game_model, metadata_controller)
+        if board_widget is not None:
+            board_widget.set_game_model(game_model)
         top_splitter.addWidget(self.detail_panel)
         
         # Connect column profile model to moves list view
@@ -2758,6 +2760,16 @@ class MainWindow(QMainWindow):
         
         status = "shown" if checked else "hidden"
         self.controller.set_status(f"Variations {status} in PGN view")
+
+    def _on_navigate_variations_toggled(self, checked: bool) -> None:
+        """Handle Enable navigating into variations toggle."""
+        self._update_pgn_visibility_setting("navigate_variations", checked)
+        if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
+            pgn_view = self.detail_panel.pgn_view
+            if hasattr(pgn_view, 'set_navigate_variations_enabled'):
+                pgn_view.set_navigate_variations_enabled(checked)
+        status = "enabled" if checked else "disabled"
+        self.controller.set_status(f"Variation navigation {status}")
     
     def _on_show_annotations_toggled(self, checked: bool) -> None:
         """Handle Show Annotations toggle.
@@ -2939,6 +2951,11 @@ class MainWindow(QMainWindow):
         game_controller = self.controller.get_game_controller()
         if element_type == "variations":
             # Variations removal changes the main line, so refresh moves list
+            # and snap any sideline navigation back to the mainline.
+            try:
+                game_controller.return_to_mainline_ancestor()
+            except Exception:
+                pass
             if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
                 try:
                     moves = game_controller.extract_moves_from_game(game)
@@ -2947,7 +2964,9 @@ class MainWindow(QMainWindow):
                         for move in moves:
                             self.detail_panel.moveslist_model.add_move(move)
                         # Re-apply active move ply to restore highlighting
-                        self.detail_panel.moveslist_model.set_active_move_ply(current_ply)
+                        self.detail_panel.moveslist_model.set_active_move_ply(
+                            game_model.get_active_move_ply()
+                        )
                 except Exception:
                     pass
             
@@ -3569,15 +3588,21 @@ class MainWindow(QMainWindow):
     
     def _navigate_to_next_move(self) -> None:
         """Navigate to the next move in the active game."""
+        if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
+            pgn_view = self.detail_panel.pgn_view
+            if hasattr(pgn_view, 'handle_variation_nav_forward') and pgn_view.handle_variation_nav_forward():
+                return
         game_controller = self.controller.get_game_controller()
-        success = game_controller.navigate_to_next_move()
-        # Navigation updates the model, which will trigger view updates automatically
+        game_controller.navigate_to_next_move()
     
     def _navigate_to_previous_move(self) -> None:
         """Navigate to the previous move in the active game."""
+        if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'pgn_view'):
+            pgn_view = self.detail_panel.pgn_view
+            if hasattr(pgn_view, 'handle_variation_nav_back') and pgn_view.handle_variation_nav_back():
+                return
         game_controller = self.controller.get_game_controller()
-        success = game_controller.navigate_to_previous_move()
-        # Navigation updates the model, which will trigger view updates automatically
+        game_controller.navigate_to_previous_move()
     
     def _on_database_row_double_click(self, row: int, model: Optional[DatabaseModel] = None) -> None:
         """Handle double-click on database table row.
@@ -3907,6 +3932,7 @@ class MainWindow(QMainWindow):
         show_metadata = pgn_visibility.get("show_metadata", True)
         show_comments = pgn_visibility.get("show_comments", True)
         show_variations = pgn_visibility.get("show_variations", True)
+        navigate_variations = pgn_visibility.get("navigate_variations", False)
         show_annotations = pgn_visibility.get("show_annotations", True)
         show_results = pgn_visibility.get("show_results", True)
         show_non_standard_tags = pgn_visibility.get("show_non_standard_tags", False)
@@ -3929,6 +3955,8 @@ class MainWindow(QMainWindow):
                 pgn_view.set_show_comments(show_comments)
             if hasattr(pgn_view, 'set_show_variations'):
                 pgn_view.set_show_variations(show_variations)
+            if hasattr(pgn_view, 'set_navigate_variations_enabled'):
+                pgn_view.set_navigate_variations_enabled(navigate_variations)
             if hasattr(pgn_view, 'set_show_annotations'):
                 pgn_view.set_show_annotations(show_annotations)
             if hasattr(pgn_view, 'set_show_results'):
@@ -3943,6 +3971,8 @@ class MainWindow(QMainWindow):
         self.show_metadata_action.setChecked(show_metadata)
         self.show_comments_action.setChecked(show_comments)
         self.show_variations_action.setChecked(show_variations)
+        if hasattr(self, 'navigate_variations_action'):
+            self.navigate_variations_action.setChecked(navigate_variations)
         self.show_annotations_action.setChecked(show_annotations)
         self.show_results_action.setChecked(show_results)
         self.show_non_standard_tags_action.setChecked(show_non_standard_tags)
@@ -4132,6 +4162,10 @@ class MainWindow(QMainWindow):
                     "show_metadata": pgn_view._show_metadata,
                     "show_comments": pgn_view._show_comments if hasattr(pgn_view, '_show_comments') else True,
                     "show_variations": pgn_view._show_variations if hasattr(pgn_view, '_show_variations') else True,
+                    "navigate_variations": (
+                        self.controller.get_game_controller().is_navigate_variations_enabled()
+                        if hasattr(self, 'controller') else False
+                    ),
                     "show_annotations": pgn_view._show_annotations if hasattr(pgn_view, '_show_annotations') else True,
                     "show_results": pgn_view._show_results if hasattr(pgn_view, '_show_results') else True,
                     "show_non_standard_tags": pgn_view._show_non_standard_tags if hasattr(pgn_view, '_show_non_standard_tags') else False
