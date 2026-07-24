@@ -1677,9 +1677,13 @@ class GameReportPDFService(BasePDFReportService):
             tw = fm.horizontalAdvance(label)
             painter.drawText(int(left - tw - 4), int(yy + fm.ascent() / 2), label)
 
-        # X labels: start / mid / end move numbers
-        for ply, label in ((0, "0"), (max_ply // 2, str(max_ply // 2)), (max_ply, str(max_ply))):
+        # X labels: start / mid / end as full-move numbers (data is ply-indexed)
+        def move_label_for_ply(ply: int) -> str:
+            return str((int(ply) + 1) // 2)
+
+        for ply in (0, max_ply // 2, max_ply):
             xx = x_for(ply)
+            label = move_label_for_ply(ply)
             tw = fm.horizontalAdvance(label)
             painter.drawText(int(xx - tw / 2), int(bottom + fm.ascent() + 2), label)
 
