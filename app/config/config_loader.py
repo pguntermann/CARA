@@ -2433,6 +2433,8 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.panels.main.board.padding",
     "ui.panels.main.board.pieces.padding_ratio",
     "ui.panels.main.board.pieces.svg_path",
+    "ui.panels.main.board.piece_move_animation.duration_ms",
+    "ui.panels.main.board.piece_move_animation.enabled",
     "ui.panels.main.board.playedmove_arrow.color",
     "ui.panels.main.board.positional_plans.min_moves_for_plan",
     "ui.panels.main.board.positional_plans.numbered_markers.background_color",

@@ -14,14 +14,16 @@ from PyQt6.QtGui import (
     QMouseEvent,
     QFontMetrics,
     QPainterPath,
+    QPixmap,
 )
 from PyQt6.QtSvg import QSvgRenderer
-from PyQt6.QtCore import Qt, QRect, QRectF, QPointF, QTimer, QPoint, QByteArray
+from PyQt6.QtCore import Qt, QRect, QRectF, QPointF, QTimer, QPoint, QByteArray, QVariantAnimation, QEasingCurve
 from pathlib import Path
 import sys
 from colorsys import rgb_to_hls, hls_to_rgb
 import chess
-from typing import Dict, Any, Optional, List, TYPE_CHECKING
+from dataclasses import dataclass
+from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 
 from app.models.board_model import BoardModel
 from app.utils.pgn_variation_path import is_mainline_path
@@ -35,6 +37,15 @@ from app.views.widgets.evaluation_bar_widget import EvaluationBarWidget
 from app.views.widgets.game_tags_widget import GameTagsWidget
 from app.views.widgets.castling_rights_widget import CastlingRightsWidget
 from app.services.logging_service import LoggingService
+
+
+@dataclass
+class _AnimatingPiece:
+    """A piece sliding between squares during navigation animation."""
+    color: str
+    piece_type: str
+    from_square: int
+    to_square: int
 
 
 class ChessBoardWidget(QWidget):
@@ -130,6 +141,21 @@ class ChessBoardWidget(QWidget):
         self._pv3_move: Optional[chess.Move] = None
         self._best_alternative_move: Optional[chess.Move] = None
         self._viewing_variation: bool = False
+
+        # Piece move animation (adjacent navigation only)
+        self._prev_full_fen: Optional[str] = None
+        self._prev_last_move: Optional[chess.Move] = None
+        self._animating_pieces: List[_AnimatingPiece] = []
+        self._move_anim_progress: float = 1.0
+        self._piece_pixmaps: Dict[Tuple[str, str], QPixmap] = {}
+        self._piece_pixmap_size: int = 0
+        self._move_animation = QVariantAnimation(self)
+        self._move_animation.setStartValue(0.0)
+        self._move_animation.setEndValue(1.0)
+        # Linear keeps short slides perceptually even; ease curves look stepped at ~120ms.
+        self._move_animation.setEasingCurve(QEasingCurve.Type.Linear)
+        self._move_animation.valueChanged.connect(self._on_move_animation_value)
+        self._move_animation.finished.connect(self._on_move_animation_finished)
         
         # Connect to model if provided
         # Set model after setup so it can load position from model
@@ -172,6 +198,10 @@ class ChessBoardWidget(QWidget):
         pieces_config = board_config.get('pieces', {})
         self.svg_path = pieces_config.get('svg_path', 'resources/chesspieces/default')
         self.piece_padding_ratio = max(0.0, min(0.5, float(pieces_config.get('padding_ratio', 0.1))))
+
+        anim_config = board_config.get('piece_move_animation', {}) or {}
+        self.piece_move_animation_enabled = bool(anim_config.get('enabled', True))
+        self.piece_move_animation_duration_ms = max(0, int(anim_config.get('duration_ms', 160)))
         
         # Turn indicator
         indicator_config = board_config.get('turn_indicator', {})
@@ -1432,6 +1462,8 @@ class ChessBoardWidget(QWidget):
             logging_service = LoggingService.get_instance()
             logging_service.warning(f"Chess pieces directory not found: {pieces_dir}")
             self.piece_renderers = {}
+            self._piece_pixmaps = {}
+            self._piece_pixmap_size = 0
             return
         
         # Piece type mapping: (color, piece_type) -> filename
@@ -1441,6 +1473,8 @@ class ChessBoardWidget(QWidget):
         colors = ['w', 'b']
         
         self.piece_renderers = {}
+        self._piece_pixmaps = {}
+        self._piece_pixmap_size = 0
         
         for color in colors:
             for piece_type in piece_types:
@@ -1629,25 +1663,222 @@ class ChessBoardWidget(QWidget):
             self.castling_rights_widget.set_model(model)
         except Exception:
             pass
+
+        # Seed previous position so the first adjacent step can animate
+        self._prev_full_fen = model.get_fen()
+        self._prev_last_move = model.last_move
         
         self.update()  # Trigger repaint
     
     def _on_position_changed(self) -> None:
         """Handle position change from model."""
+        if not self._board_model:
+            return
+
+        old_fen = self._prev_full_fen
+        old_last_move = self._prev_last_move
+        new_board = self._board_model.board.copy(stack=False)
+        new_last_move = self._board_model.last_move
+
+        self._stop_piece_move_animation()
+
+        anim_pieces = self._build_adjacent_animation(
+            old_fen, old_last_move, new_board, new_last_move
+        )
+
         self._load_position_from_model()
         self._update_castling_rights_widget_position()
-        self.update()  # Trigger repaint
-    
+
+        self._prev_full_fen = new_board.fen()
+        self._prev_last_move = new_last_move
+
+        if anim_pieces:
+            self._start_piece_move_animation(anim_pieces)
+        else:
+            self.update()
+
     def _on_flip_state_changed(self, is_flipped: bool) -> None:
         """Handle flip state change from model.
         
         Args:
             is_flipped: True if board is flipped, False otherwise.
         """
+        self._stop_piece_move_animation()
         # Reload piece positions with new flip state
         self._load_position_from_model()
         # Trigger repaint to update both pieces and coordinates
         self.update()
+
+    @staticmethod
+    def _chess_piece_to_key(piece: chess.Piece) -> Tuple[str, str]:
+        color = 'w' if piece.color == chess.WHITE else 'b'
+        type_map = {
+            chess.PAWN: 'p',
+            chess.KNIGHT: 'n',
+            chess.BISHOP: 'b',
+            chess.ROOK: 'r',
+            chess.QUEEN: 'q',
+            chess.KING: 'k',
+        }
+        return color, type_map.get(piece.piece_type, 'p')
+
+    @staticmethod
+    def _castling_rook_squares(move: chess.Move) -> Optional[Tuple[int, int]]:
+        """Return (rook_from, rook_to) for a standard castling king move."""
+        # King moves two files; rook lands next to the king.
+        if abs(chess.square_file(move.to_square) - chess.square_file(move.from_square)) != 2:
+            return None
+        if move.to_square > move.from_square:
+            rook_from = move.from_square + 3
+            rook_to = move.to_square - 1
+        else:
+            rook_from = move.from_square - 4
+            rook_to = move.to_square + 1
+        return rook_from, rook_to
+
+    def _board_after_push(self, board: chess.Board, move: chess.Move) -> Optional[chess.Board]:
+        """Return a copy of board after pushing move, or None if illegal/invalid."""
+        try:
+            test = board.copy(stack=False)
+            if move not in test.legal_moves:
+                return None
+            test.push(move)
+            return test
+        except Exception:
+            return None
+
+    def _build_adjacent_animation(
+        self,
+        old_fen: Optional[str],
+        old_last_move: Optional[chess.Move],
+        new_board: chess.Board,
+        new_last_move: Optional[chess.Move],
+    ) -> List[_AnimatingPiece]:
+        """Build animating pieces for an adjacent step, or empty list to snap."""
+        if (
+            not self.piece_move_animation_enabled
+            or self.piece_move_animation_duration_ms <= 0
+            or not old_fen
+        ):
+            return []
+
+        try:
+            old_board = chess.Board(old_fen)
+        except Exception:
+            return []
+
+        # Forward: old + new_last_move == new
+        if new_last_move is not None:
+            after = self._board_after_push(old_board, new_last_move)
+            if after is not None and after.board_fen() == new_board.board_fen():
+                return self._animating_pieces_for_move(
+                    old_board, new_board, new_last_move, reverse=False
+                )
+
+        # Backward: new + old_last_move == old
+        if old_last_move is not None:
+            after = self._board_after_push(new_board, old_last_move)
+            if after is not None and after.board_fen() == old_board.board_fen():
+                return self._animating_pieces_for_move(
+                    new_board, old_board, old_last_move, reverse=True
+                )
+
+        return []
+
+    def _animating_pieces_for_move(
+        self,
+        board_before: chess.Board,
+        board_after: chess.Board,
+        move: chess.Move,
+        reverse: bool,
+    ) -> List[_AnimatingPiece]:
+        """Create slide descriptors for a move (and castling rook).
+        
+        board_before / board_after are the positions before and after ``move``
+        in the forward sense (regardless of navigation direction).
+        """
+        pieces: List[_AnimatingPiece] = []
+
+        if reverse:
+            from_sq, to_sq = move.to_square, move.from_square
+            piece = board_before.piece_at(to_sq)
+        else:
+            from_sq, to_sq = move.from_square, move.to_square
+            piece = board_after.piece_at(to_sq)
+            if piece is None:
+                piece = board_before.piece_at(from_sq)
+
+        if piece is None:
+            return []
+
+        color, piece_type = self._chess_piece_to_key(piece)
+        pieces.append(_AnimatingPiece(color, piece_type, from_sq, to_sq))
+
+        if board_before.is_castling(move):
+            rook = self._castling_rook_squares(move)
+            if rook is not None:
+                rook_from, rook_to = rook
+                if reverse:
+                    rook_from, rook_to = rook_to, rook_from
+                if reverse:
+                    rook_piece = board_before.piece_at(rook_to)
+                else:
+                    rook_piece = board_after.piece_at(rook_to)
+                if rook_piece is None:
+                    look = move.from_square + (
+                        3 if move.to_square > move.from_square else -4
+                    )
+                    rook_piece = board_before.piece_at(look)
+                if rook_piece is not None:
+                    r_color, r_type = self._chess_piece_to_key(rook_piece)
+                    pieces.append(_AnimatingPiece(r_color, r_type, rook_from, rook_to))
+
+        return pieces
+
+    def _start_piece_move_animation(self, pieces: List[_AnimatingPiece]) -> None:
+        """Begin sliding pieces; destinations are cleared from the static board."""
+        self._animating_pieces = pieces
+        self._move_anim_progress = 0.0
+
+        for anim in pieces:
+            row, col = self._square_to_row_col(anim.to_square)
+            if 0 <= row < self.square_count and 0 <= col < self.square_count:
+                self.board[row][col] = None
+
+        self._move_animation.stop()
+        self._move_animation.setDuration(self.piece_move_animation_duration_ms)
+        self._move_animation.start()
+        self.update()
+
+    def _stop_piece_move_animation(self) -> None:
+        """Abort any in-flight piece animation without restoring the board."""
+        if self._move_animation.state() == QVariantAnimation.State.Running:
+            self._move_animation.stop()
+        self._animating_pieces = []
+        self._move_anim_progress = 1.0
+
+    def _on_move_animation_value(self, value: object) -> None:
+        try:
+            self._move_anim_progress = float(value)
+        except (TypeError, ValueError):
+            self._move_anim_progress = 1.0
+        self.update()
+
+    def _on_move_animation_finished(self) -> None:
+        self._animating_pieces = []
+        self._move_anim_progress = 1.0
+        self._load_position_from_model()
+        self.update()
+
+    def _square_to_row_col(self, square: int) -> Tuple[int, int]:
+        """Map a chess square to the widget's board row/col (respecting flip)."""
+        file_idx = chess.square_file(square)
+        rank_idx = chess.square_rank(square)
+        is_flipped = bool(self._board_model and self._board_model.is_flipped)
+        if is_flipped:
+            file_idx = 7 - file_idx
+            rank_idx = 7 - rank_idx
+        return 7 - rank_idx, file_idx
     
     def _on_coordinates_visibility_changed(self, show: bool) -> None:
         """Handle coordinates visibility change from model.
@@ -1726,6 +1957,9 @@ class ChessBoardWidget(QWidget):
             move: The last Move object, or None if no move.
         """
         self._last_move = move
+        # Avoid an extra full repaint while a slide is already driving frames.
+        if self._animating_pieces:
+            return
         self.update()  # Trigger repaint
     
     def _on_bestnextmove_arrow_visibility_changed(self, visible: bool) -> None:
@@ -2053,6 +2287,47 @@ class ChessBoardWidget(QWidget):
         if self.material_widget:
             self.material_widget.set_flipped(is_flipped)
     
+    def _ensure_piece_pixmaps(self, piece_size: float) -> None:
+        """Rasterize SVG pieces into pixmaps sized for the current square."""
+        dpr = float(self.devicePixelRatioF()) if hasattr(self, "devicePixelRatioF") else 1.0
+        dpr = max(1.0, dpr)
+        pixel_size = max(1, int(round(piece_size * dpr)))
+        if pixel_size == self._piece_pixmap_size and self._piece_pixmaps:
+            return
+
+        self._piece_pixmaps = {}
+        self._piece_pixmap_size = pixel_size
+        for key, renderer in self.piece_renderers.items():
+            pixmap = QPixmap(pixel_size, pixel_size)
+            pixmap.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(pixmap)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+            renderer.render(painter, QRectF(0, 0, pixel_size, pixel_size))
+            painter.end()
+            pixmap.setDevicePixelRatio(dpr)
+            self._piece_pixmaps[key] = pixmap
+
+    def _draw_piece_pixmap(
+        self,
+        painter: QPainter,
+        color: str,
+        piece_type: str,
+        piece_x: float,
+        piece_y: float,
+        piece_size: float,
+    ) -> None:
+        """Draw a cached piece pixmap (falls back to SVG if needed)."""
+        key = (color, piece_type)
+        pixmap = self._piece_pixmaps.get(key)
+        if pixmap is not None and not pixmap.isNull():
+            painter.drawPixmap(QPointF(piece_x, piece_y), pixmap)
+            return
+
+        renderer = self.piece_renderers.get(key)
+        if renderer is not None:
+            renderer.render(painter, QRectF(piece_x, piece_y, piece_size, piece_size))
+
     def _draw_pieces(self, painter: QPainter, board_start_x: int, board_start_y: int) -> None:
         """Draw chess pieces on the board.
         
@@ -2063,6 +2338,12 @@ class ChessBoardWidget(QWidget):
         """
         # Piece padding (margin from square edges), from config
         piece_padding = self.piece_padding_ratio
+        piece_size = self.square_size * (1 - piece_padding * 2)
+        self._ensure_piece_pixmaps(piece_size)
+
+        animating = bool(self._animating_pieces)
+        if animating:
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
 
         for row in range(self.square_count):
             for col in range(self.square_count):
@@ -2071,24 +2352,25 @@ class ChessBoardWidget(QWidget):
                     continue
                 
                 color, piece_type = piece
-                renderer = self.piece_renderers.get((color, piece_type))
-                if renderer is None:
-                    continue
-                
-                # Calculate square position
                 square_x = board_start_x + col * self.square_size
                 square_y = board_start_y + row * self.square_size
-                
-                # Calculate piece size with padding
-                piece_size = self.square_size * (1 - piece_padding * 2)
-                
-                # Calculate piece position (centered in square)
                 piece_x = square_x + self.square_size * piece_padding
                 piece_y = square_y + self.square_size * piece_padding
-                
-                # Draw piece (QSvgRenderer.render requires QRectF)
-                piece_rect = QRectF(piece_x, piece_y, piece_size, piece_size)
-                renderer.render(painter, piece_rect)
+                self._draw_piece_pixmap(painter, color, piece_type, piece_x, piece_y, piece_size)
+
+        # Draw sliding pieces on top during adjacent-step navigation
+        if animating:
+            t = max(0.0, min(1.0, float(self._move_anim_progress)))
+            for anim in self._animating_pieces:
+                from_row, from_col = self._square_to_row_col(anim.from_square)
+                to_row, to_col = self._square_to_row_col(anim.to_square)
+                col = from_col + (to_col - from_col) * t
+                row = from_row + (to_row - from_row) * t
+                piece_x = board_start_x + col * self.square_size + self.square_size * piece_padding
+                piece_y = board_start_y + row * self.square_size + self.square_size * piece_padding
+                self._draw_piece_pixmap(
+                    painter, anim.color, anim.piece_type, piece_x, piece_y, piece_size
+                )
     
     def showEvent(self, event) -> None:
         """Handle widget show event to position child widgets.

@@ -518,6 +518,10 @@
             "svg_path": "app/resources/chesspieces/default",
             "padding_ratio": 0.05
           },
+          "piece_move_animation": {
+            "enabled": true,
+            "duration_ms": 160
+          },
           "turn_indicator": {
             "size": 16,
             "padding": [0, 0, 10, 10],
