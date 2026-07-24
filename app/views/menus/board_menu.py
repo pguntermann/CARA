@@ -16,6 +16,18 @@ def setup_board_menu(mw, menu_bar: QMenuBar) -> None:
     mw.rotate_action.triggered.connect(mw.controller.rotate_board)
     board_menu.addAction(mw.rotate_action)
 
+    from app.services.user_settings_service import UserSettingsService
+
+    user_settings = UserSettingsService.get_instance().get_settings()
+    board_visibility = user_settings.get("board_visibility", {})
+    enable_board_animations = board_visibility.get("enable_board_animations", True)
+
+    mw.enable_board_animations_action = QAction("Enable board animations", mw)
+    mw.enable_board_animations_action.setCheckable(True)
+    mw.enable_board_animations_action.setChecked(bool(enable_board_animations))
+    mw.enable_board_animations_action.triggered.connect(mw._on_enable_board_animations_toggled)
+    board_menu.addAction(mw.enable_board_animations_action)
+
     board_menu.addSeparator()
 
     mw.game_info_action = QAction("Show Game Info", mw)
@@ -124,10 +136,6 @@ def setup_board_menu(mw, menu_bar: QMenuBar) -> None:
     trajectory_style_menu = board_menu.addMenu("Path trajectory style")
     mw._apply_menu_styling(trajectory_style_menu)
 
-    from app.services.user_settings_service import UserSettingsService
-
-    user_settings = UserSettingsService.get_instance().get_settings()
-    board_visibility = user_settings.get("board_visibility", {})
     use_straight_lines = board_visibility.get("use_straight_lines")
     if use_straight_lines is None:
         positional_plans_config = (

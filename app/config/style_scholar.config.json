@@ -940,6 +940,10 @@
             "enabled": true,
             "duration_ms": 160
           },
+          "board_flip_animation": {
+            "enabled": true,
+            "duration_ms": 380
+          },
           "turn_indicator": {
             "size": 16,
             "padding": [

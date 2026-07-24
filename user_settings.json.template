@@ -815,6 +815,7 @@
     "show_pv2_arrow": true,
     "show_pv3_arrow": true,
     "show_annotations_layer": true,
+    "enable_board_animations": true,
     "game_info_center_mode": "center_in_view"
   },
   "game_tags": {

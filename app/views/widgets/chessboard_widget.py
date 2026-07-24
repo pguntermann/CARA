@@ -15,6 +15,7 @@ from PyQt6.QtGui import (
     QFontMetrics,
     QPainterPath,
     QPixmap,
+    QRegion,
 )
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtCore import Qt, QRect, QRectF, QPointF, QTimer, QPoint, QByteArray, QVariantAnimation, QEasingCurve
@@ -156,6 +157,23 @@ class ChessBoardWidget(QWidget):
         self._move_animation.setEasingCurve(QEasingCurve.Type.Linear)
         self._move_animation.valueChanged.connect(self._on_move_animation_value)
         self._move_animation.finished.connect(self._on_move_animation_finished)
+
+        # Board flip visualization (horizontal scale through 0, swap layout at midpoint)
+        self._flip_animating = False
+        self._flip_anim_progress = 1.0
+        self._flip_swapped = False
+        self._visual_flip_override: Optional[bool] = None
+        self._flip_from_pixmap: Optional[QPixmap] = None
+        self._flip_to_pixmap: Optional[QPixmap] = None
+        self._flip_frame_rect: Optional[QRect] = None
+        self._painting_flip_snapshot = False
+        self._flip_animation = QVariantAnimation(self)
+        self._flip_animation.setStartValue(0.0)
+        self._flip_animation.setEndValue(1.0)
+        # Linear keeps the face-swap exactly at visual midpoint (scale X == 0).
+        self._flip_animation.setEasingCurve(QEasingCurve.Type.Linear)
+        self._flip_animation.valueChanged.connect(self._on_flip_animation_value)
+        self._flip_animation.finished.connect(self._on_flip_animation_finished)
         
         # Connect to model if provided
         # Set model after setup so it can load position from model
@@ -173,6 +191,12 @@ class ChessBoardWidget(QWidget):
         
         # Padding
         self.padding = board_config.get('padding', [20, 20, 20, 20])
+        # Behind coordinates / board padding — match main panel so flip snapshots blend.
+        panel_bg = panel_config.get('background_color', [40, 40, 45])
+        if isinstance(panel_bg, list) and len(panel_bg) >= 3:
+            self._panel_background_color = [int(panel_bg[0]), int(panel_bg[1]), int(panel_bg[2])]
+        else:
+            self._panel_background_color = [40, 40, 45]
         
         # Border
         border_config = board_config.get('border', {})
@@ -202,6 +226,15 @@ class ChessBoardWidget(QWidget):
         anim_config = board_config.get('piece_move_animation', {}) or {}
         self.piece_move_animation_enabled = bool(anim_config.get('enabled', True))
         self.piece_move_animation_duration_ms = max(0, int(anim_config.get('duration_ms', 160)))
+
+        flip_anim_config = board_config.get('board_flip_animation', {}) or {}
+        self.board_flip_animation_enabled = bool(flip_anim_config.get('enabled', True))
+        self.board_flip_animation_duration_ms = max(0, int(flip_anim_config.get('duration_ms', 380)))
+
+        # User preference (Board menu) gates both piece-move and flip animations.
+        from app.services.user_settings_service import UserSettingsService
+        board_visibility = UserSettingsService.get_instance().get_settings().get('board_visibility', {})
+        self.board_animations_user_enabled = bool(board_visibility.get('enable_board_animations', True))
         
         # Turn indicator
         indicator_config = board_config.get('turn_indicator', {})
@@ -584,6 +617,8 @@ class ChessBoardWidget(QWidget):
     def paintEvent(self, event) -> None:
         """Paint the chess board."""
         painter = QPainter(self)
+        if not painter.isActive():
+            return
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # Get calculated dimensions (cached if possible)
@@ -601,6 +636,34 @@ class ChessBoardWidget(QWidget):
         border_color_rgb = self._effective_border_color()
         light_rgb = self._effective_light_square_color()
         dark_rgb = self._effective_dark_square_color()
+
+        # Flip animation draws pre-rendered board faces scaled on X. Painting SVGs
+        # under a near-zero scale triggers QPainter engine warnings on Windows.
+        if self._flip_animating and not self._painting_flip_snapshot:
+            progress = self._flip_anim_progress
+            if progress < 0.5:
+                frame = self._flip_from_pixmap
+                sx = 1.0 - 2.0 * progress  # 1 → 0
+            else:
+                frame = self._flip_to_pixmap
+                sx = 2.0 * progress - 1.0  # 0 → 1
+            if frame is not None and not frame.isNull() and sx >= 0.001:
+                rect = self._flip_frame_rect or self._flip_board_rect(dims)
+                cx = rect.x() + rect.width() / 2.0
+                cy = rect.y() + rect.height() / 2.0
+                painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+                painter.save()
+                painter.translate(cx, cy)
+                painter.scale(sx, 1.0)
+                painter.translate(-cx, -cy)
+                painter.drawPixmap(rect.topLeft(), frame)
+                painter.restore()
+            # Keep side-to-move (and other chrome) fixed like castling-rights — not in the flip.
+            if self.show_turn_indicator:
+                self._draw_turn_indicator(painter, start_x, start_y)
+            return
+
+        snapshotting = self._painting_flip_snapshot
         
         # Draw border
         if border_size > 0:
@@ -632,7 +695,7 @@ class ChessBoardWidget(QWidget):
                 painter.fillRect(square_rect, QBrush(square_color))
 
         # Variation last-move square highlight (from/to)
-        if self._variation_style_active() and self._last_move is not None:
+        if not snapshotting and self._variation_style_active() and self._last_move is not None:
             self._draw_variation_last_move_highlight(painter, start_x, start_y)
         
         # Draw coordinates in border area if enabled
@@ -642,9 +705,13 @@ class ChessBoardWidget(QWidget):
         # Draw pieces
         self._draw_pieces(painter, start_x, start_y)
         
-        # Draw turn indicator (attached to bottom right of board) if visible
-        if self.show_turn_indicator:
+        # Draw turn indicator (attached to bottom right of board) if visible.
+        # Skip while capturing the flip face — it is painted fixed on top of the animation.
+        if self.show_turn_indicator and not snapshotting:
             self._draw_turn_indicator(painter, start_x, start_y)
+
+        if snapshotting:
+            return
         
         # Check if we should hide other arrows during plan exploration
         # Only hide if both: a plan is active AND the toggle is enabled
@@ -1394,9 +1461,7 @@ class ChessBoardWidget(QWidget):
         coord_padding = 3
         
         # Check if board is flipped
-        is_flipped = False
-        if self._board_model:
-            is_flipped = self._board_model.is_flipped
+        is_flipped = self._display_is_flipped()
         
         # Draw file letters (a-h) in bottom border
         # Position letters right at the top edge of the coordinate border area
@@ -1503,8 +1568,13 @@ class ChessBoardWidget(QWidget):
         self.board = [[None for _ in range(self.square_count)] for _ in range(self.square_count)]
         self._load_standard_starting_position()
     
-    def _load_position_from_model(self) -> None:
-        """Load board position from BoardModel."""
+    def _load_position_from_model(self, flip_override: Optional[bool] = None) -> None:
+        """Load board position from BoardModel.
+        
+        Args:
+            flip_override: Optional flip orientation for piece placement. When None,
+                uses the board model's current flip state.
+        """
         if not self._board_model:
             return
         
@@ -1518,7 +1588,11 @@ class ChessBoardWidget(QWidget):
                     self.board[row][col] = None
         
         # Get flip state
-        is_flipped = self._board_model.is_flipped
+        is_flipped = (
+            bool(flip_override)
+            if flip_override is not None
+            else self._board_model.is_flipped
+        )
         
         pieces = self._board_model.get_all_pieces()
         for (file, rank), (color, piece_type) in pieces.items():
@@ -1681,6 +1755,7 @@ class ChessBoardWidget(QWidget):
         new_last_move = self._board_model.last_move
 
         self._stop_piece_move_animation()
+        self._abort_flip_animation()
 
         anim_pieces = self._build_adjacent_animation(
             old_fen, old_last_move, new_board, new_last_move
@@ -1703,6 +1778,95 @@ class ChessBoardWidget(QWidget):
         if self._board_model is not None:
             self._board_model.notify_navigation_settled()
 
+    def _flip_board_rect(self, dims: Optional[dict] = None) -> QRect:
+        """Board + coordinates rectangle used for the flip visualization."""
+        if dims is None:
+            dims = self._calculate_board_dimensions()
+        border_size = dims.get('border_size', self._effective_border_size())
+        coord_border_width = self.coord_border_width if self.show_coordinates else 0
+        flip_left = int(dims['board_group_start_x'])
+        flip_top = int(dims['start_y'] - border_size)
+        flip_w = int(dims['total_board_width'])
+        flip_h = int(dims['total_board_height'] + coord_border_width)
+        return QRect(flip_left, flip_top, max(1, flip_w), max(1, flip_h))
+
+    def _capture_flip_frame_pixmap(self) -> QPixmap:
+        """Rasterize the current board face for scaling during the flip animation."""
+        dims = self._calculate_board_dimensions()
+        rect = self._flip_board_rect(dims)
+        dpr = max(1.0, float(self.devicePixelRatioF()) if hasattr(self, "devicePixelRatioF") else 1.0)
+        pm = QPixmap(max(1, int(rect.width() * dpr)), max(1, int(rect.height() * dpr)))
+        pm.setDevicePixelRatio(dpr)
+        # Coordinates sit on the panel background (not painted by the board face).
+        bg = getattr(self, "_panel_background_color", [40, 40, 45])
+        pm.fill(QColor(bg[0], bg[1], bg[2]))
+
+        self._painting_flip_snapshot = True
+        try:
+            # paintEvent only — skip widget background/children so coord strips keep panel color.
+            self.render(
+                pm,
+                QPoint(0, 0),
+                QRegion(rect),
+                QWidget.RenderFlag(0),
+            )
+            # Bake the heatmap into the face (it is a child overlay, not part of paintEvent).
+            overlay = getattr(self, "positional_heatmap_overlay", None)
+            if (
+                overlay is not None
+                and overlay.model is not None
+                and overlay.model.is_visible
+                and bool(getattr(overlay, "_scores", None))
+            ):
+                # Ensure geometry matches before rendering into the snapshot.
+                overlay.setGeometry(self.rect())
+                overlay.render(
+                    pm,
+                    QPoint(0, 0),
+                    QRegion(rect),
+                    QWidget.RenderFlag(0),
+                )
+        finally:
+            self._painting_flip_snapshot = False
+
+        self._flip_frame_rect = QRect(rect)
+        return pm
+
+    def _set_heatmap_suppressed_for_flip(self, suppressed: bool) -> None:
+        """Hide the live heatmap overlay while the flip pixmap animation runs."""
+        overlay = getattr(self, "positional_heatmap_overlay", None)
+        if overlay is None:
+            return
+        if suppressed:
+            overlay.hide()
+        elif overlay.model is not None and overlay.model.is_visible:
+            overlay.show()
+
+    def _clear_flip_frame(self) -> None:
+        self._flip_from_pixmap = None
+        self._flip_to_pixmap = None
+        self._flip_frame_rect = None
+
+    def _display_is_flipped(self) -> bool:
+        """Flip orientation used for painting (may lag the model during flip animation)."""
+        if self._visual_flip_override is not None:
+            return bool(self._visual_flip_override)
+        return bool(self._board_model and self._board_model.is_flipped)
+
+    def _apply_flip_chrome(self, is_flipped: bool) -> None:
+        """Update side widgets that follow board orientation."""
+        self.set_evaluation_bar_flipped(is_flipped)
+        self.set_material_widget_flipped(is_flipped)
+        self._update_castling_rights_widget_position()
+
+    def set_board_animations_enabled(self, enabled: bool) -> None:
+        """Enable or disable piece-move and board-flip animations (Board menu)."""
+        self.board_animations_user_enabled = bool(enabled)
+        if not self.board_animations_user_enabled:
+            self._stop_piece_move_animation()
+            self._abort_flip_animation(apply_model=True)
+            self.update()
+
     def _on_flip_state_changed(self, is_flipped: bool) -> None:
         """Handle flip state change from model.
         
@@ -1710,10 +1874,105 @@ class ChessBoardWidget(QWidget):
             is_flipped: True if board is flipped, False otherwise.
         """
         self._stop_piece_move_animation()
-        # Reload piece positions with new flip state
-        self._load_position_from_model()
-        # Trigger repaint to update both pieces and coordinates
+        # The model already has the *new* orientation when this signal fires.
+        # Figure out what is currently on screen — never read model.is_flipped for that.
+        if (
+            self._flip_animating
+            and self._visual_flip_override is not None
+            and self._flip_anim_progress < 0.5
+        ):
+            visual_from = bool(self._visual_flip_override)
+        else:
+            # Idle, or second half of a prior flip: previous face is the opposite of the new target.
+            visual_from = not bool(is_flipped)
+
+        self._abort_flip_animation(apply_model=False)
+
+        if (
+            not self.board_flip_animation_enabled
+            or not getattr(self, "board_animations_user_enabled", True)
+            or self.board_flip_animation_duration_ms <= 0
+            or not self.isVisible()
+            or self.width() <= 0
+            or self.height() <= 0
+        ):
+            self._visual_flip_override = None
+            self._clear_flip_frame()
+            self._set_heatmap_suppressed_for_flip(False)
+            self._load_position_from_model()
+            self._apply_flip_chrome(is_flipped)
+            self.update()
+            self._notify_navigation_settled()
+            return
+
+        # Capture both faces up front so the piece layout only swaps at progress == 0.5
+        # (when scale X is 0), even if a timer tick jumps across the midpoint.
+        self._visual_flip_override = visual_from
+        self._load_position_from_model(flip_override=visual_from)
+        self._flip_from_pixmap = self._capture_flip_frame_pixmap()
+
+        self._visual_flip_override = bool(is_flipped)
+        self._load_position_from_model(flip_override=bool(is_flipped))
+        self._flip_to_pixmap = self._capture_flip_frame_pixmap()
+
+        self._visual_flip_override = visual_from
+        self._load_position_from_model(flip_override=visual_from)
+        self._flip_swapped = False
+        self._flip_anim_progress = 0.0
+        self._flip_animating = True
+        # Live overlay would sit unscaled on top of the flipping pixmap — bake it in instead.
+        self._set_heatmap_suppressed_for_flip(True)
+        self._flip_animation.stop()
+        self._flip_animation.setDuration(self.board_flip_animation_duration_ms)
+        self._flip_animation.start()
         self.update()
+
+    def _on_flip_animation_value(self, value: object) -> None:
+        try:
+            progress = float(value)
+        except (TypeError, ValueError):
+            progress = 1.0
+        self._flip_anim_progress = progress
+        if progress >= 0.5 and not self._flip_swapped:
+            self._flip_swapped = True
+            self._visual_flip_override = None
+            self._load_position_from_model()
+            if self._board_model is not None:
+                self._apply_flip_chrome(bool(self._board_model.is_flipped))
+        self.update()
+
+    def _on_flip_animation_finished(self) -> None:
+        if not self._flip_animating:
+            return
+        if not self._flip_swapped:
+            self._flip_swapped = True
+            self._visual_flip_override = None
+            self._load_position_from_model()
+            if self._board_model is not None:
+                self._apply_flip_chrome(bool(self._board_model.is_flipped))
+        self._flip_animating = False
+        self._flip_anim_progress = 1.0
+        self._visual_flip_override = None
+        self._clear_flip_frame()
+        self._set_heatmap_suppressed_for_flip(False)
+        self.update()
+        self._notify_navigation_settled()
+
+    def _abort_flip_animation(self, *, apply_model: bool = True) -> None:
+        """Stop an in-flight flip animation without emitting navigation_settled."""
+        was_animating = self._flip_animating
+        if self._flip_animation.state() == QVariantAnimation.State.Running:
+            self._flip_animation.stop()
+        self._flip_animating = False
+        self._flip_anim_progress = 1.0
+        self._visual_flip_override = None
+        self._clear_flip_frame()
+        if was_animating:
+            self._set_heatmap_suppressed_for_flip(False)
+        if apply_model and was_animating and not self._flip_swapped and self._board_model is not None:
+            self._load_position_from_model()
+            self._apply_flip_chrome(bool(self._board_model.is_flipped))
+        self._flip_swapped = False
 
     @staticmethod
     def _chess_piece_to_key(piece: chess.Piece) -> Tuple[str, str]:
@@ -1763,6 +2022,7 @@ class ChessBoardWidget(QWidget):
         """Build animating pieces for an adjacent step, or empty list to snap."""
         if (
             not self.piece_move_animation_enabled
+            or not getattr(self, "board_animations_user_enabled", True)
             or self.piece_move_animation_duration_ms <= 0
             or not old_fen
         ):
@@ -3403,6 +3663,10 @@ class ChessBoardWidget(QWidget):
         Args:
             event: Mouse event.
         """
+        if self._flip_animating:
+            event.accept()
+            return
+
         # Cancel any pending single-click timer
         if self._single_click_timer:
             self._single_click_timer.stop()

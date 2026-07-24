@@ -127,10 +127,13 @@ class PositionalHeatmapOverlay(QWidget):
         board_start_x = dims['start_x']
         board_start_y = dims['start_y']
         
-        # Get flip state
-        is_flipped = False
-        if hasattr(self.board_widget, '_board_model') and self.board_widget._board_model:
-            is_flipped = self.board_widget._board_model.is_flipped
+        # Get flip state (follow board display during flip animation snapshots)
+        if hasattr(self.board_widget, "_display_is_flipped"):
+            is_flipped = bool(self.board_widget._display_is_flipped())
+        else:
+            is_flipped = False
+            if hasattr(self.board_widget, '_board_model') and self.board_widget._board_model:
+                is_flipped = self.board_widget._board_model.is_flipped
         
         # Get board to check for pieces
         board = None

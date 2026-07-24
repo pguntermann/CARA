@@ -37,13 +37,11 @@ class MainChessBoardView(QWidget):
         self.chessboard = ChessBoardWidget(self.config, self._board_model, self._evaluation_model)
         layout.addWidget(self.chessboard, 1)  # Takes remaining space
         
-        # Connect to board model for visibility and rotation
+        # Connect to board model for visibility (flip chrome is handled by ChessBoardWidget)
         if self._board_model:
             self._board_model.evaluation_bar_visibility_changed.connect(self._on_evaluation_bar_visibility_changed)
-            self._board_model.flip_state_changed.connect(self._on_board_flip_changed)
             # Set initial visibility
             self._on_evaluation_bar_visibility_changed(self._board_model.show_evaluation_bar)
-            self._on_board_flip_changed(self._board_model.is_flipped)
     
     def set_evaluation_model(self, model) -> None:
         """Set the evaluation model.
@@ -63,13 +61,3 @@ class MainChessBoardView(QWidget):
         """
         if self.chessboard:
             self.chessboard.set_evaluation_bar_visible(show)
-    
-    def _on_board_flip_changed(self, is_flipped: bool) -> None:
-        """Handle board flip state change.
-        
-        Args:
-            is_flipped: True if board is flipped, False otherwise.
-        """
-        if self.chessboard:
-            self.chessboard.set_evaluation_bar_flipped(is_flipped)
-

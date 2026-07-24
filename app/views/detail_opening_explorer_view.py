@@ -883,12 +883,13 @@ class DetailOpeningExplorerView(QWidget):
         self._refresh_timer.start()
 
     def _on_flip_changed(self, *_args) -> None:
-        """Flip does not animate pieces — refresh as soon as the tab is visible."""
+        """Mark stale; defer rebuild until the board finishes any flip animation."""
         self._refresh_dirty = True
         if not self.isVisible():
             self._refresh_timer.stop()
             return
-        self._refresh_timer.setInterval(_REFRESH_COALESCE_MS)
+        # Prefer navigation_settled from the board flip animation; this is a safety net.
+        self._refresh_timer.setInterval(_REFRESH_SETTLED_FALLBACK_MS)
         self._refresh_timer.start()
 
     def _on_navigation_settled(self) -> None:

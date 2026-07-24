@@ -26,6 +26,7 @@ def build_board_context_menu(mw: Any, *, parent: Optional[Any] = None) -> QMenu:
             menu.addAction(act)
 
     _add_action_attr("rotate_action")
+    _add_action_attr("enable_board_animations_action")
     menu.addSeparator()
 
     _add_action_attr("game_info_action")

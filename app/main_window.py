@@ -1335,6 +1335,14 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'rotate_action'):
             self.rotate_action.setChecked(is_flipped)
     
+    def _on_enable_board_animations_toggled(self, checked: bool) -> None:
+        """Handle Board → Enable board animations toggle."""
+        self._update_board_visibility_setting("enable_board_animations", checked)
+        if hasattr(self, "main_panel") and hasattr(self.main_panel, "chessboard_view"):
+            chessboard = getattr(self.main_panel.chessboard_view, "chessboard", None)
+            if chessboard is not None and hasattr(chessboard, "set_board_animations_enabled"):
+                chessboard.set_board_animations_enabled(checked)
+
     def _on_show_annotations_layer_toggled(self, checked: bool) -> None:
         """Handle Show Annotations Layer toggle.
         
@@ -1445,7 +1453,6 @@ class MainWindow(QMainWindow):
         if not hasattr(self, '_settings_service') or self._settings_service is None:
             return
         self._settings_service.update_annotations({"highlight_annotated_moves_in_list": checked})
-        self._settings_service.save()
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
             self.detail_panel.moveslist_model.set_highlight_annotated_moves(checked)
     
@@ -3278,11 +3285,10 @@ class MainWindow(QMainWindow):
         manual_analysis_controller = self.controller.get_manual_analysis_controller()
         manual_analysis_controller.set_max_pieces_to_explore(max_pieces)
         
-        # Save to user settings
+        # Update user settings (persisted on app exit)
         from app.services.user_settings_service import UserSettingsService
         settings_service = UserSettingsService.get_instance()
         settings_service.update_manual_analysis({'max_pieces_to_explore': max_pieces})
-        settings_service.save()
     
     def _on_max_exploration_depth_selected(self, max_depth: int) -> None:
         """Handle max exploration depth selection.
@@ -3305,11 +3311,10 @@ class MainWindow(QMainWindow):
         manual_analysis_controller = self.controller.get_manual_analysis_controller()
         manual_analysis_controller.set_max_exploration_depth(max_depth)
         
-        # Save to user settings
+        # Update user settings (persisted on app exit)
         from app.services.user_settings_service import UserSettingsService
         settings_service = UserSettingsService.get_instance()
         settings_service.update_manual_analysis({'max_exploration_depth': max_depth})
-        settings_service.save()
     
     def _on_hide_other_arrows_during_plan_exploration_toggled(self) -> None:
         """Handle hide other arrows during plan exploration toggle."""
@@ -3332,11 +3337,10 @@ class MainWindow(QMainWindow):
         self.trajectory_style_straight_action.setChecked(use_straight_lines)
         self.trajectory_style_bezier_action.setChecked(not use_straight_lines)
         
-        # Update user settings (using board_visibility to match other board settings)
+        # Update user settings (persisted on app exit)
         from app.services.user_settings_service import UserSettingsService
         settings_service = UserSettingsService.get_instance()
         settings_service.update_board_visibility({'use_straight_lines': use_straight_lines})
-        settings_service.save()
         
         # Reload board widget config and update
         if hasattr(self, 'main_panel') and hasattr(self.main_panel, 'chessboard_view'):
@@ -3380,7 +3384,7 @@ class MainWindow(QMainWindow):
         self.ai_summary_use_anthropic_action.setChecked(use_anthropic)
         self.ai_summary_use_custom_action.setChecked(use_custom)
         
-        # Persist setting
+        # Persist setting (written on app exit)
         from app.services.user_settings_service import UserSettingsService
         settings_service = UserSettingsService.get_instance()
         settings_service.update_ai_summary_settings({
@@ -3388,7 +3392,6 @@ class MainWindow(QMainWindow):
             "use_anthropic_models": use_anthropic,
             "use_custom_models": use_custom
         })
-        settings_service.save()
         
         # Refresh AI Summary dropdown (if available)
         self._refresh_ai_summary_models()
@@ -3397,13 +3400,12 @@ class MainWindow(QMainWindow):
         """Handle AI Summary include analysis data toggle."""
         enabled = self.ai_summary_include_analysis_action.isChecked()
         
-        # Persist setting
+        # Persist setting (written on app exit)
         from app.services.user_settings_service import UserSettingsService
         settings_service = UserSettingsService.get_instance()
         settings_service.update_ai_summary_settings({
             "include_analysis_data_in_preprompt": enabled
         })
-        settings_service.save()
     
     def _on_ai_summary_include_metadata_toggled(self) -> None:
         """Handle AI Summary include metadata toggle."""
@@ -3414,7 +3416,6 @@ class MainWindow(QMainWindow):
         settings_service.update_ai_summary_settings({
             "include_metadata_in_preprompt": enabled
         })
-        settings_service.save()
     
     def _refresh_ai_summary_models(self) -> None:
         """Refresh the AI Summary model dropdown based on provider selection."""
@@ -3918,6 +3919,14 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'trajectory_style_straight_action') and hasattr(self, 'trajectory_style_bezier_action'):
             self.trajectory_style_straight_action.setChecked(use_straight_lines)
             self.trajectory_style_bezier_action.setChecked(not use_straight_lines)
+
+        enable_board_animations = board_visibility.get("enable_board_animations", True)
+        if hasattr(self, "enable_board_animations_action"):
+            self.enable_board_animations_action.setChecked(bool(enable_board_animations))
+        if hasattr(self, "main_panel") and hasattr(self.main_panel, "chessboard_view"):
+            chessboard = getattr(self.main_panel.chessboard_view, "chessboard", None)
+            if chessboard is not None and hasattr(chessboard, "set_board_animations_enabled"):
+                chessboard.set_board_animations_enabled(bool(enable_board_animations))
         
         game_info_center_mode = board_visibility.get("game_info_center_mode", "center_in_view")
         if game_info_center_mode not in ("center_in_view", "center_over_board"):
