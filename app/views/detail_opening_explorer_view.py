@@ -33,6 +33,8 @@ from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
 
 _DENSITY_ORDER = ("compact", "comfortable", "gallery")
+# Coalesce move + board.position signals (and rapid ply steps) without feeling laggy.
+_REFRESH_COALESCE_MS = 25
 _DENSITY_FALLBACK_PRESETS: Dict[str, Dict[str, Any]] = {
     "compact": {
         "mini_size": 96,
@@ -260,6 +262,10 @@ class DetailOpeningExplorerView(QWidget):
         self._path_layout_is_flow = False
         self._current_path_row: Optional[QWidget] = None
         self._focused_continuation: Optional[QWidget] = None
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.setSingleShot(True)
+        self._refresh_timer.setInterval(_REFRESH_COALESCE_MS)
+        self._refresh_timer.timeout.connect(self.refresh)
         self._load_config()
         self._setup_ui()
         if game_controller is not None:
@@ -847,7 +853,11 @@ class DetailOpeningExplorerView(QWidget):
             pass
 
     def _on_game_or_ply_changed(self, *_args) -> None:
-        self.refresh()
+        self._schedule_refresh()
+
+    def _schedule_refresh(self) -> None:
+        """Restart coalesce timer so duplicate / bursty signals share one refresh."""
+        self._refresh_timer.start()
 
     def _clear_layout(self, layout) -> None:
         while layout.count():
@@ -958,6 +968,8 @@ class DetailOpeningExplorerView(QWidget):
                 w.set_focus_highlight(bool(focused and w is node), accent)
 
     def refresh(self) -> None:
+        if self._refresh_timer.isActive():
+            self._refresh_timer.stop()
         self._stop_path_anim()
         self._fade_continuations_in()
         self._ensure_path_layout_orientation()
