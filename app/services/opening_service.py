@@ -60,7 +60,7 @@ class OpeningOutOfBookGap:
 
 @dataclass(frozen=True)
 class OpeningPathStep:
-    """One distinct opening label along the played line to the current ply."""
+    """One in-book position along the played line to the current ply."""
 
     fen: str
     display: OpeningDisplay
@@ -479,7 +479,6 @@ class OpeningService:
         ucis: List[str],
     ) -> List[OpeningPathStep]:
         steps: List[OpeningPathStep] = []
-        last_display: Optional[OpeningDisplay] = None
         out_of_book_start: Optional[int] = None
 
         for index, fen in enumerate(fens):
@@ -498,9 +497,8 @@ class OpeningService:
                 gap_before = self._out_of_book_gap(out_of_book_start, index - 1, sans)
             out_of_book_start = None
 
-            if match == last_display and gap_before is None:
-                continue
-
+            # Every in-book ply is its own step (including same ECO/name continuations),
+            # so "Lines until here" shows each played position up to the current line.
             move_san = sans[index - 1] if index > 0 and index - 1 < len(sans) else None
             move_uci = ucis[index - 1] if index > 0 and index - 1 < len(ucis) else None
             full_move = (index + 1) // 2 if index > 0 else None
@@ -518,7 +516,6 @@ class OpeningService:
                     gap_before=gap_before,
                 )
             )
-            last_display = match
 
         if not steps and fens:
             fen0 = fens[0]
