@@ -1,5 +1,31 @@
 # Release Notes
 
+# CARA v2.7.9 - Variation Navigation, Board Animations, and Player Stats PDF Report
+
+**Release Date:** 25.07.2026
+
+This release adds optional **navigation into PGN variations**, **board animations** (piece moves and board flip), an optional **indented variation layout** in the PGN pane, and a **Player Stats PDF Report**. It also improves Opening Explorer performance and layout, and fixes several variation- and overlay-related display issues.
+
+## New Features
+
+- **Navigate into variations:** This is disabled by default. Enable through the PGN menu or PGN pane context menu by toggling **Enable navigating into variations**. This lets you step into sidelines when navigating moves with the cursor keys, with a branch-select overlay when multiple continuations are available. Use **up** and **down** to select the branch and use **right** or **enter** to continue on the selected branch. When reaching the end of a variation branch, press **right** twice to continue on the next mainline move.Alternatively, you can click directly into a variation move in the PGN pane to go there. When in a variation, the board uses a different color theme/style to indicate this. As with the normal board colors and styling, the "Variation-Style" can also be adjusted in the respective theme's **style_*.config** file. Variation moves can be assessed with the engine evaluation and manual analysis and be annotated, but are not processed through the Game Analysis and also do not appear in the Moves List.
+- **PGN – Indent variations:** Optional layout that places each variation on a new indented line by depth (export/copy remain unchanged). This is especially useful when you have **Navigate into variations** enabled.
+- **Board animations:** Animated piece movement when stepping to an adjacent ply, as well as a board-flip animation. Toggle via **Board → Enable board animations** (or the board context menu).
+- **Player Stats PDF Report:** From the Player Stats context menu, **Export PDF Report** creates a multi-page printable report of the sections visible for the active profile. Similar to the game summary PDF report.
+
+## Enhancements
+
+- **Opening Explorer:** Faster refresh and performance optimization, small debounce for early-move navigation; layout refined to reduce redundant information; miniature boards on the played line update correctly during opening continuation.
+- **Game Summary:** Evaluation graph X-axis labels show move numbers instead of ply indices.
+- **HTML manual:** Clarified PDF report descriptions for Game Summary and Player Stats.
+
+## Bug Fixes
+
+- **Opening Explorer:** Played line miniature boards no longer get stuck if the opening eco and name remain the same, but further moves from that opening line are played.
+- **Game Summary:** Evaluation graph X-axis labels show move numbers instead of ply indices.
+
+---
+
 # CARA v2.7.8 - Opening Explorer Layouts, Game Summary Cards, and PDF Game Report
 
 **Release Date:** 23.07.2026
