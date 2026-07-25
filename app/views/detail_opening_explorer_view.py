@@ -478,21 +478,21 @@ class DetailOpeningExplorerView(QWidget):
 
         self._path_header_row.mousePressEvent = self._path_header_mouse_press  # type: ignore[method-assign]
 
-        # Compact context always visible when a path exists (summary + breadcrumbs).
+        # Compact context: current opening chip, then move sequence.
         self._path_compact = QWidget()
         self._path_compact.setVisible(False)
         compact_layout = QVBoxLayout(self._path_compact)
         compact_layout.setContentsMargins(0, 0, 0, 0)
         compact_layout.setSpacing(self._path_compact_spacing)
 
+        self._breadcrumb_wrap = _BreadcrumbWrap(spacing=self._breadcrumb_spacing)
+        self._breadcrumb_wrap.setVisible(False)
+        compact_layout.addWidget(self._breadcrumb_wrap)
+
         self._path_summary = QLabel("")
         self._path_summary.setWordWrap(True)
         self._path_summary.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         compact_layout.addWidget(self._path_summary)
-
-        self._breadcrumb_wrap = _BreadcrumbWrap(spacing=self._breadcrumb_spacing)
-        self._breadcrumb_wrap.setVisible(False)
-        compact_layout.addWidget(self._breadcrumb_wrap)
 
         # Expandable board gallery. List modes use a vertical stack; gallery uses a
         # wrapping flow (no nested scroll area / border — outer detail scroll handles overflow).
@@ -528,7 +528,8 @@ class DetailOpeningExplorerView(QWidget):
         self._cont_container.setContentsMargins(0, 0, 0, 0)
         self._cont_container.setSpacing(self._row_spacing)
 
-        # Summary/breadcrumbs stay visible; expand header sits directly above the boards it toggles.
+        # Current opening chip + move sequence stay visible; expand header sits
+        # directly above the boards it toggles.
         self._content_layout.addWidget(self._path_compact)
         self._content_layout.addWidget(self._path_header_row)
         self._content_layout.addWidget(self._path_boards_host)
@@ -951,6 +952,7 @@ class DetailOpeningExplorerView(QWidget):
         self._configure_path_scroll_for_density()
 
     def _set_breadcrumbs(self, path: List[OpeningPathStep], current_ply: int) -> None:
+        """Show only the current opening chip (earlier steps live in Lines until here)."""
         if not path:
             self._breadcrumb_wrap.clear_chips()
             self._breadcrumb_wrap.setVisible(False)
@@ -961,48 +963,44 @@ class DetailOpeningExplorerView(QWidget):
             if step.ply_index <= current_ply:
                 active_idx = i
 
-        chips: List[QToolButton] = []
-        for i, step in enumerate(path):
-            chip = QToolButton()
-            chip.setAutoRaise(True)
-            chip.setCursor(Qt.CursorShape.PointingHandCursor)
-            chip.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-            name = step.display.name
-            if len(name) > 28:
-                name = name[:27] + "…"
-            eco = step.display.eco
-            label = f"{eco} · {name}" if eco else name
-            chip.setText(label)
-            chip.setToolTip(step.display.label)
-            chip.clicked.connect(lambda checked=False, p=step.ply_index: self._navigate_to_ply(p))
+        step = path[active_idx]
+        chip = QToolButton()
+        chip.setAutoRaise(True)
+        chip.setCursor(Qt.CursorShape.PointingHandCursor)
+        chip.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        eco = step.display.eco
+        name = step.display.name
+        label = f"{eco} · {name}" if eco else name
+        chip.setText(label)
+        chip.setToolTip(step.display.label)
+        chip.clicked.connect(lambda checked=False, p=step.ply_index: self._navigate_to_ply(p))
 
-            bg = self._chip_active_bg if i == active_idx else self._chip_bg
-            border = self._current_row_border if i == active_idx else self._chip_border
-            tc = self._chip_active_text if i == active_idx else self._text_color
-            chip.setStyleSheet(
-                f"""
-                QToolButton {{
-                    color: rgb({tc[0]}, {tc[1]}, {tc[2]});
-                    background-color: rgb({bg[0]}, {bg[1]}, {bg[2]});
-                    border: 1px solid rgb({border[0]}, {border[1]}, {border[2]});
-                    border-radius: 10px;
-                    padding: 2px 8px;
-                    font-size: {max(8, int(self._font_size) - 1)}pt;
-                }}
-                QToolButton:hover {{
-                    background-color: rgb({self._chip_active_bg[0]}, {self._chip_active_bg[1]}, {self._chip_active_bg[2]});
-                    color: rgb({self._chip_active_text[0]}, {self._chip_active_text[1]}, {self._chip_active_text[2]});
-                }}
-                """
-            )
-            try:
-                text_w = chip.fontMetrics().horizontalAdvance(label)
-            except Exception:
-                text_w = len(label) * 7
-            chip.setMinimumWidth(int(text_w + 20))
-            chips.append(chip)
+        bg = self._chip_active_bg
+        border = self._current_row_border
+        tc = self._chip_active_text
+        chip.setStyleSheet(
+            f"""
+            QToolButton {{
+                color: rgb({tc[0]}, {tc[1]}, {tc[2]});
+                background-color: rgb({bg[0]}, {bg[1]}, {bg[2]});
+                border: 1px solid rgb({border[0]}, {border[1]}, {border[2]});
+                border-radius: 10px;
+                padding: 2px 8px;
+                font-size: {max(8, int(self._font_size) - 1)}pt;
+            }}
+            QToolButton:hover {{
+                background-color: rgb({self._chip_active_bg[0]}, {self._chip_active_bg[1]}, {self._chip_active_bg[2]});
+                color: rgb({self._chip_active_text[0]}, {self._chip_active_text[1]}, {self._chip_active_text[2]});
+            }}
+            """
+        )
+        try:
+            text_w = chip.fontMetrics().horizontalAdvance(label)
+        except Exception:
+            text_w = len(label) * 7
+        chip.setMinimumWidth(int(text_w + 20))
 
-        self._breadcrumb_wrap.set_chips(chips)
+        self._breadcrumb_wrap.set_chips([chip])
         self._breadcrumb_wrap.setVisible(True)
 
     def _on_continuation_focus(self, node: QWidget, focused: bool) -> None:
@@ -1085,14 +1083,13 @@ class DetailOpeningExplorerView(QWidget):
         else:
             book_end = self._opening_service.last_in_book_index(fens)
             summary_moves = _format_san_line(sans[:book_end])
-        if current_display is not None and in_book:
-            summary = f"{summary_moves}  ·  {current_display.label}"
-        elif path and not in_book:
-            summary = f"{summary_moves}  ·  {path[-1].display.label}  ·  Out of book"
-        elif current_display is not None:
-            summary = f"{summary_moves}  ·  {current_display.label}"
-        else:
+        # Opening code/name lives on the chip above; keep this line as the move sequence.
+        if in_book:
+            summary = summary_moves
+        elif summary_moves:
             summary = f"{summary_moves}  ·  Out of book"
+        else:
+            summary = "Out of book"
         self._path_summary.setText(summary)
         self._set_breadcrumbs(path, ply)
 
