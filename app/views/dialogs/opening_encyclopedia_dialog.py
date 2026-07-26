@@ -1,0 +1,1132 @@
+"""Opening Encyclopedia detail dialog."""
+
+from __future__ import annotations
+
+import html
+import re
+from typing import Any, Dict, List, Optional, Tuple
+
+from PyQt6.QtCore import Qt, QUrl, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QFont, QKeyEvent, QMouseEvent, QPixmap, QResizeEvent, QShowEvent, QTextDocument
+from PyQt6.QtWidgets import (
+    QDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
+
+from app.services.opening_encyclopedia_service import (
+    EncyclopediaEntry,
+    EncyclopediaImage,
+    OpeningEncyclopediaService,
+)
+from app.utils.external_open import open_url
+from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.views.style import StyleManager
+
+# SAN-aware matcher for encyclopedia prose (aligned with notes formatter ideas).
+_FILE = r"[a-h]"
+_RANK = r"[1-8]"
+_SQUARE = rf"{_FILE}{_RANK}"
+_CHECK = r"[+#]?"
+_PROMO = r"(?:=[QRBN])?"
+_CASTLING = rf"O-O(?:-O)?{_CHECK}"
+_PAWN_SAN = rf"(?:{_FILE}x)?{_SQUARE}{_PROMO}{_CHECK}"
+_PIECE_SAN = rf"[KQRBN](?:{_SQUARE}|{_FILE}|{_RANK})?x?{_SQUARE}{_PROMO}{_CHECK}"
+_SAN = rf"(?:{_CASTLING}|{_PIECE_SAN}|{_PAWN_SAN})"
+_ELLIPSIS = r"(?:…|\.\.\.)"
+_BOUNDARY = r"(?<![A-Za-z0-9])"
+_TOKEN_END = r"(?=[\s,.;:)\!\?/\-–—]|$)"
+
+_NUMBERED_WHITE = re.compile(
+    rf"{_BOUNDARY}(?P<full>(?P<num>\d+)\.\s*(?P<w>{_SAN})){_TOKEN_END}"
+    rf"(?:\s+(?P<b>{_SAN}){_TOKEN_END})?"
+)
+_NUMBERED_BLACK = re.compile(
+    rf"{_BOUNDARY}(?P<full>(?P<num>\d+)\s*{_ELLIPSIS}\s*(?P<b>{_SAN})){_TOKEN_END}"
+)
+_ELLIPSIS_MOVE = re.compile(
+    rf"(?<![A-Za-z0-9])(?P<full>{_ELLIPSIS}\s*(?P<m>{_SAN})){_TOKEN_END}"
+)
+_BARE_SAN = re.compile(rf"{_BOUNDARY}(?P<full>{_SAN}){_TOKEN_END}")
+
+
+def _rgb(value: Any, default: list[int]) -> list[int]:
+    if isinstance(value, (list, tuple)) and len(value) >= 3:
+        return [int(value[0]), int(value[1]), int(value[2])]
+    return list(default)
+
+
+def _collect_move_spans(plain: str) -> List[Tuple[int, int]]:
+    """Return non-overlapping [start, end) spans of move references in ``plain``."""
+    spans: List[Tuple[int, int]] = []
+
+    def add(start: int, end: int) -> None:
+        if start < end:
+            spans.append((start, end))
+
+    for m in _NUMBERED_WHITE.finditer(plain):
+        add(m.start("full"), m.end("w"))
+        if m.group("b"):
+            add(m.start("b"), m.end("b"))
+    for m in _NUMBERED_BLACK.finditer(plain):
+        add(m.start("full"), m.end("full"))
+    for m in _ELLIPSIS_MOVE.finditer(plain):
+        add(m.start("full"), m.end("full"))
+    for m in _BARE_SAN.finditer(plain):
+        add(m.start("full"), m.end("full"))
+
+    if not spans:
+        return []
+    spans.sort(key=lambda t: (t[0], -(t[1] - t[0])))
+    merged: List[Tuple[int, int]] = []
+    last_end = -1
+    for start, end in spans:
+        if start < last_end:
+            continue
+        merged.append((start, end))
+        last_end = end
+    return merged
+
+
+def format_encyclopedia_text_html(
+    plain: str,
+    *,
+    body_color: list[int],
+    move_color: list[int],
+    move_font_weight: str = "600",
+) -> str:
+    """Escape prose and wrap recognized move references in styled spans."""
+    if not plain:
+        return ""
+    spans = _collect_move_spans(plain)
+    br = body_color
+    mr = move_color
+    body_style = f"color: rgb({br[0]}, {br[1]}, {br[2]});"
+    move_style = (
+        f"color: rgb({mr[0]}, {mr[1]}, {mr[2]}); "
+        f"font-weight: {html.escape(str(move_font_weight))};"
+    )
+    parts: List[str] = [f'<span style="{body_style}">']
+    i = 0
+    for start, end in spans:
+        if start > i:
+            parts.append(html.escape(plain[i:start]))
+        parts.append(f'<span style="{move_style}">{html.escape(plain[start:end])}</span>')
+        i = end
+    if i < len(plain):
+        parts.append(html.escape(plain[i:]))
+    parts.append("</span>")
+    return "".join(parts).replace("\n", "<br/>")
+
+
+def format_image_caption(image: EncyclopediaImage) -> Optional[str]:
+    """Primary caption with optional lifespan, e.g. ``Name (1726–1795)``."""
+    caption = (image.caption or "").strip()
+    lifespan = (image.lifespan or "").strip()
+    if caption and lifespan:
+        if lifespan in caption:
+            return caption
+        return f"{caption} ({lifespan})"
+    if caption:
+        return caption
+    if lifespan:
+        return lifespan
+    return None
+
+
+def format_image_credit_html(
+    image: EncyclopediaImage,
+    *,
+    credit_color: list[int],
+    link_color: list[int],
+    font_size_pt: int = 8,
+) -> Optional[str]:
+    """Attribution / license / source credit line (HTML, source as link when URL)."""
+    parts: List[str] = []
+    if image.attribution:
+        parts.append(html.escape(image.attribution))
+    if image.license:
+        parts.append(html.escape(image.license))
+
+    credit = " · ".join(parts) if parts else ""
+    source = (image.source or "").strip()
+    cc = credit_color
+    lc = link_color
+    color_style = (
+        f"color: rgb({cc[0]}, {cc[1]}, {cc[2]}); font-size: {int(font_size_pt)}pt;"
+    )
+    link_style = f"color: rgb({lc[0]}, {lc[1]}, {lc[2]}); font-size: {int(font_size_pt)}pt;"
+
+    if source and (source.startswith("http://") or source.startswith("https://")):
+        href = html.escape(source, quote=True)
+        link = f'<a href="{href}" style="{link_style}">Source</a>'
+        if credit:
+            return f'<span style="{color_style}">{credit}<br/>{link}</span>'
+        return f'<span style="{color_style}">{link}</span>'
+    if source:
+        src_line = html.escape(source)
+        if credit:
+            return f'<span style="{color_style}">{credit}<br/>{src_line}</span>'
+        return f'<span style="{color_style}">{src_line}</span>'
+    if credit:
+        return f'<span style="{color_style}">{credit}</span>'
+    return None
+
+
+def _fit_pixmap(pix: QPixmap, column_w: int) -> QPixmap:
+    """Scale pixmap to the shared column width (aspect ratio preserved)."""
+    if pix.isNull() or column_w <= 0:
+        return pix
+    if pix.width() == column_w:
+        return pix
+    return pix.scaledToWidth(column_w, Qt.TransformationMode.SmoothTransformation)
+
+
+def _fit_gallery_pixmap(pix: QPixmap, max_w: int, max_h: int) -> QPixmap:
+    """Fit pixmap into bounds without upscaling past the original size."""
+    if pix.isNull() or max_w <= 0 or max_h <= 0:
+        return pix
+    if pix.width() <= max_w and pix.height() <= max_h:
+        return pix
+    return pix.scaled(
+        max_w,
+        max_h,
+        Qt.AspectRatioMode.KeepAspectRatio,
+        Qt.TransformationMode.SmoothTransformation,
+    )
+
+
+class _ClickableImageLabel(QLabel):
+    """Thumbnail / gallery image that reports left-clicks."""
+
+    clicked = pyqtSignal()
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)
+
+
+class EncyclopediaGalleryOverlay(QWidget):
+    """In-dialog gallery: dimmed backdrop, fitted image, optional image switcher."""
+
+    closed = pyqtSignal()
+
+    def __init__(
+        self,
+        parent: QWidget,
+        pixmaps: List[QPixmap],
+        captions: List[Optional[str]],
+        gallery_config: Dict[str, Any],
+    ) -> None:
+        super().__init__(parent)
+        self._pixmaps = list(pixmaps)
+        self._captions = list(captions)
+        self._index = 0
+        self._nav_widgets: List[QWidget] = []
+
+        overlay_rgb = _rgb(gallery_config.get("overlay_color"), [0, 0, 0])
+        opacity = float(gallery_config.get("overlay_opacity", 0.78))
+        opacity = max(0.0, min(1.0, opacity))
+        alpha = int(round(255 * opacity))
+        padding = int(gallery_config.get("padding", 28))
+        self._padding = max(8, padding)
+
+        caption_color = _rgb(gallery_config.get("caption_color"), [220, 220, 225])
+        caption_size = int(scale_font_size(gallery_config.get("caption_font_size", 10)))
+        nav_cfg = gallery_config.get("nav", {})
+        if not isinstance(nav_cfg, dict):
+            nav_cfg = {}
+        self._dot_size = max(6, int(nav_cfg.get("dot_size", 9)))
+        self._dot_color = _rgb(nav_cfg.get("dot_color"), [120, 120, 125])
+        self._dot_active = _rgb(nav_cfg.get("dot_active_color"), [235, 235, 240])
+        nav_spacing = int(nav_cfg.get("spacing", 10))
+
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet(
+            f"background-color: rgba({overlay_rgb[0]}, {overlay_rgb[1]}, {overlay_rgb[2]}, {alpha});"
+        )
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.hide()
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(self._padding, self._padding, self._padding, self._padding)
+        root.setSpacing(10)
+
+        root.addStretch(1)
+
+        self._image = _ClickableImageLabel()
+        self._image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._image.setScaledContents(False)
+        self._image.setStyleSheet("background: transparent; border: none;")
+        self._image.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._image.clicked.connect(self.close_gallery)
+        root.addWidget(self._image, 0, Qt.AlignmentFlag.AlignCenter)
+
+        self._caption = QLabel()
+        self._caption.setWordWrap(True)
+        self._caption.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        self._caption.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
+        )
+        self._caption.setStyleSheet(
+            f"color: rgb({caption_color[0]}, {caption_color[1]}, {caption_color[2]}); "
+            f"font-size: {caption_size}pt; background: transparent; border: none;"
+        )
+        # Full-width row (text centered). AlignHCenter on the widget would shrink it
+        # to sizeHint and clip captions.
+        root.addWidget(self._caption)
+
+        self._nav = QWidget()
+        self._nav.setStyleSheet("background: transparent;")
+        self._nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        nav_row = QHBoxLayout(self._nav)
+        nav_row.setContentsMargins(0, 4, 0, 0)
+        nav_row.setSpacing(nav_spacing)
+        nav_row.addStretch(1)
+        if len(self._pixmaps) > 1:
+            for i in range(len(self._pixmaps)):
+                dot = QPushButton()
+                dot.setFixedSize(self._dot_size, self._dot_size)
+                dot.setCursor(Qt.CursorShape.PointingHandCursor)
+                dot.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+                dot.clicked.connect(lambda _checked=False, idx=i: self.show_index(idx))
+                nav_row.addWidget(dot, 0, Qt.AlignmentFlag.AlignCenter)
+                self._nav_widgets.append(dot)
+        nav_row.addStretch(1)
+        root.addWidget(self._nav)
+        self._nav.setVisible(len(self._pixmaps) > 1)
+
+        root.addStretch(1)
+
+    def open_at(self, index: int) -> None:
+        if not self._pixmaps:
+            return
+        parent = self.parentWidget()
+        if parent is not None:
+            self.setGeometry(parent.rect())
+        self._index = max(0, min(int(index), len(self._pixmaps) - 1))
+        caption = ""
+        if 0 <= self._index < len(self._captions) and self._captions[self._index]:
+            caption = str(self._captions[self._index])
+        self._caption.setText(caption)
+        self._caption.setVisible(bool(caption))
+        self._refresh_nav()
+        # Show first so width/height and word-wrap metrics are valid, then fit.
+        self.show()
+        self.raise_()
+        self.setFocus(Qt.FocusReason.PopupFocusReason)
+        self._refresh_image()
+        # Second pass after Qt finishes the initial layout (avoids caption/image collision).
+        QTimer.singleShot(0, self._refresh_image)
+
+    def close_gallery(self) -> None:
+        if not self.isVisible():
+            return
+        self.hide()
+        self.closed.emit()
+
+    def show_index(self, index: int) -> None:
+        if not self._pixmaps:
+            return
+        self._index = max(0, min(int(index), len(self._pixmaps) - 1))
+        self._refresh_image()
+        self._refresh_nav()
+
+    def refresh_geometry(self) -> None:
+        parent = self.parentWidget()
+        if parent is not None:
+            self.setGeometry(parent.rect())
+        if self.isVisible():
+            self._refresh_image()
+
+    def _footer_height(self, content_width: int) -> int:
+        """Vertical space reserved under the image (caption, nav, layout gaps)."""
+        layout = self.layout()
+        spacing = int(layout.spacing()) if layout is not None else 10
+        parts_visible = 0
+        total = 0
+
+        if self._caption.isVisible() and self._caption.text():
+            # Prefer unwrapped single-line height when the text fits.
+            fm = self._caption.fontMetrics()
+            text = self._caption.text()
+            if fm.horizontalAdvance(text) <= content_width:
+                caption_h = fm.height()
+            else:
+                caption_h = self._caption.heightForWidth(content_width)
+                if caption_h < 0:
+                    caption_h = self._caption.sizeHint().height()
+            total += max(int(caption_h), fm.height())
+            parts_visible += 1
+
+        if self._nav.isVisible():
+            nav_h = self._nav.sizeHint().height()
+            total += max(nav_h, self._dot_size + 8)
+            parts_visible += 1
+
+        # Gaps between image / caption / nav, plus a little breathing room.
+        if parts_visible:
+            total += spacing * parts_visible
+        return total
+
+    def _refresh_image(self) -> None:
+        caption = ""
+        if 0 <= self._index < len(self._captions) and self._captions[self._index]:
+            caption = str(self._captions[self._index])
+        self._caption.setText(caption)
+        self._caption.setVisible(bool(caption))
+
+        if self.width() <= 1 or self.height() <= 1:
+            parent = self.parentWidget()
+            if parent is not None:
+                self.setGeometry(parent.rect())
+
+        max_w = max(1, self.width() - 2 * self._padding)
+        footer_h = self._footer_height(max_w)
+        max_h = max(1, self.height() - 2 * self._padding - footer_h)
+
+        pix = self._pixmaps[self._index]
+        fitted = _fit_gallery_pixmap(pix, max_w, max_h)
+        self._image.setPixmap(fitted)
+        self._image.setFixedSize(fitted.size())
+
+        layout = self.layout()
+        if layout is not None:
+            layout.activate()
+
+    def _refresh_nav(self) -> None:
+        for i, dot in enumerate(self._nav_widgets):
+            active = i == self._index
+            color = self._dot_active if active else self._dot_color
+            r = self._dot_size // 2
+            dot.setStyleSheet(
+                f"""
+                QPushButton {{
+                    background-color: rgb({color[0]}, {color[1]}, {color[2]});
+                    border: none;
+                    border-radius: {r}px;
+                }}
+                """
+            )
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Clicks on nav dots are handled by the buttons; anything else closes.
+            child = self.childAt(event.position().toPoint())
+            if child is not None and (child is self._nav or self._nav.isAncestorOf(child)):
+                super().mouseReleaseEvent(event)
+                return
+            self.close_gallery()
+            return
+        super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
+        key = event.key()
+        if key in (Qt.Key.Key_Escape, Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self.close_gallery()
+            return
+        if key in (Qt.Key.Key_Left, Qt.Key.Key_Up) and len(self._pixmaps) > 1:
+            self.show_index((self._index - 1) % len(self._pixmaps))
+            return
+        if key in (Qt.Key.Key_Right, Qt.Key.Key_Down) and len(self._pixmaps) > 1:
+            self.show_index((self._index + 1) % len(self._pixmaps))
+            return
+        super().keyPressEvent(event)
+
+
+class OpeningEncyclopediaDialog(QDialog):
+    """Themed dialog showing encyclopedia prose and optional portrait art."""
+
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        entry: EncyclopediaEntry,
+        encyclopedia_service: OpeningEncyclopediaService,
+        parent=None,
+    ) -> None:
+        super().__init__(parent)
+        self.config = config
+        self._entry = entry
+        self._encyclopedia = encyclopedia_service
+        self._gallery_overlay: Optional[EncyclopediaGalleryOverlay] = None
+        self._gallery_pixmaps: List[QPixmap] = []
+        self._gallery_captions: List[Optional[str]] = []
+        self._scroll: Optional[QScrollArea] = None
+        self._content_host: Optional[QWidget] = None
+        self._body_labels: List[QLabel] = []
+        self._title_label: Optional[QLabel] = None
+        self._section_blocks: List[QWidget] = []
+        self._beside_host: Optional[QWidget] = None
+        self._below_host: Optional[QWidget] = None
+        self._beside_layout: Optional[QVBoxLayout] = None
+        self._below_layout: Optional[QVBoxLayout] = None
+        self._top_row: Optional[QWidget] = None
+        self._image_panel: Optional[QWidget] = None
+        self._image_text_gap: int = 16
+        self._beside_block_count: Optional[int] = None
+        self._resize_sync_timer = QTimer(self)
+        self._resize_sync_timer.setSingleShot(True)
+        self._resize_sync_timer.setInterval(40)
+        self._resize_sync_timer.timeout.connect(self._sync_scroll_content_size)
+
+        dialog_config = (
+            (config.get("ui") or {}).get("dialogs", {}).get("opening_encyclopedia_dialog", {})
+        )
+        self._dialog_config = dialog_config
+        layout_config = dialog_config.get("layout", {})
+        self.bottom_button_top_padding = int(dialog_config.get("bottom_button_top_padding", 24))
+
+        self.setWindowTitle(entry.display_name or "Opening Encyclopedia")
+
+        bg = _rgb(dialog_config.get("background_color"), [40, 40, 45])
+        self.setAutoFillBackground(True)
+        pal = self.palette()
+        pal.setColor(self.backgroundRole(), QColor(*bg))
+        self.setPalette(pal)
+
+        min_w = int(dialog_config.get("minimum_width", 520))
+        min_h = int(dialog_config.get("minimum_height", 360))
+        max_w = int(dialog_config.get("max_width", 800))
+        max_h = int(dialog_config.get("max_height", 640))
+        # Keep resize enabled, but clamp the allowed range.
+        self.setMinimumSize(min_w, min_h)
+        self.setMaximumSize(max(max_w, min_w), max(max_h, min_h))
+        default_w = int(dialog_config.get("width", 640))
+        default_h = int(dialog_config.get("height", 440))
+        self.resize(
+            max(min_w, min(default_w, max_w)),
+            max(min_h, min(default_h, max_h)),
+        )
+
+        root = QVBoxLayout(self)
+        margins = layout_config.get("margins", [20, 20, 20, 20])
+        if isinstance(margins, (list, tuple)) and len(margins) >= 4:
+            root.setContentsMargins(int(margins[0]), int(margins[1]), int(margins[2]), int(margins[3]))
+        root.setSpacing(int(layout_config.get("spacing", 12)))
+
+        border = _rgb(
+            (dialog_config.get("buttons") or {}).get("border_color"),
+            [60, 60, 65],
+        )
+
+        # Single scroll area for text + images together.
+        # Manual content sizing (not widgetResizable) avoids inflated QLabel
+        # height hints leaving a tall blank scrollable region under short prose.
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(False)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        StyleManager.style_scroll_area(
+            scroll,
+            config,
+            bg,
+            border,
+            border_radius=0,
+            include_scroll_area_border=False,
+        )
+        self._scroll = scroll
+
+        content_host = QWidget()
+        content_host.setStyleSheet("background: transparent;")
+        content_host.setSizePolicy(
+            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum
+        )
+        self._content_host = content_host
+        content_col = QVBoxLayout(content_host)
+        content_col.setSpacing(int(layout_config.get("section_spacing", 10)))
+        content_col.setContentsMargins(0, 0, 4, 0)
+        content_col.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        self._image_text_gap = int(layout_config.get("image_text_gap", 16))
+
+        title_cfg = dialog_config.get("title", {})
+        title = QLabel(entry.display_name)
+        title.setWordWrap(True)
+        title.setFont(
+            QFont(
+                resolve_font_family(title_cfg.get("font_family", "Helvetica Neue")),
+                int(scale_font_size(title_cfg.get("font_size", 14))),
+                QFont.Weight.Bold,
+            )
+        )
+        title_color = _rgb(title_cfg.get("text_color"), [240, 240, 240])
+        title.setStyleSheet(
+            f"color: rgb({title_color[0]}, {title_color[1]}, {title_color[2]}); background: transparent;"
+        )
+        title.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self._title_label = title
+
+        body_cfg = dialog_config.get("body", {})
+        body_family = resolve_font_family(body_cfg.get("font_family", "Helvetica Neue"))
+        body_size = int(scale_font_size(body_cfg.get("font_size", 11)))
+        body_color = _rgb(body_cfg.get("text_color"), [200, 200, 200])
+        move_cfg = dialog_config.get("move_highlight", {})
+        move_color = _rgb(move_cfg.get("text_color"), [100, 150, 255])
+        move_weight = str(move_cfg.get("font_weight", "600"))
+        section_cfg = dialog_config.get("section_title", {})
+        section_size = int(scale_font_size(section_cfg.get("font_size", 11)))
+        section_color = _rgb(section_cfg.get("text_color"), [180, 180, 185])
+        sep_cfg = dialog_config.get("section_separator", {})
+        if not isinstance(sep_cfg, dict):
+            sep_cfg = {}
+        sep_enabled = bool(sep_cfg.get("enabled", True))
+        sep_color = _rgb(sep_cfg.get("color"), [70, 70, 75])
+        sep_height = max(1, int(sep_cfg.get("height", 1)))
+        sep_margin = sep_cfg.get("margin", [10, 0, 6, 0])
+        if not isinstance(sep_margin, list) or len(sep_margin) < 4:
+            sep_margin = [10, 0, 6, 0]
+        sep_mt, _sep_mr, sep_mb, _sep_ml = (int(v) for v in sep_margin[:4])
+        section_spacing = int(layout_config.get("section_spacing", 10))
+
+        def _make_separator() -> QWidget:
+            wrap = QWidget()
+            wrap.setStyleSheet("background: transparent;")
+            wrap.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            v = QVBoxLayout(wrap)
+            v.setContentsMargins(0, 0, 0, 0)
+            v.setSpacing(0)
+            if sep_mt:
+                v.addSpacing(sep_mt)
+            line = QFrame()
+            line.setFixedHeight(sep_height)
+            line.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            c = sep_color
+            line.setStyleSheet(
+                f"background-color: rgb({c[0]}, {c[1]}, {c[2]}); border: none;"
+            )
+            v.addWidget(line)
+            if sep_mb:
+                v.addSpacing(sep_mb)
+            return wrap
+
+        def _make_section(
+            heading: Optional[str],
+            body: Optional[str],
+            *,
+            emphasize: bool = False,
+            with_separator: bool = False,
+        ) -> Optional[QWidget]:
+            if not body:
+                return None
+            block = QWidget()
+            block.setStyleSheet("background: transparent;")
+            block.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+            col = QVBoxLayout(block)
+            col.setContentsMargins(0, 0, 0, 0)
+            col.setSpacing(section_spacing)
+            col.setAlignment(Qt.AlignmentFlag.AlignTop)
+            if with_separator and sep_enabled:
+                col.addWidget(_make_separator())
+            if heading:
+                h = QLabel(heading)
+                h.setFont(QFont(body_family, section_size, QFont.Weight.DemiBold))
+                h.setStyleSheet(
+                    f"color: rgb({section_color[0]}, {section_color[1]}, {section_color[2]}); "
+                    "background: transparent;"
+                )
+                h.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+                col.addWidget(h)
+            lab = QLabel()
+            lab.setWordWrap(True)
+            lab.setTextFormat(Qt.TextFormat.RichText)
+            lab.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            size = body_size + (1 if emphasize else 0)
+            lab.setFont(QFont(body_family, size))
+            lab.setStyleSheet("background: transparent;")
+            lab.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            lab.setMinimumHeight(0)
+            lab.setText(
+                format_encyclopedia_text_html(
+                    body,
+                    body_color=body_color,
+                    move_color=move_color,
+                    move_font_weight=move_weight,
+                )
+            )
+            col.addWidget(lab)
+            self._body_labels.append(lab)
+            # Stash the body label on the block for width-specific measuring.
+            block._encyclopedia_body = lab  # type: ignore[attr-defined]
+            return block
+
+        self._section_blocks = []
+        for heading, body, emphasize in (
+            (None, entry.summary, True),
+            ("Key ideas", entry.key_ideas, False),
+            ("Name origin", entry.name_origin, False),
+            ("History", entry.history, False),
+        ):
+            block = _make_section(
+                heading,
+                body,
+                emphasize=emphasize,
+                with_separator=bool(heading) and bool(self._section_blocks),
+            )
+            if block is not None:
+                self._section_blocks.append(block)
+
+        beside_host = QWidget()
+        beside_host.setStyleSheet("background: transparent;")
+        beside_host.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        self._beside_host = beside_host
+        self._beside_layout = QVBoxLayout(beside_host)
+        self._beside_layout.setContentsMargins(0, 0, 0, 0)
+        self._beside_layout.setSpacing(section_spacing)
+        self._beside_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        below_host = QWidget()
+        below_host.setStyleSheet("background: transparent;")
+        below_host.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        self._below_host = below_host
+        self._below_layout = QVBoxLayout(below_host)
+        self._below_layout.setContentsMargins(0, 0, 0, 0)
+        self._below_layout.setSpacing(section_spacing)
+        self._below_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        top_row = QWidget()
+        top_row.setStyleSheet("background: transparent;")
+        top_row.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        self._top_row = top_row
+        top_layout = QHBoxLayout(top_row)
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        top_layout.setSpacing(self._image_text_gap)
+        top_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        top_layout.addWidget(beside_host, 1)
+
+        self._image_panel = None
+        if entry.images:
+            image_panel = self._build_image_column(
+                entry,
+                encyclopedia_service,
+                dialog_config,
+            )
+            self._image_panel = image_panel
+            top_layout.addWidget(image_panel, 0, Qt.AlignmentFlag.AlignTop)
+
+        content_col.addWidget(top_row)
+        content_col.addWidget(below_host)
+        # Initial placement; refined on show/resize once widths are known.
+        self._beside_layout.addWidget(title)
+        for block in self._section_blocks:
+            self._beside_layout.addWidget(block)
+
+        scroll.setWidget(content_host)
+        root.addWidget(scroll, 1)
+        root.addSpacing(self.bottom_button_top_padding)
+
+        buttons_config = dialog_config.get("buttons", {})
+        button_row = QHBoxLayout()
+        button_row.setSpacing(int(buttons_config.get("spacing", 10)))
+        button_row.addStretch(1)
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.accept)
+        button_row.addWidget(close_btn)
+        StyleManager.style_buttons(
+            [close_btn],
+            config,
+            bg,
+            _rgb(buttons_config.get("border_color"), [60, 60, 65]),
+            min_width=int(buttons_config.get("width", 120)),
+            min_height=int(buttons_config.get("height", 30)),
+        )
+        root.addLayout(button_row)
+
+        if self._gallery_pixmaps:
+            gallery_cfg = dialog_config.get("gallery", {})
+            if not isinstance(gallery_cfg, dict):
+                gallery_cfg = {}
+            self._gallery_overlay = EncyclopediaGalleryOverlay(
+                self,
+                self._gallery_pixmaps,
+                self._gallery_captions,
+                gallery_cfg,
+            )
+
+    def _build_image_column(
+        self,
+        entry: EncyclopediaEntry,
+        encyclopedia_service: OpeningEncyclopediaService,
+        dialog_config: Dict[str, Any],
+    ) -> QWidget:
+        """Non-scrolling portrait column (scrolls with the dialog content)."""
+        images = entry.images
+        column_w = int(dialog_config.get("thumbnail_max_width", 160))
+        slot_spacing = int(dialog_config.get("image_slot_spacing", 14))
+
+        caption_color = _rgb(dialog_config.get("caption_color"), [150, 150, 155])
+        caption_size = int(scale_font_size(dialog_config.get("caption_font_size", 9)))
+        credit_color = _rgb(dialog_config.get("credit_color"), caption_color)
+        credit_size = min(8, int(scale_font_size(dialog_config.get("credit_font_size", 8))))
+        link_color = _rgb(
+            dialog_config.get("credit_link_color"),
+            dialog_config.get("move_highlight", {}).get("text_color", [100, 150, 255]),
+        )
+
+        host = QWidget()
+        host.setFixedWidth(column_w)
+        host.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+        host.setStyleSheet("background: transparent;")
+        col = QVBoxLayout(host)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(slot_spacing)
+        col.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+
+        for image in images:
+            block = self._build_image_block(
+                entry.opening_id,
+                image,
+                encyclopedia_service,
+                column_w=column_w,
+                caption_color=caption_color,
+                caption_size=caption_size,
+                credit_color=credit_color,
+                credit_size=credit_size,
+                link_color=link_color,
+            )
+            if block is None:
+                continue
+            col.addWidget(block, 0, Qt.AlignmentFlag.AlignHCenter)
+
+        host.adjustSize()
+        host.setMinimumHeight(max(1, host.sizeHint().height()))
+        return host
+
+    def _open_gallery(self, index: int) -> None:
+        if self._gallery_overlay is None:
+            return
+        self._gallery_overlay.open_at(index)
+
+    def _build_image_block(
+        self,
+        opening_id: str,
+        image: EncyclopediaImage,
+        encyclopedia_service: OpeningEncyclopediaService,
+        *,
+        column_w: int,
+        caption_color: list[int],
+        caption_size: int,
+        credit_color: list[int],
+        credit_size: int,
+        link_color: list[int],
+    ) -> Optional[QWidget]:
+        raw = encyclopedia_service.get_image_bytes(opening_id, image.slot)
+        if not raw:
+            return None
+        pix = QPixmap()
+        if not pix.loadFromData(raw):
+            return None
+        fitted = _fit_pixmap(pix, column_w)
+        gallery_index = len(self._gallery_pixmaps)
+        self._gallery_pixmaps.append(pix)
+        self._gallery_captions.append(format_image_caption(image))
+
+        block = QWidget()
+        block.setFixedWidth(column_w)
+        block.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+        block.setStyleSheet("background: transparent;")
+        layout = QVBoxLayout(block)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+
+        thumb = _ClickableImageLabel()
+        thumb.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        thumb.setScaledContents(False)
+        thumb.setStyleSheet("background: transparent; border: none;")
+        thumb.setPixmap(fitted)
+        thumb.setFixedSize(column_w, fitted.height())
+        thumb.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        thumb.setCursor(Qt.CursorShape.PointingHandCursor)
+        thumb.clicked.connect(lambda idx=gallery_index: self._open_gallery(idx))
+        layout.addWidget(thumb, 0, Qt.AlignmentFlag.AlignHCenter)
+
+        caption = format_image_caption(image)
+        if caption:
+            cap = QLabel(caption)
+            cap.setWordWrap(True)
+            cap.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+            cap.setFixedWidth(column_w)
+            cap.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+            cap.setStyleSheet(
+                f"color: rgb({caption_color[0]}, {caption_color[1]}, {caption_color[2]}); "
+                f"font-size: {caption_size}pt; background: transparent; border: none;"
+            )
+            layout.addWidget(cap)
+
+        credit_html = format_image_credit_html(
+            image,
+            credit_color=credit_color,
+            link_color=link_color,
+            font_size_pt=credit_size,
+        )
+        if credit_html:
+            credit = QLabel()
+            credit.setWordWrap(True)
+            credit.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+            credit.setFixedWidth(column_w)
+            credit.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+            credit.setTextFormat(Qt.TextFormat.RichText)
+            credit.setOpenExternalLinks(False)
+            credit.setTextInteractionFlags(
+                Qt.TextInteractionFlag.TextBrowserInteraction
+            )
+            credit.linkActivated.connect(
+                lambda url: open_url(QUrl(url), context="encyclopedia.image_source")
+            )
+            credit.setStyleSheet(
+                f"color: rgb({credit_color[0]}, {credit_color[1]}, {credit_color[2]}); "
+                f"font-size: {credit_size}pt; background: transparent; border: none;"
+            )
+            credit.setText(credit_html)
+            layout.addWidget(credit)
+
+        block.adjustSize()
+        # Prevent parent compression from stacking caption onto the image.
+        block.setMinimumHeight(max(1, block.sizeHint().height()))
+        return block
+
+    @staticmethod
+    def _measure_label_height(lab: QLabel, width: int) -> int:
+        """Measure wrapped label height at ``width``."""
+        width = max(1, int(width))
+        if lab.textFormat() == Qt.TextFormat.RichText:
+            doc = QTextDocument()
+            doc.setDocumentMargin(0)
+            doc.setDefaultFont(lab.font())
+            doc.setHtml(lab.text())
+            doc.setTextWidth(float(width))
+            return max(1, int(doc.size().height()) + lab.fontMetrics().descent() + 4)
+        hfw = lab.heightForWidth(width)
+        return hfw if hfw > 0 else max(1, lab.sizeHint().height())
+
+    def _fit_label_to_width(self, lab: QLabel, width: int) -> int:
+        """Update label geometry for ``width`` only when values change."""
+        width = max(1, int(width))
+        h = self._measure_label_height(lab, width)
+        if lab.maximumWidth() != width:
+            lab.setMaximumWidth(width)
+        if lab.minimumWidth() != 0:
+            lab.setMinimumWidth(0)
+        if lab.height() != h or lab.minimumHeight() != h or lab.maximumHeight() != h:
+            lab.setFixedHeight(h)
+        return h
+
+    def _estimate_block_height(self, block: QWidget, width: int) -> int:
+        """Measure block height at ``width`` without mutating widgets."""
+        lab = getattr(block, "_encyclopedia_body", None)
+        body_h = (
+            self._measure_label_height(lab, width) if isinstance(lab, QLabel) else 0
+        )
+        chrome = 0
+        lay = block.layout()
+        if lay is not None:
+            for i in range(lay.count()):
+                item = lay.itemAt(i)
+                w = item.widget() if item is not None else None
+                if w is None or w is lab:
+                    continue
+                chrome += max(0, w.sizeHint().height())
+            chrome += max(0, lay.spacing()) * max(0, lay.count() - 1)
+        if body_h:
+            return body_h + chrome
+        return max(1, block.sizeHint().height())
+
+    def _fit_block_to_width(self, block: QWidget, width: int) -> int:
+        lab = getattr(block, "_encyclopedia_body", None)
+        body_h = self._fit_label_to_width(lab, width) if isinstance(lab, QLabel) else 0
+        chrome = 0
+        lay = block.layout()
+        if lay is not None:
+            for i in range(lay.count()):
+                item = lay.itemAt(i)
+                w = item.widget() if item is not None else None
+                if w is None or w is lab:
+                    continue
+                chrome += max(0, w.sizeHint().height())
+            chrome += max(0, lay.spacing()) * max(0, lay.count() - 1)
+        return body_h + chrome if body_h else max(1, block.sizeHint().height())
+
+    def _clear_layout(self, layout: QVBoxLayout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+
+    def _image_column_height(self) -> int:
+        if self._image_panel is None:
+            return 0
+        return max(
+            self._image_panel.minimumHeight(),
+            self._image_panel.sizeHint().height(),
+        )
+
+    def _desired_beside_count(self, beside_w: int, image_h: int) -> int:
+        """How many section blocks should sit beside the images at ``beside_w``."""
+        if image_h <= 0:
+            return len(self._section_blocks)
+        title = self._title_label
+        if title is None:
+            return len(self._section_blocks)
+        spacing = (
+            max(0, self._beside_layout.spacing()) if self._beside_layout is not None else 10
+        )
+        used = self._measure_label_height(title, beside_w)
+        count = 0
+        for block in self._section_blocks:
+            if used >= image_h:
+                break
+            used += spacing + self._estimate_block_height(block, beside_w)
+            count += 1
+        return count
+
+    def _apply_section_placement(self, beside_count: int) -> None:
+        """Reparent title/sections only when the beside/below split changes."""
+        beside = self._beside_layout
+        below = self._below_layout
+        title = self._title_label
+        if beside is None or below is None or title is None:
+            return
+        if self._beside_block_count == beside_count and beside.count() > 0:
+            return
+
+        self._clear_layout(beside)
+        self._clear_layout(below)
+        beside.addWidget(title)
+        for i, block in enumerate(self._section_blocks):
+            if i < beside_count:
+                beside.addWidget(block)
+            else:
+                below.addWidget(block)
+        if self._below_host is not None:
+            self._below_host.setVisible(below.count() > 0)
+        self._beside_block_count = beside_count
+
+    def _measure_laid_out_heights(
+        self, beside_w: int, full_w: int, image_h: int
+    ) -> Tuple[int, int]:
+        """Fit visible labels and return ``(top_row_height, below_height)``."""
+        title = self._title_label
+        beside = self._beside_layout
+        below = self._below_layout
+        if title is None or beside is None or below is None:
+            return 0, 0
+
+        title_w = beside_w if image_h else full_w
+        beside_h = self._fit_label_to_width(title, title_w)
+        spacing = max(0, beside.spacing())
+        below_spacing = max(0, below.spacing())
+
+        below_h = 0
+        first_below = True
+        for i, block in enumerate(self._section_blocks):
+            if image_h and i >= (self._beside_block_count or 0):
+                bh = self._fit_block_to_width(block, full_w)
+                if not first_below:
+                    below_h += below_spacing
+                below_h += bh
+                first_below = False
+            else:
+                w = beside_w if image_h else full_w
+                beside_h += spacing + self._fit_block_to_width(block, w)
+
+        top_h = max(beside_h, image_h) if image_h else beside_h
+        return top_h, below_h
+
+    def _sync_scroll_content_size(self) -> None:
+        """Reflow only when split changes; otherwise just retarget widths/heights."""
+        host = self._content_host
+        scroll = self._scroll
+        if host is None or scroll is None:
+            return
+        viewport_w = scroll.viewport().width()
+        if viewport_w <= 0:
+            return
+
+        lay = host.layout()
+        margins = lay.contentsMargins() if lay is not None else None
+        inner_w = viewport_w
+        pad_y = 0
+        if margins is not None:
+            inner_w = max(80, viewport_w - margins.left() - margins.right())
+            pad_y = margins.top() + margins.bottom()
+
+        image_w = 0
+        if self._image_panel is not None:
+            image_w = max(
+                self._image_panel.minimumWidth(),
+                self._image_panel.sizeHint().width(),
+            )
+        gap = self._image_text_gap if image_w else 0
+        image_h = self._image_column_height()
+        beside_w = max(80, inner_w - image_w - gap) if image_w else inner_w
+
+        beside_count = self._desired_beside_count(beside_w, image_h)
+        self._apply_section_placement(beside_count)
+        top_h, below_h = self._measure_laid_out_heights(beside_w, inner_w, image_h)
+
+        content_h = top_h + pad_y
+        if below_h > 0 and lay is not None:
+            content_h += lay.spacing() + below_h
+        content_h = max(1, content_h)
+
+        if host.width() != viewport_w or host.height() != content_h:
+            host.setFixedSize(viewport_w, content_h)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        if self._gallery_overlay is not None and self._gallery_overlay.isVisible():
+            self._gallery_overlay.refresh_geometry()
+        # Keep width in sync immediately; debounce full text reflow to avoid flicker.
+        if self._content_host is not None and self._scroll is not None:
+            vw = self._scroll.viewport().width()
+            if vw > 0 and self._content_host.width() != vw:
+                self._content_host.setFixedWidth(vw)
+        self._resize_sync_timer.start()
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
+        if (
+            self._gallery_overlay is not None
+            and self._gallery_overlay.isVisible()
+            and event.key() == Qt.Key.Key_Escape
+        ):
+            self._gallery_overlay.close_gallery()
+            return
+        super().keyPressEvent(event)
+
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        cfg = self._dialog_config
+        min_w = self.minimumWidth()
+        min_h = self.minimumHeight()
+        max_w = self.maximumWidth()
+        max_h = self.maximumHeight()
+        target_w = int(cfg.get("width", 640))
+        target_h = int(cfg.get("height", 440))
+        # Dual portraits need a bit more height room within the max.
+        if len(self._entry.images) >= 2:
+            target_h = max(target_h, int(cfg.get("height_with_dual_images", 520)))
+        self.resize(
+            max(min_w, min(target_w, max_w)),
+            max(min_h, min(target_h, max_h)),
+        )
+        self._beside_block_count = None  # force initial placement
+        self._sync_scroll_content_size()
+
+    @staticmethod
+    def show_entry(
+        config: Dict[str, Any],
+        entry: EncyclopediaEntry,
+        encyclopedia_service: OpeningEncyclopediaService,
+        parent=None,
+    ) -> None:
+        dialog = OpeningEncyclopediaDialog(config, entry, encyclopedia_service, parent)
+        dialog.exec()

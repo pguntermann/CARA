@@ -21,15 +21,19 @@ from PyQt6.QtWidgets import (
 )
 
 from app.models.game_model import GameModel
+from app.services.opening_encyclopedia_service import OpeningEncyclopediaService
 from app.services.opening_service import (
     OPENING_STARTING,
     OPENING_UNKNOWN,
     OpeningContinuation,
+    OpeningDisplay,
     OpeningPathStep,
     OpeningService,
 )
 from app.utils.external_open import open_url
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.themed_icon import SVG_MENU_INFO, themed_icon_from_svg
+from app.views.dialogs.opening_encyclopedia_dialog import OpeningEncyclopediaDialog
 from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
 
 _DENSITY_ORDER = ("compact", "comfortable", "gallery")
@@ -127,6 +131,58 @@ def _make_lichess_button(*, colors: Dict[str, Any], tooltip: str, on_click) -> Q
         }}
         """
     )
+    btn.clicked.connect(on_click)
+    return btn
+
+
+def _make_encyclopedia_button(
+    *,
+    colors: Dict[str, Any],
+    tooltip: str,
+    on_click,
+) -> QToolButton:
+    btn = QToolButton()
+    btn.setToolTip(tooltip)
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    btn.setAutoRaise(True)
+    size = int(colors.get("expand_button_size", 28))
+    btn.setFixedSize(size, size)
+    icon_size = max(12, size - 10)
+    btn.setIconSize(QSize(icon_size, icon_size))
+    tint = colors.get("text", [200, 200, 200])
+    icon = themed_icon_from_svg(SVG_MENU_INFO, tint)
+    if icon.isNull():
+        btn.setText("ⓘ")
+        font_size = max(11, int(colors.get("expand_font_size", 16)) - 3)
+        tc = colors["text"]
+        btn.setStyleSheet(
+            f"""
+            QToolButton {{
+                color: rgb({tc[0]}, {tc[1]}, {tc[2]});
+                background: transparent;
+                border: none;
+                padding: 0px;
+                font-size: {font_size}pt;
+            }}
+            QToolButton:hover {{
+                background: transparent;
+            }}
+            """
+        )
+    else:
+        btn.setIcon(icon)
+        btn.setStyleSheet(
+            """
+            QToolButton {
+                background: transparent;
+                border: none;
+                padding: 0px;
+            }
+            QToolButton:hover {
+                background: transparent;
+            }
+            """
+        )
     btn.clicked.connect(on_click)
     return btn
 
@@ -257,6 +313,7 @@ class DetailOpeningExplorerView(QWidget):
         self._game_model: Optional[GameModel] = None
         self._game_controller = None
         self._opening_service = opening_service
+        self._encyclopedia_service = OpeningEncyclopediaService(config)
         self._path_show_all = False
         self._last_game_id: Any = None
         self._path_height_anim: Optional[QPropertyAnimation] = None
@@ -328,6 +385,12 @@ class DetailOpeningExplorerView(QWidget):
         self._lichess_link_enabled = bool(lichess_cfg.get("enabled", True))
         self._lichess_link_tooltip = str(
             lichess_cfg.get("tooltip", "Open this opening on Lichess")
+        )
+
+        encyclopedia_cfg = cfg.get("encyclopedia_link", {})
+        self._encyclopedia_link_enabled = bool(encyclopedia_cfg.get("enabled", True))
+        self._encyclopedia_link_tooltip = str(
+            encyclopedia_cfg.get("tooltip", "Opening encyclopedia")
         )
 
         path_section = cfg.get("path_section", {})
@@ -414,7 +477,45 @@ class DetailOpeningExplorerView(QWidget):
             "expand_button_size": self._expand_button_size,
             "lichess_link_enabled": self._lichess_link_enabled,
             "lichess_link_tooltip": self._lichess_link_tooltip,
+            "encyclopedia_link_enabled": self._encyclopedia_link_enabled,
+            "encyclopedia_link_tooltip": self._encyclopedia_link_tooltip,
         }
+
+    def _encyclopedia_for_display(self, display: Optional[OpeningDisplay]):
+        if (
+            not self._encyclopedia_link_enabled
+            or display is None
+            or display is OPENING_UNKNOWN
+            or display is OPENING_STARTING
+        ):
+            return None
+        return self._encyclopedia_service.lookup(display.name, display.eco)
+
+    def _open_encyclopedia_entry(self, display: OpeningDisplay) -> None:
+        entry = self._encyclopedia_for_display(display)
+        if entry is None:
+            return
+        OpeningEncyclopediaDialog.show_entry(
+            self.config,
+            entry,
+            self._encyclopedia_service,
+            parent=self.window(),
+        )
+
+    def _maybe_encyclopedia_button(
+        self,
+        display: Optional[OpeningDisplay],
+        *,
+        colors: Dict[str, Any],
+    ) -> Optional[QToolButton]:
+        entry = self._encyclopedia_for_display(display)
+        if entry is None or display is None:
+            return None
+        return _make_encyclopedia_button(
+            colors=colors,
+            tooltip=self._encyclopedia_link_tooltip,
+            on_click=lambda checked=False, d=display: self._open_encyclopedia_entry(d),
+        )
 
     def _setup_ui(self) -> None:
         root = QVBoxLayout(self)
@@ -1000,7 +1101,26 @@ class DetailOpeningExplorerView(QWidget):
             text_w = len(label) * 7
         chip.setMinimumWidth(int(text_w + 20))
 
-        self._breadcrumb_wrap.set_chips([chip])
+        info_btn = self._maybe_encyclopedia_button(
+            step.display,
+            colors={
+                "text": self._text_color,
+                "muted": self._muted_color,
+                "expand_button_size": self._expand_button_size,
+                "expand_font_size": self._expand_font_size,
+            },
+        )
+        if info_btn is None:
+            self._breadcrumb_wrap.set_chips([chip])
+        else:
+            host = QWidget()
+            host.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            row = QHBoxLayout(host)
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(4)
+            row.addWidget(chip, 0, Qt.AlignmentFlag.AlignVCenter)
+            row.addWidget(info_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+            self._breadcrumb_wrap.set_items([host])
         self._breadcrumb_wrap.setVisible(True)
 
     def _on_continuation_focus(self, node: QWidget, focused: bool) -> None:
@@ -1127,6 +1247,7 @@ class DetailOpeningExplorerView(QWidget):
             board_size = self._mini_size if self._flow_boards else (
                 self._hero_size if is_current else self._mini_size
             )
+            encyclopedia_entry = self._encyclopedia_for_display(step.display)
             row = _OpeningStepRow(
                 config=self.config,
                 explorer_cfg=self._explorer_config(),
@@ -1144,6 +1265,12 @@ class DetailOpeningExplorerView(QWidget):
                     if self._lichess_link_enabled
                     else None
                 ),
+                encyclopedia_display=step.display if encyclopedia_entry is not None else None,
+                on_encyclopedia=(
+                    (lambda d=step.display: self._open_encyclopedia_entry(d))
+                    if encyclopedia_entry is not None
+                    else None
+                ),
                 colors={
                     "text": self._text_color,
                     "muted": self._muted_color,
@@ -1156,6 +1283,7 @@ class DetailOpeningExplorerView(QWidget):
                     "expand_font_size": self._expand_font_size,
                     "expand_button_size": self._expand_button_size,
                     "lichess_link_tooltip": self._lichess_link_tooltip,
+                    "encyclopedia_link_tooltip": self._encyclopedia_link_tooltip,
                 },
                 compact_horizontal=self._flow_boards,
             )
@@ -1206,6 +1334,8 @@ class DetailOpeningExplorerView(QWidget):
                         config=self.config,
                         explorer_cfg=self._explorer_config(),
                         opening_service=self._opening_service,
+                        encyclopedia_service=self._encyclopedia_service,
+                        on_encyclopedia=self._open_encyclopedia_entry,
                         continuation=cont,
                         is_flipped=is_flipped,
                         depth=1,
@@ -1279,6 +1409,8 @@ class _OpeningStepRow(QFrame):
         on_activate,
         colors: Dict[str, Any],
         lichess_url: Optional[str] = None,
+        encyclopedia_display: Optional[OpeningDisplay] = None,
+        on_encyclopedia: Optional[Callable[[], None]] = None,
         compact_horizontal: bool = False,
     ) -> None:
         super().__init__()
@@ -1357,8 +1489,9 @@ class _OpeningStepRow(QFrame):
         title_label.setFont(QFont(colors["font_family"], int(colors["font_size"])))
         if compact_horizontal:
             title_label.setWordWrap(False)
-            # Leave room for the "Now" badge when present.
-            title_w = max(40, mini_size - (badge_reserve if is_current else 0))
+            # Leave room for the "Now" badge and optional encyclopedia icon.
+            info_reserve = 22 if encyclopedia_display is not None else 0
+            title_w = max(40, mini_size - (badge_reserve if is_current else 0) - info_reserve)
             title_label.setMaximumWidth(title_w)
             metrics = title_label.fontMetrics()
             title_label.setText(
@@ -1379,6 +1512,14 @@ class _OpeningStepRow(QFrame):
                 f" border-radius: {badge_radius}px; padding: {badge_pad[0]}px {badge_pad[1]}px;"
             )
             title_row.addWidget(badge, 0, Qt.AlignmentFlag.AlignTop)
+        info_btn: Optional[QToolButton] = None
+        if encyclopedia_display is not None and on_encyclopedia is not None:
+            info_btn = _make_encyclopedia_button(
+                colors=colors,
+                tooltip=str(colors.get("encyclopedia_link_tooltip", "Opening encyclopedia")),
+                on_click=lambda checked=False: on_encyclopedia(),
+            )
+            title_row.addWidget(info_btn, 0, Qt.AlignmentFlag.AlignTop)
         text_col.addLayout(title_row)
 
         sub = QLabel(subtitle)
@@ -1413,6 +1554,11 @@ class _OpeningStepRow(QFrame):
                 child.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             if is_current:
                 badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            # Keep encyclopedia button interactive (not transparent).
+            if info_btn is not None:
+                info_btn.setToolTip(
+                    str(colors.get("encyclopedia_link_tooltip", "Opening encyclopedia"))
+                )
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton and self._on_activate:
@@ -1442,11 +1588,15 @@ class _ContinuationNode(QWidget):
         is_played_next: bool = False,
         played_next_label: str = "Played next →",
         on_expand_changed: Optional[Callable[["_ContinuationNode", bool], None]] = None,
+        encyclopedia_service: Optional[OpeningEncyclopediaService] = None,
+        on_encyclopedia: Optional[Callable[[OpeningDisplay], None]] = None,
     ) -> None:
         super().__init__()
         self._config = config
         self._explorer_cfg = explorer_cfg
         self._opening_service = opening_service
+        self._encyclopedia_service = encyclopedia_service
+        self._on_encyclopedia = on_encyclopedia
         self._continuation = continuation
         self._is_flipped = is_flipped
         self._depth = depth
@@ -1578,17 +1728,34 @@ class _ContinuationNode(QWidget):
         text_col.addStretch(1)
         h.addLayout(text_col, 1)
 
-        if colors.get("lichess_link_enabled", True):
-            url = opening_service.lichess_url_for_fen(continuation.fen_after)
+        if (
+            colors.get("encyclopedia_link_enabled", True)
+            and encyclopedia_service is not None
+            and on_encyclopedia is not None
+            and encyclopedia_service.has_entry(continuation.display.name, continuation.display.eco)
+        ):
             h.addWidget(
-                _make_lichess_button(
+                _make_encyclopedia_button(
                     colors=colors,
-                    tooltip=str(colors.get("lichess_link_tooltip", "Open this opening on Lichess")),
-                    on_click=lambda checked=False, u=url: _open_lichess_url(u),
+                    tooltip=str(colors.get("encyclopedia_link_tooltip", "Opening encyclopedia")),
+                    on_click=lambda checked=False, d=continuation.display: on_encyclopedia(d),
                 ),
                 0,
                 Qt.AlignmentFlag.AlignVCenter,
             )
+
+        if colors.get("lichess_link_enabled", True):
+            url = opening_service.lichess_url_for_fen(continuation.fen_after)
+            if url:
+                h.addWidget(
+                    _make_lichess_button(
+                        colors=colors,
+                        tooltip=str(colors.get("lichess_link_tooltip", "Open this opening on Lichess")),
+                        on_click=lambda checked=False, u=url: _open_lichess_url(u),
+                    ),
+                    0,
+                    Qt.AlignmentFlag.AlignVCenter,
+                )
 
         root.addWidget(header)
 
@@ -1657,6 +1824,8 @@ class _ContinuationNode(QWidget):
                 config=self._config,
                 explorer_cfg=self._explorer_cfg,
                 opening_service=self._opening_service,
+                encyclopedia_service=self._encyclopedia_service,
+                on_encyclopedia=self._on_encyclopedia,
                 continuation=cont,
                 is_flipped=self._is_flipped,
                 depth=self._depth + 1,

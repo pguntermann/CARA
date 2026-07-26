@@ -2895,6 +2895,10 @@
             "enabled": true,
             "tooltip": "Open this opening on Lichess"
           },
+          "encyclopedia_link": {
+            "enabled": true,
+            "tooltip": "Opening encyclopedia"
+          },
           "path_section": {
             "collapsed_by_default": false,
             "expanded_tail_count": 4,
@@ -4995,6 +4999,124 @@
         "text_edits": {
           "minimum_height": 96,
           "side_inset": 10
+        }
+      },
+      "opening_encyclopedia_dialog": {
+        "width": 640,
+        "height": 440,
+        "max_width": 800,
+        "max_height": 640,
+        "minimum_width": 520,
+        "minimum_height": 360,
+        "bottom_button_top_padding": 24,
+        "thumbnail_max_width": 160,
+        "thumbnail_max_height": 220,
+        "thumbnail_max_height_dual": 160,
+        "image_slot_spacing": 14,
+        "height_with_dual_images": 520,
+        "credit_font_size": 8,
+        "credit_color": {
+          "$ref": "$_COLOR_TEXT_4"
+        },
+        "credit_link_color": [
+          100,
+          150,
+          255
+        ],
+        "caption_font_size": {
+          "$ref": "$_FONT_SIZE_BASE_SMALL"
+        },
+        "caption_color": {
+          "$ref": "$_COLOR_TEXT_4"
+        },
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "layout": {
+          "spacing": 12,
+          "section_spacing": 10,
+          "image_text_gap": 16,
+          "margins": [
+            20,
+            20,
+            20,
+            20
+          ]
+        },
+        "title": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_LARGE"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          }
+        },
+        "body": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          }
+        },
+        "move_highlight": {
+          "text_color": [
+            100,
+            150,
+            255
+          ],
+          "font_weight": "600"
+        },
+        "section_title": {
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_4"
+          }
+        },
+        "section_separator": {
+          "enabled": true,
+          "color": {
+            "$ref": "$_COLOR_BORDER"
+          },
+          "height": 1,
+          "margin": [12, 0, 8, 0]
+        },
+        "gallery": {
+          "overlay_color": [0, 0, 0],
+          "overlay_opacity": 0.78,
+          "padding": 28,
+          "caption_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "caption_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "nav": {
+            "dot_size": 9,
+            "spacing": 12,
+            "dot_color": {
+              "$ref": "$_COLOR_TEXT_4"
+            },
+            "dot_active_color": {
+              "$ref": "$_COLOR_TEXT_PRIMARY"
+            }
+          }
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
         }
       },
       "search": {
