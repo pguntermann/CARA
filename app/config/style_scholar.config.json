@@ -5015,6 +5015,9 @@
           "result_selected_text_color": [50, 42, 34],
           "result_id_color": [140, 130, 115],
           "result_padding": [6, 8, 6, 8],
+          "overflow_text_color": [140, 128, 112],
+          "overflow_font_size": 9,
+          "overflow_text": "… {count} further results",
           "animation_duration_ms": 200
         },
         "gallery": {
@@ -5024,18 +5027,15 @@
           "caption_font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "caption_color": {
-            "$ref": "$_COLOR_PAPYRUS_PANEL"
-          },
+          "caption_color": [245, 240, 230],
+          "subcaption_font_size": 8,
+          "subcaption_color": [190, 178, 160],
+          "subcaption_link_color": [150, 195, 190],
           "nav": {
             "dot_size": 9,
             "spacing": 12,
-            "dot_color": {
-              "$ref": "$_COLOR_DRIFTWOOD"
-            },
-            "dot_active_color": {
-              "$ref": "$_COLOR_PAPYRUS_PANEL"
-            }
+            "dot_color": [140, 128, 112],
+            "dot_active_color": [245, 240, 230]
           }
         },
         "buttons": {

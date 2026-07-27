@@ -637,6 +637,7 @@
     "ecolists_path": "app/resources/ecolists",
     "opening_books_path": "app/resources/openingbooks/lpb",
     "encyclopedia_db_path": "app/resources/encyclopedia/openings.db",
+    "encyclopedia_search_results_limit": 15,
     "opening_repeat_indicator": "*"
   },
   "user_settings": {

@@ -368,6 +368,7 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "pgn.import.strip_pua_characters",
     "resources.ecolists_path",
     "resources.encyclopedia_db_path",
+    "resources.encyclopedia_search_results_limit",
     "resources.opening_books_path",
     "resources.opening_repeat_indicator",
     "ui.dialogs.about_dialog.app_name.color",

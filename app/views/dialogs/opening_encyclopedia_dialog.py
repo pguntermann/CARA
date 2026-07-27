@@ -228,11 +228,13 @@ class EncyclopediaGalleryOverlay(QWidget):
         parent: QWidget,
         pixmaps: List[QPixmap],
         captions: List[Optional[str]],
+        subcaptions: List[Optional[str]],
         gallery_config: Dict[str, Any],
     ) -> None:
         super().__init__(parent)
         self._pixmaps = list(pixmaps)
         self._captions = list(captions)
+        self._subcaptions = list(subcaptions)
         self._index = 0
         self._nav_widgets: List[QWidget] = []
 
@@ -245,6 +247,23 @@ class EncyclopediaGalleryOverlay(QWidget):
 
         caption_color = _rgb(gallery_config.get("caption_color"), [220, 220, 225])
         caption_size = int(scale_font_size(gallery_config.get("caption_font_size", 10)))
+        subcaption_color = _rgb(
+            gallery_config.get("subcaption_color"),
+            gallery_config.get("credit_color", [160, 160, 165]),
+        )
+        subcaption_size = int(
+            scale_font_size(
+                gallery_config.get(
+                    "subcaption_font_size",
+                    gallery_config.get("credit_font_size", 8),
+                )
+            )
+        )
+        link_color = _rgb(
+            gallery_config.get("subcaption_link_color"),
+            gallery_config.get("credit_link_color", caption_color),
+        )
+
         nav_cfg = gallery_config.get("nav", {})
         if not isinstance(nav_cfg, dict):
             nav_cfg = {}
@@ -288,6 +307,26 @@ class EncyclopediaGalleryOverlay(QWidget):
         # to sizeHint and clip captions.
         root.addWidget(self._caption)
 
+        self._subcaption = QLabel()
+        self._subcaption.setWordWrap(True)
+        self._subcaption.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        self._subcaption.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
+        )
+        self._subcaption.setTextFormat(Qt.TextFormat.RichText)
+        self._subcaption.setOpenExternalLinks(False)
+        self._subcaption.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextBrowserInteraction
+        )
+        self._subcaption.linkActivated.connect(
+            lambda url: open_url(QUrl(url), context="encyclopedia.gallery_source")
+        )
+        self._subcaption.setStyleSheet(
+            f"color: rgb({subcaption_color[0]}, {subcaption_color[1]}, {subcaption_color[2]}); "
+            f"font-size: {subcaption_size}pt; background: transparent; border: none;"
+        )
+        root.addWidget(self._subcaption)
+
         self._nav = QWidget()
         self._nav.setStyleSheet("background: transparent;")
         self._nav.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
@@ -317,11 +356,7 @@ class EncyclopediaGalleryOverlay(QWidget):
         if parent is not None:
             self.setGeometry(parent.rect())
         self._index = max(0, min(int(index), len(self._pixmaps) - 1))
-        caption = ""
-        if 0 <= self._index < len(self._captions) and self._captions[self._index]:
-            caption = str(self._captions[self._index])
-        self._caption.setText(caption)
-        self._caption.setVisible(bool(caption))
+        self._apply_caption_texts()
         self._refresh_nav()
         # Show first so width/height and word-wrap metrics are valid, then fit.
         self.show()
@@ -351,6 +386,19 @@ class EncyclopediaGalleryOverlay(QWidget):
         if self.isVisible():
             self._refresh_image()
 
+    def _apply_caption_texts(self) -> None:
+        caption = ""
+        if 0 <= self._index < len(self._captions) and self._captions[self._index]:
+            caption = str(self._captions[self._index])
+        self._caption.setText(caption)
+        self._caption.setVisible(bool(caption))
+
+        subcaption = ""
+        if 0 <= self._index < len(self._subcaptions) and self._subcaptions[self._index]:
+            subcaption = str(self._subcaptions[self._index])
+        self._subcaption.setText(subcaption)
+        self._subcaption.setVisible(bool(subcaption))
+
     def _footer_height(self, content_width: int) -> int:
         """Vertical space reserved under the image (caption, nav, layout gaps)."""
         layout = self.layout()
@@ -371,6 +419,14 @@ class EncyclopediaGalleryOverlay(QWidget):
             total += max(int(caption_h), fm.height())
             parts_visible += 1
 
+        if self._subcaption.isVisible() and self._subcaption.text():
+            fm = self._subcaption.fontMetrics()
+            hfw = self._subcaption.heightForWidth(content_width)
+            if hfw < 0:
+                hfw = self._subcaption.sizeHint().height()
+            total += max(int(hfw), fm.height())
+            parts_visible += 1
+
         if self._nav.isVisible():
             nav_h = self._nav.sizeHint().height()
             total += max(nav_h, self._dot_size + 8)
@@ -382,11 +438,7 @@ class EncyclopediaGalleryOverlay(QWidget):
         return total
 
     def _refresh_image(self) -> None:
-        caption = ""
-        if 0 <= self._index < len(self._captions) and self._captions[self._index]:
-            caption = str(self._captions[self._index])
-        self._caption.setText(caption)
-        self._caption.setVisible(bool(caption))
+        self._apply_caption_texts()
 
         if self.width() <= 1 or self.height() <= 1:
             parent = self.parentWidget()
@@ -423,9 +475,14 @@ class EncyclopediaGalleryOverlay(QWidget):
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
         if event.button() == Qt.MouseButton.LeftButton:
-            # Clicks on nav dots are handled by the buttons; anything else closes.
+            # Keep interactive chrome (nav dots / credit links) from closing the gallery.
             child = self.childAt(event.position().toPoint())
-            if child is not None and (child is self._nav or self._nav.isAncestorOf(child)):
+            if child is not None and (
+                child is self._nav
+                or self._nav.isAncestorOf(child)
+                or child is self._subcaption
+                or self._subcaption.isAncestorOf(child)
+            ):
                 super().mouseReleaseEvent(event)
                 return
             self.close_gallery()
@@ -462,7 +519,9 @@ class OpeningEncyclopediaDialog(QDialog):
         self._encyclopedia = encyclopedia_service
         self._gallery_overlay: Optional[EncyclopediaGalleryOverlay] = None
         self._gallery_pixmaps: List[QPixmap] = []
+        self._gallery_images: List[EncyclopediaImage] = []
         self._gallery_captions: List[Optional[str]] = []
+        self._gallery_subcaptions: List[Optional[str]] = []
         self._scroll: Optional[QScrollArea] = None
         self._content_host: Optional[QWidget] = None
         self._body_labels: List[QLabel] = []
@@ -781,10 +840,44 @@ class OpeningEncyclopediaDialog(QDialog):
             gallery_cfg = dialog_config.get("gallery", {})
             if not isinstance(gallery_cfg, dict):
                 gallery_cfg = {}
+            # Build gallery text with overlay-specific colors (not dialog-body colors).
+            caption_color = _rgb(gallery_cfg.get("caption_color"), [220, 220, 225])
+            subcaption_color = _rgb(
+                gallery_cfg.get("subcaption_color"),
+                gallery_cfg.get("credit_color", [160, 160, 165]),
+            )
+            link_color = _rgb(
+                gallery_cfg.get("subcaption_link_color"),
+                gallery_cfg.get("credit_link_color", caption_color),
+            )
+            subcaption_size = min(
+                8,
+                int(
+                    scale_font_size(
+                        gallery_cfg.get(
+                            "subcaption_font_size",
+                            gallery_cfg.get("credit_font_size", 8),
+                        )
+                    )
+                ),
+            )
+            self._gallery_captions = [
+                format_image_caption(image) for image in self._gallery_images
+            ]
+            self._gallery_subcaptions = [
+                format_image_credit_html(
+                    image,
+                    credit_color=subcaption_color,
+                    link_color=link_color,
+                    font_size_pt=subcaption_size,
+                )
+                for image in self._gallery_images
+            ]
             self._gallery_overlay = EncyclopediaGalleryOverlay(
                 self,
                 self._gallery_pixmaps,
                 self._gallery_captions,
+                self._gallery_subcaptions,
                 gallery_cfg,
             )
 
@@ -986,6 +1079,22 @@ class OpeningEncyclopediaDialog(QDialog):
 
         self._search_expanded_width = int(search_cfg.get("input_expanded_width", 220))
         self._results_min_width = int(search_cfg.get("results_min_width", 420))
+        resources = (self.config.get("resources") or {})
+        if not isinstance(resources, dict):
+            resources = {}
+        self._search_result_limit = max(
+            1, int(resources.get("encyclopedia_search_results_limit", 15))
+        )
+        self._search_overflow_color = _rgb(
+            search_cfg.get("overflow_text_color"),
+            search_cfg.get("result_id_color", [140, 140, 148]),
+        )
+        self._search_overflow_font_size = int(
+            scale_font_size(search_cfg.get("overflow_font_size", max(8, result_font_size - 1)))
+        )
+        self._search_overflow_template = str(
+            search_cfg.get("overflow_text", "… {count} further results")
+        )
         return container
 
     def _toggle_search(self) -> None:
@@ -1047,12 +1156,12 @@ class OpeningEncyclopediaDialog(QDialog):
         if not query:
             self._search_results.setVisible(False)
             return
-        results = self._encyclopedia.search(query, limit=15)
+        page = self._encyclopedia.search(query, limit=self._search_result_limit)
         self._search_results.clear()
-        if not results:
+        if not page.results:
             self._search_results.setVisible(False)
             return
-        for r in results:
+        for r in page.results:
             eco_list = self._parse_eco_codes(r.eco_codes)
             eco_str = ", ".join(eco_list[:3]) if eco_list else ""
             label = r.display_name
@@ -1061,6 +1170,21 @@ class OpeningEncyclopediaDialog(QDialog):
             item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, r.opening_id)
             self._search_results.addItem(item)
+
+        remaining = max(0, int(page.total) - len(page.results))
+        if remaining > 0:
+            overflow = QListWidgetItem(
+                self._search_overflow_template.format(count=remaining)
+            )
+            overflow.setFlags(Qt.ItemFlag.NoItemFlags)
+            overflow.setForeground(QColor(*self._search_overflow_color))
+            overflow_font = QFont(self._search_results.font())
+            overflow_font.setPointSize(self._search_overflow_font_size)
+            overflow_font.setItalic(True)
+            overflow.setFont(overflow_font)
+            overflow.setData(Qt.ItemDataRole.UserRole, None)
+            self._search_results.addItem(overflow)
+
         self._position_search_results()
         self._search_results.setVisible(True)
         self._search_results.raise_()
@@ -1177,7 +1301,7 @@ class OpeningEncyclopediaDialog(QDialog):
         fitted = _fit_pixmap(pix, column_w)
         gallery_index = len(self._gallery_pixmaps)
         self._gallery_pixmaps.append(pix)
-        self._gallery_captions.append(format_image_caption(image))
+        self._gallery_images.append(image)
 
         block = QWidget()
         block.setFixedWidth(column_w)

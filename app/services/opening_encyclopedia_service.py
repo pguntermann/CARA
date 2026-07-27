@@ -98,6 +98,14 @@ class EncyclopediaSearchResult:
     family_id: Optional[str]
 
 
+@dataclass(frozen=True)
+class EncyclopediaSearchPage:
+    """Truncated search hit list plus the untruncated match count."""
+
+    results: List[EncyclopediaSearchResult]
+    total: int
+
+
 class OpeningEncyclopediaService:
     """Lookup encyclopedia entries by explorer ``(display_name, eco)``."""
 
@@ -284,18 +292,21 @@ class OpeningEncyclopediaService:
     def has_entry(self, display_name: str, eco: Optional[str] = None) -> bool:
         return self.lookup(display_name, eco) is not None
 
-    def search(self, query: str, limit: int = 20) -> List[EncyclopediaSearchResult]:
+    def search(self, query: str, limit: int = 20) -> EncyclopediaSearchPage:
         """Free-text search over display_name, opening_id, eco_codes, family_id.
 
         Matching is case-insensitive and umlaut-tolerant: ``grünfeld`` /
         ``gruenfeld`` / ``grunfeld``-style digraph forms all match each other
         (``ä``↔``ae``, ``ö``↔``oe``, ``ü``↔``ue``, ``ß``↔``ss``).
+
+        Returns a page of at most ``limit`` hits plus ``total`` untruncated count
+        so the UI can show an overflow hint when results are truncated.
         """
         if not self._available or not query or not query.strip():
-            return []
+            return EncyclopediaSearchPage(results=[], total=0)
         q = _fold_search_text(query.strip())
         if not q:
-            return []
+            return EncyclopediaSearchPage(results=[], total=0)
         results: List[EncyclopediaSearchResult] = []
         for raw in self._openings.values():
             name = _fold_search_text(raw.get("display_name") or "")
@@ -313,7 +324,8 @@ class OpeningEncyclopediaService:
                     )
                 )
         results.sort(key=lambda r: r.display_name.lower())
-        return results[: max(1, int(limit))]
+        capped = max(1, int(limit))
+        return EncyclopediaSearchPage(results=results[:capped], total=len(results))
 
     def get_entry_by_id(self, opening_id: str) -> Optional[EncyclopediaEntry]:
         """Look up an entry directly by opening_id."""

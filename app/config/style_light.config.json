@@ -5137,6 +5137,9 @@
           "result_selected_text_color": [28, 28, 36],
           "result_id_color": [110, 110, 120],
           "result_padding": [6, 8, 6, 8],
+          "overflow_text_color": [120, 120, 130],
+          "overflow_font_size": 9,
+          "overflow_text": "… {count} further results",
           "animation_duration_ms": 200
         },
         "gallery": {
@@ -5146,18 +5149,15 @@
           "caption_font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "caption_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
-          },
+          "caption_color": [245, 245, 248],
+          "subcaption_font_size": 8,
+          "subcaption_color": [180, 180, 188],
+          "subcaption_link_color": [150, 185, 255],
           "nav": {
             "dot_size": 9,
             "spacing": 12,
-            "dot_color": {
-              "$ref": "$_COLOR_TEXT_4"
-            },
-            "dot_active_color": {
-              "$ref": "$_COLOR_TEXT_PRIMARY"
-            }
+            "dot_color": [130, 130, 140],
+            "dot_active_color": [245, 245, 248]
           }
         },
         "buttons": {
