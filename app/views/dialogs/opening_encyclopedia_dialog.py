@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import html
+import json
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from PyQt6.QtCore import Qt, QUrl, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QKeyEvent, QMouseEvent, QPixmap, QResizeEvent, QShowEvent, QTextDocument
+from PyQt6.QtCore import Qt, QSize, QUrl, QTimer, QPropertyAnimation, QEasingCurve, pyqtSignal
+from PyQt6.QtGui import QColor, QFont, QKeyEvent, QMouseEvent, QPalette, QPixmap, QResizeEvent, QShowEvent, QTextDocument
 from PyQt6.QtWidgets import (
     QDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -27,6 +31,7 @@ from app.services.opening_encyclopedia_service import (
 )
 from app.utils.external_open import open_url
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.themed_icon import SVG_MENU_SEARCH, themed_icon_from_svg
 from app.views.style import StyleManager
 
 # SAN-aware matcher for encyclopedia prose (aligned with notes formatter ideas).
@@ -564,6 +569,15 @@ class OpeningEncyclopediaDialog(QDialog):
         title.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self._title_label = title
 
+        tags_row = self._build_tags_row(entry, dialog_config)
+        self._tags_row = tags_row
+
+        search_cfg = dialog_config.get("search", {})
+        if not isinstance(search_cfg, dict):
+            search_cfg = {}
+        self._search_open = False
+        self._search_container = self._build_search_widget(search_cfg, dialog_config)
+
         body_cfg = dialog_config.get("body", {})
         body_family = resolve_font_family(body_cfg.get("font_family", "Helvetica Neue"))
         body_size = int(scale_font_size(body_cfg.get("font_size", 11)))
@@ -714,9 +728,33 @@ class OpeningEncyclopediaDialog(QDialog):
         content_col.addWidget(top_row)
         content_col.addWidget(below_host)
         # Initial placement; refined on show/resize once widths are known.
-        self._beside_layout.addWidget(title)
         for block in self._section_blocks:
             self._beside_layout.addWidget(block)
+
+        # Header block: title + search icon on the first line, tags below.
+        # The title gets full width; the search button is a small fixed-size
+        # widget that doesn't compress the title.  When the search field
+        # expands it overlaps via a floating results dropdown, not by
+        # squeezing the title.
+        header_host = QWidget()
+        header_host.setStyleSheet("background: transparent;")
+        header_host.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        header_col = QVBoxLayout(header_host)
+        header_col.setContentsMargins(0, 0, 0, 0)
+        header_col.setSpacing(4)
+
+        title_row = QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 0, 0)
+        title_row.setSpacing(8)
+        title.setMinimumWidth(0)
+        title_row.addWidget(title, 1)
+        title_row.addWidget(self._search_container, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
+        header_col.addLayout(title_row)
+
+        if tags_row is not None:
+            header_col.addWidget(tags_row)
+
+        root.addWidget(header_host)
 
         scroll.setWidget(content_host)
         root.addWidget(scroll, 1)
@@ -749,6 +787,319 @@ class OpeningEncyclopediaDialog(QDialog):
                 self._gallery_captions,
                 gallery_cfg,
             )
+
+    def _build_tags_row(
+        self,
+        entry: EncyclopediaEntry,
+        dialog_config: Dict[str, Any],
+    ) -> Optional[QWidget]:
+        """Build a horizontal row of small colored metadata tags."""
+        tags_cfg = dialog_config.get("tags", {})
+        if not isinstance(tags_cfg, dict):
+            tags_cfg = {}
+        font_size = int(scale_font_size(tags_cfg.get("font_size", 8)))
+        border_radius = int(tags_cfg.get("border_radius", 4))
+        pad = tags_cfg.get("padding", [2, 6, 2, 6])
+        if not isinstance(pad, (list, tuple)) or len(pad) < 4:
+            pad = [2, 6, 2, 6]
+        spacing = int(tags_cfg.get("spacing", 5))
+        margin_top = int(tags_cfg.get("margin_top", 4))
+
+        tag_defs: List[Tuple[str, str, list, list]] = []
+        if entry.opening_id:
+            tag_defs.append((
+                "ID",
+                entry.opening_id,
+                _rgb(tags_cfg.get("id_background"), [55, 55, 62]),
+                _rgb(tags_cfg.get("id_text_color"), [180, 180, 190]),
+            ))
+        if entry.tier:
+            tag_defs.append((
+                "Tier",
+                entry.tier,
+                _rgb(tags_cfg.get("tier_background"), [50, 60, 75]),
+                _rgb(tags_cfg.get("tier_text_color"), [130, 170, 230]),
+            ))
+        if entry.family_id:
+            tag_defs.append((
+                "Family",
+                entry.family_id,
+                _rgb(tags_cfg.get("family_background"), [55, 62, 55]),
+                _rgb(tags_cfg.get("family_text_color"), [130, 200, 140]),
+            ))
+        eco_list = self._parse_eco_codes(entry.eco_codes)
+        if eco_list:
+            eco_label = ", ".join(eco_list[:5])
+            if len(eco_list) > 5:
+                eco_label += f" (+{len(eco_list) - 5})"
+            tag_defs.append((
+                "ECO",
+                eco_label,
+                _rgb(tags_cfg.get("eco_background"), [65, 55, 55]),
+                _rgb(tags_cfg.get("eco_text_color"), [210, 160, 130]),
+            ))
+
+        if not tag_defs:
+            return None
+
+        row = QWidget()
+        row.setStyleSheet("background: transparent;")
+        row.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        h = QHBoxLayout(row)
+        h.setContentsMargins(0, margin_top, 0, 0)
+        h.setSpacing(spacing)
+
+        for prefix, value, bg, fg in tag_defs:
+            tag = QLabel(f"{prefix}: {value}")
+            tag.setFont(QFont(
+                resolve_font_family("Helvetica Neue"),
+                font_size,
+            ))
+            tag.setStyleSheet(
+                f"background-color: rgb({bg[0]}, {bg[1]}, {bg[2]}); "
+                f"color: rgb({fg[0]}, {fg[1]}, {fg[2]}); "
+                f"border-radius: {border_radius}px; "
+                f"padding: {pad[0]}px {pad[1]}px {pad[2]}px {pad[3]}px;"
+            )
+            tag.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+            h.addWidget(tag)
+        h.addStretch(1)
+        return row
+
+    @staticmethod
+    def _parse_eco_codes(eco_codes: Optional[str]) -> List[str]:
+        if not eco_codes:
+            return []
+        eco_codes = eco_codes.strip()
+        if eco_codes.startswith("["):
+            try:
+                parsed = json.loads(eco_codes)
+                if isinstance(parsed, list):
+                    return [str(c) for c in parsed]
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return [c.strip() for c in eco_codes.split(",") if c.strip()]
+
+    def _build_search_widget(
+        self,
+        search_cfg: Dict[str, Any],
+        dialog_config: Dict[str, Any],
+    ) -> QWidget:
+        """Build the expandable search: icon button (in layout) + floating input + results dropdown."""
+        container = QWidget()
+        container.setStyleSheet("background: transparent;")
+        container.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+        lay = QHBoxLayout(container)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+
+        icon_tint = _rgb(search_cfg.get("icon_tint_rgb"), search_cfg.get("icon_color", [160, 160, 165]))
+        icon_size = int(search_cfg.get("icon_size", 18))
+        icon_svg = str(search_cfg.get("icon_svg") or SVG_MENU_SEARCH)
+        btn = QPushButton()
+        btn.setFixedSize(icon_size + 8, icon_size + 8)
+        btn.setIcon(themed_icon_from_svg(icon_svg, icon_tint))
+        btn.setIconSize(QSize(icon_size, icon_size))
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn.setStyleSheet("QPushButton { background: transparent; border: none; }")
+        btn.clicked.connect(self._toggle_search)
+        self._search_btn = btn
+        lay.addWidget(btn)
+
+        input_h = int(search_cfg.get("input_height", 28))
+        input_bg = _rgb(search_cfg.get("input_background"), [50, 50, 56])
+        input_fg = _rgb(search_cfg.get("input_text_color"), [220, 220, 225])
+        input_border = _rgb(search_cfg.get("input_border_color"), [70, 70, 78])
+        input_focus_border = _rgb(search_cfg.get("input_focus_border_color"), input_border)
+        input_placeholder = _rgb(search_cfg.get("input_placeholder_color"), input_fg)
+        input_selection_bg = _rgb(
+            search_cfg.get("input_selection_background"),
+            search_cfg.get("result_hover_background", input_border),
+        )
+        input_selection_fg = _rgb(search_cfg.get("input_selection_text_color"), input_fg)
+        input_radius = int(search_cfg.get("input_border_radius", 5))
+        input_font_size = int(scale_font_size(search_cfg.get("input_font_size", 10)))
+
+        # Floating input — parented to the dialog (self), not in any layout,
+        # so it never affects the title's available width.
+        inp = QLineEdit(self)
+        inp.setPlaceholderText("Search openings…")
+        inp.setFixedHeight(input_h)
+        inp.setFixedWidth(0)
+        inp.setVisible(False)
+        inp.setFont(QFont(
+            resolve_font_family("Helvetica Neue"),
+            input_font_size,
+        ))
+        inp_palette = inp.palette()
+        inp_palette.setColor(QPalette.ColorRole.PlaceholderText, QColor(*input_placeholder))
+        inp.setPalette(inp_palette)
+        inp.setStyleSheet(
+            f"QLineEdit {{ background-color: rgb({input_bg[0]}, {input_bg[1]}, {input_bg[2]}); "
+            f"color: rgb({input_fg[0]}, {input_fg[1]}, {input_fg[2]}); "
+            f"border: 1px solid rgb({input_border[0]}, {input_border[1]}, {input_border[2]}); "
+            f"border-radius: {input_radius}px; padding: 2px 8px; "
+            f"selection-background-color: rgb({input_selection_bg[0]}, {input_selection_bg[1]}, {input_selection_bg[2]}); "
+            f"selection-color: rgb({input_selection_fg[0]}, {input_selection_fg[1]}, {input_selection_fg[2]}); }}"
+            f"QLineEdit:focus {{ border: 1px solid rgb({input_focus_border[0]}, {input_focus_border[1]}, {input_focus_border[2]}); }}"
+        )
+        inp.textChanged.connect(self._on_search_text_changed)
+        self._search_input = inp
+
+        result_bg = _rgb(search_cfg.get("input_background"), [50, 50, 56])
+        result_fg = _rgb(search_cfg.get("result_text_color"), [200, 200, 205])
+        result_hover = _rgb(search_cfg.get("result_hover_background"), [55, 55, 62])
+        result_selected_bg = _rgb(search_cfg.get("result_selected_background"), result_hover)
+        result_selected_fg = _rgb(search_cfg.get("result_selected_text_color"), result_fg)
+        result_font_size = int(scale_font_size(search_cfg.get("result_font_size", 10)))
+        result_border = _rgb(search_cfg.get("input_border_color"), [70, 70, 78])
+        result_padding = search_cfg.get("result_padding", [4, 8, 4, 8])
+        if not isinstance(result_padding, (list, tuple)) or len(result_padding) < 4:
+            result_padding = [4, 8, 4, 8]
+        max_results_h = int(search_cfg.get("results_max_height", 200))
+
+        results = QListWidget(self)
+        results.setVisible(False)
+        results.setMaximumHeight(max_results_h)
+        results.setFont(QFont(
+            resolve_font_family("Helvetica Neue"),
+            result_font_size,
+        ))
+        results.setStyleSheet(
+            f"QListWidget {{ background-color: rgb({result_bg[0]}, {result_bg[1]}, {result_bg[2]}); "
+            f"color: rgb({result_fg[0]}, {result_fg[1]}, {result_fg[2]}); "
+            f"border: 1px solid rgb({result_border[0]}, {result_border[1]}, {result_border[2]}); "
+            f"border-radius: {input_radius}px; }} "
+            f"QListWidget::item {{ padding: {int(result_padding[0])}px {int(result_padding[1])}px {int(result_padding[2])}px {int(result_padding[3])}px; }} "
+            f"QListWidget::item:hover {{ background-color: rgb({result_hover[0]}, {result_hover[1]}, {result_hover[2]}); }} "
+            f"QListWidget::item:selected {{ background-color: rgb({result_selected_bg[0]}, {result_selected_bg[1]}, {result_selected_bg[2]}); "
+            f"color: rgb({result_selected_fg[0]}, {result_selected_fg[1]}, {result_selected_fg[2]}); }}"
+        )
+        results.itemClicked.connect(self._on_search_result_clicked)
+        self._search_results = results
+
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(150)
+        self._search_timer.timeout.connect(self._perform_search)
+
+        self._search_expanded_width = int(search_cfg.get("input_expanded_width", 220))
+        self._results_min_width = int(search_cfg.get("results_min_width", 420))
+        return container
+
+    def _toggle_search(self) -> None:
+        if self._search_open:
+            self._close_search()
+        else:
+            self._open_search()
+
+    def _position_search_input(self, width: int) -> None:
+        """Place the floating search input to the left of the search button."""
+        btn = self._search_btn
+        inp = self._search_input
+        btn_pos = btn.mapTo(self, btn.rect().topRight())
+        x = btn_pos.x() - width - 4
+        y = btn_pos.y() + (btn.height() - inp.height()) // 2
+        x = max(12, x)
+        inp.move(x, y)
+        inp.setFixedWidth(width)
+
+    def _open_search(self) -> None:
+        self._search_open = True
+        inp = self._search_input
+        self._position_search_input(0)
+        inp.setVisible(True)
+        inp.raise_()
+        anim = QPropertyAnimation(inp, b"minimumWidth", self)
+        anim.setDuration(200)
+        anim.setStartValue(0)
+        anim.setEndValue(self._search_expanded_width)
+        anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        anim.valueChanged.connect(lambda v: self._position_search_input(int(v)))
+        anim.start()
+        self._search_anim = anim
+        inp.setFocus()
+
+    def _close_search(self) -> None:
+        self._search_open = False
+        self._search_input.clear()
+        self._search_results.setVisible(False)
+        inp = self._search_input
+        anim = QPropertyAnimation(inp, b"minimumWidth", self)
+        anim.setDuration(150)
+        anim.setStartValue(inp.width())
+        anim.setEndValue(0)
+        anim.setEasingCurve(QEasingCurve.Type.InCubic)
+        anim.valueChanged.connect(lambda v: self._position_search_input(int(v)))
+        anim.finished.connect(lambda: inp.setVisible(False))
+        anim.start()
+        self._search_anim = anim
+
+    def _on_search_text_changed(self, text: str) -> None:
+        if not text.strip():
+            self._search_results.setVisible(False)
+            return
+        self._search_timer.start()
+
+    def _perform_search(self) -> None:
+        query = self._search_input.text().strip()
+        if not query:
+            self._search_results.setVisible(False)
+            return
+        results = self._encyclopedia.search(query, limit=15)
+        self._search_results.clear()
+        if not results:
+            self._search_results.setVisible(False)
+            return
+        for r in results:
+            eco_list = self._parse_eco_codes(r.eco_codes)
+            eco_str = ", ".join(eco_list[:3]) if eco_list else ""
+            label = r.display_name
+            if eco_str:
+                label += f"  [{eco_str}]"
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, r.opening_id)
+            self._search_results.addItem(item)
+        self._position_search_results()
+        self._search_results.setVisible(True)
+        self._search_results.raise_()
+
+    def _position_search_results(self) -> None:
+        """Place the results dropdown below the search input."""
+        inp = self._search_input
+        results = self._search_results
+        if not inp.isVisible():
+            return
+        # Prefer a wide panel so longer opening names stay readable.
+        available = max(200, self.width() - 40)
+        w = min(available, max(self._results_min_width, inp.width() + 160))
+        pos = inp.mapTo(self, inp.rect().bottomRight())
+        x = max(12, min(pos.x() - w, self.width() - w - 12))
+        y = pos.y() + 2
+        results.setFixedWidth(w)
+        results.move(x, y)
+        results.adjustSize()
+
+    def _on_search_result_clicked(self, item: QListWidgetItem) -> None:
+        opening_id = item.data(Qt.ItemDataRole.UserRole)
+        if not opening_id:
+            return
+        entry = self._encyclopedia.get_entry_by_id(str(opening_id))
+        if entry is None:
+            return
+        config = self.config
+        encyclopedia = self._encyclopedia
+        parent = self.parentWidget()
+        self._close_search()
+        self.accept()
+        # Defer opening the next modal dialog until this one has fully exited.
+        QTimer.singleShot(
+            0,
+            lambda: OpeningEncyclopediaDialog.show_entry(
+                config, entry, encyclopedia, parent
+            ),
+        )
 
     def _build_image_column(
         self,
@@ -973,13 +1324,10 @@ class OpeningEncyclopediaDialog(QDialog):
         """How many section blocks should sit beside the images at ``beside_w``."""
         if image_h <= 0:
             return len(self._section_blocks)
-        title = self._title_label
-        if title is None:
-            return len(self._section_blocks)
         spacing = (
             max(0, self._beside_layout.spacing()) if self._beside_layout is not None else 10
         )
-        used = self._measure_label_height(title, beside_w)
+        used = 0
         count = 0
         for block in self._section_blocks:
             if used >= image_h:
@@ -989,18 +1337,16 @@ class OpeningEncyclopediaDialog(QDialog):
         return count
 
     def _apply_section_placement(self, beside_count: int) -> None:
-        """Reparent title/sections only when the beside/below split changes."""
+        """Reparent sections only when the beside/below split changes."""
         beside = self._beside_layout
         below = self._below_layout
-        title = self._title_label
-        if beside is None or below is None or title is None:
+        if beside is None or below is None:
             return
         if self._beside_block_count == beside_count and beside.count() > 0:
             return
 
         self._clear_layout(beside)
         self._clear_layout(below)
-        beside.addWidget(title)
         for i, block in enumerate(self._section_blocks):
             if i < beside_count:
                 beside.addWidget(block)
@@ -1014,14 +1360,12 @@ class OpeningEncyclopediaDialog(QDialog):
         self, beside_w: int, full_w: int, image_h: int
     ) -> Tuple[int, int]:
         """Fit visible labels and return ``(top_row_height, below_height)``."""
-        title = self._title_label
         beside = self._beside_layout
         below = self._below_layout
-        if title is None or beside is None or below is None:
+        if beside is None or below is None:
             return 0, 0
 
-        title_w = beside_w if image_h else full_w
-        beside_h = self._fit_label_to_width(title, title_w)
+        beside_h = 0
         spacing = max(0, beside.spacing())
         below_spacing = max(0, below.spacing())
 
@@ -1093,13 +1437,13 @@ class OpeningEncyclopediaDialog(QDialog):
         self._resize_sync_timer.start()
 
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
-        if (
-            self._gallery_overlay is not None
-            and self._gallery_overlay.isVisible()
-            and event.key() == Qt.Key.Key_Escape
-        ):
-            self._gallery_overlay.close_gallery()
-            return
+        if event.key() == Qt.Key.Key_Escape:
+            if self._gallery_overlay is not None and self._gallery_overlay.isVisible():
+                self._gallery_overlay.close_gallery()
+                return
+            if self._search_open:
+                self._close_search()
+                return
         super().keyPressEvent(event)
 
     def showEvent(self, event: QShowEvent) -> None:

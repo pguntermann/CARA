@@ -17,6 +17,16 @@ _SPELLING = {
 
 _APOSTROPHE = re.compile(r"[’‘`]")
 
+# German umlaut / Eszett → digraph forms so "grünfeld" matches "gruenfeld".
+_UMLAUT_FOLD = str.maketrans(
+    {
+        "ä": "ae",
+        "ö": "oe",
+        "ü": "ue",
+        "ß": "ss",
+    }
+)
+
 
 def normalize_opening_name(name: str) -> str:
     """Lowercase, collapse whitespace, British→American spelling, trim punctuation.
@@ -29,6 +39,11 @@ def normalize_opening_name(name: str) -> str:
     for brit, amer in _SPELLING.items():
         s = re.sub(rf"\b{brit}\b", amer, s)
     return s.strip(" .,;:")
+
+
+def _fold_search_text(text: str) -> str:
+    """Lowercase and expand German umlauts for tolerant search matching."""
+    return (text or "").lower().translate(_UMLAUT_FOLD)
 
 
 def _opt_str(value: Any) -> Optional[str]:
@@ -59,6 +74,8 @@ class EncyclopediaEntry:
     opening_id: str
     display_name: str
     family_id: Optional[str]
+    tier: Optional[str]
+    eco_codes: Optional[str]
     summary: str
     key_ideas: Optional[str]
     name_origin: Optional[str]
@@ -68,6 +85,17 @@ class EncyclopediaEntry:
     @property
     def has_image(self) -> bool:
         return bool(self.images)
+
+
+@dataclass(frozen=True)
+class EncyclopediaSearchResult:
+    """Lightweight result row for search (no prose / images)."""
+
+    opening_id: str
+    display_name: str
+    tier: Optional[str]
+    eco_codes: Optional[str]
+    family_id: Optional[str]
 
 
 class OpeningEncyclopediaService:
@@ -161,6 +189,7 @@ class OpeningEncyclopediaService:
             for row in conn.execute(
                 """
                 SELECT o.opening_id, o.display_name, o.family_id,
+                       o.tier, o.eco_codes,
                        o.summary, o.key_ideas, o.name_origin, o.history,
                        i1.mime AS image_mime, o.image_caption, o.image_lifespan,
                        o.image_origin, o.image_source, o.image_license,
@@ -180,6 +209,8 @@ class OpeningEncyclopediaService:
                     "opening_id": oid,
                     "display_name": str(row["display_name"] or ""),
                     "family_id": row["family_id"],
+                    "tier": _opt_str(row["tier"]),
+                    "eco_codes": _opt_str(row["eco_codes"]),
                     "summary": row["summary"],
                     "key_ideas": row["key_ideas"],
                     "name_origin": row["name_origin"],
@@ -238,6 +269,8 @@ class OpeningEncyclopediaService:
                     opening_id=str(raw["opening_id"]),
                     display_name=str(raw["display_name"] or display_name),
                     family_id=str(family_id) if family_id else None,
+                    tier=_opt_str(raw.get("tier")),
+                    eco_codes=_opt_str(raw.get("eco_codes")),
                     summary=summary,
                     key_ideas=_opt_str(raw.get("key_ideas")),
                     name_origin=_opt_str(raw.get("name_origin")),
@@ -250,6 +283,59 @@ class OpeningEncyclopediaService:
 
     def has_entry(self, display_name: str, eco: Optional[str] = None) -> bool:
         return self.lookup(display_name, eco) is not None
+
+    def search(self, query: str, limit: int = 20) -> List[EncyclopediaSearchResult]:
+        """Free-text search over display_name, opening_id, eco_codes, family_id.
+
+        Matching is case-insensitive and umlaut-tolerant: ``grünfeld`` /
+        ``gruenfeld`` / ``grunfeld``-style digraph forms all match each other
+        (``ä``↔``ae``, ``ö``↔``oe``, ``ü``↔``ue``, ``ß``↔``ss``).
+        """
+        if not self._available or not query or not query.strip():
+            return []
+        q = _fold_search_text(query.strip())
+        if not q:
+            return []
+        results: List[EncyclopediaSearchResult] = []
+        for raw in self._openings.values():
+            name = _fold_search_text(raw.get("display_name") or "")
+            oid = _fold_search_text(raw.get("opening_id") or "")
+            eco = _fold_search_text(raw.get("eco_codes") or "")
+            fid = _fold_search_text(raw.get("family_id") or "")
+            if q in name or q in oid or q in eco or q in fid:
+                results.append(
+                    EncyclopediaSearchResult(
+                        opening_id=str(raw["opening_id"]),
+                        display_name=str(raw.get("display_name") or ""),
+                        tier=_opt_str(raw.get("tier")),
+                        eco_codes=_opt_str(raw.get("eco_codes")),
+                        family_id=_opt_str(raw.get("family_id")),
+                    )
+                )
+        results.sort(key=lambda r: r.display_name.lower())
+        return results[: max(1, int(limit))]
+
+    def get_entry_by_id(self, opening_id: str) -> Optional[EncyclopediaEntry]:
+        """Look up an entry directly by opening_id."""
+        raw = self._openings.get(opening_id)
+        if raw is None:
+            return None
+        summary = (raw.get("summary") or "").strip()
+        if not summary:
+            return None
+        family_id = raw.get("family_id")
+        return EncyclopediaEntry(
+            opening_id=str(raw["opening_id"]),
+            display_name=str(raw["display_name"] or ""),
+            family_id=str(family_id) if family_id else None,
+            tier=_opt_str(raw.get("tier")),
+            eco_codes=_opt_str(raw.get("eco_codes")),
+            summary=summary,
+            key_ideas=_opt_str(raw.get("key_ideas")),
+            name_origin=_opt_str(raw.get("name_origin")),
+            history=_opt_str(raw.get("history")),
+            images=tuple(raw.get("images") or ()),
+        )
 
     def get_image_bytes(self, opening_id: str, slot: int = 1) -> Optional[bytes]:
         """Lazy-load image BLOB for ``opening_id`` slot 1 or 2 (cached)."""
