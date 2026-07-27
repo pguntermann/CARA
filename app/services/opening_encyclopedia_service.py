@@ -160,15 +160,19 @@ class OpeningEncyclopediaService:
 
             for row in conn.execute(
                 """
-                SELECT opening_id, display_name, family_id,
-                       summary, key_ideas, name_origin, history,
-                       image_mime, image_caption, image_lifespan,
-                       image_origin, image_source, image_license, image_attribution,
-                       CASE WHEN image IS NOT NULL THEN 1 ELSE 0 END AS has_image,
-                       image_2_mime, image_2_caption, image_2_lifespan,
-                       image_2_origin, image_2_source, image_2_license, image_2_attribution,
-                       CASE WHEN image_2 IS NOT NULL THEN 1 ELSE 0 END AS has_image_2
-                FROM opening
+                SELECT o.opening_id, o.display_name, o.family_id,
+                       o.summary, o.key_ideas, o.name_origin, o.history,
+                       i1.mime AS image_mime, o.image_caption, o.image_lifespan,
+                       o.image_origin, o.image_source, o.image_license,
+                       o.image_attribution,
+                       CASE WHEN o.image_id IS NOT NULL THEN 1 ELSE 0 END AS has_image,
+                       i2.mime AS image_2_mime, o.image_2_caption, o.image_2_lifespan,
+                       o.image_2_origin, o.image_2_source, o.image_2_license,
+                       o.image_2_attribution,
+                       CASE WHEN o.image_2_id IS NOT NULL THEN 1 ELSE 0 END AS has_image_2
+                FROM opening o
+                LEFT JOIN image i1 ON i1.sha256 = o.image_id
+                LEFT JOIN image i2 ON i2.sha256 = o.image_2_id
                 """
             ):
                 oid = str(row["opening_id"])
@@ -256,11 +260,15 @@ class OpeningEncyclopediaService:
         cache_key = (opening_id, slot)
         if cache_key in self._image_cache:
             return self._image_cache[cache_key]
-        column = "image" if slot == 1 else "image_2"
         try:
+            fk = "image_id" if slot == 1 else "image_2_id"
             row = self._conn.execute(
-                f"SELECT {column} AS blob FROM opening "
-                f"WHERE opening_id=? AND {column} IS NOT NULL",
+                f"""
+                SELECT i.bytes AS blob
+                FROM opening o
+                JOIN image i ON i.sha256 = o.{fk}
+                WHERE o.opening_id=? AND o.{fk} IS NOT NULL
+                """,
                 (opening_id,),
             ).fetchone()
         except Exception:
