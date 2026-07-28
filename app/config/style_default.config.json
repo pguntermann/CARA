@@ -5133,6 +5133,14 @@
           "overflow_text": "… {count} further results",
           "animation_duration_ms": 200
         },
+        "size_toggle": {
+          "icon_size": 18,
+          "maximize_icon_svg": "app/resources/icons/menu_maximize.svg",
+          "restore_icon_svg": "app/resources/icons/menu_restore.svg",
+          "icon_tint_rgb": [160, 160, 165],
+          "tooltip_maximize": "Maximize",
+          "tooltip_restore": "Restore"
+        },
         "gallery": {
           "overlay_color": [0, 0, 0],
           "overlay_opacity": 0.78,

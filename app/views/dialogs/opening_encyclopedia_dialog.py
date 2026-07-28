@@ -7,7 +7,17 @@ import json
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from PyQt6.QtCore import Qt, QSize, QUrl, QTimer, QPropertyAnimation, QEasingCurve, pyqtSignal
+from PyQt6.QtCore import (
+    Qt,
+    QEvent,
+    QRect,
+    QSize,
+    QUrl,
+    QTimer,
+    QPropertyAnimation,
+    QEasingCurve,
+    pyqtSignal,
+)
 from PyQt6.QtGui import QColor, QFont, QKeyEvent, QMouseEvent, QPalette, QPixmap, QResizeEvent, QShowEvent, QTextDocument
 from PyQt6.QtWidgets import (
     QDialog,
@@ -31,7 +41,12 @@ from app.services.opening_encyclopedia_service import (
 )
 from app.utils.external_open import open_url
 from app.utils.font_utils import resolve_font_family, scale_font_size
-from app.utils.themed_icon import SVG_MENU_SEARCH, themed_icon_from_svg
+from app.utils.themed_icon import (
+    SVG_MENU_MAXIMIZE,
+    SVG_MENU_RESTORE,
+    SVG_MENU_SEARCH,
+    themed_icon_from_svg,
+)
 from app.views.style import StyleManager
 
 # SAN-aware matcher for encyclopedia prose (aligned with notes formatter ideas).
@@ -560,14 +575,19 @@ class OpeningEncyclopediaDialog(QDialog):
         max_w = int(dialog_config.get("max_width", 800))
         max_h = int(dialog_config.get("max_height", 640))
         # Keep resize enabled, but clamp the allowed range.
-        self.setMinimumSize(min_w, min_h)
-        self.setMaximumSize(max(max_w, min_w), max(max_h, min_h))
+        self._min_dialog_size = QSize(min_w, min_h)
+        self._max_dialog_size = QSize(max(max_w, min_w), max(max_h, min_h))
+        self.setMinimumSize(self._min_dialog_size)
+        self.setMaximumSize(self._max_dialog_size)
         default_w = int(dialog_config.get("width", 640))
         default_h = int(dialog_config.get("height", 440))
-        self.resize(
+        self._default_dialog_size = QSize(
             max(min_w, min(default_w, max_w)),
             max(min_h, min(default_h, max_h)),
         )
+        self._remembered_normal_size = QSize(self._default_dialog_size)
+        self._size_anim: Optional[QPropertyAnimation] = None
+        self.resize(self._default_dialog_size)
 
         root = QVBoxLayout(self)
         margins = layout_config.get("margins", [20, 20, 20, 20])
@@ -790,9 +810,9 @@ class OpeningEncyclopediaDialog(QDialog):
         for block in self._section_blocks:
             self._beside_layout.addWidget(block)
 
-        # Header block: title + search icon on the first line, tags below.
-        # The title gets full width; the search button is a small fixed-size
-        # widget that doesn't compress the title.  When the search field
+        # Header block: title + search/size tools on the first line, tags below.
+        # The title gets full width; the tool buttons are small fixed-size
+        # widgets that don't compress the title.  When the search field
         # expands it overlaps via a floating results dropdown, not by
         # squeezing the title.
         header_host = QWidget()
@@ -978,13 +998,13 @@ class OpeningEncyclopediaDialog(QDialog):
         search_cfg: Dict[str, Any],
         dialog_config: Dict[str, Any],
     ) -> QWidget:
-        """Build the expandable search: icon button (in layout) + floating input + results dropdown."""
+        """Build header tools: search icon + size toggle + floating input/results."""
         container = QWidget()
         container.setStyleSheet("background: transparent;")
         container.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
         lay = QHBoxLayout(container)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(0)
+        lay.setSpacing(2)
 
         icon_tint = _rgb(search_cfg.get("icon_tint_rgb"), search_cfg.get("icon_color", [160, 160, 165]))
         icon_size = int(search_cfg.get("icon_size", 18))
@@ -995,10 +1015,34 @@ class OpeningEncyclopediaDialog(QDialog):
         btn.setIconSize(QSize(icon_size, icon_size))
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn.setToolTip("Search openings")
         btn.setStyleSheet("QPushButton { background: transparent; border: none; }")
         btn.clicked.connect(self._toggle_search)
         self._search_btn = btn
         lay.addWidget(btn)
+
+        size_cfg = dialog_config.get("size_toggle", {})
+        if not isinstance(size_cfg, dict):
+            size_cfg = {}
+        size_icon_size = int(size_cfg.get("icon_size", icon_size))
+        size_tint = _rgb(size_cfg.get("icon_tint_rgb"), icon_tint)
+        self._size_icon_tint = size_tint
+        self._size_icon_px = size_icon_size
+        self._maximize_icon_svg = str(size_cfg.get("maximize_icon_svg") or SVG_MENU_MAXIMIZE)
+        self._restore_icon_svg = str(size_cfg.get("restore_icon_svg") or SVG_MENU_RESTORE)
+        self._size_tooltip_maximize = str(size_cfg.get("tooltip_maximize", "Maximize"))
+        self._size_tooltip_restore = str(size_cfg.get("tooltip_restore", "Restore"))
+
+        size_btn = QPushButton()
+        size_btn.setFixedSize(size_icon_size + 8, size_icon_size + 8)
+        size_btn.setIconSize(QSize(size_icon_size, size_icon_size))
+        size_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        size_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        size_btn.setStyleSheet("QPushButton { background: transparent; border: none; }")
+        size_btn.clicked.connect(self._toggle_dialog_size)
+        self._size_toggle_btn = size_btn
+        lay.addWidget(size_btn)
+        self._update_size_toggle_icon()
 
         input_h = int(search_cfg.get("input_height", 28))
         input_bg = _rgb(search_cfg.get("input_background"), [50, 50, 56])
@@ -1095,7 +1139,135 @@ class OpeningEncyclopediaDialog(QDialog):
         self._search_overflow_template = str(
             search_cfg.get("overflow_text", "… {count} further results")
         )
+        self._search_anim: Optional[QPropertyAnimation] = None
         return container
+
+    def _dialog_is_expanded(self) -> bool:
+        """True when native-maximized or already at the configured max size."""
+        return self.isMaximized() or self._is_at_max_dialog_size()
+
+    def _update_size_toggle_icon(self) -> None:
+        btn = getattr(self, "_size_toggle_btn", None)
+        if btn is None:
+            return
+        if self._dialog_is_expanded():
+            btn.setIcon(themed_icon_from_svg(self._restore_icon_svg, self._size_icon_tint))
+            btn.setToolTip(self._size_tooltip_restore)
+        else:
+            btn.setIcon(themed_icon_from_svg(self._maximize_icon_svg, self._size_icon_tint))
+            btn.setToolTip(self._size_tooltip_maximize)
+
+    def _is_at_max_dialog_size(self) -> bool:
+        return (
+            self.width() >= self._max_dialog_size.width() - 2
+            and self.height() >= self._max_dialog_size.height() - 2
+        )
+
+    def _is_near_size(self, size: QSize, other: QSize, tol: int = 2) -> bool:
+        return abs(size.width() - other.width()) <= tol and abs(size.height() - other.height()) <= tol
+
+    def _stop_size_anim(self) -> None:
+        anim = getattr(self, "_size_anim", None)
+        if anim is not None:
+            anim.stop()
+            self._size_anim = None
+
+    def _remember_normal_size(self) -> None:
+        """Store the current size as the restore target when leaving normal state."""
+        if self.isMaximized() or self._is_at_max_dialog_size():
+            return
+        self._remembered_normal_size = QSize(self.size())
+
+    def _restore_size_target(self) -> QSize:
+        """Best normal size after a max/zoom."""
+        remembered = getattr(self, "_remembered_normal_size", None)
+        if isinstance(remembered, QSize) and remembered.isValid():
+            if not self._is_near_size(remembered, self._max_dialog_size):
+                return QSize(
+                    max(self._min_dialog_size.width(), min(remembered.width(), self._max_dialog_size.width())),
+                    max(self._min_dialog_size.height(), min(remembered.height(), self._max_dialog_size.height())),
+                )
+
+        normal = self.normalGeometry()
+        if normal.isValid() and normal.width() > 0 and normal.height() > 0:
+            size = normal.size()
+            if not self._is_near_size(size, self._max_dialog_size):
+                return QSize(
+                    max(self._min_dialog_size.width(), min(size.width(), self._max_dialog_size.width())),
+                    max(self._min_dialog_size.height(), min(size.height(), self._max_dialog_size.height())),
+                )
+        return QSize(self._default_dialog_size)
+
+    def _animate_dialog_size(self, target: QSize) -> None:
+        """Animate to ``target`` size (used when native maximize state isn't available)."""
+        if self._is_near_size(self.size(), target):
+            self._update_size_toggle_icon()
+            return
+        self._stop_size_anim()
+        start = self.geometry()
+        end = QRect(start)
+        end.setSize(target)
+        # Keep the top-right area stable so header tools don't jump sideways.
+        end.moveTopRight(start.topRight())
+        # Clamp into the available screen if needed.
+        screen = self.screen()
+        if screen is not None:
+            avail = screen.availableGeometry()
+            if end.left() < avail.left():
+                end.moveLeft(avail.left())
+            if end.top() < avail.top():
+                end.moveTop(avail.top())
+            if end.right() > avail.right():
+                end.moveRight(avail.right())
+            if end.bottom() > avail.bottom():
+                end.moveBottom(avail.bottom())
+        anim = QPropertyAnimation(self, b"geometry", self)
+        anim.setDuration(220)
+        anim.setStartValue(start)
+        anim.setEndValue(end)
+        anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        anim.finished.connect(self._update_size_toggle_icon)
+        anim.valueChanged.connect(lambda _v: self._update_size_toggle_icon())
+        anim.start()
+        self._size_anim = anim
+
+    def _finish_restore_after_show_normal(self, target: QSize) -> None:
+        """Complete restore when showNormal leaves the window at max size."""
+        if self.isMaximized():
+            self.showNormal()
+        if self._is_at_max_dialog_size() or not self._is_near_size(self.size(), target):
+            self._animate_dialog_size(target)
+        else:
+            self._update_size_toggle_icon()
+
+    def _toggle_dialog_size(self) -> None:
+        """Toggle expanded/normal size; one click always fully restores."""
+        if self._search_open:
+            self._close_search()
+        self._stop_size_anim()
+
+        if self._dialog_is_expanded():
+            target = self._restore_size_target()
+            if self.isMaximized():
+                # Native maximize layered on dialog expand often restores only the
+                # maximized *flag*, leaving the window at max size. Finish in one click.
+                self.showNormal()
+                QTimer.singleShot(0, lambda: self._finish_restore_after_show_normal(target))
+                return
+            self._animate_dialog_size(target)
+            return
+
+        # Expand from a true normal size.
+        self._remember_normal_size()
+        self.showMaximized()
+        # If the platform didn't take us to max (common with tight maximumSize), animate.
+        QTimer.singleShot(0, self._ensure_expanded_after_maximize)
+
+    def _ensure_expanded_after_maximize(self) -> None:
+        if not self._is_at_max_dialog_size():
+            self._animate_dialog_size(QSize(self._max_dialog_size))
+        else:
+            self._update_size_toggle_icon()
 
     def _toggle_search(self) -> None:
         if self._search_open:
@@ -1114,9 +1286,16 @@ class OpeningEncyclopediaDialog(QDialog):
         inp.move(x, y)
         inp.setFixedWidth(width)
 
+    def _stop_search_anim(self) -> None:
+        anim = getattr(self, "_search_anim", None)
+        if anim is not None:
+            anim.stop()
+            self._search_anim = None
+
     def _open_search(self) -> None:
         self._search_open = True
         inp = self._search_input
+        self._stop_search_anim()
         self._position_search_input(0)
         inp.setVisible(True)
         inp.raise_()
@@ -1131,13 +1310,20 @@ class OpeningEncyclopediaDialog(QDialog):
         inp.setFocus()
 
     def _close_search(self) -> None:
+        if not self._search_open and not self._search_input.isVisible():
+            return
         self._search_open = False
         self._search_input.clear()
         self._search_results.setVisible(False)
         inp = self._search_input
+        self._stop_search_anim()
+        start_w = max(0, inp.width())
+        if start_w <= 0:
+            inp.setVisible(False)
+            return
         anim = QPropertyAnimation(inp, b"minimumWidth", self)
         anim.setDuration(150)
-        anim.setStartValue(inp.width())
+        anim.setStartValue(start_w)
         anim.setEndValue(0)
         anim.setEasingCurve(QEasingCurve.Type.InCubic)
         anim.valueChanged.connect(lambda v: self._position_search_input(int(v)))
@@ -1551,6 +1737,18 @@ class OpeningEncyclopediaDialog(QDialog):
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         super().resizeEvent(event)
+        # Floating search is positioned absolutely; collapse it on any real resize
+        # so it doesn't linger in the old spot after maximize / drag-resize.
+        old = event.oldSize()
+        if old.isValid() and event.size() != old and self._search_open:
+            self._close_search()
+
+        # Learn normal size only while truly non-expanded (avoid animation frames).
+        if old.isValid() and event.size() != old and not self._dialog_is_expanded():
+            self._remembered_normal_size = QSize(event.size())
+
+        self._update_size_toggle_icon()
+
         if self._gallery_overlay is not None and self._gallery_overlay.isVisible():
             self._gallery_overlay.refresh_geometry()
         # Keep width in sync immediately; debounce full text reflow to avoid flicker.
@@ -1559,6 +1757,11 @@ class OpeningEncyclopediaDialog(QDialog):
             if vw > 0 and self._content_host.width() != vw:
                 self._content_host.setFixedWidth(vw)
         self._resize_sync_timer.start()
+
+    def changeEvent(self, event: QEvent) -> None:  # noqa: N802
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.WindowStateChange:
+            self._update_size_toggle_icon()
 
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
         if event.key() == Qt.Key.Key_Escape:
@@ -1582,12 +1785,17 @@ class OpeningEncyclopediaDialog(QDialog):
         # Dual portraits need a bit more height room within the max.
         if len(self._entry.images) >= 2:
             target_h = max(target_h, int(cfg.get("height_with_dual_images", 520)))
-        self.resize(
+        target = QSize(
             max(min_w, min(target_w, max_w)),
             max(min_h, min(target_h, max_h)),
         )
+        self._default_dialog_size = QSize(target)
+        if not self.isMaximized():
+            self._remembered_normal_size = QSize(target)
+            self.resize(target)
         self._beside_block_count = None  # force initial placement
         self._sync_scroll_content_size()
+        self._update_size_toggle_icon()
 
     @staticmethod
     def show_entry(
