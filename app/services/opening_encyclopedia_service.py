@@ -54,6 +54,49 @@ def _fold_search_text(text: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+# Lower rank = better. display_name beats id/eco; alias-only matches rank last.
+_SEARCH_RANK_NAME_PREFIX = 0
+_SEARCH_RANK_NAME_SUBSTRING = 1
+_SEARCH_RANK_ID_OR_FAMILY = 2
+_SEARCH_RANK_ECO = 3
+_SEARCH_RANK_ALIAS = 4
+
+
+def _search_match_rank(
+    query: str,
+    *,
+    display_name: str,
+    opening_id: str,
+    family_id: str,
+    eco_codes: str,
+    aliases: Tuple[str, ...],
+) -> Optional[int]:
+    """Return best (lowest) match rank for ``query``, or None if no match."""
+    if not query:
+        return None
+    best: Optional[int] = None
+
+    def consider(rank: int) -> None:
+        nonlocal best
+        if best is None or rank < best:
+            best = rank
+
+    if display_name:
+        if display_name.startswith(query):
+            consider(_SEARCH_RANK_NAME_PREFIX)
+        elif query in display_name:
+            consider(_SEARCH_RANK_NAME_SUBSTRING)
+    if query in opening_id or (family_id and query in family_id):
+        consider(_SEARCH_RANK_ID_OR_FAMILY)
+    if eco_codes and query in eco_codes:
+        consider(_SEARCH_RANK_ECO)
+    for alias in aliases:
+        if query in alias:
+            consider(_SEARCH_RANK_ALIAS)
+            break
+    return best
+
+
 def _opt_str(value: Any) -> Optional[str]:
     if value is None:
         return None
@@ -123,6 +166,8 @@ class OpeningEncyclopediaService:
         self._by_name_eco: Dict[Tuple[str, str], str] = {}
         self._by_name: Dict[str, str] = {}
         self._openings: Dict[str, Dict[str, Any]] = {}
+        # Folded name_resolution keys per opening_id (for free-text alias search).
+        self._aliases_by_oid: Dict[str, Tuple[str, ...]] = {}
         self._image_cache: Dict[Tuple[str, int], Optional[bytes]] = {}
         self._available = False
         self._load()
@@ -191,6 +236,7 @@ class OpeningEncyclopediaService:
             conn = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
             conn.row_factory = sqlite3.Row
             self._conn = conn
+            alias_buckets: Dict[str, List[str]] = {}
 
             for row in conn.execute(
                 "SELECT name_key, eco, opening_id FROM name_resolution"
@@ -201,6 +247,15 @@ class OpeningEncyclopediaService:
                 self._by_name_eco[(key, eco)] = oid
                 if key not in self._by_name:
                     self._by_name[key] = oid
+                folded = _fold_search_text(key)
+                if folded:
+                    bucket = alias_buckets.setdefault(oid, [])
+                    if folded not in bucket:
+                        bucket.append(folded)
+
+            self._aliases_by_oid = {
+                oid: tuple(aliases) for oid, aliases in alias_buckets.items()
+            }
 
             for row in conn.execute(
                 """
@@ -301,12 +356,17 @@ class OpeningEncyclopediaService:
         return self.lookup(display_name, eco) is not None
 
     def search(self, query: str, limit: int = 20) -> EncyclopediaSearchPage:
-        """Free-text search over display_name, opening_id, eco_codes, family_id.
+        """Free-text search over display_name, opening_id, eco_codes, family_id,
+        and ``name_resolution`` aliases for each opening.
 
         Matching is case-insensitive, punctuation-tolerant (``kings``↔``king's``),
         and umlaut-tolerant: ``grünfeld`` / ``gruenfeld`` / ``grunfeld``-style
         digraph forms all match each other (``ä``↔``ae``, ``ö``↔``oe``,
         ``ü``↔``ue``, ``ß``↔``ss``).
+
+        Ranking (best first): display_name prefix, display_name substring,
+        opening_id/family_id, eco_codes, then alias-only hits. Ties break on
+        display_name A–Z.
 
         Returns a page of at most ``limit`` hits plus ``total`` untruncated count
         so the UI can show an overflow hint when results are truncated.
@@ -316,23 +376,40 @@ class OpeningEncyclopediaService:
         q = _fold_search_text(query.strip())
         if not q:
             return EncyclopediaSearchPage(results=[], total=0)
-        results: List[EncyclopediaSearchResult] = []
+        scored: List[Tuple[int, str, EncyclopediaSearchResult]] = []
         for raw in self._openings.values():
+            oid = str(raw["opening_id"])
             name = _fold_search_text(raw.get("display_name") or "")
-            oid = _fold_search_text(raw.get("opening_id") or "")
+            oid_fold = _fold_search_text(oid)
             eco = _fold_search_text(raw.get("eco_codes") or "")
             fid = _fold_search_text(raw.get("family_id") or "")
-            if q in name or q in oid or q in eco or q in fid:
-                results.append(
+            aliases = self._aliases_by_oid.get(oid, ())
+            rank = _search_match_rank(
+                q,
+                display_name=name,
+                opening_id=oid_fold,
+                family_id=fid,
+                eco_codes=eco,
+                aliases=aliases,
+            )
+            if rank is None:
+                continue
+            display = str(raw.get("display_name") or "")
+            scored.append(
+                (
+                    rank,
+                    display.lower(),
                     EncyclopediaSearchResult(
-                        opening_id=str(raw["opening_id"]),
-                        display_name=str(raw.get("display_name") or ""),
+                        opening_id=oid,
+                        display_name=display,
                         tier=_opt_str(raw.get("tier")),
                         eco_codes=_opt_str(raw.get("eco_codes")),
                         family_id=_opt_str(raw.get("family_id")),
-                    )
+                    ),
                 )
-        results.sort(key=lambda r: r.display_name.lower())
+            )
+        scored.sort(key=lambda item: (item[0], item[1]))
+        results = [item[2] for item in scored]
         capped = max(1, int(limit))
         return EncyclopediaSearchPage(results=results[:capped], total=len(results))
 
