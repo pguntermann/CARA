@@ -18,8 +18,21 @@ from PyQt6.QtCore import (
     QEasingCurve,
     pyqtSignal,
 )
-from PyQt6.QtGui import QColor, QFont, QKeyEvent, QMouseEvent, QPalette, QPixmap, QResizeEvent, QShowEvent, QTextDocument
+from PyQt6.QtGui import (
+    QColor,
+    QFont,
+    QKeyEvent,
+    QLinearGradient,
+    QMouseEvent,
+    QPainter,
+    QPalette,
+    QPixmap,
+    QResizeEvent,
+    QShowEvent,
+    QTextDocument,
+)
 from PyQt6.QtWidgets import (
+    QApplication,
     QDialog,
     QFrame,
     QHBoxLayout,
@@ -235,6 +248,44 @@ class _ClickableImageLabel(QLabel):
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
         super().mouseReleaseEvent(event)
+
+
+class _TitleSearchFade(QWidget):
+    """Right-edge fade over the title so the floating search blends in."""
+
+    def __init__(
+        self,
+        bg_rgb: list[int],
+        parent: Optional[QWidget] = None,
+        *,
+        stops: Optional[List[Tuple[float, int]]] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._bg = QColor(int(bg_rgb[0]), int(bg_rgb[1]), int(bg_rgb[2]))
+        # (position 0..1, alpha 0..255), left → right.
+        self._stops: List[Tuple[float, int]] = list(stops) if stops else [
+            (0.0, 0),
+            (0.2, 180),
+            (0.4, 255),
+            (1.0, 255),
+        ]
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.hide()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        if self.width() <= 0 or self.height() <= 0:
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+        grad = QLinearGradient(0.0, 0.0, float(self.width()), 0.0)
+        for pos, alpha in self._stops:
+            p = max(0.0, min(1.0, float(pos)))
+            a = max(0, min(255, int(alpha)))
+            c = QColor(self._bg)
+            c.setAlpha(a)
+            grad.setColorAt(p, c)
+        painter.fillRect(self.rect(), grad)
 
 
 class EncyclopediaGalleryOverlay(QWidget):
@@ -569,6 +620,7 @@ class OpeningEncyclopediaDialog(QDialog):
         self.setWindowTitle(entry.display_name or "Opening Encyclopedia")
 
         bg = _rgb(dialog_config.get("background_color"), [40, 40, 45])
+        self._dialog_bg_rgb = bg
         self.setAutoFillBackground(True)
         pal = self.palette()
         pal.setColor(self.backgroundRole(), QColor(*bg))
@@ -660,6 +712,14 @@ class OpeningEncyclopediaDialog(QDialog):
             search_cfg = {}
         self._search_open = False
         self._search_container = self._build_search_widget(search_cfg, dialog_config)
+        self._search_fade_extra = int(search_cfg.get("title_fade_extra_width", 56))
+        self._search_fade_min_width = int(search_cfg.get("title_fade_min_width", 72))
+        fade_stops = self._parse_title_fade_stops(search_cfg.get("title_fade_stops"))
+        self._title_fade = _TitleSearchFade(bg, title, stops=fade_stops)
+
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self)
 
         body_cfg = dialog_config.get("body", {})
         body_family = resolve_font_family(body_cfg.get("font_family", "Helvetica Neue"))
@@ -997,6 +1057,29 @@ class OpeningEncyclopediaDialog(QDialog):
                 pass
         return [c.strip() for c in eco_codes.split(",") if c.strip()]
 
+    @staticmethod
+    def _parse_title_fade_stops(raw: Any) -> List[Tuple[float, int]]:
+        """Parse ``title_fade_stops`` as ``[[position, alpha], ...]``."""
+        defaults: List[Tuple[float, int]] = [
+            (0.0, 0),
+            (0.2, 180),
+            (0.4, 255),
+            (1.0, 255),
+        ]
+        if not isinstance(raw, (list, tuple)) or not raw:
+            return defaults
+        parsed: List[Tuple[float, int]] = []
+        for item in raw:
+            if not isinstance(item, (list, tuple)) or len(item) < 2:
+                continue
+            try:
+                pos = float(item[0])
+                alpha = int(item[1])
+            except (TypeError, ValueError):
+                continue
+            parsed.append((max(0.0, min(1.0, pos)), max(0, min(255, alpha))))
+        return parsed if len(parsed) >= 2 else defaults
+
     def _build_search_widget(
         self,
         search_cfg: Dict[str, Any],
@@ -1284,6 +1367,43 @@ class OpeningEncyclopediaDialog(QDialog):
         else:
             self._update_size_toggle_icon()
 
+    def _is_search_ui_global_pos(self, global_pos) -> bool:
+        """True if ``global_pos`` hits the search chrome (button/input/results/tools)."""
+        widgets = (
+            getattr(self, "_search_container", None),
+            getattr(self, "_search_btn", None),
+            getattr(self, "_search_input", None),
+            getattr(self, "_search_results", None),
+            getattr(self, "_size_toggle_btn", None),
+        )
+        for w in widgets:
+            if w is None or not w.isVisible():
+                continue
+            local = w.mapFromGlobal(global_pos)
+            if w.rect().contains(local):
+                return True
+        return False
+
+    def _sync_title_fade(self, search_width: Optional[int] = None) -> None:
+        """Place/hide the title fade to match the floating search field."""
+        fade = getattr(self, "_title_fade", None)
+        title = self._title_label
+        if fade is None or title is None:
+            return
+        if not self._search_open:
+            fade.hide()
+            return
+        tw = max(1, title.width())
+        th = max(1, title.height())
+        sw = int(search_width) if search_width is not None else max(0, self._search_input.width())
+        fade_w = max(
+            self._search_fade_min_width,
+            min(tw, sw + max(0, self._search_fade_extra)),
+        )
+        fade.setGeometry(tw - fade_w, 0, fade_w, th)
+        fade.show()
+        fade.raise_()
+
     def _toggle_search(self) -> None:
         if self._search_open:
             self._close_search()
@@ -1300,6 +1420,7 @@ class OpeningEncyclopediaDialog(QDialog):
         x = max(12, x)
         inp.move(x, y)
         inp.setFixedWidth(width)
+        self._sync_title_fade(width)
 
     def _stop_search_anim(self) -> None:
         anim = getattr(self, "_search_anim", None)
@@ -1314,6 +1435,7 @@ class OpeningEncyclopediaDialog(QDialog):
         self._position_search_input(0)
         inp.setVisible(True)
         inp.raise_()
+        self._sync_title_fade(0)
         anim = QPropertyAnimation(inp, b"minimumWidth", self)
         anim.setDuration(200)
         anim.setStartValue(0)
@@ -1335,16 +1457,46 @@ class OpeningEncyclopediaDialog(QDialog):
         start_w = max(0, inp.width())
         if start_w <= 0:
             inp.setVisible(False)
+            self._sync_title_fade(0)
             return
         anim = QPropertyAnimation(inp, b"minimumWidth", self)
         anim.setDuration(150)
         anim.setStartValue(start_w)
         anim.setEndValue(0)
         anim.setEasingCurve(QEasingCurve.Type.InCubic)
-        anim.valueChanged.connect(lambda v: self._position_search_input(int(v)))
-        anim.finished.connect(lambda: inp.setVisible(False))
+
+        def _on_width(v: object) -> None:
+            w = int(v)
+            self._position_search_input(w)
+            if w <= 0:
+                self._sync_title_fade(0)
+
+        anim.valueChanged.connect(_on_width)
+
+        def _on_finished() -> None:
+            inp.setVisible(False)
+            self._sync_title_fade(0)
+
+        anim.finished.connect(_on_finished)
         anim.start()
         self._search_anim = anim
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802
+        if (
+            self._search_open
+            and event.type() == QEvent.Type.MouseButtonPress
+            and isinstance(event, QMouseEvent)
+            and event.button() == Qt.MouseButton.LeftButton
+        ):
+            if not self._is_search_ui_global_pos(event.globalPosition().toPoint()):
+                self._close_search()
+        return super().eventFilter(obj, event)
+
+    def done(self, result: int) -> None:  # noqa: N802
+        app = QApplication.instance()
+        if app is not None:
+            app.removeEventFilter(self)
+        super().done(result)
 
     def _on_search_text_changed(self, text: str) -> None:
         if not text.strip():
@@ -1767,6 +1919,8 @@ class OpeningEncyclopediaDialog(QDialog):
             self._remembered_normal_size = QSize(event.size())
 
         self._update_size_toggle_icon()
+        if self._search_open:
+            self._sync_title_fade()
 
         if self._gallery_overlay is not None and self._gallery_overlay.isVisible():
             self._gallery_overlay.refresh_geometry()

@@ -5140,7 +5140,15 @@
           "overflow_text_color": [120, 120, 130],
           "overflow_font_size": 9,
           "overflow_text": "… {count} further results",
-          "animation_duration_ms": 200
+          "animation_duration_ms": 200,
+          "title_fade_extra_width": 56,
+          "title_fade_min_width": 72,
+          "title_fade_stops": [
+            [0.0, 0],
+            [0.2, 180],
+            [0.4, 255],
+            [1.0, 255]
+          ]
         },
         "size_toggle": {
           "icon_size": 18,
