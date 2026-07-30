@@ -17,6 +17,9 @@ _SPELLING = {
 
 _APOSTROPHE = re.compile(r"[’‘`]")
 
+# Punctuation that should not block substring search (e.g. "kings" ↔ "king's").
+_SEARCH_PUNCT = re.compile(r"['’‘`ʼ\-–—_/.,:;!?()\[\]{}]+")
+
 # German umlaut / Eszett → digraph forms so "grünfeld" matches "gruenfeld".
 _UMLAUT_FOLD = str.maketrans(
     {
@@ -42,8 +45,13 @@ def normalize_opening_name(name: str) -> str:
 
 
 def _fold_search_text(text: str) -> str:
-    """Lowercase and expand German umlauts for tolerant search matching."""
-    return (text or "").lower().translate(_UMLAUT_FOLD)
+    """Lowercase, expand umlauts, and strip punctuation for tolerant search matching.
+
+    Apostrophes/hyphens are removed so ``kings indian`` matches ``King's Indian``.
+    """
+    s = (text or "").lower().translate(_UMLAUT_FOLD)
+    s = _SEARCH_PUNCT.sub("", s)
+    return re.sub(r"\s+", " ", s).strip()
 
 
 def _opt_str(value: Any) -> Optional[str]:
@@ -295,9 +303,10 @@ class OpeningEncyclopediaService:
     def search(self, query: str, limit: int = 20) -> EncyclopediaSearchPage:
         """Free-text search over display_name, opening_id, eco_codes, family_id.
 
-        Matching is case-insensitive and umlaut-tolerant: ``grünfeld`` /
-        ``gruenfeld`` / ``grunfeld``-style digraph forms all match each other
-        (``ä``↔``ae``, ``ö``↔``oe``, ``ü``↔``ue``, ``ß``↔``ss``).
+        Matching is case-insensitive, punctuation-tolerant (``kings``↔``king's``),
+        and umlaut-tolerant: ``grünfeld`` / ``gruenfeld`` / ``grunfeld``-style
+        digraph forms all match each other (``ä``↔``ae``, ``ö``↔``oe``,
+        ``ü``↔``ue``, ``ß``↔``ss``).
 
         Returns a page of at most ``limit`` hits plus ``total`` untruncated count
         so the UI can show an overflow hint when results are truncated.
