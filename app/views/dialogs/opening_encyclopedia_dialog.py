@@ -47,6 +47,10 @@ from app.utils.themed_icon import (
     SVG_MENU_SEARCH,
     themed_icon_from_svg,
 )
+from app.views.delegates.encyclopedia_search_result_delegate import (
+    ECO_CHIP_ROLE,
+    EncyclopediaSearchResultDelegate,
+)
 from app.views.style import StyleManager
 
 # SAN-aware matcher for encyclopedia prose (aligned with notes formatter ideas).
@@ -1107,11 +1111,22 @@ class OpeningEncyclopediaDialog(QDialog):
             f"QListWidget {{ background-color: rgb({result_bg[0]}, {result_bg[1]}, {result_bg[2]}); "
             f"color: rgb({result_fg[0]}, {result_fg[1]}, {result_fg[2]}); "
             f"border: 1px solid rgb({result_border[0]}, {result_border[1]}, {result_border[2]}); "
-            f"border-radius: {input_radius}px; }} "
+            f"border-radius: {input_radius}px; outline: none; }} "
             f"QListWidget::item {{ padding: {int(result_padding[0])}px {int(result_padding[1])}px {int(result_padding[2])}px {int(result_padding[3])}px; }} "
             f"QListWidget::item:hover {{ background-color: rgb({result_hover[0]}, {result_hover[1]}, {result_hover[2]}); }} "
             f"QListWidget::item:selected {{ background-color: rgb({result_selected_bg[0]}, {result_selected_bg[1]}, {result_selected_bg[2]}); "
             f"color: rgb({result_selected_fg[0]}, {result_selected_fg[1]}, {result_selected_fg[2]}); }}"
+        )
+        tags_cfg = dialog_config.get("tags", {})
+        if not isinstance(tags_cfg, dict):
+            tags_cfg = {}
+        results.setItemDelegate(
+            EncyclopediaSearchResultDelegate(
+                tags_cfg,
+                name_color=result_fg,
+                selected_name_color=result_selected_fg,
+                parent=results,
+            )
         )
         results.itemClicked.connect(self._on_search_result_clicked)
         self._search_results = results
@@ -1349,12 +1364,16 @@ class OpeningEncyclopediaDialog(QDialog):
             return
         for r in page.results:
             eco_list = self._parse_eco_codes(r.eco_codes)
-            eco_str = ", ".join(eco_list[:3]) if eco_list else ""
-            label = r.display_name
-            if eco_str:
-                label += f"  [{eco_str}]"
-            item = QListWidgetItem(label)
+            eco_label = ""
+            if eco_list:
+                eco_codes = ", ".join(eco_list[:3])
+                if len(eco_list) > 3:
+                    eco_codes += f" (+{len(eco_list) - 3})"
+                eco_label = f"ECO: {eco_codes}"
+            item = QListWidgetItem(r.display_name)
             item.setData(Qt.ItemDataRole.UserRole, r.opening_id)
+            if eco_label:
+                item.setData(ECO_CHIP_ROLE, eco_label)
             self._search_results.addItem(item)
 
         remaining = max(0, int(page.total) - len(page.results))
