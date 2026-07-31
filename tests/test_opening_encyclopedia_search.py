@@ -10,7 +10,10 @@ from app.services.opening_encyclopedia_service import (
     _SEARCH_RANK_ID_OR_FAMILY,
     _SEARCH_RANK_NAME_PREFIX,
     _SEARCH_RANK_NAME_SUBSTRING,
+    _SearchAbbrev,
     _fold_search_text,
+    _opening_in_family_scope,
+    _rewrite_search_query,
     _search_match_rank,
 )
 
@@ -22,6 +25,80 @@ class SearchFoldTests(unittest.TestCase):
             "queens gambit declined tarrasch",
         )
         self.assertEqual(_fold_search_text("Qgd: Semi-Tarrasch"), "qgd semitarrasch")
+
+
+class SearchAbbrevRewriteTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.abbrevs = {
+            "qid": _SearchAbbrev(
+                abbrev="qid",
+                expansion="queen's indian",
+                family_id="queens-indian-defense",
+            ),
+            "kia": _SearchAbbrev(
+                abbrev="kia",
+                expansion="king's indian attack",
+                family_id="kings-indian-attack",
+            ),
+            "kid": _SearchAbbrev(
+                abbrev="kid",
+                expansion="king's indian",
+                family_id="kings-indian-defense",
+            ),
+        }
+
+    def test_bare_abbrev_expands_and_scopes(self) -> None:
+        q, scope = _rewrite_search_query("QID", self.abbrevs)
+        self.assertEqual(q, "queens indian")
+        self.assertEqual(scope, "queens-indian-defense")
+
+    def test_colon_and_space_remainder_share_fold_path(self) -> None:
+        q_space, scope_space = _rewrite_search_query("kid b3", self.abbrevs)
+        q_colon, scope_colon = _rewrite_search_query("kid: b3", self.abbrevs)
+        self.assertEqual(q_space, "kings indian b3")
+        self.assertEqual(q_colon, "kings indian b3")
+        self.assertEqual(scope_space, scope_colon)
+        self.assertEqual(scope_space, "kings-indian-defense")
+
+    def test_colon_abbrev_rewrites_remainder(self) -> None:
+        q, scope = _rewrite_search_query("qid: Botvinnik", self.abbrevs)
+        self.assertEqual(q, "queens indian botvinnik")
+        self.assertEqual(scope, "queens-indian-defense")
+
+    def test_space_abbrev_rewrites_remainder(self) -> None:
+        q, scope = _rewrite_search_query("kid b3", self.abbrevs)
+        self.assertEqual(q, "kings indian b3")
+        self.assertEqual(scope, "kings-indian-defense")
+
+    def test_unknown_query_unchanged_fold(self) -> None:
+        q, scope = _rewrite_search_query("Najdorf", self.abbrevs)
+        self.assertEqual(q, "najdorf")
+        self.assertIsNone(scope)
+
+    def test_kia_family_scope_excludes_french_crumbs(self) -> None:
+        self.assertTrue(
+            _opening_in_family_scope(
+                opening_id="kings-indian-attack",
+                family_id=None,
+                scope_family_id="kings-indian-attack",
+            )
+        )
+        self.assertFalse(
+            _opening_in_family_scope(
+                opening_id="french-defense/kia-2-d3-d5",
+                family_id="french-defense",
+                scope_family_id="kings-indian-attack",
+            )
+        )
+
+    def test_kid_child_in_scope_via_prefix(self) -> None:
+        self.assertTrue(
+            _opening_in_family_scope(
+                opening_id="kings-indian-defense/saemisch",
+                family_id="kings-indian-defense",
+                scope_family_id="kings-indian-defense",
+            )
+        )
 
 
 class SearchRankTests(unittest.TestCase):

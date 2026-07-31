@@ -157,6 +157,70 @@ class EncyclopediaSearchPage:
     total: int
 
 
+@dataclass(frozen=True)
+class _SearchAbbrev:
+    """Cached ``search_abbrev`` row for free-text query rewrite."""
+
+    abbrev: str
+    expansion: str
+    family_id: Optional[str]
+
+
+def _rewrite_search_query(
+    raw_query: str,
+    abbrevs: Dict[str, _SearchAbbrev],
+) -> Tuple[str, Optional[str]]:
+    """Expand a leading ``search_abbrev`` token, then fold like any other query.
+
+    Abbreviation detection runs on the normalized (but not yet fold-stripped)
+    string so separators such as ``:`` remain visible. After expansion, the
+    same ``_fold_search_text`` path used for unabbreviated queries strips
+    punctuation — so ``kid b3`` and ``kid: b3`` match like
+    ``King's Indian defense b3`` / ``King's Indian defense: b3``.
+    """
+    normalized = normalize_opening_name(raw_query)
+    if not normalized:
+        return "", None
+
+    # Longest abbrev first so ``semi-slav …`` wins over ``slav …``.
+    for abbrev, hit in sorted(abbrevs.items(), key=lambda item: -len(item[0])):
+        if normalized == abbrev:
+            return _fold_search_text(hit.expansion), hit.family_id
+        if not normalized.startswith(abbrev):
+            continue
+        if len(normalized) == len(abbrev):
+            continue
+        # Require a separator after the abbrev (space or fold-stripped punct).
+        boundary = normalized[len(abbrev)]
+        if not (boundary.isspace() or _SEARCH_PUNCT.match(boundary)):
+            continue
+        rest = _SEARCH_PUNCT.sub(" ", normalized[len(abbrev) :])
+        rest = re.sub(r"\s+", " ", rest).strip()
+        rewritten = hit.expansion if not rest else f"{hit.expansion} {rest}"
+        return _fold_search_text(rewritten), hit.family_id
+
+    return _fold_search_text(normalized), None
+
+
+def _opening_in_family_scope(
+    *,
+    opening_id: str,
+    family_id: Optional[str],
+    scope_family_id: str,
+) -> bool:
+    """True if this opening belongs to the abbrev's family tree."""
+    if not scope_family_id:
+        return True
+    oid = opening_id or ""
+    if oid == scope_family_id:
+        return True
+    if oid.startswith(scope_family_id + "/") or oid.startswith(scope_family_id + "-"):
+        return True
+    if family_id and str(family_id) == scope_family_id:
+        return True
+    return False
+
+
 class OpeningEncyclopediaService:
     """Lookup encyclopedia entries by explorer ``(display_name, eco)``."""
 
@@ -168,9 +232,12 @@ class OpeningEncyclopediaService:
         self._openings: Dict[str, Dict[str, Any]] = {}
         # Folded name_resolution keys per opening_id (for free-text alias search).
         self._aliases_by_oid: Dict[str, Tuple[str, ...]] = {}
+        # Loaded once from search_abbrev (never re-queried per search).
+        self._search_abbrevs: Dict[str, _SearchAbbrev] = {}
         self._image_cache: Dict[Tuple[str, int], Optional[bytes]] = {}
         self._available = False
         self._load()
+
 
     @property
     def available(self) -> bool:
@@ -257,6 +324,26 @@ class OpeningEncyclopediaService:
                 oid: tuple(aliases) for oid, aliases in alias_buckets.items()
             }
 
+            # Optional in older product DBs; cache in memory for search rewrites.
+            self._search_abbrevs = {}
+            try:
+                for row in conn.execute(
+                    "SELECT abbrev, expansion, family_id FROM search_abbrev"
+                ):
+                    abbrev = normalize_opening_name(str(row["abbrev"] or ""))
+                    expansion = normalize_opening_name(str(row["expansion"] or ""))
+                    if not abbrev or not expansion:
+                        continue
+                    family_raw = row["family_id"]
+                    family_id = str(family_raw).strip() if family_raw else None
+                    self._search_abbrevs[abbrev] = _SearchAbbrev(
+                        abbrev=abbrev,
+                        expansion=expansion,
+                        family_id=family_id or None,
+                    )
+            except sqlite3.OperationalError:
+                self._search_abbrevs = {}
+
             for row in conn.execute(
                 """
                 SELECT o.opening_id, o.display_name, o.family_id,
@@ -296,13 +383,15 @@ class OpeningEncyclopediaService:
                 LoggingService.get_instance(self._config).info(
                     f"Opening encyclopedia loaded: path={path}, "
                     f"openings={len(self._openings)}, "
-                    f"name_keys={len(self._by_name)}"
+                    f"name_keys={len(self._by_name)}, "
+                    f"search_abbrevs={len(self._search_abbrevs)}"
                 )
             except Exception:
                 pass
         except Exception as exc:
             self._conn = None
             self._available = False
+            self._search_abbrevs = {}
             try:
                 from app.services.logging_service import LoggingService
 
@@ -364,6 +453,13 @@ class OpeningEncyclopediaService:
         digraph forms all match each other (``ä``↔``ae``, ``ö``↔``oe``,
         ``ü``↔``ue``, ``ß``↔``ss``).
 
+        Queries may start with a curated ``search_abbrev`` token (cached at
+        load). That token is expanded to its full ``expansion`` text, then the
+        query is folded with the same punctuation/umlaut rules as any other
+        search — so ``kid b3`` and ``kid: b3`` behave like
+        ``King's Indian defense b3`` / ``…: b3``. Hits are scoped to the
+        abbrev's ``family_id`` tree when set.
+
         Ranking (best first): display_name prefix, display_name substring,
         opening_id/family_id, eco_codes, then alias-only hits. Ties break on
         display_name A–Z.
@@ -373,12 +469,19 @@ class OpeningEncyclopediaService:
         """
         if not self._available or not query or not query.strip():
             return EncyclopediaSearchPage(results=[], total=0)
-        q = _fold_search_text(query.strip())
+        q, family_scope = _rewrite_search_query(query.strip(), self._search_abbrevs)
         if not q:
             return EncyclopediaSearchPage(results=[], total=0)
         scored: List[Tuple[int, str, EncyclopediaSearchResult]] = []
         for raw in self._openings.values():
             oid = str(raw["opening_id"])
+            row_family = raw.get("family_id")
+            if family_scope and not _opening_in_family_scope(
+                opening_id=oid,
+                family_id=str(row_family) if row_family else None,
+                scope_family_id=family_scope,
+            ):
+                continue
             name = _fold_search_text(raw.get("display_name") or "")
             oid_fold = _fold_search_text(oid)
             eco = _fold_search_text(raw.get("eco_codes") or "")
