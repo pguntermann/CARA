@@ -28,6 +28,7 @@ from PyQt6.QtGui import (
     QKeyEvent,
     QLinearGradient,
     QMouseEvent,
+    QMoveEvent,
     QPainter,
     QPalette,
     QPixmap,
@@ -800,6 +801,8 @@ class OpeningEncyclopediaDialog(QDialog):
         self._size_preset_key = _SIZE_PRESET_DEFAULT
         self._size_anim: Optional[QPropertyAnimation] = None
         self._suppress_size_persist = False
+        self._programmatic_resize = False
+        self._center_reassert_token = 0
         self._size_applied_on_show = False
         self._size_persist_timer = QTimer(self)
         self._size_persist_timer.setSingleShot(True)
@@ -1633,31 +1636,46 @@ class OpeningEncyclopediaDialog(QDialog):
         resizes and only honor an explicit ``move`` after the size has settled.
         """
         size = end.size()
-        self.resize(size)
-        avail = self._available_geometry()
-        margin = self._size_screen_margin
-        fg = self.frameGeometry()
-        # If the frame size hasn't updated yet, synthesize from client + prior chrome.
-        if fg.width() < size.width() or fg.height() < size.height():
-            geo = self.geometry()
-            extra_w = max(0, fg.width() - max(1, geo.width()))
-            extra_h = max(0, fg.height() - max(1, geo.height()))
-            fg.setSize(QSize(size.width() + extra_w, size.height() + extra_h))
-        fg.moveCenter(avail.center())
-        if fg.left() < avail.left() + margin:
-            fg.moveLeft(avail.left() + margin)
-        if fg.top() < avail.top() + margin:
-            fg.moveTop(avail.top() + margin)
-        if fg.right() > avail.right() - margin:
-            fg.moveRight(avail.right() - margin)
-        if fg.bottom() > avail.bottom() - margin:
-            fg.moveBottom(avail.bottom() - margin)
-        self.move(fg.topLeft())
-        # Re-assert after the WM processes the resize (helps X11 and some compositors).
-        QTimer.singleShot(0, self._reassert_centered_on_screen)
+        self._center_reassert_token += 1
+        token = self._center_reassert_token
+        self._programmatic_resize = True
+        self._suppress_size_persist = True
+        try:
+            self.resize(size)
+            avail = self._available_geometry()
+            margin = self._size_screen_margin
+            fg = self.frameGeometry()
+            # If the frame size hasn't updated yet, synthesize from client + prior chrome.
+            if fg.width() < size.width() or fg.height() < size.height():
+                geo = self.geometry()
+                extra_w = max(0, fg.width() - max(1, geo.width()))
+                extra_h = max(0, fg.height() - max(1, geo.height()))
+                fg.setSize(QSize(size.width() + extra_w, size.height() + extra_h))
+            fg.moveCenter(avail.center())
+            if fg.left() < avail.left() + margin:
+                fg.moveLeft(avail.left() + margin)
+            if fg.top() < avail.top() + margin:
+                fg.moveTop(avail.top() + margin)
+            if fg.right() > avail.right() - margin:
+                fg.moveRight(avail.right() - margin)
+            if fg.bottom() > avail.bottom() - margin:
+                fg.moveBottom(avail.bottom() - margin)
+            self.move(fg.topLeft())
+        finally:
+            self._programmatic_resize = False
+            self._suppress_size_persist = False
+        # Re-assert once after the WM processes the resize. Cancelled if the user
+        # starts a manual resize/move before it runs.
+        QTimer.singleShot(0, lambda t=token: self._reassert_centered_on_screen(t))
 
-    def _reassert_centered_on_screen(self) -> None:
-        if not self.isVisible():
+    def _cancel_pending_center_reassert(self) -> None:
+        """Invalidate any deferred screen-centering from a preset size change."""
+        self._center_reassert_token += 1
+
+    def _reassert_centered_on_screen(self, token: int) -> None:
+        if token != self._center_reassert_token:
+            return
+        if not self.isVisible() or self._programmatic_resize:
             return
         avail = self._available_geometry()
         margin = self._size_screen_margin
@@ -1673,7 +1691,13 @@ class OpeningEncyclopediaDialog(QDialog):
         if target.bottom() > avail.bottom() - margin:
             target.moveBottom(avail.bottom() - margin)
         if abs(fg.x() - target.x()) > 2 or abs(fg.y() - target.y()) > 2:
-            self.move(target.topLeft())
+            self._programmatic_resize = True
+            self._suppress_size_persist = True
+            try:
+                self.move(target.topLeft())
+            finally:
+                self._programmatic_resize = False
+                self._suppress_size_persist = False
 
     def _is_near_size(self, size: QSize, other: QSize, tol: int = _SIZE_AXIS_TOL_PX) -> bool:
         return abs(size.width() - other.width()) <= tol and abs(size.height() - other.height()) <= tol
@@ -2776,8 +2800,11 @@ class OpeningEncyclopediaDialog(QDialog):
             old.isValid()
             and event.size() != old
             and not getattr(self, "_suppress_size_persist", False)
+            and not getattr(self, "_programmatic_resize", False)
             and self._size_applied_on_show
         ):
+            # User is drag-resizing: never snap back to screen center.
+            self._cancel_pending_center_reassert()
             self._size_persist_timer.start()
 
         if self._search_open:
@@ -2791,6 +2818,16 @@ class OpeningEncyclopediaDialog(QDialog):
             if vw > 0 and self._content_host.width() != vw:
                 self._content_host.setFixedWidth(vw)
         self._resize_sync_timer.start()
+
+    def moveEvent(self, event: QMoveEvent) -> None:  # noqa: N802
+        super().moveEvent(event)
+        # User drag-move should cancel a pending preset recenter.
+        if (
+            self._size_applied_on_show
+            and not getattr(self, "_programmatic_resize", False)
+            and not getattr(self, "_suppress_size_persist", False)
+        ):
+            self._cancel_pending_center_reassert()
 
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
         if event.key() == Qt.Key.Key_Escape:
