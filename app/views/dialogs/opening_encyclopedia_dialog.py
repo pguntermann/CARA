@@ -48,6 +48,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QVBoxLayout,
     QWidget,
+    QWidgetAction,
 )
 
 from app.services.opening_encyclopedia_service import (
@@ -58,9 +59,14 @@ from app.services.opening_encyclopedia_service import (
 from app.utils.external_open import open_url
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.themed_icon import (
+    SVG_MENU_EXCLAMATION,
     SVG_MENU_MAXIMIZE,
-    SVG_MENU_PENCIL,
     SVG_MENU_SEARCH,
+    SVG_MENU_SIZE_EQUAL,
+    SVG_MENU_SIZE_HEIGHT,
+    SVG_MENU_SIZE_WIDTH,
+    SVG_MENU_TEXT_SIZE,
+    menu_icon_dark_tint_rgb,
     themed_icon_from_svg,
 )
 from app.views.delegates.encyclopedia_search_result_delegate import (
@@ -76,6 +82,25 @@ _SIZE_PRESET_FRACTIONS = {"45": 0.45, "60": 0.60, "80": 0.80}
 # Older keys from previous schemes map to the nearest current preset.
 _SIZE_PRESET_LEGACY = {"25": "45", "40": "45", "50": "60", "75": "80"}
 _SIZE_PRESET_CUSTOM = "custom"
+_SIZE_AXIS_TOL_PX = 4
+
+_TEXT_SIZE_KEYS = ("small", "medium", "large")
+_TEXT_SIZE_DEFAULT = "medium"
+_TEXT_SIZE_SCALES = {
+    "small": 0.9,
+    "medium": 1.0,
+    "large": 1.18,
+}
+_TEXT_SIZE_MENU_A_PT = {
+    "small": 11,
+    "medium": 14,
+    "large": 18,
+}
+_TEXT_SIZE_LABELS = {
+    "small": "Small",
+    "medium": "Medium",
+    "large": "Large",
+}
 
 # SAN-aware matcher for encyclopedia prose (aligned with notes formatter ideas).
 _FILE = r"[a-h]"
@@ -108,6 +133,19 @@ def _rgb(value: Any, default: list[int]) -> list[int]:
     if isinstance(value, (list, tuple)) and len(value) >= 3:
         return [int(value[0]), int(value[1]), int(value[2])]
     return list(default)
+
+
+class _ClickableMenuRow(QWidget):
+    """Simple clickable row used inside QWidgetAction menu items."""
+
+    clicked = pyqtSignal()
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
 
 def _collect_move_spans(plain: str) -> List[Tuple[int, int]]:
@@ -630,6 +668,7 @@ class OpeningEncyclopediaDialog(QDialog):
         self._scroll: Optional[QScrollArea] = None
         self._content_host: Optional[QWidget] = None
         self._body_labels: List[QLabel] = []
+        self._heading_labels: List[QLabel] = []
         self._title_label: Optional[QLabel] = None
         self._section_blocks: List[QWidget] = []
         self._beside_host: Optional[QWidget] = None
@@ -686,6 +725,22 @@ class OpeningEncyclopediaDialog(QDialog):
         if not isinstance(labels, (list, tuple)) or len(labels) < 3:
             labels = ["45%", "60%", "80%"]
         self._size_preset_labels = [str(labels[0]), str(labels[1]), str(labels[2])]
+        equal_labels = size_cfg.get("equal_labels")
+        if isinstance(equal_labels, (list, tuple)) and len(equal_labels) >= 3:
+            self._size_equal_labels = [
+                str(equal_labels[0]),
+                str(equal_labels[1]),
+                str(equal_labels[2]),
+            ]
+        else:
+            self._size_equal_labels = [
+                f"{self._size_preset_labels[0]} × {self._size_preset_labels[0]}",
+                f"{self._size_preset_labels[1]} × {self._size_preset_labels[1]}",
+                f"{self._size_preset_labels[2]} × {self._size_preset_labels[2]}",
+            ]
+        self._size_section_equal = str(size_cfg.get("section_equal", "Equal"))
+        self._size_section_width = str(size_cfg.get("section_width", "Width"))
+        self._size_section_height = str(size_cfg.get("section_height", "Height"))
         self._size_screen_margin = max(0, int(size_cfg.get("screen_margin", 8)))
         self._size_preset_key = "60"
         self._size_anim: Optional[QPropertyAnimation] = None
@@ -695,6 +750,62 @@ class OpeningEncyclopediaDialog(QDialog):
         self._size_persist_timer.setSingleShot(True)
         self._size_persist_timer.setInterval(200)
         self._size_persist_timer.timeout.connect(self._persist_current_size)
+
+        text_size_cfg = size_cfg.get("text_size", {})
+        if not isinstance(text_size_cfg, dict):
+            text_size_cfg = {}
+        self._text_size_section = str(text_size_cfg.get("section", "Text size"))
+        self._text_size_options: List[Dict[str, Any]] = []
+        raw_text_opts = text_size_cfg.get("options")
+        if isinstance(raw_text_opts, list):
+            for item in raw_text_opts:
+                if not isinstance(item, dict):
+                    continue
+                opt_id = str(item.get("id") or "").strip().lower()
+                if opt_id not in _TEXT_SIZE_KEYS:
+                    continue
+                try:
+                    scale = float(item.get("scale", _TEXT_SIZE_SCALES[opt_id]))
+                except (TypeError, ValueError):
+                    scale = _TEXT_SIZE_SCALES[opt_id]
+                try:
+                    menu_a_pt = int(item.get("menu_a_pt", _TEXT_SIZE_MENU_A_PT[opt_id]))
+                except (TypeError, ValueError):
+                    menu_a_pt = _TEXT_SIZE_MENU_A_PT[opt_id]
+                self._text_size_options.append(
+                    {
+                        "id": opt_id,
+                        "label": str(
+                            item.get("label") or _TEXT_SIZE_LABELS.get(opt_id, opt_id)
+                        ),
+                        "scale": max(0.5, min(2.0, scale)),
+                        "menu_a_pt": max(8, min(28, menu_a_pt)),
+                    }
+                )
+        if len(self._text_size_options) != 3:
+            self._text_size_options = [
+                {
+                    "id": key,
+                    "label": _TEXT_SIZE_LABELS[key],
+                    "scale": _TEXT_SIZE_SCALES[key],
+                    "menu_a_pt": _TEXT_SIZE_MENU_A_PT[key],
+                }
+                for key in _TEXT_SIZE_KEYS
+            ]
+        self._text_size_scales = {
+            str(opt["id"]): float(opt["scale"]) for opt in self._text_size_options
+        }
+        stored_text = str(
+            self._load_size_settings().get("text_size")
+            or text_size_cfg.get("default")
+            or _TEXT_SIZE_DEFAULT
+        ).strip().lower()
+        if stored_text not in self._text_size_scales:
+            stored_text = _TEXT_SIZE_DEFAULT
+        self._text_size_key = stored_text
+        self._text_size_scale = float(
+            self._text_size_scales.get(stored_text, _TEXT_SIZE_SCALES[_TEXT_SIZE_DEFAULT])
+        )
 
         root = QVBoxLayout(self)
         margins = layout_config.get("margins", [20, 20, 20, 20])
@@ -741,10 +852,17 @@ class OpeningEncyclopediaDialog(QDialog):
         title_cfg = dialog_config.get("title", {})
         title = QLabel(entry.display_name)
         title.setWordWrap(True)
+        self._title_font_family = resolve_font_family(
+            title_cfg.get("font_family", "Helvetica Neue")
+        )
+        try:
+            self._title_font_base = float(title_cfg.get("font_size", 14))
+        except (TypeError, ValueError):
+            self._title_font_base = 14.0
         title.setFont(
             QFont(
-                resolve_font_family(title_cfg.get("font_family", "Helvetica Neue")),
-                int(scale_font_size(title_cfg.get("font_size", 14))),
+                self._title_font_family,
+                self._content_pt(self._title_font_base),
                 QFont.Weight.Bold,
             )
         )
@@ -774,13 +892,22 @@ class OpeningEncyclopediaDialog(QDialog):
 
         body_cfg = dialog_config.get("body", {})
         body_family = resolve_font_family(body_cfg.get("font_family", "Helvetica Neue"))
-        body_size = int(scale_font_size(body_cfg.get("font_size", 11)))
+        self._body_font_family = body_family
+        try:
+            self._body_font_base = float(body_cfg.get("font_size", 11))
+        except (TypeError, ValueError):
+            self._body_font_base = 11.0
+        body_size = self._content_pt(self._body_font_base)
         body_color = _rgb(body_cfg.get("text_color"), [200, 200, 200])
         move_cfg = dialog_config.get("move_highlight", {})
         move_color = _rgb(move_cfg.get("text_color"), [100, 150, 255])
         move_weight = str(move_cfg.get("font_weight", "600"))
         section_cfg = dialog_config.get("section_title", {})
-        section_size = int(scale_font_size(section_cfg.get("font_size", 11)))
+        try:
+            self._section_font_base = float(section_cfg.get("font_size", 11))
+        except (TypeError, ValueError):
+            self._section_font_base = 11.0
+        section_size = self._content_pt(self._section_font_base)
         section_color = _rgb(section_cfg.get("text_color"), [180, 180, 185])
         sep_cfg = dialog_config.get("section_separator", {})
         if not isinstance(sep_cfg, dict):
@@ -842,6 +969,7 @@ class OpeningEncyclopediaDialog(QDialog):
                 )
                 h.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
                 col.addWidget(h)
+                self._heading_labels.append(h)
             lab = QLabel()
             lab.setWordWrap(True)
             lab.setTextFormat(Qt.TextFormat.RichText)
@@ -859,6 +987,7 @@ class OpeningEncyclopediaDialog(QDialog):
                     move_font_weight=move_weight,
                 )
             )
+            lab._encyclopedia_emphasize = bool(emphasize)  # type: ignore[attr-defined]
             col.addWidget(lab)
             self._body_labels.append(lab)
             # Stash the body label on the block for width-specific measuring.
@@ -1183,7 +1312,7 @@ class OpeningEncyclopediaDialog(QDialog):
         if bool(feedback_cfg.get("enabled", True)):
             fb_icon_size = int(feedback_cfg.get("icon_size", icon_size))
             fb_tint = _rgb(feedback_cfg.get("icon_tint_rgb"), icon_tint)
-            fb_svg = str(feedback_cfg.get("icon_svg") or SVG_MENU_PENCIL)
+            fb_svg = str(feedback_cfg.get("icon_svg") or SVG_MENU_EXCLAMATION)
             fb_btn = QPushButton()
             fb_btn.setFixedSize(fb_icon_size + 8, fb_icon_size + 8)
             fb_btn.setIcon(themed_icon_from_svg(fb_svg, fb_tint))
@@ -1319,22 +1448,88 @@ class OpeningEncyclopediaDialog(QDialog):
             return QRect(0, 0, 1280, 800)
         return screen.availableGeometry()
 
-    def _size_for_fraction(self, fraction: float) -> QSize:
+    def _content_pt(self, base_size: float) -> int:
+        """DPI-scale a base point size, then apply the encyclopedia text-size preference."""
+        return max(
+            1,
+            int(round(scale_font_size(float(base_size)) * float(self._text_size_scale))),
+        )
+
+    def _text_size_label_for_key(self, key: str) -> str:
+        for opt in self._text_size_options:
+            if opt["id"] == key:
+                return str(opt["label"])
+        return _TEXT_SIZE_LABELS.get(key, key)
+
+    def _refresh_content_fonts(self) -> None:
+        title = getattr(self, "_title_label", None)
+        if isinstance(title, QLabel):
+            title.setFont(
+                QFont(
+                    getattr(self, "_title_font_family", title.font().family()),
+                    self._content_pt(getattr(self, "_title_font_base", 14.0)),
+                    QFont.Weight.Bold,
+                )
+            )
+        section_pt = self._content_pt(getattr(self, "_section_font_base", 11.0))
+        body_family = getattr(self, "_body_font_family", "Helvetica Neue")
+        for heading in getattr(self, "_heading_labels", []):
+            if isinstance(heading, QLabel):
+                heading.setFont(QFont(body_family, section_pt, QFont.Weight.DemiBold))
+        body_base_pt = self._content_pt(getattr(self, "_body_font_base", 11.0))
+        for lab in getattr(self, "_body_labels", []):
+            if not isinstance(lab, QLabel):
+                continue
+            emphasize = bool(getattr(lab, "_encyclopedia_emphasize", False))
+            lab.setFont(QFont(body_family, body_base_pt + (1 if emphasize else 0)))
+            # Clear fixed height so reflow remeasures.
+            lab.setMinimumHeight(0)
+            lab.setMaximumHeight(16777215)
+
+    def _set_text_size(self, key: str) -> None:
+        key = str(key or "").strip().lower()
+        if key not in self._text_size_scales:
+            return
+        if key == self._text_size_key and abs(
+            self._text_size_scale - float(self._text_size_scales[key])
+        ) < 0.001:
+            return
+        self._text_size_key = key
+        self._text_size_scale = float(self._text_size_scales[key])
+        self._refresh_content_fonts()
+        self._beside_block_count = None
+        self._sync_scroll_content_size()
+        try:
+            from app.services.user_settings_service import UserSettingsService
+
+            UserSettingsService.get_instance().update_opening_encyclopedia_dialog(
+                {"text_size": key}
+            )
+        except Exception:
+            pass
+
+    def _usable_screen_size(self) -> Tuple[int, int]:
         avail = self._available_geometry()
         margin = self._size_screen_margin
         usable_w = max(1, avail.width() - 2 * margin)
         usable_h = max(1, avail.height() - 2 * margin)
-        w = max(self._min_dialog_size.width(), int(usable_w * fraction))
-        h = max(self._min_dialog_size.height(), int(usable_h * fraction))
+        return usable_w, usable_h
+
+    def _size_for_fractions(self, width_frac: float, height_frac: float) -> QSize:
+        usable_w, usable_h = self._usable_screen_size()
+        w = max(self._min_dialog_size.width(), int(usable_w * width_frac))
+        h = max(self._min_dialog_size.height(), int(usable_h * height_frac))
         w = min(w, usable_w)
         h = min(h, usable_h)
         return QSize(w, h)
 
+    def _size_for_fraction(self, fraction: float) -> QSize:
+        return self._size_for_fractions(fraction, fraction)
+
     def _centered_geometry_for_size(self, size: QSize) -> QRect:
         avail = self._available_geometry()
         margin = self._size_screen_margin
-        usable_w = max(1, avail.width() - 2 * margin)
-        usable_h = max(1, avail.height() - 2 * margin)
+        usable_w, usable_h = self._usable_screen_size()
         w = max(self._min_dialog_size.width(), min(size.width(), usable_w))
         h = max(self._min_dialog_size.height(), min(size.height(), usable_h))
         x = avail.x() + (avail.width() - w) // 2
@@ -1344,26 +1539,56 @@ class OpeningEncyclopediaDialog(QDialog):
         y = max(avail.y() + margin, min(y, avail.bottom() - h - margin + 1))
         return QRect(x, y, w, h)
 
-    def _is_near_size(self, size: QSize, other: QSize, tol: int = 4) -> bool:
+    def _is_near_size(self, size: QSize, other: QSize, tol: int = _SIZE_AXIS_TOL_PX) -> bool:
         return abs(size.width() - other.width()) <= tol and abs(size.height() - other.height()) <= tol
+
+    def _matched_frac_for_axis(self, axis: str) -> Optional[float]:
+        """Return preset fraction if the given axis currently matches a preset size."""
+        usable_w, usable_h = self._usable_screen_size()
+        current = self.width() if axis == "w" else self.height()
+        usable = usable_w if axis == "w" else usable_h
+        minimum = (
+            self._min_dialog_size.width()
+            if axis == "w"
+            else self._min_dialog_size.height()
+        )
+        for frac in self._size_presets:
+            expected = max(minimum, int(usable * frac))
+            expected = min(expected, usable)
+            if abs(current - expected) <= _SIZE_AXIS_TOL_PX:
+                return frac
+        return None
+
+    def _current_axis_fraction(self, axis: str) -> float:
+        matched = self._matched_frac_for_axis(axis)
+        if matched is not None:
+            return matched
+        usable_w, usable_h = self._usable_screen_size()
+        if axis == "w":
+            return max(0.05, min(1.0, self.width() / float(usable_w)))
+        return max(0.05, min(1.0, self.height() / float(usable_h)))
 
     def _preset_key_for_fraction(self, fraction: float) -> str:
         for key, frac in _SIZE_PRESET_FRACTIONS.items():
             if abs(frac - fraction) < 0.001:
                 return key
-        # Map configured order to keys by index.
         for index, frac in enumerate(self._size_presets):
             if abs(frac - fraction) < 0.001 and index < len(_SIZE_PRESET_KEYS):
                 return _SIZE_PRESET_KEYS[index]
         return "60"
 
+    def _matching_equal_preset_key(self) -> Optional[str]:
+        """Return equal-preset key when both axes match the same preset fraction."""
+        w_frac = self._matched_frac_for_axis("w")
+        h_frac = self._matched_frac_for_axis("h")
+        if w_frac is None or h_frac is None:
+            return None
+        if abs(w_frac - h_frac) > 0.001:
+            return None
+        return self._preset_key_for_fraction(w_frac)
+
     def _matching_preset_key(self) -> Optional[str]:
-        current = self.size()
-        for index, frac in enumerate(self._size_presets):
-            if self._is_near_size(current, self._size_for_fraction(frac)):
-                if index < len(_SIZE_PRESET_KEYS):
-                    return _SIZE_PRESET_KEYS[index]
-        return None
+        return self._matching_equal_preset_key()
 
     def _stop_size_anim(self) -> None:
         anim = getattr(self, "_size_anim", None)
@@ -1402,19 +1627,45 @@ class OpeningEncyclopediaDialog(QDialog):
         anim.start()
         self._size_anim = anim
 
-    def _apply_size_preset(self, fraction: float, *, animate: bool = True) -> None:
+    def _apply_size_fractions(
+        self,
+        width_frac: float,
+        height_frac: float,
+        *,
+        animate: bool = True,
+    ) -> None:
         if self._search_open:
             self._close_search()
         if self.isMaximized():
             self.showNormal()
-        target = self._size_for_fraction(fraction)
+        target = self._size_for_fractions(width_frac, height_frac)
         geom = self._centered_geometry_for_size(target)
-        self._size_preset_key = self._preset_key_for_fraction(fraction)
+        if abs(width_frac - height_frac) < 0.001:
+            self._size_preset_key = self._preset_key_for_fraction(width_frac)
+        else:
+            self._size_preset_key = _SIZE_PRESET_CUSTOM
         if animate and self.isVisible():
             self._animate_to_geometry(geom)
         else:
             self.setGeometry(geom)
             self._persist_current_size()
+
+    def _apply_size_preset(self, fraction: float, *, animate: bool = True) -> None:
+        self._apply_size_fractions(fraction, fraction, animate=animate)
+
+    def _apply_width_fraction(self, width_frac: float, *, animate: bool = True) -> None:
+        self._apply_size_fractions(
+            width_frac,
+            self._current_axis_fraction("h"),
+            animate=animate,
+        )
+
+    def _apply_height_fraction(self, height_frac: float, *, animate: bool = True) -> None:
+        self._apply_size_fractions(
+            self._current_axis_fraction("w"),
+            height_frac,
+            animate=animate,
+        )
 
     def _apply_custom_size(self, width: int, height: int, *, animate: bool = False) -> None:
         if self.isMaximized():
@@ -1429,20 +1680,31 @@ class OpeningEncyclopediaDialog(QDialog):
     def _persist_current_size(self) -> None:
         if getattr(self, "_suppress_size_persist", False):
             return
-        matched = self._matching_preset_key()
+        matched = self._matching_equal_preset_key()
+        usable_w, usable_h = self._usable_screen_size()
+        width_pct = int(round((self.width() / float(usable_w)) * 100.0))
+        height_pct = int(round((self.height() / float(usable_h)) * 100.0))
+        width_pct = max(1, min(100, width_pct))
+        height_pct = max(1, min(100, height_pct))
         if matched is not None:
             self._size_preset_key = matched
             payload = {
                 "size_preset": matched,
+                "width_pct": width_pct,
+                "height_pct": height_pct,
                 "width": self.width(),
                 "height": self.height(),
+                "text_size": self._text_size_key,
             }
         else:
             self._size_preset_key = _SIZE_PRESET_CUSTOM
             payload = {
                 "size_preset": _SIZE_PRESET_CUSTOM,
+                "width_pct": width_pct,
+                "height_pct": height_pct,
                 "width": self.width(),
                 "height": self.height(),
+                "text_size": self._text_size_key,
             }
         try:
             from app.services.user_settings_service import UserSettingsService
@@ -1460,14 +1722,32 @@ class OpeningEncyclopediaDialog(QDialog):
         except Exception:
             return {}
 
+    def _pct_to_frac(self, value: Any) -> Optional[float]:
+        try:
+            pct = float(value)
+        except (TypeError, ValueError):
+            return None
+        if pct > 1.0:
+            pct = pct / 100.0
+        if 0.05 <= pct <= 1.0:
+            return pct
+        return None
+
     def _apply_persisted_or_default_size(self) -> None:
-        """Restore last size from user settings (defaults to 60% of available screen)."""
+        """Restore last size from user settings (defaults to 60% × 60%)."""
         settings = self._load_size_settings()
         preset = str(settings.get("size_preset") or "60").strip().lower()
         preset = _SIZE_PRESET_LEGACY.get(preset, preset)
         if preset in _SIZE_PRESET_FRACTIONS:
             self._apply_size_preset(_SIZE_PRESET_FRACTIONS[preset], animate=False)
             return
+
+        width_frac = self._pct_to_frac(settings.get("width_pct"))
+        height_frac = self._pct_to_frac(settings.get("height_pct"))
+        if width_frac is not None and height_frac is not None:
+            self._apply_size_fractions(width_frac, height_frac, animate=False)
+            return
+
         if preset == _SIZE_PRESET_CUSTOM:
             try:
                 width = int(settings.get("width") or 0)
@@ -1481,15 +1761,63 @@ class OpeningEncyclopediaDialog(QDialog):
         self._apply_size_preset(0.6, animate=False)
 
     def _current_size_percent_label(self) -> str:
-        """Approximate current size as % of usable screen (mean of width/height)."""
-        avail = self._available_geometry()
-        margin = self._size_screen_margin
-        usable_w = max(1, avail.width() - 2 * margin)
-        usable_h = max(1, avail.height() - 2 * margin)
-        frac_w = self.width() / float(usable_w)
-        frac_h = self.height() / float(usable_h)
-        pct = int(round(((frac_w + frac_h) / 2.0) * 100.0))
-        return f"{max(1, min(100, pct))}%"
+        """Current size as independent W% × H% of usable screen."""
+        usable_w, usable_h = self._usable_screen_size()
+        pct_w = int(round((self.width() / float(usable_w)) * 100.0))
+        pct_h = int(round((self.height() / float(usable_h)) * 100.0))
+        pct_w = max(1, min(100, pct_w))
+        pct_h = max(1, min(100, pct_h))
+        return f"{pct_w}% × {pct_h}%"
+
+    def _frac_percent_label(self, frac: Optional[float], *, axis: Optional[str] = None) -> str:
+        if frac is not None:
+            return f"{int(round(frac * 100))}%"
+        if axis in ("w", "h"):
+            usable_w, usable_h = self._usable_screen_size()
+            usable = usable_w if axis == "w" else usable_h
+            px = self.width() if axis == "w" else self.height()
+            pct = int(round((px / float(usable)) * 100.0))
+            return f"{max(1, min(100, pct))}%"
+        return ""
+
+    def _size_branch_title(self, section: str, detail: str) -> str:
+        """Build a two-column menu title (label + value) using a tab stop."""
+        detail = (detail or "").strip()
+        if not detail:
+            return section
+        return f"{section}\t{detail}"
+
+    def _populate_size_preset_submenu(
+        self,
+        submenu: QMenu,
+        *,
+        kind: str,
+        active_frac: Optional[float],
+        use_equal_labels: bool,
+    ) -> None:
+        group = QActionGroup(submenu)
+        group.setExclusive(True)
+        for index, frac in enumerate(self._size_presets):
+            if use_equal_labels:
+                label = (
+                    self._size_equal_labels[index]
+                    if index < len(self._size_equal_labels)
+                    else f"{int(round(frac * 100))}% × {int(round(frac * 100))}%"
+                )
+            else:
+                label = (
+                    self._size_preset_labels[index]
+                    if index < len(self._size_preset_labels)
+                    else f"{int(round(frac * 100))}%"
+                )
+            action = QAction(label, submenu)
+            action.setCheckable(True)
+            action.setChecked(
+                active_frac is not None and abs(active_frac - frac) < 0.001
+            )
+            action.setData((kind, frac))
+            group.addAction(action)
+            submenu.addAction(action)
 
     def _show_size_menu(self) -> None:
         if self._search_open:
@@ -1500,48 +1828,182 @@ class OpeningEncyclopediaDialog(QDialog):
 
         menu = QMenu(self)
         apply_menu_styling(menu, self.config)
-        group = QActionGroup(menu)
-        group.setExclusive(True)
-        matched = self._matching_preset_key()
-        active = matched or (
-            self._size_preset_key if self._size_preset_key in _SIZE_PRESET_KEYS else None
+        icon_tint = menu_icon_dark_tint_rgb(self.config)
+        size_cfg = (
+            (self._dialog_config.get("size_toggle") or {})
+            if isinstance(self._dialog_config, dict)
+            else {}
+        )
+        if not isinstance(size_cfg, dict):
+            size_cfg = {}
+
+        def _branch_icon(config_key: str, default_svg: str) -> Any:
+            svg = str(size_cfg.get(config_key) or default_svg)
+            return themed_icon_from_svg(svg, icon_tint)
+
+        equal_key = self._matching_equal_preset_key()
+        width_frac = self._matched_frac_for_axis("w")
+        height_frac = self._matched_frac_for_axis("h")
+        equal_frac = (
+            _SIZE_PRESET_FRACTIONS.get(equal_key) if equal_key is not None else None
+        )
+        if equal_frac is None and equal_key is not None:
+            try:
+                equal_frac = float(equal_key) / 100.0
+            except (TypeError, ValueError):
+                equal_frac = None
+
+        equal_menu = menu.addMenu(
+            self._size_branch_title(
+                self._size_section_equal,
+                self._frac_percent_label(equal_frac)
+                if equal_frac is not None
+                else "—",
+            )
+        )
+        equal_menu.menuAction().setIcon(
+            _branch_icon("icon_equal_svg", SVG_MENU_SIZE_EQUAL)
+        )
+        apply_menu_styling(equal_menu, self.config)
+        self._populate_size_preset_submenu(
+            equal_menu,
+            kind="equal",
+            active_frac=equal_frac,
+            use_equal_labels=True,
         )
 
-        for index, frac in enumerate(self._size_presets):
-            key = _SIZE_PRESET_KEYS[index] if index < len(_SIZE_PRESET_KEYS) else str(int(frac * 100))
-            label = (
-                self._size_preset_labels[index]
-                if index < len(self._size_preset_labels)
-                else f"{int(round(frac * 100))}%"
+        width_menu = menu.addMenu(
+            self._size_branch_title(
+                self._size_section_width,
+                self._frac_percent_label(width_frac, axis="w"),
             )
-            action = QAction(label, menu)
-            action.setCheckable(True)
-            action.setChecked(active == key)
-            action.setData(frac)
-            group.addAction(action)
-            menu.addAction(action)
+        )
+        width_menu.menuAction().setIcon(
+            _branch_icon("icon_width_svg", SVG_MENU_SIZE_WIDTH)
+        )
+        apply_menu_styling(width_menu, self.config)
+        self._populate_size_preset_submenu(
+            width_menu,
+            kind="width",
+            active_frac=width_frac,
+            use_equal_labels=False,
+        )
 
-        # Free-resized size on its own row below a separator.
-        if matched is None:
+        height_menu = menu.addMenu(
+            self._size_branch_title(
+                self._size_section_height,
+                self._frac_percent_label(height_frac, axis="h"),
+            )
+        )
+        height_menu.menuAction().setIcon(
+            _branch_icon("icon_height_svg", SVG_MENU_SIZE_HEIGHT)
+        )
+        apply_menu_styling(height_menu, self.config)
+        self._populate_size_preset_submenu(
+            height_menu,
+            kind="height",
+            active_frac=height_frac,
+            use_equal_labels=False,
+        )
+
+        menu.addSeparator()
+        text_menu = menu.addMenu(
+            self._size_branch_title(
+                self._text_size_section,
+                self._text_size_label_for_key(self._text_size_key),
+            )
+        )
+        text_size_cfg = size_cfg.get("text_size", {})
+        text_icon_svg = SVG_MENU_TEXT_SIZE
+        if isinstance(text_size_cfg, dict):
+            text_icon_svg = str(text_size_cfg.get("icon_svg") or SVG_MENU_TEXT_SIZE)
+        text_menu.menuAction().setIcon(themed_icon_from_svg(text_icon_svg, icon_tint))
+        apply_menu_styling(text_menu, self.config)
+        self._menu_text_size_pick: Optional[str] = None
+        for opt in self._text_size_options:
+            opt_id = str(opt["id"])
+            checked = opt_id == self._text_size_key
+            row = _ClickableMenuRow(text_menu)
+            row.setCursor(Qt.CursorShape.PointingHandCursor)
+            row.setStyleSheet("background: transparent;")
+            row_lay = QHBoxLayout(row)
+            row_lay.setContentsMargins(10, 4, 14, 4)
+            row_lay.setSpacing(10)
+            mark = QLabel("✓" if checked else "")
+            mark.setFixedWidth(14)
+            mark.setStyleSheet("background: transparent;")
+            mark.setAlignment(
+                Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+            )
+            a_label = QLabel("A")
+            a_label.setStyleSheet("background: transparent;")
+            a_label.setFont(
+                QFont(
+                    resolve_font_family("Helvetica Neue"),
+                    int(opt["menu_a_pt"]),
+                    QFont.Weight.DemiBold,
+                )
+            )
+            a_label.setFixedWidth(28)
+            a_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            name = QLabel(str(opt["label"]))
+            name.setStyleSheet("background: transparent;")
+            name.setAlignment(
+                Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+            )
+            row_lay.addWidget(mark)
+            row_lay.addWidget(a_label)
+            row_lay.addWidget(name)
+            row_lay.addStretch(1)
+            action = QWidgetAction(text_menu)
+            action.setDefaultWidget(row)
+            action.setData(("text_size", opt_id))
+            text_menu.addAction(action)
+
+            def _pick(oid: str = opt_id, top_menu: QMenu = menu) -> None:
+                self._menu_text_size_pick = oid
+                top_menu.close()
+
+            row.clicked.connect(_pick)
+
+        if equal_key is None:
             menu.addSeparator()
-            custom = QAction(self._current_size_percent_label(), menu)
+            custom = QAction(
+                self._size_branch_title("Custom", self._current_size_percent_label()),
+                menu,
+            )
             custom.setCheckable(True)
             custom.setChecked(True)
-            custom.setData(_SIZE_PRESET_CUSTOM)
-            group.addAction(custom)
+            custom.setData((_SIZE_PRESET_CUSTOM, None))
             menu.addAction(custom)
 
         chosen = menu.exec(btn.mapToGlobal(btn.rect().bottomLeft()))
+        text_pick = getattr(self, "_menu_text_size_pick", None)
+        self._menu_text_size_pick = None
+        if text_pick:
+            self._set_text_size(str(text_pick))
+            return
         if chosen is None:
             return
         data = chosen.data()
-        if data == _SIZE_PRESET_CUSTOM:
+        if not isinstance(data, (tuple, list)) or len(data) < 2:
+            return
+        kind, value = data[0], data[1]
+        if kind == _SIZE_PRESET_CUSTOM:
+            return
+        if kind == "text_size":
+            self._set_text_size(str(value))
             return
         try:
-            fraction = float(data)
+            fraction = float(value)
         except (TypeError, ValueError):
             return
-        self._apply_size_preset(fraction, animate=True)
+        if kind == "equal":
+            self._apply_size_preset(fraction, animate=True)
+        elif kind == "width":
+            self._apply_width_fraction(fraction, animate=True)
+        elif kind == "height":
+            self._apply_height_fraction(fraction, animate=True)
 
     def _open_feedback_dialog(self) -> None:
         if self._search_open:

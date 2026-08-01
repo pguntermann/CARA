@@ -983,8 +983,11 @@
   },
   "opening_encyclopedia_dialog": {
     "size_preset": "60",
+    "width_pct": 60,
+    "height_pct": 60,
     "width": 0,
-    "height": 0
+    "height": 0,
+    "text_size": "medium"
   },
   "player_stats_section_visibility": {
     "overview": true,

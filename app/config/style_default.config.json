@@ -5148,12 +5148,29 @@
           "tooltip": "Window size",
           "presets": [0.45, 0.6, 0.8],
           "preset_labels": ["45%", "60%", "80%"],
+          "equal_labels": ["45% × 45%", "60% × 60%", "80% × 80%"],
+          "section_equal": "Equal",
+          "section_width": "Width",
+          "section_height": "Height",
+          "icon_equal_svg": "app/resources/icons/menu_size_equal.svg",
+          "icon_width_svg": "app/resources/icons/menu_size_width.svg",
+          "icon_height_svg": "app/resources/icons/menu_size_height.svg",
+          "text_size": {
+            "section": "Text size",
+            "icon_svg": "app/resources/icons/menu_text_size.svg",
+            "default": "medium",
+            "options": [
+              {"id": "small", "label": "Small", "scale": 0.9, "menu_a_pt": 11},
+              {"id": "medium", "label": "Medium", "scale": 1.0, "menu_a_pt": 14},
+              {"id": "large", "label": "Large", "scale": 1.18, "menu_a_pt": 18}
+            ]
+          },
           "screen_margin": 8
         },
         "feedback": {
           "enabled": true,
           "icon_size": 18,
-          "icon_svg": "app/resources/icons/pencil.svg",
+          "icon_svg": "app/resources/icons/menu_exclamation.svg",
           "icon_tint_rgb": [160, 160, 165],
           "tooltip": "Report feedback"
         },
