@@ -1,5 +1,18 @@
 # Release Notes
 
+# CARA v2.8.0 - Opening Encyclopedia
+
+**Release Date:** 01.08.2026
+
+This release focuses solely on the new **Opening Encyclopedia** feature, which adds encyclopedic entries for many openings and variations.
+
+- **Integration:** When an encyclopedic entry is available, a small ⓘ symbol appears next to the opening name in the Game Information header and on opening entries in the Opening Explorer. Click it to open the article in a dedicated dialog.
+- **Structure:** Each entry includes a short introduction, **Key ideas**, **Name origin**, and **History**, plus up to two illustrative images with captions and credits where available. Only Public Domain and CC0 licensed images are used. The entries contain links to the original image sources.
+- **Granularity:** The database is a work-in-progress but already contains 1.000 dedicated entries, some going very deep into specific variation branches. If CARA cannot match a variation exactly, it tries to fall back to the next closest available entry for this variation branch.
+- **Search:** From the dialog header, look up openings by name or ECO code. Common abbreviations such as **KID** (King's Indian Defense) are recognized, so you can type **KID b3** instead of **King's Indian Defense: b3** 
+
+---
+
 # CARA v2.7.9 - Variation Navigation, Board Animations, and Player Stats PDF Report
 
 **Release Date:** 25.07.2026
