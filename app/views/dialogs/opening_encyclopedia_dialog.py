@@ -19,6 +19,8 @@ from PyQt6.QtCore import (
     pyqtSignal,
 )
 from PyQt6.QtGui import (
+    QAction,
+    QActionGroup,
     QColor,
     QFont,
     QKeyEvent,
@@ -40,6 +42,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -56,7 +59,6 @@ from app.utils.external_open import open_url
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.themed_icon import (
     SVG_MENU_MAXIMIZE,
-    SVG_MENU_RESTORE,
     SVG_MENU_SEARCH,
     themed_icon_from_svg,
 )
@@ -65,6 +67,14 @@ from app.views.delegates.encyclopedia_search_result_delegate import (
     EncyclopediaSearchResultDelegate,
 )
 from app.views.style import StyleManager
+from app.views.style.menu_bar import apply_menu_styling
+
+# Window-size presets as percent-of-available-screen keys stored in user settings.
+_SIZE_PRESET_KEYS = ("45", "60", "80")
+_SIZE_PRESET_FRACTIONS = {"45": 0.45, "60": 0.60, "80": 0.80}
+# Older keys from previous schemes map to the nearest current preset.
+_SIZE_PRESET_LEGACY = {"25": "45", "40": "45", "50": "60", "75": "80"}
+_SIZE_PRESET_CUSTOM = "custom"
 
 # SAN-aware matcher for encyclopedia prose (aligned with notes formatter ideas).
 _FILE = r"[a-h]"
@@ -628,23 +638,38 @@ class OpeningEncyclopediaDialog(QDialog):
 
         min_w = int(dialog_config.get("minimum_width", 520))
         min_h = int(dialog_config.get("minimum_height", 360))
-        max_w = int(dialog_config.get("max_width", 800))
-        max_h = int(dialog_config.get("max_height", 640))
-        # Keep resize enabled, but clamp the allowed range.
+        # Free resize with a layout-safe lower bound only (no artificial max).
         self._min_dialog_size = QSize(min_w, min_h)
-        self._max_dialog_size = QSize(max(max_w, min_w), max(max_h, min_h))
         self.setMinimumSize(self._min_dialog_size)
-        self.setMaximumSize(self._max_dialog_size)
-        default_w = int(dialog_config.get("width", 640))
-        default_h = int(dialog_config.get("height", 440))
-        self._default_dialog_size = QSize(
-            max(min_w, min(default_w, max_w)),
-            max(min_h, min(default_h, max_h)),
-        )
-        self._remembered_normal_size = QSize(self._default_dialog_size)
+
+        size_cfg = dialog_config.get("size_toggle", {})
+        if not isinstance(size_cfg, dict):
+            size_cfg = {}
+        raw_presets = size_cfg.get("presets", [0.45, 0.6, 0.8])
+        self._size_presets: List[float] = []
+        if isinstance(raw_presets, (list, tuple)):
+            for value in raw_presets:
+                try:
+                    frac = float(value)
+                except (TypeError, ValueError):
+                    continue
+                if 0.05 <= frac <= 1.0:
+                    self._size_presets.append(frac)
+        if len(self._size_presets) != 3:
+            self._size_presets = [0.45, 0.6, 0.8]
+        labels = size_cfg.get("preset_labels", ["45%", "60%", "80%"])
+        if not isinstance(labels, (list, tuple)) or len(labels) < 3:
+            labels = ["45%", "60%", "80%"]
+        self._size_preset_labels = [str(labels[0]), str(labels[1]), str(labels[2])]
+        self._size_screen_margin = max(0, int(size_cfg.get("screen_margin", 8)))
+        self._size_preset_key = "60"
         self._size_anim: Optional[QPropertyAnimation] = None
-        self._suppress_normal_size_learn = False
-        self.resize(self._default_dialog_size)
+        self._suppress_size_persist = False
+        self._size_applied_on_show = False
+        self._size_persist_timer = QTimer(self)
+        self._size_persist_timer.setSingleShot(True)
+        self._size_persist_timer.setInterval(200)
+        self._size_persist_timer.timeout.connect(self._persist_current_size)
 
         root = QVBoxLayout(self)
         margins = layout_config.get("margins", [20, 20, 20, 20])
@@ -1114,23 +1139,20 @@ class OpeningEncyclopediaDialog(QDialog):
             size_cfg = {}
         size_icon_size = int(size_cfg.get("icon_size", icon_size))
         size_tint = _rgb(size_cfg.get("icon_tint_rgb"), icon_tint)
-        self._size_icon_tint = size_tint
-        self._size_icon_px = size_icon_size
-        self._maximize_icon_svg = str(size_cfg.get("maximize_icon_svg") or SVG_MENU_MAXIMIZE)
-        self._restore_icon_svg = str(size_cfg.get("restore_icon_svg") or SVG_MENU_RESTORE)
-        self._size_tooltip_maximize = str(size_cfg.get("tooltip_maximize", "Maximize"))
-        self._size_tooltip_restore = str(size_cfg.get("tooltip_restore", "Restore"))
+        size_icon_svg = str(size_cfg.get("icon_svg") or SVG_MENU_MAXIMIZE)
+        size_tooltip = str(size_cfg.get("tooltip", "Window size"))
 
         size_btn = QPushButton()
         size_btn.setFixedSize(size_icon_size + 8, size_icon_size + 8)
+        size_btn.setIcon(themed_icon_from_svg(size_icon_svg, size_tint))
         size_btn.setIconSize(QSize(size_icon_size, size_icon_size))
         size_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         size_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        size_btn.setToolTip(size_tooltip)
         size_btn.setStyleSheet("QPushButton { background: transparent; border: none; }")
-        size_btn.clicked.connect(self._toggle_dialog_size)
+        size_btn.clicked.connect(self._show_size_menu)
         self._size_toggle_btn = size_btn
         lay.addWidget(size_btn)
-        self._update_size_toggle_icon()
 
         input_h = int(search_cfg.get("input_height", 28))
         input_bg = _rgb(search_cfg.get("input_background"), [50, 50, 56])
@@ -1241,140 +1263,241 @@ class OpeningEncyclopediaDialog(QDialog):
         self._search_anim: Optional[QPropertyAnimation] = None
         return container
 
-    def _dialog_is_expanded(self) -> bool:
-        """True when native-maximized or already at the configured max size."""
-        return self.isMaximized() or self._is_at_max_dialog_size()
+    def _available_geometry(self) -> QRect:
+        """Work area of the screen this dialog is on (excludes taskbar/dock)."""
+        screen = self.screen()
+        if screen is None:
+            center = self.frameGeometry().center()
+            screen = QApplication.screenAt(center)
+        if screen is None:
+            screen = QApplication.primaryScreen()
+        if screen is None:
+            return QRect(0, 0, 1280, 800)
+        return screen.availableGeometry()
 
-    def _update_size_toggle_icon(self) -> None:
-        btn = getattr(self, "_size_toggle_btn", None)
-        if btn is None:
-            return
-        if self._dialog_is_expanded():
-            btn.setIcon(themed_icon_from_svg(self._restore_icon_svg, self._size_icon_tint))
-            btn.setToolTip(self._size_tooltip_restore)
-        else:
-            btn.setIcon(themed_icon_from_svg(self._maximize_icon_svg, self._size_icon_tint))
-            btn.setToolTip(self._size_tooltip_maximize)
+    def _size_for_fraction(self, fraction: float) -> QSize:
+        avail = self._available_geometry()
+        margin = self._size_screen_margin
+        usable_w = max(1, avail.width() - 2 * margin)
+        usable_h = max(1, avail.height() - 2 * margin)
+        w = max(self._min_dialog_size.width(), int(usable_w * fraction))
+        h = max(self._min_dialog_size.height(), int(usable_h * fraction))
+        w = min(w, usable_w)
+        h = min(h, usable_h)
+        return QSize(w, h)
 
-    def _is_at_max_dialog_size(self) -> bool:
-        return (
-            self.width() >= self._max_dialog_size.width() - 2
-            and self.height() >= self._max_dialog_size.height() - 2
-        )
+    def _centered_geometry_for_size(self, size: QSize) -> QRect:
+        avail = self._available_geometry()
+        margin = self._size_screen_margin
+        usable_w = max(1, avail.width() - 2 * margin)
+        usable_h = max(1, avail.height() - 2 * margin)
+        w = max(self._min_dialog_size.width(), min(size.width(), usable_w))
+        h = max(self._min_dialog_size.height(), min(size.height(), usable_h))
+        x = avail.x() + (avail.width() - w) // 2
+        y = avail.y() + (avail.height() - h) // 2
+        # Keep fully inside the available rect.
+        x = max(avail.x() + margin, min(x, avail.right() - w - margin + 1))
+        y = max(avail.y() + margin, min(y, avail.bottom() - h - margin + 1))
+        return QRect(x, y, w, h)
 
-    def _is_near_size(self, size: QSize, other: QSize, tol: int = 2) -> bool:
+    def _is_near_size(self, size: QSize, other: QSize, tol: int = 4) -> bool:
         return abs(size.width() - other.width()) <= tol and abs(size.height() - other.height()) <= tol
+
+    def _preset_key_for_fraction(self, fraction: float) -> str:
+        for key, frac in _SIZE_PRESET_FRACTIONS.items():
+            if abs(frac - fraction) < 0.001:
+                return key
+        # Map configured order to keys by index.
+        for index, frac in enumerate(self._size_presets):
+            if abs(frac - fraction) < 0.001 and index < len(_SIZE_PRESET_KEYS):
+                return _SIZE_PRESET_KEYS[index]
+        return "60"
+
+    def _matching_preset_key(self) -> Optional[str]:
+        current = self.size()
+        for index, frac in enumerate(self._size_presets):
+            if self._is_near_size(current, self._size_for_fraction(frac)):
+                if index < len(_SIZE_PRESET_KEYS):
+                    return _SIZE_PRESET_KEYS[index]
+        return None
 
     def _stop_size_anim(self) -> None:
         anim = getattr(self, "_size_anim", None)
         if anim is not None:
-            # Avoid resizeEvent treating in-between frames as the new "normal" size.
-            self._suppress_normal_size_learn = True
+            self._suppress_size_persist = True
             try:
                 anim.stop()
             finally:
                 self._size_anim = None
-                self._suppress_normal_size_learn = False
+                self._suppress_size_persist = False
 
-    def _on_size_anim_finished(self) -> None:
-        self._size_anim = None
-        self._suppress_normal_size_learn = False
-        self._update_size_toggle_icon()
-
-    def _remember_normal_size(self) -> None:
-        """Store the current size as the restore target when leaving normal state."""
-        if self.isMaximized() or self._is_at_max_dialog_size():
-            return
-        self._remembered_normal_size = QSize(self.size())
-
-    def _restore_size_target(self) -> QSize:
-        """Best normal size after a max/zoom."""
-        remembered = getattr(self, "_remembered_normal_size", None)
-        if isinstance(remembered, QSize) and remembered.isValid():
-            if not self._is_near_size(remembered, self._max_dialog_size):
-                return QSize(
-                    max(self._min_dialog_size.width(), min(remembered.width(), self._max_dialog_size.width())),
-                    max(self._min_dialog_size.height(), min(remembered.height(), self._max_dialog_size.height())),
-                )
-
-        normal = self.normalGeometry()
-        if normal.isValid() and normal.width() > 0 and normal.height() > 0:
-            size = normal.size()
-            if not self._is_near_size(size, self._max_dialog_size):
-                return QSize(
-                    max(self._min_dialog_size.width(), min(size.width(), self._max_dialog_size.width())),
-                    max(self._min_dialog_size.height(), min(size.height(), self._max_dialog_size.height())),
-                )
-        return QSize(self._default_dialog_size)
-
-    def _animate_dialog_size(self, target: QSize) -> None:
-        """Animate to ``target`` size while keeping the top-right corner stable."""
-        if self._is_near_size(self.size(), target):
-            self._update_size_toggle_icon()
+    def _animate_to_geometry(self, end: QRect) -> None:
+        if (
+            abs(self.geometry().width() - end.width()) <= 2
+            and abs(self.geometry().height() - end.height()) <= 2
+            and abs(self.geometry().x() - end.x()) <= 2
+            and abs(self.geometry().y() - end.y()) <= 2
+        ):
+            self.setGeometry(end)
             return
         self._stop_size_anim()
         start = self.geometry()
-        end = QRect(start)
-        end.setSize(target)
-        # Keep the top-right area stable so header tools don't jump sideways.
-        end.moveTopRight(start.topRight())
-        # Clamp into the available screen if needed.
-        screen = self.screen()
-        if screen is not None:
-            avail = screen.availableGeometry()
-            if end.left() < avail.left():
-                end.moveLeft(avail.left())
-            if end.top() < avail.top():
-                end.moveTop(avail.top())
-            if end.right() > avail.right():
-                end.moveRight(avail.right())
-            if end.bottom() > avail.bottom():
-                end.moveBottom(avail.bottom())
         anim = QPropertyAnimation(self, b"geometry", self)
         anim.setDuration(220)
         anim.setStartValue(start)
         anim.setEndValue(end)
         anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
-        # Block resizeEvent from learning intermediate sizes as the restore target.
-        self._suppress_normal_size_learn = True
-        anim.finished.connect(self._on_size_anim_finished)
-        anim.valueChanged.connect(lambda _v: self._update_size_toggle_icon())
+        self._suppress_size_persist = True
+
+        def _finished() -> None:
+            self._size_anim = None
+            self._suppress_size_persist = False
+            self._persist_current_size()
+
+        anim.finished.connect(_finished)
         anim.start()
         self._size_anim = anim
 
-    def _finish_restore_after_show_normal(self, target: QSize) -> None:
-        """Complete restore when showNormal leaves the window at max size."""
-        if self.isMaximized():
-            self.showNormal()
-        if self._is_at_max_dialog_size() or not self._is_near_size(self.size(), target):
-            self._animate_dialog_size(target)
-        else:
-            self._update_size_toggle_icon()
-
-    def _toggle_dialog_size(self) -> None:
-        """Toggle expanded/normal size; one click always fully restores."""
+    def _apply_size_preset(self, fraction: float, *, animate: bool = True) -> None:
         if self._search_open:
             self._close_search()
-        self._stop_size_anim()
-
-        if self._dialog_is_expanded():
-            target = self._restore_size_target()
-            if self.isMaximized():
-                # Native maximize layered on dialog expand often restores only the
-                # maximized *flag*, leaving the window at max size. Finish in one click.
-                self.showNormal()
-                QTimer.singleShot(0, lambda: self._finish_restore_after_show_normal(target))
-                return
-            self._animate_dialog_size(target)
-            return
-
-        # Expand to the configured max size (not OS maximize).
-        # On Windows, showMaximized() with maximumSize < screen parks the dialog
-        # in the top-left corner while still reporting the clamped max size.
-        self._remember_normal_size()
         if self.isMaximized():
             self.showNormal()
-        self._animate_dialog_size(QSize(self._max_dialog_size))
+        target = self._size_for_fraction(fraction)
+        geom = self._centered_geometry_for_size(target)
+        self._size_preset_key = self._preset_key_for_fraction(fraction)
+        if animate and self.isVisible():
+            self._animate_to_geometry(geom)
+        else:
+            self.setGeometry(geom)
+            self._persist_current_size()
+
+    def _apply_custom_size(self, width: int, height: int, *, animate: bool = False) -> None:
+        if self.isMaximized():
+            self.showNormal()
+        geom = self._centered_geometry_for_size(QSize(int(width), int(height)))
+        self._size_preset_key = _SIZE_PRESET_CUSTOM
+        if animate and self.isVisible():
+            self._animate_to_geometry(geom)
+        else:
+            self.setGeometry(geom)
+
+    def _persist_current_size(self) -> None:
+        if getattr(self, "_suppress_size_persist", False):
+            return
+        matched = self._matching_preset_key()
+        if matched is not None:
+            self._size_preset_key = matched
+            payload = {
+                "size_preset": matched,
+                "width": self.width(),
+                "height": self.height(),
+            }
+        else:
+            self._size_preset_key = _SIZE_PRESET_CUSTOM
+            payload = {
+                "size_preset": _SIZE_PRESET_CUSTOM,
+                "width": self.width(),
+                "height": self.height(),
+            }
+        try:
+            from app.services.user_settings_service import UserSettingsService
+
+            UserSettingsService.get_instance().update_opening_encyclopedia_dialog(payload)
+        except Exception:
+            pass
+
+    def _load_size_settings(self) -> Dict[str, Any]:
+        try:
+            from app.services.user_settings_service import UserSettingsService
+
+            data = UserSettingsService.get_instance().get_opening_encyclopedia_dialog()
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def _apply_persisted_or_default_size(self) -> None:
+        """Restore last size from user settings (defaults to 60% of available screen)."""
+        settings = self._load_size_settings()
+        preset = str(settings.get("size_preset") or "60").strip().lower()
+        preset = _SIZE_PRESET_LEGACY.get(preset, preset)
+        if preset in _SIZE_PRESET_FRACTIONS:
+            self._apply_size_preset(_SIZE_PRESET_FRACTIONS[preset], animate=False)
+            return
+        if preset == _SIZE_PRESET_CUSTOM:
+            try:
+                width = int(settings.get("width") or 0)
+                height = int(settings.get("height") or 0)
+            except (TypeError, ValueError):
+                width, height = 0, 0
+            if width >= self._min_dialog_size.width() and height >= self._min_dialog_size.height():
+                self._apply_custom_size(width, height, animate=False)
+                self._persist_current_size()
+                return
+        self._apply_size_preset(0.6, animate=False)
+
+    def _current_size_percent_label(self) -> str:
+        """Approximate current size as % of usable screen (mean of width/height)."""
+        avail = self._available_geometry()
+        margin = self._size_screen_margin
+        usable_w = max(1, avail.width() - 2 * margin)
+        usable_h = max(1, avail.height() - 2 * margin)
+        frac_w = self.width() / float(usable_w)
+        frac_h = self.height() / float(usable_h)
+        pct = int(round(((frac_w + frac_h) / 2.0) * 100.0))
+        return f"{max(1, min(100, pct))}%"
+
+    def _show_size_menu(self) -> None:
+        if self._search_open:
+            self._close_search()
+        btn = getattr(self, "_size_toggle_btn", None)
+        if btn is None:
+            return
+
+        menu = QMenu(self)
+        apply_menu_styling(menu, self.config)
+        group = QActionGroup(menu)
+        group.setExclusive(True)
+        matched = self._matching_preset_key()
+        active = matched or (
+            self._size_preset_key if self._size_preset_key in _SIZE_PRESET_KEYS else None
+        )
+
+        for index, frac in enumerate(self._size_presets):
+            key = _SIZE_PRESET_KEYS[index] if index < len(_SIZE_PRESET_KEYS) else str(int(frac * 100))
+            label = (
+                self._size_preset_labels[index]
+                if index < len(self._size_preset_labels)
+                else f"{int(round(frac * 100))}%"
+            )
+            action = QAction(label, menu)
+            action.setCheckable(True)
+            action.setChecked(active == key)
+            action.setData(frac)
+            group.addAction(action)
+            menu.addAction(action)
+
+        # Free-resized size on its own row below a separator.
+        if matched is None:
+            menu.addSeparator()
+            custom = QAction(self._current_size_percent_label(), menu)
+            custom.setCheckable(True)
+            custom.setChecked(True)
+            custom.setData(_SIZE_PRESET_CUSTOM)
+            group.addAction(custom)
+            menu.addAction(custom)
+
+        chosen = menu.exec(btn.mapToGlobal(btn.rect().bottomLeft()))
+        if chosen is None:
+            return
+        data = chosen.data()
+        if data == _SIZE_PRESET_CUSTOM:
+            return
+        try:
+            fraction = float(data)
+        except (TypeError, ValueError):
+            return
+        self._apply_size_preset(fraction, animate=True)
 
     def _is_search_ui_global_pos(self, global_pos) -> bool:
         """True if ``global_pos`` hits the search chrome (button/input/results/tools)."""
@@ -1923,16 +2046,15 @@ class OpeningEncyclopediaDialog(QDialog):
         if old.isValid() and event.size() != old and self._search_open:
             self._close_search()
 
-        # Learn normal size only while truly non-expanded (avoid animation frames).
+        # Free user resize → remember as custom (debounced); skip animation frames.
         if (
             old.isValid()
             and event.size() != old
-            and not self._dialog_is_expanded()
-            and not getattr(self, "_suppress_normal_size_learn", False)
+            and not getattr(self, "_suppress_size_persist", False)
+            and self._size_applied_on_show
         ):
-            self._remembered_normal_size = QSize(event.size())
+            self._size_persist_timer.start()
 
-        self._update_size_toggle_icon()
         if self._search_open:
             self._sync_title_fade()
 
@@ -1944,11 +2066,6 @@ class OpeningEncyclopediaDialog(QDialog):
             if vw > 0 and self._content_host.width() != vw:
                 self._content_host.setFixedWidth(vw)
         self._resize_sync_timer.start()
-
-    def changeEvent(self, event: QEvent) -> None:  # noqa: N802
-        super().changeEvent(event)
-        if event.type() == QEvent.Type.WindowStateChange:
-            self._update_size_toggle_icon()
 
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
         if event.key() == Qt.Key.Key_Escape:
@@ -1962,27 +2079,11 @@ class OpeningEncyclopediaDialog(QDialog):
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
-        cfg = self._dialog_config
-        min_w = self.minimumWidth()
-        min_h = self.minimumHeight()
-        max_w = self.maximumWidth()
-        max_h = self.maximumHeight()
-        target_w = int(cfg.get("width", 640))
-        target_h = int(cfg.get("height", 440))
-        # Dual portraits need a bit more height room within the max.
-        if len(self._entry.images) >= 2:
-            target_h = max(target_h, int(cfg.get("height_with_dual_images", 520)))
-        target = QSize(
-            max(min_w, min(target_w, max_w)),
-            max(min_h, min(target_h, max_h)),
-        )
-        self._default_dialog_size = QSize(target)
-        if not self.isMaximized():
-            self._remembered_normal_size = QSize(target)
-            self.resize(target)
+        if not self._size_applied_on_show:
+            self._apply_persisted_or_default_size()
+            self._size_applied_on_show = True
         self._beside_block_count = None  # force initial placement
         self._sync_scroll_content_size()
-        self._update_size_toggle_icon()
 
     @staticmethod
     def show_entry(

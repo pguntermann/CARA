@@ -592,6 +592,14 @@ class UserSettingsService:
         """
         return self.get_model().get_settings()
 
+    def get_opening_encyclopedia_dialog(self) -> Dict[str, Any]:
+        """Get Opening Encyclopedia dialog window-size preferences."""
+        return self.get_model().get_opening_encyclopedia_dialog()
+
+    def update_opening_encyclopedia_dialog(self, partial: Dict[str, Any]) -> None:
+        """Merge Opening Encyclopedia dialog preferences in memory (saved on exit)."""
+        self.get_model().update_opening_encyclopedia_dialog(partial)
+
     def bind_board_model(self, board_model: Any) -> None:
         """Keep in-memory board visibility settings synchronized with the live board model."""
         if board_model is self._bound_board_model or board_model is None:

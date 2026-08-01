@@ -437,6 +437,21 @@ class UserSettingsModel(QObject):
         cur.update(partial)
         self.set_player_stats_accuracy_distribution(cur)
 
+    def get_opening_encyclopedia_dialog(self) -> Dict[str, Any]:
+        """Get Opening Encyclopedia dialog window-size preferences."""
+        return self._settings.get("opening_encyclopedia_dialog", {}).copy()
+
+    def set_opening_encyclopedia_dialog(self, settings: Dict[str, Any]) -> None:
+        """Replace Opening Encyclopedia dialog preferences."""
+        self._settings["opening_encyclopedia_dialog"] = settings.copy()
+        self.settings_changed.emit()
+
+    def update_opening_encyclopedia_dialog(self, partial: Dict[str, Any]) -> None:
+        """Merge keys into Opening Encyclopedia dialog preferences."""
+        cur = self.get_opening_encyclopedia_dialog()
+        cur.update(partial)
+        self.set_opening_encyclopedia_dialog(cur)
+
     def update_from_dict(self, settings: Dict[str, Any]) -> None:
         """Update settings from a dictionary (used when loading from file).
         

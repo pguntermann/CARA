@@ -981,6 +981,11 @@
       "default_style_config": "app/config/style_default.config.json"
     }
   },
+  "opening_encyclopedia_dialog": {
+    "size_preset": "60",
+    "width": 0,
+    "height": 0
+  },
   "player_stats_section_visibility": {
     "overview": true,
     "activity_heatmap": true,
