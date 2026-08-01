@@ -114,7 +114,11 @@
                                 <li><a href="#moves-list">4.5.1 Moves List</a></li>
                                 <li><a href="#metadata">4.5.2 PGN header tags</a></li>
                                 <li><a href="#manual-analysis">4.5.3 Manual Analysis</a></li>
-                                <li><a href="#opening-explorer">4.5.4 Opening Explorer</a></li>
+                                <li><a href="#opening-explorer">4.5.4 Opening Explorer</a>
+                                    <ul>
+                                        <li><a href="#opening-encyclopedia">4.5.4.1 Opening Encyclopedia</a></li>
+                                    </ul>
+                                </li>
                                 <li><a href="#game-summary">4.5.5 Game Summary</a></li>
                                 <li><a href="#player-stats">4.5.6 Player Stats</a></li>
                                 <li><a href="#annotations">4.5.7 Annotations</a></li>
@@ -300,7 +304,7 @@
                     
                     <li><strong>Manual Analysis:</strong> Perform continuous engine analysis on any position with MultiPV support. You can navigate through game positions while maintaining continuous analysis of the current position. Hovering over principal variation moves displays a beautiful optional miniature board showing the resulting position. You can freeze the displayed PV lines while the engine keeps searching, and—when the assigned engine reports UCI W/D/L—optionally show a win/draw/loss probability bar for the best line. Positional plan exploration extracts piece trajectories from PV lines, visualizing how pieces move through the engine's recommended plan on the chessboard. You can explore positional plans for up to three PV lines (PV1, PV2, PV3) independently, with configurable options for the number of pieces to track and exploration depth.</li>
                     
-                    <li><strong>Opening Explorer:</strong> Browse the opening path that led to the current position and expand book continuations from here using CARA's ECO opening database. Embedded mini boards follow the main board's piece set, colors, and orientation. Jump to a position on the path or open the corresponding Lichess opening explorer page. Access via <span class="menu-item">View → Opening Explorer</span> (<code>F4</code>).</li>
+                    <li><strong>Opening Explorer:</strong> Browse the opening path that led to the current position and expand book continuations from here using CARA's ECO opening database. Embedded mini boards follow the main board's piece set, colors, and orientation. Jump to a position on the path or open the corresponding Lichess opening explorer page. When an encyclopedia article is available, an information control next to the opening name opens a richer description of that opening (see <a href="#opening-encyclopedia">section 4.5.4.1</a>). Access via <span class="menu-item">View → Opening Explorer</span> (<code>F4</code>).</li>
                     
                     <li><strong>Annotations:</strong> Powerful free-form annotation system for marking positions, ideas, and analysis insights. Unlike other chess applications, text can be freely positioned anywhere on the board, adjusted in size and rotated. In addition to text, you can add arrows, circles, and square highlighting with customizable colors. Annotations are position-specific, attached to the current path in the game tree (mainline or variation), and are compressed and serialized in a PGN metadata tag to keep the PGN move notation clean. This flexible annotation system enables you to create rich, personalized study materials and analysis notes.</li>
                     
@@ -679,6 +683,7 @@
                     <li>Game result (1-0, 0-1, 1/2-1/2, or * for indecisive results)</li>
                     <li>Opening ECO code and name (e.g., "A00 - Unknown Opening")</li>
                 </ul>
+                <p>When an Opening Encyclopedia article matches the displayed opening, a small ⓘ symbol appears next to the opening name. Click it to open the article. See <a href="#opening-encyclopedia">section 4.5.4.1</a> for details.</p>
                 <p>Toggle visibility with <code>Alt+I</code> / <code>⌥+I</code> or <span class="menu-item">Board → Show Game Info</span>.</p>
                 
                 <h5 id="evaluation-bar">4.3.3 Evaluation Bar</h5>
@@ -884,6 +889,7 @@
                     <li><span class="menu-item">PGN → Show Non-Standard Tags</span> (<code>Ctrl+Shift+T</code> / <code>⌘+Shift+T</code>): Toggle display of non-standard tags like [%evp] and [%mdl] within comments</li>
                     <li><span class="menu-item">PGN → Show Annotations</span> (<code>Ctrl+Shift+A</code> / <code>⌘+Shift+A</code>): Toggle display of move annotations, including symbol-based annotations (!, !!, ?, ??, !?, ?!) and NAGs (Numeric Annotation Glyphs).</li>
                     <li><span class="menu-item">PGN → Show Results</span> (<code>Ctrl+R</code> / <code>⌘+R</code>): Toggle display of game results (1-0, 0-1, 1/2-1/2)</li>
+                    <li><span class="menu-item">PGN → Indent variations</span>: Show each variation on its own indented line by nesting depth (display only; copy and export keep the original PGN layout). Especially useful together with navigating into variations</li>
                     <li><span class="menu-item">PGN → Enable navigating into variations</span>: Allow keyboard and click navigation into PGN sidelines (branch selector, variation board appearance)</li>
                     <li><span class="menu-item">PGN → Display NAG move assessments as...</span>: Choose between displaying NAGs as symbols (??, ?, ?! ..) or as text descriptions</li>
                 </ul>
@@ -968,6 +974,22 @@
                     <li><strong>Lines until here:</strong> The sequence of book (and out-of-book) steps from the start position to the active ply. Each step can show a small board in the current theme (piece set, colors, and orientation match the main board). Click a step to jump to that position in the game. Use the ↗ control to open the corresponding position in the Lichess opening explorer in your browser.</li>
                     <li><strong>Lines from here:</strong> Continuations suggested by CARA's ECO opening database from the current position. Expand a move to browse deeper book lines.</li>
                 </ul>
+                <p>When an encyclopedia article is available for a named opening on the path or among the continuations, an information control (ⓘ) appears next to that name so you can open the article directly. See <a href="#opening-encyclopedia">the next section</a>.</p>
+
+                <h5 id="opening-encyclopedia">4.5.4.1 Opening Encyclopedia</h5>
+                <p>The Opening Encyclopedia provides articles for many well-known openings and variations. Each article includes a short introduction, a <strong>Key ideas</strong> section, <strong>Name origin</strong> and <strong>History</strong> sections, and up to two illustrative images, so you can learn more about an opening that you encountered in one of your games or that you discovered in the Opening Explorer.</p>
+
+                <img src="screenshots/opening_encyclopedia.png" alt="CARA Opening Encyclopedia - Dialog showing an opening article with introduction, key ideas, history, tags, and illustrative images" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <p>To open the encyclopedia, look for the small ⓘ symbol next to the opening name in the Game Information header above the board or the opening entries in the Opening Explorer pane.</p>
+
+                <img src="screenshots/opening_encyclopedia_integration1.png" alt="CARA Opening Encyclopedia integration - Information symbol next to the opening name in the Game Information header" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <img src="screenshots/opening_encyclopedia_integration2.png" alt="CARA Opening Encyclopedia integration - Information symbols next to opening entries in the Opening Explorer" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <p>CARA tries to open the article that matches the specific opening line whenever possible. If that exact variation is not yet covered, it falls back to an earlier related variation in the same opening family.</p>
+
+                <p>Use the search icon in the dialog header to look up other openings by name or ECO code. Common abbreviations such as <strong>KID</strong> (King's Indian Defense) are recognized, and you can refine them further (for example <strong>KID b3</strong>). Click a result to open that article. When many openings match, CARA shows a short list and notes how many further matches were found.</p>
                 
                 <h5 id="game-summary">4.5.5 Game Summary</h5>
                 <p>The Game Summary tab provides a comprehensive overview of the current game by synthesizing data from the Game Analysis function into key performance indicators (KPIs) and valuable insights. Access this tab using <span class="menu-item">View → Game Summary</span> or press <code>F5</code>.</p>
@@ -2338,10 +2360,13 @@
                 <p><strong>Shortcut:</strong> <code>Ctrl+R</code> / <code>⌘+R</code></p>
                 <p>Toggles the display of game results (1-0, 0-1, 1/2-1/2) in the PGN Notation Pane.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5 id="enable-navigating-variations">6.5.7 Enable navigating into variations</h5>
+                <h5 id="indent-variations">6.5.7 Indent variations</h5>
+                <p>When enabled, each variation in the PGN Notation Pane starts on a new line and is indented according to its nesting depth. Nested sidelines indent further; the main line continues on its own line after a top-level variation closes. This affects only how the notation is shown—copying or exporting the game still uses the original PGN layout. The option is also available from the PGN notation context menu.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
+                
+                <h5 id="enable-navigating-variations">6.5.8 Enable navigating into variations</h5>
                 <p>When enabled, <code>←</code> / <code>→</code> navigation and clicks in the PGN Notation Pane can enter variation (sideline) lines. At a branching point, <code>→</code> opens a branch selector (<code>↑</code> / <code>↓</code> to choose, <code>→</code> or <code>Enter</code> to confirm, <code>←</code> or <code>Esc</code> to cancel). At the end of a sideline, a second <code>→</code> rejoins the mainline move at the fork. The chessboard uses a distinct variation appearance while off the main line; manual analysis and the evaluation bar follow the sideline position. The Moves List stays on the mainline ancestor. Hiding variations or turning this option off snaps back to the mainline ancestor if you were on a sideline.<br>See <a href="#detail-panel">section 4.5</a> for a full description of the workflow.</p>
                 
-                <h5>6.5.8 Display NAG move assessments as...</h5>
+                <h5>6.5.9 Display NAG move assessments as...</h5>
                 <p>This submenu allows you to choose how NAG (Numeric Annotation Glyph) move assessments are displayed in the PGN Notation Pane:</p>
                 <ul>
                     <li><span class="menu-item">Symbols (??, ?, ?! ..)</span>: Displays common NAGs as symbols (!, !!, ?, ??, !?, ?!) and other NAGs as numbers</li>
@@ -2349,16 +2374,16 @@
                 </ul>
                 <p>The selected option is saved in your user settings and persists between application sessions.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.5.9 Remove Comments</h5>
+                <h5>6.5.10 Remove Comments</h5>
                 <p>Permanently removes all comments from the active game's PGN notation. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.5.10 Remove Variations</h5>
+                <h5>6.5.11 Remove Variations</h5>
                 <p>Permanently removes all move variations from the active game's PGN notation. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.5.11 Remove Non-Standard Tags</h5>
+                <h5>6.5.12 Remove Non-Standard Tags</h5>
                 <p>Permanently removes non-standard tags (like [%evp] and [%mdl]) from comments in the active game's PGN. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
                 
-                <h5>6.5.12 Remove Annotations</h5>
+                <h5>6.5.13 Remove Annotations</h5>
                 <p>Permanently removes all move annotations (symbols and NAGs) from the active game's PGN notation. This action modifies the game's actual PGN content and cannot be undone. The game will be marked to contain unsaved changes and the changes will be persisted when you save the database.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
             </div>
 
@@ -2629,7 +2654,7 @@
 
                 <h5>6.14.6 Opening Explorer</h5>
                 <p><strong>Shortcut:</strong> <code>F4</code></p>
-                <p>Switches the Detail Panel to the <strong>Opening Explorer</strong> tab.<br>See <a href="#opening-explorer">section 4.5.4</a> for more information.</p>
+                <p>Switches the Detail Panel to the <strong>Opening Explorer</strong> tab. From there (and from the game information header) you can open matching Opening Encyclopedia articles when available.<br>See <a href="#opening-explorer">section 4.5.4</a> and <a href="#opening-encyclopedia">section 4.5.4.1</a> for more information.</p>
 
                 <h5>6.14.7 Game Summary</h5>
                 <p><strong>Shortcut:</strong> <code>F5</code></p>
