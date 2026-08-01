@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import json
 import re
+import sys
 from typing import Any, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import (
@@ -23,6 +24,7 @@ from PyQt6.QtGui import (
     QActionGroup,
     QColor,
     QFont,
+    QIcon,
     QKeyEvent,
     QLinearGradient,
     QMouseEvent,
@@ -48,7 +50,6 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QVBoxLayout,
     QWidget,
-    QWidgetAction,
 )
 
 from app.services.opening_encyclopedia_service import (
@@ -141,17 +142,40 @@ def _rgb(value: Any, default: list[int]) -> list[int]:
     return list(default)
 
 
-class _ClickableMenuRow(QWidget):
-    """Simple clickable row used inside QWidgetAction menu items."""
-
-    clicked = pyqtSignal()
-
-    def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.clicked.emit()
-            event.accept()
-            return
-        super().mouseReleaseEvent(event)
+def _letter_a_menu_icon(
+    point_size: int,
+    tint_rgb: Tuple[int, int, int],
+    *,
+    box_size: int = 22,
+) -> QIcon:
+    """Paint a capital A icon for text-size menu rows (theme-tinted)."""
+    dpr = 1.0
+    app = QApplication.instance()
+    if app is not None:
+        screen = app.primaryScreen()
+        if screen is not None:
+            dpr = float(screen.devicePixelRatio())
+    px = max(16, int(round(box_size * dpr)))
+    pm = QPixmap(px, px)
+    pm.fill(Qt.GlobalColor.transparent)
+    pm.setDevicePixelRatio(dpr)
+    painter = QPainter(pm)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+    font = QFont(
+        resolve_font_family("Helvetica Neue"),
+        max(8, int(point_size)),
+        QFont.Weight.DemiBold,
+    )
+    painter.setFont(font)
+    painter.setPen(QColor(int(tint_rgb[0]), int(tint_rgb[1]), int(tint_rgb[2])))
+    painter.drawText(
+        QRect(0, 0, box_size, box_size),
+        int(Qt.AlignmentFlag.AlignCenter),
+        "A",
+    )
+    painter.end()
+    return QIcon(pm)
 
 
 def _collect_move_spans(plain: str) -> List[Tuple[int, int]]:
@@ -1558,17 +1582,98 @@ class OpeningEncyclopediaDialog(QDialog):
         return self._size_for_fractions(fraction, fraction)
 
     def _centered_geometry_for_size(self, size: QSize) -> QRect:
+        """Client geometry that centers the window frame in the available screen."""
         avail = self._available_geometry()
         margin = self._size_screen_margin
         usable_w, usable_h = self._usable_screen_size()
         w = max(self._min_dialog_size.width(), min(size.width(), usable_w))
         h = max(self._min_dialog_size.height(), min(size.height(), usable_h))
-        x = avail.x() + (avail.width() - w) // 2
-        y = avail.y() + (avail.height() - h) // 2
-        # Keep fully inside the available rect.
-        x = max(avail.x() + margin, min(x, avail.right() - w - margin + 1))
-        y = max(avail.y() + margin, min(y, avail.bottom() - h - margin + 1))
-        return QRect(x, y, w, h)
+
+        # geometry() is the client area; frameGeometry() includes decorations.
+        # Center the outer frame, then convert back to a client rect for setGeometry.
+        geo = self.geometry()
+        frame = self.frameGeometry()
+        if self.isVisible() and frame.isValid() and geo.isValid() and geo.width() > 0:
+            dx = geo.x() - frame.x()
+            dy = geo.y() - frame.y()
+            extra_w = max(0, frame.width() - geo.width())
+            extra_h = max(0, frame.height() - geo.height())
+        else:
+            dx = dy = 0
+            extra_w = extra_h = 0
+
+        frame_w = w + extra_w
+        frame_h = h + extra_h
+        frame_x = avail.x() + (avail.width() - frame_w) // 2
+        frame_y = avail.y() + (avail.height() - frame_h) // 2
+        frame_x = max(
+            avail.x() + margin,
+            min(frame_x, avail.right() - frame_w - margin + 1),
+        )
+        frame_y = max(
+            avail.y() + margin,
+            min(frame_y, avail.bottom() - frame_h - margin + 1),
+        )
+        return QRect(frame_x + dx, frame_y + dy, w, h)
+
+    def _geometry_animation_reliable(self) -> bool:
+        """False on Linux/Wayland where WMs often ignore animated moves."""
+        app = QApplication.instance()
+        platform = ((app.platformName() if app is not None else "") or "").lower()
+        if platform.startswith("wayland"):
+            return False
+        if sys.platform.startswith("linux"):
+            return False
+        return True
+
+    def _commit_window_geometry(self, end: QRect) -> None:
+        """Resize then center via frameGeometry — reliable on Linux window managers.
+
+        Many Linux WMs keep the top-left fixed across ``setGeometry``/animated
+        resizes and only honor an explicit ``move`` after the size has settled.
+        """
+        size = end.size()
+        self.resize(size)
+        avail = self._available_geometry()
+        margin = self._size_screen_margin
+        fg = self.frameGeometry()
+        # If the frame size hasn't updated yet, synthesize from client + prior chrome.
+        if fg.width() < size.width() or fg.height() < size.height():
+            geo = self.geometry()
+            extra_w = max(0, fg.width() - max(1, geo.width()))
+            extra_h = max(0, fg.height() - max(1, geo.height()))
+            fg.setSize(QSize(size.width() + extra_w, size.height() + extra_h))
+        fg.moveCenter(avail.center())
+        if fg.left() < avail.left() + margin:
+            fg.moveLeft(avail.left() + margin)
+        if fg.top() < avail.top() + margin:
+            fg.moveTop(avail.top() + margin)
+        if fg.right() > avail.right() - margin:
+            fg.moveRight(avail.right() - margin)
+        if fg.bottom() > avail.bottom() - margin:
+            fg.moveBottom(avail.bottom() - margin)
+        self.move(fg.topLeft())
+        # Re-assert after the WM processes the resize (helps X11 and some compositors).
+        QTimer.singleShot(0, self._reassert_centered_on_screen)
+
+    def _reassert_centered_on_screen(self) -> None:
+        if not self.isVisible():
+            return
+        avail = self._available_geometry()
+        margin = self._size_screen_margin
+        fg = self.frameGeometry()
+        target = QRect(fg)
+        target.moveCenter(avail.center())
+        if target.left() < avail.left() + margin:
+            target.moveLeft(avail.left() + margin)
+        if target.top() < avail.top() + margin:
+            target.moveTop(avail.top() + margin)
+        if target.right() > avail.right() - margin:
+            target.moveRight(avail.right() - margin)
+        if target.bottom() > avail.bottom() - margin:
+            target.moveBottom(avail.bottom() - margin)
+        if abs(fg.x() - target.x()) > 2 or abs(fg.y() - target.y()) > 2:
+            self.move(target.topLeft())
 
     def _is_near_size(self, size: QSize, other: QSize, tol: int = _SIZE_AXIS_TOL_PX) -> bool:
         return abs(size.width() - other.width()) <= tol and abs(size.height() - other.height()) <= tol
@@ -1632,13 +1737,17 @@ class OpeningEncyclopediaDialog(QDialog):
                 self._suppress_size_persist = False
 
     def _animate_to_geometry(self, end: QRect) -> None:
+        if not self._geometry_animation_reliable():
+            self._commit_window_geometry(end)
+            self._persist_current_size()
+            return
         if (
             abs(self.geometry().width() - end.width()) <= 2
             and abs(self.geometry().height() - end.height()) <= 2
             and abs(self.geometry().x() - end.x()) <= 2
             and abs(self.geometry().y() - end.y()) <= 2
         ):
-            self.setGeometry(end)
+            self._commit_window_geometry(end)
             return
         self._stop_size_anim()
         start = self.geometry()
@@ -1652,6 +1761,8 @@ class OpeningEncyclopediaDialog(QDialog):
         def _finished() -> None:
             self._size_anim = None
             self._suppress_size_persist = False
+            # Final frame-aware center (covers WMs that ignored mid-animation moves).
+            self._commit_window_geometry(end)
             self._persist_current_size()
 
         anim.finished.connect(_finished)
@@ -1678,7 +1789,7 @@ class OpeningEncyclopediaDialog(QDialog):
         if animate and self.isVisible():
             self._animate_to_geometry(geom)
         else:
-            self.setGeometry(geom)
+            self._commit_window_geometry(geom)
             self._persist_current_size()
 
     def _apply_size_preset(self, fraction: float, *, animate: bool = True) -> None:
@@ -1706,7 +1817,7 @@ class OpeningEncyclopediaDialog(QDialog):
         if animate and self.isVisible():
             self._animate_to_geometry(geom)
         else:
-            self.setGeometry(geom)
+            self._commit_window_geometry(geom)
 
     def _compute_auto_default_size(self) -> QSize:
         """Comfortable absolute reading size, clamped to the usable screen."""
@@ -1733,7 +1844,7 @@ class OpeningEncyclopediaDialog(QDialog):
         if animate and self.isVisible():
             self._animate_to_geometry(geom)
         else:
-            self.setGeometry(geom)
+            self._commit_window_geometry(geom)
             self._persist_current_size()
 
     def _is_near_auto_default_size(self) -> bool:
@@ -2033,52 +2144,19 @@ class OpeningEncyclopediaDialog(QDialog):
             text_icon_svg = str(text_size_cfg.get("icon_svg") or SVG_MENU_TEXT_SIZE)
         text_menu.menuAction().setIcon(themed_icon_from_svg(text_icon_svg, icon_tint))
         apply_menu_styling(text_menu, self.config)
-        self._menu_text_size_pick: Optional[str] = None
+        text_group = QActionGroup(text_menu)
+        text_group.setExclusive(True)
         for opt in self._text_size_options:
             opt_id = str(opt["id"])
-            checked = opt_id == self._text_size_key
-            row = _ClickableMenuRow(text_menu)
-            row.setCursor(Qt.CursorShape.PointingHandCursor)
-            row.setStyleSheet("background: transparent;")
-            row_lay = QHBoxLayout(row)
-            row_lay.setContentsMargins(10, 4, 14, 4)
-            row_lay.setSpacing(10)
-            mark = QLabel("✓" if checked else "")
-            mark.setFixedWidth(14)
-            mark.setStyleSheet("background: transparent;")
-            mark.setAlignment(
-                Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+            action = QAction(str(opt["label"]), text_menu)
+            action.setIcon(
+                _letter_a_menu_icon(int(opt["menu_a_pt"]), icon_tint)
             )
-            a_label = QLabel("A")
-            a_label.setStyleSheet("background: transparent;")
-            a_label.setFont(
-                QFont(
-                    resolve_font_family("Helvetica Neue"),
-                    int(opt["menu_a_pt"]),
-                    QFont.Weight.DemiBold,
-                )
-            )
-            a_label.setFixedWidth(28)
-            a_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            name = QLabel(str(opt["label"]))
-            name.setStyleSheet("background: transparent;")
-            name.setAlignment(
-                Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
-            )
-            row_lay.addWidget(mark)
-            row_lay.addWidget(a_label)
-            row_lay.addWidget(name)
-            row_lay.addStretch(1)
-            action = QWidgetAction(text_menu)
-            action.setDefaultWidget(row)
+            action.setCheckable(True)
+            action.setChecked(opt_id == self._text_size_key)
             action.setData(("text_size", opt_id))
+            text_group.addAction(action)
             text_menu.addAction(action)
-
-            def _pick(oid: str = opt_id, top_menu: QMenu = menu) -> None:
-                self._menu_text_size_pick = oid
-                top_menu.close()
-
-            row.clicked.connect(_pick)
 
         if equal_key is None:
             menu.addSeparator()
@@ -2109,11 +2187,6 @@ class OpeningEncyclopediaDialog(QDialog):
                 menu.addAction(custom)
 
         chosen = menu.exec(btn.mapToGlobal(btn.rect().bottomLeft()))
-        text_pick = getattr(self, "_menu_text_size_pick", None)
-        self._menu_text_size_pick = None
-        if text_pick:
-            self._set_text_size(str(text_pick))
-            return
         if chosen is None:
             return
         data = chosen.data()
