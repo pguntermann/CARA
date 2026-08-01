@@ -982,9 +982,9 @@
     }
   },
   "opening_encyclopedia_dialog": {
-    "size_preset": "60",
-    "width_pct": 60,
-    "height_pct": 60,
+    "size_preset": "default",
+    "width_pct": 0,
+    "height_pct": 0,
     "width": 0,
     "height": 0,
     "text_size": "medium"

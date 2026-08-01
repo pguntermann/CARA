@@ -61,6 +61,7 @@ from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.themed_icon import (
     SVG_MENU_EXCLAMATION,
     SVG_MENU_MAXIMIZE,
+    SVG_MENU_RESET,
     SVG_MENU_SEARCH,
     SVG_MENU_SIZE_EQUAL,
     SVG_MENU_SIZE_HEIGHT,
@@ -82,7 +83,12 @@ _SIZE_PRESET_FRACTIONS = {"45": 0.45, "60": 0.60, "80": 0.80}
 # Older keys from previous schemes map to the nearest current preset.
 _SIZE_PRESET_LEGACY = {"25": "45", "40": "45", "50": "60", "75": "80"}
 _SIZE_PRESET_CUSTOM = "custom"
+_SIZE_PRESET_DEFAULT = "default"
 _SIZE_AXIS_TOL_PX = 4
+# Comfortable reading size used when no preset is chosen yet (and for Reset).
+_DEFAULT_TARGET_WIDTH = 880
+_DEFAULT_TARGET_HEIGHT = 620
+_DEFAULT_MAX_SCREEN_FRACTION = 0.75
 
 _TEXT_SIZE_KEYS = ("small", "medium", "large")
 _TEXT_SIZE_DEFAULT = "medium"
@@ -741,8 +747,33 @@ class OpeningEncyclopediaDialog(QDialog):
         self._size_section_equal = str(size_cfg.get("section_equal", "Equal"))
         self._size_section_width = str(size_cfg.get("section_width", "Width"))
         self._size_section_height = str(size_cfg.get("section_height", "Height"))
+        self._size_reset_label = str(size_cfg.get("reset_label", "Reset to default"))
         self._size_screen_margin = max(0, int(size_cfg.get("screen_margin", 8)))
-        self._size_preset_key = "60"
+        default_size_cfg = size_cfg.get("default_size", {})
+        if not isinstance(default_size_cfg, dict):
+            default_size_cfg = {}
+        try:
+            self._default_target_width = max(
+                1, int(default_size_cfg.get("target_width", _DEFAULT_TARGET_WIDTH))
+            )
+        except (TypeError, ValueError):
+            self._default_target_width = _DEFAULT_TARGET_WIDTH
+        try:
+            self._default_target_height = max(
+                1, int(default_size_cfg.get("target_height", _DEFAULT_TARGET_HEIGHT))
+            )
+        except (TypeError, ValueError):
+            self._default_target_height = _DEFAULT_TARGET_HEIGHT
+        try:
+            max_frac = float(
+                default_size_cfg.get(
+                    "max_screen_fraction", _DEFAULT_MAX_SCREEN_FRACTION
+                )
+            )
+        except (TypeError, ValueError):
+            max_frac = _DEFAULT_MAX_SCREEN_FRACTION
+        self._default_max_screen_fraction = max(0.2, min(1.0, max_frac))
+        self._size_preset_key = _SIZE_PRESET_DEFAULT
         self._size_anim: Optional[QPropertyAnimation] = None
         self._suppress_size_persist = False
         self._size_applied_on_show = False
@@ -1677,35 +1708,68 @@ class OpeningEncyclopediaDialog(QDialog):
         else:
             self.setGeometry(geom)
 
+    def _compute_auto_default_size(self) -> QSize:
+        """Comfortable absolute reading size, clamped to the usable screen."""
+        usable_w, usable_h = self._usable_screen_size()
+        min_w = self._min_dialog_size.width()
+        min_h = self._min_dialog_size.height()
+        max_w = max(min_w, int(usable_w * float(self._default_max_screen_fraction)))
+        max_h = max(min_h, int(usable_h * float(self._default_max_screen_fraction)))
+        max_w = min(max_w, usable_w)
+        max_h = min(max_h, usable_h)
+        w = min(max(int(self._default_target_width), min_w), max_w)
+        h = min(max(int(self._default_target_height), min_h), max_h)
+        return QSize(w, h)
+
+    def _apply_auto_default_size(self, *, animate: bool = False) -> None:
+        """Apply the calculated default size and remember preset mode as default."""
+        if self._search_open:
+            self._close_search()
+        if self.isMaximized():
+            self.showNormal()
+        target = self._compute_auto_default_size()
+        geom = self._centered_geometry_for_size(target)
+        self._size_preset_key = _SIZE_PRESET_DEFAULT
+        if animate and self.isVisible():
+            self._animate_to_geometry(geom)
+        else:
+            self.setGeometry(geom)
+            self._persist_current_size()
+
+    def _is_near_auto_default_size(self) -> bool:
+        return self._is_near_size(self.size(), self._compute_auto_default_size())
+
     def _persist_current_size(self) -> None:
         if getattr(self, "_suppress_size_persist", False):
             return
-        matched = self._matching_equal_preset_key()
         usable_w, usable_h = self._usable_screen_size()
         width_pct = int(round((self.width() / float(usable_w)) * 100.0))
         height_pct = int(round((self.height() / float(usable_h)) * 100.0))
         width_pct = max(1, min(100, width_pct))
         height_pct = max(1, min(100, height_pct))
-        if matched is not None:
+
+        matched = self._matching_equal_preset_key()
+        if (
+            self._size_preset_key == _SIZE_PRESET_DEFAULT
+            and self._is_near_auto_default_size()
+        ):
+            # Prefer explicit default mode over a coincidental % match.
+            preset_key = _SIZE_PRESET_DEFAULT
+        elif matched is not None:
+            preset_key = matched
             self._size_preset_key = matched
-            payload = {
-                "size_preset": matched,
-                "width_pct": width_pct,
-                "height_pct": height_pct,
-                "width": self.width(),
-                "height": self.height(),
-                "text_size": self._text_size_key,
-            }
         else:
+            preset_key = _SIZE_PRESET_CUSTOM
             self._size_preset_key = _SIZE_PRESET_CUSTOM
-            payload = {
-                "size_preset": _SIZE_PRESET_CUSTOM,
-                "width_pct": width_pct,
-                "height_pct": height_pct,
-                "width": self.width(),
-                "height": self.height(),
-                "text_size": self._text_size_key,
-            }
+
+        payload = {
+            "size_preset": preset_key,
+            "width_pct": width_pct,
+            "height_pct": height_pct,
+            "width": self.width(),
+            "height": self.height(),
+            "text_size": self._text_size_key,
+        }
         try:
             from app.services.user_settings_service import UserSettingsService
 
@@ -1733,19 +1797,43 @@ class OpeningEncyclopediaDialog(QDialog):
             return pct
         return None
 
+    def _settings_request_auto_default(self, settings: Dict[str, Any]) -> bool:
+        """True when no user size choice exists yet, or default mode is active."""
+        if not settings:
+            return True
+        preset = str(settings.get("size_preset") or "").strip().lower()
+        preset = _SIZE_PRESET_LEGACY.get(preset, preset)
+        if preset == _SIZE_PRESET_DEFAULT or preset == "":
+            # Empty / default: only treat as auto if no explicit % or pixel size.
+            if preset == _SIZE_PRESET_DEFAULT:
+                return True
+            has_pct = (
+                self._pct_to_frac(settings.get("width_pct")) is not None
+                and self._pct_to_frac(settings.get("height_pct")) is not None
+            )
+            try:
+                width = int(settings.get("width") or 0)
+                height = int(settings.get("height") or 0)
+            except (TypeError, ValueError):
+                width, height = 0, 0
+            has_px = (
+                width >= self._min_dialog_size.width()
+                and height >= self._min_dialog_size.height()
+            )
+            return not has_pct and not has_px
+        return False
+
     def _apply_persisted_or_default_size(self) -> None:
-        """Restore last size from user settings (defaults to 60% × 60%)."""
+        """Restore last size, or compute a comfortable default when unset."""
         settings = self._load_size_settings()
-        preset = str(settings.get("size_preset") or "60").strip().lower()
+        if self._settings_request_auto_default(settings):
+            self._apply_auto_default_size(animate=False)
+            return
+
+        preset = str(settings.get("size_preset") or "").strip().lower()
         preset = _SIZE_PRESET_LEGACY.get(preset, preset)
         if preset in _SIZE_PRESET_FRACTIONS:
             self._apply_size_preset(_SIZE_PRESET_FRACTIONS[preset], animate=False)
-            return
-
-        width_frac = self._pct_to_frac(settings.get("width_pct"))
-        height_frac = self._pct_to_frac(settings.get("height_pct"))
-        if width_frac is not None and height_frac is not None:
-            self._apply_size_fractions(width_frac, height_frac, animate=False)
             return
 
         if preset == _SIZE_PRESET_CUSTOM:
@@ -1754,11 +1842,21 @@ class OpeningEncyclopediaDialog(QDialog):
                 height = int(settings.get("height") or 0)
             except (TypeError, ValueError):
                 width, height = 0, 0
-            if width >= self._min_dialog_size.width() and height >= self._min_dialog_size.height():
+            if (
+                width >= self._min_dialog_size.width()
+                and height >= self._min_dialog_size.height()
+            ):
                 self._apply_custom_size(width, height, animate=False)
                 self._persist_current_size()
                 return
-        self._apply_size_preset(0.6, animate=False)
+
+        width_frac = self._pct_to_frac(settings.get("width_pct"))
+        height_frac = self._pct_to_frac(settings.get("height_pct"))
+        if width_frac is not None and height_frac is not None:
+            self._apply_size_fractions(width_frac, height_frac, animate=False)
+            return
+
+        self._apply_auto_default_size(animate=False)
 
     def _current_size_percent_label(self) -> str:
         """Current size as independent W% × H% of usable screen."""
@@ -1907,6 +2005,22 @@ class OpeningEncyclopediaDialog(QDialog):
         )
 
         menu.addSeparator()
+        reset_action = QAction(self._size_reset_label, menu)
+        reset_action.setIcon(
+            themed_icon_from_svg(
+                str(size_cfg.get("icon_reset_svg") or SVG_MENU_RESET),
+                icon_tint,
+            )
+        )
+        reset_action.setData((_SIZE_PRESET_DEFAULT, None))
+        on_default = (
+            self._size_preset_key == _SIZE_PRESET_DEFAULT
+            and self._is_near_auto_default_size()
+        )
+        reset_action.setEnabled(not on_default)
+        menu.addAction(reset_action)
+
+        menu.addSeparator()
         text_menu = menu.addMenu(
             self._size_branch_title(
                 self._text_size_section,
@@ -1968,14 +2082,31 @@ class OpeningEncyclopediaDialog(QDialog):
 
         if equal_key is None:
             menu.addSeparator()
-            custom = QAction(
-                self._size_branch_title("Custom", self._current_size_percent_label()),
-                menu,
-            )
-            custom.setCheckable(True)
-            custom.setChecked(True)
-            custom.setData((_SIZE_PRESET_CUSTOM, None))
-            menu.addAction(custom)
+            if (
+                self._size_preset_key == _SIZE_PRESET_DEFAULT
+                and self._is_near_auto_default_size()
+            ):
+                default_action = QAction(
+                    self._size_branch_title(
+                        "Default", self._current_size_percent_label()
+                    ),
+                    menu,
+                )
+                default_action.setCheckable(True)
+                default_action.setChecked(True)
+                default_action.setData((_SIZE_PRESET_DEFAULT, None))
+                menu.addAction(default_action)
+            else:
+                custom = QAction(
+                    self._size_branch_title(
+                        "Custom", self._current_size_percent_label()
+                    ),
+                    menu,
+                )
+                custom.setCheckable(True)
+                custom.setChecked(True)
+                custom.setData((_SIZE_PRESET_CUSTOM, None))
+                menu.addAction(custom)
 
         chosen = menu.exec(btn.mapToGlobal(btn.rect().bottomLeft()))
         text_pick = getattr(self, "_menu_text_size_pick", None)
@@ -1989,6 +2120,9 @@ class OpeningEncyclopediaDialog(QDialog):
         if not isinstance(data, (tuple, list)) or len(data) < 2:
             return
         kind, value = data[0], data[1]
+        if kind == _SIZE_PRESET_DEFAULT:
+            self._apply_auto_default_size(animate=True)
+            return
         if kind == _SIZE_PRESET_CUSTOM:
             return
         if kind == "text_size":

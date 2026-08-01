@@ -5164,6 +5164,13 @@
           "icon_equal_svg": "app/resources/icons/menu_size_equal.svg",
           "icon_width_svg": "app/resources/icons/menu_size_width.svg",
           "icon_height_svg": "app/resources/icons/menu_size_height.svg",
+          "icon_reset_svg": "app/resources/icons/menu_reset.svg",
+          "reset_label": "Reset to default",
+          "default_size": {
+            "target_width": 880,
+            "target_height": 620,
+            "max_screen_fraction": 0.75
+          },
           "text_size": {
             "section": "Text size",
             "icon_svg": "app/resources/icons/menu_text_size.svg",
