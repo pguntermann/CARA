@@ -472,6 +472,42 @@
           "label": "Contact:",
           "email": "pguntermann@me.com"
         }
+      },
+      "opening_encyclopedia_feedback_dialog": {
+        "min_description_chars": 25,
+        "category": {
+          "items": [
+            "Factually wrong content",
+            "Image license / attribution issue",
+            "Matches wrong line",
+            "Typo / wording",
+            "Improvement suggestion",
+            "Other"
+          ]
+        },
+        "delivery": {
+          "items": [
+            {
+              "id": "mailto",
+              "label": "Use local mail client - mailto:",
+              "hint": "Send Report using your local installed E-Mail client"
+            },
+            {
+              "id": "gmail",
+              "label": "Open in Google-Mail",
+              "hint": "Opens Gmail compose in your browser. Requires a Google account."
+            },
+            {
+              "id": "clipboard",
+              "label": "Copy to clipboard",
+              "hint": "Copies the report to the clipboard."
+            }
+          ]
+        },
+        "messages": {
+          "description_too_short": "Feedback too short, please describe the issue in more detail",
+          "category_required": "Please select a category"
+        }
       }
     },
     "positional_heatmap": {

@@ -59,6 +59,7 @@ from app.utils.external_open import open_url
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.themed_icon import (
     SVG_MENU_MAXIMIZE,
+    SVG_MENU_PENCIL,
     SVG_MENU_SEARCH,
     themed_icon_from_svg,
 )
@@ -583,6 +584,30 @@ class EncyclopediaGalleryOverlay(QWidget):
         super().keyPressEvent(event)
 
 
+def build_encyclopedia_tag_chip(
+    prefix: str,
+    value: str,
+    *,
+    bg: List[int],
+    fg: List[int],
+    font_size: int = 8,
+    border_radius: int = 4,
+    padding: Optional[List[int]] = None,
+) -> QLabel:
+    """Create a small colored metadata chip (``Prefix: value``)."""
+    pad = padding if isinstance(padding, (list, tuple)) and len(padding) >= 4 else [2, 6, 2, 6]
+    tag = QLabel(f"{prefix}: {value}")
+    tag.setFont(QFont(resolve_font_family("Helvetica Neue"), int(font_size)))
+    tag.setStyleSheet(
+        f"background-color: rgb({bg[0]}, {bg[1]}, {bg[2]}); "
+        f"color: rgb({fg[0]}, {fg[1]}, {fg[2]}); "
+        f"border-radius: {int(border_radius)}px; "
+        f"padding: {int(pad[0])}px {int(pad[1])}px {int(pad[2])}px {int(pad[3])}px;"
+    )
+    tag.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+    return tag
+
+
 class OpeningEncyclopediaDialog(QDialog):
     """Themed dialog showing encyclopedia prose and optional portrait art."""
 
@@ -1053,19 +1078,17 @@ class OpeningEncyclopediaDialog(QDialog):
         h.setSpacing(spacing)
 
         for prefix, value, bg, fg in tag_defs:
-            tag = QLabel(f"{prefix}: {value}")
-            tag.setFont(QFont(
-                resolve_font_family("Helvetica Neue"),
-                font_size,
-            ))
-            tag.setStyleSheet(
-                f"background-color: rgb({bg[0]}, {bg[1]}, {bg[2]}); "
-                f"color: rgb({fg[0]}, {fg[1]}, {fg[2]}); "
-                f"border-radius: {border_radius}px; "
-                f"padding: {pad[0]}px {pad[1]}px {pad[2]}px {pad[3]}px;"
+            h.addWidget(
+                build_encyclopedia_tag_chip(
+                    prefix,
+                    value,
+                    bg=bg,
+                    fg=fg,
+                    font_size=font_size,
+                    border_radius=border_radius,
+                    padding=list(pad),
+                )
             )
-            tag.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
-            h.addWidget(tag)
         h.addStretch(1)
         return row
 
@@ -1111,7 +1134,7 @@ class OpeningEncyclopediaDialog(QDialog):
         search_cfg: Dict[str, Any],
         dialog_config: Dict[str, Any],
     ) -> QWidget:
-        """Build header tools: search icon + size toggle + floating input/results."""
+        """Build header tools: search icon + size menu + feedback + floating input/results."""
         container = QWidget()
         container.setStyleSheet("background: transparent;")
         container.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
@@ -1153,6 +1176,27 @@ class OpeningEncyclopediaDialog(QDialog):
         size_btn.clicked.connect(self._show_size_menu)
         self._size_toggle_btn = size_btn
         lay.addWidget(size_btn)
+
+        feedback_cfg = dialog_config.get("feedback", {})
+        if not isinstance(feedback_cfg, dict):
+            feedback_cfg = {}
+        if bool(feedback_cfg.get("enabled", True)):
+            fb_icon_size = int(feedback_cfg.get("icon_size", icon_size))
+            fb_tint = _rgb(feedback_cfg.get("icon_tint_rgb"), icon_tint)
+            fb_svg = str(feedback_cfg.get("icon_svg") or SVG_MENU_PENCIL)
+            fb_btn = QPushButton()
+            fb_btn.setFixedSize(fb_icon_size + 8, fb_icon_size + 8)
+            fb_btn.setIcon(themed_icon_from_svg(fb_svg, fb_tint))
+            fb_btn.setIconSize(QSize(fb_icon_size, fb_icon_size))
+            fb_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            fb_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            fb_btn.setToolTip(str(feedback_cfg.get("tooltip", "Report feedback")))
+            fb_btn.setStyleSheet("QPushButton { background: transparent; border: none; }")
+            fb_btn.clicked.connect(self._open_feedback_dialog)
+            self._feedback_btn = fb_btn
+            lay.addWidget(fb_btn)
+        else:
+            self._feedback_btn = None
 
         input_h = int(search_cfg.get("input_height", 28))
         input_bg = _rgb(search_cfg.get("input_background"), [50, 50, 56])
@@ -1499,6 +1543,17 @@ class OpeningEncyclopediaDialog(QDialog):
             return
         self._apply_size_preset(fraction, animate=True)
 
+    def _open_feedback_dialog(self) -> None:
+        if self._search_open:
+            self._close_search()
+        from app.views.dialogs.opening_encyclopedia_feedback_dialog import (
+            OpeningEncyclopediaFeedbackDialog,
+        )
+
+        OpeningEncyclopediaFeedbackDialog.show_for_entry(
+            self.config, self._entry, parent=self
+        )
+
     def _is_search_ui_global_pos(self, global_pos) -> bool:
         """True if ``global_pos`` hits the search chrome (button/input/results/tools)."""
         widgets = (
@@ -1507,6 +1562,7 @@ class OpeningEncyclopediaDialog(QDialog):
             getattr(self, "_search_input", None),
             getattr(self, "_search_results", None),
             getattr(self, "_size_toggle_btn", None),
+            getattr(self, "_feedback_btn", None),
         )
         for w in widgets:
             if w is None or not w.isVisible():

@@ -5037,6 +5037,13 @@
           "preset_labels": ["45%", "60%", "80%"],
           "screen_margin": 8
         },
+        "feedback": {
+          "enabled": true,
+          "icon_size": 18,
+          "icon_svg": "app/resources/icons/pencil.svg",
+          "icon_tint_rgb": [140, 130, 115],
+          "tooltip": "Report feedback"
+        },
         "gallery": {
           "overlay_color": [28, 24, 20],
           "overlay_opacity": 0.76,
@@ -5059,6 +5066,88 @@
           "spacing": 10,
           "width": 120,
           "height": 30,
+          "border_color": {
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
+          }
+        }
+      },
+      "opening_encyclopedia_feedback_dialog": {
+        "window_title": "Report feedback",
+        "width": 500,
+        "minimum_height": 400,
+        "bottom_button_top_padding": 50,
+        "background_color": {
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
+        },
+        "layout": {
+          "spacing": 8,
+          "margins": [25, 25, 25, 25]
+        },
+        "title": {
+          "text": "Report feedback",
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_LARGE"
+          },
+          "padding": 0,
+          "spacing_after": 4,
+          "text_color": {
+            "$ref": "$_COLOR_INK_BODY"
+          }
+        },
+        "label": {
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_DRIFTWOOD"
+          }
+        },
+        "entry": {
+          "label": "Opening",
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_INK_BODY"
+          },
+          "spacing_after": 10
+        },
+        "category": {
+          "label": "Category",
+          "placeholder": "Select a category…",
+          "spacing_after": 10
+        },
+        "description": {
+          "label": "Description",
+          "placeholder": "Describe the issue or suggestion…",
+          "minimum_height": 100,
+          "spacing_after": 10,
+          "border_radius": 3,
+          "padding": [6, 8, 6, 8],
+          "text_color": [63, 53, 43],
+          "background_color": [244, 239, 230],
+          "border_color": [184, 171, 154],
+          "focus_border_color": [78, 112, 112]
+        },
+        "delivery": {
+          "label": "How to report",
+          "spacing_after": 4
+        },
+        "hint": {
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_DRIFTWOOD"
+          }
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "create_width": 120,
+          "height": 30,
+          "cancel_label": "Cancel",
+          "create_label": "Create Report",
           "border_color": {
             "$ref": "$_COLOR_BOURBON_OUTLINE"
           }
