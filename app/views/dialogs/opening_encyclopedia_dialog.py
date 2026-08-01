@@ -643,6 +643,7 @@ class OpeningEncyclopediaDialog(QDialog):
         )
         self._remembered_normal_size = QSize(self._default_dialog_size)
         self._size_anim: Optional[QPropertyAnimation] = None
+        self._suppress_normal_size_learn = False
         self.resize(self._default_dialog_size)
 
         root = QVBoxLayout(self)
@@ -1267,8 +1268,18 @@ class OpeningEncyclopediaDialog(QDialog):
     def _stop_size_anim(self) -> None:
         anim = getattr(self, "_size_anim", None)
         if anim is not None:
-            anim.stop()
-            self._size_anim = None
+            # Avoid resizeEvent treating in-between frames as the new "normal" size.
+            self._suppress_normal_size_learn = True
+            try:
+                anim.stop()
+            finally:
+                self._size_anim = None
+                self._suppress_normal_size_learn = False
+
+    def _on_size_anim_finished(self) -> None:
+        self._size_anim = None
+        self._suppress_normal_size_learn = False
+        self._update_size_toggle_icon()
 
     def _remember_normal_size(self) -> None:
         """Store the current size as the restore target when leaving normal state."""
@@ -1297,7 +1308,7 @@ class OpeningEncyclopediaDialog(QDialog):
         return QSize(self._default_dialog_size)
 
     def _animate_dialog_size(self, target: QSize) -> None:
-        """Animate to ``target`` size (used when native maximize state isn't available)."""
+        """Animate to ``target`` size while keeping the top-right corner stable."""
         if self._is_near_size(self.size(), target):
             self._update_size_toggle_icon()
             return
@@ -1324,7 +1335,9 @@ class OpeningEncyclopediaDialog(QDialog):
         anim.setStartValue(start)
         anim.setEndValue(end)
         anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
-        anim.finished.connect(self._update_size_toggle_icon)
+        # Block resizeEvent from learning intermediate sizes as the restore target.
+        self._suppress_normal_size_learn = True
+        anim.finished.connect(self._on_size_anim_finished)
         anim.valueChanged.connect(lambda _v: self._update_size_toggle_icon())
         anim.start()
         self._size_anim = anim
@@ -1355,17 +1368,13 @@ class OpeningEncyclopediaDialog(QDialog):
             self._animate_dialog_size(target)
             return
 
-        # Expand from a true normal size.
+        # Expand to the configured max size (not OS maximize).
+        # On Windows, showMaximized() with maximumSize < screen parks the dialog
+        # in the top-left corner while still reporting the clamped max size.
         self._remember_normal_size()
-        self.showMaximized()
-        # If the platform didn't take us to max (common with tight maximumSize), animate.
-        QTimer.singleShot(0, self._ensure_expanded_after_maximize)
-
-    def _ensure_expanded_after_maximize(self) -> None:
-        if not self._is_at_max_dialog_size():
-            self._animate_dialog_size(QSize(self._max_dialog_size))
-        else:
-            self._update_size_toggle_icon()
+        if self.isMaximized():
+            self.showNormal()
+        self._animate_dialog_size(QSize(self._max_dialog_size))
 
     def _is_search_ui_global_pos(self, global_pos) -> bool:
         """True if ``global_pos`` hits the search chrome (button/input/results/tools)."""
@@ -1915,7 +1924,12 @@ class OpeningEncyclopediaDialog(QDialog):
             self._close_search()
 
         # Learn normal size only while truly non-expanded (avoid animation frames).
-        if old.isValid() and event.size() != old and not self._dialog_is_expanded():
+        if (
+            old.isValid()
+            and event.size() != old
+            and not self._dialog_is_expanded()
+            and not getattr(self, "_suppress_normal_size_learn", False)
+        ):
             self._remembered_normal_size = QSize(event.size())
 
         self._update_size_toggle_icon()
