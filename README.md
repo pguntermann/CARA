@@ -73,13 +73,9 @@ For a structured overview of everything CARA can do, see **[Key Features](https:
 
 > **App Bundles (Recommended)**: Pre-built application bundles are available for Windows, macOS, and Linux. They include all dependencies and can be run directly without a separate Python installation. Download from the **[project website](https://pguntermann.github.io/CARA/)** (recommended for choosing your platform and bundle) or from **[GitHub Releases](https://github.com/pguntermann/CARA/releases)** (direct assets and release notes).
 >
-> **macOS users**: Due to macOS security settings, you may need to allow the app to run. If you see a security warning when trying to open the app, follow these steps:
-> 1. Right-click the app and select "Open"
-> 2. When the warning dialog appears, click "OK"
-> 3. Open System Settings → Privacy & Security
-> 4. Scroll down to find the blocked app notification and click "Open Anyway"
+> **macOS users**: Official macOS App Bundles are **Developer ID–signed and notarized** by Apple. After unzipping, you can open the app normally (moving it to Applications is optional). The first launch may still show a one-time confirmation that the app was downloaded from the internet — choose **Open**.
 >
-> After completing these steps, you can launch the app normally. For background and troubleshooting details, see [this Q&A post](https://github.com/pguntermann/CARA/discussions/72).
+> If Gatekeeper still blocks the app (uncommon with current builds), see [this Q&A post](https://github.com/pguntermann/CARA/discussions/72) for troubleshooting steps such as **Open Anyway** in System Settings → Privacy & Security.
 
 ---
 

@@ -433,14 +433,8 @@
             <h2>3. Installation</h2>
             <div class="tip-box" style="margin-bottom: 20px;">
                 <strong>App Bundles (Recommended):</strong> Pre-built application bundles are available for Windows, macOS, and Linux. They include all dependencies, so you can run CARA without installing Python. See the <a href="https://github.com/pguntermann/CARA/releases" target="_blank">releases page</a> for downloads (Linux bundles are published as <code>.tar.gz</code> per architecture).
-                <p style="margin-top: 10px; margin-bottom: 0;"><strong>macOS users:</strong> Due to macOS security settings, you may need to allow the app to run. If you see a security warning when trying to open the app, follow these steps:</p>
-                <ol style="margin-top: 10px; margin-bottom: 10px;">
-                    <li>Right-click the app and select "Open"</li>
-                    <li>When the warning dialog appears, click "OK"</li>
-                    <li>Open System Settings → Privacy & Security</li>
-                    <li>Scroll down to find the blocked app notification and click "Open Anyway"</li>
-                </ol>
-                After completing these steps, you can launch the app normally. For background and troubleshooting details, see <a href="https://github.com/pguntermann/CARA/discussions/72" target="_blank" rel="noopener noreferrer">this Q&amp;A post</a>.
+                <p style="margin-top: 10px; margin-bottom: 0;"><strong>macOS users:</strong> Official macOS App Bundles are <strong>Developer ID–signed and notarized</strong> by Apple. After unzipping, you can open the app normally (moving it to Applications is optional). The first launch may still show a one-time confirmation that the app was downloaded from the internet — choose <strong>Open</strong>.</p>
+                <p style="margin-top: 10px; margin-bottom: 0;">If Gatekeeper still blocks the app (uncommon with current builds), see <a href="https://github.com/pguntermann/CARA/discussions/72" target="_blank" rel="noopener noreferrer">this Q&amp;A post</a> for troubleshooting steps such as <strong>Open Anyway</strong> in System Settings → Privacy &amp; Security.</p>
             </div>
             <p style="margin-bottom: 20px;"><strong>Manual Installation:</strong> The following sections describe how to manually install Python and CARA dependencies, if you don't want to use the pre-built application bundles.</p>
             <div class="outline-item">
