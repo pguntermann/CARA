@@ -85,8 +85,10 @@ DIST_ZIP="$ROOT/dist/CARA.${VERSION}.macOS.AppBundle.zip"
 rm -f "$NOTARY_ZIP"
 
 echo "==> Creating zip for notarytool"
-# ditto preserves macOS metadata better than zip(1) for notarization.
-ditto -c -k --keepParent "$APP" "$NOTARY_ZIP"
+# ditto (not zip) for a proper .app archive. Omit resource forks / xattrs so the
+# archive does not embed AppleDouble "._*" entries (Finder unzip materializes
+# those as real files and breaks the code signature seal).
+ditto -c -k --norsrc --noextattr --keepParent "$APP" "$NOTARY_ZIP"
 
 echo "==> Submitting to Apple notary service (profile: ${NOTARY_PROFILE})"
 # Credentials come from Keychain profile — never from this repo.
@@ -100,7 +102,7 @@ xcrun stapler validate "$APP"
 
 echo "==> Creating distribution zip"
 rm -f "$DIST_ZIP"
-ditto -c -k --keepParent "$APP" "$DIST_ZIP"
+ditto -c -k --norsrc --noextattr --keepParent "$APP" "$DIST_ZIP"
 rm -f "$NOTARY_ZIP"
 
 echo
