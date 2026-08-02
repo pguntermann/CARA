@@ -655,17 +655,19 @@ class EncyclopediaGalleryOverlay(QWidget):
 
 def build_encyclopedia_tag_chip(
     prefix: str,
-    value: str,
+    value: str = "",
     *,
     bg: List[int],
     fg: List[int],
     font_size: int = 8,
     border_radius: int = 4,
     padding: Optional[List[int]] = None,
+    tooltip: Optional[str] = None,
 ) -> QLabel:
-    """Create a small colored metadata chip (``Prefix: value``)."""
+    """Create a small colored metadata chip (``Prefix: value`` or ``Prefix`` alone)."""
     pad = padding if isinstance(padding, (list, tuple)) and len(padding) >= 4 else [2, 6, 2, 6]
-    tag = QLabel(f"{prefix}: {value}")
+    label = prefix if not value else f"{prefix}: {value}"
+    tag = QLabel(label)
     tag.setFont(QFont(resolve_font_family("Helvetica Neue"), int(font_size)))
     tag.setStyleSheet(
         f"background-color: rgb({bg[0]}, {bg[1]}, {bg[2]}); "
@@ -674,6 +676,8 @@ def build_encyclopedia_tag_chip(
         f"padding: {int(pad[0])}px {int(pad[1])}px {int(pad[2])}px {int(pad[3])}px;"
     )
     tag.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+    if tooltip:
+        tag.setToolTip(tooltip)
     return tag
 
 
@@ -1220,13 +1224,14 @@ class OpeningEncyclopediaDialog(QDialog):
         spacing = int(tags_cfg.get("spacing", 5))
         margin_top = int(tags_cfg.get("margin_top", 4))
 
-        tag_defs: List[Tuple[str, str, list, list]] = []
+        tag_defs: List[Tuple[str, str, list, list, Optional[str]]] = []
         if entry.opening_id:
             tag_defs.append((
                 "ID",
                 entry.opening_id,
                 _rgb(tags_cfg.get("id_background"), [55, 55, 62]),
                 _rgb(tags_cfg.get("id_text_color"), [180, 180, 190]),
+                None,
             ))
         if entry.tier:
             tag_defs.append((
@@ -1234,6 +1239,7 @@ class OpeningEncyclopediaDialog(QDialog):
                 entry.tier,
                 _rgb(tags_cfg.get("tier_background"), [50, 60, 75]),
                 _rgb(tags_cfg.get("tier_text_color"), [130, 170, 230]),
+                None,
             ))
         if entry.family_id:
             tag_defs.append((
@@ -1241,6 +1247,7 @@ class OpeningEncyclopediaDialog(QDialog):
                 entry.family_id,
                 _rgb(tags_cfg.get("family_background"), [55, 62, 55]),
                 _rgb(tags_cfg.get("family_text_color"), [130, 200, 140]),
+                None,
             ))
         eco_list = self._parse_eco_codes(entry.eco_codes)
         if eco_list:
@@ -1252,9 +1259,10 @@ class OpeningEncyclopediaDialog(QDialog):
                 eco_label,
                 _rgb(tags_cfg.get("eco_background"), [65, 55, 55]),
                 _rgb(tags_cfg.get("eco_text_color"), [210, 160, 130]),
+                None,
             ))
 
-        if not tag_defs:
+        if not tag_defs and not entry.used_fallback:
             return None
 
         row = QWidget()
@@ -1264,7 +1272,7 @@ class OpeningEncyclopediaDialog(QDialog):
         h.setContentsMargins(0, margin_top, 0, 0)
         h.setSpacing(spacing)
 
-        for prefix, value, bg, fg in tag_defs:
+        for prefix, value, bg, fg, tip in tag_defs:
             h.addWidget(
                 build_encyclopedia_tag_chip(
                     prefix,
@@ -1274,8 +1282,44 @@ class OpeningEncyclopediaDialog(QDialog):
                     font_size=font_size,
                     border_radius=border_radius,
                     padding=list(pad),
+                    tooltip=tip,
                 )
             )
+
+        if entry.used_fallback:
+            parent_name = entry.display_name or "the parent opening"
+            state = (entry.matched_content_state or "pending").strip().lower()
+            if state == "skipped":
+                tip_tmpl = str(
+                    tags_cfg.get(
+                        "fallback_tooltip_skipped",
+                        "No dedicated entry — showing {parent}.",
+                    )
+                )
+            else:
+                tip_tmpl = str(
+                    tags_cfg.get(
+                        "fallback_tooltip_pending",
+                        "This line isn't researched yet — showing {parent}.",
+                    )
+                )
+            try:
+                tip = tip_tmpl.format(parent=parent_name)
+            except (KeyError, ValueError):
+                tip = tip_tmpl
+            h.addWidget(
+                build_encyclopedia_tag_chip(
+                    "Fallback",
+                    "",
+                    bg=_rgb(tags_cfg.get("fallback_background"), [70, 58, 48]),
+                    fg=_rgb(tags_cfg.get("fallback_text_color"), [220, 175, 130]),
+                    font_size=font_size,
+                    border_radius=border_radius,
+                    padding=list(pad),
+                    tooltip=tip,
+                )
+            )
+
         h.addStretch(1)
         return row
 
@@ -2239,6 +2283,45 @@ class OpeningEncyclopediaDialog(QDialog):
     def _open_feedback_dialog(self) -> None:
         if self._search_open:
             self._close_search()
+
+        if self._entry.used_fallback:
+            from app.views.dialogs.confirmation_dialog import ConfirmationDialog
+
+            # Copy lives in config.json (not style themes).
+            feedback_cfg = (
+                (self.config.get("ui") or {})
+                .get("dialogs", {})
+                .get("opening_encyclopedia_dialog", {})
+                .get("feedback", {})
+            )
+            if not isinstance(feedback_cfg, dict):
+                feedback_cfg = {}
+            matched = (
+                self._entry.matched_display_name
+                or self._entry.matched_opening_id
+                or "the identified line"
+            )
+            parent = self._entry.display_name or "the parent opening"
+            title = str(
+                feedback_cfg.get("fallback_confirm_title", "Parent entry shown")
+            )
+            message_tmpl = str(
+                feedback_cfg.get(
+                    "fallback_confirm_message",
+                    "The line CARA identified ({matched}) does not have its own "
+                    "encyclopedia entry yet. You are viewing the parent opening "
+                    "({parent}).\n\nDo you still want to file feedback about this entry?",
+                )
+            )
+            try:
+                message = message_tmpl.format(matched=matched, parent=parent)
+            except (KeyError, ValueError):
+                message = message_tmpl
+            if not ConfirmationDialog.show_confirmation(
+                self.config, title, message, parent=self
+            ):
+                return
+
         from app.views.dialogs.opening_encyclopedia_feedback_dialog import (
             OpeningEncyclopediaFeedbackDialog,
         )

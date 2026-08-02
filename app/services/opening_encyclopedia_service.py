@@ -132,10 +132,20 @@ class EncyclopediaEntry:
     name_origin: Optional[str]
     history: Optional[str]
     images: Tuple[EncyclopediaImage, ...]
+    # When name_resolution hit a stub and prose came from an ancestor:
+    matched_opening_id: Optional[str] = None
+    matched_display_name: Optional[str] = None
+    matched_content_state: Optional[str] = None  # pending | skipped | ready
 
     @property
     def has_image(self) -> bool:
         return bool(self.images)
+
+    @property
+    def used_fallback(self) -> bool:
+        """True when displayed prose belongs to a less-specific ancestor."""
+        matched = self.matched_opening_id
+        return bool(matched and matched != self.opening_id)
 
 
 @dataclass(frozen=True)
@@ -344,11 +354,28 @@ class OpeningEncyclopediaService:
             except sqlite3.OperationalError:
                 self._search_abbrevs = {}
 
+            # Prefer content_state when present; older DBs fall back to summary.
+            has_content_state = False
+            try:
+                cols = {
+                    str(r[1])
+                    for r in conn.execute("PRAGMA table_info(opening)").fetchall()
+                }
+                has_content_state = "content_state" in cols
+            except Exception:
+                has_content_state = False
+
+            state_select = (
+                "o.content_state"
+                if has_content_state
+                else "NULL AS content_state"
+            )
             for row in conn.execute(
-                """
+                f"""
                 SELECT o.opening_id, o.display_name, o.family_id,
                        o.tier, o.eco_codes,
                        o.summary, o.key_ideas, o.name_origin, o.history,
+                       {state_select},
                        i1.mime AS image_mime, o.image_caption, o.image_lifespan,
                        o.image_origin, o.image_source, o.image_license,
                        o.image_attribution,
@@ -363,16 +390,25 @@ class OpeningEncyclopediaService:
                 """
             ):
                 oid = str(row["opening_id"])
+                summary = row["summary"]
+                raw_state = row["content_state"] if has_content_state else None
+                if raw_state in ("ready", "pending", "skipped"):
+                    content_state = str(raw_state)
+                elif summary and str(summary).strip():
+                    content_state = "ready"
+                else:
+                    content_state = "pending"
                 self._openings[oid] = {
                     "opening_id": oid,
                     "display_name": str(row["display_name"] or ""),
                     "family_id": row["family_id"],
                     "tier": _opt_str(row["tier"]),
                     "eco_codes": _opt_str(row["eco_codes"]),
-                    "summary": row["summary"],
+                    "summary": summary,
                     "key_ideas": row["key_ideas"],
                     "name_origin": row["name_origin"],
                     "history": row["history"],
+                    "content_state": content_state,
                     "images": self._images_from_row(row),
                 }
 
@@ -413,33 +449,95 @@ class OpeningEncyclopediaService:
             oid = self._by_name.get(key)
         return oid
 
-    def lookup(
-        self, display_name: str, eco: Optional[str] = None
+    def _entry_from_ready(
+        self,
+        raw: Dict[str, Any],
+        *,
+        matched_opening_id: Optional[str] = None,
+        matched_display_name: Optional[str] = None,
+        matched_content_state: Optional[str] = None,
+        fallback_display_name: Optional[str] = None,
+    ) -> EncyclopediaEntry:
+        """Build an ``EncyclopediaEntry`` from a ready in-memory opening row."""
+        family_id = raw.get("family_id")
+        display = str(raw.get("display_name") or fallback_display_name or "")
+        return EncyclopediaEntry(
+            opening_id=str(raw["opening_id"]),
+            display_name=display,
+            family_id=str(family_id) if family_id else None,
+            tier=_opt_str(raw.get("tier")),
+            eco_codes=_opt_str(raw.get("eco_codes")),
+            summary=str(raw.get("summary") or "").strip(),
+            key_ideas=_opt_str(raw.get("key_ideas")),
+            name_origin=_opt_str(raw.get("name_origin")),
+            history=_opt_str(raw.get("history")),
+            images=tuple(raw.get("images") or ()),
+            matched_opening_id=matched_opening_id,
+            matched_display_name=matched_display_name,
+            matched_content_state=matched_content_state,
+        )
+
+    @staticmethod
+    def _is_ready(raw: Dict[str, Any]) -> bool:
+        state = raw.get("content_state") or ""
+        summary = (raw.get("summary") or "").strip()
+        if state == "ready" and summary:
+            return True
+        # Legacy DBs without content_state: non-empty summary is enough.
+        if not state and summary:
+            return True
+        return False
+
+    def _walk_to_ready(
+        self,
+        start_id: str,
+        *,
+        fallback_display_name: Optional[str] = None,
     ) -> Optional[EncyclopediaEntry]:
-        """Resolve name → node, then walk family_id until a row has summary prose."""
-        node = self._resolve_opening_id(display_name, eco)
-        while node:
+        """Walk ``family_id`` from ``start_id`` until a ready prose row."""
+        matched_raw = self._openings.get(start_id)
+        matched_name = (
+            str(matched_raw.get("display_name") or "")
+            if matched_raw
+            else (fallback_display_name or "")
+        )
+        matched_state = (
+            str(matched_raw.get("content_state") or "pending")
+            if matched_raw
+            else "pending"
+        )
+        node: Optional[str] = start_id
+        seen: set[str] = set()
+        while node and node not in seen:
+            seen.add(node)
             raw = self._openings.get(node)
             if raw is None:
                 break
-            summary = (raw.get("summary") or "").strip()
-            if summary:
-                family_id = raw.get("family_id")
-                return EncyclopediaEntry(
-                    opening_id=str(raw["opening_id"]),
-                    display_name=str(raw["display_name"] or display_name),
-                    family_id=str(family_id) if family_id else None,
-                    tier=_opt_str(raw.get("tier")),
-                    eco_codes=_opt_str(raw.get("eco_codes")),
-                    summary=summary,
-                    key_ideas=_opt_str(raw.get("key_ideas")),
-                    name_origin=_opt_str(raw.get("name_origin")),
-                    history=_opt_str(raw.get("history")),
-                    images=tuple(raw.get("images") or ()),
+            if self._is_ready(raw):
+                used_fallback = node != start_id
+                return self._entry_from_ready(
+                    raw,
+                    matched_opening_id=start_id if used_fallback else None,
+                    matched_display_name=matched_name if used_fallback else None,
+                    matched_content_state=matched_state if used_fallback else None,
+                    fallback_display_name=fallback_display_name,
                 )
             family = raw.get("family_id")
             node = str(family) if family else None
         return None
+
+    def lookup(
+        self, display_name: str, eco: Optional[str] = None
+    ) -> Optional[EncyclopediaEntry]:
+        """Resolve name → node, then walk family_id until a ready prose row.
+
+        When the matched node is a ``pending`` / ``skipped`` stub, the returned
+        entry carries fallback metadata so the UI can show a Fallback chip.
+        """
+        node = self._resolve_opening_id(display_name, eco)
+        if not node:
+            return None
+        return self._walk_to_ready(node, fallback_display_name=display_name)
 
     def has_entry(self, display_name: str, eco: Optional[str] = None) -> bool:
         return self.lookup(display_name, eco) is not None
@@ -464,6 +562,9 @@ class OpeningEncyclopediaService:
         opening_id/family_id, eco_codes, then alias-only hits. Ties break on
         display_name A–Z.
 
+        Only ``content_state=ready`` openings are searchable (stubs stay out of
+        the hit list; explorer lookup still resolves them via inheritance).
+
         Returns a page of at most ``limit`` hits plus ``total`` untruncated count
         so the UI can show an overflow hint when results are truncated.
         """
@@ -474,6 +575,8 @@ class OpeningEncyclopediaService:
             return EncyclopediaSearchPage(results=[], total=0)
         scored: List[Tuple[int, str, EncyclopediaSearchResult]] = []
         for raw in self._openings.values():
+            if not self._is_ready(raw):
+                continue
             oid = str(raw["opening_id"])
             row_family = raw.get("family_id")
             if family_scope and not _opening_in_family_scope(
@@ -517,26 +620,10 @@ class OpeningEncyclopediaService:
         return EncyclopediaSearchPage(results=results[:capped], total=len(results))
 
     def get_entry_by_id(self, opening_id: str) -> Optional[EncyclopediaEntry]:
-        """Look up an entry directly by opening_id."""
-        raw = self._openings.get(opening_id)
-        if raw is None:
+        """Look up an entry by opening_id, walking to a ready ancestor if needed."""
+        if not opening_id:
             return None
-        summary = (raw.get("summary") or "").strip()
-        if not summary:
-            return None
-        family_id = raw.get("family_id")
-        return EncyclopediaEntry(
-            opening_id=str(raw["opening_id"]),
-            display_name=str(raw["display_name"] or ""),
-            family_id=str(family_id) if family_id else None,
-            tier=_opt_str(raw.get("tier")),
-            eco_codes=_opt_str(raw.get("eco_codes")),
-            summary=summary,
-            key_ideas=_opt_str(raw.get("key_ideas")),
-            name_origin=_opt_str(raw.get("name_origin")),
-            history=_opt_str(raw.get("history")),
-            images=tuple(raw.get("images") or ()),
-        )
+        return self._walk_to_ready(opening_id)
 
     def get_image_bytes(self, opening_id: str, slot: int = 1) -> Optional[bytes]:
         """Lazy-load image BLOB for ``opening_id`` slot 1 or 2 (cached)."""

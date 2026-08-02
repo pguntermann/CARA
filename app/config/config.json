@@ -508,6 +508,12 @@
           "description_too_short": "Feedback too short, please describe the issue in more detail",
           "category_required": "Please select a category"
         }
+      },
+      "opening_encyclopedia_dialog": {
+        "feedback": {
+          "fallback_confirm_title": "Parent entry shown",
+          "fallback_confirm_message": "The line CARA identified ({matched}) does not have its own encyclopedia entry yet. You are viewing the parent opening ({parent}).\n\nDo you still want to file feedback about this entry?"
+        }
       }
     },
     "positional_heatmap": {

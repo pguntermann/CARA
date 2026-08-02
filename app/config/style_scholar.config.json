@@ -4989,7 +4989,11 @@
           "family_background": [217, 227, 212],
           "family_text_color": [70, 104, 66],
           "eco_background": [232, 218, 205],
-          "eco_text_color": [126, 83, 49]
+          "eco_text_color": [126, 83, 49],
+        "fallback_background": [75, 60, 48],
+        "fallback_text_color": [210, 170, 120],
+        "fallback_tooltip_pending": "This line isn't researched yet — showing {parent}.",
+        "fallback_tooltip_skipped": "No dedicated entry — showing {parent}."
         },
         "search": {
           "icon_size": 18,
