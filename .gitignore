@@ -98,12 +98,24 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Apple signing / notarization secrets (never commit)
+*.p12
+*.cer
+*.certSigningRequest
+*.csr
+AuthKey_*.p8
+*.p8
+packaging/macos/local/
+dist/*-notarize.zip
 
 # Spyder project settings
 .spyderproject
