@@ -1,5 +1,18 @@
 # Release Notes
 
+# CARA v2.8.1 - Opening Encyclopedia Refinements
+
+**Release Date:** 02.08.2026
+
+This release refines the **Opening Encyclopedia** with better window sizing, entry feedback and clearer fallback handling for unfinished variation stubs.
+
+- **Window sizing:** More flexible and free (re-)sizing of the window, with persistence - Including improved compatibility with Linux Window Managers.
+- **Entry feedback:** Report issues or suggestions for an encyclopedia entry from the dialog (feedback button in the header).
+- **Fallback tag:** When the displayed entry is a fallback to a parent entry, because the specific variation is not yet covered in the encyclopedia, this is indicated with a **Fallback** tag.
+- **Title:** The opening title shown in the encyclopedia window now matches the entry, instead of the detected concrete opening.
+
+---
+
 # CARA v2.8.0 - Opening Encyclopedia
 
 **Release Date:** 01.08.2026
