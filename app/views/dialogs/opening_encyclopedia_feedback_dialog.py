@@ -31,7 +31,7 @@ from app.views.style import StyleManager
 _DEFAULT_CATEGORIES = [
     "Factually wrong content",
     "Image license / attribution issue",
-    "Matches wrong line",
+    "Suggest Image (PD/CC0)",
     "Typo / wording",
     "Improvement suggestion",
     "Other",
