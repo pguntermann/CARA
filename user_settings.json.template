@@ -1082,5 +1082,6 @@
     }
   },
   "player_stats_active_profile": "Default",
-  "player_stats_profile_order": []
+  "player_stats_profile_order": [],
+  "recent_pgn_databases": []
 }

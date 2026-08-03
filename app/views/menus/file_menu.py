@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PyQt6.QtGui import QAction, QKeySequence
-from PyQt6.QtWidgets import QMenuBar
+from PyQt6.QtWidgets import QMenu, QMenuBar
 
 from app.utils.themed_icon import set_menubar_themable_action_icon
 
@@ -21,6 +21,11 @@ def setup_file_menu(mw, menu_bar: QMenuBar) -> None:
     set_menubar_themable_action_icon(mw, mw.open_pgn_database_action, _FOLDER_OPEN_SVG)
     mw.open_pgn_database_action.triggered.connect(mw._open_pgn_database)
     file_menu.addAction(mw.open_pgn_database_action)
+
+    mw.open_recent_menu = QMenu("Open Recent", mw)
+    mw._apply_menu_styling(mw.open_recent_menu)
+    mw.open_recent_menu.aboutToShow.connect(mw._rebuild_open_recent_menu)
+    file_menu.addMenu(mw.open_recent_menu)
 
     file_menu.addSeparator()
 
@@ -113,3 +118,5 @@ def setup_file_menu(mw, menu_bar: QMenuBar) -> None:
     mw.close_application_action.triggered.connect(mw._close_application)
     file_menu.addAction(mw.close_application_action)
 
+    # Populate once so the submenu is not empty before first open.
+    mw._rebuild_open_recent_menu()

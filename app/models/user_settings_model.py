@@ -452,6 +452,22 @@ class UserSettingsModel(QObject):
         cur.update(partial)
         self.set_opening_encyclopedia_dialog(cur)
 
+    def get_recent_pgn_databases(self) -> list:
+        """Get recent PGN database file paths (most recent first)."""
+        raw = self._settings.get("recent_pgn_databases", [])
+        if not isinstance(raw, list):
+            return []
+        return [str(p) for p in raw if isinstance(p, str) and p.strip()]
+
+    def set_recent_pgn_databases(self, paths: list) -> None:
+        """Replace the recent PGN database list."""
+        cleaned: list = []
+        for p in paths:
+            if isinstance(p, str) and p.strip():
+                cleaned.append(p.strip())
+        self._settings["recent_pgn_databases"] = cleaned
+        self.settings_changed.emit()
+
     def update_from_dict(self, settings: Dict[str, Any]) -> None:
         """Update settings from a dictionary (used when loading from file).
         

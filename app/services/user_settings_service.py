@@ -59,14 +59,17 @@ class UserSettingsService:
                 user_settings_config = config.get("user_settings", {})
                 self._settings_filename = user_settings_config.get("filename", "user_settings.json")
                 self._template_filename = user_settings_config.get("template_filename", "user_settings.json.template")
+                self._recent_pgn_max = int(user_settings_config.get("recent_pgn_databases_max", 15))
             else:
                 # Config file doesn't exist, use defaults
                 self._settings_filename = "user_settings.json"
                 self._template_filename = "user_settings.json.template"
-        except (json.JSONDecodeError, IOError, KeyError):
+                self._recent_pgn_max = 15
+        except (json.JSONDecodeError, IOError, KeyError, TypeError, ValueError):
             # Config is corrupted or missing, use defaults
             self._settings_filename = "user_settings.json"
             self._template_filename = "user_settings.json.template"
+            self._recent_pgn_max = 15
     
     def _get_template_path(self) -> Path:
         """Get the path to the template file (always in app root).
@@ -403,6 +406,10 @@ class UserSettingsService:
                     model.set_ai_models(template_value)
                 elif key == "ai_summary":
                     model.set_ai_summary(template_value)
+                elif key == "recent_pgn_databases":
+                    model.set_recent_pgn_databases(
+                        template_value if isinstance(template_value, list) else []
+                    )
                 else:
                     # Unknown key - add directly via update_from_dict
                     updated_settings = current_settings.copy()
@@ -599,6 +606,35 @@ class UserSettingsService:
     def update_opening_encyclopedia_dialog(self, partial: Dict[str, Any]) -> None:
         """Merge Opening Encyclopedia dialog preferences in memory (saved on exit)."""
         self.get_model().update_opening_encyclopedia_dialog(partial)
+
+    def get_recent_pgn_databases(self) -> list:
+        """Return recent PGN database paths (most recent first)."""
+        return self.get_model().get_recent_pgn_databases()
+
+    def add_recent_pgn_database(self, file_path: str) -> None:
+        """Push a successfully used PGN path to the front of the recent list (in memory).
+
+        Does not write to disk; persistence happens on application exit via ``save()``.
+        """
+        import os
+
+        if not file_path or not str(file_path).strip():
+            return
+        try:
+            normalized = str(Path(file_path).expanduser().resolve())
+        except OSError:
+            normalized = str(Path(file_path).expanduser())
+
+        max_entries = max(1, int(getattr(self, "_recent_pgn_max", 15) or 15))
+        current = self.get_recent_pgn_databases()
+        key = os.path.normcase(normalized)
+        filtered = [p for p in current if os.path.normcase(p) != key]
+        filtered.insert(0, normalized)
+        self.get_model().set_recent_pgn_databases(filtered[:max_entries])
+
+    def clear_recent_pgn_databases(self) -> None:
+        """Clear the recent PGN database list in memory (saved on exit)."""
+        self.get_model().set_recent_pgn_databases([])
 
     def bind_board_model(self, board_model: Any) -> None:
         """Keep in-memory board visibility settings synchronized with the live board model."""

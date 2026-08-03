@@ -685,6 +685,7 @@
   "user_settings": {
     "filename": "user_settings.json",
     "template_filename": "user_settings.json.template",
+    "recent_pgn_databases_max": 15,
     "player_stats_reset": {
       "confirmation_title": "Reset Player Stats settings",
       "confirmation_message": "This will overwrite the Default Player Stats profile with the application defaults and activate it. Continue?",

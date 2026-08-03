@@ -486,6 +486,7 @@ class MainWindow(QMainWindow):
             success, message, first_game = database_controller.open_pgn_database(file_path)
 
             if success:
+                self._remember_recent_pgn_database(file_path)
                 self._update_save_menu_state()
                 self._update_close_menu_state()
                 if first_game:
@@ -497,6 +498,11 @@ class MainWindow(QMainWindow):
         opened_count, skipped_count, failed_count, messages, last_successful_database, last_first_game = (
             database_controller.open_pgn_databases(file_paths)
         )
+
+        # Record opened and already-open paths (not failures).
+        for file_path in file_paths:
+            if database_controller.get_database_by_file_path(file_path) is not None:
+                self._remember_recent_pgn_database(file_path)
 
         if opened_count > 0:
             self._update_save_menu_state()
@@ -520,7 +526,66 @@ class MainWindow(QMainWindow):
             status_message = "No databases opened"
 
         self.controller.set_status(status_message)
-    
+
+    def _remember_recent_pgn_database(self, file_path: str) -> None:
+        """Record a PGN path in the recent list (in-memory; saved on app exit)."""
+        from app.services.user_settings_service import UserSettingsService
+
+        UserSettingsService.get_instance().add_recent_pgn_database(file_path)
+
+    def _rebuild_open_recent_menu(self) -> None:
+        """Rebuild File → Open Recent from user settings."""
+        from app.services.user_settings_service import UserSettingsService
+
+        menu = getattr(self, "open_recent_menu", None)
+        if menu is None:
+            return
+        menu.clear()
+
+        paths = UserSettingsService.get_instance().get_recent_pgn_databases()
+        if not paths:
+            empty = QAction("(No recent databases)", self)
+            empty.setEnabled(False)
+            menu.addAction(empty)
+        else:
+            for path in paths:
+                p = Path(path)
+                exists = p.is_file()
+                label = p.name if p.name else path
+                if not exists:
+                    label = f"{label} (missing)"
+                action = QAction(label, self)
+                action.setToolTip(path)
+                action.setEnabled(exists)
+                if exists:
+                    action.triggered.connect(
+                        lambda _checked=False, fp=path: self._open_recent_pgn_database(fp)
+                    )
+                menu.addAction(action)
+
+        menu.addSeparator()
+        clear_action = QAction("Clear", self)
+        clear_action.setEnabled(bool(paths))
+        clear_action.triggered.connect(self._clear_recent_pgn_databases)
+        menu.addAction(clear_action)
+
+    def _open_recent_pgn_database(self, file_path: str) -> None:
+        """Open a path chosen from File → Open Recent."""
+        path = Path(file_path)
+        if not path.is_file():
+            self.controller.set_status(f"Recent database not found: {path.name}")
+            self._rebuild_open_recent_menu()
+            return
+        self._open_pgn_database_paths([str(path)])
+
+    def _clear_recent_pgn_databases(self) -> None:
+        """Clear the Open Recent list (in-memory; saved on app exit)."""
+        from app.services.user_settings_service import UserSettingsService
+
+        UserSettingsService.get_instance().clear_recent_pgn_databases()
+        self._rebuild_open_recent_menu()
+        self.controller.set_status("Recent databases cleared")
+
     def _on_database_removed(self, identifier: str) -> None:
         """When any database tab is closed (file menu or context menu), clear active game and update menu state."""
         self.controller.get_game_controller().set_active_game(None)
@@ -696,6 +761,7 @@ class MainWindow(QMainWindow):
         self.controller.set_status(message)
         
         if success:
+            self._remember_recent_pgn_database(file_path)
             # If this was a search results database, close the search results tab
             if identifier == 'search_results':
                 self._close_search_results_after_save()

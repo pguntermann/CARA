@@ -2863,6 +2863,7 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.window.x",
     "ui.window.y",
     "user_settings.filename",
+    "user_settings.recent_pgn_databases_max",
     "user_settings.player_stats_reset.confirmation_message",
     "user_settings.player_stats_reset.confirmation_title",
     "user_settings.player_stats_reset.status_failed",
