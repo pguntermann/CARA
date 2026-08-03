@@ -78,6 +78,7 @@ from app.views.delegates.encyclopedia_search_result_delegate import (
 )
 from app.views.style import StyleManager
 from app.views.style.menu_bar import apply_menu_styling
+from app.views.style.tooltip import tooltip_qss_block
 
 # Window-size presets as percent-of-available-screen keys stored in user settings.
 _SIZE_PRESET_KEYS = ("45", "60", "80")
@@ -1376,14 +1377,20 @@ class OpeningEncyclopediaDialog(QDialog):
         icon_tint = _rgb(search_cfg.get("icon_tint_rgb"), search_cfg.get("icon_color", [160, 160, 165]))
         icon_size = int(search_cfg.get("icon_size", 18))
         icon_svg = str(search_cfg.get("icon_svg") or SVG_MENU_SEARCH)
+        # Widget-local QSS can override app QToolTip theme; embed tip rules (summary-view pattern).
+        tip_qss = tooltip_qss_block(self.config)
+        header_btn_qss = (
+            "QPushButton { background: transparent; border: none; }\n"
+            f"{tip_qss}"
+        )
         btn = QPushButton()
         btn.setFixedSize(icon_size + 8, icon_size + 8)
         btn.setIcon(themed_icon_from_svg(icon_svg, icon_tint))
         btn.setIconSize(QSize(icon_size, icon_size))
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        btn.setToolTip("Search openings")
-        btn.setStyleSheet("QPushButton { background: transparent; border: none; }")
+        btn.setToolTip(str(search_cfg.get("tooltip", "Search openings")))
+        btn.setStyleSheet(header_btn_qss)
         btn.clicked.connect(self._toggle_search)
         self._search_btn = btn
         lay.addWidget(btn)
@@ -1403,7 +1410,7 @@ class OpeningEncyclopediaDialog(QDialog):
         size_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         size_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         size_btn.setToolTip(size_tooltip)
-        size_btn.setStyleSheet("QPushButton { background: transparent; border: none; }")
+        size_btn.setStyleSheet(header_btn_qss)
         size_btn.clicked.connect(self._show_size_menu)
         self._size_toggle_btn = size_btn
         lay.addWidget(size_btn)
@@ -1422,7 +1429,7 @@ class OpeningEncyclopediaDialog(QDialog):
             fb_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             fb_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             fb_btn.setToolTip(str(feedback_cfg.get("tooltip", "Report feedback")))
-            fb_btn.setStyleSheet("QPushButton { background: transparent; border: none; }")
+            fb_btn.setStyleSheet(header_btn_qss)
             fb_btn.clicked.connect(self._open_feedback_dialog)
             self._feedback_btn = fb_btn
             lay.addWidget(fb_btn)

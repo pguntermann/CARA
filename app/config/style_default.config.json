@@ -5112,6 +5112,7 @@
           "icon_size": 18,
           "icon_svg": "app/resources/icons/menu_search.svg",
           "icon_tint_rgb": [160, 160, 165],
+          "tooltip": "Search openings",
           "input_height": 28,
           "input_font_size": 10,
           "input_expanded_width": 220,

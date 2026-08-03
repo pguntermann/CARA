@@ -1379,6 +1379,7 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.dialogs.opening_encyclopedia_dialog.search.icon_size",
     "ui.dialogs.opening_encyclopedia_dialog.search.icon_svg",
     "ui.dialogs.opening_encyclopedia_dialog.search.icon_tint_rgb",
+    "ui.dialogs.opening_encyclopedia_dialog.search.tooltip",
     "ui.dialogs.opening_encyclopedia_dialog.search.input_height",
     "ui.dialogs.opening_encyclopedia_dialog.search.input_font_size",
     "ui.dialogs.opening_encyclopedia_dialog.search.input_expanded_width",
