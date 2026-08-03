@@ -107,11 +107,12 @@ When standard tags are modified, corresponding `GameData` fields are updated (`W
 `BulkOperationsController` (`app/controllers/bulk_operations_controller.py`):
 - Runs the ordered plan via `BulkPlanService.apply_plan()` (one pass over games)
 - Optionally runs Result/ECO Smart Update after the plan
-- Aggregates multi-phase stats (unique games changed via PGN fingerprint when plan + Smart Update both run)
+- Aggregates multi-phase stats (union of per-game update/fail IDs across plan + Smart Update)
 - Gets engine configuration from `EngineController` and `EngineParametersService`
 - Creates `OpeningService` instance for ECO updates
 - Handles progress reporting and cancellation
-- Refreshes active game and marks database unsaved
+- Dialog runs execute on a background `QThread`; plan pass uses `ProcessPoolExecutor`
+- Refreshes active game and marks database unsaved on the UI thread after completion
 
 ## Clean PGN helpers
 

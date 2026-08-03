@@ -12,7 +12,6 @@ from app.controllers.bulk_operations_controller import (
 from app.services.bulk_operation_stats import BulkProcessingOutcome
 from app.services.bulk_plan_service import (
     _process_game_for_plan,
-    plan_requires_position_reindex,
     plan_step_from_operation,
 )
 
@@ -36,17 +35,6 @@ def _steps(*ops: BulkOperation):
 
 
 class TestBulkPlanService(unittest.TestCase):
-    def test_plan_ops_never_require_position_reindex(self) -> None:
-        header_and_clean = _steps(
-            BulkOperation(mode=MODE_OVERWRITE, tags=("White",), replace_text="A"),
-            BulkOperation(mode=MODE_CLEAN, remove_comments=True, remove_variations=True),
-        )
-        self.assertFalse(plan_requires_position_reindex(header_and_clean))
-        variations_only = _steps(
-            BulkOperation(mode=MODE_CLEAN, remove_variations=True),
-        )
-        self.assertFalse(plan_requires_position_reindex(variations_only))
-
     def test_plan_remove_then_add_recreates_tag(self) -> None:
         steps = _steps(
             BulkOperation(mode=MODE_REMOVE_TAGS, tags=("Annotator",)),

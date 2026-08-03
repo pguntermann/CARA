@@ -1,7 +1,8 @@
 """Database model for holding game data."""
 
-from PyQt6.QtCore import QAbstractTableModel, Qt, QModelIndex, QRect, pyqtSignal
+from PyQt6.QtCore import QAbstractTableModel, Qt, QModelIndex, QRect, pyqtSignal, pyqtSlot, QMetaObject, QThread, Q_ARG
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QBrush, QColor
+from PyQt6.QtWidgets import QApplication
 from typing import Optional, List, Dict, Any, Set, Tuple, Callable
 from datetime import datetime
 from collections import Counter
@@ -1214,14 +1215,35 @@ class DatabaseModel(QAbstractTableModel):
         min_row = rows[0]
         max_row = rows[-1]
         
-        # Emit a single dataChanged signal for the entire range
+        # Emit on the UI thread when called from a bulk-ops worker QThread.
+        self._emit_batch_data_changed(min_row, max_row)
+        _pump()
+
+    def _emit_batch_data_changed(self, min_row: int, max_row: int) -> None:
+        """Emit dataChanged / stats signals, marshaled to the UI thread if needed."""
+        app = QApplication.instance()
+        if app is not None and QThread.currentThread() is not app.thread():
+            QMetaObject.invokeMethod(
+                self,
+                "_emit_batch_data_changed_impl",
+                Qt.ConnectionType.BlockingQueuedConnection,
+                Q_ARG(int, min_row),
+                Q_ARG(int, max_row),
+            )
+            return
+        self._emit_batch_data_changed_impl(min_row, max_row)
+
+    @pyqtSlot(int, int)
+    def _emit_batch_data_changed_impl(self, min_row: int, max_row: int) -> None:
         parent = QModelIndex()
         left_index = self.index(min_row, 0, parent)
         right_index = self.index(max_row, self.columnCount(parent) - 1, parent)
-        self.dataChanged.emit(left_index, right_index,
-                             [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole])
+        self.dataChanged.emit(
+            left_index,
+            right_index,
+            [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole],
+        )
         self._emit_stats_relevant_data_change()
-        _pump()
     
     def _create_unsaved_icon(self) -> QIcon:
         """Create icon for unsaved changes indicator.

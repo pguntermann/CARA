@@ -32,8 +32,26 @@ class BulkOperationStats:
 BulkProgressCallback = Callable[[int, int, str, int, int, int], None]
 
 
+def _on_ui_thread() -> bool:
+    try:
+        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtCore import QThread
+
+        app = QApplication.instance()
+        return app is not None and QThread.currentThread() is app.thread()
+    except Exception:
+        return False
+
+
 def pump_bulk_ui_events() -> None:
-    """Keep Qt timers (e.g. progress spinner) alive during UI-thread bulk work."""
+    """Pump Qt events only when called from the UI thread.
+
+    Never call this while waiting on a ProcessPool from the UI thread — that
+    combination hung/crashed on macOS. Prefer running the pool on a QThread
+    so the UI event loop stays free without nested processEvents.
+    """
+    if not _on_ui_thread():
+        return
     try:
         from PyQt6.QtWidgets import QApplication
         from PyQt6.QtCore import QEventLoop
@@ -46,22 +64,24 @@ def pump_bulk_ui_events() -> None:
 
 
 def shutdown_executor_keeping_ui_alive(executor: Any) -> None:
-    """Release a ProcessPoolExecutor without blocking the Qt UI thread forever.
+    """Shut down a ProcessPoolExecutor after all futures are done.
 
-    Call only after all futures have already completed. Waiting on
-    ``shutdown(wait=True)`` can hang indefinitely on some platforms (notably
-    macOS + Qt) while worker processes tear down, which left Bulk Operations
-    stuck on \"Finishing…\". Non-blocking shutdown is safe once work is done:
-    idle workers exit shortly after.
+    On a background thread, ``wait=True`` is safe and preferred. On the UI
+    thread, use non-blocking shutdown to avoid macOS/Qt hangs.
     """
     if executor is None:
         return
     try:
-        executor.shutdown(wait=False)
+        if _on_ui_thread():
+            executor.shutdown(wait=False)
+            pump_bulk_ui_events()
+        else:
+            executor.shutdown(wait=True)
     except Exception:
-        pass
-    # Brief pump so the overlay can repaint before the next blocking step.
-    pump_bulk_ui_events()
+        try:
+            executor.shutdown(wait=False)
+        except Exception:
+            pass
 
 
 def emit_bulk_progress_applying(
@@ -74,10 +94,7 @@ def emit_bulk_progress_applying(
     *,
     message: str = "Finishing…",
 ) -> None:
-    """Notify UI before in-memory batch apply (not disk persistence).
-
-    Callers should treat this as wrap-up of the current step, not Save Database.
-    """
+    """Notify UI before in-memory batch apply (not disk persistence)."""
     if not progress_callback:
         return
     progress_callback(

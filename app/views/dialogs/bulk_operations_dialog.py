@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from PyQt6.QtCore import Qt, QPoint, QSize, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QPoint, QSize, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPalette, QShowEvent, QResizeEvent, QCloseEvent
 from PyQt6.QtWidgets import (
     QButtonGroup,
@@ -1537,6 +1537,44 @@ class _ProgressOverlay(QWidget):
         self.cancel_requested.emit()
 
 
+class _BulkOperationsWorker(QThread):
+    """Runs bulk execute off the UI thread so ProcessPool + Qt stay stable."""
+
+    finished_with_result = pyqtSignal(object)
+    failed_with_error = pyqtSignal(str)
+
+    def __init__(
+        self,
+        controller: BulkOperationsController,
+        database: DatabaseModel,
+        operations: List[BulkOperation],
+        has_result: bool,
+        has_eco: bool,
+        game_indices: Optional[List[int]],
+        parent=None,
+    ) -> None:
+        super().__init__(parent)
+        self._controller = controller
+        self._database = database
+        self._operations = operations
+        self._has_result = has_result
+        self._has_eco = has_eco
+        self._game_indices = game_indices
+
+    def run(self) -> None:  # noqa: N802
+        try:
+            result = self._controller.execute_bulk_operations(
+                self._database,
+                self._operations,
+                self._has_result,
+                self._has_eco,
+                self._game_indices,
+            )
+            self.finished_with_result.emit(result)
+        except Exception as exc:
+            self.failed_with_error.emit(str(exc))
+
+
 class BulkOperationsDialog(QDialog):
     """Dialog for bulk header-tag and PGN cleaning operations on databases."""
 
@@ -1566,6 +1604,7 @@ class BulkOperationsDialog(QDialog):
         self._row_widgets: List[_OperationListRow] = []
         self._selected_operation_index: Optional[int] = None
         self._operation_in_progress = False
+        self._worker: Optional[_BulkOperationsWorker] = None
 
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         self._load_config()
@@ -2284,8 +2323,7 @@ class BulkOperationsDialog(QDialog):
         step_label: str,
     ) -> None:
         self._progress_overlay.set_step(step_label)
-        is_finishing = message == "Finishing…" or message.startswith("Updating search index")
-        if is_finishing:
+        if message == "Finishing…":
             self._progress_overlay.set_status(message)
         self._progress_overlay.set_live_stats(
             games_processed,
@@ -2293,8 +2331,7 @@ class BulkOperationsDialog(QDialog):
             games_failed,
             games_skipped,
         )
-        # Do not processEvents here — the plan runner pumps on a throttle.
-        # Nested processEvents during Apply caused macOS hangs/crashes.
+        # Do not processEvents here — the worker/QThread keeps the UI loop free.
 
     def _on_progress_cancel_requested(self) -> None:
         if self._operation_in_progress:
@@ -2352,29 +2389,44 @@ class BulkOperationsDialog(QDialog):
         self._operation_in_progress = True
         self.apply_button.setEnabled(False)
         self._progress_overlay.open_running()
-        # Let the overlay paint before the blocking run.
+        # Let the overlay paint before starting the worker thread.
         QTimer.singleShot(0, lambda: self._run_operations(has_result, has_eco))
 
     def _run_operations(self, has_result: bool, has_eco: bool) -> None:
-        try:
-            game_indices = None
-            if self.selected_games_radio.isChecked():
-                game_indices = self.selected_game_indices if self.selected_game_indices else None
-            result = self.controller.execute_bulk_operations(
-                self.database,
-                list(self._pending_operations),
-                has_result,
-                has_eco,
-                game_indices,
-            )
-            self._finish_operations(result)
-        except Exception as e:
-            from app.views.dialogs.message_dialog import MessageDialog
-            MessageDialog.show_critical(self.config, "Error", f"An error occurred: {str(e)}", self)
-            self._operation_in_progress = False
-            self._progress_overlay.show_failed(str(e))
+        if self._worker is not None and self._worker.isRunning():
+            return
+        game_indices = None
+        if self.selected_games_radio.isChecked():
+            game_indices = self.selected_game_indices if self.selected_game_indices else None
+        worker = _BulkOperationsWorker(
+            self.controller,
+            self.database,
+            list(self._pending_operations),
+            has_result,
+            has_eco,
+            game_indices,
+            self,
+        )
+        worker.finished_with_result.connect(self._finish_operations)
+        worker.failed_with_error.connect(self._on_worker_failed)
+        worker.finished.connect(worker.deleteLater)
+        self._worker = worker
+        worker.start()
+
+    def _on_worker_failed(self, message: str) -> None:
+        from app.views.dialogs.message_dialog import MessageDialog
+        MessageDialog.show_critical(
+            self.config,
+            "Error",
+            f"An error occurred: {message}",
+            self,
+        )
+        self._operation_in_progress = False
+        self._progress_overlay.show_failed(message)
+        self._worker = None
 
     def _finish_operations(self, result) -> None:
+        self._worker = None
         if not result.success:
             self._operation_in_progress = False
             message = result.error_message or "Operation failed"
@@ -2383,6 +2435,14 @@ class BulkOperationsDialog(QDialog):
             else:
                 self._progress_overlay.show_failed(message)
             return
+
+        # UI-thread post-work (unsafe to do inside the worker QThread).
+        if result.games_updated > 0 and self.database is not None:
+            game_indices = None
+            if self.selected_games_radio.isChecked():
+                game_indices = self.selected_game_indices if self.selected_game_indices else None
+            self.controller._refresh_active_game_if_updated(self.database, game_indices)
+            self.controller.database_controller.mark_database_unsaved(self.database)
 
         self._progress_overlay.show_complete(format_bulk_operation_summary_plain(result))
 

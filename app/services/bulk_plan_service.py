@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import re
 from io import StringIO
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import chess.pgn
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from app.models.database_model import DatabaseModel
 from app.services.bulk_clean_pgn_service import _process_game_for_cleaning
@@ -15,10 +17,11 @@ from app.services.bulk_operation_stats import (
     BulkProcessingOutcome,
     BulkProgressCallback,
     emit_bulk_progress_applying,
-    pump_bulk_ui_events,
+    shutdown_executor_keeping_ui_alive,
 )
 from app.services.logging_service import LoggingService
 from app.services.pgn_service import PgnService
+from app.utils.concurrency_utils import get_process_pool_max_workers
 from app.utils.game_data_header_sync import (
     apply_game_data_updates,
     game_data_updates_for_header_tag,
@@ -51,15 +54,6 @@ def plan_step_from_operation(operation: Any) -> PlanStep:
         "remove_non_standard_tags": bool(operation.remove_non_standard_tags),
         "remove_annotations": bool(operation.remove_annotations),
     }
-
-
-def plan_requires_position_reindex(steps: Sequence[PlanStep]) -> bool:
-    """True when plan ops can change main-line positions used by search.
-
-    Bulk plan ops only edit headers or strip comments/variations/annotations/tags.
-    The position index is main-line only, so none of these require a rebuild.
-    """
-    return False
 
 
 def _apply_add_tag(
@@ -266,11 +260,10 @@ class BulkPlanService:
         progress_callback: Optional[BulkProgressCallback] = None,
         cancellation_check: Optional[Callable[[], bool]] = None,
     ) -> BulkOperationStats:
-        """Apply all plan operations to each game once.
+        """Apply all plan operations to each game once (process pool).
 
-        Runs in-process on the caller thread (typically the Qt UI thread).
-        Process pools were avoided here: combining ProcessPoolExecutor with
-        Qt processEvents on macOS hung/crashed near the end of large runs.
+        Intended to run on a background QThread. Do not drive this from the UI
+        thread with nested processEvents — that hung/crashed on macOS.
         """
         steps = tuple(plan_step_from_operation(op) for op in operations)
         if not steps:
@@ -288,6 +281,7 @@ class BulkPlanService:
                 progress_callback(0, 0, "No games to process", 0, 0, 0)
             return BulkOperationStats(True, 0, 0, 0, 0)
 
+        max_workers = get_process_pool_max_workers(os.cpu_count(), self.config)
         updated_games: List[Any] = []
         updated_game_ids: List[int] = []
         failed_game_ids: List[int] = []
@@ -295,48 +289,62 @@ class BulkPlanService:
         games_failed = 0
         games_skipped = 0
         completed = 0
+        executor = None
 
-        for game in games_to_process:
-            if cancellation_check and cancellation_check():
-                break
+        try:
+            executor = ProcessPoolExecutor(max_workers=max_workers)
+            future_to_game = {
+                executor.submit(_process_game_for_plan, game.pgn, steps): game
+                for game in games_to_process
+            }
 
-            completed += 1
-            try:
-                new_pgn, field_updates, outcome = _process_game_for_plan(game.pgn, steps)
-                if outcome == BulkProcessingOutcome.UPDATED:
-                    if new_pgn:
-                        game.pgn = new_pgn
-                        if isinstance(field_updates, dict):
-                            apply_game_data_updates(game, field_updates)
-                        updated_games.append(game)
-                        updated_game_ids.append(id(game))
-                        games_updated += 1
+            for future in as_completed(future_to_game):
+                if cancellation_check and cancellation_check():
+                    for f in future_to_game:
+                        if f != future:
+                            f.cancel()
+                    break
+
+                game = future_to_game[future]
+                completed += 1
+                try:
+                    new_pgn, field_updates, outcome = future.result()
+                    if outcome == BulkProcessingOutcome.UPDATED:
+                        if new_pgn:
+                            game.pgn = new_pgn
+                            if isinstance(field_updates, dict):
+                                apply_game_data_updates(game, field_updates)
+                            updated_games.append(game)
+                            updated_game_ids.append(id(game))
+                            games_updated += 1
+                        else:
+                            failed_game_ids.append(id(game))
+                            games_failed += 1
+                    elif outcome == BulkProcessingOutcome.SKIPPED:
+                        games_skipped += 1
                     else:
                         failed_game_ids.append(id(game))
                         games_failed += 1
-                elif outcome == BulkProcessingOutcome.SKIPPED:
-                    games_skipped += 1
-                else:
+                except Exception:
                     failed_game_ids.append(id(game))
                     games_failed += 1
-            except Exception:
-                failed_game_ids.append(id(game))
-                games_failed += 1
 
-            if progress_callback and (
-                completed == 1
-                or completed == total_games
-                or completed % 8 == 0
-            ):
-                progress_callback(
-                    completed,
-                    total_games,
-                    f"Processing game {completed}/{total_games}",
-                    games_updated,
-                    games_failed,
-                    games_skipped,
-                )
-                pump_bulk_ui_events()
+                if progress_callback and (
+                    completed == 1
+                    or completed == total_games
+                    or completed % 8 == 0
+                ):
+                    progress_callback(
+                        completed,
+                        total_games,
+                        f"Processing game {completed}/{total_games}",
+                        games_updated,
+                        games_failed,
+                        games_skipped,
+                    )
+        finally:
+            if executor is not None:
+                shutdown_executor_keeping_ui_alive(executor)
 
         emit_bulk_progress_applying(
             progress_callback,
@@ -347,26 +355,8 @@ class BulkPlanService:
             games_skipped,
         )
         if updated_games:
-            needs_reindex = plan_requires_position_reindex(steps)
-
-            def _on_reindex(done: int, total: int) -> None:
-                emit_bulk_progress_applying(
-                    progress_callback,
-                    completed,
-                    total_games,
-                    games_updated,
-                    games_failed,
-                    games_skipped,
-                    message=f"Updating search index {done}/{total}",
-                )
-
-            database.batch_update_games(
-                updated_games,
-                reindex_positions=needs_reindex,
-                progress_callback=(
-                    _on_reindex if (needs_reindex and progress_callback) else None
-                ),
-            )
+            # Header/clean ops do not change main-line positions.
+            database.batch_update_games(updated_games, reindex_positions=False)
 
         added_tags = {
             (step.get("tags") or [None])[0]
