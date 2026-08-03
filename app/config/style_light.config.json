@@ -4702,6 +4702,10 @@
           "remove_button_tooltip": "Remove selected operation",
           "clear_button_icon_svg": "app/resources/icons/menu_reset.svg",
           "clear_button_tooltip": "Clear all operations",
+          "save_button_icon_svg": "app/resources/icons/save_database.svg",
+          "save_button_tooltip": "Save operations as a named plan",
+          "load_button_icon_svg": "app/resources/icons/folder_open.svg",
+          "load_button_tooltip": "Load or delete a saved plan",
           "toolbar_separator_width": 1,
           "toolbar_separator_margin": [6, 4, 6, 4]
         },

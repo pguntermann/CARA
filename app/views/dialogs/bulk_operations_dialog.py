@@ -7,7 +7,16 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import Qt, QPoint, QSize, QTimer, QThread, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPalette, QShowEvent, QResizeEvent, QCloseEvent
+from PyQt6.QtGui import (
+    QColor,
+    QFont,
+    QFontMetrics,
+    QMouseEvent,
+    QPalette,
+    QShowEvent,
+    QResizeEvent,
+    QCloseEvent,
+)
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -18,6 +27,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenu,
     QPushButton,
     QRadioButton,
     QScrollArea,
@@ -40,6 +50,11 @@ from app.controllers.bulk_operations_controller import (
     sanitize_tag_name,
     validate_bulk_operation,
     validate_bulk_operation_plan,
+)
+from app.utils.bulk_operation_plan import (
+    normalize_plan_name,
+    plan_operations_from_dicts,
+    plan_operations_to_dicts,
 )
 from app.utils.bulk_regex_presets import (
     CUSTOM_PRESET_ID,
@@ -1650,6 +1665,18 @@ class BulkOperationsDialog(QDialog):
         self.clear_button_tooltip = str(
             buttons_config.get("clear_button_tooltip", "Clear all operations")
         )
+        self.save_button_icon_svg = str(
+            buttons_config.get("save_button_icon_svg", "app/resources/icons/save_database.svg")
+        )
+        self.save_button_tooltip = str(
+            buttons_config.get("save_button_tooltip", "Save operations as a named plan")
+        )
+        self.load_button_icon_svg = str(
+            buttons_config.get("load_button_icon_svg", "app/resources/icons/folder_open.svg")
+        )
+        self.load_button_tooltip = str(
+            buttons_config.get("load_button_tooltip", "Load or delete a saved plan")
+        )
         self.toolbar_separator_width = int(buttons_config.get("toolbar_separator_width", 1))
         sep_m = buttons_config.get("toolbar_separator_margin", [6, 4, 6, 4])
         self.toolbar_separator_margin = (
@@ -1854,11 +1881,25 @@ class BulkOperationsDialog(QDialog):
         self.clear_operations_button.setAccessibleName("Clear all operations")
         self.clear_operations_button.clicked.connect(self._on_clear_all_clicked)
 
+        self.save_plan_button = QPushButton()
+        self.save_plan_button.setObjectName("operations_toolbar_save")
+        self.save_plan_button.setToolTip(self.save_button_tooltip)
+        self.save_plan_button.setAccessibleName("Save operations plan")
+        self.save_plan_button.clicked.connect(self._on_save_plan_clicked)
+
+        self.load_plan_button = QPushButton()
+        self.load_plan_button.setObjectName("operations_toolbar_load")
+        self.load_plan_button.setToolTip(self.load_button_tooltip)
+        self.load_plan_button.setAccessibleName("Load operations plan")
+        self.load_plan_button.clicked.connect(self._on_load_plan_clicked)
+
         for btn in (
             self.add_operation_button,
             self.edit_operation_button,
             self.remove_operation_button,
             self.clear_operations_button,
+            self.save_plan_button,
+            self.load_plan_button,
         ):
             btn.setAutoDefault(False)
             btn.setDefault(False)
@@ -1867,20 +1908,23 @@ class BulkOperationsDialog(QDialog):
         toolbar.addWidget(self.edit_operation_button)
         toolbar.addWidget(self.remove_operation_button)
 
-        self._toolbar_separator = QFrame()
-        self._toolbar_separator.setObjectName("operations_toolbar_separator")
-        self._toolbar_separator.setFrameShape(QFrame.Shape.VLine)
-        self._toolbar_separator.setFrameShadow(QFrame.Shadow.Plain)
-        self._toolbar_separator.setLineWidth(1)
-        self._toolbar_separator.setFixedWidth(max(1, self.toolbar_separator_width))
+        self._toolbar_separator = self._make_toolbar_separator("operations_toolbar_separator")
         m = self.toolbar_separator_margin
-        self._toolbar_separator.setContentsMargins(0, 0, 0, 0)
         toolbar.addSpacing(max(0, m[0]))
         toolbar.addWidget(self._toolbar_separator)
         toolbar.addSpacing(max(0, m[2]))
 
         toolbar.addWidget(self.clear_operations_button)
         toolbar.addStretch(1)
+
+        self._toolbar_plans_separator = self._make_toolbar_separator(
+            "operations_toolbar_plans_separator"
+        )
+        toolbar.addSpacing(max(0, m[0]))
+        toolbar.addWidget(self._toolbar_plans_separator)
+        toolbar.addSpacing(max(0, m[2]))
+        toolbar.addWidget(self.save_plan_button)
+        toolbar.addWidget(self.load_plan_button)
         operations_layout.addLayout(toolbar)
         operations_group.setLayout(operations_layout)
         main_layout.addWidget(operations_group)
@@ -1929,6 +1973,16 @@ class BulkOperationsDialog(QDialog):
         self._progress_overlay.accept_requested.connect(self._on_progress_accepted)
         self._progress_overlay.dismiss_requested.connect(self._on_progress_dismissed)
         self.controller.progress_updated.connect(self._on_progress_updated)
+
+    def _make_toolbar_separator(self, object_name: str) -> QFrame:
+        sep = QFrame()
+        sep.setObjectName(object_name)
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setFrameShadow(QFrame.Shadow.Plain)
+        sep.setLineWidth(1)
+        sep.setFixedWidth(max(1, self.toolbar_separator_width))
+        sep.setContentsMargins(0, 0, 0, 0)
+        return sep
 
     def _rebuild_operations_list(self) -> None:
         previous_selection = self._selected_operation_index
@@ -2020,6 +2074,8 @@ class BulkOperationsDialog(QDialog):
         self.clear_operations_button.setEnabled(
             not busy and bool(self._pending_operations)
         )
+        self.save_plan_button.setEnabled(not busy and bool(self._pending_operations))
+        self.load_plan_button.setEnabled(not busy)
 
     def _update_summary_elision(self) -> None:
         viewport_w = self.operations_scroll.viewport().width()
@@ -2077,6 +2133,136 @@ class BulkOperationsDialog(QDialog):
         self._rebuild_operations_list()
         self._update_toolbar_enabled()
         self._apply_configured_dialog_size()
+
+    def _on_save_plan_clicked(self) -> None:
+        """Prompt for a name and store the current operations list in user settings."""
+        if self._operation_in_progress or not self._pending_operations:
+            return
+        from app.services.user_settings_service import UserSettingsService
+        from app.views.dialogs.confirmation_dialog import ConfirmationDialog
+        from app.views.dialogs.input_dialog import InputDialog
+        from app.views.dialogs.message_dialog import MessageDialog
+
+        name, ok = InputDialog.get_text(
+            self.config,
+            "Save Plan",
+            "Plan name:",
+            "",
+            self,
+        )
+        if not ok:
+            return
+        name = normalize_plan_name(name)
+        if not name:
+            MessageDialog.show_warning(self.config, "Save Plan", "Please enter a plan name.", self)
+            return
+
+        settings = UserSettingsService.get_instance()
+        plans = settings.get_bulk_operation_plans()
+        if name in plans:
+            if not ConfirmationDialog.show_confirmation(
+                self.config,
+                "Overwrite Plan",
+                f'A plan named "{name}" already exists. Overwrite it?',
+                self,
+            ):
+                return
+
+        plans[name] = plan_operations_to_dicts(self._pending_operations)
+        settings.update_bulk_operation_plans(plans)
+
+    def _on_load_plan_clicked(self) -> None:
+        """Show a menu of saved plans (load) and a Delete plan… submenu."""
+        if self._operation_in_progress:
+            return
+        from app.services.user_settings_service import UserSettingsService
+        from app.views.style.menu_bar import apply_menu_styling
+
+        settings = UserSettingsService.get_instance()
+        plans = settings.get_bulk_operation_plans()
+        names = sorted(plans.keys(), key=lambda n: n.casefold())
+
+        menu = QMenu(self)
+        apply_menu_styling(menu, self.config)
+
+        if not names:
+            empty = menu.addAction("No saved plans")
+            empty.setEnabled(False)
+        else:
+            for name in names:
+                action = menu.addAction(name)
+                action.triggered.connect(
+                    lambda _checked=False, n=name: self._load_named_plan(n)
+                )
+            menu.addSeparator()
+            delete_menu = menu.addMenu("Delete plan…")
+            apply_menu_styling(delete_menu, self.config)
+            for name in names:
+                delete_action = delete_menu.addAction(name)
+                delete_action.triggered.connect(
+                    lambda _checked=False, n=name: self._delete_named_plan(n)
+                )
+
+        button_pos = self.load_plan_button.mapToGlobal(
+            self.load_plan_button.rect().bottomLeft()
+        )
+        menu.exec(button_pos)
+
+    def _load_named_plan(self, name: str) -> None:
+        """Replace the operations list with a saved plan (confirm if non-empty)."""
+        if self._operation_in_progress:
+            return
+        from app.services.user_settings_service import UserSettingsService
+        from app.views.dialogs.confirmation_dialog import ConfirmationDialog
+        from app.views.dialogs.message_dialog import MessageDialog
+
+        plans = UserSettingsService.get_instance().get_bulk_operation_plans()
+        raw = plans.get(name)
+        if raw is None:
+            MessageDialog.show_warning(
+                self.config, "Load Plan", f'Plan "{name}" was not found.', self
+            )
+            return
+        operations, error = plan_operations_from_dicts(raw)
+        if error:
+            MessageDialog.show_warning(self.config, "Load Plan", error, self)
+            return
+
+        if self._pending_operations:
+            if not ConfirmationDialog.show_confirmation(
+                self.config,
+                "Load Plan",
+                f'Replace the current operations list with "{name}"?',
+                self,
+            ):
+                return
+
+        self._pending_operations = list(operations)
+        self._selected_operation_index = (
+            len(self._pending_operations) - 1 if self._pending_operations else None
+        )
+        self._rebuild_operations_list()
+        self._update_toolbar_enabled()
+        self._apply_configured_dialog_size()
+
+    def _delete_named_plan(self, name: str) -> None:
+        """Confirm and remove a named plan from in-memory user settings."""
+        from app.services.user_settings_service import UserSettingsService
+        from app.views.dialogs.confirmation_dialog import ConfirmationDialog
+
+        if not ConfirmationDialog.show_confirmation(
+            self.config,
+            "Delete Plan",
+            f'Delete saved plan "{name}"?',
+            self,
+        ):
+            return
+        settings = UserSettingsService.get_instance()
+        plans = settings.get_bulk_operation_plans()
+        if name not in plans:
+            return
+        del plans[name]
+        settings.update_bulk_operation_plans(plans)
 
     def _remember_current_state(self) -> None:
         """Persist plan + Smart Update + game scope for the next dialog open."""
@@ -2173,6 +2359,8 @@ class BulkOperationsDialog(QDialog):
             self.edit_operation_button,
             self.remove_operation_button,
             self.clear_operations_button,
+            self.save_plan_button,
+            self.load_plan_button,
         ]
         StyleManager.style_buttons(
             toolbar_buttons,
@@ -2194,18 +2382,25 @@ class BulkOperationsDialog(QDialog):
         self.clear_operations_button.setIcon(
             themed_icon_from_svg(self.clear_button_icon_svg, self.toolbar_icon_tint)
         )
+        self.save_plan_button.setIcon(
+            themed_icon_from_svg(self.save_button_icon_svg, self.toolbar_icon_tint)
+        )
+        self.load_plan_button.setIcon(
+            themed_icon_from_svg(self.load_button_icon_svg, self.toolbar_icon_tint)
+        )
         for btn in toolbar_buttons:
             btn.setText("")
             btn.setIconSize(QSize(self.toolbar_icon_px, self.toolbar_icon_px))
             btn.setFixedSize(self.button_height, self.button_height)
         sep_h = max(8, self.button_height - self.toolbar_separator_margin[1] - self.toolbar_separator_margin[3])
-        self._toolbar_separator.setFixedHeight(sep_h)
-        self._toolbar_separator.setStyleSheet(
-            "QFrame#operations_toolbar_separator {"
-            f"  background-color: rgb({border[0]}, {border[1]}, {border[2]});"
-            "  border: 0px; padding: 0px; margin: 0px;"
-            "}"
-        )
+        for sep in (self._toolbar_separator, self._toolbar_plans_separator):
+            sep.setFixedHeight(sep_h)
+            sep.setStyleSheet(
+                f"QFrame#{sep.objectName()} {{"
+                f"  background-color: rgb({border[0]}, {border[1]}, {border[2]});"
+                "  border: 0px; padding: 0px; margin: 0px;"
+                "}"
+            )
         self._update_toolbar_enabled()
 
         input_bg = [self.input_bg_color.red(), self.input_bg_color.green(), self.input_bg_color.blue()]

@@ -114,6 +114,14 @@ When standard tags are modified, corresponding `GameData` fields are updated (`W
 - Dialog runs execute on a background `QThread`; plan pass uses `ProcessPoolExecutor`
 - Refreshes active game and marks database unsaved on the UI thread after completion
 
+### Named plans (save / load)
+
+`BulkOperationsDialog` can persist **operations only** (not Smart Update or All/Selected) as named plans:
+
+- Storage: `bulk_operation_plans` in user settings via `UserSettingsService.update_bulk_operation_plans()` (in memory; disk write on normal app exit — no explicit `save()`)
+- Serialize/validate: `app/utils/bulk_operation_plan.py`
+- Toolbar: Save (`InputDialog` name + overwrite confirm) and Load (`QMenu` of plan names + **Delete plan…** submenu)
+
 ## Clean PGN helpers
 
 ### `_process_game_for_cleaning`
