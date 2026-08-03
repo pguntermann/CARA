@@ -1135,6 +1135,15 @@ class DatabaseModel(QAbstractTableModel):
         """
         if not games:
             return
+
+        def _pump() -> None:
+            # Keep progress overlays (spinner) fluent during long reindex passes.
+            try:
+                from app.services.bulk_operation_stats import pump_bulk_ui_events
+
+                pump_bulk_ui_events()
+            except Exception:
+                pass
         
         if reindex_positions:
             start_ts = time.perf_counter()
@@ -1149,6 +1158,8 @@ class DatabaseModel(QAbstractTableModel):
                 pass
             for game in games:
                 self._position_index_add_game(game, None, None)
+                _pump()
+            _pump()
             elapsed_ms = int((time.perf_counter() - start_ts) * 1000)
             try:
                 from app.services.logging_service import LoggingService
@@ -1164,12 +1175,15 @@ class DatabaseModel(QAbstractTableModel):
         for game in games:
             self._unsaved_games.add(game)
         
-        # Find all row indices for the updated games
+        # O(n) id→row map once instead of repeated list.index per game.
+        id_to_row = {id(g): idx for idx, g in enumerate(self._games)}
         rows = []
         for game in games:
-            row = self.find_game(game)
+            row = id_to_row.get(id(game))
             if row is not None:
                 rows.append(row)
+            if len(rows) % 64 == 0:
+                _pump()
         
         if not rows:
             return
@@ -1186,6 +1200,7 @@ class DatabaseModel(QAbstractTableModel):
         self.dataChanged.emit(left_index, right_index,
                              [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole])
         self._emit_stats_relevant_data_change()
+        _pump()
     
     def _create_unsaved_icon(self) -> QIcon:
         """Create icon for unsaved changes indicator.

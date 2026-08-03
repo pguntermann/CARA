@@ -514,6 +514,66 @@
           "fallback_confirm_title": "Parent entry shown",
           "fallback_confirm_message": "The line CARA identified ({matched}) does not have its own encyclopedia entry yet. You are viewing the parent opening ({parent}).\n\nDo you still want to file feedback about this entry?"
         }
+      },
+      "bulk_operations": {
+        "regex_presets": [
+          {
+            "id": "",
+            "label": "Custom…",
+            "find": "",
+            "replace": "",
+            "tooltip": "Enter your own regular expression in Find / Replace."
+          },
+          {
+            "id": "keep_capture",
+            "label": "Keep only matched substring",
+            "find": ".*(text to keep).*",
+            "replace": "\\1",
+            "tooltip": "Keeps only the part matched inside the first (…). Replace \"text to keep\" with the literal text or a pattern such as Candidates or [A-Za-z ]+."
+          },
+          {
+            "id": "keep_before_dash",
+            "label": "Keep text before \"-\"",
+            "find": "^(.*?)\\s*-\\s*.*$",
+            "replace": "\\1",
+            "tooltip": "Example: \"Wijk aan Zee - Masters\" or \"Wijk aan Zee-Masters\" → \"Wijk aan Zee\"."
+          },
+          {
+            "id": "keep_after_dash",
+            "label": "Keep text after \"-\"",
+            "find": "^.*?\\s*-\\s*(.*)$",
+            "replace": "\\1",
+            "tooltip": "Example: \"Wijk aan Zee - Masters\" or \"Wijk aan Zee-Masters\" → \"Masters\"."
+          },
+          {
+            "id": "keep_in_parens",
+            "label": "Keep text inside (…)",
+            "find": ".*?\\(([^)]+)\\).*",
+            "replace": "\\1",
+            "tooltip": "Example: \"Olympiad (Open)\" → \"Open\"."
+          },
+          {
+            "id": "keep_before_parens",
+            "label": "Keep text before (…)",
+            "find": "^(.*?)\\s*\\(.*$",
+            "replace": "\\1",
+            "tooltip": "Example: \"Olympiad (Open)\" → \"Olympiad\"."
+          },
+          {
+            "id": "keep_year",
+            "label": "Keep first 4-digit year",
+            "find": ".*?(\\d{4}).*",
+            "replace": "\\1",
+            "tooltip": "Example: \"London 2024 Open\" → \"2024\"."
+          },
+          {
+            "id": "keep_first_three_words",
+            "label": "Keep first three words",
+            "find": "^(\\S+(?:\\s+\\S+){0,2}).*$",
+            "replace": "\\1",
+            "tooltip": "Drops everything after the first three whitespace-separated words."
+          }
+        ]
       }
     },
     "positional_heatmap": {

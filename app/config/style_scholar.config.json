@@ -4699,7 +4699,22 @@
           "buttons_top_spacing": 8,
           "label_min_width": 88
         },
-        "tag_picker": {
+
+                        "progress": {
+          "card_width": 360,
+          "card_margins": [28, 28, 28, 24],
+          "card_spacing": 16,
+          "buttons_top_spacing": 4,
+          "title_font_size": { "$ref": "$_FONT_SIZE_BASE_MEDIUM" },
+          "summary_font_size": { "$ref": "$_FONT_SIZE_BASE_MEDIUM" },
+          "summary_text_color": { "$ref": "$_COLOR_COCOA_BROWN" },
+          "spinner_size": 40,
+          "spinner_line_width": 4,
+          "spinner_span_degrees": 120,
+          "spinner_color": { "$ref": "$_COLOR_BOURBON_TEAL" },
+          "spinner_track_color": { "$ref": "$_COLOR_TAUPE_SAND" }
+        },
+"tag_picker": {
           "selected_border_color": {
             "$ref": "$_COLOR_DEEP_TEAL"
           },

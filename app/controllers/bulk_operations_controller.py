@@ -4,17 +4,16 @@ from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from app.models.database_model import DatabaseModel, GameData
-from app.services.bulk_clean_pgn_service import BulkCleanPgnService
 from app.services.bulk_operation_stats import BulkOperationStats
+from app.services.bulk_plan_service import BulkPlanService
 from app.services.bulk_replace_service import BulkReplaceService
-from app.services.bulk_tag_service import BulkTagService
 from app.services.engine_parameters_service import EngineParametersService
 from app.services.opening_service import OpeningService
 from app.services.progress_service import ProgressService
@@ -76,32 +75,8 @@ STANDARD_TAGS: List[str] = [
 
 
 def _pgn_fingerprint(pgn: str) -> bytes:
-    """Compact digest for comparing PGN before/after multi-step bulk ops."""
+    """Compact digest for comparing PGN before/after multi-phase bulk ops."""
     return hashlib.blake2b(pgn.encode("utf-8"), digest_size=16).digest()
-
-
-def _combine_multi_step_bulk_stats(
-    step_results: List[BulkOperationStats],
-    games_in_scope: List[GameData],
-    initial_fingerprints: Dict[int, bytes],
-) -> BulkOperationStats:
-    """Single summary for multiple phases: unique games via PGN fingerprint delta."""
-    if not step_results:
-        return BulkOperationStats(True, 0, 0, 0, 0)
-    if len(step_results) == 1:
-        return step_results[0]
-    n = len(games_in_scope)
-    modified = sum(
-        1 for g in games_in_scope if _pgn_fingerprint(g.pgn) != initial_fingerprints[id(g)]
-    )
-    failed_sum = sum(r.games_failed for r in step_results)
-    return BulkOperationStats(
-        success=True,
-        games_processed=n,
-        games_updated=modified,
-        games_failed=failed_sum,
-        games_skipped=n - modified,
-    )
 
 
 @dataclass(frozen=True)
@@ -221,10 +196,160 @@ def validate_bulk_operation(operation: BulkOperation) -> Optional[str]:
     return None
 
 
+@dataclass(frozen=True)
+class BulkPlanIssue:
+    """One interlocking / redundant-plan finding for a bulk operation sequence."""
+
+    message: str
+
+
+def _plan_tag_name(raw: str) -> str:
+    return sanitize_tag_name((raw or "").strip())
+
+
+def _plan_step_label(index: int) -> str:
+    return f"Step {index + 1}"
+
+
+def validate_bulk_operation_plan(
+    operations: List[BulkOperation],
+    has_result_update: bool = False,
+    has_eco_update: bool = False,
+) -> List[BulkPlanIssue]:
+    """Detect conflicting or redundant tag interactions across an ordered plan.
+
+    Clean PGN does not affect header tags (its "non-standard tags" option removes
+    comment markers like [%clk], not PGN headers), so it is ignored here.
+
+    Returns human-readable issues. Empty list means no plan-level problems found.
+    """
+    issues: List[BulkPlanIssue] = []
+    # Tags removed by an earlier step and not re-added yet.
+    removed: Dict[str, int] = {}
+    # Last step that wrote each tag (add / overwrite / replace / copy target).
+    last_writer: Dict[str, int] = {}
+
+    def _note_use_after_remove(step_index: int, tag: str, role: str) -> None:
+        if tag in removed:
+            issues.append(
+                BulkPlanIssue(
+                    f"{_plan_step_label(step_index)} {role} tag \"{tag}\", "
+                    f"which was removed in {_plan_step_label(removed[tag])}"
+                )
+            )
+
+    def _note_write(step_index: int, tag: str, action: str) -> None:
+        _note_use_after_remove(step_index, tag, action)
+        if tag in last_writer and tag not in removed:
+            issues.append(
+                BulkPlanIssue(
+                    f"{_plan_step_label(step_index)} writes tag \"{tag}\", "
+                    f"which was already modified in {_plan_step_label(last_writer[tag])} "
+                    f"(earlier write will be overwritten)"
+                )
+            )
+        removed.pop(tag, None)
+        last_writer[tag] = step_index
+
+    for index, operation in enumerate(operations):
+        if operation.mode == MODE_CLEAN:
+            continue
+
+        if operation.mode == MODE_REMOVE_TAGS:
+            for raw in operation.tags:
+                tag = _plan_tag_name(raw)
+                if not tag:
+                    continue
+                if tag in removed:
+                    issues.append(
+                        BulkPlanIssue(
+                            f"{_plan_step_label(index)} removes tag \"{tag}\", "
+                            f"which was already removed in {_plan_step_label(removed[tag])}"
+                        )
+                    )
+                removed[tag] = index
+                last_writer.pop(tag, None)
+            continue
+
+        if operation.mode == MODE_ADD_TAG:
+            tag = _plan_tag_name(operation.tags[0] if operation.tags else "")
+            if not tag:
+                continue
+            if operation.copy_value_from_source:
+                source = _plan_tag_name(operation.source_tag)
+                if source:
+                    _note_use_after_remove(index, source, "copies from")
+            # Re-adding after remove is intentional; clear removed and record write.
+            if tag in last_writer and tag not in removed:
+                issues.append(
+                    BulkPlanIssue(
+                        f"{_plan_step_label(index)} adds tag \"{tag}\", "
+                        f"which was already modified in {_plan_step_label(last_writer[tag])} "
+                        f"(earlier write will be overwritten)"
+                    )
+                )
+            removed.pop(tag, None)
+            last_writer[tag] = index
+            continue
+
+        if operation.mode == MODE_COPY:
+            source = _plan_tag_name(operation.source_tag)
+            if source:
+                _note_use_after_remove(index, source, "copies from")
+            for raw in operation.tags:
+                tag = _plan_tag_name(raw)
+                if tag:
+                    _note_write(index, tag, "writes")
+            continue
+
+        # find_replace / overwrite
+        action = "overwrites" if operation.mode == MODE_OVERWRITE else "updates"
+        for raw in operation.tags:
+            tag = _plan_tag_name(raw)
+            if tag:
+                _note_write(index, tag, action)
+
+    def _note_smart(label: str, tag: str) -> None:
+        if tag in removed:
+            issues.append(
+                BulkPlanIssue(
+                    f"Smart Update ({label}) targets tag \"{tag}\", "
+                    f"which was removed in {_plan_step_label(removed[tag])}"
+                )
+            )
+            return
+        if tag in last_writer:
+            issues.append(
+                BulkPlanIssue(
+                    f"Smart Update ({label}) overwrites tag \"{tag}\", "
+                    f"which was already modified in {_plan_step_label(last_writer[tag])}"
+                )
+            )
+
+    if has_result_update:
+        _note_smart("Result", "Result")
+    if has_eco_update:
+        _note_smart("ECO", "ECO")
+
+    return issues
+
+
+def format_bulk_plan_issues(issues: List[BulkPlanIssue]) -> str:
+    """User-facing confirmation body for plan validation findings."""
+    lines = ["The operation plan has potential conflicts:", ""]
+    for issue in issues:
+        lines.append(f"• {issue.message}")
+    lines.append("")
+    lines.append("Continue anyway?")
+    return "\n".join(lines)
+
+
 class BulkOperationsController(QObject):
     """Orchestrates bulk header-tag, clean, and Smart Update operations."""
 
     operation_complete = pyqtSignal(BulkOperationStats)
+    # percent, message, processed, updated, failed, skipped, step_label
+    progress_updated = pyqtSignal(int, str, int, int, int, int, str)
 
     def __init__(
         self,
@@ -241,10 +366,22 @@ class BulkOperationsController(QObject):
         self.evaluation_controller = evaluation_controller
         self.game_controller = game_controller
         self.replace_service = BulkReplaceService(config)
-        self.tag_service = BulkTagService(config)
-        self.clean_service = BulkCleanPgnService(config)
+        self.plan_service = BulkPlanService(config)
         self.progress_service = ProgressService.get_instance()
         self._cancelled = False
+        self._progress_step_index = 0
+        self._progress_total_steps = 1
+        self._baseline_processed = 0
+        self._baseline_updated = 0
+        self._baseline_failed = 0
+        self._baseline_skipped = 0
+        self._games_in_scope: List[GameData] = []
+        self._initial_fingerprints: Dict[int, bytes] = {}
+        self._current_step_label = ""
+        self._last_live_processed = 0
+        self._last_live_updated = 0
+        self._last_live_failed = 0
+        self._last_live_skipped = 0
 
     def get_active_database(self) -> Optional[DatabaseModel]:
         return self.database_controller.get_active_database()
@@ -285,81 +422,221 @@ class BulkOperationsController(QObject):
         if active_game in updated_games:
             game_model.refresh_active_game()
 
-    def _progress_callback(self, game_index: int, total: int, message: str) -> None:
+    def _overall_percent(self, fraction_within_step: float) -> int:
+        total = max(1, int(self._progress_total_steps))
+        step = max(0, min(total - 1, int(self._progress_step_index)))
+        fraction = max(0.0, min(1.0, float(fraction_within_step)))
+        return int(((step + fraction) / total) * 100)
+
+    def _clamp_live_counts(
+        self,
+        processed: int,
+        updated: int,
+        failed: int,
+        skipped: int,
+    ) -> Tuple[int, int, int, int]:
+        """Keep live counters within the games-in-scope size (multi-step sums must not exceed it)."""
+        n = len(self._games_in_scope)
+        processed = max(0, int(processed))
+        updated = max(0, int(updated))
+        failed = max(0, int(failed))
+        skipped = max(0, int(skipped))
+        if n <= 0:
+            return processed, updated, failed, skipped
+        return min(processed, n), min(updated, n), min(failed, n), min(skipped, n)
+
+    def _live_unique_updated(self) -> int:
+        """Count games whose PGN changed since the plan started (matches final summary)."""
+        if not self._games_in_scope or not self._initial_fingerprints:
+            return 0
+        from app.services.bulk_operation_stats import pump_bulk_ui_events
+
+        count = 0
+        for i, g in enumerate(self._games_in_scope):
+            if _pgn_fingerprint(g.pgn) != self._initial_fingerprints.get(id(g), b""):
+                count += 1
+            if (i + 1) % 32 == 0:
+                pump_bulk_ui_events()
+        return count
+
+    def _emit_progress(
+        self,
+        percent: int,
+        message: str,
+        processed: int,
+        updated: int,
+        failed: int,
+        skipped: int,
+        *,
+        use_unique_updated: bool = True,
+    ) -> None:
+        n = len(self._games_in_scope)
+        # Multi-step plans re-visit the same games; prefer unique PGN deltas for "updated"
+        # so live counts match the final summary instead of summing per-step hits.
+        if use_unique_updated and self._initial_fingerprints:
+            updated = self._live_unique_updated()
+            if n > 0:
+                processed = min(max(0, int(processed)), n)
+                failed = min(max(0, int(failed)), n)
+                skipped = max(0, processed - updated - failed)
+            else:
+                processed = max(0, int(processed))
+                failed = max(0, int(failed))
+                skipped = max(0, int(skipped))
+        else:
+            processed, updated, failed, skipped = self._clamp_live_counts(
+                processed, updated, failed, skipped
+            )
+        self._last_live_processed = processed
+        self._last_live_updated = updated
+        self._last_live_failed = failed
+        self._last_live_skipped = skipped
+        self.progress_updated.emit(
+            int(percent),
+            message,
+            processed,
+            updated,
+            failed,
+            skipped,
+            self._current_step_label,
+        )
+
+    def _progress_callback(
+        self,
+        game_index: int,
+        total: int,
+        message: str,
+        games_updated: int = 0,
+        games_failed: int = 0,
+        games_skipped: int = 0,
+    ) -> None:
         if self._cancelled:
             return
-        percent = int((game_index / total) * 100) if total > 0 else 0
+        # Post-loop in-memory apply / pool teardown (not Save Database). Surface
+        # "Finishing…" before that blocking work and skip a redundant fingerprint pass.
+        if message == "Finishing…":
+            self._current_step_label = message
+            percent = self._overall_percent(1.0)
+            self.progress_service.set_progress(percent)
+            self.progress_service.set_status(f"Bulk Operations: {message}")
+            # Use the final completed count from the service (not the stale n-1
+            # cache from the previous unique-scan tick).
+            self._emit_progress(
+                percent,
+                message,
+                self._baseline_processed + max(0, int(game_index)),
+                max(
+                    self._last_live_updated,
+                    self._baseline_updated + max(0, int(games_updated)),
+                ),
+                self._baseline_failed + max(0, int(games_failed)),
+                self._baseline_skipped + max(0, int(games_skipped)),
+                use_unique_updated=False,
+            )
+            return
+        fraction = (game_index / total) if total > 0 else 0.0
+        percent = self._overall_percent(fraction)
+        status = f"Bulk Operations: {message}"
         self.progress_service.set_progress(percent)
+        self.progress_service.set_status(status)
+        processed_count = self._baseline_processed + max(0, int(game_index))
+        # Skip full-PGN unique scan on the final tick of a step — that work was
+        # freezing the UI before "Finishing…" could paint. Still advance the
+        # processed counter to n (do not reuse the n-1 cache).
+        at_step_end = total > 0 and int(game_index) >= int(total)
+        if at_step_end and self._initial_fingerprints:
+            self._emit_progress(
+                percent,
+                message,
+                processed_count,
+                max(
+                    self._last_live_updated,
+                    self._baseline_updated + max(0, int(games_updated)),
+                ),
+                self._baseline_failed + max(0, int(games_failed)),
+                self._baseline_skipped + max(0, int(games_skipped)),
+                use_unique_updated=False,
+            )
+        else:
+            self._emit_progress(
+                percent,
+                message,
+                processed_count,
+                self._baseline_updated + max(0, int(games_updated)),
+                self._baseline_failed + max(0, int(games_failed)),
+                self._baseline_skipped + max(0, int(games_skipped)),
+            )
+
+    def _set_step_status(self, message: str, percent: Optional[int] = None) -> None:
+        self._current_step_label = message
         self.progress_service.set_status(f"Bulk Operations: {message}")
+        if percent is None:
+            percent = self._overall_percent(0.0)
+        self.progress_service.set_progress(percent)
+        # Finishing: reuse last live unique counts (avoid another full
+        # fingerprint scan of every PGN on the UI thread).
+        use_unique = message not in ("Finishing…", "Complete")
+        processed = self._last_live_processed if not use_unique else self._baseline_processed
+        updated = self._last_live_updated if not use_unique else self._baseline_updated
+        failed = self._last_live_failed if not use_unique else self._baseline_failed
+        skipped = self._last_live_skipped if not use_unique else self._baseline_skipped
+        self._emit_progress(
+            int(percent),
+            message,
+            processed,
+            updated,
+            failed,
+            skipped,
+            use_unique_updated=use_unique,
+        )
+
+    def _accumulate_step_stats(self, step: BulkOperationStats) -> None:
+        self._baseline_processed += int(step.games_processed)
+        self._baseline_updated += int(step.games_updated)
+        self._baseline_failed += int(step.games_failed)
+        self._baseline_skipped += int(step.games_skipped)
 
     def _cancel_flag(self) -> bool:
         return self._cancelled
 
-    def _run_operation(
-        self,
-        database: DatabaseModel,
-        operation: BulkOperation,
-        game_indices: Optional[List[int]],
-    ) -> BulkOperationStats:
-        if operation.mode == MODE_CLEAN:
-            return self.clean_service.clean_pgn(
-                database,
-                operation.remove_comments,
-                operation.remove_variations,
-                operation.remove_non_standard_tags,
-                operation.remove_annotations,
-                game_indices,
-                self._progress_callback,
-                self._cancel_flag,
-            )
-        if operation.mode == MODE_ADD_TAG:
-            tag_name = sanitize_tag_name(operation.tags[0])
-            source = (
-                sanitize_tag_name(operation.source_tag)
-                if operation.copy_value_from_source
-                else None
-            )
-            value = None if source else operation.replace_text
-            return self.tag_service.add_tag(
-                database,
-                tag_name,
-                value,
-                source,
-                game_indices,
-                self._progress_callback,
-                self._cancel_flag,
-            )
-        if operation.mode == MODE_REMOVE_TAGS:
-            names = [sanitize_tag_name(t) for t in operation.tags]
-            names = [t for t in names if t]
-            return self.tag_service.remove_tags(
-                database,
-                names,
-                game_indices,
-                self._progress_callback,
-                self._cancel_flag,
-            )
-        if operation.mode == MODE_COPY:
-            return self.replace_service.copy_metadata_tags(
-                database,
-                list(operation.tags),
-                operation.source_tag.strip(),
-                game_indices,
-                self._progress_callback,
-                self._cancel_flag,
-            )
-        return self.replace_service.replace_metadata_tags(
-            database,
-            list(operation.tags),
-            operation.find_text,
-            operation.replace_text,
-            operation.case_sensitive,
-            operation.use_regex,
-            operation.mode == MODE_OVERWRITE,
-            game_indices,
-            self._progress_callback,
-            self._cancel_flag,
-        )
+    def _prepare_operations(self, operations: List[BulkOperation]) -> List[BulkOperation]:
+        """Sanitize tag names on a validated plan before the single-pass runner."""
+        prepared: List[BulkOperation] = []
+        for op in operations:
+            if op.mode == MODE_ADD_TAG:
+                tag = sanitize_tag_name(op.tags[0]) if op.tags else ""
+                source = (
+                    sanitize_tag_name(op.source_tag)
+                    if op.copy_value_from_source
+                    else op.source_tag
+                )
+                prepared.append(
+                    replace(op, tags=(tag,) if tag else (), source_tag=source)
+                )
+            elif op.mode == MODE_REMOVE_TAGS:
+                tags = tuple(
+                    t for t in (sanitize_tag_name(x) for x in op.tags) if t
+                )
+                prepared.append(replace(op, tags=tags))
+            elif op.mode == MODE_COPY:
+                tags = tuple(
+                    t for t in (sanitize_tag_name(x) for x in op.tags) if t
+                )
+                prepared.append(
+                    replace(
+                        op,
+                        tags=tags,
+                        source_tag=sanitize_tag_name(op.source_tag),
+                    )
+                )
+            elif op.mode in (MODE_FIND_REPLACE, MODE_OVERWRITE):
+                tags = tuple(
+                    t for t in (sanitize_tag_name(x) for x in op.tags) if t
+                )
+                prepared.append(replace(op, tags=tags))
+            else:
+                prepared.append(op)
+        return prepared
 
     def _run_result_update(
         self,
@@ -495,60 +772,115 @@ class BulkOperationsController(QObject):
         initial_fingerprints = {id(g): _pgn_fingerprint(g.pgn) for g in games_in_scope}
 
         self._cancelled = False
+        self._baseline_processed = 0
+        self._baseline_updated = 0
+        self._baseline_failed = 0
+        self._baseline_skipped = 0
+        self._last_live_processed = 0
+        self._last_live_updated = 0
+        self._last_live_failed = 0
+        self._last_live_skipped = 0
+        self._games_in_scope = games_in_scope
+        self._initial_fingerprints = initial_fingerprints
+        self._current_step_label = ""
         self.progress_service.show_progress()
-        self.progress_service.set_progress(0)
-        self.progress_service.set_status("Bulk Operations: Starting...")
+        # Plan ops share one game pass; Smart Update steps remain separate phases.
+        phase_count = int(bool(operations)) + int(has_result_update) + int(has_eco_update)
+        self._progress_total_steps = max(1, phase_count)
+        self._progress_step_index = 0
+        self._set_step_status("Starting…", 0)
 
         step_results: List[BulkOperationStats] = []
         result = BulkOperationStats(True, 0, 0, 0, 0)
         try:
-            total_steps = len(operations) + int(has_result_update) + int(has_eco_update)
             step_index = 0
             failed: Optional[BulkOperationStats] = None
 
-            for operation in operations:
+            if operations and not self._cancelled:
                 step_index += 1
-                self.progress_service.set_status(
-                    f"Bulk Operations: Operation {step_index}/{total_steps}…"
+                self._progress_step_index = step_index - 1
+                n_ops = len(operations)
+                self._set_step_status(
+                    f"Step {step_index}/{phase_count}: "
+                    f"Applying {n_ops} operation{'s' if n_ops != 1 else ''}…",
                 )
-                step = self._run_operation(database, operation, game_indices)
-                if not step.success:
-                    failed = step
-                    break
-                step_results.append(step)
+                plan_ops = self._prepare_operations(list(operations))
+                plan_result = self.plan_service.apply_plan(
+                    database,
+                    plan_ops,
+                    game_indices,
+                    self._progress_callback,
+                    self._cancel_flag,
+                )
+                if not plan_result.success:
+                    failed = plan_result
+                else:
+                    step_results.append(plan_result)
+                    self._accumulate_step_stats(plan_result)
 
-            if failed is None and has_result_update:
+            if failed is None and has_result_update and not self._cancelled:
                 step_index += 1
-                self.progress_service.set_status(
-                    f"Bulk Operations: Operation {step_index}/{total_steps} (Result)…"
+                self._progress_step_index = step_index - 1
+                self._set_step_status(
+                    f"Step {step_index}/{phase_count}: Smart Update (Result)",
                 )
                 result_update = self._run_result_update(database, game_indices)
                 if not result_update.success:
                     failed = result_update
                 else:
                     step_results.append(result_update)
+                    self._accumulate_step_stats(result_update)
 
-            if failed is None and has_eco_update:
+            if failed is None and has_eco_update and not self._cancelled:
                 step_index += 1
-                self.progress_service.set_status(
-                    f"Bulk Operations: Operation {step_index}/{total_steps} (ECO)…"
+                self._progress_step_index = step_index - 1
+                self._set_step_status(
+                    f"Step {step_index}/{phase_count}: Smart Update (ECO)",
                 )
                 eco_result = self._run_eco_update(database, game_indices)
                 if not eco_result.success:
                     failed = eco_result
                 else:
                     step_results.append(eco_result)
+                    self._accumulate_step_stats(eco_result)
 
-            if failed is not None:
+            if self._cancelled:
+                result = BulkOperationStats(
+                    success=False,
+                    games_processed=sum(r.games_processed for r in step_results),
+                    games_updated=sum(r.games_updated for r in step_results),
+                    games_failed=sum(r.games_failed for r in step_results),
+                    games_skipped=sum(r.games_skipped for r in step_results),
+                    error_message="Cancelled",
+                )
+            elif failed is not None:
                 result = failed
             else:
-                result = _combine_multi_step_bulk_stats(
-                    step_results, games_in_scope, initial_fingerprints
-                )
+                if len(step_results) <= 1:
+                    result = (
+                        step_results[0]
+                        if step_results
+                        else BulkOperationStats(True, 0, 0, 0, 0)
+                    )
+                else:
+                    # Unique count across plan + Smart Update phases.
+                    n = len(games_in_scope)
+                    failed_sum = sum(r.games_failed for r in step_results)
+                    updated = int(self._live_unique_updated())
+                    result = BulkOperationStats(
+                        success=True,
+                        games_processed=n,
+                        games_updated=updated,
+                        games_failed=min(failed_sum, n),
+                        games_skipped=max(0, n - updated),
+                    )
         finally:
-            self.progress_service.hide_progress()
+            # hide_progress alone leaves the last status ("Finishing…") in the bar.
+            self.progress_service.reset()
 
         if result.success:
+            # Status already showed Finishing during apply; refresh without a
+            # second late status update that would appear after the freeze.
             if self.game_controller:
                 self._refresh_active_game_if_updated(database, game_indices)
             if result.games_updated > 0:

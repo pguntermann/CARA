@@ -5,9 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from PyQt6.QtCore import Qt, QPoint, QSize, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QPoint, QSize, QTimer, QEventLoop, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPalette, QShowEvent, QResizeEvent
 from PyQt6.QtWidgets import (
+    QApplication,
     QButtonGroup,
     QCheckBox,
     QComboBox,
@@ -35,11 +36,22 @@ from app.controllers.bulk_operations_controller import (
     MODE_REMOVE_TAGS,
     BulkOperation,
     BulkOperationsController,
+    format_bulk_plan_issues,
     sanitize_tag_name,
     validate_bulk_operation,
+    validate_bulk_operation_plan,
+)
+from app.utils.bulk_regex_presets import (
+    CUSTOM_PRESET_ID,
+    find_preset_by_id,
+    load_bulk_regex_presets,
+    match_preset_id,
 )
 from app.models.database_model import DatabaseModel
-from app.utils.bulk_operation_summary import format_bulk_operation_summary_plain
+from app.utils.bulk_operation_summary import (
+    format_bulk_operation_counts,
+    format_bulk_operation_summary_plain,
+)
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.path_display_utils import truncate_path_for_display, truncate_text_middle
 from app.utils.themed_icon import themed_icon_from_svg
@@ -170,8 +182,9 @@ class _PgnTagsChipPickerPopup(QFrame):
         except Exception:
             pass
 
+        self.setObjectName("bulk_tags_chip_picker")
         self.setStyleSheet(
-            "QFrame {"
+            "#bulk_tags_chip_picker {"
             f"  background-color: rgb({self._bg.red()},{self._bg.green()},{self._bg.blue()});"
             f"  border: 1px solid rgb({self._border.red()},{self._border.green()},{self._border.blue()});"
             "  border-radius: 6px;"
@@ -188,22 +201,49 @@ class _PgnTagsChipPickerPopup(QFrame):
             layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(int(self._layout_spacing))
 
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._scroll.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+
         self._root = QWidget()
         self._root.setAutoFillBackground(False)
         self._root.setStyleSheet("background: transparent; border: none;")
         root_layout = QVBoxLayout(self._root)
         root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
         self._wrap = _ChipWrapContainer(self.flow_spacing, self._root)
         self._wrap.setStyleSheet("background: transparent; border: none;")
         root_layout.addWidget(self._wrap)
-        layout.addWidget(self._root, 1)
+        # Do not add a stretch: with setWidgetResizable(True), the scroll widget
+        # must keep a minimum height larger than the viewport for the scrollbar.
+        self._scroll.setWidget(self._root)
+        layout.addWidget(self._scroll, 1)
 
         self.setFixedWidth(int(self._popup_width))
         try:
             m = self.layout().contentsMargins()
-            inner_w = max(1, int(self._popup_width - m.left() - m.right()))
-            self._root.setFixedWidth(inner_w)
+            # Leave room for the vertical scrollbar when content overflows.
+            inner_w = max(1, int(self._popup_width - m.left() - m.right() - 14))
+            self._root.setMinimumWidth(inner_w)
             self._wrap.setFixedWidth(inner_w)
+        except Exception:
+            pass
+
+        try:
+            from app.views.style import StyleManager
+
+            StyleManager.style_scroll_area(
+                self._scroll,
+                self.config,
+                [self._bg.red(), self._bg.green(), self._bg.blue()],
+                [self._border.red(), self._border.green(), self._border.blue()],
+                3,
+                include_scroll_area_border=False,
+            )
         except Exception:
             pass
         self._rebuild()
@@ -214,9 +254,12 @@ class _PgnTagsChipPickerPopup(QFrame):
         def _reflow() -> None:
             try:
                 m = self.layout().contentsMargins()
-                inner_w = max(1, int(self.width() - m.left() - m.right()))
-                self._root.setFixedWidth(inner_w)
+                bar_w = 14
+                if self._scroll.verticalScrollBar().isVisible():
+                    bar_w = max(bar_w, int(self._scroll.verticalScrollBar().sizeHint().width()))
+                inner_w = max(1, int(self.width() - m.left() - m.right() - bar_w))
                 self._wrap.setFixedWidth(inner_w)
+                self._root.setMinimumWidth(inner_w)
             except Exception:
                 pass
             self._sync_height()
@@ -225,18 +268,38 @@ class _PgnTagsChipPickerPopup(QFrame):
 
     def _sync_height(self, *, max_height: int | None = None) -> None:
         try:
+            self._wrap._layout()
             self._root.adjustSize()
             self._wrap.adjustSize()
         except Exception:
             pass
         contents_h = int(max(1, self._wrap.minimumHeight()))
+        try:
+            self._wrap.setMinimumHeight(contents_h)
+            self._root.setMinimumHeight(contents_h)
+        except Exception:
+            pass
         margins = self.layout().contentsMargins() if self.layout() else None
         mh = (int(margins.top()) + int(margins.bottom())) if margins else 20
-        target = int(contents_h + mh + int(self._extra_height))
+        natural = int(contents_h + mh + int(self._extra_height))
         max_h = int(max_height) if max_height is not None else int(self._popup_max_height)
         if max_h > 0:
-            target = min(max_h, target)
-        self.setFixedHeight(max(1, target))
+            self.setFixedHeight(max(1, min(max_h, natural)))
+        else:
+            self.setFixedHeight(max(1, natural))
+        # Force a scrollbar when chips exceed the capped popup height. Minimum
+        # height on the scroll widget prevents Qt from collapsing content.
+        needs_scroll = natural > self.height()
+        try:
+            self._scroll.setVerticalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAsNeeded
+                if needs_scroll
+                else Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+            )
+            if needs_scroll:
+                self._scroll.verticalScrollBar().setVisible(True)
+        except Exception:
+            pass
 
     def _rebuild(self) -> None:
         selected = {t.casefold() for t in self._selected}
@@ -424,6 +487,7 @@ class _OperationEditorOverlay(QWidget):
         self.tag_name_combo.addItems(self.add_tag_options)
         if self.tag_name_combo.lineEdit() is not None:
             self.tag_name_combo.lineEdit().setPlaceholderText("Select or type a new tag…")
+            self.tag_name_combo.lineEdit().returnPressed.connect(self._on_save)
         self._tag_name_row = self._make_field_row(self.tag_name_label, self.tag_name_combo)
 
         self.value_source_label = QLabel("Fill from")
@@ -441,12 +505,30 @@ class _OperationEditorOverlay(QWidget):
         self.find_label = QLabel("Find")
         self.find_input = QLineEdit()
         self.find_input.setPlaceholderText("Text to find")
+        self.find_input.returnPressed.connect(self._on_save)
+        self.find_input.textEdited.connect(self._on_find_replace_edited)
         self._find_row = self._make_field_row(self.find_label, self.find_input)
 
         self.replace_label = QLabel("Replace")
         self.replace_input = QLineEdit()
         self.replace_input.setPlaceholderText("Replacement text")
+        self.replace_input.returnPressed.connect(self._on_save)
+        self.replace_input.textEdited.connect(self._on_find_replace_edited)
         self._replace_row = self._make_field_row(self.replace_label, self.replace_input)
+
+        self.preset_label = QLabel("Preset")
+        self.preset_combo = QComboBox()
+        self._regex_presets = load_bulk_regex_presets(self.config)
+        for preset in self._regex_presets:
+            self.preset_combo.addItem(preset.label, preset.id)
+            tip = (preset.tooltip or "").strip()
+            if tip:
+                self.preset_combo.setItemData(
+                    self.preset_combo.count() - 1, tip, Qt.ItemDataRole.ToolTipRole
+                )
+        self.preset_combo.currentIndexChanged.connect(self._on_regex_preset_changed)
+        self._preset_row = self._make_field_row(self.preset_label, self.preset_combo)
+        self._applying_regex_preset = False
 
         self.options_label = QLabel("Options")
         options_wrap = QWidget()
@@ -455,6 +537,7 @@ class _OperationEditorOverlay(QWidget):
         options_layout.setSpacing(22)
         self.case_check = QCheckBox("Case sensitive")
         self.regex_check = QCheckBox("Use regex")
+        self.regex_check.toggled.connect(self._on_regex_toggled)
         options_layout.addWidget(self.case_check)
         options_layout.addWidget(self.regex_check)
         options_layout.addStretch(1)
@@ -492,9 +575,10 @@ class _OperationEditorOverlay(QWidget):
             self._tag_name_row,
             self._value_source_row,
             self._source_row,
+            self._options_row,
+            self._preset_row,
             self._find_row,
             self._replace_row,
-            self._options_row,
             self._clean_row,
         ]
         card_layout.addWidget(self._fields_host)
@@ -510,6 +594,10 @@ class _OperationEditorOverlay(QWidget):
         buttons.addStretch(1)
         self.cancel_btn = QPushButton("Cancel")
         self.save_btn = QPushButton("Add")
+        self.cancel_btn.setAutoDefault(False)
+        self.cancel_btn.setDefault(False)
+        self.save_btn.setAutoDefault(True)
+        self.save_btn.setDefault(True)
         self.cancel_btn.clicked.connect(self._on_cancel)
         self.save_btn.clicked.connect(self._on_save)
         buttons.addWidget(self.cancel_btn)
@@ -564,7 +652,10 @@ class _OperationEditorOverlay(QWidget):
         elif mode == MODE_COPY:
             ordered.append(self._source_row)
         elif mode == MODE_FIND_REPLACE:
-            ordered.extend([self._find_row, self._replace_row, self._options_row])
+            ordered.append(self._options_row)
+            if self.regex_check.isChecked():
+                ordered.append(self._preset_row)
+            ordered.extend([self._find_row, self._replace_row])
         elif mode == MODE_OVERWRITE:
             ordered.append(self._replace_row)
         elif mode == MODE_CLEAN:
@@ -576,12 +667,13 @@ class _OperationEditorOverlay(QWidget):
             if w is not None:
                 w.setParent(self._fields_host)
 
+        ordered_set = set(ordered)
         for row in self._all_field_rows:
-            if row in ordered:
-                row.show()
-                self._fields_layout.addWidget(row)
-            else:
+            if row not in ordered_set:
                 row.hide()
+        for row in ordered:
+            row.show()
+            self._fields_layout.addWidget(row)
 
     def paintEvent(self, event) -> None:  # noqa: N802
         from PyQt6.QtGui import QPainter
@@ -636,8 +728,82 @@ class _OperationEditorOverlay(QWidget):
         if not is_find:
             self.case_check.setChecked(False)
             self.regex_check.setChecked(False)
+            self._reset_regex_preset_to_custom()
 
+        self._update_find_replace_placeholders()
         self._relayout_field_rows()
+
+    def _on_regex_toggled(self, checked: bool) -> None:
+        if not checked:
+            self._reset_regex_preset_to_custom()
+        self._update_find_replace_placeholders()
+        if self._current_mode() == MODE_FIND_REPLACE:
+            self._relayout_field_rows()
+
+    def _reset_regex_preset_to_custom(self) -> None:
+        self._applying_regex_preset = True
+        try:
+            idx = self.preset_combo.findData(CUSTOM_PRESET_ID)
+            if idx >= 0:
+                self.preset_combo.setCurrentIndex(idx)
+            self.preset_combo.setToolTip(
+                "Choose a starting pattern for common substring keep/extract tasks."
+            )
+        finally:
+            self._applying_regex_preset = False
+
+    def _on_regex_preset_changed(self, *_args) -> None:
+        if self._applying_regex_preset:
+            return
+        preset_id = str(self.preset_combo.currentData() or CUSTOM_PRESET_ID)
+        preset = find_preset_by_id(self._regex_presets, preset_id)
+        tip = (preset.tooltip if preset else "") or (
+            "Choose a starting pattern for common substring keep/extract tasks."
+        )
+        self.preset_combo.setToolTip(tip)
+        if not preset or not preset.id:
+            return
+        self._applying_regex_preset = True
+        try:
+            if not self.regex_check.isChecked():
+                self.regex_check.setChecked(True)
+            self.find_input.setText(preset.find)
+            self.replace_input.setText(preset.replace)
+        finally:
+            self._applying_regex_preset = False
+        self.find_input.setFocus()
+        if preset.id == "keep_capture" and "text to keep" in self.find_input.text():
+            # Select the placeholder inside the capture group for quick editing.
+            start = self.find_input.text().find("text to keep")
+            if start >= 0:
+                self.find_input.setSelection(start, len("text to keep"))
+
+    def _on_find_replace_edited(self, *_args) -> None:
+        if self._applying_regex_preset:
+            return
+        if self.preset_combo.currentData() == CUSTOM_PRESET_ID:
+            return
+        matched = match_preset_id(
+            self._regex_presets, self.find_input.text(), self.replace_input.text()
+        )
+        if matched == self.preset_combo.currentData():
+            return
+        self._reset_regex_preset_to_custom()
+
+    def _update_find_replace_placeholders(self) -> None:
+        mode = self._current_mode()
+        if mode == MODE_FIND_REPLACE and self.regex_check.isChecked():
+            self.find_input.setPlaceholderText(r"e.g. (text to keep) or ^.*?(…).*")
+            self.replace_input.setPlaceholderText(r"e.g. \1 for the first capture")
+            return
+        if mode == MODE_OVERWRITE or (
+            mode == MODE_ADD_TAG and self.value_source_combo.currentData() == "fixed"
+        ):
+            self.replace_input.setPlaceholderText("Value to set")
+            self.find_input.setPlaceholderText("Text to find")
+            return
+        self.find_input.setPlaceholderText("Text to find")
+        self.replace_input.setPlaceholderText("Replacement text")
 
     def _tags_for_picker(self) -> List[str]:
         if self._current_mode() == MODE_REMOVE_TAGS:
@@ -689,6 +855,7 @@ class _OperationEditorOverlay(QWidget):
         self.replace_input.clear()
         self.case_check.setChecked(False)
         self.regex_check.setChecked(False)
+        self._reset_regex_preset_to_custom()
         self.value_source_combo.setCurrentIndex(0)
         self.tag_name_combo.setCurrentIndex(-1)
         self.tag_name_combo.setEditText("")
@@ -716,6 +883,25 @@ class _OperationEditorOverlay(QWidget):
         self.replace_input.setText(operation.replace_text)
         self.case_check.setChecked(operation.case_sensitive)
         self.regex_check.setChecked(operation.use_regex)
+        self._applying_regex_preset = True
+        try:
+            preset_id = (
+                match_preset_id(
+                    self._regex_presets, operation.find_text, operation.replace_text
+                )
+                if operation.use_regex
+                else CUSTOM_PRESET_ID
+            )
+            idx = self.preset_combo.findData(preset_id)
+            if idx >= 0:
+                self.preset_combo.setCurrentIndex(idx)
+            preset = find_preset_by_id(self._regex_presets, preset_id)
+            self.preset_combo.setToolTip(
+                (preset.tooltip if preset and preset.tooltip else None)
+                or "Choose a starting pattern for common substring keep/extract tasks."
+            )
+        finally:
+            self._applying_regex_preset = False
         if operation.mode == MODE_ADD_TAG and operation.tags:
             self.tag_name_combo.setCurrentText(operation.tags[0])
             self.value_source_combo.setCurrentIndex(1 if operation.copy_value_from_source else 0)
@@ -750,6 +936,7 @@ class _OperationEditorOverlay(QWidget):
         parent = self.parentWidget()
         if parent is not None:
             self.setGeometry(parent.rect())
+        self.save_btn.setDefault(True)
         self.raise_()
         self.show()
 
@@ -759,6 +946,7 @@ class _OperationEditorOverlay(QWidget):
                 self._tags_popup.close()
         except Exception:
             pass
+        self.save_btn.setDefault(False)
         self.hide()
         self.cancelled.emit()
 
@@ -805,6 +993,7 @@ class _OperationEditorOverlay(QWidget):
                 self._tags_popup.close()
         except Exception:
             pass
+        self.save_btn.setDefault(False)
         self.hide()
         self.saved.emit((self._edit_index, operation))
 
@@ -835,6 +1024,7 @@ class _OperationEditorOverlay(QWidget):
             self.source_label,
             self.find_label,
             self.replace_label,
+            self.preset_label,
             self.options_label,
             self.clean_label,
         ):
@@ -862,7 +1052,7 @@ class _OperationEditorOverlay(QWidget):
             edit.setFixedHeight(self.input_min_height)
 
         StyleManager.style_comboboxes(
-            [self.mode_combo, self.source_combo, self.value_source_combo],
+            [self.mode_combo, self.source_combo, self.value_source_combo, self.preset_combo],
             self.config,
             text_color,
             self.input_font_family,
@@ -895,7 +1085,13 @@ class _OperationEditorOverlay(QWidget):
         )
         if self.tag_name_combo.lineEdit() is not None:
             self.tag_name_combo.lineEdit().setPlaceholderText("Select or type a new tag…")
-        for combo in (self.mode_combo, self.source_combo, self.tag_name_combo, self.value_source_combo):
+        for combo in (
+            self.mode_combo,
+            self.source_combo,
+            self.tag_name_combo,
+            self.value_source_combo,
+            self.preset_combo,
+        ):
             combo.setFixedHeight(self.input_min_height)
 
         # Tags control: match line-edit height/width; explicit padding so the label stays centered.
@@ -962,11 +1158,12 @@ class _OperationEditorOverlay(QWidget):
         self._lock_card_height_to_full_form()
         self._on_mode_changed()
         QWidget.setTabOrder(self.mode_combo, self.tags_picker_btn)
-        QWidget.setTabOrder(self.tags_picker_btn, self.find_input)
-        QWidget.setTabOrder(self.find_input, self.replace_input)
-        QWidget.setTabOrder(self.replace_input, self.case_check)
+        QWidget.setTabOrder(self.tags_picker_btn, self.case_check)
         QWidget.setTabOrder(self.case_check, self.regex_check)
-        QWidget.setTabOrder(self.regex_check, self.cancel_btn)
+        QWidget.setTabOrder(self.regex_check, self.preset_combo)
+        QWidget.setTabOrder(self.preset_combo, self.find_input)
+        QWidget.setTabOrder(self.find_input, self.replace_input)
+        QWidget.setTabOrder(self.replace_input, self.cancel_btn)
         QWidget.setTabOrder(self.cancel_btn, self.save_btn)
 
     def _lock_card_height_to_full_form(self) -> None:
@@ -978,9 +1175,10 @@ class _OperationEditorOverlay(QWidget):
                 w.setParent(self._fields_host)
         for row in (
             self._tags_row,
+            self._options_row,
+            self._preset_row,
             self._find_row,
             self._replace_row,
-            self._options_row,
         ):
             row.show()
             self._fields_layout.addWidget(row)
@@ -991,10 +1189,352 @@ class _OperationEditorOverlay(QWidget):
             self._clean_row,
         ):
             row.hide()
+        # Preset stays visible so the locked height includes the regex-on form.
         self.card.adjustSize()
         hint_h = int(self.card.sizeHint().height())
         if hint_h > 0:
             self.card.setFixedHeight(hint_h)
+
+
+class _BusySpinner(QWidget):
+    """Animated circular spinner for modal busy overlays."""
+
+    def __init__(
+        self,
+        *,
+        color: QColor,
+        track_color: Optional[QColor] = None,
+        size: int = 40,
+        line_width: int = 3,
+        span_degrees: int = 110,
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._color = color
+        self._track_color = track_color
+        self._line_width = max(2, int(line_width))
+        self._span_degrees = max(60, min(270, int(span_degrees)))
+        self._angle = 0
+        side = max(24, int(size))
+        self.setFixedSize(side, side)
+        self._timer = QTimer(self)
+        self._timer.setInterval(16)
+        self._timer.timeout.connect(self._tick)
+
+    def start(self) -> None:
+        if not self._timer.isActive():
+            self._timer.start()
+        self.show()
+
+    def stop(self) -> None:
+        self._timer.stop()
+
+    def _tick(self) -> None:
+        self._angle = (self._angle + 8) % 360
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        from PyQt6.QtGui import QPainter, QPen
+        from PyQt6.QtCore import QRectF
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        inset = self._line_width / 2.0 + 1.0
+        rect = QRectF(inset, inset, self.width() - 2 * inset, self.height() - 2 * inset)
+
+        if self._track_color is not None:
+            track_pen = QPen(self._track_color, float(self._line_width), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+            painter.setPen(track_pen)
+            painter.drawEllipse(rect)
+
+        pen = QPen(self._color, float(self._line_width), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        painter.drawArc(rect, int((-self._angle) * 16), int(self._span_degrees) * 16)
+
+
+class _ProgressOverlay(QWidget):
+    """Dimmed overlay with a spinner while bulk operations run, then a compact summary."""
+
+    cancel_requested = pyqtSignal()
+    accept_requested = pyqtSignal()  # success → close dialog
+    dismiss_requested = pyqtSignal()  # cancel/fail → return to form
+
+    def __init__(self, config: Dict[str, Any], parent: QWidget) -> None:
+        super().__init__(parent)
+        self.config = config
+        self._phase = "running"  # running | success | dismiss
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.hide()
+        self._load_config()
+        self._setup_ui()
+        self._apply_styling()
+
+    def _load_config(self) -> None:
+        dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("bulk_operations", {})
+        overlay_cfg = dialog_config.get("overlay", {})
+        progress_cfg = dialog_config.get("progress", {})
+
+        self.overlay_dim = overlay_cfg.get("dim_color", [0, 0, 0, 150])
+        self.card_bg = QColor(
+            *overlay_cfg.get("card_background_color", dialog_config.get("background_color", [40, 40, 45]))
+        )
+        self.card_border = QColor(
+            *overlay_cfg.get("card_border_color", dialog_config.get("border_color", [60, 60, 65]))
+        )
+        self.card_radius = int(overlay_cfg.get("card_border_radius", 8))
+        self.card_width = int(progress_cfg.get("card_width", 360))
+        self.card_margins = progress_cfg.get(
+            "card_margins",
+            overlay_cfg.get("card_margins", [28, 28, 28, 24]),
+        )
+        self.card_spacing = int(progress_cfg.get("card_spacing", 16))
+        self.buttons_top_spacing = int(
+            progress_cfg.get("buttons_top_spacing", overlay_cfg.get("buttons_top_spacing", 8))
+        )
+
+        labels_config = dialog_config.get("labels", {})
+        self.label_font_family = resolve_font_family(labels_config.get("font_family", "Helvetica Neue"))
+        self.label_font_size = int(scale_font_size(labels_config.get("font_size", 11)))
+        self.label_text_color = QColor(*labels_config.get("text_color", [200, 200, 200]))
+        self.title_font_size = int(
+            scale_font_size(progress_cfg.get("title_font_size", labels_config.get("font_size", 11)))
+        )
+        # Summary uses the same body label size/color as the rest of the dialog.
+        self.summary_font_size = int(
+            scale_font_size(progress_cfg.get("summary_font_size", labels_config.get("font_size", 11)))
+        )
+        self.summary_text_color = QColor(
+            *progress_cfg.get(
+                "summary_text_color",
+                [
+                    self.label_text_color.red(),
+                    self.label_text_color.green(),
+                    self.label_text_color.blue(),
+                ],
+            )
+        )
+
+        spinner_color = progress_cfg.get(
+            "spinner_color",
+            dialog_config.get("operations_list", {}).get("selected_background_color", [70, 90, 130]),
+        )
+        track = progress_cfg.get("spinner_track_color")
+        self.spinner_color = QColor(*spinner_color)
+        self.spinner_track_color = QColor(*track) if isinstance(track, list) and len(track) >= 3 else None
+        self.spinner_size = int(progress_cfg.get("spinner_size", 40))
+        self.spinner_line_width = int(progress_cfg.get("spinner_line_width", 3))
+        self.spinner_span_degrees = int(progress_cfg.get("spinner_span_degrees", 110))
+
+        buttons_config = dialog_config.get("buttons", {})
+        self.button_width = int(buttons_config.get("width", 120))
+        self.button_height = int(buttons_config.get("height", 30))
+        self.dialog_bg = dialog_config.get("background_color", [40, 40, 45])
+        self.dialog_border = dialog_config.get("border_color", [60, 60, 65])
+
+    def _setup_ui(self) -> None:
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.card = QFrame()
+        self.card.setObjectName("bulk_operations_progress_card")
+        self.card.setFixedWidth(self.card_width)
+        card_layout = QVBoxLayout(self.card)
+        card_layout.setContentsMargins(
+            int(self.card_margins[0]),
+            int(self.card_margins[1]),
+            int(self.card_margins[2]),
+            int(self.card_margins[3]),
+        )
+        card_layout.setSpacing(self.card_spacing)
+        card_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+
+        self.spinner = _BusySpinner(
+            color=self.spinner_color,
+            track_color=self.spinner_track_color,
+            size=self.spinner_size,
+            line_width=self.spinner_line_width,
+            span_degrees=self.spinner_span_degrees,
+        )
+        spinner_row = QHBoxLayout()
+        spinner_row.setContentsMargins(0, 0, 0, 0)
+        spinner_row.addStretch(1)
+        spinner_row.addWidget(self.spinner, 0, Qt.AlignmentFlag.AlignCenter)
+        spinner_row.addStretch(1)
+        card_layout.addLayout(spinner_row)
+
+        self.title_label = QLabel("Running operations…")
+        self.title_label.setWordWrap(True)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        card_layout.addWidget(self.title_label)
+
+        self.step_label = QLabel("")
+        self.step_label.setWordWrap(True)
+        self.step_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.step_label.hide()
+        card_layout.addWidget(self.step_label)
+
+        self.summary_label = QLabel("")
+        self.summary_label.setWordWrap(True)
+        self.summary_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.summary_label.hide()
+        card_layout.addWidget(self.summary_label)
+
+        if self.buttons_top_spacing > 0:
+            card_layout.addSpacing(self.buttons_top_spacing)
+
+        buttons = QHBoxLayout()
+        buttons.setContentsMargins(0, 0, 0, 0)
+        buttons.addStretch(1)
+        self.action_button = QPushButton("Cancel")
+        self.action_button.setAutoDefault(False)
+        self.action_button.setDefault(False)
+        self.action_button.clicked.connect(self._on_action_clicked)
+        buttons.addWidget(self.action_button)
+        buttons.addStretch(1)
+        card_layout.addLayout(buttons)
+
+        root.addWidget(self.card, 0, Qt.AlignmentFlag.AlignCenter)
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        from PyQt6.QtGui import QPainter
+
+        painter = QPainter(self)
+        dim = self.overlay_dim if isinstance(self.overlay_dim, list) else [0, 0, 0, 150]
+        a = int(dim[3]) if len(dim) > 3 else 150
+        painter.fillRect(self.rect(), QColor(int(dim[0]), int(dim[1]), int(dim[2]), a))
+        super().paintEvent(event)
+
+    def _apply_styling(self) -> None:
+        from app.views.style import StyleManager
+
+        self.card.setStyleSheet(
+            f"#bulk_operations_progress_card {{"
+            f"  background-color: rgb({self.card_bg.red()}, {self.card_bg.green()}, {self.card_bg.blue()});"
+            f"  border: 1px solid rgb({self.card_border.red()}, {self.card_border.green()}, {self.card_border.blue()});"
+            f"  border-radius: {self.card_radius}px;"
+            f"}}"
+        )
+
+        title_style = (
+            f"QLabel {{ color: rgb({self.label_text_color.red()}, {self.label_text_color.green()}, {self.label_text_color.blue()}); "
+            f"font-family: {self.label_font_family}; font-size: {self.title_font_size}pt; font-weight: 600; "
+            f"background: transparent; }}"
+        )
+        summary_style = (
+            f"QLabel {{ color: rgb({self.summary_text_color.red()}, {self.summary_text_color.green()}, {self.summary_text_color.blue()}); "
+            f"font-family: {self.label_font_family}; font-size: {self.summary_font_size}pt; background: transparent; }}"
+        )
+        self.title_label.setStyleSheet(title_style)
+        self.step_label.setStyleSheet(summary_style)
+        self.summary_label.setStyleSheet(summary_style)
+
+        StyleManager.style_buttons(
+            [self.action_button],
+            self.config,
+            self.dialog_bg,
+            self.dialog_border,
+            min_width=self.button_width,
+            min_height=self.button_height,
+        )
+        self.action_button.setFixedHeight(self.button_height)
+
+    def open_running(self) -> None:
+        self._phase = "running"
+        self.title_label.setText("Running operations…")
+        self.set_step("")
+        self.set_live_stats(0, 0, 0, 0)
+        self.spinner.start()
+        self.spinner.show()
+        self.action_button.setText("Cancel")
+        self.action_button.setEnabled(True)
+        parent = self.parentWidget()
+        if parent is not None:
+            self.setGeometry(parent.rect())
+        self.raise_()
+        self.show()
+
+    def set_status(self, message: str) -> None:
+        """Optional title update while running (e.g. Cancelling…)."""
+        if self._phase == "running" and message:
+            self.title_label.setText(message)
+
+    def set_step(self, step_text: str) -> None:
+        """Show the active plan step under the title."""
+        text = (step_text or "").strip()
+        if text:
+            self.step_label.setText(text)
+            self.step_label.show()
+        else:
+            self.step_label.clear()
+            self.step_label.hide()
+
+    def set_live_stats(
+        self,
+        games_processed: int,
+        games_updated: int,
+        games_failed: int,
+        games_skipped: int,
+    ) -> None:
+        """Update running counters shown under the spinner."""
+        self.summary_label.setText(
+            format_bulk_operation_counts(
+                games_processed,
+                games_updated,
+                games_failed,
+                games_skipped,
+            )
+        )
+        self.summary_label.show()
+
+    def show_complete(self, summary: str) -> None:
+        self._phase = "success"
+        self.spinner.stop()
+        self.spinner.hide()
+        self.title_label.setText("Complete")
+        self.step_label.hide()
+        self.step_label.clear()
+        self.summary_label.setText(summary)
+        self.summary_label.show()
+        self.action_button.setText("Close")
+        self.action_button.setEnabled(True)
+        self.card.adjustSize()
+
+    def show_cancelled(self) -> None:
+        self._phase = "dismiss"
+        self.spinner.stop()
+        self.spinner.hide()
+        self.title_label.setText("Cancelled")
+        # Keep step + live counts for context.
+        self.summary_label.show()
+        self.action_button.setText("Close")
+        self.action_button.setEnabled(True)
+
+    def show_failed(self, message: str) -> None:
+        self._phase = "dismiss"
+        self.spinner.stop()
+        self.spinner.hide()
+        self.title_label.setText("Failed")
+        if not self.summary_label.text().strip():
+            self.summary_label.setText(message or "Operation failed")
+        self.summary_label.show()
+        self.action_button.setText("Close")
+        self.action_button.setEnabled(True)
+
+    def _on_action_clicked(self) -> None:
+        if self._phase == "success":
+            self.spinner.stop()
+            self.hide()
+            self.accept_requested.emit()
+            return
+        if self._phase == "dismiss":
+            self.spinner.stop()
+            self.hide()
+            self.dismiss_requested.emit()
+            return
+        self.action_button.setEnabled(False)
+        self.title_label.setText("Cancelling…")
+        self.cancel_requested.emit()
 
 
 class BulkOperationsDialog(QDialog):
@@ -1246,6 +1786,14 @@ class BulkOperationsDialog(QDialog):
         self.remove_operation_button.setAccessibleName("Remove selected operation")
         self.remove_operation_button.clicked.connect(self._on_remove_selected_clicked)
 
+        for btn in (
+            self.add_operation_button,
+            self.edit_operation_button,
+            self.remove_operation_button,
+        ):
+            btn.setAutoDefault(False)
+            btn.setDefault(False)
+
         toolbar.addWidget(self.add_operation_button)
         toolbar.addWidget(self.edit_operation_button)
         toolbar.addWidget(self.remove_operation_button)
@@ -1273,7 +1821,10 @@ class BulkOperationsDialog(QDialog):
         buttons.addStretch()
         self.cancel_button = QPushButton("Cancel")
         self.apply_button = QPushButton("Apply")
-        self.cancel_button.clicked.connect(self.reject)
+        for btn in (self.cancel_button, self.apply_button):
+            btn.setAutoDefault(False)
+            btn.setDefault(False)
+        self.cancel_button.clicked.connect(self._on_cancel_clicked)
         self.apply_button.clicked.connect(self._on_apply_clicked)
         buttons.addWidget(self.cancel_button)
         buttons.addWidget(self.apply_button)
@@ -1289,6 +1840,12 @@ class BulkOperationsDialog(QDialog):
             self,
         )
         self._editor.saved.connect(self._on_editor_saved)
+
+        self._progress_overlay = _ProgressOverlay(self.config, self)
+        self._progress_overlay.cancel_requested.connect(self._on_progress_cancel_requested)
+        self._progress_overlay.accept_requested.connect(self.accept)
+        self._progress_overlay.dismiss_requested.connect(self._on_progress_dismissed)
+        self.controller.progress_updated.connect(self._on_progress_updated)
 
     def _rebuild_operations_list(self) -> None:
         previous_selection = self._selected_operation_index
@@ -1527,16 +2084,28 @@ class BulkOperationsDialog(QDialog):
             f"QLabel {{ color: rgb({self.label_text_color.red()}, {self.label_text_color.green()}, {self.label_text_color.blue()}); "
             f"font-family: {self.label_font_family}; font-size: {self.label_font_size}pt; background: transparent; }}"
         )
+        overlay_roots = (self._editor, self._progress_overlay)
         for label in self.findChildren(QLabel):
+            if any(root is label or root.isAncestorOf(label) for root in overlay_roots):
+                continue
             label.setStyleSheet(label_style)
 
-        radios = list(self.findChildren(QRadioButton))
+        radios = [
+            r
+            for r in self.findChildren(QRadioButton)
+            if not any(root is r or root.isAncestorOf(r) for root in overlay_roots)
+        ]
         if radios:
             StyleManager.style_radio_buttons(radios, self.config)
 
         checkmark = Path(__file__).resolve().parents[2] / "resources" / "icons" / "checkmark.svg"
+        dialog_checks = [
+            c
+            for c in self.findChildren(QCheckBox)
+            if not any(root is c or root.isAncestorOf(c) for root in overlay_roots)
+        ]
         StyleManager.style_checkboxes(
-            self.findChildren(QCheckBox),
+            dialog_checks,
             self.config,
             [
                 self.label_text_color.red(),
@@ -1561,6 +2130,8 @@ class BulkOperationsDialog(QDialog):
         self._update_summary_elision()
         if self._editor.isVisible():
             self._editor.setGeometry(self.rect())
+        if self._progress_overlay.isVisible():
+            self._progress_overlay.setGeometry(self.rect())
 
     def _update_path_label_truncation(self) -> None:
         if getattr(self, "_db_name_full", None) and hasattr(self, "db_name_label"):
@@ -1578,6 +2149,59 @@ class BulkOperationsDialog(QDialog):
             self.db_path_label.setText(
                 truncate_path_for_display(self._db_path_full, max(80, self.db_path_label.width()), self.db_path_label.font())
             )
+
+    def _on_progress_updated(
+        self,
+        percent: int,
+        message: str,
+        games_processed: int,
+        games_updated: int,
+        games_failed: int,
+        games_skipped: int,
+        step_label: str,
+    ) -> None:
+        self._progress_overlay.set_step(step_label)
+        # Surface wrap-up before pool shutdown / in-memory batch apply / refresh.
+        if message == "Finishing…":
+            self._progress_overlay.set_status(message)
+            try:
+                self._progress_overlay.repaint()
+                self._progress_overlay.card.repaint()
+            except Exception:
+                pass
+        self._progress_overlay.set_live_stats(
+            games_processed,
+            games_updated,
+            games_failed,
+            games_skipped,
+        )
+        # Blocking bulk work runs on the UI thread; pump events so the spinner
+        # timer and Cancel button stay responsive, and so Finishing paints
+        # before shutdown / batch_update.
+        QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
+        if message == "Finishing…":
+            try:
+                self._progress_overlay.repaint()
+            except Exception:
+                pass
+            QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
+
+    def _on_progress_cancel_requested(self) -> None:
+        if self._operation_in_progress:
+            self.controller.cancel_operation()
+
+    def _on_progress_dismissed(self) -> None:
+        self._operation_in_progress = False
+        self._set_controls_enabled(True)
+        self.apply_button.setEnabled(True)
+        self.cancel_button.setText("Cancel")
+
+    def _on_cancel_clicked(self) -> None:
+        if self._operation_in_progress:
+            self.controller.cancel_operation()
+            self._progress_overlay.set_status("Cancelling…")
+            return
+        self.reject()
 
     def _on_apply_clicked(self) -> None:
         if not self.database:
@@ -1599,8 +2223,29 @@ class BulkOperationsDialog(QDialog):
             )
             return
 
+        from app.views.dialogs.confirmation_dialog import ConfirmationDialog
+
+        plan_issues = validate_bulk_operation_plan(
+            list(self._pending_operations),
+            has_result,
+            has_eco,
+        )
+        if plan_issues and not ConfirmationDialog.show_confirmation(
+            self.config,
+            "Conflicting operations",
+            format_bulk_plan_issues(plan_issues),
+            self,
+        ):
+            return
+
         self._set_controls_enabled(False)
         self._operation_in_progress = True
+        self.apply_button.setEnabled(False)
+        self._progress_overlay.open_running()
+        # Let the overlay paint before the blocking run.
+        QTimer.singleShot(0, lambda: self._run_operations(has_result, has_eco))
+
+    def _run_operations(self, has_result: bool, has_eco: bool) -> None:
         try:
             game_indices = None
             if self.selected_games_radio.isChecked():
@@ -1612,24 +2257,24 @@ class BulkOperationsDialog(QDialog):
                 has_eco,
                 game_indices,
             )
-            if not result.success:
-                from app.views.dialogs.message_dialog import MessageDialog
-                MessageDialog.show_warning(
-                    self.config, "Error", result.error_message or "Operation failed", self
-                )
-                self._set_controls_enabled(True)
-                self._operation_in_progress = False
-                return
-            self._show_success_dialog(
-                "Bulk Operations Complete",
-                format_bulk_operation_summary_plain(result),
-            )
-            self.accept()
+            self._finish_operations(result)
         except Exception as e:
             from app.views.dialogs.message_dialog import MessageDialog
             MessageDialog.show_critical(self.config, "Error", f"An error occurred: {str(e)}", self)
-            self._set_controls_enabled(True)
             self._operation_in_progress = False
+            self._progress_overlay.show_failed(str(e))
+
+    def _finish_operations(self, result) -> None:
+        if not result.success:
+            self._operation_in_progress = False
+            message = result.error_message or "Operation failed"
+            if message == "Cancelled":
+                self._progress_overlay.show_cancelled()
+            else:
+                self._progress_overlay.show_failed(message)
+            return
+
+        self._progress_overlay.show_complete(format_bulk_operation_summary_plain(result))
 
     def _set_controls_enabled(self, enabled: bool) -> None:
         self.all_games_radio.setEnabled(enabled)
@@ -1637,7 +2282,7 @@ class BulkOperationsDialog(QDialog):
         self.update_result_check.setEnabled(enabled)
         self.update_eco_check.setEnabled(enabled)
         self.apply_button.setEnabled(enabled)
-        self.cancel_button.setEnabled(enabled)
+        self.cancel_button.setEnabled(True)
         has_selection = (
             self._selected_operation_index is not None
             and 0 <= int(self._selected_operation_index) < len(self._pending_operations)
@@ -1645,62 +2290,4 @@ class BulkOperationsDialog(QDialog):
         self.add_operation_button.setEnabled(enabled)
         self.edit_operation_button.setEnabled(enabled and has_selection)
         self.remove_operation_button.setEnabled(enabled and has_selection)
-
-    def _show_success_dialog(self, title: str, message: str) -> None:
-        dialog = QDialog(self)
-        dialog.setWindowTitle(title)
-        dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("message", {})
-        dialog_width = dialog_config.get("width", 400)
-        bg_color = dialog_config.get("background_color", [40, 40, 45])
-        layout_margins = dialog_config.get("layout", {}).get("margins", [20, 20, 20, 20])
-        layout_spacing = dialog_config.get("layout", {}).get("spacing", 15)
-        title_config = dialog_config.get("title", {})
-        message_config = dialog_config.get("message", {})
-        buttons_config = dialog_config.get("buttons", {})
-
-        palette = dialog.palette()
-        palette.setColor(dialog.backgroundRole(), QColor(*bg_color))
-        dialog.setPalette(palette)
-        dialog.setAutoFillBackground(True)
-
-        layout = QVBoxLayout(dialog)
-        layout.setSpacing(layout_spacing)
-        layout.setContentsMargins(
-            layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3]
-        )
-        title_label = QLabel(title)
-        title_fs = scale_font_size(title_config.get("font_size", 14))
-        title_tc = title_config.get("text_color", [240, 240, 240])
-        title_label.setStyleSheet(
-            f"font-size: {title_fs}pt; font-weight: bold; padding: {title_config.get('padding', 10)}px; "
-            f"color: rgb({title_tc[0]}, {title_tc[1]}, {title_tc[2]});"
-        )
-        layout.addWidget(title_label)
-        message_label = QLabel(message)
-        message_label.setWordWrap(True)
-        msg_fs = scale_font_size(message_config.get("font_size", 11))
-        msg_tc = message_config.get("text_color", [200, 200, 200])
-        message_label.setStyleSheet(
-            f"font-size: {msg_fs}pt; padding: {message_config.get('padding', 5)}px; "
-            f"color: rgb({msg_tc[0]}, {msg_tc[1]}, {msg_tc[2]});"
-        )
-        layout.addWidget(message_label)
-        layout.addStretch(1)
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        from app.views.style import StyleManager
-        ok_button = QPushButton("OK")
-        StyleManager.style_buttons(
-            [ok_button],
-            self.config,
-            bg_color,
-            buttons_config.get("border_color", [60, 60, 65]),
-            min_width=buttons_config.get("width", 120),
-            min_height=buttons_config.get("height", 30),
-        )
-        ok_button.clicked.connect(dialog.accept)
-        button_layout.addWidget(ok_button)
-        layout.addLayout(button_layout)
-        dialog.setMinimumWidth(dialog_width)
-        dialog.adjustSize()
-        dialog.exec()
+        self.operations_scroll.setEnabled(enabled)
