@@ -217,12 +217,9 @@ def apply_combobox_styling(
         # Always make combobox editable for consistent behavior on macOS
         # If editable=False, we'll make the inner QLineEdit read-only to prevent text input
         combobox.setEditable(True)
-        
-        # If we don't want user input, make the line edit read-only
-        if not editable:
-            line_edit = combobox.lineEdit()
-            if line_edit:
-                line_edit.setReadOnly(True)
+        line_edit = combobox.lineEdit()
+        if line_edit:
+            line_edit.setReadOnly(not editable)
         
         combobox.setStyleSheet(combobox_style)
         

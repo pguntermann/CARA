@@ -16,9 +16,7 @@ from app.controllers.evaluation_controller import EvaluationController
 from app.controllers.manual_analysis_controller import ManualAnalysisController
 from app.controllers.game_analysis_controller import GameAnalysisController
 from app.controllers.move_classification_controller import MoveClassificationController
-from app.controllers.bulk_replace_controller import BulkReplaceController
-from app.controllers.bulk_tag_controller import BulkTagController
-from app.controllers.bulk_clean_pgn_controller import BulkCleanPgnController
+from app.controllers.bulk_operations_controller import BulkOperationsController
 from app.controllers.bulk_analysis_controller import BulkAnalysisController
 from app.controllers.deduplication_controller import DeduplicationController
 from app.controllers.positional_heatmap_controller import PositionalHeatmapController
@@ -113,26 +111,12 @@ class AppController:
             self.database_controller  # Pass DatabaseController to mark databases as unsaved
         )
         
-        # Initialize bulk replace controller (depends on database controller, engine controller, evaluation controller, and game controller)
-        self.bulk_replace_controller = BulkReplaceController(
+        # Initialize bulk operations controller (tags, replace, clean, smart update)
+        self.bulk_operations_controller = BulkOperationsController(
             config,
             self.database_controller,
             self.engine_controller,
             self.evaluation_controller,
-            self.game_controller
-        )
-        
-        # Initialize bulk tag controller (depends on database controller and game controller)
-        self.bulk_tag_controller = BulkTagController(
-            config,
-            self.database_controller,
-            self.game_controller
-        )
-        
-        # Initialize bulk clean PGN controller (depends on database controller and game controller)
-        self.bulk_clean_pgn_controller = BulkCleanPgnController(
-            config,
-            self.database_controller,
             self.game_controller
         )
         
@@ -231,9 +215,7 @@ class AppController:
             "manual_analysis_controller",
             "evaluation_controller",
             "game_analysis_controller",
-            "bulk_replace_controller",
-            "bulk_tag_controller",
-            "bulk_clean_pgn_controller",
+            "bulk_operations_controller",
             "bulk_analysis_controller",
             "deduplication_controller",
             "positional_heatmap_controller",
@@ -928,21 +910,13 @@ class AppController:
         """
         return self.move_classification_controller
     
-    def get_bulk_replace_controller(self) -> BulkReplaceController:
-        """Get the bulk replace controller.
+    def get_bulk_operations_controller(self) -> BulkOperationsController:
+        """Get the bulk operations controller.
         
         Returns:
-            The BulkReplaceController instance for managing bulk replacement operations.
+            The BulkOperationsController instance for header-tag and PGN cleaning ops.
         """
-        return self.bulk_replace_controller
-    
-    def get_bulk_tag_controller(self) -> BulkTagController:
-        """Get the bulk tag controller.
-        
-        Returns:
-            The BulkTagController instance for managing bulk tag operations.
-        """
-        return self.bulk_tag_controller
+        return self.bulk_operations_controller
     
     def get_deduplication_controller(self):
         """Get the deduplication controller.
@@ -951,14 +925,6 @@ class AppController:
             The DeduplicationController instance.
         """
         return self.deduplication_controller
-    
-    def get_bulk_clean_pgn_controller(self) -> BulkCleanPgnController:
-        """Get the bulk clean PGN controller.
-        
-        Returns:
-            The BulkCleanPgnController instance for managing bulk PGN cleaning operations.
-        """
-        return self.bulk_clean_pgn_controller
     
     def get_bulk_analysis_controller(self) -> BulkAnalysisController:
         """Get the bulk analysis controller.

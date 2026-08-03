@@ -151,7 +151,7 @@ class AnnotationPreferencesDialog(QDialog):
         # Layout
         layout_config = dialog_config.get('layout', {})
         self.layout_spacing = layout_config.get('spacing', 10)
-        # Match bulk_replace and other dialogs (window chrome inset for group boxes)
+        # Match bulk_operations and other dialogs (window chrome inset for group boxes)
         self.layout_margins = layout_config.get('margins', [25, 25, 25, 25])
         self.section_spacing = layout_config.get('section_spacing', 15)
         
@@ -191,7 +191,7 @@ class AnnotationPreferencesDialog(QDialog):
         self.group_title_font_family = resolve_font_family(groups_config.get('title_font_family'))
         self.group_title_font_size = scale_font_size(groups_config.get('title_font_size', 11))
         self.group_title_color = groups_config.get('title_color')
-        # Same pattern as bulk_replace / import_games: applied via StyleManager.style_group_boxes
+        # Same pattern as bulk_operations / import_games: applied via StyleManager.style_group_boxes
         self.group_content_margins = groups_config.get('content_margins', [10, 20, 10, 15])
         self.group_margin_top = groups_config.get('margin_top', 10)
         self.group_padding_top = groups_config.get('padding_top', 5)

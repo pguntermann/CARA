@@ -4654,9 +4654,10 @@
           "path_layout_spacing": 8
         }
       },
-      "bulk_replace": {
-        "width": 600,
-        "bottom_button_top_padding": 50,
+      "bulk_operations": {
+        "width": 640,
+        "scroll_area_height": 150,
+        "bottom_button_top_padding": 28,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -4675,23 +4676,30 @@
         "layout": {
           "margins": [
             25,
+            22,
             25,
-            25,
-            25
+            22
           ],
-          "spacing": 15
+          "spacing": 14
         },
         "spacing": {
-          "layout": 10,
-          "section": 15,
-          "form": 14,
-          "options": 22,
+          "section": 14,
           "result": 8
         },
         "buttons": {
           "spacing": 10,
           "width": 120,
-          "height": 30
+          "height": 30,
+          "add_button_icon_svg": "app/resources/icons/menu_plus.svg",
+          "edit_button_icon_svg": "app/resources/icons/pencil.svg",
+          "remove_button_icon_svg": "app/resources/icons/menu_trash.svg",
+          "remove_button_icon_tint_rgb": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "remove_button_icon_px": 18,
+          "add_button_tooltip": "Add operation",
+          "edit_button_tooltip": "Edit selected operation",
+          "remove_button_tooltip": "Remove selected operation"
         },
         "labels": {
           "font_family": {
@@ -4705,8 +4713,7 @@
           },
           "note_font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"
-          },
-          "minimum_width": 90
+          }
         },
         "inputs": {
           "font_family": {
@@ -4727,9 +4734,8 @@
           "border_radius": 3,
           "padding": [
             8,
-            6
+            4
           ],
-          "minimum_width": 200,
           "minimum_height": 30,
           "selection_background_color": {
             "$ref": "$_COLOR_BACKGROUND_ACTIVE"
@@ -4746,180 +4752,91 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "title_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
+            "$ref": "$_COLOR_TEXT_PRIMARY"
           },
           "content_margins": [
-            10,
-            20,
-            10,
-            15
+            12,
+            14,
+            12,
+            12
           ],
-          "margin_top": 10,
-          "padding_top": 5,
+          "margin_top": 8,
+          "padding_top": 4,
           "title_left": 10,
           "title_padding": [
             0,
             5
           ]
         },
-        "tags_list": {
-          "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_3"
-          },
-          "height": 130,
-          "columns": 2,
-          "spacing": 8,
-          "row_spacing": 4,
+        "operations_list": {
+          "empty_text": "No operations yet",
+          "row_min_height": 34,
+          "spacing": 4,
           "margins": [
-            10,
-            6,
             8,
-            10
-          ]
-        },
-        "quick_select_buttons": {
-          "enabled": true,
-          "spacing": 8,
-          "width": 100,
-          "height": 24,
-          "select_all_button_icon_svg": "app/resources/icons/select_all_pgn_tags.svg",
-          "select_all_button_icon_tint_rgb": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
-          },
-          "select_all_button_icon_px": 18,
-          "select_all_button_tooltip": "Select all tags",
-          "deselect_all_button_icon_svg": "app/resources/icons/deselect_all_pgn_tags.svg",
-          "deselect_all_button_icon_tint_rgb": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
-          },
-          "deselect_all_button_icon_px": 18,
-          "deselect_all_button_tooltip": "Deselect all tags"
-        }
-      },
-      "bulk_tag": {
-        "width": 600,
-        "bottom_button_top_padding": 50,
-        "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
-        },
-        "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
-        },
-        "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
-        },
-        "font_size": {
-          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
-        },
-        "font_family": {
-          "$ref": "$_FONT_FAMILY_PRIMARY"
-        },
-        "layout": {
-          "margins": [
-            25,
-            25,
-            25,
-            25
-          ],
-          "spacing": 15
-        },
-        "spacing": {
-          "layout": 10,
-          "section": 15,
-          "form": 14,
-          "options": 22,
-          "result": 8
-        },
-        "buttons": {
-          "spacing": 10,
-          "width": 120,
-          "height": 30
-        },
-        "labels": {
-          "font_family": {
-            "$ref": "$_FONT_FAMILY_PRIMARY"
-          },
-          "font_size": {
-            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
-          },
-          "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
-          },
-          "note_font_size": {
-            "$ref": "$_FONT_SIZE_BASE_SMALL"
-          },
-          "minimum_width": 90
-        },
-        "radio_buttons": {
-          "first_button_minimum_width": 100
-        },
-        "inputs": {
-          "font_family": {
-            "$ref": "$_FONT_FAMILY_MONO"
-          },
-          "font_size": {
-            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
-          },
-          "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
-          },
-          "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
-          },
-          "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
-          },
-          "border_radius": 3,
-          "padding": [
             8,
-            6
+            8,
+            8
           ],
-          "minimum_width": 200,
-          "minimum_height": 30,
-          "selection_background_color": {
+          "row_padding": [
+            8,
+            4,
+            8,
+            4
+          ],
+          "selected_background_color": {
             "$ref": "$_COLOR_BACKGROUND_ACTIVE"
           },
-          "selection_text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
-          }
+          "selected_border_radius": 4
         },
-        "tags_list": {
-          "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_3"
+        "overlay": {
+          "dim_color": [
+            0,
+            0,
+            0,
+            160
+          ],
+          "card_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_PRIMARY"
           },
-          "height": 120,
-          "columns": 2,
-          "spacing": 8,
-          "margins": [
-            10,
-            6,
-            8,
-            10
-          ]
-        },
-        "groups": {
-          "title_font_family": {
-            "$ref": "$_FONT_FAMILY_PRIMARY"
-          },
-          "title_font_size": {
-            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
-          },
-          "title_color": {
+          "card_border_color": {
             "$ref": "$_COLOR_BUTTON_BORDER"
           },
-          "content_margins": [
-            10,
-            20,
-            10,
-            15
+          "card_border_radius": 8,
+          "card_width": 560,
+          "card_margins": [
+            28,
+            26,
+            28,
+            24
           ],
-          "margin_top": 10,
-          "padding_top": 5,
-          "title_left": 10,
-          "title_padding": [
+          "card_spacing": 20,
+          "form_vertical_spacing": 16,
+          "form_horizontal_spacing": 16,
+          "mode_spacing": 22,
+          "buttons_top_spacing": 8,
+          "label_min_width": 88
+        },
+        "tag_picker": {
+          "selected_border_color": [
             0,
-            5
-          ]
+            200,
+            255
+          ],
+          "selected_border_width": 2,
+          "popup_width": 360,
+          "popup_max_height": 260,
+          "popup_layout_margins": [
+            10,
+            10,
+            10,
+            10
+          ],
+          "popup_layout_spacing": 8,
+          "popup_extra_height": 16,
+          "popup_anchor_gap_y": 8,
+          "popup_flip_gap_y": 12,
+          "popup_min_bottom_space_to_prefer_below": 140
         }
       },
       "move_comment": {
@@ -5096,73 +5013,212 @@
             "$ref": "$_COLOR_BORDER"
           },
           "height": 1,
-          "margin": [12, 0, 8, 0]
+          "margin": [
+            12,
+            0,
+            8,
+            0
+          ]
         },
         "tags": {
           "font_size": 8,
           "border_radius": 4,
-          "padding": [2, 6, 2, 6],
+          "padding": [
+            2,
+            6,
+            2,
+            6
+          ],
           "spacing": 5,
           "margin_top": 4,
-          "id_background": [225, 228, 235],
-          "id_text_color": [80, 80, 95],
-          "tier_background": [215, 225, 240],
-          "tier_text_color": [40, 70, 140],
-          "family_background": [215, 235, 218],
-          "family_text_color": [30, 100, 45],
-          "eco_background": [240, 228, 218],
-          "eco_text_color": [140, 70, 30],
-        "fallback_background": [235, 220, 200],
-        "fallback_text_color": [140, 90, 40],
-        "fallback_tooltip_pending": "This line isn't researched yet — showing {parent}.",
-        "fallback_tooltip_skipped": "No dedicated entry — showing {parent}."
+          "id_background": [
+            225,
+            228,
+            235
+          ],
+          "id_text_color": [
+            80,
+            80,
+            95
+          ],
+          "tier_background": [
+            215,
+            225,
+            240
+          ],
+          "tier_text_color": [
+            40,
+            70,
+            140
+          ],
+          "family_background": [
+            215,
+            235,
+            218
+          ],
+          "family_text_color": [
+            30,
+            100,
+            45
+          ],
+          "eco_background": [
+            240,
+            228,
+            218
+          ],
+          "eco_text_color": [
+            140,
+            70,
+            30
+          ],
+          "fallback_background": [
+            235,
+            220,
+            200
+          ],
+          "fallback_text_color": [
+            140,
+            90,
+            40
+          ],
+          "fallback_tooltip_pending": "This line isn't researched yet \u2014 showing {parent}.",
+          "fallback_tooltip_skipped": "No dedicated entry \u2014 showing {parent}."
         },
         "search": {
           "icon_size": 18,
           "icon_svg": "app/resources/icons/menu_search.svg",
-          "icon_tint_rgb": [100, 100, 110],
+          "icon_tint_rgb": [
+            100,
+            100,
+            110
+          ],
           "tooltip": "Search openings",
           "input_height": 28,
           "input_font_size": 10,
           "input_expanded_width": 220,
-          "input_background": [245, 245, 248],
-          "input_text_color": [30, 30, 35],
-          "input_placeholder_color": [130, 130, 138],
-          "input_border_color": [190, 190, 200],
-          "input_focus_border_color": [90, 125, 195],
-          "input_selection_background": [208, 222, 245],
-          "input_selection_text_color": [24, 24, 30],
+          "input_background": [
+            245,
+            245,
+            248
+          ],
+          "input_text_color": [
+            30,
+            30,
+            35
+          ],
+          "input_placeholder_color": [
+            130,
+            130,
+            138
+          ],
+          "input_border_color": [
+            190,
+            190,
+            200
+          ],
+          "input_focus_border_color": [
+            90,
+            125,
+            195
+          ],
+          "input_selection_background": [
+            208,
+            222,
+            245
+          ],
+          "input_selection_text_color": [
+            24,
+            24,
+            30
+          ],
           "input_border_radius": 5,
           "results_max_height": 200,
           "results_min_width": 420,
-          "result_hover_background": [232, 235, 242],
+          "result_hover_background": [
+            232,
+            235,
+            242
+          ],
           "result_font_size": 10,
-          "result_text_color": [40, 40, 50],
-          "result_selected_background": [214, 223, 240],
-          "result_selected_text_color": [28, 28, 36],
-          "result_id_color": [110, 110, 120],
-          "result_padding": [6, 8, 6, 8],
-          "overflow_text_color": [120, 120, 130],
+          "result_text_color": [
+            40,
+            40,
+            50
+          ],
+          "result_selected_background": [
+            214,
+            223,
+            240
+          ],
+          "result_selected_text_color": [
+            28,
+            28,
+            36
+          ],
+          "result_id_color": [
+            110,
+            110,
+            120
+          ],
+          "result_padding": [
+            6,
+            8,
+            6,
+            8
+          ],
+          "overflow_text_color": [
+            120,
+            120,
+            130
+          ],
           "overflow_font_size": 9,
-          "overflow_text": "… {count} further results",
+          "overflow_text": "\u2026 {count} further results",
           "animation_duration_ms": 200,
           "title_fade_extra_width": 56,
           "title_fade_min_width": 72,
           "title_fade_stops": [
-            [0.0, 0],
-            [0.2, 180],
-            [0.4, 255],
-            [1.0, 255]
+            [
+              0.0,
+              0
+            ],
+            [
+              0.2,
+              180
+            ],
+            [
+              0.4,
+              255
+            ],
+            [
+              1.0,
+              255
+            ]
           ]
         },
         "size_toggle": {
           "icon_size": 18,
           "icon_svg": "app/resources/icons/menu_maximize.svg",
-          "icon_tint_rgb": [100, 100, 110],
+          "icon_tint_rgb": [
+            100,
+            100,
+            110
+          ],
           "tooltip": "Window size",
-          "presets": [0.45, 0.6, 0.8],
-          "preset_labels": ["45%", "60%", "80%"],
-          "equal_labels": ["45% × 45%", "60% × 60%", "80% × 80%"],
+          "presets": [
+            0.45,
+            0.6,
+            0.8
+          ],
+          "preset_labels": [
+            "45%",
+            "60%",
+            "80%"
+          ],
+          "equal_labels": [
+            "45% \u00d7 45%",
+            "60% \u00d7 60%",
+            "80% \u00d7 80%"
+          ],
           "section_equal": "Equal",
           "section_width": "Width",
           "section_height": "Height",
@@ -5181,9 +5237,24 @@
             "icon_svg": "app/resources/icons/menu_text_size.svg",
             "default": "medium",
             "options": [
-              {"id": "small", "label": "Small", "scale": 0.9, "menu_a_pt": 11},
-              {"id": "medium", "label": "Medium", "scale": 1.0, "menu_a_pt": 14},
-              {"id": "large", "label": "Large", "scale": 1.18, "menu_a_pt": 18}
+              {
+                "id": "small",
+                "label": "Small",
+                "scale": 0.9,
+                "menu_a_pt": 11
+              },
+              {
+                "id": "medium",
+                "label": "Medium",
+                "scale": 1.0,
+                "menu_a_pt": 14
+              },
+              {
+                "id": "large",
+                "label": "Large",
+                "scale": 1.18,
+                "menu_a_pt": 18
+              }
             ]
           },
           "screen_margin": 8
@@ -5192,25 +5263,53 @@
           "enabled": true,
           "icon_size": 18,
           "icon_svg": "app/resources/icons/menu_exclamation.svg",
-          "icon_tint_rgb": [100, 100, 110],
+          "icon_tint_rgb": [
+            100,
+            100,
+            110
+          ],
           "tooltip": "Report feedback"
         },
         "gallery": {
-          "overlay_color": [20, 20, 24],
+          "overlay_color": [
+            20,
+            20,
+            24
+          ],
           "overlay_opacity": 0.72,
           "padding": 28,
           "caption_font_size": {
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
-          "caption_color": [245, 245, 248],
+          "caption_color": [
+            245,
+            245,
+            248
+          ],
           "subcaption_font_size": 8,
-          "subcaption_color": [180, 180, 188],
-          "subcaption_link_color": [150, 185, 255],
+          "subcaption_color": [
+            180,
+            180,
+            188
+          ],
+          "subcaption_link_color": [
+            150,
+            185,
+            255
+          ],
           "nav": {
             "dot_size": 9,
             "spacing": 12,
-            "dot_color": [130, 130, 140],
-            "dot_active_color": [245, 245, 248]
+            "dot_color": [
+              130,
+              130,
+              140
+            ],
+            "dot_active_color": [
+              245,
+              245,
+              248
+            ]
           }
         },
         "buttons": {
@@ -5232,7 +5331,12 @@
         },
         "layout": {
           "spacing": 8,
-          "margins": [25, 25, 25, 25]
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ]
         },
         "title": {
           "text": "Report feedback",
@@ -5265,16 +5369,21 @@
         },
         "category": {
           "label": "Category",
-          "placeholder": "Select a category…",
+          "placeholder": "Select a category\u2026",
           "spacing_after": 10
         },
         "description": {
           "label": "Description",
-          "placeholder": "Describe the issue or suggestion…",
+          "placeholder": "Describe the issue or suggestion\u2026",
           "minimum_height": 100,
           "spacing_after": 10,
           "border_radius": 3,
-          "padding": [6, 8, 6, 8],
+          "padding": [
+            6,
+            8,
+            6,
+            8
+          ],
           "text_color": {
             "$ref": "$_COLOR_TEXT_PRIMARY"
           },
@@ -5659,127 +5768,6 @@
         "spinboxes": {
           "parallel_movetime_width": 104,
           "max_threads_min_width": 128
-        }
-      },
-      "bulk_clean_pgn": {
-        "width": 650,
-        "bottom_button_top_padding": 50,
-        "minimum_width": 600,
-        "minimum_height": 300,
-        "background_color": {
-          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
-        },
-        "border_color": {
-          "$ref": "$_COLOR_BUTTON_BORDER"
-        },
-        "text_color": {
-          "$ref": "$_COLOR_TEXT_SECONDARY"
-        },
-        "font_size": {
-          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
-        },
-        "font_family": {
-          "$ref": "$_FONT_FAMILY_PRIMARY"
-        },
-        "layout": {
-          "margins": [
-            25,
-            25,
-            25,
-            25
-          ],
-          "spacing": 15
-        },
-        "spacing": {
-          "section": 15
-        },
-        "buttons": {
-          "spacing": 10,
-          "width": 120,
-          "height": 30
-        },
-        "labels": {
-          "font_family": {
-            "$ref": "$_FONT_FAMILY_PRIMARY"
-          },
-          "font_size": {
-            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
-          },
-          "text_color": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
-          }
-        },
-        "inputs": {
-          "font_family": {
-            "$ref": "$_FONT_FAMILY_MONO"
-          },
-          "font_size": {
-            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
-          },
-          "text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
-          },
-          "background_color": {
-            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
-          },
-          "border_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
-          },
-          "border_radius": 3,
-          "padding": [
-            8,
-            6
-          ],
-          "minimum_width": 200,
-          "minimum_height": 30,
-          "selection_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
-          },
-          "selection_text_color": {
-            "$ref": "$_COLOR_TEXT_PRIMARY"
-          }
-        },
-        "groups": {
-          "title_font_family": {
-            "$ref": "$_FONT_FAMILY_PRIMARY"
-          },
-          "title_font_size": {
-            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
-          },
-          "title_color": {
-            "$ref": "$_COLOR_BUTTON_BORDER"
-          },
-          "content_margins": [
-            10,
-            20,
-            10,
-            15
-          ],
-          "margin_top": 10,
-          "padding_top": 5,
-          "title_left": 10,
-          "title_padding": [
-            0,
-            5
-          ]
-        },
-        "quick_select_buttons": {
-          "enabled": true,
-          "spacing": 8,
-          "select_all_button_icon_svg": "app/resources/icons/select_all_pgn_tags.svg",
-          "select_all_button_icon_tint_rgb": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
-          },
-          "select_all_button_icon_px": 18,
-          "select_all_button_tooltip": "Select all",
-          "deselect_all_button_icon_svg": "app/resources/icons/deselect_all_pgn_tags.svg",
-          "deselect_all_button_icon_tint_rgb": {
-            "$ref": "$_COLOR_TEXT_SECONDARY"
-          },
-          "deselect_all_button_icon_px": 18,
-          "deselect_all_button_tooltip": "Deselect all",
-          "width": 100,
-          "height": 24
         }
       },
       "confirmation_dialog": {

@@ -47,14 +47,25 @@ class BulkOperationStats:
 
 ## Available Operations
 
-The system provides four main bulk operations:
+The UI exposes two entry points:
 
-- **Bulk Tag Operations**: Add or remove PGN tags from games
-- **Bulk Replace Operations**: Replace text in metadata tags, copy tags, update Result/ECO tags
-- **Bulk Clean PGN Operations**: Remove comments, variations, annotations, non-standard tags, results
-- **Bulk Analysis Operations**: Analyze multiple games without making them active
+- **Bulk Operations** (`BulkOperationsDialog`): ordered list of header-tag and PGN-clean steps, plus dialog-level Smart Update (Result / ECO)
+- **Bulk Analysis**: analyze multiple games without making them active (separate dialog)
 
-## Bulk Tag Operations
+`BulkOperationsController` runs an ordered list of `BulkOperation` items via `execute_bulk_operations()`, then optional Smart Update. Domain logic stays in the services below.
+
+### Operation modes (`BulkOperation.mode`)
+
+| Mode | Summary |
+|------|---------|
+| `find_replace` | Find/replace text in one or more header tags (case / regex options) |
+| `overwrite` | Set selected tags to a value (empty clears) |
+| `copy` | Copy a source tag into one or more targets |
+| `add_tag` | Create tag if missing (fixed value or copy from source) |
+| `remove_tags` | Remove selected tags (Seven Tag Roster omitted from UI) |
+| `clean` | Remove comments / variations / non-standard inline tags / annotations |
+
+## Tag services
 
 ### BulkTagService
 
@@ -68,8 +79,8 @@ The system provides four main bulk operations:
   - **Empty**: Add tag with empty value
 - Skips games where tag already exists (`games_skipped`)
 
-**Remove Tag** (`remove_tag()`):
-- Removes specified tag from games
+**Remove Tags** (`remove_tags()`):
+- Removes specified tags from games
 - Skips games where tag doesn't exist
 
 **Tag-to-field mapping**:
@@ -84,31 +95,22 @@ When standard tags are modified, corresponding `GameData` fields are updated:
 - `WhiteElo` → `game.white_elo`
 - `BlackElo` → `game.black_elo`
 
-### BulkTagController
-
-`BulkTagController` (`app/controllers/bulk_tag_controller.py`):
-- Sanitizes tag names (removes whitespace, invalid characters)
-- Shows/hides progress via `ProgressService`
-- Refreshes active game if it was updated
-- Marks database as unsaved on success
-- Emits `operation_complete` signal
-
-## Bulk Replace Operations
+## Replace / Smart Update services
 
 ### BulkReplaceService
 
 `BulkReplaceService` (`app/services/bulk_replace_service.py`) handles text replacement and tag updates.
 
-**Replace Metadata Tag** (`replace_metadata_tag()`):
-- Replaces text in specified PGN tag
+**Replace Metadata Tags** (`replace_metadata_tags()`):
+- Replaces text in one or more PGN tags in a single pass per game
 - **Modes**:
   - **Normal replacement**: Find and replace text (case-sensitive or case-insensitive)
   - **Regex replacement**: Use regex pattern for finding
   - **Overwrite all**: Replace any value with new value (ignores find_text)
 - Updates tag-to-field mappings for standard tags
 
-**Copy Metadata Tag** (`copy_metadata_tag()`):
-- Copies value from source tag to target tag
+**Copy Metadata Tags** (`copy_metadata_tags()`):
+- Copies value from one source tag to one or more target tags
 - Only updates if source has value and differs from current target value
 
 **Update Result Tags** (`update_result_tags()`):
@@ -126,15 +128,19 @@ When standard tags are modified, corresponding `GameData` fields are updated:
 - Only updates if ECO differs from current tag
 - Skips games where no ECO found
 
-### BulkReplaceController
+### BulkOperationsController
 
-`BulkReplaceController` (`app/controllers/bulk_replace_controller.py`):
+`BulkOperationsController` (`app/controllers/bulk_operations_controller.py`):
+- Executes an ordered list of `BulkOperation` items via `execute_bulk_operations()`
+- Dispatches to `BulkTagService`, `BulkReplaceService`, or `BulkCleanPgnService` per mode
+- Optionally runs Result/ECO Smart Update after listed operations
+- Aggregates multi-step stats (unique games changed via PGN fingerprint)
 - Gets engine configuration from `EngineController` and `EngineParametersService`
 - Creates `OpeningService` instance for ECO updates
 - Handles progress reporting and cancellation
 - Refreshes active game and marks database unsaved
 
-## Bulk Clean PGN Operations
+## Clean PGN services
 
 ### BulkCleanPgnService
 
@@ -146,7 +152,6 @@ When standard tags are modified, corresponding `GameData` fields are updated:
   - `remove_variations`: Remove all variations
   - `remove_non_standard_tags`: Remove tags like `[%evp]`, `[%mdl]`, `[%clk]`
   - `remove_annotations`: Remove NAGs and move annotations (`!`, `?`, `!!`, `??`)
-  - `remove_results`: Remove results from move notation (preserves `[Result]` tag)
 - Uses `PgnCleaningService` for actual cleaning logic
 - Tracks if game was modified (only updates if at least one operation modified the game)
 
@@ -156,12 +161,6 @@ When standard tags are modified, corresponding `GameData` fields are updated:
 - Uses `PgnFormatterService` filtering logic
 - Preserves metadata tags during cleaning
 - Each method returns `True` if game was modified
-
-### BulkCleanPgnController
-
-`BulkCleanPgnController` (`app/controllers/bulk_clean_pgn_controller.py`):
-- Handles progress reporting
-- Refreshes active game and marks database unsaved
 
 ## Bulk Analysis Operations
 
@@ -307,9 +306,9 @@ Implementation files:
 - `app/services/bulk_clean_pgn_service.py`: PGN cleaning operations
 - `app/services/bulk_analysis_service.py`: Bulk game analysis
 - `app/services/pgn_cleaning_service.py`: PGN cleaning utilities
-- `app/controllers/bulk_tag_controller.py`: Tag operations orchestration
-- `app/controllers/bulk_replace_controller.py`: Replace operations orchestration
-- `app/controllers/bulk_clean_pgn_controller.py`: Clean operations orchestration
+- `app/controllers/bulk_operations_controller.py`: Orchestrates tag/replace/clean + Smart Update
+- `app/views/dialogs/bulk_operations_dialog.py`: Unified Bulk Operations UI
+- `app/controllers/bulk_analysis_controller.py`: Bulk analysis orchestration
 
 ## Best Practices
 

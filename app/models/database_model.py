@@ -970,7 +970,7 @@ class DatabaseModel(QAbstractTableModel):
         """Get ordered list of unique tags.
         
         Returns:
-            List of tag names ordered by importance (same ordering as bulk_replace_controller).
+            List of tag names ordered by importance (same ordering as bulk operations tag lists).
         """
         if not self._unique_tags:
             return []
