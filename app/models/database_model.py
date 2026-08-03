@@ -2,7 +2,7 @@
 
 from PyQt6.QtCore import QAbstractTableModel, Qt, QModelIndex, QRect, pyqtSignal
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QBrush, QColor
-from typing import Optional, List, Dict, Any, Set, Tuple
+from typing import Optional, List, Dict, Any, Set, Tuple, Callable
 from datetime import datetime
 from collections import Counter
 import time
@@ -1122,7 +1122,13 @@ class DatabaseModel(QAbstractTableModel):
         self._emit_stats_relevant_data_change()
         return True
     
-    def batch_update_games(self, games: List['GameData'], *, reindex_positions: bool = True) -> None:
+    def batch_update_games(
+        self,
+        games: List['GameData'],
+        *,
+        reindex_positions: bool = True,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+    ) -> None:
         """Batch update multiple games and emit a single dataChanged signal.
         
         This is more efficient than calling update_game() multiple times,
@@ -1132,6 +1138,8 @@ class DatabaseModel(QAbstractTableModel):
             games: List of GameData instances to update (must already be in the model).
             reindex_positions: If True (default), update the position-search index
                 for each game based on its current PGN.
+            progress_callback: Optional ``(done, total)`` called during reindex so
+                long batches can update a progress overlay.
         """
         if not games:
             return
@@ -1156,9 +1164,22 @@ class DatabaseModel(QAbstractTableModel):
                 )
             except Exception:
                 pass
-            for game in games:
-                self._position_index_add_game(game, None, None)
-                _pump()
+            total = len(games)
+            for index, game in enumerate(games, start=1):
+                try:
+                    self._position_index_add_game(game, None, None)
+                except Exception:
+                    # Keep batch apply moving if one PGN fails to rehash.
+                    pass
+                # Avoid per-game Qt processEvents (nested event storms / hangs);
+                # progress + pump only periodically.
+                if index == 1 or index == total or index % 16 == 0:
+                    if progress_callback is not None:
+                        try:
+                            progress_callback(index, total)
+                        except Exception:
+                            pass
+                    _pump()
             _pump()
             elapsed_ms = int((time.perf_counter() - start_ts) * 1000)
             try:

@@ -6,7 +6,7 @@ import hashlib
 import re
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -377,6 +377,8 @@ class BulkOperationsController(QObject):
         self._baseline_skipped = 0
         self._games_in_scope: List[GameData] = []
         self._initial_fingerprints: Dict[int, bytes] = {}
+        self._updated_game_ids: Set[int] = set()
+        self._failed_game_ids: Set[int] = set()
         self._current_step_label = ""
         self._last_live_processed = 0
         self._last_live_updated = 0
@@ -435,28 +437,65 @@ class BulkOperationsController(QObject):
         failed: int,
         skipped: int,
     ) -> Tuple[int, int, int, int]:
-        """Keep live counters within the games-in-scope size (multi-step sums must not exceed it)."""
+        """Keep live counters within scope and mutually consistent."""
         n = len(self._games_in_scope)
         processed = max(0, int(processed))
         updated = max(0, int(updated))
         failed = max(0, int(failed))
         skipped = max(0, int(skipped))
+        if n > 0:
+            processed = min(processed, n)
+            updated = min(updated, n)
+            failed = min(failed, n)
+        # Skipped is whatever remains — don't sum per-step skips (ECO would
+        # otherwise overwrite a prior plan's "updated" with huge skip counts).
+        skipped = max(0, processed - updated - failed)
+        return processed, updated, failed, skipped
+
+    def _merge_step_stats(self, step_results: List[BulkOperationStats]) -> BulkOperationStats:
+        """Union per-game outcomes across plan + Smart Update phases."""
+        n = len(self._games_in_scope)
+        updated_ids: Set[int] = set()
+        failed_ids: Set[int] = set()
+        for step in step_results:
+            updated_ids.update(step.updated_game_ids)
+            failed_ids.update(step.failed_game_ids)
+        # Prefer "updated" when a later step fails after an earlier update.
+        failed_ids -= updated_ids
+        updated = len(updated_ids)
+        failed = len(failed_ids)
         if n <= 0:
-            return processed, updated, failed, skipped
-        return min(processed, n), min(updated, n), min(failed, n), min(skipped, n)
+            processed = sum(r.games_processed for r in step_results)
+            return BulkOperationStats(
+                success=True,
+                games_processed=processed,
+                games_updated=updated,
+                games_failed=failed,
+                games_skipped=max(0, processed - updated - failed),
+                updated_game_ids=tuple(updated_ids),
+                failed_game_ids=tuple(failed_ids),
+            )
+        return BulkOperationStats(
+            success=True,
+            games_processed=n,
+            games_updated=updated,
+            games_failed=failed,
+            games_skipped=max(0, n - updated - failed),
+            updated_game_ids=tuple(updated_ids),
+            failed_game_ids=tuple(failed_ids),
+        )
 
     def _live_unique_updated(self) -> int:
-        """Count games whose PGN changed since the plan started (matches final summary)."""
+        """Count games whose PGN changed since the plan started (matches final summary).
+
+        Call only for the final multi-step summary — not on live progress ticks.
+        """
         if not self._games_in_scope or not self._initial_fingerprints:
             return 0
-        from app.services.bulk_operation_stats import pump_bulk_ui_events
-
         count = 0
-        for i, g in enumerate(self._games_in_scope):
+        for g in self._games_in_scope:
             if _pgn_fingerprint(g.pgn) != self._initial_fingerprints.get(id(g), b""):
                 count += 1
-            if (i + 1) % 32 == 0:
-                pump_bulk_ui_events()
         return count
 
     def _emit_progress(
@@ -468,11 +507,11 @@ class BulkOperationsController(QObject):
         failed: int,
         skipped: int,
         *,
-        use_unique_updated: bool = True,
+        use_unique_updated: bool = False,
     ) -> None:
         n = len(self._games_in_scope)
-        # Multi-step plans re-visit the same games; prefer unique PGN deltas for "updated"
-        # so live counts match the final summary instead of summing per-step hits.
+        # Multi-step final summary may request unique PGN deltas; live ticks must
+        # never scan every PGN (that froze/crashed the UI near end of large runs).
         if use_unique_updated and self._initial_fingerprints:
             updated = self._live_unique_updated()
             if n > 0:
@@ -512,15 +551,12 @@ class BulkOperationsController(QObject):
     ) -> None:
         if self._cancelled:
             return
-        # Post-loop in-memory apply / pool teardown (not Save Database). Surface
-        # "Finishing…" before that blocking work and skip a redundant fingerprint pass.
-        if message == "Finishing…":
-            self._current_step_label = message
+        # Post-loop in-memory apply (not Save Database). Surface wrap-up before
+        # model refresh. Keep the prior step label (avoid "Finishing…" twice).
+        if message == "Finishing…" or message.startswith("Updating search index"):
             percent = self._overall_percent(1.0)
             self.progress_service.set_progress(percent)
             self.progress_service.set_status(f"Bulk Operations: {message}")
-            # Use the final completed count from the service (not the stale n-1
-            # cache from the previous unique-scan tick).
             self._emit_progress(
                 percent,
                 message,
@@ -531,7 +567,6 @@ class BulkOperationsController(QObject):
                 ),
                 self._baseline_failed + max(0, int(games_failed)),
                 self._baseline_skipped + max(0, int(games_skipped)),
-                use_unique_updated=False,
             )
             return
         fraction = (game_index / total) if total > 0 else 0.0
@@ -540,32 +575,26 @@ class BulkOperationsController(QObject):
         self.progress_service.set_progress(percent)
         self.progress_service.set_status(status)
         processed_count = self._baseline_processed + max(0, int(game_index))
-        # Skip full-PGN unique scan on the final tick of a step — that work was
-        # freezing the UI before "Finishing…" could paint. Still advance the
-        # processed counter to n (do not reuse the n-1 cache).
-        at_step_end = total > 0 and int(game_index) >= int(total)
-        if at_step_end and self._initial_fingerprints:
-            self._emit_progress(
-                percent,
-                message,
-                processed_count,
-                max(
-                    self._last_live_updated,
-                    self._baseline_updated + max(0, int(games_updated)),
-                ),
-                self._baseline_failed + max(0, int(games_failed)),
-                self._baseline_skipped + max(0, int(games_skipped)),
-                use_unique_updated=False,
-            )
-        else:
-            self._emit_progress(
-                percent,
-                message,
-                processed_count,
-                self._baseline_updated + max(0, int(games_updated)),
-                self._baseline_failed + max(0, int(games_failed)),
-                self._baseline_skipped + max(0, int(games_skipped)),
-            )
+        # Unique updated so far (prior steps) plus this step's running updated
+        # count as a lower bound for the live display. Derive skipped so ECO
+        # skip-heavy ticks cannot erase earlier plan updates.
+        unique_prior = len(self._updated_game_ids)
+        step_updated = max(0, int(games_updated))
+        updated_count = max(
+            unique_prior,
+            self._baseline_updated + step_updated
+            if (total > 0 and int(game_index) >= int(total))
+            else unique_prior + step_updated,
+        )
+        failed_count = len(self._failed_game_ids) + max(0, int(games_failed))
+        self._emit_progress(
+            percent,
+            message,
+            processed_count,
+            updated_count,
+            failed_count,
+            0,  # recomputed in _clamp_live_counts
+        )
 
     def _set_step_status(self, message: str, percent: Optional[int] = None) -> None:
         self._current_step_label = message
@@ -573,21 +602,14 @@ class BulkOperationsController(QObject):
         if percent is None:
             percent = self._overall_percent(0.0)
         self.progress_service.set_progress(percent)
-        # Finishing: reuse last live unique counts (avoid another full
-        # fingerprint scan of every PGN on the UI thread).
-        use_unique = message not in ("Finishing…", "Complete")
-        processed = self._last_live_processed if not use_unique else self._baseline_processed
-        updated = self._last_live_updated if not use_unique else self._baseline_updated
-        failed = self._last_live_failed if not use_unique else self._baseline_failed
-        skipped = self._last_live_skipped if not use_unique else self._baseline_skipped
+        # Reuse last live counts — never fingerprint-scan on step transitions.
         self._emit_progress(
             int(percent),
             message,
-            processed,
-            updated,
-            failed,
-            skipped,
-            use_unique_updated=use_unique,
+            self._last_live_processed,
+            self._last_live_updated,
+            self._last_live_failed,
+            self._last_live_skipped,
         )
 
     def _accumulate_step_stats(self, step: BulkOperationStats) -> None:
@@ -595,6 +617,9 @@ class BulkOperationsController(QObject):
         self._baseline_updated += int(step.games_updated)
         self._baseline_failed += int(step.games_failed)
         self._baseline_skipped += int(step.games_skipped)
+        self._updated_game_ids.update(step.updated_game_ids)
+        self._failed_game_ids.update(step.failed_game_ids)
+        self._failed_game_ids -= self._updated_game_ids
 
     def _cancel_flag(self) -> bool:
         return self._cancelled
@@ -782,6 +807,8 @@ class BulkOperationsController(QObject):
         self._last_live_skipped = 0
         self._games_in_scope = games_in_scope
         self._initial_fingerprints = initial_fingerprints
+        self._updated_game_ids = set()
+        self._failed_game_ids = set()
         self._current_step_label = ""
         self.progress_service.show_progress()
         # Plan ops share one game pass; Smart Update steps remain separate phases.
@@ -863,17 +890,9 @@ class BulkOperationsController(QObject):
                         else BulkOperationStats(True, 0, 0, 0, 0)
                     )
                 else:
-                    # Unique count across plan + Smart Update phases.
-                    n = len(games_in_scope)
-                    failed_sum = sum(r.games_failed for r in step_results)
-                    updated = int(self._live_unique_updated())
-                    result = BulkOperationStats(
-                        success=True,
-                        games_processed=n,
-                        games_updated=updated,
-                        games_failed=min(failed_sum, n),
-                        games_skipped=max(0, n - updated),
-                    )
+                    # Union across plan + Smart Update: a game updated in any
+                    # phase counts as updated (ECO skips must not erase plan hits).
+                    result = self._merge_step_stats(step_results)
         finally:
             # hide_progress alone leaves the last status ("Finishing…") in the bar.
             self.progress_service.reset()

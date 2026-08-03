@@ -4690,7 +4690,11 @@
           "remove_button_icon_px": 18,
           "add_button_tooltip": "Add operation",
           "edit_button_tooltip": "Edit selected operation",
-          "remove_button_tooltip": "Remove selected operation"
+          "remove_button_tooltip": "Remove selected operation",
+          "clear_button_icon_svg": "app/resources/icons/menu_reset.svg",
+          "clear_button_tooltip": "Clear all operations",
+          "toolbar_separator_width": 1,
+          "toolbar_separator_margin": [6, 4, 6, 4]
         },
         "labels": {
           "font_family": {

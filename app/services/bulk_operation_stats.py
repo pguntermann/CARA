@@ -1,9 +1,8 @@
 """Shared types for bulk database operations (tags, replace, clean PGN)."""
 
 from enum import Enum
-from dataclasses import dataclass
-from typing import Callable, Optional, Any
-import threading
+from dataclasses import dataclass, field
+from typing import Callable, Optional, Any, Tuple
 
 
 class BulkProcessingOutcome(str, Enum):
@@ -24,6 +23,9 @@ class BulkOperationStats:
     games_failed: int
     games_skipped: int
     error_message: Optional[str] = None
+    # Object ids of games touched this step (for multi-step unique merge).
+    updated_game_ids: Tuple[int, ...] = field(default_factory=tuple)
+    failed_game_ids: Tuple[int, ...] = field(default_factory=tuple)
 
 
 # completed, total, message, updated, failed, skipped
@@ -44,31 +46,21 @@ def pump_bulk_ui_events() -> None:
 
 
 def shutdown_executor_keeping_ui_alive(executor: Any) -> None:
-    """Shut down a ProcessPoolExecutor without freezing the Qt event loop.
+    """Release a ProcessPoolExecutor without blocking the Qt UI thread forever.
 
-    ``shutdown(wait=True)`` runs on a helper thread while the UI thread pumps
-    events so overlays (spinner) stay fluent.
+    Call only after all futures have already completed. Waiting on
+    ``shutdown(wait=True)`` can hang indefinitely on some platforms (notably
+    macOS + Qt) while worker processes tear down, which left Bulk Operations
+    stuck on \"Finishing…\". Non-blocking shutdown is safe once work is done:
+    idle workers exit shortly after.
     """
     if executor is None:
         return
-    done = threading.Event()
-
-    def _wait() -> None:
-        try:
-            executor.shutdown(wait=True)
-        finally:
-            done.set()
-
-    worker = threading.Thread(
-        target=_wait,
-        name="bulk-executor-shutdown",
-        daemon=True,
-    )
-    worker.start()
-    # ~60fps to match the bulk-ops spinner timer interval.
-    while not done.wait(timeout=0.016):
-        pump_bulk_ui_events()
-    worker.join(timeout=5.0)
+    try:
+        executor.shutdown(wait=False)
+    except Exception:
+        pass
+    # Brief pump so the overlay can repaint before the next blocking step.
     pump_bulk_ui_events()
 
 
@@ -79,18 +71,19 @@ def emit_bulk_progress_applying(
     updated: int,
     failed: int,
     skipped: int,
+    *,
+    message: str = "Finishing…",
 ) -> None:
-    """Notify UI before in-memory batch apply / pool teardown (not disk persistence).
+    """Notify UI before in-memory batch apply (not disk persistence).
 
-    Message is \"Finishing…\" so the overlay updates before the blocking work;
-    callers should treat this as wrap-up of the current step, not Save Database.
+    Callers should treat this as wrap-up of the current step, not Save Database.
     """
     if not progress_callback:
         return
     progress_callback(
         max(0, int(completed)),
         max(0, int(total)),
-        "Finishing…",
+        message,
         max(0, int(updated)),
         max(0, int(failed)),
         max(0, int(skipped)),

@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from PyQt6.QtCore import Qt, QPoint, QSize, QTimer, QEventLoop, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPalette, QShowEvent, QResizeEvent
+from PyQt6.QtCore import Qt, QPoint, QSize, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPalette, QShowEvent, QResizeEvent, QCloseEvent
 from PyQt6.QtWidgets import (
-    QApplication,
     QButtonGroup,
     QCheckBox,
     QComboBox,
@@ -1540,6 +1540,15 @@ class _ProgressOverlay(QWidget):
 class BulkOperationsDialog(QDialog):
     """Dialog for bulk header-tag and PGN cleaning operations on databases."""
 
+    @dataclass(frozen=True)
+    class _RememberedState:
+        operations: Tuple[BulkOperation, ...]
+        update_result: bool
+        update_eco: bool
+        selected_games_scope: bool
+
+    _last_state: Optional["BulkOperationsDialog._RememberedState"] = None
+
     def __init__(
         self,
         config: Dict[str, Any],
@@ -1564,6 +1573,7 @@ class BulkOperationsDialog(QDialog):
         self._apply_styling()
         self._apply_configured_dialog_size()
         self.setWindowTitle("Bulk Operations")
+        self._restore_last_state()
 
     def _load_config(self) -> None:
         dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("bulk_operations", {})
@@ -1594,6 +1604,19 @@ class BulkOperationsDialog(QDialog):
         self.edit_button_tooltip = str(buttons_config.get("edit_button_tooltip", "Edit selected operation"))
         self.remove_button_tooltip = str(
             buttons_config.get("remove_button_tooltip", "Remove selected operation")
+        )
+        self.clear_button_icon_svg = str(
+            buttons_config.get("clear_button_icon_svg", "app/resources/icons/menu_reset.svg")
+        )
+        self.clear_button_tooltip = str(
+            buttons_config.get("clear_button_tooltip", "Clear all operations")
+        )
+        self.toolbar_separator_width = int(buttons_config.get("toolbar_separator_width", 1))
+        sep_m = buttons_config.get("toolbar_separator_margin", [6, 4, 6, 4])
+        self.toolbar_separator_margin = (
+            [int(sep_m[0]), int(sep_m[1]), int(sep_m[2]), int(sep_m[3])]
+            if isinstance(sep_m, list) and len(sep_m) >= 4
+            else [6, 4, 6, 4]
         )
         self.toolbar_icon_px = int(buttons_config.get("remove_button_icon_px", 18))
 
@@ -1786,10 +1809,17 @@ class BulkOperationsDialog(QDialog):
         self.remove_operation_button.setAccessibleName("Remove selected operation")
         self.remove_operation_button.clicked.connect(self._on_remove_selected_clicked)
 
+        self.clear_operations_button = QPushButton()
+        self.clear_operations_button.setObjectName("operations_toolbar_clear")
+        self.clear_operations_button.setToolTip(self.clear_button_tooltip)
+        self.clear_operations_button.setAccessibleName("Clear all operations")
+        self.clear_operations_button.clicked.connect(self._on_clear_all_clicked)
+
         for btn in (
             self.add_operation_button,
             self.edit_operation_button,
             self.remove_operation_button,
+            self.clear_operations_button,
         ):
             btn.setAutoDefault(False)
             btn.setDefault(False)
@@ -1797,6 +1827,20 @@ class BulkOperationsDialog(QDialog):
         toolbar.addWidget(self.add_operation_button)
         toolbar.addWidget(self.edit_operation_button)
         toolbar.addWidget(self.remove_operation_button)
+
+        self._toolbar_separator = QFrame()
+        self._toolbar_separator.setObjectName("operations_toolbar_separator")
+        self._toolbar_separator.setFrameShape(QFrame.Shape.VLine)
+        self._toolbar_separator.setFrameShadow(QFrame.Shadow.Plain)
+        self._toolbar_separator.setLineWidth(1)
+        self._toolbar_separator.setFixedWidth(max(1, self.toolbar_separator_width))
+        m = self.toolbar_separator_margin
+        self._toolbar_separator.setContentsMargins(0, 0, 0, 0)
+        toolbar.addSpacing(max(0, m[0]))
+        toolbar.addWidget(self._toolbar_separator)
+        toolbar.addSpacing(max(0, m[2]))
+
+        toolbar.addWidget(self.clear_operations_button)
         toolbar.addStretch(1)
         operations_layout.addLayout(toolbar)
         operations_group.setLayout(operations_layout)
@@ -1843,7 +1887,7 @@ class BulkOperationsDialog(QDialog):
 
         self._progress_overlay = _ProgressOverlay(self.config, self)
         self._progress_overlay.cancel_requested.connect(self._on_progress_cancel_requested)
-        self._progress_overlay.accept_requested.connect(self.accept)
+        self._progress_overlay.accept_requested.connect(self._on_progress_accepted)
         self._progress_overlay.dismiss_requested.connect(self._on_progress_dismissed)
         self.controller.progress_updated.connect(self._on_progress_updated)
 
@@ -1853,8 +1897,13 @@ class BulkOperationsDialog(QDialog):
             item = self._list_layout.takeAt(0)
             w = item.widget()
             if w is not None:
+                # Detach immediately — deleteLater alone leaves the old empty
+                # label painted under restored rows until the event loop runs.
+                w.hide()
+                w.setParent(None)
                 w.deleteLater()
         self._row_widgets = []
+        self._empty_label = None
 
         label_style = (
             f"QLabel {{ color: rgb({self.label_text_color.red()}, {self.label_text_color.green()}, {self.label_text_color.blue()}); "
@@ -1929,6 +1978,9 @@ class BulkOperationsDialog(QDialog):
         self.add_operation_button.setEnabled(not busy)
         self.edit_operation_button.setEnabled(not busy and has_selection)
         self.remove_operation_button.setEnabled(not busy and has_selection)
+        self.clear_operations_button.setEnabled(
+            not busy and bool(self._pending_operations)
+        )
 
     def _update_summary_elision(self) -> None:
         viewport_w = self.operations_scroll.viewport().width()
@@ -1977,6 +2029,65 @@ class BulkOperationsDialog(QDialog):
             self._rebuild_operations_list()
             self._apply_configured_dialog_size()
 
+    def _on_clear_all_clicked(self) -> None:
+        """Clear the operations list only (Smart Update / scope unchanged)."""
+        if not self._pending_operations or self._operation_in_progress:
+            return
+        self._pending_operations.clear()
+        self._selected_operation_index = None
+        self._rebuild_operations_list()
+        self._update_toolbar_enabled()
+        self._apply_configured_dialog_size()
+
+    def _remember_current_state(self) -> None:
+        """Persist plan + Smart Update + game scope for the next dialog open."""
+        BulkOperationsDialog._last_state = BulkOperationsDialog._RememberedState(
+            operations=tuple(self._pending_operations),
+            update_result=bool(self.update_result_check.isChecked()),
+            update_eco=bool(self.update_eco_check.isChecked()),
+            selected_games_scope=bool(self.selected_games_radio.isChecked()),
+        )
+
+    def _restore_last_state(self) -> None:
+        """Restore remembered settings (Search-dialog style in-memory recall)."""
+        state = BulkOperationsDialog._last_state
+        if state is None:
+            return
+        self._pending_operations = list(state.operations)
+        self._selected_operation_index = (
+            len(self._pending_operations) - 1 if self._pending_operations else None
+        )
+        self.update_result_check.setChecked(state.update_result)
+        self.update_eco_check.setChecked(state.update_eco)
+        if state.selected_games_scope and self.selected_game_indices:
+            self.selected_games_radio.setChecked(True)
+        elif state.selected_games_scope and not self.selected_game_indices:
+            # No current selection available — keep All games.
+            self.all_games_radio.setChecked(True)
+        else:
+            self.all_games_radio.setChecked(True)
+        self._rebuild_operations_list()
+        self._update_toolbar_enabled()
+        self._apply_configured_dialog_size()
+
+    def done(self, result: int) -> None:  # noqa: N802
+        self._remember_current_state()
+        super().done(result)
+
+    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
+        # Ignore window-close while Apply is running so nested processEvents
+        # cannot tear down the dialog mid-pass.
+        if self._operation_in_progress:
+            event.ignore()
+            return
+        super().closeEvent(event)
+
+    def _on_progress_accepted(self) -> None:
+        """Success Close: clear busy flag, remember plan, then close."""
+        self._operation_in_progress = False
+        self._remember_current_state()
+        self.accept()
+
     def _on_editor_saved(self, payload: object) -> None:
         edit_index, operation = payload  # type: ignore[misc]
         if edit_index is None:
@@ -2022,6 +2133,7 @@ class BulkOperationsDialog(QDialog):
             self.add_operation_button,
             self.edit_operation_button,
             self.remove_operation_button,
+            self.clear_operations_button,
         ]
         StyleManager.style_buttons(
             toolbar_buttons,
@@ -2040,10 +2152,21 @@ class BulkOperationsDialog(QDialog):
         self.remove_operation_button.setIcon(
             themed_icon_from_svg(self.remove_button_icon_svg, self.toolbar_icon_tint)
         )
+        self.clear_operations_button.setIcon(
+            themed_icon_from_svg(self.clear_button_icon_svg, self.toolbar_icon_tint)
+        )
         for btn in toolbar_buttons:
             btn.setText("")
             btn.setIconSize(QSize(self.toolbar_icon_px, self.toolbar_icon_px))
             btn.setFixedSize(self.button_height, self.button_height)
+        sep_h = max(8, self.button_height - self.toolbar_separator_margin[1] - self.toolbar_separator_margin[3])
+        self._toolbar_separator.setFixedHeight(sep_h)
+        self._toolbar_separator.setStyleSheet(
+            "QFrame#operations_toolbar_separator {"
+            f"  background-color: rgb({border[0]}, {border[1]}, {border[2]});"
+            "  border: 0px; padding: 0px; margin: 0px;"
+            "}"
+        )
         self._update_toolbar_enabled()
 
         input_bg = [self.input_bg_color.red(), self.input_bg_color.green(), self.input_bg_color.blue()]
@@ -2161,30 +2284,17 @@ class BulkOperationsDialog(QDialog):
         step_label: str,
     ) -> None:
         self._progress_overlay.set_step(step_label)
-        # Surface wrap-up before pool shutdown / in-memory batch apply / refresh.
-        if message == "Finishing…":
+        is_finishing = message == "Finishing…" or message.startswith("Updating search index")
+        if is_finishing:
             self._progress_overlay.set_status(message)
-            try:
-                self._progress_overlay.repaint()
-                self._progress_overlay.card.repaint()
-            except Exception:
-                pass
         self._progress_overlay.set_live_stats(
             games_processed,
             games_updated,
             games_failed,
             games_skipped,
         )
-        # Blocking bulk work runs on the UI thread; pump events so the spinner
-        # timer and Cancel button stay responsive, and so Finishing paints
-        # before shutdown / batch_update.
-        QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
-        if message == "Finishing…":
-            try:
-                self._progress_overlay.repaint()
-            except Exception:
-                pass
-            QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
+        # Do not processEvents here — the plan runner pumps on a throttle.
+        # Nested processEvents during Apply caused macOS hangs/crashes.
 
     def _on_progress_cancel_requested(self) -> None:
         if self._operation_in_progress:
@@ -2290,4 +2400,7 @@ class BulkOperationsDialog(QDialog):
         self.add_operation_button.setEnabled(enabled)
         self.edit_operation_button.setEnabled(enabled and has_selection)
         self.remove_operation_button.setEnabled(enabled and has_selection)
+        self.clear_operations_button.setEnabled(
+            enabled and bool(self._pending_operations)
+        )
         self.operations_scroll.setEnabled(enabled)

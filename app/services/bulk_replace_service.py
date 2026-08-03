@@ -84,6 +84,8 @@ class BulkReplaceService:
         games_failed = 0
         games_skipped = 0
         games_processed_count = 0
+        updated_game_ids: List[int] = []
+        failed_game_ids: List[int] = []
         
         # Initialize engine once and reuse across games
         uci = None
@@ -154,6 +156,7 @@ class BulkReplaceService:
                     chess_game = chess.pgn.read_game(pgn_io)
                     
                     if not chess_game:
+                        failed_game_ids.append(id(game))
                         games_failed += 1
                         continue
                     
@@ -234,9 +237,11 @@ class BulkReplaceService:
                     
                     # Collect game for batch update
                     updated_games.append(game)
+                    updated_game_ids.append(id(game))
                     games_updated += 1
                     
                 except Exception as e:
+                    failed_game_ids.append(id(game))
                     games_failed += 1
                     continue
                 finally:
@@ -279,7 +284,9 @@ class BulkReplaceService:
             games_processed=games_processed_count,
             games_updated=games_updated,
             games_failed=games_failed,
-            games_skipped=games_skipped
+            games_skipped=games_skipped,
+            updated_game_ids=tuple(updated_game_ids),
+            failed_game_ids=tuple(failed_game_ids),
         )
     
     def _determine_result_from_evaluation(
@@ -456,6 +463,8 @@ class BulkReplaceService:
         
         # Collect all updated games for batch update
         updated_games = []
+        updated_game_ids: List[int] = []
+        failed_game_ids: List[int] = []
         
         # Process each game
         for idx, game in enumerate(games_to_process):
@@ -477,6 +486,7 @@ class BulkReplaceService:
                 chess_game = chess.pgn.read_game(pgn_io)
                 
                 if not chess_game:
+                    failed_game_ids.append(id(game))
                     games_failed += 1
                     continue
                 
@@ -500,9 +510,11 @@ class BulkReplaceService:
                 
                 # Collect game for batch update
                 updated_games.append(game)
+                updated_game_ids.append(id(game))
                 games_updated += 1
                 
             except Exception:
+                failed_game_ids.append(id(game))
                 games_failed += 1
                 continue
             finally:
@@ -533,6 +545,8 @@ class BulkReplaceService:
             games_processed=games_processed_count,
             games_updated=games_updated,
             games_failed=games_failed,
-            games_skipped=games_skipped
+            games_skipped=games_skipped,
+            updated_game_ids=tuple(updated_game_ids),
+            failed_game_ids=tuple(failed_game_ids),
         )
 
