@@ -64,10 +64,6 @@ from app.utils.bulk_regex_presets import (
     match_preset_id,
 )
 from app.models.database_model import DatabaseModel
-from app.utils.bulk_operation_summary import (
-    format_bulk_operation_counts,
-    format_bulk_operation_summary_plain,
-)
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.path_display_utils import truncate_path_for_display, truncate_text_middle
 from app.utils.themed_icon import themed_icon_from_svg
@@ -1403,11 +1399,36 @@ class _ProgressOverlay(QWidget):
         self.step_label.hide()
         card_layout.addWidget(self.step_label)
 
-        self.summary_label = QLabel("")
-        self.summary_label.setWordWrap(True)
-        self.summary_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        self.summary_label.hide()
-        card_layout.addWidget(self.summary_label)
+        self._stats_labels: Dict[str, QLabel] = {}
+        self._stats_value_labels: Dict[str, QLabel] = {}
+        self.stats_grid = QGridLayout()
+        self.stats_grid.setContentsMargins(0, 0, 0, 0)
+        self.stats_grid.setHorizontalSpacing(14)
+        self.stats_grid.setVerticalSpacing(2)
+        self.stats_grid.setColumnStretch(0, 1)
+        self.stats_grid.setColumnStretch(1, 0)
+        stat_rows = [
+            ("processed", "Games processed:"),
+            ("updated", "Games updated:"),
+            ("failed", "Games failed:"),
+            ("skipped", "Games skipped:"),
+        ]
+        for row, (key, title) in enumerate(stat_rows):
+            label = QLabel(title)
+            value = QLabel("0")
+            label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self._stats_labels[key] = label
+            self._stats_value_labels[key] = value
+            self.stats_grid.addWidget(label, row, 0)
+            self.stats_grid.addWidget(value, row, 1)
+        card_layout.addLayout(self.stats_grid)
+
+        self.message_label = QLabel("")
+        self.message_label.setWordWrap(True)
+        self.message_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.message_label.hide()
+        card_layout.addWidget(self.message_label)
 
         if self.buttons_top_spacing > 0:
             card_layout.addSpacing(self.buttons_top_spacing)
@@ -1456,7 +1477,11 @@ class _ProgressOverlay(QWidget):
         )
         self.title_label.setStyleSheet(title_style)
         self.step_label.setStyleSheet(summary_style)
-        self.summary_label.setStyleSheet(summary_style)
+        self.message_label.setStyleSheet(summary_style)
+        for label in self._stats_labels.values():
+            label.setStyleSheet(summary_style)
+        for label in self._stats_value_labels.values():
+            label.setStyleSheet(summary_style)
 
         StyleManager.style_buttons(
             [self.action_button],
@@ -1473,6 +1498,7 @@ class _ProgressOverlay(QWidget):
         self.title_label.setText("Running operations…")
         self.set_step("")
         self.set_live_stats(0, 0, 0, 0)
+        self._set_message("")
         self.spinner.start()
         self.spinner.show()
         self.action_button.setText("Cancel")
@@ -1506,25 +1532,48 @@ class _ProgressOverlay(QWidget):
         games_skipped: int,
     ) -> None:
         """Update running counters shown under the spinner."""
-        self.summary_label.setText(
-            format_bulk_operation_counts(
-                games_processed,
-                games_updated,
-                games_failed,
-                games_skipped,
-            )
+        self._set_stats(
+            games_processed,
+            games_updated,
+            games_failed,
+            games_skipped,
         )
-        self.summary_label.show()
 
-    def show_complete(self, summary: str) -> None:
+    def _set_stats(
+        self,
+        games_processed: int,
+        games_updated: int,
+        games_failed: int,
+        games_skipped: int,
+    ) -> None:
+        values = {
+            "processed": max(0, int(games_processed)),
+            "updated": max(0, int(games_updated)),
+            "failed": max(0, int(games_failed)),
+            "skipped": max(0, int(games_skipped)),
+        }
+        for key, value in values.items():
+            self._stats_value_labels[key].setText(str(value))
+
+    def _set_message(self, message: str) -> None:
+        text = (message or "").strip()
+        self.message_label.setText(text)
+        self.message_label.setVisible(bool(text))
+
+    def show_complete(self, stats) -> None:
         self._phase = "success"
         self.spinner.stop()
         self.spinner.hide()
         self.title_label.setText("Complete")
         self.step_label.hide()
         self.step_label.clear()
-        self.summary_label.setText(summary)
-        self.summary_label.show()
+        self._set_stats(
+            stats.games_processed,
+            stats.games_updated,
+            stats.games_failed,
+            stats.games_skipped,
+        )
+        self._set_message("")
         self.action_button.setText("Close")
         self.action_button.setEnabled(True)
         self.card.adjustSize()
@@ -1534,8 +1583,7 @@ class _ProgressOverlay(QWidget):
         self.spinner.stop()
         self.spinner.hide()
         self.title_label.setText("Cancelled")
-        # Keep step + live counts for context.
-        self.summary_label.show()
+        self._set_message("")
         self.action_button.setText("Close")
         self.action_button.setEnabled(True)
 
@@ -1544,9 +1592,7 @@ class _ProgressOverlay(QWidget):
         self.spinner.stop()
         self.spinner.hide()
         self.title_label.setText("Failed")
-        if not self.summary_label.text().strip():
-            self.summary_label.setText(message or "Operation failed")
-        self.summary_label.show()
+        self._set_message(message or "Operation failed")
         self.action_button.setText("Close")
         self.action_button.setEnabled(True)
 
@@ -2703,7 +2749,7 @@ class BulkOperationsDialog(QDialog):
             self.controller._refresh_active_game_if_updated(self.database, game_indices)
             self.controller.database_controller.mark_database_unsaved(self.database)
 
-        self._ensure_progress_overlay().show_complete(format_bulk_operation_summary_plain(result))
+        self._ensure_progress_overlay().show_complete(result)
 
     def _set_controls_enabled(self, enabled: bool) -> None:
         self.all_games_radio.setEnabled(enabled)
