@@ -1215,7 +1215,9 @@ class DatabaseModel(QAbstractTableModel):
         min_row = rows[0]
         max_row = rows[-1]
         
-        # Emit on the UI thread when called from a bulk-ops worker QThread.
+        # Emit on the UI thread when called from a background worker. Use
+        # QueuedConnection (never BlockingQueued) so the worker cannot deadlock
+        # waiting for the UI while the UI waits on the worker.
         self._emit_batch_data_changed(min_row, max_row)
         _pump()
 
@@ -1226,7 +1228,7 @@ class DatabaseModel(QAbstractTableModel):
             QMetaObject.invokeMethod(
                 self,
                 "_emit_batch_data_changed_impl",
-                Qt.ConnectionType.BlockingQueuedConnection,
+                Qt.ConnectionType.QueuedConnection,
                 Q_ARG(int, min_row),
                 Q_ARG(int, max_row),
             )

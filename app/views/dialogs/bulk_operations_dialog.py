@@ -2542,7 +2542,12 @@ class BulkOperationsDialog(QDialog):
         if self._progress_overlay is None:
             return
         self._progress_overlay.set_step(step_label)
-        if message == "Finishing…":
+        # Keep the title in sync with work (handoff / wrap-up / per-game status).
+        if message in ("Finishing…", "Preparing next step…"):
+            self._progress_overlay.set_status(message)
+        elif message.startswith("Step "):
+            self._progress_overlay.set_status("Running operations…")
+        elif message:
             self._progress_overlay.set_status(message)
         self._progress_overlay.set_live_stats(
             games_processed,
@@ -2615,6 +2620,18 @@ class BulkOperationsDialog(QDialog):
     def _run_operations(self, has_result: bool, has_eco: bool) -> None:
         if self._worker is not None and self._worker.isRunning():
             return
+        # Load opening book on the UI thread before the worker (and before any
+        # ProcessPool teardown) so Smart Update ECO does not stall after the plan.
+        if has_eco:
+            try:
+                if self._progress_overlay is not None:
+                    self._progress_overlay.set_status("Loading opening book…")
+                self.controller.ensure_opening_service()
+            except Exception as exc:
+                self._on_worker_failed(f"Failed to load opening book: {exc}")
+                return
+            if self._progress_overlay is not None:
+                self._progress_overlay.set_status("Running operations…")
         game_indices = None
         if self.selected_games_radio.isChecked():
             game_indices = self.selected_game_indices if self.selected_game_indices else None
@@ -2635,6 +2652,12 @@ class BulkOperationsDialog(QDialog):
 
     def _on_worker_failed(self, message: str) -> None:
         from app.views.dialogs.message_dialog import MessageDialog
+        if self._progress_overlay is not None:
+            self._progress_overlay.set_status("Updating database…")
+        # Apply any mutations already computed before the failure.
+        applied = self.controller.apply_pending_model_updates(self.database)
+        if applied > 0 and self.database is not None:
+            self.controller.database_controller.mark_database_unsaved(self.database)
         MessageDialog.show_critical(
             self.config,
             "Error",
@@ -2647,17 +2670,23 @@ class BulkOperationsDialog(QDialog):
 
     def _finish_operations(self, result) -> None:
         self._worker = None
+        if self._progress_overlay is not None:
+            self._progress_overlay.set_status("Updating database…")
+        # UI-thread model apply (never from the worker — avoids BlockingQueued deadlocks).
+        applied = self.controller.apply_pending_model_updates(self.database)
+
         if not result.success:
             self._operation_in_progress = False
             message = result.error_message or "Operation failed"
+            if applied > 0 and self.database is not None:
+                self.controller.database_controller.mark_database_unsaved(self.database)
             if message == "Cancelled":
                 self._ensure_progress_overlay().show_cancelled()
             else:
                 self._ensure_progress_overlay().show_failed(message)
             return
 
-        # UI-thread post-work (unsafe to do inside the worker QThread).
-        if result.games_updated > 0 and self.database is not None:
+        if (result.games_updated > 0 or applied > 0) and self.database is not None:
             game_indices = None
             if self.selected_games_radio.isChecked():
                 game_indices = self.selected_game_indices if self.selected_game_indices else None

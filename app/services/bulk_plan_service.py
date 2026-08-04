@@ -16,8 +16,8 @@ from app.services.bulk_operation_stats import (
     BulkOperationStats,
     BulkProcessingOutcome,
     BulkProgressCallback,
-    emit_bulk_progress_applying,
-    shutdown_executor_keeping_ui_alive,
+    emit_bulk_progress_phase_complete,
+    release_process_pool_executor,
 )
 from app.services.logging_service import LoggingService
 from app.services.pgn_service import PgnService
@@ -259,11 +259,17 @@ class BulkPlanService:
         game_indices: Optional[List[int]] = None,
         progress_callback: Optional[BulkProgressCallback] = None,
         cancellation_check: Optional[Callable[[], bool]] = None,
+        *,
+        announce_next_phase: bool = False,
     ) -> BulkOperationStats:
         """Apply all plan operations to each game once (process pool).
 
         Intended to run on a background QThread. Do not drive this from the UI
         thread with nested processEvents — that hung/crashed on macOS.
+
+        When ``announce_next_phase`` is True, the overlay shows
+        "Preparing next step…" during process-pool teardown so the handoff
+        before Smart Update (or another phase) is not an unlabeled pause.
         """
         steps = tuple(plan_step_from_operation(op) for op in operations)
         if not steps:
@@ -343,20 +349,28 @@ class BulkPlanService:
                         games_skipped,
                     )
         finally:
+            # Label the teardown gap before workers join (can take a moment).
+            if progress_callback and completed > 0:
+                if announce_next_phase:
+                    progress_callback(
+                        completed,
+                        total_games,
+                        "Preparing next step…",
+                        games_updated,
+                        games_failed,
+                        games_skipped,
+                    )
+                else:
+                    emit_bulk_progress_phase_complete(
+                        progress_callback,
+                        completed,
+                        total_games,
+                        games_updated,
+                        games_failed,
+                        games_skipped,
+                    )
             if executor is not None:
-                shutdown_executor_keeping_ui_alive(executor)
-
-        emit_bulk_progress_applying(
-            progress_callback,
-            completed,
-            total_games,
-            games_updated,
-            games_failed,
-            games_skipped,
-        )
-        if updated_games:
-            # Header/clean ops do not change main-line positions.
-            database.batch_update_games(updated_games, reindex_positions=False)
+                release_process_pool_executor(executor)
 
         added_tags = {
             (step.get("tags") or [None])[0]
@@ -369,11 +383,15 @@ class BulkPlanService:
             except Exception:
                 pass
 
-        LoggingService.get_instance().info(
-            f"Bulk plan completed: steps={len(steps)}, games_processed={completed}, "
-            f"games_updated={games_updated}, games_failed={games_failed}, "
-            f"games_skipped={games_skipped}"
-        )
+        try:
+            LoggingService.get_instance().info(
+                f"Bulk plan completed: steps={len(steps)}, games_processed={completed}, "
+                f"games_updated={games_updated}, games_failed={games_failed}, "
+                f"games_skipped={games_skipped}"
+            )
+        except Exception:
+            pass
+        # Mutate games here; batch_update_games / dataChanged must run on the UI thread.
         return BulkOperationStats(
             success=True,
             games_processed=completed,
@@ -382,4 +400,6 @@ class BulkPlanService:
             games_skipped=games_skipped,
             updated_game_ids=tuple(updated_game_ids),
             failed_game_ids=tuple(failed_game_ids),
+            pending_games=tuple(updated_games),
+            reindex_positions=False,
         )

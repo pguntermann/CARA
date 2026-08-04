@@ -76,7 +76,7 @@ The UI exposes two entry points:
 - Each worker receives the full plan and applies steps in order on that game
 - Header ops mutate an in-memory `chess.pgn.Game`; clean steps use `_process_game_for_cleaning` (`bulk_clean_pgn_service.py`) via `PgnCleaningService`
 - Skipped steps (e.g. tag already present / nothing to remove) do not stop later steps
-- One `batch_update_games()` after the pool completes
+- One pass collects mutated games; `batch_update_games()` runs on the UI thread after the worker finishes
 
 **Tag-to-field mapping** (via `game_data_header_sync`):
 When standard tags are modified, corresponding `GameData` fields are updated (`White`, `Black`, `Result`, `Date`, `ECO`, `Event`, `Site`, `WhiteElo`, `BlackElo`, etc.).
@@ -112,6 +112,11 @@ When standard tags are modified, corresponding `GameData` fields are updated (`W
 - Creates `OpeningService` instance for ECO updates
 - Handles progress reporting and cancellation
 - Dialog runs execute on a background `QThread`; plan pass uses `ProcessPoolExecutor`
+- After the worker finishes, the dialog applies pending game mutations via
+  `batch_update_games()` on the **UI thread** (no Qt model signals from the worker)
+- Process pool is released with graceful ``shutdown(wait=True)`` on a helper
+  thread (timeout, then terminate only as last resort) so worker semaphores are
+  not leaked
 - Refreshes active game and marks database unsaved on the UI thread after completion
 
 ### Named plans (save / load)

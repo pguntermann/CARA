@@ -11,7 +11,7 @@ from app.models.database_model import DatabaseModel
 from app.services.bulk_operation_stats import (
     BulkOperationStats,
     BulkProgressCallback,
-    emit_bulk_progress_applying,
+    emit_bulk_progress_phase_complete,
 )
 from app.services.uci_communication_service import UCICommunicationService
 from app.services.opening_service import OpeningService
@@ -86,6 +86,7 @@ class BulkReplaceService:
         games_processed_count = 0
         updated_game_ids: List[int] = []
         failed_game_ids: List[int] = []
+        updated_games: List[Any] = []
         
         # Initialize engine once and reuse across games
         uci = None
@@ -140,9 +141,6 @@ class BulkReplaceService:
                     games_skipped=0,
                     error_message="Engine did not respond with readyok"
                 )
-            
-            # Collect all updated games for batch update
-            updated_games = []
             
             # Process each game
             for idx, game in enumerate(games_to_process):
@@ -255,7 +253,7 @@ class BulkReplaceService:
                             games_skipped,
                         )
             
-            emit_bulk_progress_applying(
+            emit_bulk_progress_phase_complete(
                 progress_callback,
                 games_processed_count,
                 total_games,
@@ -263,9 +261,6 @@ class BulkReplaceService:
                 games_failed,
                 games_skipped,
             )
-            # Batch update all modified games with a single dataChanged signal
-            if updated_games:
-                database.batch_update_games(updated_games)
             
         finally:
             # Cleanup engine
@@ -273,12 +268,16 @@ class BulkReplaceService:
                 uci.cleanup()
         
         # Log bulk replace operation (update_result_tags)
-        logging_service = LoggingService.get_instance()
-        logging_service.info(
-            f"Bulk replace operation completed: operation=update_result_tags, engine={engine_path.name if engine_path else 'unknown'}, "
-            f"games_processed={games_processed_count}, games_updated={games_updated}, games_failed={games_failed}, games_skipped={games_skipped}"
-        )
+        try:
+            logging_service = LoggingService.get_instance()
+            logging_service.info(
+                f"Bulk replace operation completed: operation=update_result_tags, engine={engine_path.name if engine_path else 'unknown'}, "
+                f"games_processed={games_processed_count}, games_updated={games_updated}, games_failed={games_failed}, games_skipped={games_skipped}"
+            )
+        except Exception:
+            pass
         
+        # Mutate games here; batch_update_games / dataChanged must run on the UI thread.
         return BulkOperationStats(
             success=True,
             games_processed=games_processed_count,
@@ -287,6 +286,8 @@ class BulkReplaceService:
             games_skipped=games_skipped,
             updated_game_ids=tuple(updated_game_ids),
             failed_game_ids=tuple(failed_game_ids),
+            pending_games=tuple(updated_games),
+            reindex_positions=True,
         )
     
     def _determine_result_from_evaluation(
@@ -528,7 +529,7 @@ class BulkReplaceService:
                         games_skipped,
                     )
         
-        emit_bulk_progress_applying(
+        emit_bulk_progress_phase_complete(
             progress_callback,
             games_processed_count,
             total_games,
@@ -536,10 +537,7 @@ class BulkReplaceService:
             games_failed,
             games_skipped,
         )
-        # Batch update all modified games with a single dataChanged signal
-        if updated_games:
-            database.batch_update_games(updated_games)
-        
+        # Mutate games here; batch_update_games / dataChanged must run on the UI thread.
         return BulkOperationStats(
             success=True,
             games_processed=games_processed_count,
@@ -548,5 +546,7 @@ class BulkReplaceService:
             games_skipped=games_skipped,
             updated_game_ids=tuple(updated_game_ids),
             failed_game_ids=tuple(failed_game_ids),
+            pending_games=tuple(updated_games),
+            reindex_positions=True,
         )
 

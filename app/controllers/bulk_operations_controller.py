@@ -360,6 +360,7 @@ class BulkOperationsController(QObject):
         self.replace_service = BulkReplaceService(config)
         self.plan_service = BulkPlanService(config)
         self.progress_service = ProgressService.get_instance()
+        self._opening_service: Optional[OpeningService] = None
         self._cancelled = False
         self._progress_step_index = 0
         self._progress_total_steps = 1
@@ -374,9 +375,39 @@ class BulkOperationsController(QObject):
         self._last_live_updated = 0
         self._last_live_failed = 0
         self._last_live_skipped = 0
+        # Games mutated on the worker; applied via batch_update_games on the UI thread.
+        self._pending_model_games: Dict[int, GameData] = {}
+        self._pending_model_reindex = False
 
     def get_active_database(self) -> Optional[DatabaseModel]:
         return self.database_controller.get_active_database()
+
+    def _clear_pending_model_updates(self) -> None:
+        self._pending_model_games.clear()
+        self._pending_model_reindex = False
+
+    def _note_pending_model_updates(self, stats: BulkOperationStats) -> None:
+        """Record in-memory game mutations for a later UI-thread batch apply."""
+        for game in stats.pending_games:
+            if game is not None:
+                self._pending_model_games[id(game)] = game
+        if stats.reindex_positions and stats.pending_games:
+            self._pending_model_reindex = True
+
+    def take_pending_model_updates(self) -> Tuple[List[GameData], bool]:
+        """Return and clear pending games for ``batch_update_games`` (UI thread)."""
+        games = list(self._pending_model_games.values())
+        reindex = bool(self._pending_model_reindex)
+        self._clear_pending_model_updates()
+        return games, reindex
+
+    def apply_pending_model_updates(self, database: Optional[DatabaseModel]) -> int:
+        """Apply worker mutations on the UI thread. Returns number of games applied."""
+        games, reindex = self.take_pending_model_updates()
+        if not games or database is None:
+            return 0
+        database.batch_update_games(games, reindex_positions=reindex)
+        return len(games)
 
     def get_add_tag_options(self) -> List[str]:
         """Tag name presets for Add tag mode (omits fixed PGN roster tags)."""
@@ -512,8 +543,8 @@ class BulkOperationsController(QObject):
     ) -> None:
         if self._cancelled:
             return
-        # Post-loop in-memory apply (not Save Database).
-        if message == "Finishing…":
+        # Phase handoff / final wrap-up (not Save Database).
+        if message in ("Finishing…", "Preparing next step…"):
             percent = self._overall_percent(1.0)
             self.progress_service.set_progress(percent)
             self.progress_service.set_status(f"Bulk Operations: {message}")
@@ -567,6 +598,19 @@ class BulkOperationsController(QObject):
             int(percent),
             message,
             self._last_live_processed,
+            self._last_live_updated,
+            self._last_live_failed,
+            self._last_live_skipped,
+        )
+
+    def _announce_preparing_next_step(self) -> None:
+        """Show a labeled handoff while the next phase is about to start."""
+        n = max(1, len(self._games_in_scope))
+        processed = min(n, max(self._last_live_processed, n))
+        self._progress_callback(
+            processed,
+            n,
+            "Preparing next step…",
             self._last_live_updated,
             self._last_live_failed,
             self._last_live_skipped,
@@ -692,13 +736,30 @@ class BulkOperationsController(QObject):
             self._cancel_flag,
         )
 
+    def ensure_opening_service(self) -> OpeningService:
+        """Load the opening book once (prefer calling from the UI thread before work)."""
+        if self._opening_service is None:
+            service = OpeningService(self.config)
+            service.load()
+            self._opening_service = service
+        return self._opening_service
+
     def _run_eco_update(
         self,
         database: DatabaseModel,
         game_indices: Optional[List[int]],
     ) -> BulkOperationStats:
-        opening_service = OpeningService(self.config)
-        opening_service.load()
+        try:
+            opening_service = self.ensure_opening_service()
+        except Exception as exc:
+            return BulkOperationStats(
+                success=False,
+                games_processed=0,
+                games_updated=0,
+                games_failed=0,
+                games_skipped=0,
+                error_message=f"Failed to load opening book: {exc}",
+            )
         return self.replace_service.update_eco_tags(
             database,
             opening_service,
@@ -766,6 +827,7 @@ class BulkOperationsController(QObject):
         self._updated_game_ids = set()
         self._failed_game_ids = set()
         self._current_step_label = ""
+        self._clear_pending_model_updates()
         self.progress_service.show_progress()
         # Plan ops share one game pass; Smart Update steps remain separate phases.
         phase_count = int(bool(operations)) + int(has_result_update) + int(has_eco_update)
@@ -788,13 +850,16 @@ class BulkOperationsController(QObject):
                     f"Applying {n_ops} operation{'s' if n_ops != 1 else ''}…",
                 )
                 plan_ops = self._prepare_operations(list(operations))
+                more_after_plan = bool(has_result_update or has_eco_update)
                 plan_result = self.plan_service.apply_plan(
                     database,
                     plan_ops,
                     game_indices,
                     self._progress_callback,
                     self._cancel_flag,
+                    announce_next_phase=more_after_plan,
                 )
+                self._note_pending_model_updates(plan_result)
                 if not plan_result.success:
                     failed = plan_result
                 else:
@@ -808,6 +873,7 @@ class BulkOperationsController(QObject):
                     f"Step {step_index}/{phase_count}: Smart Update (Result)",
                 )
                 result_update = self._run_result_update(database, game_indices)
+                self._note_pending_model_updates(result_update)
                 if not result_update.success:
                     failed = result_update
                 else:
@@ -815,12 +881,15 @@ class BulkOperationsController(QObject):
                     self._accumulate_step_stats(result_update)
 
             if failed is None and has_eco_update and not self._cancelled:
+                if step_results:
+                    self._announce_preparing_next_step()
                 step_index += 1
                 self._progress_step_index = step_index - 1
                 self._set_step_status(
                     f"Step {step_index}/{phase_count}: Smart Update (ECO)",
                 )
                 eco_result = self._run_eco_update(database, game_indices)
+                self._note_pending_model_updates(eco_result)
                 if not eco_result.success:
                     failed = eco_result
                 else:
@@ -849,6 +918,18 @@ class BulkOperationsController(QObject):
                     # Union across plan + Smart Update: a game updated in any
                     # phase counts as updated (ECO skips must not erase plan hits).
                     result = self._merge_step_stats(step_results)
+
+            # One final status before the UI thread applies pending model updates.
+            if not self._cancelled:
+                n = len(self._games_in_scope)
+                self._progress_callback(
+                    n,
+                    n,
+                    "Finishing…",
+                    result.games_updated,
+                    result.games_failed,
+                    result.games_skipped,
+                )
         finally:
             # hide_progress alone leaves the last status ("Finishing…") in the bar.
             self.progress_service.reset()
