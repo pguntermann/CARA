@@ -827,6 +827,7 @@
                 <p>You can perform common database operations using the File menu or keyboard shortcuts:</p>
                 <ul>
                     <li><strong>Open PGN Database:</strong> Use <span class="menu-item">File → Open PGN Database</span> (<code>Ctrl+O</code> / <code>⌘+O</code>) to open one or multiple PGN files. In the file dialog, you can select multiple files by clicking and dragging, holding <code>Ctrl</code> / <code>⌘</code> for individual selection, or <code>Shift</code> for range selection. Each file appears as a separate tab in the Database Panel.</li>
+                    <li><strong>Open Recent:</strong> Use <span class="menu-item">File → Open Recent</span> to reopen a recently opened PGN database by filename. Missing files are marked <em>(missing)</em> and cannot be opened. Use <strong>Clear</strong> in the submenu to empty the list.</li>
                     <li><strong>Save PGN Database:</strong> Use <span class="menu-item">File → Save PGN Database</span> (<code>Ctrl+S</code> / <code>⌘+S</code>) to save the active database. This overwrites the existing database file with the current contents.</li>
                     <li><strong>Save PGN Database as...</strong>: Use <span class="menu-item">File → Save PGN Database as...</span> (<code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>) to save the active database as a new copy.</li>
                     <li><strong>Close PGN Database:</strong> Use <span class="menu-item">File → Close PGN Database</span> (<code>Ctrl+W</code> / <code>⌘+W</code>) to close the active database tab.</li>
@@ -1320,6 +1321,7 @@
                     <li><strong>Load games:</strong><br>
                     Each selected file opens as a separate tab in the Database Panel. The first game from the first file automatically becomes the active game.</li>
                 </ol>
+                <p>To reopen a database you used earlier, choose it from <span class="menu-item">File → Open Recent</span>.</p>
                 
                 <h5 id="import-from-online">5.2.3 Import from Online Platforms</h5>
                 <p>CARA can import games directly from online chess platforms:</p>
@@ -2128,47 +2130,50 @@
                 <p><strong>Shortcut:</strong> <code>Ctrl+O</code> / <code>⌘+O</code></p>
                 <p>Opens one or more PGN files from your computer. Each file appears as a separate tab in the Database Panel.<br>See <a href="#open-pgn-files">section 5.2.2</a> for detailed instructions.</p>
                 
-                <h5>6.1.2 Close PGN Database</h5>
+                <h5>6.1.2 Open Recent</h5>
+                <p>Opens a submenu of recently opened PGN databases. Choose a database by filename to open it again. If a listed file is no longer available, it appears as <em>(missing)</em> and cannot be opened. When the list is empty, the submenu shows <em>(No recent databases)</em>. Use <strong>Clear</strong> at the bottom of the submenu to remove all recent entries.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
+                
+                <h5>6.1.3 Close PGN Database</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+W</code> / <code>⌘+W</code></p>
                 <p>Closes the currently active database tab. Any unsaved changes will be lost if you haven't saved the database first.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
                 
-                <h5>6.1.3 Close All PGN Databases</h5>
+                <h5>6.1.4 Close All PGN Databases</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Alt+W</code> / <code>⌘+⌥+W</code></p>
                 <p>Closes all file-based database tabs. The Clipboard and Search Results tabs are preserved. Any unsaved changes will be lost if you haven't saved the databases first.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
                 
-                <h5>6.1.4 Clear Clipboard Database</h5>
+                <h5>6.1.5 Clear Clipboard Database</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code></p>
                 <p>Removes all games from the Clipboard database.</p>
                 
-                <h5>6.1.5 Save PGN Database</h5>
+                <h5>6.1.6 Save PGN Database</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+S</code> / <code>⌘+S</code></p>
                 <p>Saves the active database to disk, overwriting the existing file.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
                 
-                <h5>6.1.6 Save PGN Database as...</h5>
+                <h5>6.1.7 Save PGN Database as...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code></p>
                 <p>Saves the active database to a new file location. This allows you to create a copy of the database without overwriting the original.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
                 
-                <h5>6.1.7 Import Games from Online...</h5>
+                <h5>6.1.8 Import Games from Online...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+I</code> / <code>⌘+Shift+I</code></p>
                 <p>Opens a dialog to import games from Lichess or Chess.com.<br>See <a href="#import-from-online">section 5.2.3</a> for detailed instructions.</p>
                 
-                <h5>6.1.8 Bulk Operations...</h5>
+                <h5>6.1.9 Bulk Operations...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+B</code> / <code>⌘+Shift+B</code></p>
                 <p>Opens a dialog to build an ordered list of header-tag and PGN-cleaning operations, optionally run Smart Update, and apply them across many games.<br>See <a href="#bulk-operations">section 5.3.3</a> for detailed instructions.</p>
                 
-                <h5>6.1.9 Deduplicate Games in Active Database...</h5>
+                <h5>6.1.10 Deduplicate Games in Active Database...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+U</code> / <code>⌘+Shift+U</code></p>
                 <p>Opens a dialog to identify and remove duplicate games from the active database.<br>See <a href="#deduplicate-games">section 5.3.4</a> for detailed instructions.</p>
                 
-                <h5>6.1.10 Search Games...</h5>
+                <h5>6.1.11 Search Games...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+F</code> / <code>⌘+Shift+F</code></p>
                 <p>Opens a dialog to search for games across databases using multiple criteria and logical operators.<br>See <a href="#searching-games">section 5.4</a> for detailed instructions.</p>
                 
-                <h5>6.1.11 Close Search Results</h5>
+                <h5>6.1.12 Close Search Results</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+W</code> / <code>⌘+Shift+W</code></p>
                 <p>Closes the Search Results tab in the Database Panel. This menu item is only enabled when a search results tab is open.</p>
                 
-                <h5>6.1.12 Close Application</h5>
+                <h5>6.1.13 Close Application</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Q</code> / <code>⌘+Q</code></p>
                 <p>Closes the CARA application. Any unsaved changes in open databases will be lost if you haven't saved them first.</p>
             </div>
