@@ -9,7 +9,7 @@ Core Principles
 ---------------
 1. **Configuration-Driven**: All styling values MUST come from config.json, never hardcoded
 2. **StyleManager-Based**: Use StyleManager for all UI controls to ensure unified styling
-3. **Template-Based**: Use BulkTagDialog (`app/views/bulk_tag_dialog.py`) as the reference template
+3. **Template-Based**: Use BulkOperationsDialog (`app/views/dialogs/bulk_operations_dialog.py`) as the reference template
 4. **Validation**: All config values must be validated by ConfigLoader
 
 Dialog Implementation Pattern
@@ -209,7 +209,7 @@ ConfigLoader validates all required keys on startup. Missing keys cause applicat
 Template Dialog
 ---------------
 
-Use **BulkTagDialog** (`app/views/bulk_tag_dialog.py`) as the reference template:
+Use **BulkOperationsDialog** (`app/views/dialogs/bulk_operations_dialog.py`) as the reference template:
 
 - Complete implementation following `_load_config()`, `_setup_ui()`, `_apply_styling()` pattern
 - Uses StyleManager for all UI controls

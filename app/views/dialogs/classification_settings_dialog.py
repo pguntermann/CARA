@@ -756,7 +756,7 @@ class ClassificationSettingsDialog(QDialog):
         fields_config = dialog_config.get('fields', {})
         buttons_config = dialog_config.get('buttons', {})
         
-        # Dialog chrome (same pattern as bulk_replace / import_games)
+        # Dialog chrome (same pattern as bulk_operations / import_games)
         dialog_bg_color = dialog_config.get('background_color', [40, 40, 45])
         dialog_border_color = dialog_config.get('border_color', [60, 60, 65])
         group_border_color = (

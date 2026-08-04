@@ -771,8 +771,8 @@ class MainWindow(QMainWindow):
                 # Update save menu state
                 self._update_save_menu_state()
     
-    def _bulk_replace(self) -> None:
-        """Open bulk replace dialog."""
+    def _bulk_operations(self) -> None:
+        """Open bulk operations dialog."""
         if not hasattr(self, 'database_panel'):
             return
         
@@ -780,49 +780,17 @@ class MainWindow(QMainWindow):
         if not active_database:
             return
         
-        # Get selected game indices from database panel (if any)
         selected_game_indices = []
         active_info = self.database_panel.get_active_database_info()
         if active_info and active_info.get('model') == active_database:
             selected_game_indices = self.database_panel.get_selected_game_indices()
         
-        # Get bulk replace controller
-        bulk_replace_controller = self.controller.get_bulk_replace_controller()
+        bulk_operations_controller = self.controller.get_bulk_operations_controller()
         
-        # Import and show dialog
-        from app.views.dialogs.bulk_replace_dialog import BulkReplaceDialog
-        dialog = BulkReplaceDialog(
+        from app.views.dialogs.bulk_operations_dialog import BulkOperationsDialog
+        dialog = BulkOperationsDialog(
             self.config,
-            bulk_replace_controller,
-            active_database,
-            selected_game_indices=selected_game_indices if selected_game_indices else None,
-            parent=self
-        )
-        dialog.exec()
-    
-    def _bulk_tag(self) -> None:
-        """Open bulk tag dialog."""
-        if not hasattr(self, 'database_panel'):
-            return
-        
-        active_database = self._require_active_database()
-        if not active_database:
-            return
-        
-        # Get selected game indices from database panel (if any)
-        selected_game_indices = []
-        active_info = self.database_panel.get_active_database_info()
-        if active_info and active_info.get('model') == active_database:
-            selected_game_indices = self.database_panel.get_selected_game_indices()
-        
-        # Get bulk tag controller
-        bulk_tag_controller = self.controller.get_bulk_tag_controller()
-        
-        # Import and show dialog
-        from app.views.dialogs.bulk_tag_dialog import BulkTagDialog
-        dialog = BulkTagDialog(
-            self.config,
-            bulk_tag_controller,
+            bulk_operations_controller,
             active_database,
             selected_game_indices=selected_game_indices if selected_game_indices else None,
             parent=self
@@ -1093,28 +1061,6 @@ class MainWindow(QMainWindow):
             return
         
         self._close_search_results_tab()
-    
-    def _bulk_clean_pgn(self) -> None:
-        """Open bulk clean PGN dialog."""
-        if not hasattr(self, 'database_panel'):
-            return
-        
-        active_database = self._require_active_database()
-        if not active_database:
-            return
-        
-        # Get bulk clean PGN controller
-        bulk_clean_pgn_controller = self.controller.get_bulk_clean_pgn_controller()
-        
-        # Import and show dialog
-        from app.views.dialogs.bulk_clean_pgn_dialog import BulkCleanPgnDialog
-        dialog = BulkCleanPgnDialog(
-            self.config,
-            bulk_clean_pgn_controller,
-            active_database,
-            self
-        )
-        dialog.exec()
     
     def _deduplicate_games(self) -> None:
         """Deduplicate games in the active database."""

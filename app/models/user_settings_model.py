@@ -468,6 +468,27 @@ class UserSettingsModel(QObject):
         self._settings["recent_pgn_databases"] = cleaned
         self.settings_changed.emit()
 
+    def get_bulk_operation_plans(self) -> Dict[str, Any]:
+        """Get named bulk-operation plans (name → list of operation dicts)."""
+        raw = self._settings.get("bulk_operation_plans", {})
+        if not isinstance(raw, dict):
+            return {}
+        plans: Dict[str, Any] = {}
+        for name, ops in raw.items():
+            if isinstance(name, str) and name.strip() and isinstance(ops, list):
+                plans[name.strip()] = [item for item in ops if isinstance(item, dict)]
+        return plans
+
+    def set_bulk_operation_plans(self, plans: Dict[str, Any]) -> None:
+        """Replace the named bulk-operation plans map."""
+        cleaned: Dict[str, Any] = {}
+        if isinstance(plans, dict):
+            for name, ops in plans.items():
+                if isinstance(name, str) and name.strip() and isinstance(ops, list):
+                    cleaned[name.strip()] = [item for item in ops if isinstance(item, dict)]
+        self._settings["bulk_operation_plans"] = cleaned
+        self.settings_changed.emit()
+
     def update_from_dict(self, settings: Dict[str, Any]) -> None:
         """Update settings from a dictionary (used when loading from file).
         

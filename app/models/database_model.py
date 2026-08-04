@@ -1,8 +1,9 @@
 """Database model for holding game data."""
 
-from PyQt6.QtCore import QAbstractTableModel, Qt, QModelIndex, QRect, pyqtSignal
+from PyQt6.QtCore import QAbstractTableModel, Qt, QModelIndex, QRect, pyqtSignal, pyqtSlot, QMetaObject, QThread, Q_ARG
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QBrush, QColor
-from typing import Optional, List, Dict, Any, Set, Tuple
+from PyQt6.QtWidgets import QApplication
+from typing import Optional, List, Dict, Any, Set, Tuple, Callable
 from datetime import datetime
 from collections import Counter
 import time
@@ -970,7 +971,7 @@ class DatabaseModel(QAbstractTableModel):
         """Get ordered list of unique tags.
         
         Returns:
-            List of tag names ordered by importance (same ordering as bulk_replace_controller).
+            List of tag names ordered by importance (same ordering as bulk operations tag lists).
         """
         if not self._unique_tags:
             return []
@@ -1122,7 +1123,13 @@ class DatabaseModel(QAbstractTableModel):
         self._emit_stats_relevant_data_change()
         return True
     
-    def batch_update_games(self, games: List['GameData'], *, reindex_positions: bool = True) -> None:
+    def batch_update_games(
+        self,
+        games: List['GameData'],
+        *,
+        reindex_positions: bool = True,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+    ) -> None:
         """Batch update multiple games and emit a single dataChanged signal.
         
         This is more efficient than calling update_game() multiple times,
@@ -1132,9 +1139,20 @@ class DatabaseModel(QAbstractTableModel):
             games: List of GameData instances to update (must already be in the model).
             reindex_positions: If True (default), update the position-search index
                 for each game based on its current PGN.
+            progress_callback: Optional ``(done, total)`` called during reindex so
+                long batches can update a progress overlay.
         """
         if not games:
             return
+
+        def _pump() -> None:
+            # Keep progress overlays (spinner) fluent during long reindex passes.
+            try:
+                from app.services.bulk_operation_stats import pump_bulk_ui_events
+
+                pump_bulk_ui_events()
+            except Exception:
+                pass
         
         if reindex_positions:
             start_ts = time.perf_counter()
@@ -1147,8 +1165,23 @@ class DatabaseModel(QAbstractTableModel):
                 )
             except Exception:
                 pass
-            for game in games:
-                self._position_index_add_game(game, None, None)
+            total = len(games)
+            for index, game in enumerate(games, start=1):
+                try:
+                    self._position_index_add_game(game, None, None)
+                except Exception:
+                    # Keep batch apply moving if one PGN fails to rehash.
+                    pass
+                # Avoid per-game Qt processEvents (nested event storms / hangs);
+                # progress + pump only periodically.
+                if index == 1 or index == total or index % 16 == 0:
+                    if progress_callback is not None:
+                        try:
+                            progress_callback(index, total)
+                        except Exception:
+                            pass
+                    _pump()
+            _pump()
             elapsed_ms = int((time.perf_counter() - start_ts) * 1000)
             try:
                 from app.services.logging_service import LoggingService
@@ -1164,12 +1197,15 @@ class DatabaseModel(QAbstractTableModel):
         for game in games:
             self._unsaved_games.add(game)
         
-        # Find all row indices for the updated games
+        # O(n) id→row map once instead of repeated list.index per game.
+        id_to_row = {id(g): idx for idx, g in enumerate(self._games)}
         rows = []
         for game in games:
-            row = self.find_game(game)
+            row = id_to_row.get(id(game))
             if row is not None:
                 rows.append(row)
+            if len(rows) % 64 == 0:
+                _pump()
         
         if not rows:
             return
@@ -1179,12 +1215,36 @@ class DatabaseModel(QAbstractTableModel):
         min_row = rows[0]
         max_row = rows[-1]
         
-        # Emit a single dataChanged signal for the entire range
+        # Emit on the UI thread when called from a background worker. Use
+        # QueuedConnection (never BlockingQueued) so the worker cannot deadlock
+        # waiting for the UI while the UI waits on the worker.
+        self._emit_batch_data_changed(min_row, max_row)
+        _pump()
+
+    def _emit_batch_data_changed(self, min_row: int, max_row: int) -> None:
+        """Emit dataChanged / stats signals, marshaled to the UI thread if needed."""
+        app = QApplication.instance()
+        if app is not None and QThread.currentThread() is not app.thread():
+            QMetaObject.invokeMethod(
+                self,
+                "_emit_batch_data_changed_impl",
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(int, min_row),
+                Q_ARG(int, max_row),
+            )
+            return
+        self._emit_batch_data_changed_impl(min_row, max_row)
+
+    @pyqtSlot(int, int)
+    def _emit_batch_data_changed_impl(self, min_row: int, max_row: int) -> None:
         parent = QModelIndex()
         left_index = self.index(min_row, 0, parent)
         right_index = self.index(max_row, self.columnCount(parent) - 1, parent)
-        self.dataChanged.emit(left_index, right_index,
-                             [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole])
+        self.dataChanged.emit(
+            left_index,
+            right_index,
+            [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.DecorationRole],
+        )
         self._emit_stats_relevant_data_change()
     
     def _create_unsaved_icon(self) -> QIcon:

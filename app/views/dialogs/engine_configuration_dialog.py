@@ -180,18 +180,18 @@ class EngineConfigurationDialog(QDialog):
         layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetNoConstraint)
         layout.setContentsMargins(layout_margins[0], layout_margins[1], layout_margins[2], layout_margins[3])
         
-        # Engine info header (same pattern as BulkReplaceDialog database name/path: no boxed frame).
-        # Font metrics match BulkReplaceDialog labels (dialogs.*.labels), with header.* as fallback.
+        # Engine info header (same pattern as BulkOperationsDialog database name/path: no boxed frame).
+        # Font metrics match BulkOperationsDialog labels (dialogs.*.labels), with header.* as fallback.
         labels_config = dialog_config.get('labels', {})
         header_config = dialog_config.get('header', {})
         title_font_family = resolve_font_family(
             labels_config.get('font_family') or header_config.get('font_family', 'Helvetica Neue')
         )
-        # Same sizing as BulkReplaceDialog database path: int(scale_font_size(labels.font_size)) - 2
+        # Same sizing as BulkOperationsDialog database path: int(scale_font_size(labels.font_size)) - 2
         _label_fs_raw = labels_config.get('font_size', header_config.get('font_size', 11))
         label_font_size = int(scale_font_size(_label_fs_raw))
         title_font_size = label_font_size
-        # Same delta as BulkReplaceDialog path (label_font_size - 2); explicit QSS enforces pt size on Windows.
+        # Same delta as BulkOperationsDialog path (label_font_size - 2); explicit QSS enforces pt size on Windows.
         path_font_size = max(8, label_font_size - 2)
         self._engine_label_font_size = label_font_size
         self._engine_title_font_family_resolved = title_font_family
@@ -242,7 +242,7 @@ class EngineConfigurationDialog(QDialog):
         self._engine_path_label = QLabel(path_display)
         self._engine_path_label.setWordWrap(False)
         self._engine_path_label.setToolTip(str(self.engine_path))
-        # Match BulkReplaceDialog db path: setFont drives point size; stylesheet is color-only (see _apply_engine_info_path_style).
+        # Match BulkOperationsDialog db path: setFont drives point size; stylesheet is color-only (see _apply_engine_info_path_style).
         self._engine_path_label.setFont(path_font)
         self._engine_path_font = path_font
         self._apply_engine_info_path_style(dialog_config)
@@ -1063,7 +1063,7 @@ class EngineConfigurationDialog(QDialog):
         return widget
 
     def _apply_engine_info_path_style(self, dialog_config: Dict[str, Any]) -> None:
-        """Path line: same pattern as BulkReplaceDialog — setFont in _setup_ui; stylesheet color only.
+        """Path line: same pattern as BulkOperationsDialog — setFont in _setup_ui; stylesheet color only.
 
         Setting font-size/family in QSS can fight setFont on Windows/DPI and make the path look tiny.
         """
@@ -1464,7 +1464,7 @@ class EngineConfigurationDialog(QDialog):
                     checkmark_path,
                 )
         
-        # Window chrome: same as BulkReplaceDialog (dialogs.*.background_color), not tab pane color
+        # Window chrome: same as BulkOperationsDialog (dialogs.*.background_color), not tab pane color
         tabs_config = dialog_config.get('tabs', {})
         pane_bg = tabs_config.get('pane_background', [40, 40, 45])
         dialog_chrome_bg = dialog_config.get('background_color', pane_bg)

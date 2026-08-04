@@ -8,7 +8,7 @@ The bulk operations system provides efficient batch processing of games in datab
 
 The bulk operations system follows a Service-Controller-Model pattern consistent with the application's architecture:
 
-- **Services**: Handle the business logic for bulk operations (`BulkTagService`, `BulkReplaceService`, etc.)
+- **Services**: `BulkPlanService` (ordered header/clean plan in one pass), `BulkReplaceService` (Smart Update Result/ECO), plus analysis/cleaning helpers
 - **Controllers**: Orchestrate operations, handle UI concerns (progress, cancellation), and coordinate with models
 - **Models**: Store game data; operations update `DatabaseModel` via batch updates
 
@@ -21,18 +21,20 @@ Each bulk operation consists of:
 
 ### Common Pattern
 
-All bulk operations follow this pattern:
+Header-tag and clean steps share a **single pass** over games:
 
 1. **Filter games**: Select games to process (all games or selected indices)
-2. **Process each game**: Parse PGN, apply transformation, regenerate PGN
+2. **Process each game once**: Parse PGN, apply the ordered plan in sequence, regenerate PGN
 3. **Collect updates**: Build list of modified games
 4. **Batch update**: Call `database.batch_update_games()` once with all modified games
 5. **Progress reporting**: Report progress via callback
 6. **Error handling**: Continue processing on errors, track failures
 
+Optional Smart Update (Result / ECO) runs as separate post-passes after the plan.
+
 ### Result type and UI summaries
 
-All bulk tag, bulk replace, and bulk clean PGN services return **`BulkOperationStats`** from `app/services/bulk_operation_stats.py` (same fields as below). Dialogs format results via **`format_bulk_operation_summary_plain`** / **`format_bulk_operation_summary_html`** in `app/utils/bulk_operation_summary.py`.
+Plan and Smart Update services return **`BulkOperationStats`** from `app/services/bulk_operation_stats.py` (same fields as below). Dialogs format results via **`format_bulk_operation_summary_plain`** / **`format_bulk_operation_summary_html`** in `app/utils/bulk_operation_summary.py`.
 
 ```python
 @dataclass
@@ -47,69 +49,43 @@ class BulkOperationStats:
 
 ## Available Operations
 
-The system provides four main bulk operations:
+The UI exposes two entry points:
 
-- **Bulk Tag Operations**: Add or remove PGN tags from games
-- **Bulk Replace Operations**: Replace text in metadata tags, copy tags, update Result/ECO tags
-- **Bulk Clean PGN Operations**: Remove comments, variations, annotations, non-standard tags, results
-- **Bulk Analysis Operations**: Analyze multiple games without making them active
+- **Bulk Operations** (`BulkOperationsDialog`): ordered list of header-tag and PGN-clean steps, plus dialog-level Smart Update (Result / ECO)
+- **Bulk Analysis**: analyze multiple games without making them active (separate dialog)
 
-## Bulk Tag Operations
+`BulkOperationsController` runs an ordered list of `BulkOperation` items via `execute_bulk_operations()` (single-pass plan), then optional Smart Update. Domain logic stays in the services below.
 
-### BulkTagService
+### Operation modes (`BulkOperation.mode`)
 
-`BulkTagService` (`app/services/bulk_tag_service.py`) handles adding and removing PGN tags.
+| Mode | Summary |
+|------|---------|
+| `find_replace` | Find/replace text in one or more header tags (case / regex options) |
+| `overwrite` | Set selected tags to a value (empty clears) |
+| `copy` | Copy a source tag into one or more targets |
+| `add_tag` | Create tag if missing (fixed value or copy from source) |
+| `remove_tags` | Remove selected tags (Seven Tag Roster omitted from UI) |
+| `clean` | Remove comments / variations / non-standard inline tags / annotations |
 
-**Add Tag** (`add_tag()`):
-- Adds a tag to games that don't already have it
-- Three value modes:
-  - **Fixed value**: Set tag to specified value
-  - **Copy from source**: Copy value from another tag
-  - **Empty**: Add tag with empty value
-- Skips games where tag already exists (`games_skipped`)
+## Plan service
 
-**Remove Tag** (`remove_tag()`):
-- Removes specified tag from games
-- Skips games where tag doesn't exist
+### BulkPlanService
 
-**Tag-to-field mapping**:
-When standard tags are modified, corresponding `GameData` fields are updated:
-- `White` → `game.white`
-- `Black` → `game.black`
-- `Result` → `game.result`
-- `Date` → `game.date`
-- `ECO` → `game.eco`
-- `Event` → `game.event`
-- `Site` → `game.site`
-- `WhiteElo` → `game.white_elo`
-- `BlackElo` → `game.black_elo`
+`BulkPlanService` (`app/services/bulk_plan_service.py`) applies the ordered header/clean plan in **one pass** over games (process pool).
 
-### BulkTagController
+- Each worker receives the full plan and applies steps in order on that game
+- Header ops mutate an in-memory `chess.pgn.Game`; clean steps use `_process_game_for_cleaning` (`bulk_clean_pgn_service.py`) via `PgnCleaningService`
+- Skipped steps (e.g. tag already present / nothing to remove) do not stop later steps
+- One pass collects mutated games; `batch_update_games()` runs on the UI thread after the worker finishes
 
-`BulkTagController` (`app/controllers/bulk_tag_controller.py`):
-- Sanitizes tag names (removes whitespace, invalid characters)
-- Shows/hides progress via `ProgressService`
-- Refreshes active game if it was updated
-- Marks database as unsaved on success
-- Emits `operation_complete` signal
+**Tag-to-field mapping** (via `game_data_header_sync`):
+When standard tags are modified, corresponding `GameData` fields are updated (`White`, `Black`, `Result`, `Date`, `ECO`, `Event`, `Site`, `WhiteElo`, `BlackElo`, etc.).
 
-## Bulk Replace Operations
+## Smart Update services
 
 ### BulkReplaceService
 
-`BulkReplaceService` (`app/services/bulk_replace_service.py`) handles text replacement and tag updates.
-
-**Replace Metadata Tag** (`replace_metadata_tag()`):
-- Replaces text in specified PGN tag
-- **Modes**:
-  - **Normal replacement**: Find and replace text (case-sensitive or case-insensitive)
-  - **Regex replacement**: Use regex pattern for finding
-  - **Overwrite all**: Replace any value with new value (ignores find_text)
-- Updates tag-to-field mappings for standard tags
-
-**Copy Metadata Tag** (`copy_metadata_tag()`):
-- Copies value from source tag to target tag
-- Only updates if source has value and differs from current target value
+`BulkReplaceService` (`app/services/bulk_replace_service.py`) provides dialog-level Smart Update only:
 
 **Update Result Tags** (`update_result_tags()`):
 - Analyzes final position of games to determine result
@@ -126,29 +102,39 @@ When standard tags are modified, corresponding `GameData` fields are updated:
 - Only updates if ECO differs from current tag
 - Skips games where no ECO found
 
-### BulkReplaceController
+### BulkOperationsController
 
-`BulkReplaceController` (`app/controllers/bulk_replace_controller.py`):
+`BulkOperationsController` (`app/controllers/bulk_operations_controller.py`):
+- Runs the ordered plan via `BulkPlanService.apply_plan()` (one pass over games)
+- Optionally runs Result/ECO Smart Update after the plan
+- Aggregates multi-phase stats (union of per-game update/fail IDs across plan + Smart Update)
 - Gets engine configuration from `EngineController` and `EngineParametersService`
 - Creates `OpeningService` instance for ECO updates
 - Handles progress reporting and cancellation
-- Refreshes active game and marks database unsaved
+- Dialog runs execute on a background `QThread`; plan pass uses `ProcessPoolExecutor`
+- After the worker finishes, the dialog applies pending game mutations via
+  `batch_update_games()` on the **UI thread** (no Qt model signals from the worker)
+- Process pool is released with graceful ``shutdown(wait=True)`` on a helper
+  thread (timeout, then terminate only as last resort) so worker semaphores are
+  not leaked
+- Refreshes active game and marks database unsaved on the UI thread after completion
 
-## Bulk Clean PGN Operations
+### Named plans (save / load)
 
-### BulkCleanPgnService
+`BulkOperationsDialog` can persist **operations only** (not Smart Update or All/Selected) as named plans:
 
-`BulkCleanPgnService` (`app/services/bulk_clean_pgn_service.py`) removes elements from PGN notation.
+- Storage: `bulk_operation_plans` in user settings via `UserSettingsService.update_bulk_operation_plans()` (in memory; disk write on normal app exit — no explicit `save()`)
+- Serialize/validate: `app/utils/bulk_operation_plan.py`
+- Toolbar: Save (`InputDialog` name + overwrite confirm) and Load (`QMenu` of plan names + **Delete plan…** submenu)
 
-**Clean PGN** (`clean_pgn()`):
-- Applies multiple cleaning operations in sequence:
-  - `remove_comments`: Remove all comments
-  - `remove_variations`: Remove all variations
-  - `remove_non_standard_tags`: Remove tags like `[%evp]`, `[%mdl]`, `[%clk]`
-  - `remove_annotations`: Remove NAGs and move annotations (`!`, `?`, `!!`, `??`)
-  - `remove_results`: Remove results from move notation (preserves `[Result]` tag)
-- Uses `PgnCleaningService` for actual cleaning logic
-- Tracks if game was modified (only updates if at least one operation modified the game)
+## Clean PGN helpers
+
+### `_process_game_for_cleaning`
+
+`app/services/bulk_clean_pgn_service.py` exposes the picklable cleaning helper used by the plan worker:
+
+- `remove_comments` / `remove_variations` / `remove_non_standard_tags` / `remove_annotations`
+- Delegates to `PgnCleaningService`
 
 ### PgnCleaningService
 
@@ -156,12 +142,6 @@ When standard tags are modified, corresponding `GameData` fields are updated:
 - Uses `PgnFormatterService` filtering logic
 - Preserves metadata tags during cleaning
 - Each method returns `True` if game was modified
-
-### BulkCleanPgnController
-
-`BulkCleanPgnController` (`app/controllers/bulk_clean_pgn_controller.py`):
-- Handles progress reporting
-- Refreshes active game and marks database unsaved
 
 ## Bulk Analysis Operations
 
@@ -302,14 +282,14 @@ Controllers check if active game was updated and refresh it:
 
 Implementation files:
 
-- `app/services/bulk_tag_service.py`: Tag add/remove operations
-- `app/services/bulk_replace_service.py`: Text replacement and tag updates
-- `app/services/bulk_clean_pgn_service.py`: PGN cleaning operations
+- `app/services/bulk_plan_service.py`: Single-pass ordered plan (header tags + clean)
+- `app/services/bulk_replace_service.py`: Smart Update (Result / ECO)
+- `app/services/bulk_clean_pgn_service.py`: Picklable PGN cleaning helper for the plan worker
 - `app/services/bulk_analysis_service.py`: Bulk game analysis
 - `app/services/pgn_cleaning_service.py`: PGN cleaning utilities
-- `app/controllers/bulk_tag_controller.py`: Tag operations orchestration
-- `app/controllers/bulk_replace_controller.py`: Replace operations orchestration
-- `app/controllers/bulk_clean_pgn_controller.py`: Clean operations orchestration
+- `app/controllers/bulk_operations_controller.py`: Orchestrates plan + Smart Update
+- `app/views/dialogs/bulk_operations_dialog.py`: Unified Bulk Operations UI
+- `app/controllers/bulk_analysis_controller.py`: Bulk analysis orchestration
 
 ## Best Practices
 

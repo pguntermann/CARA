@@ -607,6 +607,14 @@ class UserSettingsService:
         """Merge Opening Encyclopedia dialog preferences in memory (saved on exit)."""
         self.get_model().update_opening_encyclopedia_dialog(partial)
 
+    def get_bulk_operation_plans(self) -> Dict[str, Any]:
+        """Return named bulk-operation plans (name → operation dicts)."""
+        return self.get_model().get_bulk_operation_plans()
+
+    def update_bulk_operation_plans(self, plans: Dict[str, Any]) -> None:
+        """Replace named bulk-operation plans in memory (persisted on exit)."""
+        self.get_model().set_bulk_operation_plans(plans)
+
     def get_recent_pgn_databases(self) -> list:
         """Return recent PGN database paths (most recent first)."""
         return self.get_model().get_recent_pgn_databases()
