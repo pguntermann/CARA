@@ -149,10 +149,8 @@
                             <ul>
                                 <li><a href="#basic-database-operations">5.3.1 Basic Database Operations</a></li>
                                 <li><a href="#game-tagging">5.3.2 Game Tags</a></li>
-                                <li><a href="#bulk-replace-tags">5.3.3 Bulk replace PGN header tags</a></li>
-                                <li><a href="#bulk-add-remove-tags">5.3.4 Bulk add/remove PGN header tags</a></li>
-                                <li><a href="#bulk-clean-pgn">5.3.5 Bulk Clean PGN</a></li>
-                                <li><a href="#deduplicate-games">5.3.6 Deduplicate Games</a></li>
+                                <li><a href="#bulk-operations">5.3.3 Bulk Operations</a></li>
+                                <li><a href="#deduplicate-games">5.3.4 Deduplicate Games</a></li>
                             </ul>
                         </li>
                         <li><a href="#searching-games">5.4 Searching Games</a>
@@ -288,7 +286,7 @@
                 <p>CARA offers an extensive set of features designed to support thorough chess game analysis and review. Here are the main capabilities:</p>
                 
                 <ul>
-                    <li><strong>PGN Database Management:</strong> Complete management of chess game collections stored in PGN format. The system supports opening multiple PGN databases simultaneously, each displayed in its own tab for easy navigation. Powerful search functionality allows you to find games by player names, dates, openings, results, and other criteria. Built-in deduplication helps identify and remove duplicate games across databases. Bulk operations streamline common tasks: replace tags across multiple games, clean and format PGN content, and perform batch modifications. Import games from local PGN files or directly from online platforms like Lichess and Chess.com, with support for filtering by date range, game type, and other criteria.</li>
+                    <li><strong>PGN Database Management:</strong> Complete management of chess game collections stored in PGN format. The system supports opening multiple PGN databases simultaneously, each displayed in its own tab for easy navigation. Powerful search functionality allows you to find games by player names, dates, openings, results, and other criteria. Built-in deduplication helps identify and remove duplicate games across databases. Bulk Operations allow you to efficiently perform repeatable database maintenance tasks. Import games from local PGN files or directly from online platforms like Lichess and Chess.com, with support for filtering by date range, game type, and other criteria.</li>
                     
                     <li><strong>Interactive Chessboard:</strong> Beautiful, feature-rich chessboard at the heart of the application, providing an intuitive visual interface for game review and analysis. The board integrates seamlessly with game analysis and manual analysis through extensive visual indicators. Played move arrows highlight the last move made in the game, while best alternative move arrows indicate superior moves found during analysis. During manual analysis, PV1, PV2, and PV3 arrows display the principal variations from MultiPV analysis, allowing you to explore multiple candidate moves simultaneously. All arrows can be individually shown or hidden to customize the display according to your analysis needs. The board features a positional heatmap overlay that visualizes positional factors like weak squares, passed pawns, outposts, piece activity, and king safety through color-coded gradients. Additional toggleable elements include coordinate labels, turn indicator, game information panel, evaluation bar, and material widget. All visual elements are fully customizable through the configuration system.</li>
                     
@@ -1119,9 +1117,7 @@
                     <li><code>Ctrl+Shift+F</code> / <code>⌘+Shift+F</code>: Search games across databases</li>
                     <li><code>Ctrl+Shift+W</code> / <code>⌘+Shift+W</code>: Close search results</li>
                     <li><code>Ctrl+Shift+I</code> / <code>⌘+Shift+I</code>: Import online games</li>
-                    <li><code>Ctrl+Shift+R</code> / <code>⌘+Shift+R</code>: Bulk replace in databases</li>
-                    <li><code>Ctrl+Alt+T</code> / <code>⌘+⌥+T</code>: Bulk tag games</li>
-                    <li><code>Ctrl+Shift+L</code> / <code>⌘+Shift+L</code>: Bulk clean PGN</li>
+                    <li><code>Ctrl+Shift+B</code> / <code>⌘+Shift+B</code>: Bulk Operations</li>
                     <li><code>Ctrl+Shift+U</code> / <code>⌘+Shift+U</code>: Deduplicate games</li>
                 </ul>
                 
@@ -1349,7 +1345,7 @@
 
             <div class="outline-item">
                 <h4 id="managing-databases">5.3 Managing Databases</h4>
-                <p>CARA provides several tools for managing your game databases, including basic file operations and powerful bulk operations for batch processing multiple games at once.</p>
+                <p>CARA provides several tools for managing your game databases, including basic file operations and Bulk Operations for batch processing multiple games at once.</p>
                 
                 <div class="tip-box">
                     <strong>Quick Tip:</strong> All changes made to a database (including bulk operations, tag modifications, and game edits) are applied in memory only and are not persisted to disk until you explicitly save the database using <span class="menu-item">File → Save PGN Database</span> (<code>Ctrl+S</code> / <code>⌘+S</code>) or <span class="menu-item">File → Save PGN Database as...</span> (<code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>). The unsaved changes indicator (orange dot) on database tabs helps you track which databases have unsaved modifications.
@@ -1373,18 +1369,34 @@
                     <strong>Quick Tip:</strong> CARA can also assign tags automatically after analysis (auto-tagging). If you want CARA to tag games based on analysis, see <a href="#auto-tagging">section 5.5.5 Auto-tagging</a>.
                 </div>
 
-                <h5 id="bulk-replace-tags">5.3.3 Bulk replace PGN header tags</h5>
-                <p>Use <span class="menu-item">File → Bulk Replace PGN header tags...</span> (<code>Ctrl+Shift+R</code> / <code>⌘+Shift+R</code>) to find and replace text in PGN header tags across multiple games. This is useful for correcting typos, standardizing player names, or updating event information.</p>
-                <img src="screenshots/bulk_replace_tags_dialog.png" alt="CARA Bulk replace PGN header tags dialog - Dialog for finding and replacing text in PGN header tags across multiple games with tag selection, find/replace fields, and matching options" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
-                <p>The dialog allows you to:</p>
+                <h5 id="bulk-operations">5.3.3 Bulk Operations</h5>
+                <p>Use <span class="menu-item">File → Bulk Operations...</span> (<code>Ctrl+Shift+B</code> / <code>⌘+Shift+B</code>) to update PGN header tags and clean game notation across many games in one pass.</p>
+                <img src="screenshots/bulk_operations_dialog.png" alt="CARA Bulk Operations dialog - Target Games, Operations list with toolbar, and Smart Update options" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <p>The dialog is organized into three groups:</p>
                 <ul>
-                    <li>Select a tag to modify (e.g., White, Black, Event, Site)</li>
-                    <li>Specify text to find and replace</li>
-                    <li>Choose between case-sensitive or case-insensitive matching</li>
-                    <li>Use regular expressions for advanced pattern matching</li>
-                    <li>Process all games or only selected games in the database table</li>
+                    <li><strong>Target Games:</strong> Choose <strong>All games</strong> in the active database, or <strong>Selected games</strong> in the database table.</li>
+                    <li><strong>Operations:</strong> Your ordered list of steps. Use the toolbar icons to add, edit, or remove an operation, clear the list, or save and load named plans.</li>
+                    <li><strong>Smart Update:</strong> Optional Result and ECO updates that run in addition to your operations list (they are not stored in saved plans).</li>
                 </ul>
-                <p>If you enable <strong>Use regex</strong>, the <strong>Find</strong> field is treated as a regular expression. Here are a few practical examples you can try:</p>
+
+                <p>To add an operation, use the add button in the Operations toolbar. In the editor, choose an <strong>Operation</strong> type, fill in the fields that appear for that type, then click <strong>Add</strong> (or <strong>Save</strong> when editing). Operations run from top to bottom in the order shown in the list.</p>
+
+                <p>Available operation types:</p>
+                <ul>
+                    <li><strong>Replace PGN header tag values:</strong> Find and replace text in one or more tags (for example White, Black, Event, or Site). Use <strong>Case sensitive</strong> and <strong>Use regex</strong> when you need stricter or pattern-based matching. With <strong>Use regex</strong> enabled, the <strong>Preset</strong> list offers starting patterns for common tasks (for example <em>Remove matched text</em> or <em>Keep text before "-"</em>); choose <em>Custom…</em> to enter your own pattern.</li>
+                    <li><strong>Overwrite PGN header tag values:</strong> Set the selected tags to a fixed <strong>Value</strong>, replacing whatever was there before.</li>
+                    <li><strong>Copy PGN header tag values:</strong> Copy the value from a <strong>Source</strong> tag into the selected tags.</li>
+                    <li><strong>Add PGN header tag:</strong> Create a tag by <strong>Tag name</strong>. Under <strong>Fill from</strong>, choose <strong>Fixed value</strong> (then enter a <strong>Value</strong>) or <strong>Copy from tag</strong> (then choose a <strong>Source</strong> tag).</li>
+                    <li><strong>Remove PGN header tags:</strong> Remove the selected tags from each game.</li>
+                    <li><strong>Clean PGN notation:</strong> Under <strong>Remove</strong>, choose any combination of <strong>Comments</strong>, <strong>Variations</strong>, <strong>Non-standard tags</strong>, and <strong>Annotations</strong> (for example !, ?, !?, ?!).</li>
+                </ul>
+
+                <div class="tip-box">
+                    <strong>Quick Tip:</strong> You can save the current operations list as a named plan with the save toolbar button, then load it later from the load button. The load menu also includes <strong>Delete plan…</strong> if you want to remove a saved plan. Plans store only the operations list—not Target Games or Smart Update.
+                </div>
+
+                <p>If you enable <strong>Use regex</strong> on a <strong>Replace PGN header tag values</strong> operation, the <strong>Find</strong> field is treated as a regular expression. Here are a few practical examples you can try:</p>
                 <div class="regex-examples-desktop column-table-wrapper">
                 <table class="column-table">
                     <thead>
@@ -1438,34 +1450,14 @@
                     </div>
                 </div>
                 <br>
-                <p>The dialog also includes two smart update options:</p>
+                <p>Under <strong>Smart Update</strong> you can enable:</p>
                 <ul>
                     <li><strong>Update Result based on last move evaluation:</strong> Analyzes the final position of each game using a chess engine to determine the game result. This option only updates games with indecisive results (empty, "*", or "?"), preserving games that already have decisive results (1-0, 0-1, 1/2-1/2). It can detect checkmate or stalemate directly, or use engine evaluation to determine the likely result for incomplete games. This is useful if you are for example importing games from a chess computer, which doesn't provide a resign function.</li>
                     <li><strong>Update ECO code with played opening ECO:</strong> Analyzes the opening moves of each game and updates the ECO (Encyclopaedia of Chess Openings) tag based on the opening that was actually played. This uses CARA's built-in opening database to identify the correct ECO code from the game's move sequence.</li>
                 </ul>
-
-                <h5 id="bulk-add-remove-tags">5.3.4 Bulk add/remove PGN header tags</h5>
-                <p>Use <span class="menu-item">File → Bulk Add/Remove PGN header tags...</span> (<code>Ctrl+Alt+T</code> / <code>⌘+⌥+T</code>) to add or remove PGN header tags across multiple games. This is useful for adding missing information or cleaning up tag sets.</p>
-                <p>The dialog allows you to:</p>
-                <ul>
-                    <li>Add a new tag with a fixed value or copy from another tag</li>
-                    <li>Remove existing tags</li>
-                    <li>Process all games or only selected games in the database table</li>
-                </ul>
+                <p>You can run Smart Update on its own, or together with one or more operations. When you click <strong>Apply</strong>, progress is shown in the dialog until the run finishes.</p>
                 
-                <h5 id="bulk-clean-pgn">5.3.5 Bulk Clean PGN</h5>
-                <p>Use <span class="menu-item">File → Bulk Clean PGN...</span> (<code>Ctrl+Shift+L</code> / <code>⌘+Shift+L</code>) to remove unwanted elements from PGN notation across multiple games.</p>
-                <p>The dialog allows you to remove:</p>
-                <ul>
-                    <li>Comments</li>
-                    <li>Variations</li>
-                    <li>Non-standard tags</li>
-                    <li>Annotations (e.g., !, ?, !?, ?!)</li>
-                    <li>Results</li>
-                </ul>
-                <p>You can select any combination of these options and process all games or only selected games in the database table.</p>
-                
-                <h5 id="deduplicate-games">5.3.6 Deduplicate Games</h5>
+                <h5 id="deduplicate-games">5.3.4 Deduplicate Games</h5>
                 <p>Use <span class="menu-item">File → Deduplicate Games in Active Database...</span> (<code>Ctrl+Shift+U</code> / <code>⌘+Shift+U</code>) to identify and remove duplicate games from the active database.</p>
                 <p>The deduplication dialog allows you to choose how games are matched:</p>
                 <ul>
@@ -2160,31 +2152,23 @@
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+I</code> / <code>⌘+Shift+I</code></p>
                 <p>Opens a dialog to import games from Lichess or Chess.com.<br>See <a href="#import-from-online">section 5.2.3</a> for detailed instructions.</p>
                 
-                <h5>6.1.8 Bulk Replace PGN header tags...</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+R</code> / <code>⌘+Shift+R</code></p>
-                <p>Opens a dialog to find and replace text in metadata tags across multiple games.<br>See <a href="#bulk-replace-tags">section 5.3.2</a> for detailed instructions.</p>
+                <h5>6.1.8 Bulk Operations...</h5>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+B</code> / <code>⌘+Shift+B</code></p>
+                <p>Opens a dialog to build an ordered list of header-tag and PGN-cleaning operations, optionally run Smart Update, and apply them across many games.<br>See <a href="#bulk-operations">section 5.3.3</a> for detailed instructions.</p>
                 
-                <h5>6.1.9 Bulk Add/Remove PGN header tags...</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Alt+T</code> / <code>⌘+⌥+T</code></p>
-                <p>Opens a dialog to add or remove metadata tags across multiple games.<br>See <a href="#bulk-add-remove-tags">section 5.3.3</a> for detailed instructions.</p>
-                
-                <h5>6.1.10 Bulk Clean PGN...</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+L</code> / <code>⌘+Shift+L</code></p>
-                <p>Opens a dialog to remove unwanted elements (comments, variations, annotations, etc.) from PGN notation across multiple games.<br>See <a href="#bulk-clean-pgn">section 5.3.4</a> for detailed instructions.</p>
-                
-                <h5>6.1.11 Deduplicate Games in Active Database...</h5>
+                <h5>6.1.9 Deduplicate Games in Active Database...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+U</code> / <code>⌘+Shift+U</code></p>
-                <p>Opens a dialog to identify and remove duplicate games from the active database.<br>See <a href="#deduplicate-games">section 5.3.5</a> for detailed instructions.</p>
+                <p>Opens a dialog to identify and remove duplicate games from the active database.<br>See <a href="#deduplicate-games">section 5.3.4</a> for detailed instructions.</p>
                 
-                <h5>6.1.12 Search Games...</h5>
+                <h5>6.1.10 Search Games...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+F</code> / <code>⌘+Shift+F</code></p>
                 <p>Opens a dialog to search for games across databases using multiple criteria and logical operators.<br>See <a href="#searching-games">section 5.4</a> for detailed instructions.</p>
                 
-                <h5>6.1.13 Close Search Results</h5>
+                <h5>6.1.11 Close Search Results</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+W</code> / <code>⌘+Shift+W</code></p>
                 <p>Closes the Search Results tab in the Database Panel. This menu item is only enabled when a search results tab is open.</p>
                 
-                <h5>6.1.14 Close Application</h5>
+                <h5>6.1.12 Close Application</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Q</code> / <code>⌘+Q</code></p>
                 <p>Closes the CARA application. Any unsaved changes in open databases will be lost if you haven't saved them first.</p>
             </div>
@@ -2814,9 +2798,7 @@
                 <ul>
                     <li><code>Ctrl+Shift+F</code> / <code>⌘+Shift+F</code>: Search games across databases</li>
                     <li><code>Ctrl+Shift+W</code> / <code>⌘+Shift+W</code>: Close search results tab</li>
-                    <li><code>Ctrl+Shift+R</code> / <code>⌘+Shift+R</code>: Bulk replace tags</li>
-                    <li><code>Ctrl+Alt+T</code> / <code>⌘+⌥+T</code>: Bulk add/remove tags</li>
-                    <li><code>Ctrl+Shift+L</code> / <code>⌘+Shift+L</code>: Bulk clean PGN</li>
+                    <li><code>Ctrl+Shift+B</code> / <code>⌘+Shift+B</code>: Bulk Operations</li>
                     <li><code>Ctrl+Shift+U</code> / <code>⌘+Shift+U</code>: Deduplicate games</li>
                     <li><code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code>: Clear Clipboard database</li>
                 </ul>
