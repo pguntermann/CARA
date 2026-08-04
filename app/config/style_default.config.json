@@ -373,7 +373,13 @@
         "padding": [
           8,
           10
-        ]
+        ],
+        "separator_color": {
+          "$ref": "$_COLOR_SEPERATOR_BACKGROUND"
+        },
+        "separator_row_height": 8,
+        "separator_thickness": 1,
+        "separator_horizontal_margin": 8
       },
       "radio_button": {
         "text_color": {

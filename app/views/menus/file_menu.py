@@ -5,7 +5,10 @@ from __future__ import annotations
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenu, QMenuBar
 
-from app.utils.themed_icon import set_menubar_themable_action_icon
+from app.utils.themed_icon import (
+    SVG_MENU_LAYERS,
+    set_menubar_themable_action_icon,
+)
 
 _FOLDER_OPEN_SVG = "app/resources/icons/folder_open.svg"
 _SAVE_DATABASE_SVG = "app/resources/icons/save_database.svg"
@@ -71,11 +74,11 @@ def setup_file_menu(mw, menu_bar: QMenuBar) -> None:
     file_menu.addSeparator()
 
     bulk_operations_action = QAction("Bulk Operations...", mw)
+    bulk_operations_action.setShortcut(QKeySequence("Ctrl+Shift+B"))
     bulk_operations_action.setMenuRole(QAction.MenuRole.NoRole)
+    set_menubar_themable_action_icon(mw, bulk_operations_action, SVG_MENU_LAYERS)
     bulk_operations_action.triggered.connect(mw._bulk_operations)
     file_menu.addAction(bulk_operations_action)
-
-    file_menu.addSeparator()
 
     deduplicate_games_action = QAction("Deduplicate Games in Active Database...", mw)
     deduplicate_games_action.setShortcut(QKeySequence("Ctrl+Shift+U"))

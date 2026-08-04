@@ -70,6 +70,9 @@ from app.utils.bulk_operation_summary import (
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.path_display_utils import truncate_path_for_display, truncate_text_middle
 from app.utils.themed_icon import themed_icon_from_svg
+from app.views.delegates.combobox_separator_delegate import (
+    apply_combobox_separator_delegate,
+)
 
 
 
@@ -395,6 +398,8 @@ class _OperationEditorOverlay(QWidget):
         parent: QWidget,
     ) -> None:
         super().__init__(parent)
+        # Hidden before any child widgets exist — parent may already be visible (lazy create).
+        self.setVisible(False)
         self.config = config
         self.available_tags = list(available_tags or [])
         self.add_tag_options = list(add_tag_options or [])
@@ -403,7 +408,6 @@ class _OperationEditorOverlay(QWidget):
         self._tags_popup: Optional[_PgnTagsChipPickerPopup] = None
         self._edit_index: Optional[int] = None
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.hide()
         self._load_config()
         self._setup_ui()
         self._apply_styling()
@@ -1082,6 +1086,9 @@ class _OperationEditorOverlay(QWidget):
             padding=self.input_padding,
             editable=False,
         )
+        # Themed separators for Operation only; items still use QItemDelegate paint
+        # so the popup matches the other comboboxes on this dialog.
+        apply_combobox_separator_delegate(self.mode_combo, self.config)
         StyleManager.style_comboboxes(
             [self.tag_name_combo],
             self.config,
@@ -1276,10 +1283,11 @@ class _ProgressOverlay(QWidget):
 
     def __init__(self, config: Dict[str, Any], parent: QWidget) -> None:
         super().__init__(parent)
+        # Hidden before any child widgets exist — parent may already be visible (lazy create).
+        self.setVisible(False)
         self.config = config
         self._phase = "running"  # running | success | dismiss
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.hide()
         self._load_config()
         self._setup_ui()
         self._apply_styling()
@@ -1959,20 +1967,32 @@ class BulkOperationsDialog(QDialog):
         main_layout.addLayout(buttons)
 
         self._available_tags = self._get_available_tags()
-        self._editor = _OperationEditorOverlay(
-            self.config,
-            self._available_tags,
-            self.controller.get_add_tag_options(),
-            self.controller.get_removable_tags(self.database),
-            self,
-        )
-        self._editor.saved.connect(self._on_editor_saved)
-
-        self._progress_overlay = _ProgressOverlay(self.config, self)
-        self._progress_overlay.cancel_requested.connect(self._on_progress_cancel_requested)
-        self._progress_overlay.accept_requested.connect(self._on_progress_accepted)
-        self._progress_overlay.dismiss_requested.connect(self._on_progress_dismissed)
+        # Overlays are built on first use. Constructing them during dialog setup
+        # parents large widget trees (combos, cards) onto the QDialog before show,
+        # which on Windows can force an early native window and title-bar flash.
+        self._editor: Optional[_OperationEditorOverlay] = None
+        self._progress_overlay: Optional[_ProgressOverlay] = None
         self.controller.progress_updated.connect(self._on_progress_updated)
+
+    def _ensure_editor(self) -> _OperationEditorOverlay:
+        if self._editor is None:
+            self._editor = _OperationEditorOverlay(
+                self.config,
+                self._available_tags,
+                self.controller.get_add_tag_options(),
+                self.controller.get_removable_tags(self.database),
+                self,
+            )
+            self._editor.saved.connect(self._on_editor_saved)
+        return self._editor
+
+    def _ensure_progress_overlay(self) -> _ProgressOverlay:
+        if self._progress_overlay is None:
+            self._progress_overlay = _ProgressOverlay(self.config, self)
+            self._progress_overlay.cancel_requested.connect(self._on_progress_cancel_requested)
+            self._progress_overlay.accept_requested.connect(self._on_progress_accepted)
+            self._progress_overlay.dismiss_requested.connect(self._on_progress_dismissed)
+        return self._progress_overlay
 
     def _make_toolbar_separator(self, object_name: str) -> QFrame:
         sep = QFrame()
@@ -2095,7 +2115,7 @@ class BulkOperationsDialog(QDialog):
         self._update_toolbar_enabled()
 
     def _on_add_clicked(self) -> None:
-        self._editor.open_for_add()
+        self._ensure_editor().open_for_add()
 
     def _on_edit_selected_clicked(self) -> None:
         if self._selected_operation_index is not None:
@@ -2110,7 +2130,7 @@ class BulkOperationsDialog(QDialog):
             self._selected_operation_index = index
             self._apply_row_selection_styles()
             self._update_toolbar_enabled()
-            self._editor.open_for_edit(index, self._pending_operations[index])
+            self._ensure_editor().open_for_edit(index, self._pending_operations[index])
 
     def _on_remove_clicked(self, index: int) -> None:
         if 0 <= index < len(self._pending_operations):
@@ -2441,7 +2461,9 @@ class BulkOperationsDialog(QDialog):
             f"QLabel {{ color: rgb({self.label_text_color.red()}, {self.label_text_color.green()}, {self.label_text_color.blue()}); "
             f"font-family: {self.label_font_family}; font-size: {self.label_font_size}pt; background: transparent; }}"
         )
-        overlay_roots = (self._editor, self._progress_overlay)
+        overlay_roots = tuple(
+            root for root in (self._editor, self._progress_overlay) if root is not None
+        )
         for label in self.findChildren(QLabel):
             if any(root is label or root.isAncestorOf(label) for root in overlay_roots):
                 continue
@@ -2485,9 +2507,9 @@ class BulkOperationsDialog(QDialog):
         super().resizeEvent(event)
         self._update_path_label_truncation()
         self._update_summary_elision()
-        if self._editor.isVisible():
+        if self._editor is not None and self._editor.isVisible():
             self._editor.setGeometry(self.rect())
-        if self._progress_overlay.isVisible():
+        if self._progress_overlay is not None and self._progress_overlay.isVisible():
             self._progress_overlay.setGeometry(self.rect())
 
     def _update_path_label_truncation(self) -> None:
@@ -2517,6 +2539,8 @@ class BulkOperationsDialog(QDialog):
         games_skipped: int,
         step_label: str,
     ) -> None:
+        if self._progress_overlay is None:
+            return
         self._progress_overlay.set_step(step_label)
         if message == "Finishing…":
             self._progress_overlay.set_status(message)
@@ -2541,7 +2565,8 @@ class BulkOperationsDialog(QDialog):
     def _on_cancel_clicked(self) -> None:
         if self._operation_in_progress:
             self.controller.cancel_operation()
-            self._progress_overlay.set_status("Cancelling…")
+            if self._progress_overlay is not None:
+                self._progress_overlay.set_status("Cancelling…")
             return
         self.reject()
 
@@ -2583,7 +2608,7 @@ class BulkOperationsDialog(QDialog):
         self._set_controls_enabled(False)
         self._operation_in_progress = True
         self.apply_button.setEnabled(False)
-        self._progress_overlay.open_running()
+        self._ensure_progress_overlay().open_running()
         # Let the overlay paint before starting the worker thread.
         QTimer.singleShot(0, lambda: self._run_operations(has_result, has_eco))
 
@@ -2617,7 +2642,7 @@ class BulkOperationsDialog(QDialog):
             self,
         )
         self._operation_in_progress = False
-        self._progress_overlay.show_failed(message)
+        self._ensure_progress_overlay().show_failed(message)
         self._worker = None
 
     def _finish_operations(self, result) -> None:
@@ -2626,9 +2651,9 @@ class BulkOperationsDialog(QDialog):
             self._operation_in_progress = False
             message = result.error_message or "Operation failed"
             if message == "Cancelled":
-                self._progress_overlay.show_cancelled()
+                self._ensure_progress_overlay().show_cancelled()
             else:
-                self._progress_overlay.show_failed(message)
+                self._ensure_progress_overlay().show_failed(message)
             return
 
         # UI-thread post-work (unsafe to do inside the worker QThread).
@@ -2639,7 +2664,7 @@ class BulkOperationsDialog(QDialog):
             self.controller._refresh_active_game_if_updated(self.database, game_indices)
             self.controller.database_controller.mark_database_unsaved(self.database)
 
-        self._progress_overlay.show_complete(format_bulk_operation_summary_plain(result))
+        self._ensure_progress_overlay().show_complete(format_bulk_operation_summary_plain(result))
 
     def _set_controls_enabled(self, enabled: bool) -> None:
         self.all_games_radio.setEnabled(enabled)
