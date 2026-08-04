@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QFrame,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -1738,18 +1739,17 @@ class BulkOperationsDialog(QDialog):
             self.layout_margins[3],
         )
 
-        # Target Database
+        # Target Database — grid keeps name and path left-aligned in column 1.
         db_container = QWidget()
-        db_container_layout = QVBoxLayout(db_container)
-        db_container_layout.setContentsMargins(0, 0, 0, 0)
-        db_container_layout.setSpacing(2)
+        db_grid = QGridLayout(db_container)
+        db_grid.setContentsMargins(0, 0, 0, 0)
+        db_grid.setHorizontalSpacing(8)
+        db_grid.setVerticalSpacing(2)
+        db_grid.setColumnStretch(1, 1)
 
-        db_header = QHBoxLayout()
-        db_header.setContentsMargins(0, 0, 0, 0)
-        db_header.setSpacing(8)
         self._target_db_label = QLabel("Target Database:")
         self._target_db_label.setFont(QFont(self.label_font_family, self.label_font_size))
-        db_header.addWidget(self._target_db_label)
+        db_grid.addWidget(self._target_db_label, 0, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
         db_name = "Clipboard"
         db_path = None
@@ -1763,25 +1763,26 @@ class BulkOperationsDialog(QDialog):
         self.db_name_label = QLabel(f"<b>{db_name}</b>")
         self.db_name_label.setFont(QFont(self.label_font_family, self.label_font_size))
         self.db_name_label.setWordWrap(False)
-        db_header.addWidget(self.db_name_label)
-        db_header.addStretch()
-        db_container_layout.addLayout(db_header)
+        self.db_name_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        db_grid.addWidget(self.db_name_label, 0, 1, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
-        path_layout = QHBoxLayout()
-        path_layout.setContentsMargins(0, 0, 0, 0)
-        label_width = self._target_db_label.fontMetrics().horizontalAdvance("Target Database:")
-        spacer = QWidget()
-        spacer.setFixedWidth(label_width + 8)
-        path_layout.addWidget(spacer)
         path_font = QFont(self.label_font_family, max(8, self.label_font_size - 2))
         path_h = QFontMetrics(path_font).lineSpacing()
+        label_w_est = self._target_db_label.fontMetrics().horizontalAdvance("Target Database:")
         if db_path:
             self._db_path_full = db_path
             self._db_name_full = db_name
             self.db_path_label = QLabel(
                 truncate_path_for_display(
                     db_path,
-                    max(80, self.dialog_width - self.layout_margins[0] - self.layout_margins[2] - label_width - 16),
+                    max(
+                        80,
+                        self.dialog_width
+                        - self.layout_margins[0]
+                        - self.layout_margins[2]
+                        - label_w_est
+                        - 16,
+                    ),
                     path_font,
                 )
             )
@@ -1795,12 +1796,9 @@ class BulkOperationsDialog(QDialog):
             self.db_path_label = QLabel("")
         self.db_path_label.setFont(path_font)
         self.db_path_label.setFixedHeight(path_h)
-        path_layout.addWidget(self.db_path_label)
-        path_layout.addStretch()
-        path_widget = QWidget()
-        path_widget.setLayout(path_layout)
-        path_widget.setFixedHeight(path_h)
-        db_container_layout.addWidget(path_widget)
+        self.db_path_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        db_grid.addWidget(self.db_path_label, 1, 1, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self._db_header_container = db_container
         main_layout.addWidget(db_container)
         main_layout.addSpacing(self.section_spacing)
 
@@ -2514,9 +2512,12 @@ class BulkOperationsDialog(QDialog):
 
     def _update_path_label_truncation(self) -> None:
         if getattr(self, "_db_name_full", None) and hasattr(self, "db_name_label"):
-            container = self.db_name_label.parent()
-            if container:
-                name_w = max(40, container.width() - self._target_db_label.width() - 8)
+            container = getattr(self, "_db_header_container", None)
+            if container is not None:
+                name_w = max(
+                    40,
+                    container.width() - self._target_db_label.sizeHint().width() - 8,
+                )
                 self.db_name_label.setMaximumWidth(name_w)
                 name_font = QFont(self.db_name_label.font())
                 name_font.setBold(True)
@@ -2526,7 +2527,11 @@ class BulkOperationsDialog(QDialog):
                 self.db_name_label.setToolTip(self._db_name_full)
         if getattr(self, "_db_path_full", None) and getattr(self, "db_path_label", None):
             self.db_path_label.setText(
-                truncate_path_for_display(self._db_path_full, max(80, self.db_path_label.width()), self.db_path_label.font())
+                truncate_path_for_display(
+                    self._db_path_full,
+                    max(80, self.db_path_label.width()),
+                    self.db_path_label.font(),
+                )
             )
 
     def _on_progress_updated(
