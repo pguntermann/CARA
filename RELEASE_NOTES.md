@@ -1,5 +1,33 @@
 # Release Notes
 
+# CARA v2.8.2 - Bulk Operations
+
+**Release Date:** 04.08.2026
+
+This release replaces the old separate Bulk Replace, Bulk Tag, and Bulk Clean functions with a new single **Bulk Operations** dialog for updating PGN header tags and cleaning game notation across many games in one pass. It also includes some smaller improvements and fixes.
+
+## Bulk Operations
+
+- **Unified workflow:** Use **File → Bulk Operations…** (`Ctrl+Shift+B` / `⌘+Shift+B`). Build a set of operations, then apply them in one go.
+- **Re-usable plans:** If you perform similar operations regularly, you can save them as an operation plan and re-use it later.
+- **Combined functions:** Update, Add and remove tags and PGN cleanup functionality is now exposed through the operations list, allowing you to perform multiple different kind of updates in the same run.
+- **Regex presets:** The dialog now comes with a set of **Presets** for **Regular expressions** such as *Keep text before "-"* or *Remove matched text*. These presets are defined through the *config.json* configuration file, so they can also be easily amended. Of course, like before, you can still just type in the expression yourself.
+- **Better UX:** The new dialog has much better UX design than the old dialogs, operations still use multi-threading for fast performance - additionally improved by the combined operations execution. The dialog remembers its state during the session.
+
+## Other Improvements
+
+- **Open Recent:** **File → Open Recent** lists recently opened databases for quick reopen.
+- **Opening Encyclopedia:** Roughly 100 additional opening variation entries.
+
+## Bug Fixes
+- **Opening Encyclopedia:** Fixed tooltip styling issue.
+
+## Documentation
+
+- **HTML manual:** Updated the HTML user manual to reflect this version's updates.
+
+---
+
 # CARA v2.8.1 - Opening Encyclopedia Refinements
 
 **Release Date:** 02.08.2026
