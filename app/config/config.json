@@ -532,6 +532,13 @@
             "tooltip": "Keeps only the part matched inside the first (…). Replace \"text to keep\" with the literal text or a pattern such as Candidates or [A-Za-z ]+."
           },
           {
+            "id": "remove_text",
+            "label": "Remove matched text",
+            "find": "^(.*?)text to remove(.*)$",
+            "replace": "\\1\\2",
+            "tooltip": "Removes only the part matched by \"text to remove\" while keeping the text before and after it. Replace that placeholder with the literal text or a pattern such as \\([^)]*\\) or -\\s*.*$."
+          },
+          {
             "id": "keep_before_dash",
             "label": "Keep text before \"-\"",
             "find": "^(.*?)\\s*-\\s*.*$",

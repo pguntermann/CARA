@@ -185,8 +185,6 @@ def validate_bulk_operation(operation: BulkOperation) -> Optional[str]:
 
     if not (operation.find_text or "").strip():
         return "Please enter text to find"
-    if not (operation.replace_text or "").strip():
-        return "Please enter replacement text"
     return None
 
 
