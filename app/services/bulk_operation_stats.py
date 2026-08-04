@@ -64,24 +64,20 @@ def pump_bulk_ui_events() -> None:
 
 
 def shutdown_executor_keeping_ui_alive(executor: Any) -> None:
-    """Shut down a ProcessPoolExecutor after all futures are done.
+    """Release a ProcessPoolExecutor after futures have already completed.
 
-    On a background thread, ``wait=True`` is safe and preferred. On the UI
-    thread, use non-blocking shutdown to avoid macOS/Qt hangs.
+    ``shutdown(wait=True)`` can hang indefinitely during worker-process teardown
+    on some platforms (observed on Windows after large bulk runs: UI stuck on
+    "Running operations…" with final game counts). ``wait=False`` is safe here
+    because ``as_completed`` / ``future.result()`` already waited for the work.
     """
     if executor is None:
         return
     try:
-        if _on_ui_thread():
-            executor.shutdown(wait=False)
-            pump_bulk_ui_events()
-        else:
-            executor.shutdown(wait=True)
+        executor.shutdown(wait=False)
     except Exception:
-        try:
-            executor.shutdown(wait=False)
-        except Exception:
-            pass
+        pass
+    pump_bulk_ui_events()
 
 
 def emit_bulk_progress_applying(
