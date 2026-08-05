@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QMenu, QMenuBar
 
 from app.utils.keyboard_shortcuts_catalog import mark_shortcuts_excluded
 from app.utils.themed_icon import (
+    SVG_MENU_DOWNLOAD,
     SVG_MENU_GEAR,
     SVG_MENU_PLUS,
     SVG_SIMPLE_X,
@@ -24,6 +25,15 @@ def setup_engines_menu(mw, menu_bar: QMenuBar) -> None:
     set_menubar_themable_action_icon(mw, add_engine_action, SVG_MENU_PLUS)
     add_engine_action.triggered.connect(mw._add_engine)
     engines_menu.addAction(add_engine_action)
+
+    mw.get_stockfish_action = QAction("Get Stockfish...", mw)
+    mw.get_stockfish_action.setMenuRole(QAction.MenuRole.NoRole)
+    mark_shortcuts_excluded(mw.get_stockfish_action)
+    set_menubar_themable_action_icon(mw, mw.get_stockfish_action, SVG_MENU_DOWNLOAD)
+    mw.get_stockfish_action.triggered.connect(mw._get_stockfish)
+    # Visibility is managed in rebuild_engines_menu (only when no engines).
+    mw.get_stockfish_action.setVisible(False)
+    engines_menu.addAction(mw.get_stockfish_action)
 
     engines_menu.addSeparator()
 
@@ -70,6 +80,9 @@ def rebuild_engines_menu(mw) -> None:
         mw.no_engines_action = None
 
     engines = mw.engine_model.get_engines()
+    if hasattr(mw, "get_stockfish_action") and mw.get_stockfish_action is not None:
+        mw.get_stockfish_action.setVisible(not bool(engines))
+
     if not engines:
         if mw.no_engines_action is None:
             mw.no_engines_action = QAction("(No engines configured)", mw)

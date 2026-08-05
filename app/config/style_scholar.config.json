@@ -4542,6 +4542,95 @@
           "path_layout_spacing": 8
         }
       },
+      "get_stockfish": {
+        "width": 560,
+        "height": 480,
+        "minimum_width": 520,
+        "minimum_height": 420,
+        "bottom_button_top_padding": 18,
+        "background_color": {
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_FOREST_OUTLINE"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_INK_BODY"
+        },
+        "layout": {
+          "spacing": 12,
+          "margins": [
+            24,
+            22,
+            24,
+            20
+          ]
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_COCOA_BROWN"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_LARGE"
+          },
+          "title_text_color": {
+            "$ref": "$_COLOR_INK_BODY"
+          },
+          "hint_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "hint_text_color": {
+            "$ref": "$_COLOR_DRIFTWOOD"
+          }
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_COCOA_BROWN"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_FOREST_OUTLINE"
+          },
+          "focus_border_color": {
+            "$ref": "$_COLOR_DEEP_TEAL"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ],
+          "minimum_height": 30
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 110,
+          "height": 30,
+          "border_color": {
+            "$ref": "$_COLOR_FOREST_OUTLINE"
+          }
+        },
+        "binary_option_spacing": 10,
+        "progress": {
+          "chunk_color": {
+            "$ref": "$_COLOR_DEEP_TEAL"
+          },
+          "height": 18
+        }
+      },
       "bulk_operations": {
         "width": 640,
         "scroll_area_height": 150,

@@ -3706,6 +3706,15 @@ class MainWindow(QMainWindow):
         
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.controller.set_status("Engine added successfully")
+
+    def _get_stockfish(self) -> None:
+        """Open the Get Stockfish wizard (shown when no engines are configured)."""
+        from app.views.dialogs.get_stockfish_dialog import GetStockfishDialog
+
+        engine_controller = self.controller.get_engine_controller()
+        dialog = GetStockfishDialog(self.config, engine_controller, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.controller.set_status("Stockfish added successfully")
     
     def _update_engines_menu(self) -> None:
         """Update the Engines menu with current engines and assignments."""

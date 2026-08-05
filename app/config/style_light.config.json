@@ -4660,6 +4660,95 @@
           "path_layout_spacing": 8
         }
       },
+      "get_stockfish": {
+        "width": 560,
+        "height": 480,
+        "minimum_width": 520,
+        "minimum_height": 420,
+        "bottom_button_top_padding": 18,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_PRIMARY"
+        },
+        "layout": {
+          "spacing": 12,
+          "margins": [
+            24,
+            22,
+            24,
+            20
+          ]
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_LARGE"
+          },
+          "title_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "hint_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "hint_text_color": {
+            "$ref": "$_COLOR_TEXT_4"
+          }
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "focus_border_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ],
+          "minimum_height": 30
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 110,
+          "height": 30,
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
+        },
+        "binary_option_spacing": 10,
+        "progress": {
+          "chunk_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "height": 18
+        }
+      },
       "bulk_operations": {
         "width": 640,
         "scroll_area_height": 150,
