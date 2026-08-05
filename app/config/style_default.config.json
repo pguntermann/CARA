@@ -6027,7 +6027,9 @@
           "card_spacing": 14,
           "title": "Set shortcut",
           "prompt": "Press a new key combination for “{action}”.",
-          "hint": "Esc removes the shortcut · click outside to cancel",
+          "hint": "Click outside to cancel",
+          "clear_button_text": "Clear",
+          "buttons_top_spacing": 8,
           "title_font_size": {
             "$ref": "$_FONT_SIZE_BASE_LARGE"
           },

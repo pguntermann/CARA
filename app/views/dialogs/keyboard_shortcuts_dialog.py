@@ -79,8 +79,16 @@ class _ShortcutCaptureOverlay(QWidget):
             "prompt", 'Press a new key combination for “{action}”.'
         )
         self.overlay_hint = overlay_cfg.get(
-            "hint", "Esc removes the shortcut · click outside to cancel"
+            "hint", "Click outside to cancel"
         )
+        self.clear_button_text = overlay_cfg.get("clear_button_text", "Clear")
+        self.buttons_top_spacing = int(overlay_cfg.get("buttons_top_spacing", 8))
+
+        buttons_config = dialog_config.get("buttons", {})
+        self.button_width = int(buttons_config.get("width", 100))
+        self.button_height = int(buttons_config.get("height", 28))
+        self.dialog_bg = dialog_config.get("background_color", [40, 40, 45])
+        self.dialog_border = dialog_config.get("border_color", [60, 60, 65])
 
         labels_config = dialog_config.get("labels", {})
         self.label_font_family = resolve_font_family(
@@ -145,7 +153,24 @@ class _ShortcutCaptureOverlay(QWidget):
         self.hint_label.setWordWrap(True)
         card_layout.addWidget(self.hint_label)
 
+        if self.buttons_top_spacing > 0:
+            card_layout.addSpacing(self.buttons_top_spacing)
+
+        button_row = QHBoxLayout()
+        button_row.setContentsMargins(0, 0, 0, 0)
+        button_row.addStretch(1)
+        self.clear_button = QPushButton(self.clear_button_text)
+        self.clear_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.clear_button.clicked.connect(self._on_clear_clicked)
+        button_row.addWidget(self.clear_button)
+        button_row.addStretch(1)
+        card_layout.addLayout(button_row)
+
         root.addWidget(self.card, 0, Qt.AlignmentFlag.AlignCenter)
+
+    def _on_clear_clicked(self) -> None:
+        self.hide_overlay()
+        self.shortcut_cleared.emit()
 
     def _apply_styling(self) -> None:
         self.card.setStyleSheet(
@@ -180,6 +205,15 @@ class _ShortcutCaptureOverlay(QWidget):
             f"background-color: transparent;"
             f"}}"
         )
+        StyleManager.style_buttons(
+            [self.clear_button],
+            self.config,
+            self.dialog_bg,
+            self.dialog_border,
+            min_width=self.button_width,
+            min_height=self.button_height,
+        )
+        self.clear_button.setFixedHeight(self.button_height)
 
     def paintEvent(self, event) -> None:  # noqa: N802
         painter = QPainter(self)
@@ -227,12 +261,6 @@ class _ShortcutCaptureOverlay(QWidget):
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         key = event.key()
-        if key == Qt.Key.Key_Escape:
-            self.hide_overlay()
-            self.shortcut_cleared.emit()
-            event.accept()
-            return
-
         if key in (
             Qt.Key.Key_Control,
             Qt.Key.Key_Shift,
@@ -242,6 +270,7 @@ class _ShortcutCaptureOverlay(QWidget):
             event.accept()
             return
 
+        # Esc / Backspace / etc. are valid assignable shortcuts; clear uses the button.
         shortcut = shortcut_from_key_event(event)
         if not shortcut:
             event.accept()

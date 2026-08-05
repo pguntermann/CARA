@@ -1135,6 +1135,8 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.dialogs.keyboard_shortcuts.overlay.card_margins",
     "ui.dialogs.keyboard_shortcuts.overlay.card_spacing",
     "ui.dialogs.keyboard_shortcuts.overlay.card_width",
+    "ui.dialogs.keyboard_shortcuts.overlay.clear_button_text",
+    "ui.dialogs.keyboard_shortcuts.overlay.buttons_top_spacing",
     "ui.dialogs.keyboard_shortcuts.overlay.dim_color",
     "ui.dialogs.keyboard_shortcuts.overlay.hint",
     "ui.dialogs.keyboard_shortcuts.overlay.hint_font_size",
