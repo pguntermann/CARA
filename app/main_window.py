@@ -2147,6 +2147,10 @@ class MainWindow(QMainWindow):
         
         # Left Arrow: Navigate to previous move
         shortcut_manager.register_shortcut("Left", self._navigate_to_previous_move)
+
+        # Shift+Left / Shift+Right: Jump to start / end of the mainline
+        shortcut_manager.register_shortcut("Shift+Left", self._navigate_to_start)
+        shortcut_manager.register_shortcut("Shift+Right", self._navigate_to_end)
     
     def _copy_fen_to_clipboard(self) -> None:
         """Copy the current board position FEN to clipboard."""
@@ -3639,6 +3643,16 @@ class MainWindow(QMainWindow):
                 return
         game_controller = self.controller.get_game_controller()
         game_controller.navigate_to_previous_move()
+
+    def _navigate_to_start(self) -> None:
+        """Jump to the starting position of the active game (mainline)."""
+        game_controller = self.controller.get_game_controller()
+        game_controller.navigate_to_start()
+
+    def _navigate_to_end(self) -> None:
+        """Jump to the last mainline ply of the active game."""
+        game_controller = self.controller.get_game_controller()
+        game_controller.navigate_to_end()
     
     def _on_database_row_double_click(self, row: int, model: Optional[DatabaseModel] = None) -> None:
         """Handle double-click on database table row.

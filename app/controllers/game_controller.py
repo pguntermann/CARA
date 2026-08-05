@@ -363,6 +363,26 @@ class GameController:
             
         except Exception:
             return False
+
+    def navigate_to_start(self) -> bool:
+        """Navigate to the starting position of the active game (mainline ply 0)."""
+        self._clear_rejoin_mainline_arm()
+        return self.navigate_to_ply(0)
+
+    def navigate_to_end(self) -> bool:
+        """Navigate to the last mainline ply of the active game."""
+        game = self.game_model.active_game
+        if game is None:
+            return False
+        try:
+            chess_game = self._parse_active_chess_game()
+            if chess_game is None:
+                return False
+            last_ply = sum(1 for _ in chess_game.mainline_moves())
+            self._clear_rejoin_mainline_arm()
+            return self.navigate_to_ply(last_ply)
+        except Exception:
+            return False
     
     def navigate_to_ply(self, ply_index: int) -> bool:
         """Navigate to a specific mainline ply index in the active game.

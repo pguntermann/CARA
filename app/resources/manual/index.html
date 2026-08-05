@@ -618,7 +618,7 @@
                 <p>The interface is designed to be intuitive and efficient. You can resize panels by dragging the splitter handles between them, customize which information is displayed, and use keyboard shortcuts for quick navigation. The application automatically updates all views when you navigate through a game, ensuring that the chessboard, move lists, evaluations, and statistics stay synchronized.</p>
                 
                 <div class="tip-box">
-                    <strong>Quick Tip:</strong> Use the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys to navigate through game moves. This is the primary and most efficient way to review games move-by-move. The board, moves list, and all analysis views update automatically as you navigate. With <span class="menu-item">PGN → Enable navigating into variations</span> turned on, the arrows follow the active line (including sidelines) and can open a branch selector when several continuations exist—see <a href="#detail-panel">section 4.5</a>.
+                    <strong>Quick Tip:</strong> Use the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys to navigate through game moves. Hold <code>Shift</code> with <code>←</code> / <code>→</code> to jump to the start or end of the game. This is the primary and most efficient way to review games move-by-move. The board, moves list, and all analysis views update automatically as you navigate. With <span class="menu-item">PGN → Enable navigating into variations</span> turned on, the arrows follow the active line (including sidelines) and can open a branch selector when several continuations exist—see <a href="#detail-panel">section 4.5</a>.
                 </div>
                 
                 <p>CARA separates behavioral configuration from visual styling. Use <code>config.json</code> for things like import/export behavior, logging, and formulas. Use the theme / style config files in <code>app/config/</code> for colors, fonts, spacing, and other UI appearance settings.</p>
@@ -1091,6 +1091,8 @@
                 <ul>
                     <li><code>←</code> (Left Arrow): Navigate to the previous move along the active path (main line, or within a variation when variation navigation is enabled)</li>
                     <li><code>→</code> (Right Arrow): Navigate to the next move along the active path; with variation navigation enabled, opens the branch selector when multiple continuations exist</li>
+                    <li><code>Shift+←</code>: Jump to the starting position of the game</li>
+                    <li><code>Shift+→</code>: Jump to the last move of the main line</li>
                     <li><code>↑</code> / <code>↓</code>: While the branch selector is open, move the highlight among choices</li>
                     <li><code>Enter</code>: While the branch selector is open, take the highlighted continuation (<code>→</code> also confirms)</li>
                     <li><code>Esc</code>: Dismiss the branch selector without moving (<code>←</code> also dismisses)</li>
@@ -2692,6 +2694,8 @@
                 <ul>
                     <li><code>→</code> (Right Arrow): Navigate to next move along the active path; with variation navigation enabled, opens the branch selector when multiple continuations exist (also confirms a highlighted branch)</li>
                     <li><code>←</code> (Left Arrow): Navigate to previous move along the active path; dismisses the branch selector if it is open</li>
+                    <li><code>Shift+←</code>: Jump to the starting position of the game</li>
+                    <li><code>Shift+→</code>: Jump to the last move of the main line</li>
                     <li><code>↑</code> / <code>↓</code>: Move the highlight in the branch selector</li>
                     <li><code>Enter</code>: Confirm the highlighted branch in the branch selector</li>
                     <li><code>Esc</code>: Dismiss the branch selector</li>
