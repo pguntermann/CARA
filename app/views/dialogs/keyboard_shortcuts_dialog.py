@@ -802,11 +802,14 @@ class KeyboardShortcutsDialog(QDialog):
         self._reload_entries()
 
     def _confirm_steal(self, conflict: ShortcutConflict, shortcut: str) -> bool:
+        display = self.controller.display_shortcut(
+            shortcut, self.table_empty_display
+        )
         dlg = ConfirmationDialog(
             self.config,
             "Shortcut already in use",
             (
-                f"“{shortcut}” is already assigned to "
+                f"“{display}” is already assigned to "
                 f"“{conflict.category} → {conflict.action}”.\n\n"
                 "Reassign it to the selected action?"
             ),

@@ -8,7 +8,10 @@ from typing import List, Optional, Sequence
 from PyQt6.QtCore import QObject
 
 from app.services.keyboard_shortcuts_service import KeyboardShortcutsService
-from app.utils.keyboard_shortcuts_catalog import ShortcutEntry
+from app.utils.keyboard_shortcuts_catalog import (
+    ShortcutEntry,
+    format_shortcut_for_display,
+)
 
 
 @dataclass(frozen=True)
@@ -41,17 +44,30 @@ class KeyboardShortcutsController(QObject):
         entries: Sequence[ShortcutEntry],
         query: str,
     ) -> List[ShortcutEntry]:
-        """Filter rows by category, action, or shortcut text (case-insensitive)."""
+        """Filter rows by category, action, or shortcut text (case-insensitive).
+
+        Shortcut matching covers both portable storage text (``Ctrl+O``) and
+        the platform-native display form (e.g. ``⌘O`` on macOS).
+        """
         needle = (query or "").strip().lower()
         if not needle:
             return list(entries)
-        return [
-            entry
-            for entry in entries
-            if needle in entry.category.lower()
-            or needle in entry.action.lower()
-            or needle in (entry.shortcut or "").lower()
-        ]
+        matched: List[ShortcutEntry] = []
+        for entry in entries:
+            if (
+                needle in entry.category.lower()
+                or needle in entry.action.lower()
+            ):
+                matched.append(entry)
+                continue
+            portable = (entry.shortcut or "").lower()
+            if needle in portable:
+                matched.append(entry)
+                continue
+            native = format_shortcut_for_display(entry.shortcut).lower()
+            if native and needle in native:
+                matched.append(entry)
+        return matched
 
     def count_bound(self, entries: Sequence[ShortcutEntry]) -> int:
         """Count entries that currently have a non-empty shortcut."""
@@ -77,9 +93,12 @@ class KeyboardShortcutsController(QObject):
         )
 
     def display_shortcut(self, shortcut: str, empty_display: str = "—") -> str:
-        """Format a shortcut for the table (empty → placeholder)."""
+        """Format a shortcut for UI (native glyphs; empty → placeholder)."""
         text = (shortcut or "").strip()
-        return text if text else empty_display
+        if not text:
+            return empty_display
+        display = format_shortcut_for_display(text)
+        return display if display else empty_display
 
     def find_conflict(
         self,

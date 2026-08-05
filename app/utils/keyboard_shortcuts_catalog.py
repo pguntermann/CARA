@@ -115,11 +115,19 @@ def _normalize_key_with_modifiers(
 
 
 def format_shortcut(sequence: QKeySequence) -> str:
-    """Format a key sequence for storage/display (portable Ctrl/Shift labels)."""
+    """Format a key sequence for storage/matching (portable Ctrl/Alt labels)."""
     if sequence is None or sequence.isEmpty():
         return ""
     normalized = normalize_key_sequence(sequence)
     return normalized.toString(QKeySequence.SequenceFormat.PortableText)
+
+
+def format_shortcut_for_display(text: str) -> str:
+    """Format a portable shortcut string for UI (native glyphs on macOS)."""
+    sequence = parse_shortcut(text)
+    if sequence.isEmpty():
+        return ""
+    return sequence.toString(QKeySequence.SequenceFormat.NativeText)
 
 
 def parse_shortcut(text: str) -> QKeySequence:
