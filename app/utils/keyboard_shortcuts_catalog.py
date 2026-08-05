@@ -167,12 +167,29 @@ def shortcut_from_key_event(event: QKeyEvent) -> str:
     return format_shortcut(QKeySequence(QKeyCombination(mods, key)))
 
 
-def _iter_menu_actions(menu: QMenu) -> Iterable[Tuple[QMenu, QAction]]:
+# Joins intermediate submenu titles into the action label (not the category).
+_SUBMENU_PATH_SEP = " › "
+
+
+def _iter_menu_actions(
+    menu: QMenu,
+    submenu_path: Tuple[str, ...] = (),
+) -> Iterable[Tuple[QMenu, QAction, Tuple[str, ...]]]:
+    """Yield (parent_menu, action, path_of_submenu_titles_above_this_action)."""
     for action in menu.actions():
-        yield menu, action
+        yield menu, action, submenu_path
         submenu = action.menu()
         if submenu is not None:
-            yield from _iter_menu_actions(submenu)
+            title = _clean_action_text(action.text())
+            next_path = submenu_path + ((title,) if title else ())
+            yield from _iter_menu_actions(submenu, next_path)
+
+
+def _action_label(leaf_text: str, submenu_path: Tuple[str, ...]) -> str:
+    """Leaf label, prefixed with nested submenu titles when present."""
+    if not submenu_path:
+        return leaf_text
+    return _SUBMENU_PATH_SEP.join((*submenu_path, leaf_text))
 
 
 def _ancestor_excluded(menu: QMenu) -> bool:
@@ -206,7 +223,7 @@ def collect_menu_entries(
         if is_shortcuts_excluded(top_menu):
             continue
         category = _clean_action_text(top_action.text()) or "Menu"
-        for parent_menu, action in _iter_menu_actions(top_menu):
+        for parent_menu, action, submenu_path in _iter_menu_actions(top_menu):
             if action.isSeparator():
                 continue
             if action.menu() is not None:
@@ -214,12 +231,13 @@ def collect_menu_entries(
                 continue
             if is_shortcuts_excluded(action) or _ancestor_excluded(parent_menu):
                 continue
-            label = _clean_action_text(action.text())
-            if not label:
+            leaf = _clean_action_text(action.text())
+            if not leaf:
                 continue
             # Placeholder / disabled headers such as "(No engines configured)".
-            if not action.isEnabled() and label.startswith("("):
+            if not action.isEnabled() and leaf.startswith("("):
                 continue
+            label = _action_label(leaf, submenu_path)
             shortcut = format_shortcut(action.shortcut())
             if not shortcut and not include_unbound:
                 continue
@@ -306,12 +324,15 @@ def find_menu_action(
             continue
         if is_shortcuts_excluded(top_menu):
             continue
-        for parent_menu, action in _iter_menu_actions(top_menu):
+        for parent_menu, action, submenu_path in _iter_menu_actions(top_menu):
             if action.isSeparator() or action.menu() is not None:
                 continue
             if is_shortcuts_excluded(action) or _ancestor_excluded(parent_menu):
                 continue
-            if _clean_action_text(action.text()) == action_label:
+            leaf = _clean_action_text(action.text())
+            if not leaf:
+                continue
+            if _action_label(leaf, submenu_path) == action_label:
                 return action
     return None
 
