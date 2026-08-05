@@ -72,10 +72,120 @@ class TestBulkRegexPresets(unittest.TestCase):
         preset = find_preset_by_id(presets, "keep_capture")
         self.assertIsNotNone(preset)
         assert preset is not None
+        self.assertEqual(preset.select_text, "text to keep")
         find = preset.find.replace("text to keep", "Candidates")
         self.assertEqual(
             _apply(find, preset.replace, "FIDE Candidates Tournament 2024"),
             "Candidates",
+        )
+
+    def test_remove_text_select_text(self) -> None:
+        presets = load_bulk_regex_presets(_config_from_disk())
+        preset = find_preset_by_id(presets, "remove_text")
+        self.assertIsNotNone(preset)
+        assert preset is not None
+        self.assertEqual(preset.select_text, "text to remove")
+
+    def test_select_text_must_be_substring_of_find(self) -> None:
+        with self.assertRaisesRegex(ValueError, "select_text"):
+            load_bulk_regex_presets(
+                {
+                    "ui": {
+                        "dialogs": {
+                            "bulk_operations": {
+                                "regex_presets": [
+                                    {
+                                        "id": "bad_select",
+                                        "label": "Bad select",
+                                        "find": ".*(keep this).*",
+                                        "replace": r"\1",
+                                        "select_text": "missing placeholder",
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            )
+
+    def test_remove_titles_preset(self) -> None:
+        presets = load_bulk_regex_presets(_config_from_disk())
+        preset = find_preset_by_id(presets, "remove_titles")
+        self.assertIsNotNone(preset)
+        assert preset is not None
+        self.assertEqual(
+            _apply(preset.find, preset.replace, "GM Carlsen, Magnus"),
+            "Carlsen, Magnus",
+        )
+        self.assertEqual(
+            _apply(preset.find, preset.replace, "WGM Hou, Yifan"),
+            "Hou, Yifan",
+        )
+
+    def test_remove_rating_parens_preset(self) -> None:
+        presets = load_bulk_regex_presets(_config_from_disk())
+        preset = find_preset_by_id(presets, "remove_rating_parens")
+        self.assertIsNotNone(preset)
+        assert preset is not None
+        self.assertEqual(
+            _apply(preset.find, preset.replace, "Carlsen (2830)"),
+            "Carlsen",
+        )
+
+    def test_keep_digits_only_preset(self) -> None:
+        presets = load_bulk_regex_presets(_config_from_disk())
+        preset = find_preset_by_id(presets, "keep_digits_only")
+        self.assertIsNotNone(preset)
+        assert preset is not None
+        self.assertEqual(_apply(preset.find, preset.replace, "elo 2755"), "2755")
+        self.assertEqual(_apply(preset.find, preset.replace, "~2755"), "2755")
+
+    def test_remove_federation_code_preset(self) -> None:
+        presets = load_bulk_regex_presets(_config_from_disk())
+        preset = find_preset_by_id(presets, "remove_federation_code")
+        self.assertIsNotNone(preset)
+        assert preset is not None
+        self.assertEqual(
+            _apply(preset.find, preset.replace, "Wijk aan Zee NED"),
+            "Wijk aan Zee",
+        )
+        self.assertEqual(
+            _apply(preset.find, preset.replace, "Berlin [GER]"),
+            "Berlin",
+        )
+
+    def test_keep_before_after_comma_presets(self) -> None:
+        presets = load_bulk_regex_presets(_config_from_disk())
+        before = find_preset_by_id(presets, "keep_before_comma")
+        after = find_preset_by_id(presets, "keep_after_comma")
+        self.assertIsNotNone(before)
+        self.assertIsNotNone(after)
+        assert before is not None and after is not None
+        self.assertEqual(
+            _apply(before.find, before.replace, "Candidates, Toronto"),
+            "Candidates",
+        )
+        self.assertEqual(
+            _apply(after.find, after.replace, "Candidates, Toronto"),
+            "Toronto",
+        )
+
+    def test_remove_time_control_preset(self) -> None:
+        presets = load_bulk_regex_presets(_config_from_disk())
+        preset = find_preset_by_id(presets, "remove_time_control")
+        self.assertIsNotNone(preset)
+        assert preset is not None
+        self.assertEqual(
+            _apply(preset.find, preset.replace, "Titled Arena 10+0"),
+            "Titled Arena",
+        )
+        self.assertEqual(
+            _apply(preset.find, preset.replace, "Blitz G/5"),
+            "Blitz",
+        )
+        self.assertEqual(
+            _apply(preset.find, preset.replace, "Rapid 15|10"),
+            "Rapid",
         )
 
     def test_match_preset_id_roundtrip(self) -> None:
