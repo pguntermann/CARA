@@ -11,6 +11,7 @@ from app.utils.themed_icon import (
     SVG_MENU_RESET,
     set_menubar_themable_action_icon,
 )
+from app.utils.keyboard_shortcuts_catalog import mark_shortcuts_excluded
 from app.views.menus.player_stats_accuracy_distribution_menu import (
     PlayerStatsAccuracyDistributionMenuController,
 )
@@ -68,6 +69,7 @@ def rebuild_player_stats_menu(mw) -> None:
     # Profile toggle actions at top.
     for profile_name in profile_names:
         act = QAction(profile_name, mw)
+        mark_shortcuts_excluded(act)
         act.setCheckable(True)
         act.setMenuRole(QAction.MenuRole.NoRole)
         act.setChecked(profile_name == active_profile)
@@ -152,6 +154,13 @@ def rebuild_player_stats_menu(mw) -> None:
     _setup_player_stats_time_series_submenu(mw, menu)
     menu.addSeparator()
     _add_player_stats_section_visibility_actions(sections[idx_acpl + 1 :])
+
+    try:
+        from app.services.keyboard_shortcuts_service import KeyboardShortcutsService
+
+        KeyboardShortcutsService.get_instance().reapply()
+    except Exception:
+        pass
 
 
 def _setup_player_stats_time_series_submenu(mw, ps_menu: QMenu) -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenu, QMenuBar
 
+from app.utils.keyboard_shortcuts_catalog import mark_shortcuts_excluded
 from app.utils.themed_icon import (
     SVG_MENU_GEAR,
     SVG_MENU_PLUS,
@@ -72,6 +73,7 @@ def rebuild_engines_menu(mw) -> None:
     if not engines:
         if mw.no_engines_action is None:
             mw.no_engines_action = QAction("(No engines configured)", mw)
+            mark_shortcuts_excluded(mw.no_engines_action)
             mw.no_engines_action.setEnabled(False)
             menu.addAction(mw.no_engines_action)
         return
@@ -84,6 +86,7 @@ def rebuild_engines_menu(mw) -> None:
 
     for engine in engines:
         engine_submenu = QMenu(engine.name, mw)
+        mark_shortcuts_excluded(engine_submenu)
         mw._apply_menu_styling(engine_submenu)
 
         remove_action = QAction("Remove Engine", mw)

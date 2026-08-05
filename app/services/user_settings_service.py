@@ -615,6 +615,14 @@ class UserSettingsService:
         """Replace named bulk-operation plans in memory (persisted on exit)."""
         self.get_model().set_bulk_operation_plans(plans)
 
+    def get_keyboard_shortcuts(self) -> Dict[str, Any]:
+        """Return keyboard shortcut preferences (overrides map)."""
+        return self.get_model().get_keyboard_shortcuts()
+
+    def update_keyboard_shortcuts(self, settings: Dict[str, Any]) -> None:
+        """Replace keyboard shortcut preferences in memory (persisted on exit)."""
+        self.get_model().set_keyboard_shortcuts(settings)
+
     def get_recent_pgn_databases(self) -> list:
         """Return recent PGN database paths (most recent first)."""
         return self.get_model().get_recent_pgn_databases()

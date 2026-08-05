@@ -153,6 +153,9 @@ class MainWindow(QMainWindow):
         theme_menu = parent_menu.addMenu("Theme")
         self._apply_menu_styling(theme_menu)
         set_menubar_themable_action_icon(self, theme_menu.menuAction(), SVG_MENU_PALETTE)
+        from app.utils.keyboard_shortcuts_catalog import mark_shortcuts_excluded
+
+        mark_shortcuts_excluded(theme_menu)
 
         group = QActionGroup(self)
         group.setExclusive(True)
@@ -1139,6 +1142,13 @@ class MainWindow(QMainWindow):
     def _show_about_dialog(self) -> None:
         """Show the about dialog."""
         dialog = AboutDialog(self.config, self)
+        dialog.exec()
+
+    def _show_keyboard_shortcuts_dialog(self) -> None:
+        """Show the Keyboard Shortcuts dialog (view/edit bindings)."""
+        from app.views.dialogs.keyboard_shortcuts_dialog import KeyboardShortcutsDialog
+
+        dialog = KeyboardShortcutsDialog(self.config, parent=self)
         dialog.exec()
     
     def _show_release_notes_dialog(self) -> None:
@@ -2129,28 +2139,36 @@ class MainWindow(QMainWindow):
         logging_service = LoggingService.get_instance()
         logging_service.debug("Setting up shortcuts")
 
-        # Initialize shortcut manager with MainWindow as parent
-        shortcut_manager = ShortcutManager(self)
-        
-        # Register shortcuts
-        # X key: Rotate board 180 degrees (handled by menu action, no need to register separately)
-        # shortcut_manager.register_shortcut("X", self.controller.rotate_board)  # Removed - handled by menu action
-        
-        # Shift+F: Copy FEN (handled by menu action)
-        # Ctrl+P: Copy PGN (handled by menu action)
-        
-        # Ctrl+V: Paste PGN to Clipboard DB (handled by menu action)
-        # Ctrl+Alt+V: Paste PGN to active DB (handled by menu action)
-        
-        # Right Arrow: Navigate to next move
-        shortcut_manager.register_shortcut("Right", self._navigate_to_next_move)
-        
-        # Left Arrow: Navigate to previous move
-        shortcut_manager.register_shortcut("Left", self._navigate_to_previous_move)
+        from app.services.keyboard_shortcuts_service import KeyboardShortcutsService
+        from app.utils.keyboard_shortcuts_catalog import make_binding_id
 
-        # Shift+Left / Shift+Right: Jump to start / end of the mainline
-        shortcut_manager.register_shortcut("Shift+Left", self._navigate_to_start)
-        shortcut_manager.register_shortcut("Shift+Right", self._navigate_to_end)
+        # Initialize shortcut manager with MainWindow as parent
+        self.shortcut_manager = ShortcutManager(self)
+
+        # Right/Left (+ Shift): navigate the mainline
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Previous move"),
+            "Left",
+            self._navigate_to_previous_move,
+        )
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Next move"),
+            "Right",
+            self._navigate_to_next_move,
+        )
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Jump to start"),
+            "Shift+Left",
+            self._navigate_to_start,
+        )
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Jump to last move"),
+            "Shift+Right",
+            self._navigate_to_end,
+        )
+
+        # Capture factory defaults, then apply any user overrides (live, no restart).
+        KeyboardShortcutsService.get_instance().bind(self, self.shortcut_manager)
     
     def _copy_fen_to_clipboard(self) -> None:
         """Copy the current board position FEN to clipboard."""
@@ -4209,6 +4227,14 @@ class MainWindow(QMainWindow):
         engine_model.load_assignments(assignments_data)
         
         self._update_engines_menu()
+
+        # Apply any persisted keyboard-shortcut overrides after menus/settings are ready.
+        try:
+            from app.services.keyboard_shortcuts_service import KeyboardShortcutsService
+
+            KeyboardShortcutsService.get_instance().reapply()
+        except Exception:
+            pass
     
     def _save_user_settings(self) -> None:
         """Save current user settings to file.

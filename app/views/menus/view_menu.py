@@ -14,6 +14,13 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
     mw._setup_theme_menu(view_menu)
     view_menu.addSeparator()
 
+    mw.view_keyboard_shortcuts_action = QAction("Keyboard Shortcuts...", mw)
+    mw.view_keyboard_shortcuts_action.triggered.connect(
+        mw._show_keyboard_shortcuts_dialog
+    )
+    view_menu.addAction(mw.view_keyboard_shortcuts_action)
+    view_menu.addSeparator()
+
     mw.view_moves_list_action = QAction("Moves List", mw)
     mw.view_moves_list_action.setShortcut(QKeySequence("F1"))
     mw.view_moves_list_action.setCheckable(True)

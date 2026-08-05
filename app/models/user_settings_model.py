@@ -489,6 +489,39 @@ class UserSettingsModel(QObject):
         self._settings["bulk_operation_plans"] = cleaned
         self.settings_changed.emit()
 
+    def get_keyboard_shortcuts(self) -> Dict[str, Any]:
+        """Get keyboard shortcut preferences (overrides map)."""
+        raw = self._settings.get("keyboard_shortcuts", {})
+        if not isinstance(raw, dict):
+            return {"overrides": {}}
+        overrides = raw.get("overrides", {})
+        if not isinstance(overrides, dict):
+            overrides = {}
+        cleaned_overrides: Dict[str, str] = {}
+        for key, value in overrides.items():
+            if isinstance(key, str) and key.strip():
+                cleaned_overrides[key.strip()] = "" if value is None else str(value)
+        return {"overrides": cleaned_overrides}
+
+    def set_keyboard_shortcuts(self, settings: Dict[str, Any]) -> None:
+        """Replace keyboard shortcut preferences."""
+        overrides_in = settings.get("overrides", {}) if isinstance(settings, dict) else {}
+        cleaned: Dict[str, str] = {}
+        if isinstance(overrides_in, dict):
+            for key, value in overrides_in.items():
+                if isinstance(key, str) and key.strip():
+                    cleaned[key.strip()] = "" if value is None else str(value)
+        self._settings["keyboard_shortcuts"] = {"overrides": cleaned}
+        self.settings_changed.emit()
+
+    def update_keyboard_shortcuts(self, partial: Dict[str, Any]) -> None:
+        """Merge keys into keyboard shortcut preferences."""
+        cur = self.get_keyboard_shortcuts()
+        if isinstance(partial, dict):
+            if "overrides" in partial and isinstance(partial["overrides"], dict):
+                cur["overrides"] = partial["overrides"]
+        self.set_keyboard_shortcuts(cur)
+
     def update_from_dict(self, settings: Dict[str, Any]) -> None:
         """Update settings from a dictionary (used when loading from file).
         

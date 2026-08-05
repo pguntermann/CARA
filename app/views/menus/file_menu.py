@@ -9,6 +9,7 @@ from app.utils.themed_icon import (
     SVG_MENU_LAYERS,
     set_menubar_themable_action_icon,
 )
+from app.utils.keyboard_shortcuts_catalog import mark_shortcuts_excluded
 
 _FOLDER_OPEN_SVG = "app/resources/icons/folder_open.svg"
 _SAVE_DATABASE_SVG = "app/resources/icons/save_database.svg"
@@ -26,6 +27,7 @@ def setup_file_menu(mw, menu_bar: QMenuBar) -> None:
     file_menu.addAction(mw.open_pgn_database_action)
 
     mw.open_recent_menu = QMenu("Open Recent", mw)
+    mark_shortcuts_excluded(mw.open_recent_menu)
     mw._apply_menu_styling(mw.open_recent_menu)
     mw.open_recent_menu.aboutToShow.connect(mw._rebuild_open_recent_menu)
     file_menu.addMenu(mw.open_recent_menu)
