@@ -39,7 +39,6 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -79,6 +78,7 @@ from app.views.delegates.encyclopedia_search_result_delegate import (
 from app.views.style import StyleManager
 from app.views.style.menu_bar import apply_menu_styling
 from app.views.style.tooltip import tooltip_qss_block
+from app.views.widgets.pixel_aligned_hline import PixelAlignedHLine
 
 # Window-size presets as percent-of-available-screen keys stored in user settings.
 _SIZE_PRESET_KEYS = ("45", "60", "80")
@@ -993,13 +993,7 @@ class OpeningEncyclopediaDialog(QDialog):
             v.setSpacing(0)
             if sep_mt:
                 v.addSpacing(sep_mt)
-            line = QFrame()
-            line.setFixedHeight(sep_height)
-            line.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            c = sep_color
-            line.setStyleSheet(
-                f"background-color: rgb({c[0]}, {c[1]}, {c[2]}); border: none;"
-            )
+            line = PixelAlignedHLine(sep_color, sep_height)
             v.addWidget(line)
             if sep_mb:
                 v.addSpacing(sep_mb)
