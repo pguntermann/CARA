@@ -406,7 +406,12 @@
         "font_size": {
           "$ref": "$_FONT_SIZE_BASE_MEDIUM"
         },
-        "spacing": 5
+        "spacing": 5,
+        "indicator_width": 13,
+        "indicator_height": 13,
+        "indicator_svg_path": "app/resources/icons/radio/light",
+        "margin_top": 2,
+        "margin_bottom": 2
       },
       "button": {
         "text_color": {
