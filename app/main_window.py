@@ -139,7 +139,6 @@ class MainWindow(QMainWindow):
         from app.views.menus.menu_bar import setup_menu_bar as _setup_menu_bar_definitions
 
         _setup_menu_bar_definitions(self, menu_bar)
-        self._connect_menu_icon_color_scheme_refresh()
 
     def _setup_theme_menu(self, parent_menu: QMenu) -> None:
         """Add a View → Theme submenu.
@@ -339,21 +338,6 @@ class MainWindow(QMainWindow):
                 self._toggle_database_panel()
         except Exception:
             pass
-
-    def _connect_menu_icon_color_scheme_refresh(self) -> None:
-        """Rebuild themed menu icons when the system light/dark preference changes (Qt 6.5+)."""
-        app = QApplication.instance()
-        if app is None:
-            return
-        sh = app.styleHints()
-        if not hasattr(sh, "colorSchemeChanged"):
-            return
-        sh.colorSchemeChanged.connect(self._on_menu_icon_color_scheme_changed)
-
-    def _on_menu_icon_color_scheme_changed(self, _scheme) -> None:
-        from app.utils.themed_icon import refresh_all_menubar_themable_action_icons
-
-        refresh_all_menubar_themable_action_icons(self)
 
     def _on_player_stats_reset_to_template_defaults(self) -> None:
         """Restore Player Stats menu settings from ``user_settings.json.template``."""

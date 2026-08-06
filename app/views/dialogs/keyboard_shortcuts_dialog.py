@@ -26,6 +26,7 @@ from app.controllers.keyboard_shortcuts_controller import (
     KeyboardShortcutsController,
     ShortcutConflict,
 )
+from app.services.keyboard_shortcuts_service import KeyboardShortcutsService
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.keyboard_shortcuts_catalog import ShortcutEntry, shortcut_from_key_event
 from app.views.dialogs.confirmation_dialog import ConfirmationDialog
@@ -743,6 +744,7 @@ class KeyboardShortcutsDialog(QDialog):
 
     def _start_capture(self, entry: ShortcutEntry) -> None:
         self._pending_binding_id = entry.binding_id
+        KeyboardShortcutsService.get_instance().set_shortcuts_enabled(False)
         overlay = self._ensure_capture_overlay()
         overlay.show_for(entry)
         self.filter_edit.setEnabled(False)
@@ -752,6 +754,7 @@ class KeyboardShortcutsDialog(QDialog):
         self.table.setEnabled(False)
 
     def _end_capture_ui(self) -> None:
+        KeyboardShortcutsService.get_instance().set_shortcuts_enabled(True)
         self.filter_edit.setEnabled(True)
         self.clear_all_button.setEnabled(True)
         self.restore_button.setEnabled(True)

@@ -11,6 +11,11 @@ from app.utils.font_utils import resolve_font_family, scale_font_size
 
 def apply_menu_bar_styling(menu_bar: QMenuBar, config: Dict[str, Any]) -> None:
     """Apply styling to the menu bar based on configuration."""
+    # Qt-drawn menus so shortcut labels use the same NativeText as the shortcuts
+    # dialog. Native macOS menus remap QAction shortcuts via Cocoa (e.g. Shift+:
+    # → Shift+Ü) and ignore most of our menu stylesheets.
+    menu_bar.setNativeMenuBar(False)
+
     ui_config = config.get("ui", {})
     menu_config = ui_config.get("menu", {})
 

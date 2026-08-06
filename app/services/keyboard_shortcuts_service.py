@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenuBar, QWidget
 
 from app.input.shortcut_manager import ShortcutManager
@@ -13,12 +15,21 @@ from app.utils.keyboard_shortcuts_catalog import (
     collect_all_shortcuts,
     entries_with_shortcuts,
     find_menu_action,
+)
+from app.utils.shortcut_binding import (
+    normalize_binding,
     parse_shortcut,
+    shortcut_match_key,
 )
 
 
 class KeyboardShortcutsService:
-    """Captures factory defaults and applies user overrides without restart."""
+    """Captures factory defaults and applies user overrides without restart.
+
+    Activation is owned by ShortcutManager (physical key match). Menu QActions
+    receive a display-only shortcut (WidgetShortcut) so the menu bar label
+    stays correct without Qt also activating character-based sequences.
+    """
 
     _instance: Optional["KeyboardShortcutsService"] = None
 
@@ -49,6 +60,11 @@ class KeyboardShortcutsService:
     def is_bound(self) -> bool:
         return self._bound and self._window is not None
 
+    def set_shortcuts_enabled(self, enabled: bool) -> None:
+        """Enable/disable ShortcutManager activation (e.g. while capturing)."""
+        if self._shortcut_manager is not None:
+            self._shortcut_manager.set_shortcuts_enabled(enabled)
+
     def _menu_bar(self) -> Optional[QMenuBar]:
         if self._window is None or not hasattr(self._window, "menuBar"):
             return None
@@ -65,11 +81,11 @@ class KeyboardShortcutsService:
         result: Dict[str, str] = {}
         for entry in entries:
             if entry.is_navigation:
-                result[entry.binding_id] = nav_keys.get(
-                    entry.binding_id, entry.shortcut
+                result[entry.binding_id] = normalize_binding(
+                    nav_keys.get(entry.binding_id, entry.shortcut)
                 )
             else:
-                result[entry.binding_id] = entry.shortcut
+                result[entry.binding_id] = normalize_binding(entry.shortcut)
         return result
 
     def get_defaults(self) -> Dict[str, str]:
@@ -87,18 +103,15 @@ class KeyboardShortcutsService:
             if value is None:
                 cleaned[key] = ""
             else:
-                cleaned[key] = str(value)
+                cleaned[key] = normalize_binding(str(value)) if str(value).strip() else ""
         return cleaned
 
     def effective_bindings(self) -> Dict[str, str]:
         """Defaults merged with overrides (override wins, including empty clear)."""
-        # Ensure newly appeared catalog ids get a factory default snapshot.
         live = self._snapshot_current_bindings()
         for binding_id, shortcut in live.items():
             if binding_id not in self._defaults:
                 overrides = self.get_overrides()
-                # If an override already exists we cannot recover the original;
-                # treat empty as factory default for restore semantics.
                 self._defaults[binding_id] = (
                     "" if binding_id in overrides else shortcut
                 )
@@ -111,7 +124,6 @@ class KeyboardShortcutsService:
 
     def list_entries(self) -> List[ShortcutEntry]:
         catalog = collect_all_shortcuts(self._menu_bar(), include_unbound=True)
-        # Side effect: refresh defaults for new ids via effective_bindings().
         bindings = self.effective_bindings()
         return entries_with_shortcuts(catalog, bindings)
 
@@ -121,13 +133,13 @@ class KeyboardShortcutsService:
         shortcut: str,
     ) -> Optional[ShortcutEntry]:
         """Return another entry that already uses ``shortcut``, if any."""
-        key = (shortcut or "").strip()
+        key = shortcut_match_key(shortcut)
         if not key:
             return None
         for entry in self.list_entries():
             if entry.binding_id == binding_id:
                 continue
-            if (entry.shortcut or "").strip().lower() == key.lower():
+            if shortcut_match_key(entry.shortcut) == key:
                 return entry
         return None
 
@@ -146,7 +158,7 @@ class KeyboardShortcutsService:
             self._apply_one(steal_from, "")
 
         default = self._defaults.get(binding_id, "")
-        normalized = (shortcut or "").strip()
+        normalized = normalize_binding(shortcut)
         if normalized == default:
             overrides.pop(binding_id, None)
             self._apply_one(binding_id, default)
@@ -176,13 +188,20 @@ class KeyboardShortcutsService:
             self._apply_one(binding_id, shortcut)
         for entry in collect_all_shortcuts(self._menu_bar(), include_unbound=True):
             if entry.binding_id not in self._defaults:
-                self._defaults[entry.binding_id] = entry.shortcut
-                self._apply_one(entry.binding_id, entry.shortcut)
+                self._defaults[entry.binding_id] = normalize_binding(entry.shortcut)
+                self._apply_one(entry.binding_id, self._defaults[entry.binding_id])
 
     def reapply(self) -> None:
         """Re-apply effective bindings to the live UI (after menu rebuilds)."""
-        if not self.is_bound():
+        if not self.is_bound() or self._shortcut_manager is None:
             return
+        catalog = collect_all_shortcuts(self._menu_bar(), include_unbound=True)
+        catalog_ids = {entry.binding_id for entry in catalog}
+        for binding_id in list(self._shortcut_manager.get_all_keys()):
+            if binding_id.startswith("Navigation/"):
+                continue
+            if binding_id not in catalog_ids:
+                self._shortcut_manager.unregister_shortcut(binding_id)
         effective = self.effective_bindings()
         for binding_id, shortcut in effective.items():
             self._apply_one(binding_id, shortcut)
@@ -193,10 +212,39 @@ class KeyboardShortcutsService:
         )
 
     def _apply_one(self, binding_id: str, shortcut: str) -> None:
-        if binding_id.startswith("Navigation/") and self._shortcut_manager is not None:
-            if self._shortcut_manager.has_binding(binding_id):
-                self._shortcut_manager.set_key(binding_id, shortcut)
-                return
+        sm = self._shortcut_manager
+        if sm is None:
+            return
+        normalized = normalize_binding(shortcut)
+
+        if binding_id.startswith("Navigation/"):
+            if sm.has_binding(binding_id):
+                sm.set_key(binding_id, normalized)
+            return
+
         action = find_menu_action(self._menu_bar(), binding_id)
-        if action is not None:
+        if action is None:
+            if sm.has_binding(binding_id):
+                sm.unregister_shortcut(binding_id)
+            return
+
+        def _trigger(a: QAction = action) -> None:
+            if a.isEnabled():
+                a.trigger()
+
+        sm.register_shortcut(binding_id, normalized, _trigger)
+        self._set_menu_display_shortcut(action, normalized)
+
+    @staticmethod
+    def _set_menu_display_shortcut(action: QAction, shortcut: str) -> None:
+        """Show the chord beside the menu item; activation stays on ShortcutManager."""
+        base = action.text().split("\t")[0]
+        if action.text() != base:
+            action.setText(base)
+        if shortcut:
             action.setShortcut(parse_shortcut(shortcut))
+        else:
+            action.setShortcut(QKeySequence())
+        # WidgetShortcut: Qt shows the label but does not activate while focus is
+        # in child views; ShortcutManager owns activation.
+        action.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)

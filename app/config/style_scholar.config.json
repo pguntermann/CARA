@@ -3667,12 +3667,6 @@
       "icons": {
         "tint_color": {
           "$ref": "$_COLOR_ICON_FOREST"
-        },
-        "tint_color_dark_scheme": {
-          "$ref": "$_COLOR_TRAIL_AQUA"
-        },
-        "tint_color_light_scheme": {
-          "$ref": "$_COLOR_ICON_FOREST_LIGHT"
         }
       },
       "colors": {

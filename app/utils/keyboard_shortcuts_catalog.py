@@ -5,9 +5,40 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
-from PyQt6.QtCore import Qt, QKeyCombination
-from PyQt6.QtGui import QAction, QKeyEvent, QKeySequence
+from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenu, QMenuBar, QWidget
+
+# Binding helpers (also re-exported for dialogs / older imports).
+from app.utils.shortcut_binding import (
+    format_shortcut,
+    format_shortcut_for_display,
+    normalize_binding,
+    parse_shortcut,
+    shortcut_from_key_event,
+    shortcut_match_key,
+)
+
+__all__ = [
+    "CARA_SHORTCUTS_EXCLUDED",
+    "NAVIGATION_SHORTCUTS",
+    "ShortcutEntry",
+    "collect_all_shortcuts",
+    "collect_menu_entries",
+    "collect_navigation_entries",
+    "collect_shortcuts_from_window",
+    "entries_with_shortcuts",
+    "find_menu_action",
+    "format_shortcut",
+    "format_shortcut_for_display",
+    "is_shortcuts_excluded",
+    "make_binding_id",
+    "mark_shortcuts_excluded",
+    "normalize_binding",
+    "parse_shortcut",
+    "shortcut_from_key_event",
+    "shortcut_match_key",
+    "sort_shortcut_entries",
+]
 
 # QObject property: menus/actions marked True are omitted from the shortcuts catalog.
 CARA_SHORTCUTS_EXCLUDED = "cara_shortcuts_excluded"
@@ -55,124 +86,13 @@ def is_shortcuts_excluded(obj) -> bool:
 
 
 def _clean_action_text(text: str) -> str:
-    """Strip menu accelerators and trailing ellipsis for display/ids."""
-    cleaned = (text or "").replace("&", "").strip()
+    """Strip shortcut annotations, menu accelerators, and trailing ellipsis."""
+    cleaned = (text or "").split("\t")[0].replace("&", "").strip()
     if cleaned.endswith("..."):
         cleaned = cleaned[:-3].rstrip()
     elif cleaned.endswith("…"):
         cleaned = cleaned[:-1].rstrip()
     return cleaned
-
-
-# Shift+digit/punctuation is reported as the shifted glyph (e.g. Key_Exclam for
-# Shift+1). Shortcut matching expects the physical base key + ShiftModifier.
-_SHIFT_SYMBOL_TO_BASE_KEY: Dict[Qt.Key, Qt.Key] = {
-    Qt.Key.Key_Exclam: Qt.Key.Key_1,
-    Qt.Key.Key_At: Qt.Key.Key_2,
-    Qt.Key.Key_NumberSign: Qt.Key.Key_3,
-    Qt.Key.Key_Dollar: Qt.Key.Key_4,
-    Qt.Key.Key_Percent: Qt.Key.Key_5,
-    Qt.Key.Key_AsciiCircum: Qt.Key.Key_6,
-    Qt.Key.Key_Ampersand: Qt.Key.Key_7,
-    Qt.Key.Key_Asterisk: Qt.Key.Key_8,
-    Qt.Key.Key_ParenLeft: Qt.Key.Key_9,
-    Qt.Key.Key_ParenRight: Qt.Key.Key_0,
-    Qt.Key.Key_Underscore: Qt.Key.Key_Minus,
-    Qt.Key.Key_Plus: Qt.Key.Key_Equal,
-    Qt.Key.Key_BraceLeft: Qt.Key.Key_BracketLeft,
-    Qt.Key.Key_BraceRight: Qt.Key.Key_BracketRight,
-    Qt.Key.Key_Bar: Qt.Key.Key_Backslash,
-    Qt.Key.Key_Colon: Qt.Key.Key_Semicolon,
-    Qt.Key.Key_QuoteDbl: Qt.Key.Key_Apostrophe,
-    Qt.Key.Key_Less: Qt.Key.Key_Comma,
-    Qt.Key.Key_Greater: Qt.Key.Key_Period,
-    Qt.Key.Key_Question: Qt.Key.Key_Slash,
-    Qt.Key.Key_AsciiTilde: Qt.Key.Key_QuoteLeft,
-}
-
-
-def _shortcut_modifiers(modifiers: Qt.KeyboardModifier) -> Qt.KeyboardModifier:
-    """Keep only modifiers that belong in a stored shortcut."""
-    return modifiers & (
-        Qt.KeyboardModifier.ShiftModifier
-        | Qt.KeyboardModifier.ControlModifier
-        | Qt.KeyboardModifier.AltModifier
-        | Qt.KeyboardModifier.MetaModifier
-    )
-
-
-def _normalize_key_with_modifiers(
-    key: Qt.Key,
-    modifiers: Qt.KeyboardModifier,
-) -> Tuple[Qt.Key, Qt.KeyboardModifier]:
-    """Map Shift+shifted-glyph keys back to base keys for reliable matching."""
-    mods = _shortcut_modifiers(modifiers)
-    if mods & Qt.KeyboardModifier.ShiftModifier:
-        base = _SHIFT_SYMBOL_TO_BASE_KEY.get(key)
-        if base is not None:
-            key = base
-    return key, mods
-
-
-def format_shortcut(sequence: QKeySequence) -> str:
-    """Format a key sequence for storage/matching (portable Ctrl/Alt labels)."""
-    if sequence is None or sequence.isEmpty():
-        return ""
-    normalized = normalize_key_sequence(sequence)
-    return normalized.toString(QKeySequence.SequenceFormat.PortableText)
-
-
-def format_shortcut_for_display(text: str) -> str:
-    """Format a portable shortcut string for UI (native glyphs on macOS)."""
-    sequence = parse_shortcut(text)
-    if sequence.isEmpty():
-        return ""
-    return sequence.toString(QKeySequence.SequenceFormat.NativeText)
-
-
-def parse_shortcut(text: str) -> QKeySequence:
-    """Parse a portable shortcut string into a QKeySequence."""
-    raw = (text or "").strip()
-    if not raw:
-        return QKeySequence()
-    return normalize_key_sequence(
-        QKeySequence(raw, QKeySequence.SequenceFormat.PortableText)
-    )
-
-
-def normalize_key_sequence(sequence: QKeySequence) -> QKeySequence:
-    """Normalize Shift+symbol combos (e.g. Shift+! → Shift+1) for matching."""
-    if sequence is None or sequence.isEmpty():
-        return QKeySequence()
-    try:
-        combo = sequence[0]
-    except Exception:
-        return sequence
-    if not isinstance(combo, QKeyCombination):
-        # Older/alternate representation: integer key+mods.
-        try:
-            key_int = int(combo)
-            key = Qt.Key(key_int & ~int(Qt.KeyboardModifier.KeyboardModifierMask))
-            mods = Qt.KeyboardModifier(
-                key_int & int(Qt.KeyboardModifier.KeyboardModifierMask)
-            )
-        except Exception:
-            return sequence
-    else:
-        key = combo.key()
-        mods = combo.keyboardModifiers()
-
-    key, mods = _normalize_key_with_modifiers(Qt.Key(key), Qt.KeyboardModifier(mods))
-    return QKeySequence(QKeyCombination(mods, key))
-
-
-def shortcut_from_key_event(event: QKeyEvent) -> str:
-    """Build a portable shortcut string from a key event (capture-safe)."""
-    key, mods = _normalize_key_with_modifiers(
-        Qt.Key(event.key()),
-        event.modifiers(),
-    )
-    return format_shortcut(QKeySequence(QKeyCombination(mods, key)))
 
 
 # Joins intermediate submenu titles into the action label (not the category).

@@ -1560,8 +1560,6 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.menu.font_family",
     "ui.menu.font_size",
     "ui.menu.icons.tint_color",
-    "ui.menu.icons.tint_color_dark_scheme",
-    "ui.menu.icons.tint_color_light_scheme",
     "ui.menu.menu.border_color",
     "ui.menu.menu.border_width",
     "ui.menu.menu.item_padding",
