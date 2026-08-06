@@ -2146,6 +2146,11 @@ class MainWindow(QMainWindow):
             self._navigate_to_start,
         )
         self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Jump to first move"),
+            "",
+            self._navigate_to_first_move,
+        )
+        self.shortcut_manager.register_shortcut(
             make_binding_id("Navigation", "Jump to last move"),
             "Shift+Right",
             self._navigate_to_end,
@@ -3650,6 +3655,11 @@ class MainWindow(QMainWindow):
         """Jump to the starting position of the active game (mainline)."""
         game_controller = self.controller.get_game_controller()
         game_controller.navigate_to_start()
+
+    def _navigate_to_first_move(self) -> None:
+        """Jump to after the first mainline move of the active game."""
+        game_controller = self.controller.get_game_controller()
+        game_controller.navigate_to_first_move()
 
     def _navigate_to_end(self) -> None:
         """Jump to the last mainline ply of the active game."""

@@ -369,6 +369,11 @@ class GameController:
         self._clear_rejoin_mainline_arm()
         return self.navigate_to_ply(0)
 
+    def navigate_to_first_move(self) -> bool:
+        """Navigate to after the first mainline move (ply 1), if present."""
+        self._clear_rejoin_mainline_arm()
+        return self.navigate_to_ply(1)
+
     def navigate_to_end(self) -> bool:
         """Navigate to the last mainline ply of the active game."""
         game = self.game_model.active_game

@@ -48,6 +48,7 @@ NAVIGATION_SHORTCUTS: Tuple[Tuple[str, str, str], ...] = (
     ("Navigation", "Previous move", "Left"),
     ("Navigation", "Next move", "Right"),
     ("Navigation", "Jump to start", "Shift+Left"),
+    ("Navigation", "Jump to first move", ""),
     ("Navigation", "Jump to last move", "Shift+Right"),
 )
 
