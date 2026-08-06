@@ -6,6 +6,7 @@ from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenuBar, QMenu
 
 from app.services.game_auto_tagging_service import AUTO_TAGS
+from app.utils.keyboard_shortcuts_catalog import mark_shortcuts_excluded
 from app.utils.themed_icon import (
     SVG_MENU_GEAR,
     SVG_MENU_LAYERS,
@@ -72,6 +73,7 @@ def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
 
     # Select which auto-tags/rules are applied
     mw.select_auto_tags_menu = QMenu("Select Tags for Auto-Tagging", game_analysis_menu)
+    mark_shortcuts_excluded(mw.select_auto_tags_menu)
     mw._apply_menu_styling(mw.select_auto_tags_menu)
     mw.auto_game_tagging_tag_actions = {}
     for tag in AUTO_TAGS:

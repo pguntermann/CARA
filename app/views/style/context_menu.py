@@ -208,10 +208,9 @@ def _leaf_actions_in_menu_tree(menu: QMenu) -> List[QAction]:
     return out
 
 
-def apply_registry_icons_for_menu_tree(menu: QMenu, mw: Any, *, dark_surface: bool) -> None:
-    """Re-tint menubar-registered actions present under ``menu`` for dark or menubar chrome."""
+def apply_registry_icons_for_menu_tree(menu: QMenu, mw: Any) -> None:
+    """Re-tint menubar-registered actions present under ``menu``."""
     from app.utils.themed_icon import (
-        menu_icon_dark_tint_rgb,
         menu_icon_tint_rgb,
         themed_icon_from_svg,
     )
@@ -219,7 +218,7 @@ def apply_registry_icons_for_menu_tree(menu: QMenu, mw: Any, *, dark_surface: bo
     reg: Dict[Any, str] = getattr(mw, "_menubar_action_icon_svgs", None) or {}
     if not reg:
         return
-    tint = menu_icon_dark_tint_rgb(mw.config) if dark_surface else menu_icon_tint_rgb(mw.config)
+    tint = menu_icon_tint_rgb(mw.config)
     for act in _leaf_actions_in_menu_tree(menu):
         path = reg.get(act)
         if path:
@@ -227,19 +226,15 @@ def apply_registry_icons_for_menu_tree(menu: QMenu, mw: Any, *, dark_surface: bo
 
 
 def wire_context_menu_icon_retheming(menu: QMenu, mw: Any) -> None:
-    """While this menu is visible, use dark-surface icon tints for registered menubar actions; restore on hide."""
+    """Ensure registered menubar actions under this menu use the style icon tint."""
     if getattr(menu, "_cara_context_icon_retheme_connected", False):
         return
     menu._cara_context_icon_retheme_connected = True
 
     def _on_show() -> None:
-        apply_registry_icons_for_menu_tree(menu, mw, dark_surface=True)
-
-    def _on_hide() -> None:
-        apply_registry_icons_for_menu_tree(menu, mw, dark_surface=False)
+        apply_registry_icons_for_menu_tree(menu, mw)
 
     menu.aboutToShow.connect(_on_show)
-    menu.aboutToHide.connect(_on_hide)
 
 
 def try_wire_context_menu_shared_action_icons(menu: QMenu) -> None:

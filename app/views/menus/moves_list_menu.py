@@ -6,6 +6,7 @@ from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenuBar
 
 from app.utils.themed_icon import SVG_MENU_GEAR, SVG_SIMPLE_X, set_menubar_themable_action_icon
+from app.utils.keyboard_shortcuts_catalog import mark_shortcuts_excluded
 
 _SAVE_PROFILE_SVG = "app/resources/icons/save_database.svg"
 
@@ -51,6 +52,7 @@ def rebuild_moves_list_menu(mw) -> None:
     # Add profile toggle actions (at top)
     for index, profile_name in enumerate(profile_names):
         profile_action = QAction(profile_name, mw)
+        mark_shortcuts_excluded(profile_action)
         profile_action.setCheckable(True)
         profile_action.setChecked(profile_name == active_profile_name)
         profile_action.triggered.connect(
@@ -184,6 +186,7 @@ def rebuild_moves_list_menu(mw) -> None:
     categorized_columns: set[str] = set()
     for category_name, category_columns in column_categories.items():
         category_menu = menu.addMenu(category_name)
+        mark_shortcuts_excluded(category_menu)
         mw._apply_menu_styling(category_menu)
 
         for column_name in category_columns:
@@ -193,6 +196,7 @@ def rebuild_moves_list_menu(mw) -> None:
                 visible = column_visibility.get(column_name, True)
 
                 column_action = QAction(display_name, mw)
+                mark_shortcuts_excluded(column_action)
                 column_action.setCheckable(True)
                 column_action.setChecked(visible)
                 column_action.triggered.connect(
@@ -204,12 +208,14 @@ def rebuild_moves_list_menu(mw) -> None:
     uncategorized_columns = [col for col in column_names if col not in categorized_columns]
     if uncategorized_columns:
         other_menu = menu.addMenu("Other")
+        mark_shortcuts_excluded(other_menu)
         mw._apply_menu_styling(other_menu)
         for column_name in uncategorized_columns:
             display_name = mw.profile_model.get_column_display_name(column_name)
             visible = column_visibility.get(column_name, True)
 
             column_action = QAction(display_name, mw)
+            mark_shortcuts_excluded(column_action)
             column_action.setCheckable(True)
             column_action.setChecked(visible)
             column_action.triggered.connect(
@@ -219,4 +225,11 @@ def rebuild_moves_list_menu(mw) -> None:
             mw.column_actions[column_name] = column_action
 
     menu.addSeparator()
+
+    try:
+        from app.services.keyboard_shortcuts_service import KeyboardShortcutsService
+
+        KeyboardShortcutsService.get_instance().reapply()
+    except Exception:
+        pass
 

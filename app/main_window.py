@@ -139,7 +139,6 @@ class MainWindow(QMainWindow):
         from app.views.menus.menu_bar import setup_menu_bar as _setup_menu_bar_definitions
 
         _setup_menu_bar_definitions(self, menu_bar)
-        self._connect_menu_icon_color_scheme_refresh()
 
     def _setup_theme_menu(self, parent_menu: QMenu) -> None:
         """Add a View → Theme submenu.
@@ -153,6 +152,9 @@ class MainWindow(QMainWindow):
         theme_menu = parent_menu.addMenu("Theme")
         self._apply_menu_styling(theme_menu)
         set_menubar_themable_action_icon(self, theme_menu.menuAction(), SVG_MENU_PALETTE)
+        from app.utils.keyboard_shortcuts_catalog import mark_shortcuts_excluded
+
+        mark_shortcuts_excluded(theme_menu)
 
         group = QActionGroup(self)
         group.setExclusive(True)
@@ -336,21 +338,6 @@ class MainWindow(QMainWindow):
                 self._toggle_database_panel()
         except Exception:
             pass
-
-    def _connect_menu_icon_color_scheme_refresh(self) -> None:
-        """Rebuild themed menu icons when the system light/dark preference changes (Qt 6.5+)."""
-        app = QApplication.instance()
-        if app is None:
-            return
-        sh = app.styleHints()
-        if not hasattr(sh, "colorSchemeChanged"):
-            return
-        sh.colorSchemeChanged.connect(self._on_menu_icon_color_scheme_changed)
-
-    def _on_menu_icon_color_scheme_changed(self, _scheme) -> None:
-        from app.utils.themed_icon import refresh_all_menubar_themable_action_icons
-
-        refresh_all_menubar_themable_action_icons(self)
 
     def _on_player_stats_reset_to_template_defaults(self) -> None:
         """Restore Player Stats menu settings from ``user_settings.json.template``."""
@@ -1139,6 +1126,13 @@ class MainWindow(QMainWindow):
     def _show_about_dialog(self) -> None:
         """Show the about dialog."""
         dialog = AboutDialog(self.config, self)
+        dialog.exec()
+
+    def _show_keyboard_shortcuts_dialog(self) -> None:
+        """Show the Keyboard Shortcuts dialog (view/edit bindings)."""
+        from app.views.dialogs.keyboard_shortcuts_dialog import KeyboardShortcutsDialog
+
+        dialog = KeyboardShortcutsDialog(self.config, parent=self)
         dialog.exec()
     
     def _show_release_notes_dialog(self) -> None:
@@ -2129,24 +2123,51 @@ class MainWindow(QMainWindow):
         logging_service = LoggingService.get_instance()
         logging_service.debug("Setting up shortcuts")
 
+        from app.services.keyboard_shortcuts_service import KeyboardShortcutsService
+        from app.utils.keyboard_shortcuts_catalog import make_binding_id
+
         # Initialize shortcut manager with MainWindow as parent
-        shortcut_manager = ShortcutManager(self)
-        
-        # Register shortcuts
-        # X key: Rotate board 180 degrees (handled by menu action, no need to register separately)
-        # shortcut_manager.register_shortcut("X", self.controller.rotate_board)  # Removed - handled by menu action
-        
-        # Shift+F: Copy FEN (handled by menu action)
-        # Ctrl+P: Copy PGN (handled by menu action)
-        
-        # Ctrl+V: Paste PGN to Clipboard DB (handled by menu action)
-        # Ctrl+Alt+V: Paste PGN to active DB (handled by menu action)
-        
-        # Right Arrow: Navigate to next move
-        shortcut_manager.register_shortcut("Right", self._navigate_to_next_move)
-        
-        # Left Arrow: Navigate to previous move
-        shortcut_manager.register_shortcut("Left", self._navigate_to_previous_move)
+        self.shortcut_manager = ShortcutManager(self)
+
+        # Right/Left (+ Shift): navigate the mainline; game list navigation unbound by default
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Previous move"),
+            "Left",
+            self._navigate_to_previous_move,
+        )
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Next move"),
+            "Right",
+            self._navigate_to_next_move,
+        )
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Previous game"),
+            "",
+            self._navigate_to_previous_game,
+        )
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Next game"),
+            "",
+            self._navigate_to_next_game,
+        )
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Jump to start"),
+            "Shift+Left",
+            self._navigate_to_start,
+        )
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Jump to first move"),
+            "",
+            self._navigate_to_first_move,
+        )
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Jump to last move"),
+            "Shift+Right",
+            self._navigate_to_end,
+        )
+
+        # Capture factory defaults, then apply any user overrides (live, no restart).
+        KeyboardShortcutsService.get_instance().bind(self, self.shortcut_manager)
     
     def _copy_fen_to_clipboard(self) -> None:
         """Copy the current board position FEN to clipboard."""
@@ -3639,6 +3660,85 @@ class MainWindow(QMainWindow):
                 return
         game_controller = self.controller.get_game_controller()
         game_controller.navigate_to_previous_move()
+
+    def _navigate_to_start(self) -> None:
+        """Jump to the starting position of the active game (mainline)."""
+        game_controller = self.controller.get_game_controller()
+        game_controller.navigate_to_start()
+
+    def _navigate_to_first_move(self) -> None:
+        """Jump to after the first mainline move of the active game."""
+        game_controller = self.controller.get_game_controller()
+        game_controller.navigate_to_first_move()
+
+    def _navigate_to_end(self) -> None:
+        """Jump to the last mainline ply of the active game."""
+        game_controller = self.controller.get_game_controller()
+        game_controller.navigate_to_end()
+
+    def _navigate_to_previous_game(self) -> None:
+        """Load the previous game in the current database list order."""
+        self._navigate_to_adjacent_game(-1)
+
+    def _navigate_to_next_game(self) -> None:
+        """Load the next game in the current database list order."""
+        self._navigate_to_adjacent_game(1)
+
+    def _navigate_to_adjacent_game(self, delta: int) -> None:
+        """Activate the game at current_row + delta in the owning database tab.
+
+        Uses the sorted/list order of the tab that contains the active game
+        (including Search Results). If there is no active game, uses the
+        currently visible database tab and starts from the first/last row.
+        """
+        if self.controller.is_game_analysis_running():
+            self.controller.set_status("Cannot load game while analysis is running")
+            return
+        if not hasattr(self, "database_panel") or self.database_panel is None:
+            return
+
+        game_controller = self.controller.get_game_controller()
+        active_game = game_controller.get_game_model().active_game
+        model: Optional[DatabaseModel] = None
+        current_row: Optional[int] = None
+
+        if active_game is not None:
+            location = self.database_panel.find_game_location(active_game)
+            if location is not None:
+                model, current_row = location
+
+        if model is None:
+            active_info = self.database_panel.get_active_database_info()
+            if not active_info:
+                return
+            model = active_info.get("model")
+            if model is None:
+                return
+
+        count = model.rowCount()
+        if count <= 0:
+            return
+
+        if current_row is None:
+            target_row = 0 if delta > 0 else count - 1
+        else:
+            target_row = current_row + delta
+            if target_row < 0 or target_row >= count:
+                return
+
+        game = model.get_game(target_row)
+        if game is None:
+            return
+
+        game_controller.set_active_game(game)
+        status_message = game_controller.format_active_game_status_message(game)
+        if status_message:
+            self.controller.set_status(status_message)
+        ref_ply = getattr(game, "ref_ply", 0)
+        if isinstance(ref_ply, int) and ref_ply > 0:
+            game_controller.navigate_to_ply(ref_ply)
+
+        self.database_panel.select_rows(model, [target_row])
     
     def _on_database_row_double_click(self, row: int, model: Optional[DatabaseModel] = None) -> None:
         """Handle double-click on database table row.
@@ -3674,6 +3774,15 @@ class MainWindow(QMainWindow):
         
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.controller.set_status("Engine added successfully")
+
+    def _get_stockfish(self) -> None:
+        """Open the Get Stockfish wizard (shown when no engines are configured)."""
+        from app.views.dialogs.get_stockfish_dialog import GetStockfishDialog
+
+        engine_controller = self.controller.get_engine_controller()
+        dialog = GetStockfishDialog(self.config, engine_controller, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.controller.set_status("Stockfish added successfully")
     
     def _update_engines_menu(self) -> None:
         """Update the Engines menu with current engines and assignments."""
@@ -4195,6 +4304,14 @@ class MainWindow(QMainWindow):
         engine_model.load_assignments(assignments_data)
         
         self._update_engines_menu()
+
+        # Apply any persisted keyboard-shortcut overrides after menus/settings are ready.
+        try:
+            from app.services.keyboard_shortcuts_service import KeyboardShortcutsService
+
+            KeyboardShortcutsService.get_instance().reapply()
+        except Exception:
+            pass
     
     def _save_user_settings(self) -> None:
         """Save current user settings to file.

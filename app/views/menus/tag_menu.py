@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import QMenuBar, QMenu
 
 from app.services.game_tags_service import GameTagsService
 from app.utils.game_tags_utils import parse_game_tags, format_game_tags, PGN_TAG_NAME_GAME_TAGS
+from app.utils.keyboard_shortcuts_catalog import mark_shortcuts_excluded
 from app.utils.themed_icon import (
     set_menubar_themable_action_icon,
     SVG_MENU_CLEAR_ALL_GAME_TAGS,
@@ -97,6 +98,7 @@ def _rebuild_tag_menu(mw: Any, menu: QMenu) -> None:
     # Built-in tags directly in the menu (no submenu)
     for d in builtins:
         act = QAction(d.name, mw)
+        mark_shortcuts_excluded(act)
         act.setCheckable(True)
         act.setChecked(d.name.casefold() in current)
         act.setEnabled(has_active_game)
@@ -107,6 +109,7 @@ def _rebuild_tag_menu(mw: Any, menu: QMenu) -> None:
         menu.addSeparator()
         for d in customs:
             act = QAction(d.name, mw)
+            mark_shortcuts_excluded(act)
             act.setCheckable(True)
             act.setChecked(d.name.casefold() in current)
             act.setEnabled(has_active_game)
@@ -119,10 +122,12 @@ def _rebuild_tag_menu(mw: Any, menu: QMenu) -> None:
     if unmanaged:
         menu.addSeparator()
         unmanaged_header = QAction("Unmanaged game tags (this game)", mw)
+        mark_shortcuts_excluded(unmanaged_header)
         unmanaged_header.setEnabled(False)
         menu.addAction(unmanaged_header)
         for n in unmanaged:
             act = QAction(n, mw)
+            mark_shortcuts_excluded(act)
             act.setCheckable(True)
             act.setChecked(True)
             act.setEnabled(has_active_game)

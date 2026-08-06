@@ -16,6 +16,8 @@ class BulkRegexPreset:
     find: str
     replace: str
     tooltip: str = ""
+    # Optional substring of ``find`` to select in the Find field after applying.
+    select_text: str = ""
 
 
 # Empty id = "Custom…" (user-authored pattern; do not overwrite fields).
@@ -50,6 +52,7 @@ def load_bulk_regex_presets(config: Dict[str, Any]) -> List[BulkRegexPreset]:
         find = str(item.get("find", ""))
         replace = str(item.get("replace", ""))
         tooltip = str(item.get("tooltip", "") or "")
+        select_text = str(item.get("select_text", "") or "")
         if not label:
             raise ValueError(
                 f"ui.dialogs.bulk_operations.regex_presets[{index}] is missing label"
@@ -59,6 +62,11 @@ def load_bulk_regex_presets(config: Dict[str, Any]) -> List[BulkRegexPreset]:
                 f"Duplicate regex preset id {preset_id!r} at index {index}"
             )
         seen_ids.add(preset_id)
+        if select_text and select_text not in find:
+            raise ValueError(
+                f"select_text {select_text!r} for preset {preset_id!r} "
+                f"must be a substring of find"
+            )
         if preset_id:
             try:
                 re.compile(find)
@@ -73,6 +81,7 @@ def load_bulk_regex_presets(config: Dict[str, Any]) -> List[BulkRegexPreset]:
                 find=find,
                 replace=replace,
                 tooltip=tooltip,
+                select_text=select_text,
             )
         )
     return presets

@@ -3755,16 +3755,6 @@
           70,
           95,
           140
-        ],
-        "tint_color_dark_scheme": [
-          110,
-          140,
-          200
-        ],
-        "tint_color_light_scheme": [
-          45,
-          60,
-          90
         ]
       },
       "colors": {
@@ -4658,6 +4648,95 @@
           ],
           "content_spacing": 8,
           "path_layout_spacing": 8
+        }
+      },
+      "get_stockfish": {
+        "width": 560,
+        "height": 480,
+        "minimum_width": 520,
+        "minimum_height": 420,
+        "bottom_button_top_padding": 18,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_PRIMARY"
+        },
+        "layout": {
+          "spacing": 12,
+          "margins": [
+            24,
+            22,
+            24,
+            20
+          ]
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_LARGE"
+          },
+          "title_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "hint_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "hint_text_color": {
+            "$ref": "$_COLOR_TEXT_4"
+          }
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "focus_border_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ],
+          "minimum_height": 30
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 110,
+          "height": 30,
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
+        },
+        "binary_option_spacing": 10,
+        "progress": {
+          "chunk_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "height": 18
         }
       },
       "bulk_operations": {
@@ -5964,6 +6043,184 @@
         "buttons": {
           "spacing": 10,
           "width": 120,
+          "height": 30,
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
+        }
+      },
+      "keyboard_shortcuts": {
+        "width": 780,
+        "height": 560,
+        "minimum_width": 620,
+        "minimum_height": 420,
+        "bottom_button_top_padding": 50,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "layout": {
+          "spacing": 10,
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ]
+        },
+        "filter": {
+          "placeholder": "Filter by category, action, or shortcut…",
+          "minimum_height": 28
+        },
+        "status": {
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_4"
+          }
+        },
+        "overlay": {
+          "dim_color": [
+            0,
+            0,
+            0,
+            120
+          ],
+          "card_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+          },
+          "card_border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "card_border_radius": 8,
+          "card_width": 420,
+          "card_margins": [
+            28,
+            26,
+            28,
+            24
+          ],
+          "card_spacing": 14,
+          "title": "Set shortcut",
+          "prompt": "Press a new key combination for “{action}”.",
+          "hint": "Click outside to cancel",
+          "clear_button_text": "Clear",
+          "buttons_top_spacing": 8,
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_LARGE"
+          },
+          "prompt_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "hint_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "title_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "prompt_text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "hint_text_color": {
+            "$ref": "$_COLOR_TEXT_4"
+          }
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          }
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_3"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BORDER"
+          },
+          "focus_border_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ]
+        },
+        "table": {
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_3"
+          },
+          "alternate_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_4"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BORDER"
+          },
+          "border_radius": 3,
+          "header_background_color": {
+            "$ref": "$_COLOR_TABLE_HEADER_BACKGROUND"
+          },
+          "header_text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "selection_background_color": {
+            "$ref": "$_COLOR_ACTIVE_MOVE_BACKGROUND"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_NEAR_BLACK"
+          },
+          "hover_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_6"
+          },
+          "hover_text_color": {
+            "$ref": "$_COLOR_TEXT_5"
+          },
+          "item_padding": 5,
+          "header_padding": 5,
+          "category_column_width": 140,
+          "shortcut_column_width": 160,
+          "row_height": 28,
+          "alternating_row_colors": true,
+          "header_section_border": true,
+          "empty_shortcut_display": "—",
+          "shortcut_font_family": {
+            "$ref": "$_FONT_FAMILY_MONO"
+          }
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "action_width": 140,
           "height": 30,
           "font_size": {
             "$ref": "$_FONT_SIZE_BASE_SMALL"

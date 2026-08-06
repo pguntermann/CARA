@@ -788,16 +788,11 @@ class _OperationEditorOverlay(QWidget):
         finally:
             self._applying_regex_preset = False
         self.find_input.setFocus()
-        placeholder_by_preset = {
-            "keep_capture": "text to keep",
-            "remove_text": "text to remove",
-        }
-        placeholder = placeholder_by_preset.get(preset.id, "")
-        if placeholder and placeholder in self.find_input.text():
-            # Select the editable placeholder for quick customization.
-            start = self.find_input.text().find(placeholder)
+        select_text = (preset.select_text or "").strip()
+        if select_text and select_text in self.find_input.text():
+            start = self.find_input.text().find(select_text)
             if start >= 0:
-                self.find_input.setSelection(start, len(placeholder))
+                self.find_input.setSelection(start, len(select_text))
 
     def _on_find_replace_edited(self, *_args) -> None:
         if self._applying_regex_preset:

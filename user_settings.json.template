@@ -1084,5 +1084,8 @@
   "player_stats_active_profile": "Default",
   "player_stats_profile_order": [],
   "recent_pgn_databases": [],
-  "bulk_operation_plans": {}
+  "bulk_operation_plans": {},
+  "keyboard_shortcuts": {
+    "overrides": {}
+  }
 }

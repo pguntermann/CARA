@@ -7,24 +7,20 @@ duplicating assets per theme.
 
 from __future__ import annotations
 
-import sys
 from typing import Any, Dict, Sequence, Tuple
 
 from PyQt6.QtCore import QByteArray, QRectF, Qt
-from PyQt6.QtGui import QGuiApplication, QIcon, QImage, QPainter, QPixmap
+from PyQt6.QtGui import QIcon, QImage, QPainter, QPixmap
 from PyQt6.QtSvg import QSvgRenderer
 
 from app.utils.path_resolver import get_app_resource_path
-
-# Default icon tint when Qt reports a light system color scheme (e.g. native macOS menu bar).
-_DEFAULT_LIGHT_SCHEME_ICON_TINT: Tuple[int, int, int] = (52, 52, 58)
 
 # Template SVG paths (``#ffffff``); shared by menu bar and dark-styled context menus.
 SVG_MENU_COPY = "app/resources/icons/copy_pgn.svg"
 SVG_MENU_CUT = "app/resources/icons/cut_selected.svg"
 SVG_MENU_PASTE_CLIPBOARD = "app/resources/icons/paste_clipboard_db.svg"
 SVG_MENU_PASTE_ACTIVE_DB = "app/resources/icons/paste_active_db.svg"
-# QTextEdit standard context menu (styled dark; use with :func:`menu_icon_dark_tint_rgb`).
+# QTextEdit standard context menu (styled dark; use with :func:`menu_icon_tint_rgb`).
 SVG_CONTEXT_UNDO = "app/resources/icons/context_undo.svg"
 SVG_CONTEXT_REDO = "app/resources/icons/context_redo.svg"
 SVG_CONTEXT_SELECT_ALL = "app/resources/icons/context_select_all.svg"
@@ -43,6 +39,7 @@ SVG_MENU_TRASH = "app/resources/icons/menu_trash.svg"
 SVG_MENU_PALETTE = "app/resources/icons/menu_palette.svg"
 SVG_MENU_PLAY = "app/resources/icons/menu_play.svg"
 SVG_MENU_PLUS = "app/resources/icons/menu_plus.svg"
+SVG_MENU_DOWNLOAD = "app/resources/icons/menu_download.svg"
 SVG_ZOOM_IN = "app/resources/icons/zoom_in.svg"
 SVG_ZOOM_OUT = "app/resources/icons/zoom_out.svg"
 SVG_MENU_RESET = "app/resources/icons/menu_reset.svg"
@@ -68,80 +65,25 @@ def _rgb_from_config_list(value: Any) -> Tuple[int, int, int] | None:
     return None
 
 
-def _is_qt_light_color_scheme() -> bool | None:
-    """True if Qt reports light, False if dark, None if unknown or unavailable."""
-    app = QGuiApplication.instance()
-    if app is None:
-        return None
-    sh = app.styleHints()
-    try:
-        cs = sh.colorScheme()
-    except AttributeError:
-        return None
-    if cs == Qt.ColorScheme.Light:
-        return True
-    if cs == Qt.ColorScheme.Dark:
-        return False
-    return None
-
-
-def menu_icon_dark_tint_rgb(config: Dict[str, Any]) -> Tuple[int, int, int]:
-    """RGB tint for icons on surfaces that stay dark regardless of OS theme.
+def menu_icon_tint_rgb(config: Dict[str, Any]) -> Tuple[int, int, int]:
+    """RGB tint for menu / menubar icons from the active style config.
 
     Uses ``ui.menu.icons.tint_color`` if set, otherwise ``ui.menu.colors.normal.text``.
-    Context menus that apply a dark stylesheet should use this instead of
-    :func:`menu_icon_tint_rgb` so icons match that chrome, not a light menu bar.
+    Qt-drawn menus use the configured chrome colors; no OS light/dark remapping.
     """
     ui = config.get("ui", {})
     menu = ui.get("menu", {})
     icons_cfg = menu.get("icons", {})
     normal = menu.get("colors", {}).get("normal", {})
     text = normal.get("text", [200, 200, 200])
-    dark_tint = _rgb_from_config_list(icons_cfg.get("tint_color"))
-    if dark_tint is None:
-        dark_tint = (int(text[0]), int(text[1]), int(text[2]))
-    return dark_tint
+    tint = _rgb_from_config_list(icons_cfg.get("tint_color"))
+    if tint is None:
+        tint = (int(text[0]), int(text[1]), int(text[2]))
+    return tint
 
 
-def menu_icon_tint_rgb(config: Dict[str, Any]) -> Tuple[int, int, int]:
-    """Resolve [R, G, B] for menubar menu icons from config and Qt color scheme.
-
-    On **macOS**, when ``QStyleHints.colorScheme()`` is ``Light``, uses
-    ``ui.menu.icons.tint_color_light_scheme`` (or a dark neutral default) so glyphs
-    stay visible on a **native light** menu bar.
-
-    On **Linux and Windows**, Qt often reports ``Light`` while CARA still paints the
-    menu bar with the configured **dark** stylesheet (``ui.menu.colors``). Using the
-    light-scheme tint there makes icons nearly the same RGB as the bar (e.g. manage
-    tags vs. open folder perceived contrast). Those platforms always use the same tint
-    as :func:`menu_icon_dark_tint_rgb` for the menubar.
-
-    For ``Dark`` on macOS, uses ``ui.menu.icons.tint_color_dark_scheme`` if set
-    (otherwise falls back to ``ui.menu.icons.tint_color`` / menu text color).
-
-    For ``Unknown`` on macOS, uses the same tint as :func:`menu_icon_dark_tint_rgb`.
-    """
-    dark_tint = menu_icon_dark_tint_rgb(config)
-
-    if sys.platform != "darwin":
-        return dark_tint
-
-    ui = config.get("ui", {})
-    menu = ui.get("menu", {})
-    icons_cfg = menu.get("icons", {})
-
-    light_tint = _rgb_from_config_list(icons_cfg.get("tint_color_light_scheme"))
-    if light_tint is None:
-        light_tint = _DEFAULT_LIGHT_SCHEME_ICON_TINT
-
-    dark_scheme_tint = _rgb_from_config_list(icons_cfg.get("tint_color_dark_scheme"))
-
-    scheme = _is_qt_light_color_scheme()
-    if scheme is True:
-        return light_tint
-    if scheme is False and dark_scheme_tint is not None:
-        return dark_scheme_tint
-    return dark_tint
+# Alias kept for call sites that historically meant "dark chrome" icons.
+menu_icon_dark_tint_rgb = menu_icon_tint_rgb
 
 
 def _tint_svg_bytes(data: bytes, rgb: Tuple[int, int, int]) -> QByteArray:
@@ -184,12 +126,7 @@ def themed_icon_from_svg(relative_path: str, rgb: Sequence[int]) -> QIcon:
 
 
 def set_menubar_themable_action_icon(mw: Any, action: Any, svg_path: str) -> None:
-    """Assign a themed SVG icon for the menubar and register it for context-menu re-tinting.
-
-    Icons on shared menubar actions are tinted for the OS color scheme. Any root
-    context menu that calls :func:`app.views.style.context_menu.try_wire_context_menu_shared_action_icons`
-    temporarily switches registered actions to :func:`menu_icon_dark_tint_rgb` while open.
-    """
+    """Assign a themed SVG icon for the menubar and register it for refresh on theme change."""
     if not hasattr(mw, "_menubar_action_icon_svgs"):
         mw._menubar_action_icon_svgs = {}
     mw._menubar_action_icon_svgs[action] = svg_path

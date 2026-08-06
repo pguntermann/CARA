@@ -579,7 +579,7 @@
                     
                     <li><strong>Theme / style config files:</strong> Files such as <code>style_default.config.json</code> and <code>style_light.config.json</code> define colors, fonts, spacing, borders, and other visual styling. These files are also located in <code>app/config/</code> and can be used to customize or create themes.</li>
                     
-                    <li><strong>user_settings.json:</strong> Stores your personal preferences and settings, including moves list column profiles, board visibility settings, PGN display options, engine configurations, and other user-specific settings. The file is automatically created when you first save settings and persists your preferences between application sessions.</li>
+                    <li><strong>user_settings.json:</strong> Stores your personal preferences and settings, including moves list column profiles, board visibility settings, PGN display options, engine configurations, keyboard shortcut overrides, and other user-specific settings. The file is automatically created when you first save settings and persists your preferences between application sessions.</li>
                     
                     <li><strong>engine_parameters.json:</strong> Stores engine-specific parameters and options for each configured chess engine. Engine settings are automatically saved to this file when you configure engines through the application interface.</li>
                 </ul>
@@ -618,7 +618,7 @@
                 <p>The interface is designed to be intuitive and efficient. You can resize panels by dragging the splitter handles between them, customize which information is displayed, and use keyboard shortcuts for quick navigation. The application automatically updates all views when you navigate through a game, ensuring that the chessboard, move lists, evaluations, and statistics stay synchronized.</p>
                 
                 <div class="tip-box">
-                    <strong>Quick Tip:</strong> Use the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys to navigate through game moves. This is the primary and most efficient way to review games move-by-move. The board, moves list, and all analysis views update automatically as you navigate. With <span class="menu-item">PGN → Enable navigating into variations</span> turned on, the arrows follow the active line (including sidelines) and can open a branch selector when several continuations exist—see <a href="#detail-panel">section 4.5</a>.
+                    <strong>Quick Tip:</strong> Use the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys to navigate through game moves. Hold <code>Shift</code> with <code>←</code> / <code>→</code> to jump to the start or end of the game. This is the primary and most efficient way to review games move-by-move. The board, moves list, and all analysis views update automatically as you navigate. With <span class="menu-item">PGN → Enable navigating into variations</span> turned on, the arrows follow the active line (including sidelines) and can open a branch selector when several continuations exist—see <a href="#detail-panel">section 4.5</a>.
                 </div>
                 
                 <p>CARA separates behavioral configuration from visual styling. Use <code>config.json</code> for things like import/export behavior, logging, and formulas. Use the theme / style config files in <code>app/config/</code> for colors, fonts, spacing, and other UI appearance settings.</p>
@@ -1085,12 +1085,14 @@
             </div>
             <div class="outline-item">
                 <h4 id="keyboard-shortcuts">4.6 Keyboard Shortcuts</h4>
-                <p>Below you can find a list of the most common keyboard shortcuts, allowing you to work efficiently with the features described in this section. For a complete reference of all keyboard shortcuts organized by category, see <a href="#complete-keyboard-shortcuts">section 6.15</a>.</p>
+                <p>Below you can find a list of the most common keyboard shortcuts (application defaults), allowing you to work efficiently with the features described in this section. You can customize these bindings in CARA—see <a href="#customizing-keyboard-shortcuts">section 6.14.2</a>. For a complete reference of all default keyboard shortcuts organized by category, see <a href="#complete-keyboard-shortcuts">section 6.16</a>.</p>
                 
                 <h5>4.6.1 Navigation</h5>
                 <ul>
                     <li><code>←</code> (Left Arrow): Navigate to the previous move along the active path (main line, or within a variation when variation navigation is enabled)</li>
                     <li><code>→</code> (Right Arrow): Navigate to the next move along the active path; with variation navigation enabled, opens the branch selector when multiple continuations exist</li>
+                    <li><code>Shift+←</code>: Jump to the starting position of the game</li>
+                    <li><code>Shift+→</code>: Jump to the last move of the main line</li>
                     <li><code>↑</code> / <code>↓</code>: While the branch selector is open, move the highlight among choices</li>
                     <li><code>Enter</code>: While the branch selector is open, take the highlighted continuation (<code>→</code> also confirms)</li>
                     <li><code>Esc</code>: Dismiss the branch selector without moving (<code>←</code> also dismisses)</li>
@@ -1269,7 +1271,7 @@
                 <img src="screenshots/add_engine_dialog.png" alt="CARA Add Engine Dialog - Dialog for adding UCI chess engines with browse button, validation, and engine information fields" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
                 <div class="tip-box">
-                    <strong>Don’t have a chess engine yet?</strong> See <a href="#recommended-engines">section 7.10 “Recommended Chess Engines”</a> for a short list of suggested free and commercial engines (with links) and when to use them in CARA.
+                    <strong>Don’t have a chess engine yet?</strong> If no engine is configured yet, use <span class="menu-item">Engines → Get Stockfish...</span> to download and set up Stockfish automatically. You can also add an engine you already have with <span class="menu-item">Engines → Add Engine...</span>. See <a href="#recommended-engines">section 7.10 “Recommended Chess Engines”</a> for other suggested free and commercial engines and when to use them in CARA.
                 </div>
                 
                 <h5 id="adding-additional-engines">5.1.2 Adding Additional Engines and Advanced Configuration</h5>
@@ -2616,14 +2618,22 @@
             <!-- View Menu -->
             <div class="outline-item">
                 <h4 id="view-menu">6.14 View Menu</h4>
-                <p>The <span class="menu-item">View</span> menu provides quick access to panel visibility, detail-tab switching, and visual theme selection.</p>
+                <p>The <span class="menu-item">View</span> menu provides quick access to panel visibility, detail-tab switching, visual theme selection, and keyboard shortcut customization.</p>
 
                 <h5>6.14.1 Theme</h5>
                 <p>Switches the active application theme. Each theme uses its own style configuration file, which controls colors, fonts, spacing, borders, and other UI appearance settings. See <a href="#customizing-themes">section 7.1.4</a> and <a href="#creating-themes">section 7.1.5</a> for more information about theme files and custom themes.</p>
 
-                <h5>6.14.2 Hide Database Panel</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code></p>
-                <p>Toggles the visibility of the Database Panel to free more space for the Main and Detail panels.<br>See <a href="#three-panel-layout">section 4.2</a> for more information.</p>
+                <h5 id="customizing-keyboard-shortcuts">6.14.2 Keyboard Shortcuts...</h5>
+                <p>Opens the Keyboard Shortcuts dialog, where you can view and change most menu and navigation shortcuts. Changes apply immediately and are saved in your user settings.</p>
+                <img src="screenshots/keyboard_shortcuts_dialog.png" alt="CARA Keyboard Shortcuts dialog - Filterable table of categories, actions, and shortcuts with Clear All, Restore Defaults, and Close" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+                <p>The dialog lists bindable actions by <strong>Category</strong>, <strong>Action</strong>, and current <strong>Shortcut</strong>. Use the filter box to narrow the list. Nested menu items show their submenu path in the Action column (for example <em>Set miniature preview scale factor › 1.25x</em>).</p>
+                <ul>
+                    <li><strong>Assign a shortcut:</strong> Double-click a row, then press the desired key or key combination. If that combination is already used, CARA asks whether to move it from the other action.</li>
+                    <li><strong>Clear one shortcut:</strong> In the capture overlay, click <strong>Clear</strong>. Click outside the overlay card to cancel without changing the binding.</li>
+                    <li><strong>Clear All:</strong> Removes shortcuts from every listed action.</li>
+                    <li><strong>Restore Defaults:</strong> Discards your overrides and restores the factory shortcuts.</li>
+                </ul>
+                <p>Some dynamic menus (for example Open Recent, Theme, and profile/column pickers) are excluded from customization.</p>
 
                 <h5>6.14.3 Moves List</h5>
                 <p><strong>Shortcut:</strong> <code>F1</code></p>
@@ -2660,6 +2670,10 @@
                 <h5>6.14.11 Notes</h5>
                 <p><strong>Shortcut:</strong> <code>F9</code></p>
                 <p>Switches the Detail Panel to the <strong>Notes</strong> tab.<br>See <a href="#notes">section 4.5.9</a> for more information.</p>
+
+                <h5>6.14.12 Hide Database Panel</h5>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code></p>
+                <p>Toggles the visibility of the Database Panel to free more space for the Main and Detail panels.<br>See <a href="#three-panel-layout">section 4.2</a> for more information.</p>
             </div>
 
             <!-- Help Menu -->
@@ -2685,13 +2699,15 @@
             <!-- Keyboard Shortcuts Reference -->
             <div class="outline-item">
                 <h4 id="complete-keyboard-shortcuts">6.16 Complete Keyboard Shortcuts</h4>
-                <p>This section provides a comprehensive reference of all keyboard shortcuts in CARA.</p>
+                <p>This section provides a comprehensive reference of the default keyboard shortcuts in CARA. You can customize most of these bindings—see <a href="#customizing-keyboard-shortcuts">section 6.14.2</a>.</p>
                 
                 <h5>6.16.1 Game Navigation</h5>
                 <p>Essential shortcuts for navigating through games:</p>
                 <ul>
                     <li><code>→</code> (Right Arrow): Navigate to next move along the active path; with variation navigation enabled, opens the branch selector when multiple continuations exist (also confirms a highlighted branch)</li>
                     <li><code>←</code> (Left Arrow): Navigate to previous move along the active path; dismisses the branch selector if it is open</li>
+                    <li><code>Shift+←</code>: Jump to the starting position of the game</li>
+                    <li><code>Shift+→</code>: Jump to the last move of the main line</li>
                     <li><code>↑</code> / <code>↓</code>: Move the highlight in the branch selector</li>
                     <li><code>Enter</code>: Confirm the highlighted branch in the branch selector</li>
                     <li><code>Esc</code>: Dismiss the branch selector</li>
