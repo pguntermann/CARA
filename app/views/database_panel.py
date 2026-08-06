@@ -1282,6 +1282,64 @@ class DatabasePanel(QWidget):
                 matches.append(r)
         return matches
 
+    def find_game_location(self, game: Any) -> Optional[Tuple[DatabaseModel, int]]:
+        """Find which open tab/model contains ``game`` and at which row.
+
+        Includes Search Results tabs that are not registered in the panel model.
+        """
+        if game is None:
+            return None
+        for tab_info in self._tab_models.values():
+            model = tab_info.get("model")
+            if model is None:
+                continue
+            row = model.find_game(game)
+            if row is not None:
+                return model, row
+        return None
+
+    def select_rows(
+        self,
+        database: DatabaseModel,
+        row_indices: List[int],
+        *,
+        make_current_tab: bool = True,
+    ) -> None:
+        """Select rows in a database table without reordering the list.
+
+        Unlike ``highlight_rows``, this does not call ``sort_games_to_top``.
+        """
+        tab_index = self._model_to_tab.get(database)
+        if tab_index is None:
+            # Search Results (and similar) may only live in _tab_models.
+            for idx, tab_info in self._tab_models.items():
+                if tab_info.get("model") is database:
+                    tab_index = idx
+                    break
+        if tab_index is None or tab_index not in self._tab_models:
+            return
+
+        tab_info = self._tab_models[tab_index]
+        table = tab_info.get("table")
+        model = tab_info.get("model")
+        if not table or not model:
+            return
+
+        valid_indices = [idx for idx in row_indices if 0 <= idx < model.rowCount()]
+        if not valid_indices:
+            return
+
+        if make_current_tab:
+            self.tab_widget.setCurrentIndex(tab_index)
+            if self._panel_model and tab_info.get("identifier") != "search_results":
+                self._panel_model.set_active_database(database)
+
+        self._set_table_selection_to_rows(table, model, valid_indices)
+        table.scrollTo(
+            model.index(valid_indices[0], 0),
+            QTableView.ScrollHint.EnsureVisible,
+        )
+
     def highlight_row(self, database: DatabaseModel, row_index: int) -> None:
         """Highlight a specific row in a specific database's table.
         

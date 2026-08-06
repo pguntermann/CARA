@@ -44,9 +44,12 @@ __all__ = [
 CARA_SHORTCUTS_EXCLUDED = "cara_shortcuts_excluded"
 
 # Global navigation shortcuts registered via ShortcutManager (not menu QActions).
+# Order here is the Shortcuts dialog order within Navigation (not alphabetical).
 NAVIGATION_SHORTCUTS: Tuple[Tuple[str, str, str], ...] = (
     ("Navigation", "Previous move", "Left"),
     ("Navigation", "Next move", "Right"),
+    ("Navigation", "Previous game", ""),
+    ("Navigation", "Next game", ""),
     ("Navigation", "Jump to start", "Shift+Left"),
     ("Navigation", "Jump to first move", ""),
     ("Navigation", "Jump to last move", "Shift+Right"),
@@ -201,11 +204,21 @@ def collect_navigation_entries() -> List[ShortcutEntry]:
 
 
 def sort_shortcut_entries(entries: List[ShortcutEntry]) -> List[ShortcutEntry]:
-    """Sort with Navigation first, then category/action."""
+    """Sort with Navigation first (catalog order), then other categories A–Z."""
+
+    navigation_order = {
+        make_binding_id(category, action): index
+        for index, (category, action, _shortcut) in enumerate(NAVIGATION_SHORTCUTS)
+    }
 
     def _sort_key(e: ShortcutEntry) -> tuple:
-        category_rank = 0 if e.category == "Navigation" else 1
-        return (category_rank, e.category.lower(), e.action.lower(), e.shortcut.lower())
+        if e.category == "Navigation" or e.is_navigation:
+            return (
+                0,
+                navigation_order.get(e.binding_id or make_binding_id(e.category, e.action), 10_000),
+                e.action.lower(),
+            )
+        return (1, e.category.lower(), e.action.lower(), e.shortcut.lower())
 
     return sorted(entries, key=_sort_key)
 
