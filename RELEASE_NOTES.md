@@ -1,5 +1,46 @@
 # Release Notes
 
+# CARA v2.8.3 - Customizable Keyboard Shortcuts and Get Stockfish Wizard
+
+**Release Date:** 07.08.2026
+
+This release adds a **Keyboard Shortcuts** dialog for viewing and rebinding actions, a **Get Stockfish…** helper when no engine is configured yet, several new shortcut actions and Linux/UI reliability fixes.
+
+## Keyboard Shortcuts
+
+**Shortcuts dialog:** Open **View → Keyboard Shortcuts…** to see all bindable actions, filter them, and assign your own keys. Factory defaults can be restored
+
+With this feature, the following new shortcuts/actions have been added:
+
+- **Navigation: Jump to start:** Bound to `Shift+Left` by default — jumps to the starting position of the active game (ply 0).
+- **Navigation: Jump to last move:** Bound to `Shift+Right` by default — jumps to the last mainline ply.
+- **Navigation: Jump to first move:** Unbound by default — jumps to the first move (ply 1).
+- **Navigation: Previous game:** Unbound by default — loads the previous game in the current database list.
+- **Navigation: Next game:** Unbound by default — loads the next game in the current database list.
+- **Navigation: Jump to next Blunder:** Unbound by default — jumps to the next analyzed Blunder on the mainline.
+- **Navigation: Jump to next Miss:** Unbound by default — jumps to the next analyzed Miss on the mainline.
+- **Navigation: Jump to next Blunder/Miss:** Unbound by default — jumps to the next analyzed Blunder or Miss on the mainline.
+- **View: Previous detail tab:** Unbound by default — switches to the previous detail panel tab (wraps).
+- **View: Next detail tab:** Unbound by default — switches to the next detail panel tab (wraps).
+
+## Get Stockfish
+
+**Engines menu:** When no engine is configured, **Engines → Get Stockfish…** opens a short wizard to suggested the correct build, choose a folder, download, validate, and add it.
+
+## Other Improvements and Bug Fixes
+
+- **Bulk Operations:** The config-driven Regex presets now allow to specify if and what part of the Find text string should be selected/highlighted, when that regex is chosen. Several additional Regex presets have been added.
+- **Radio buttons:** Theme-specific radio buttons for more reliable selected/unselected appearance across operation systems (especially Linux, where previously radio buttons sometimes couldnt be distinguished between selected and unselected state when using the Light or Scholar theme).
+- **Menu bar:** On macOS, for better cross-compatability, the menu bar no longer uses the native macOS rendering pipeline, instead uses the applications unified QT menu bar.
+- **Opening Encyclopedia:** Added roughly 100 additional opening variation entries to the database.
+- **Opening Encyclopedia:** Section separators keep a stable thickness under fractional display scaling.
+
+## Documentation
+
+- **HTML manual:** Updated for the Keyboard Shortcuts dialog and the Get Stockfish engine wizard mention.
+
+---
+
 # CARA v2.8.2 - Bulk Operations
 
 **Release Date:** 04.08.2026
