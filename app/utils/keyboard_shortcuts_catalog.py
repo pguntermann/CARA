@@ -53,6 +53,9 @@ NAVIGATION_SHORTCUTS: Tuple[Tuple[str, str, str], ...] = (
     ("Navigation", "Jump to start", "Shift+Left"),
     ("Navigation", "Jump to first move", ""),
     ("Navigation", "Jump to last move", "Shift+Right"),
+    ("Navigation", "Jump to next Blunder", ""),
+    ("Navigation", "Jump to next Miss", ""),
+    ("Navigation", "Jump to next Blunder/Miss", ""),
 )
 
 
@@ -204,21 +207,44 @@ def collect_navigation_entries() -> List[ShortcutEntry]:
 
 
 def sort_shortcut_entries(entries: List[ShortcutEntry]) -> List[ShortcutEntry]:
-    """Sort with Navigation first (catalog order), then other categories A–Z."""
+    """Sort with Navigation first (catalog order), then menu categories.
+
+    Menu categories and actions keep collect_menu_entries order (menu-bar /
+    within-menu order), so View detail tabs match F1–F9 and categories match
+    the menubar sequence.
+    """
 
     navigation_order = {
         make_binding_id(category, action): index
         for index, (category, action, _shortcut) in enumerate(NAVIGATION_SHORTCUTS)
     }
 
+    # First-seen indices preserve collect_menu_entries / menu-bar order.
+    category_order: Dict[str, int] = {}
+    menu_order: Dict[str, int] = {}
+    for index, entry in enumerate(entries):
+        if entry.category == "Navigation" or entry.is_navigation:
+            continue
+        if entry.category not in category_order:
+            category_order[entry.category] = index
+        binding_id = entry.binding_id or make_binding_id(entry.category, entry.action)
+        if binding_id not in menu_order:
+            menu_order[binding_id] = index
+
     def _sort_key(e: ShortcutEntry) -> tuple:
+        binding_id = e.binding_id or make_binding_id(e.category, e.action)
         if e.category == "Navigation" or e.is_navigation:
             return (
                 0,
-                navigation_order.get(e.binding_id or make_binding_id(e.category, e.action), 10_000),
+                navigation_order.get(binding_id, 10_000),
                 e.action.lower(),
             )
-        return (1, e.category.lower(), e.action.lower(), e.shortcut.lower())
+        return (
+            1,
+            category_order.get(e.category, 10_000),
+            menu_order.get(binding_id, 10_000),
+            e.action.lower(),
+        )
 
     return sorted(entries, key=_sort_key)
 

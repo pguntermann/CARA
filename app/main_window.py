@@ -2165,6 +2165,21 @@ class MainWindow(QMainWindow):
             "Shift+Right",
             self._navigate_to_end,
         )
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Jump to next Blunder"),
+            "",
+            self._navigate_to_next_blunder,
+        )
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Jump to next Miss"),
+            "",
+            self._navigate_to_next_miss,
+        )
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Jump to next Blunder/Miss"),
+            "",
+            self._navigate_to_next_blunder_or_miss,
+        )
 
         # Capture factory defaults, then apply any user overrides (live, no restart).
         KeyboardShortcutsService.get_instance().bind(self, self.shortcut_manager)
@@ -3621,6 +3636,35 @@ class MainWindow(QMainWindow):
             tab_widget = self.detail_panel.tab_widget
             if 0 <= index < tab_widget.count():
                 tab_widget.setCurrentIndex(index)
+
+    def _cycle_detail_tab(self, delta: int) -> None:
+        """Switch to the next or previous eligible detail panel tab (wraps).
+
+        Skips hidden or disabled tabs. No-op if none are eligible.
+        """
+        if not hasattr(self, "detail_panel") or not hasattr(self.detail_panel, "tab_widget"):
+            return
+        tab_widget = self.detail_panel.tab_widget
+        count = tab_widget.count()
+        if count <= 0 or delta == 0:
+            return
+
+        def _eligible(index: int) -> bool:
+            if hasattr(tab_widget, "isTabVisible") and not tab_widget.isTabVisible(index):
+                return False
+            if hasattr(tab_widget, "isTabEnabled") and not tab_widget.isTabEnabled(index):
+                return False
+            return True
+
+        current = tab_widget.currentIndex()
+        if current < 0:
+            current = 0
+        step = 1 if delta > 0 else -1
+        for offset in range(1, count + 1):
+            index = (current + step * offset) % count
+            if _eligible(index):
+                self._switch_detail_tab(index)
+                return
     
     def _on_detail_tab_changed(self, index: int) -> None:
         """Handle detail panel tab change to update View menu checkmarks.
@@ -3675,6 +3719,28 @@ class MainWindow(QMainWindow):
         """Jump to the last mainline ply of the active game."""
         game_controller = self.controller.get_game_controller()
         game_controller.navigate_to_end()
+
+    def _navigate_to_next_blunder(self) -> None:
+        """Jump to the next analyzed Blunder on the mainline."""
+        self._navigate_to_next_assessment({"Blunder"})
+
+    def _navigate_to_next_miss(self) -> None:
+        """Jump to the next analyzed Miss on the mainline."""
+        self._navigate_to_next_assessment({"Miss"})
+
+    def _navigate_to_next_blunder_or_miss(self) -> None:
+        """Jump to the next analyzed Blunder or Miss on the mainline."""
+        self._navigate_to_next_assessment({"Blunder", "Miss"})
+
+    def _navigate_to_next_assessment(self, labels: set[str]) -> None:
+        """Jump forward to the next mainline ply with an assessment in ``labels``."""
+        if not hasattr(self, "detail_panel") or not hasattr(self.detail_panel, "moveslist_model"):
+            return
+        moveslist_model = self.detail_panel.moveslist_model
+        if moveslist_model is None:
+            return
+        game_controller = self.controller.get_game_controller()
+        game_controller.navigate_to_next_assessment(moveslist_model, labels)
 
     def _navigate_to_previous_game(self) -> None:
         """Load the previous game in the current database list order."""

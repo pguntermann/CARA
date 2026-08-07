@@ -348,6 +348,25 @@ class MovesListModel(QAbstractTableModel):
         if ply_index % 2 == 1:
             return (move.assess_white or "").strip() or None
         return (move.assess_black or "").strip() or None
+
+    def find_next_ply_with_assessment(
+        self,
+        from_ply: int,
+        labels: frozenset[str] | set[str],
+    ) -> Optional[int]:
+        """Return the next mainline ply after ``from_ply`` whose assessment is in ``labels``.
+
+        Exact string match (e.g. ``\"Blunder\"``, ``\"Miss\"``). Does not wrap.
+        """
+        if not labels:
+            return None
+        last_ply = len(self._moves) * 2
+        start = max(0, int(from_ply)) + 1
+        for ply in range(start, last_ply + 1):
+            assess = self.get_assessment_for_ply(ply)
+            if assess is not None and assess in labels:
+                return ply
+        return None
     
     def set_active_move_ply(self, ply_index: int) -> None:
         """Set the active move ply index for highlighting.

@@ -388,6 +388,26 @@ class GameController:
             return self.navigate_to_ply(last_ply)
         except Exception:
             return False
+
+    def navigate_to_next_assessment(
+        self,
+        moveslist_model: MovesListModel,
+        labels: frozenset[str] | set[str],
+    ) -> bool:
+        """Jump to the next mainline ply with an assessment in ``labels``.
+
+        Requires analyzed move assessments on ``moveslist_model``. No wrap.
+        """
+        if self.game_model.active_game is None:
+            return False
+        next_ply = moveslist_model.find_next_ply_with_assessment(
+            self.game_model.get_active_move_ply(),
+            labels,
+        )
+        if next_ply is None:
+            return False
+        self._clear_rejoin_mainline_arm()
+        return self.navigate_to_ply(next_ply)
     
     def navigate_to_ply(self, ply_index: int) -> bool:
         """Navigate to a specific mainline ply index in the active game.

@@ -75,6 +75,18 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
     mw.view_notes_action.triggered.connect(lambda: mw._switch_detail_tab(8))
     view_menu.addAction(mw.view_notes_action)
 
+    mw.view_previous_detail_tab_action = QAction("Previous detail tab", mw)
+    mw.view_previous_detail_tab_action.triggered.connect(
+        lambda: mw._cycle_detail_tab(-1)
+    )
+    view_menu.addAction(mw.view_previous_detail_tab_action)
+
+    mw.view_next_detail_tab_action = QAction("Next detail tab", mw)
+    mw.view_next_detail_tab_action.triggered.connect(
+        lambda: mw._cycle_detail_tab(1)
+    )
+    view_menu.addAction(mw.view_next_detail_tab_action)
+
     view_menu.addSeparator()
 
     mw.view_hide_database_panel_action = QAction("Hide Database Panel", mw)
