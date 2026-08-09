@@ -50,6 +50,11 @@ def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
     mw.configure_classification_action.triggered.connect(mw._open_classification_settings)
     game_analysis_menu.addAction(mw.configure_classification_action)
 
+    mw.manage_highlight_rules_action = QAction("Manage Game Highlight Rules...", mw)
+    mw.manage_highlight_rules_action.setMenuRole(QAction.MenuRole.NoRole)
+    mw.manage_highlight_rules_action.triggered.connect(mw._open_manage_highlight_rules)
+    game_analysis_menu.addAction(mw.manage_highlight_rules_action)
+
     game_analysis_menu.addSeparator()
 
     mw.normalized_graph_action = QAction("Normalized Evaluation Graph", mw)

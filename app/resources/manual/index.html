@@ -2428,30 +2428,33 @@
                 <h5 id="classification-settings">6.7.4 Configure Classification Settings...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+K</code> / <code>⌘+Shift+K</code></p>
                 <p>Opens a dialog to customize the thresholds used for move classification (Brilliant, Best Move, Good Move, Inaccuracy, Mistake, Blunder). These thresholds determine how moves are categorized based on Centipawn Loss (CPL) values. The dialog also includes settings for brilliancy detection, including shallow depth ranges, minimum agreement requirements, and candidate move selection. See <a href="#analysis-results">section 5.5.2</a> for more information about move classifications and <a href="#brilliant-move-detection">section 5.5.3</a> for details on brilliancy detection.</p>
+
+                <h5 id="manage-game-highlight-rules">6.7.5 Manage Game Highlight Rules...</h5>
+                <p>Opens a dialog to control which game-highlight detection rules are active, which game phases each rule may fire in, and their relative priority. The same dialog includes highlights composition settings (limits per phase and per move, and related ranking options).</p>
                 
-                <h5>6.7.5 Normalized Evaluation Graph</h5>
+                <h5>6.7.6 Normalized Evaluation Graph</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+N</code> / <code>⌘+Shift+N</code></p>
                 <p>Toggles the normalized evaluation graph display mode in the Moves List. When enabled, evaluation values are normalized to a scale that better highlights relative evaluation changes throughout the game, making it easier to identify critical moments and evaluation swings.</p>
                 
-                <h5>6.7.6 Brilliant Move Detection</h5>
+                <h5>6.7.7 Brilliant Move Detection</h5>
                 <p>Toggles whether CARA performs brilliancy detection after initial game analysis. When enabled, CARA analyzes candidate moves at shallow engine depths to identify exceptional moves that appear suboptimal at shallow depths but are actually strong when analyzed more deeply. This detection step runs automatically after the main analysis completes. See <a href="#brilliant-move-detection">section 5.5.3</a> for a detailed explanation of how brilliancy detection works.</p>
 
-                <h5>6.7.7 Auto Tag Games</h5>
-                <p>Toggles whether CARA performs <a href="#auto-tagging">auto-tagging</a> after analysis completes. When enabled, CARA may assign <a href="#game-tagging">game tags</a> according to the rules described in <a href="#auto-tagging">section 5.5.5</a> and the tags you allow under <span class="menu-item">Select Tags for Auto-Tagging</span> (see <a href="#select-tags-auto-tagging">section 6.7.8</a>). When disabled, no automatic game tags are applied by this feature.</p>
+                <h5>6.7.8 Auto Tag Games</h5>
+                <p>Toggles whether CARA performs <a href="#auto-tagging">auto-tagging</a> after analysis completes. When enabled, CARA may assign <a href="#game-tagging">game tags</a> according to the rules described in <a href="#auto-tagging">section 5.5.5</a> and the tags you allow under <span class="menu-item">Select Tags for Auto-Tagging</span> (see <a href="#select-tags-auto-tagging">section 6.7.9</a>). When disabled, no automatic game tags are applied by this feature.</p>
                 
-                <h5 id="select-tags-auto-tagging">6.7.8 Select Tags for Auto-Tagging</h5>
+                <h5 id="select-tags-auto-tagging">6.7.9 Select Tags for Auto-Tagging</h5>
                 <p>Opens a submenu with a checkable entry for each supported auto-tag (see the table in <a href="#auto-tagging">section 5.5.5</a>). Only checked tags can be added or refreshed by auto-tagging; unchecked rules are skipped. Your selection is saved with your user preferences. This submenu is disabled while <span class="menu-item">Auto Tag Games</span> is turned off.</p>
                 
-                <h5>6.7.9 Return to PLY 0 after analysis completes</h5>
+                <h5>6.7.10 Return to PLY 0 after analysis completes</h5>
                 <p>Toggles whether CARA automatically navigates to the starting position (PLY 0) when analysis completes. When enabled, the board and Moves List automatically return to PLY 0 after analysis finishes.</p>
                 
-                <h5>6.7.10 Switch to Moves List at the start of Analysis</h5>
+                <h5>6.7.11 Switch to Moves List at the start of Analysis</h5>
                 <p>Toggles whether CARA automatically switches to the Moves List tab when analysis begins. This is enabled by default, ensuring you can immediately see analysis results as they are generated.</p>
                 
-                <h5>6.7.11 Switch to Game Summary after Analysis</h5>
+                <h5>6.7.12 Switch to Game Summary after Analysis</h5>
                 <p>Toggles whether CARA automatically switches to the Game Summary tab when analysis completes. When enabled, you are taken directly to the condensed overview of key game moments and statistics after analysis finishes.</p>
                 
-                <h5>6.7.12 Store Analysis results in PGN Tag</h5>
+                <h5>6.7.13 Store Analysis results in PGN Tag</h5>
                 <p>Toggles whether analysis results (evaluations, CPL values, move classifications) are saved in a PGN metadata tag for persistence across sessions. When enabled, analysis data is serialized and stored in the game's PGN, allowing you to preserve analysis results even after closing and reopening the database.</p>
             </div>
 

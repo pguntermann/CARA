@@ -6235,6 +6235,186 @@
           }
         }
       },
+
+      "manage_game_highlight_rules": {
+        "window_title": "Manage Game Highlight Rules",
+        "width": 780,
+        "height": 560,
+        "minimum_width": 720,
+        "minimum_height": 520,
+        "bottom_button_top_padding": 50,
+        "priority_min": 0,
+        "priority_max": 100,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "layout": {
+          "spacing": 10,
+          "composition_section_top_spacing": 14,
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ]
+        },
+        "filter": {
+          "placeholder": "Filter by category or rule…",
+          "minimum_height": 28
+        },
+        "status": {
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_4"
+          }
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          }
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "focus_border_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ]
+        },
+        "table": {
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_3"
+          },
+          "alternate_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_4"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BORDER"
+          },
+          "border_radius": 3,
+          "header_background_color": {
+            "$ref": "$_COLOR_TABLE_HEADER_BACKGROUND"
+          },
+          "header_text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "selection_background_color": {
+            "$ref": "$_COLOR_ACTIVE_MOVE_BACKGROUND"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_NEAR_BLACK"
+          },
+          "hover_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_6"
+          },
+          "hover_text_color": {
+            "$ref": "$_COLOR_TEXT_5"
+          },
+          "item_padding": 5,
+          "header_padding": 5,
+          "enabled_column_width": 80,
+          "category_column_width": 150,
+          "priority_column_width": 90,
+          "phase_column_width": 90,
+          "row_height": 28,
+          "alternating_row_colors": true,
+          "header_section_border": true
+        },
+        "groups": {
+          "title_font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "title_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "title_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "margin_top": 4,
+          "padding_top": 4,
+          "title_left": 10,
+          "title_padding": [
+            0,
+            5
+          ],
+          "content_margins": [
+            10,
+            14,
+            10,
+            10
+          ]
+        },
+        "fields": {
+          "input_width": 56,
+          "label_width": 120,
+          "spacing": 16,
+          "row_spacing": 8,
+          "column_gap": 40,
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          }
+        },
+        "output": {
+          "section_title": "Highlights composition settings",
+          "max_per_phase_label": "Max per phase",
+          "max_per_move_label": "Max per move",
+          "cross_phase_penalty_label": "Priority penalty",
+          "cross_phase_min_label": "Min. highlights"
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "action_width": 140,
+          "height": 30,
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
+        }
+      },
+
       "add_tag_dialog": {
         "width": 420,
         "bottom_button_top_padding": 50,

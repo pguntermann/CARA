@@ -1,10 +1,11 @@
 """Base rule interface for game highlight detection rules."""
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Set
 from dataclasses import dataclass
 
 from app.models.moveslist_model import MoveData
+from app.services.game_highlights.rule_catalog import ALL_PHASES
 
 
 @dataclass
@@ -69,6 +70,18 @@ class HighlightRule(ABC):
         self.enabled = config.get('enabled', True)
         self.name = config.get('name', self.__class__.__name__)
         self.description = config.get('description', '')
+        phases = config.get('phases', ALL_PHASES)
+        if isinstance(phases, (list, tuple, set)) and phases:
+            self.allowed_phases: Set[str] = {str(p) for p in phases}
+        else:
+            self.allowed_phases = set(ALL_PHASES)
+        raw_priority = config.get('priority_override', None)
+        try:
+            self.priority_override: Optional[int] = (
+                int(raw_priority) if raw_priority is not None else None
+            )
+        except (TypeError, ValueError):
+            self.priority_override = None
     
     @abstractmethod
     def evaluate(self, move: MoveData, context: RuleContext) -> List[GameHighlight]:

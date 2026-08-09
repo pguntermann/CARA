@@ -4577,6 +4577,15 @@ class MainWindow(QMainWindow):
             self
         )
         dialog.exec()
+
+    def _open_manage_highlight_rules(self) -> None:
+        """Open the manage game highlight rules dialog."""
+        from app.views.dialogs.manage_game_highlight_rules_dialog import (
+            ManageGameHighlightRulesDialog,
+        )
+
+        dialog = ManageGameHighlightRulesDialog(self.config, parent=self)
+        dialog.exec()
     
     def _on_game_analysis_started(self) -> None:
         """Handle game analysis started signal."""

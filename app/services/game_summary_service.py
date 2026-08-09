@@ -428,13 +428,27 @@ class GameSummaryService:
         # Use new highlight detector
         from app.services.game_highlights.rule_registry import RuleRegistry
         from app.services.game_highlights.highlight_detector import HighlightDetector
+        from app.services.game_highlight_rules_service import GameHighlightRulesService
         
         highlights_config = self.config.get('ui', {}).get('panels', {}).get('detail', {}).get('summary', {}).get('highlights', {})
-        rule_config = highlights_config.get('rules', {})
+        rules_service = GameHighlightRulesService.get_instance()
+        rule_config = rules_service.build_registry_config(
+            highlights_config.get('rules', {})
+        )
+        composer = rules_service.get_composer_settings(
+            default_max_per_phase=self.highlights_per_phase_limit
+        )
         
         rule_registry = RuleRegistry({'rules': rule_config})
         highlight_detector = HighlightDetector(
-            {'highlights_per_phase_limit': self.highlights_per_phase_limit}, 
+            {
+                'highlights_per_phase_limit': composer.max_per_phase,
+                'max_per_move': composer.max_per_move,
+                'phase_dedupe_enabled': composer.phase_dedupe_enabled,
+                'cross_phase_penalty_enabled': composer.cross_phase_penalty_enabled,
+                'cross_phase_penalty': composer.cross_phase_penalty,
+                'cross_phase_penalty_min_highlights': composer.cross_phase_penalty_min_highlights,
+            },
             rule_registry,
             good_move_max_cpl=self.good_move_max_cpl,
             inaccuracy_max_cpl=self.inaccuracy_max_cpl,

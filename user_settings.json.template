@@ -884,6 +884,11 @@
       "exclude_already_winning_threshold_cpl": 600
     }
   },
+  "game_highlight_rules": {
+    "overrides": {},
+    "priority_order": [],
+    "composer": {}
+  },
   "manual_analysis": {
     "max_pieces_to_explore": 3,
     "max_exploration_depth": 3,

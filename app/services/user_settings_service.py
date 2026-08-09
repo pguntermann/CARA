@@ -623,6 +623,14 @@ class UserSettingsService:
         """Replace keyboard shortcut preferences in memory (persisted on exit)."""
         self.get_model().set_keyboard_shortcuts(settings)
 
+    def get_game_highlight_rules(self) -> Dict[str, Any]:
+        """Return game highlight rule preferences (overrides map)."""
+        return self.get_model().get_game_highlight_rules()
+
+    def update_game_highlight_rules(self, settings: Dict[str, Any]) -> None:
+        """Replace game highlight rule preferences in memory (persisted on exit)."""
+        self.get_model().set_game_highlight_rules(settings)
+
     def get_recent_pgn_databases(self) -> list:
         """Return recent PGN database paths (most recent first)."""
         return self.get_model().get_recent_pgn_databases()
