@@ -272,51 +272,24 @@ class DecoyRule(HighlightRule):
             if own_capture or material_sacrificed <= 0:
                 return highlights
             
-            # Case 1: Opponent captured on same move
-            if opponent_capture:
+            # Case 1: Opponent captured on the same move number.
+            # Only valid for White: White moves first, so Black can capture the decoyed
+            # piece on the same move. For Black, White's capture on this move happened
+            # before Black moved and cannot be a response to Black's current half-move.
+            if opponent_capture and is_white:
                 captured_value = PIECE_VALUES.get(opponent_capture.lower(), 0)
-                
-                # Check if opponent's material increased (they gained from capturing)
-                # If opponent's material increased by approximately the captured value, they captured something we moved there
-                # (e.g., we moved a piece there and they captured it - this is a non-capture sacrifice/decoy)
-                # If opponent's material didn't increase, they captured something we already had (not a decoy)
-                opponent_material_change = 0
-                if is_white:
-                    opponent_material_change = move.black_material - context.prev_black_material
-                else:
-                    opponent_material_change = move.white_material - context.prev_white_material
-                
-                # If opponent's material increased, they captured something we moved there (decoy)
-                # If opponent's material decreased, they captured something we already had (not a decoy)
-                # If opponent's material stayed same, check if we moved to the capture square
+
+                # Non-capture decoy: we moved onto a square and opponent captured there.
+                # Require matching destination squares — do not infer from material alone
+                # (material can change for unrelated reasons on the same move row).
                 is_non_capture_sacrifice = False
-                if opponent_material_change > 0:
+                our_dest = parse_destination_square(move.white_move)
+                opp_dest = parse_destination_square(move.black_move)
+                if our_dest is not None and opp_dest is not None and our_dest == opp_dest:
                     is_non_capture_sacrifice = True
-                elif opponent_material_change == 0:
-                    # Material tracking might not reflect capture immediately
-                    # Check if material_sacrificed matches captured_value (we lost what they captured)
-                    # AND verify from move notation that we moved a piece to the capture square
-                    if abs(material_sacrificed - captured_value) <= 50:
-                        # Try to verify from move notation: did we move to the square that got captured?
-                        if is_white:
-                            our_move = move.white_move
-                            opp_move = move.black_move
-                        else:
-                            our_move = move.black_move
-                            opp_move = move.white_move
-                        
-                        # Extract destination square from our move and opponent's capture
-                        dest_square = parse_destination_square(our_move)
-                        opp_dest_square = parse_destination_square(opp_move)
-                        
-                        # If we moved to the same square that opponent captured, it's a decoy
-                        if dest_square and opp_dest_square and dest_square == opp_dest_square:
-                            is_non_capture_sacrifice = True
-                
+
                 if is_non_capture_sacrifice:
                     # Non-capture sacrifice: we moved a piece that opponent captured
-                    # The material_sacrificed is what we lost (the piece we moved)
-                    # Net material loss = what we lost (since opponent didn't lose anything, or even gained)
                     net_material_loss = material_sacrificed
                     if net_material_loss >= MATERIAL_SACRIFICE_THRESHOLD and cpl < context.good_move_max_cpl:
                         highlight = self._check_true_sacrifice_decoy(
@@ -359,9 +332,11 @@ class DecoyRule(HighlightRule):
                     )
                     if highlight:
                         highlights.append(highlight)
-                    return highlights
-            
-            # Case 2: No opponent capture on same move - check next move
+                return highlights
+
+            # Case 2: check whether the opponent captures our piece on the next move.
+            # (For Black, a White capture on this same move number is ignored above — it
+            # happened before Black moved and is not a decoy response.)
             if material_sacrificed < MATERIAL_SACRIFICE_THRESHOLD or cpl >= context.good_move_max_cpl:
                 return highlights
             
@@ -372,6 +347,17 @@ class DecoyRule(HighlightRule):
                     opponent_move = next_move
             
             if opponent_move:
+                # Require the capture square to match our destination (they took the
+                # piece we just moved, not some unrelated piece).
+                if is_white:
+                    our_dest = parse_destination_square(move.white_move)
+                    opp_dest = parse_destination_square(opponent_move.black_move)
+                else:
+                    our_dest = parse_destination_square(move.black_move)
+                    opp_dest = parse_destination_square(opponent_move.white_move)
+                if our_dest is None or opp_dest is None or our_dest != opp_dest:
+                    return highlights
+
                 opponent_captured_value = PIECE_VALUES.get(
                     (opponent_move.black_capture if is_white else opponent_move.white_capture).lower(), 0
                 )

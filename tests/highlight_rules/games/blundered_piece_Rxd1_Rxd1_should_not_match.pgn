@@ -1,0 +1,21 @@
+[Event "Highlight rule review: blundered_piece"]
+[Site "CARA"]
+[Date "2026.08.09"]
+[Round "-"]
+[White "Review"]
+[Black "Review"]
+[Result "*"]
+[Annotator "CARA highlight-rules"]
+[Rule "blundered_piece"]
+[Expectation "should_not_match"]
+[TriggerMove "28...Rxd1"]
+[RecaptureMove "29. Rxd1"]
+[Side "both"]
+[Piece "rook"]
+[Comment "delayed equal rook exchange across move rows: Black takes White's rook (28...Rxd1); White recaptures on the next move (29.Rxd1). Both sides are down one rook — not a hung-rook blunder for either side. After Game Analysis, blundered_piece should NOT fire on 28. Be1 / 28...Rxd1 / 29. Rxd1."]
+
+1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Ndb5 Bb4 7. a3 Bxc3+ 8.
+Nxc3 d5 9. Bd3 O-O 10. O-O d4 11. Na4 e5 12. Nc5 b6 13. Bb5 Bd7 14. Nxd7 Qxd7
+15. Qe2 Ne8 16. Bg5 f6 17. Bd2 Nd6 18. Ba4 Rab8 19. Rfd1 b5 20. Bxb5 Nxb5 21.
+Qc4+ Kh8 22. Rab1 Nd6 23. Qd5 Rfd8 24. b4 Nb7 25. Qc4 d3 26. cxd3 Qxd3 27. Qxc6
+Qxa3 28. Be1 Rxd1 29. Rxd1 *

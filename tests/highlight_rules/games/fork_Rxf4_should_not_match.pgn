@@ -1,0 +1,19 @@
+[Event "Highlight rule review: fork"]
+[Site "CARA"]
+[Date "2026.08.09"]
+[Round "-"]
+[White "Review"]
+[Black "Review"]
+[Result "*"]
+[Annotator "CARA highlight-rules"]
+[Rule "fork"]
+[Expectation "should_not_match"]
+[TriggerMove "27...Rxf4+"]
+[Side "black"]
+[Comment "Rxf4+ takes a free pawn with check, but afterward the rook only attacks the king — that is not a fork (a fork must attack two pieces at once after the move). After Game Analysis, fork should NOT fire on 27...Rxf4+."]
+
+1. e4 c5 2. c3 Nf6 3. e5 Nd5 4. d4 cxd4 5. Nf3 Nc6 6. cxd4 e6 7. Bc4 Bb4+ 8.
+Nc3 Nxc3 9. Qd3 Nd5+ 10. Bd2 Bxd2+ 11. Qxd2 Nb6 12. Bb5 a6 13. Bxc6 f6 14.
+Be4 d5 15. O-O dxe4 16. Ne1 Nd5 17. Rc1 O-O 18. f3 Bd7 19. fxe4 fxe5 20. exd5
+Rxf1+ 21. Kxf1 e4 22. Qf4 Qf6 23. g3 Qxf4+ 24. gxf4 Rf8 25. Rc7 Bb5+ 26. Kf2
+exd5 27. Rxb7 Rxf4+ *

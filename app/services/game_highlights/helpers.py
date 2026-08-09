@@ -460,77 +460,32 @@ def check_tactical_pattern_on_follow_up_moves(board_after_capture: chess.Board,
         if board_after_follow_up.is_checkmate():
             if target_piece.piece_type == chess.KING:
                 return "checkmate"
-        
-        # Check if this move gives check and leads to material gain
-        # This handles cases like Rxe8+ where check wins material (e.g., captures a piece)
-        # For a decoy, we need to verify the check leads to a net material win by looking forward
-        if board_after_follow_up.is_check():
-            # Check material change on this move
+
+        # Check that captures material (e.g. Rxe8+ after a decoy): require an actual
+        # capture, not a bare check that merely happens while an unrelated piece is
+        # undefended (that mislabels mating nets as "fork").
+        if board_after_follow_up.is_check() and "x" in (move_san or ""):
             material_gain_this_move = 0
             if material_before is not None and material_after is not None:
                 material_gain_this_move = material_after - material_before
-            
-            # IMPORTANT: For a decoy, the check might capture material on the same move
-            # This is the case for Rxe8+ where the check itself captures the knight
-            # We should check if material increased on this move (indicating a capture)
             if material_gain_this_move >= MIN_VALUABLE_PIECE_VALUE:
-                return "fork"  # Generic "tactical pattern" for check+material gain
-            
-            # Also check if the move is a capture (indicated by 'x' in SAN)
-            # For a decoy, a check that captures material is profitable
-            # We check the board directly to verify a capture occurred, since material tracking
-            # might not be accurate or updated immediately
-            if "x" in move_san:
-                # Check if material increased (if tracking is accurate)
-                if material_before is not None and material_after is not None:
-                    if material_after - material_before >= 200:
-                        return "fork"  # Generic "tactical pattern" for check+capture
-                
-                # Even if material tracking doesn't show an increase, a check+capture is likely profitable
-                # This handles cases where material tracking is delayed or inaccurate
-                # For decoy purposes, if we have check + capture notation, it's a profitable tactical pattern
-                return "fork"  # Generic "tactical pattern" for check+capture
-            
-            # Look at the next move to see if material was gained (opponent's response)
-            # For a decoy, the check should lead to material gain after opponent responds
-            if i + 1 < len(follow_up_moves):
-                next_move = follow_up_moves[i + 1]
-                if color == chess.WHITE:
-                    material_after_next = next_move.white_material
-                else:
-                    material_after_next = next_move.black_material
-                
-                # Calculate net material gain after opponent's response
-                net_material_gain = material_after_next - material_before if material_before is not None else 0
-                
-                # If we gained material after the check sequence, it's profitable
+                return "fork"
+            # Capture+check is still a real tactical follow-up even if material
+            # fields are briefly stale.
+            return "fork"
+
+        # Check that leads to a clear material gain on the next ply
+        if board_after_follow_up.is_check() and i + 1 < len(follow_up_moves):
+            next_move = follow_up_moves[i + 1]
+            if color == chess.WHITE:
+                material_after_next = next_move.white_material
+            else:
+                material_after_next = next_move.black_material
+            if material_before is not None and material_after_next is not None:
+                net_material_gain = material_after_next - material_before
                 if net_material_gain >= MIN_VALUABLE_PIECE_VALUE:
-                    return "fork"  # Generic "tactical pattern" for check+material gain
-            
-            # Also check if target piece becomes vulnerable (undefended) after the check
-            target_after = board_after_follow_up.piece_at(target_square)
-            if target_after and target_after.color == opponent_color:
-                # Check if target is now undefended (can be captured)
-                if not board_after_follow_up.is_attacked_by(opponent_color, target_square):
-                    # Target is undefended - verify we can attack it or will gain material
-                    # For a decoy, if check + target is undefended, it's likely profitable
-                    if target_value >= MIN_VALUABLE_PIECE_VALUE:
-                        # Look ahead one more move to see if we capture it
-                        if i + 1 < len(follow_up_moves):
-                            next_move = follow_up_moves[i + 1]
-                            if color == chess.WHITE:
-                                material_after_next = next_move.white_material
-                            else:
-                                material_after_next = next_move.black_material
-                            
-                            net_gain = material_after_next - material_before if material_before is not None else 0
-                            if net_gain >= target_value - 200:  # Allow some tolerance
-                                return "fork"  # Generic tactical pattern
-                        else:
-                            # No next move, but check + undefended valuable piece is likely profitable
-                            if target_value >= MIN_VALUABLE_PIECE_VALUE:
-                                return "fork"  # Generic tactical pattern
-    
+                    return "fork"
+
     return None
 
 

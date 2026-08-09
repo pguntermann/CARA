@@ -1,0 +1,18 @@
+[Event "Highlight rule review: blundered_piece"]
+[Site "CARA"]
+[Date "2026.08.09"]
+[Round "-"]
+[White "Review"]
+[Black "Review"]
+[Result "*"]
+[Annotator "CARA highlight-rules"]
+[Rule "blundered_piece"]
+[Expectation "should_not_match"]
+[TriggerMove "8. Qxd8+"]
+[RecaptureMove "8...Kxd8"]
+[Side "both"]
+[Piece "queen"]
+[Comment "Equal queen trade: White captures Black's queen with check; Black immediately recaptures with the king. Neither side hangs a queen for free. After Game Analysis, blundered_piece should NOT fire on 8. Qxd8+ / 8...Kxd8."]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. d4 Nd6 6. Bxc6 dxc6 7. dxe5 Nf5
+8. Qxd8+ Kxd8 *

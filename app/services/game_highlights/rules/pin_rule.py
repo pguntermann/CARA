@@ -43,7 +43,12 @@ class PinRule(HighlightRule):
                                 move.white_move, board_before, board_after, chess.WHITE
                             )
                             if moved_piece_square is not None:
-                                pinned_square = self._find_pinned_piece(board_after, moved_piece_square, chess.WHITE)
+                                pinned_square = self._find_new_pin(
+                                    board_before,
+                                    board_after,
+                                    moved_piece_square,
+                                    chess.WHITE,
+                                )
                                 if pinned_square is not None:
                                     highlights.append(GameHighlight(
                                         move_number=move_num,
@@ -72,7 +77,12 @@ class PinRule(HighlightRule):
                                 move.black_move, board_before, board_after, chess.BLACK
                             )
                             if moved_piece_square is not None:
-                                pinned_square = self._find_pinned_piece(board_after, moved_piece_square, chess.BLACK)
+                                pinned_square = self._find_new_pin(
+                                    board_before,
+                                    board_after,
+                                    moved_piece_square,
+                                    chess.BLACK,
+                                )
                                 if pinned_square is not None:
                                     highlights.append(GameHighlight(
                                         move_number=move_num,
@@ -87,6 +97,33 @@ class PinRule(HighlightRule):
         
         return highlights
     
+    def _find_new_pin(
+        self,
+        board_before: chess.Board,
+        board_after: chess.Board,
+        attacker_square: chess.Square,
+        attacker_color: chess.Color,
+    ) -> Optional[chess.Square]:
+        """Find a pin created by this move that did not already exist before it.
+
+        Skips cases where the opponent walked into an existing ray (e.g. Ke4 into
+        Bc6's diagonal) and the mover only slides along the same pin line (Bb7).
+        """
+        pinned_square = self._find_pinned_piece(
+            board_after, attacker_square, attacker_color
+        )
+        if pinned_square is None:
+            return None
+        opponent_color = (
+            chess.BLACK if attacker_color == chess.WHITE else chess.WHITE
+        )
+        # Same enemy unit was already pinned before this half-move.
+        if board_before.piece_at(pinned_square) is not None and board_before.is_pinned(
+            opponent_color, pinned_square
+        ):
+            return None
+        return pinned_square
+
     def _find_moved_piece_square(self, move_san: str, board_before: chess.Board, 
                                  board_after: chess.Board, color: chess.Color) -> Optional[chess.Square]:
         """Find the square of the piece that moved.

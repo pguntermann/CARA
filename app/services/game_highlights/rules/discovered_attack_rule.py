@@ -13,6 +13,15 @@ class DiscoveredAttackRule(HighlightRule):
     
     # Minimum value of target piece for a meaningful discovered attack
     MIN_TARGET_PIECE_VALUE = 300
+
+    PIECE_NAMES = {
+        "p": "pawn",
+        "n": "knight",
+        "b": "bishop",
+        "r": "rook",
+        "q": "queen",
+        "k": "king",
+    }
     
     def evaluate(self, move, context: RuleContext) -> List[GameHighlight]:
         """Evaluate move for discovered attack highlights.
@@ -85,7 +94,9 @@ class DiscoveredAttackRule(HighlightRule):
                                     target_piece, is_check, target_value, is_undefended = discovered_info
                                     # Verify discovered attack is meaningful: require target >=300cp AND (undefended OR check)
                                     if target_piece and target_value >= self.MIN_TARGET_PIECE_VALUE and (is_undefended or is_check):
-                                        piece_name = target_piece.capitalize() if target_piece != "p" else "pawn"
+                                        piece_name = self.PIECE_NAMES.get(
+                                            target_piece.lower(), target_piece
+                                        )
                                         if is_check:
                                             description = f"White performed a discovered attack on Black's king"
                                             priority = 45
@@ -124,7 +135,9 @@ class DiscoveredAttackRule(HighlightRule):
                                     target_piece, is_check, target_value, is_undefended = discovered_info
                                     # Verify discovered attack is meaningful: require target >=300cp AND (undefended OR check)
                                     if target_piece and target_value >= self.MIN_TARGET_PIECE_VALUE and (is_undefended or is_check):
-                                        piece_name = target_piece.capitalize() if target_piece != "p" else "pawn"
+                                        piece_name = self.PIECE_NAMES.get(
+                                            target_piece.lower(), target_piece
+                                        )
                                         if is_check:
                                             description = f"Black performed a discovered attack on White's king"
                                             priority = 45
@@ -229,260 +242,131 @@ class DiscoveredAttackRule(HighlightRule):
     def _has_discovered_attack(self, board_before: chess.Board, board_after: chess.Board,
                               moved_piece_square: chess.Square, color: chess.Color) -> Optional[Tuple[str, bool, int, bool]]:
         """Check if moving a piece creates a discovered attack.
-        
-        Args:
-            board_before: Board position before the move.
-            board_after: Board position after the move.
-            moved_piece_square: Square of the piece after it moved.
-            color: Color of the moving side.
-        
+
+        A discovered attack occurs when the moved piece was blocking a friendly
+        sliding piece (R/B/Q) from attacking a valuable enemy piece, and after
+        the move the slider's path to that target is open.
+
         Returns:
-            Tuple of (target_piece_letter, is_check, target_value, is_undefended) if discovered attack found, None otherwise.
-            target_piece_letter: Letter of the piece being attacked (e.g., "q", "r", "k").
-            is_check: True if the discovered attack delivers check.
-            target_value: Value of the target piece in centipawns.
-            is_undefended: True if the target piece is undefended.
+            (target_piece_letter, is_check, target_value, is_undefended) or None.
         """
-        # Find the source square of the moved piece
-        source_square = self._find_source_square(moved_piece_square, board_before, board_after, color)
+        source_square = self._find_source_square(
+            moved_piece_square, board_before, board_after, color
+        )
         if source_square is None:
             return None
-        
-        # Check if there's a piece behind the source square that now attacks an enemy piece
+
+        # Moving along the discovery ray still leaves a blocker unless the piece
+        # leaves that ray entirely (classic discovered attack / discovered check).
         opponent_color = chess.BLACK if color == chess.WHITE else chess.WHITE
-        
-        # Calculate the direction of movement (from source to destination)
-        source_file = chess.square_file(source_square)
-        source_rank = chess.square_rank(source_square)
-        dest_file = chess.square_file(moved_piece_square)
-        dest_rank = chess.square_rank(moved_piece_square)
-        
-        move_df = dest_file - source_file
-        move_dr = dest_rank - source_rank
-        
-        # Only check the direction opposite to movement (behind the source square)
-        # Normalize direction to unit vector
-        if move_df != 0:
-            move_df = move_df // abs(move_df)
-        if move_dr != 0:
-            move_dr = move_dr // abs(move_dr)
-        
-        # Look behind the source square (opposite direction from movement)
-        # This is the direction where a piece might be that was blocked by the moved piece
-        behind_df = -move_df
-        behind_dr = -move_dr
-        
-        # Only check if there's actual movement (not a null move)
-        if behind_df == 0 and behind_dr == 0:
-            return False
-        
-        # Look along the "behind" direction for a sliding piece
-        for dist in range(1, 8):
-            file = source_file + behind_df * dist
-            rank = source_rank + behind_dr * dist
-            
-            if file < 0 or file > 7 or rank < 0 or rank > 7:
-                break
-            
-            sq = chess.square(file, rank)
-            sq_piece = board_before.piece_at(sq)
-            
-            if sq_piece is None:
-                continue
-            
-            if sq_piece.color != color:
-                # Enemy piece blocks the ray
-                break
-            
-            # Our piece found - check if it's a sliding piece that can now attack
-            if sq_piece.piece_type in [chess.ROOK, chess.BISHOP, chess.QUEEN]:
-                # Check if this direction is valid for the piece type
-                if sq_piece.piece_type == chess.ROOK and (behind_df != 0 and behind_dr != 0):
-                    continue
-                if sq_piece.piece_type == chess.BISHOP and (behind_df == 0 or behind_dr == 0):
-                    continue
-                
-                # CRITICAL: Verify that the moved piece was actually blocking an attack
-                # Check if the piece behind attacks a valuable piece AFTER the move
-                # AND that this attack was blocked by the moved piece BEFORE the move
-                attack_info = self._attacks_valuable_piece(board_after, sq, sq_piece.piece_type, opponent_color)
-                if attack_info:
-                    target_piece_letter, is_check, target_square = attack_info
-                    # Verify the attack was blocked before: check if there's a valuable piece
-                    # on the same line that the moved piece was blocking
-                    if self._was_attack_blocked(board_before, source_square, sq, sq_piece.piece_type, opponent_color, behind_df, behind_dr):
-                        # Get target value and check if undefended
-                        target_value = PIECE_VALUES.get(target_piece_letter, 0)
-                        if target_piece_letter == "k":
-                            target_value = 900  # King is special case
-                        is_undefended = not board_after.is_attacked_by(opponent_color, target_square) if target_square is not None else False
-                        # Additional meaningfulness check: ensure the discovered attack is meaningful
-                        if self._is_meaningful_discovered_attack(board_after, sq, target_piece_letter, opponent_color, is_check):
-                            return (target_piece_letter, is_check, target_value, is_undefended)
-        
-        return None
-    
-    def _attacks_valuable_piece(self, board: chess.Board, attacker_square: chess.Square,
-                               piece_type: chess.PieceType, opponent_color: chess.Color) -> Optional[Tuple[str, bool, chess.Square]]:
-        """Check if a piece attacks a valuable enemy piece.
-        
-        Args:
-            board: Board position.
-            attacker_square: Square of the attacking piece.
-            piece_type: Type of the attacking piece.
-            opponent_color: Color of the opponent.
-        
-        Returns:
-            Tuple of (target_piece_letter, is_check, target_square) if attacks valuable piece, None otherwise.
-            target_piece_letter: Letter of the piece being attacked (e.g., "q", "r", "k").
-            is_check: True if the attack delivers check.
-            target_square: Square of the target piece.
-        """
-        attacker_file = chess.square_file(attacker_square)
-        attacker_rank = chess.square_rank(attacker_square)
-        
         directions = [
-            (1, 0), (-1, 0), (0, 1), (0, -1),  # Rook directions
-            (1, 1), (1, -1), (-1, 1), (-1, -1)  # Bishop directions
+            (1, 0), (-1, 0), (0, 1), (0, -1),
+            (1, 1), (1, -1), (-1, 1), (-1, -1),
         ]
-        
+
         for df, dr in directions:
-            # Check if this direction is valid for the piece type
-            if piece_type == chess.ROOK and (df != 0 and dr != 0):
+            slider_piece, slider_sq = self._first_piece_on_ray(
+                board_before, source_square, df, dr
+            )
+            if (
+                slider_piece is None
+                or slider_sq is None
+                or slider_piece.color != color
+                or not self._slider_can_use_direction(slider_piece.piece_type, df, dr)
+            ):
                 continue
-            if piece_type == chess.BISHOP and (df == 0 or dr == 0):
+
+            target_piece, target_sq = self._first_piece_on_ray(
+                board_before, source_square, -df, -dr
+            )
+            if (
+                target_piece is None
+                or target_sq is None
+                or target_piece.color != opponent_color
+            ):
                 continue
-            
-            # Look along this ray for enemy pieces
-            for dist in range(1, 8):
-                file = attacker_file + df * dist
-                rank = attacker_rank + dr * dist
-                
-                if file < 0 or file > 7 or rank < 0 or rank > 7:
-                    break
-                
-                sq = chess.square(file, rank)
-                sq_piece = board.piece_at(sq)
-                
-                if sq_piece is None:
-                    continue
-                
-                if sq_piece.color == opponent_color:
-                    # Enemy piece found - check if it's valuable
-                    piece_letter = sq_piece.symbol().lower()
-                    piece_value = PIECE_VALUES.get(piece_letter, 0)
-                    is_check = (sq_piece.piece_type == chess.KING)
-                    # Check if it's valuable (>= 300cp) or if it's the king (check)
-                    if piece_value >= self.MIN_TARGET_PIECE_VALUE or is_check:
-                        return (piece_letter, is_check, sq)
-                    # Even if not valuable, this piece blocks the ray - can't attack beyond it
-                    break
-                else:
-                    # Our own piece blocks the ray
-                    break
-        
+
+            target_letter = target_piece.symbol().lower()
+            is_check = target_piece.piece_type == chess.KING
+            target_value = (
+                900 if is_check else PIECE_VALUES.get(target_letter, 0)
+            )
+            if target_value < self.MIN_TARGET_PIECE_VALUE and not is_check:
+                continue
+
+            # After the move the target must still be there and the ray open.
+            target_after = board_after.piece_at(target_sq)
+            if (
+                target_after is None
+                or target_after.color != opponent_color
+                or target_after.piece_type != target_piece.piece_type
+            ):
+                continue
+            if not self._ray_clear_between(board_after, slider_sq, target_sq):
+                continue
+
+            is_undefended = not board_after.is_attacked_by(opponent_color, target_sq)
+            if self._is_meaningful_discovered_attack(
+                board_after, slider_sq, target_letter, opponent_color, is_check
+            ):
+                return (target_letter, is_check, target_value, is_undefended)
+
         return None
-    
-    def _was_attack_blocked(self, board: chess.Board, blocker_square: chess.Square,
-                           attacker_square: chess.Square, piece_type: chess.PieceType,
-                           opponent_color: chess.Color, direction_df: int, direction_dr: int) -> bool:
-        """Check if the blocker was actually blocking an attack from the attacker.
-        
-        This verifies that the blocker is on the same line as the attacker's attack,
-        and that there's a valuable piece behind the blocker that the attacker can now reach.
-        
-        Args:
-            board: Board position before the move.
-            blocker_square: Square of the piece that was blocking (the moved piece).
-            attacker_square: Square of the piece that might have been blocked.
-            piece_type: Type of the attacking piece.
-            opponent_color: Color of the opponent.
-            direction_df: File direction from attacker to blocker (normalized).
-            direction_dr: Rank direction from attacker to blocker (normalized).
-        
-        Returns:
-            True if the blocker was actually blocking a valuable piece attack.
-        """
-        attacker_file = chess.square_file(attacker_square)
-        attacker_rank = chess.square_rank(attacker_square)
-        blocker_file = chess.square_file(blocker_square)
-        blocker_rank = chess.square_rank(blocker_square)
-        
-        # Verify blocker is on the same line as attacker in the given direction
-        # Calculate actual direction from attacker to blocker
-        att_to_block_df = blocker_file - attacker_file
-        att_to_block_dr = blocker_rank - attacker_rank
-        
-        # Normalize to unit vector
-        if att_to_block_df != 0:
-            att_to_block_df_norm = att_to_block_df // abs(att_to_block_df)
-        else:
-            att_to_block_df_norm = 0
-        if att_to_block_dr != 0:
-            att_to_block_dr_norm = att_to_block_dr // abs(att_to_block_dr)
-        else:
-            att_to_block_dr_norm = 0
-        
-        # Check if normalized direction matches the expected direction
-        if att_to_block_df_norm != direction_df or att_to_block_dr_norm != direction_dr:
-            return False
-        
-        # Check if direction is valid for piece type
-        if piece_type == chess.ROOK and (direction_df != 0 and direction_dr != 0):
-            return False
-        if piece_type == chess.BISHOP and (direction_df == 0 or direction_dr == 0):
-            return False
-        
-        # Continue past the blocker in the same direction to find the target
-        # The target should be behind the blocker, in the same direction as attacker->blocker
+
+    @staticmethod
+    def _slider_can_use_direction(piece_type: chess.PieceType, df: int, dr: int) -> bool:
+        if piece_type == chess.QUEEN:
+            return True
+        if piece_type == chess.ROOK:
+            return df == 0 or dr == 0
+        if piece_type == chess.BISHOP:
+            return df != 0 and dr != 0
+        return False
+
+    @staticmethod
+    def _first_piece_on_ray(
+        board: chess.Board,
+        start: chess.Square,
+        df: int,
+        dr: int,
+    ) -> Tuple[Optional[chess.Piece], Optional[chess.Square]]:
+        """Return the first piece along a ray from start (exclusive)."""
+        file0 = chess.square_file(start)
+        rank0 = chess.square_rank(start)
         for dist in range(1, 8):
-            file = blocker_file + direction_df * dist
-            rank = blocker_rank + direction_dr * dist
-            
+            file = file0 + df * dist
+            rank = rank0 + dr * dist
             if file < 0 or file > 7 or rank < 0 or rank > 7:
                 break
-            
             sq = chess.square(file, rank)
-            sq_piece = board.piece_at(sq)
-            
-            if sq_piece is None:
-                continue
-            
-            if sq_piece.color == opponent_color:
-                # Enemy piece found behind the blocker - this is the target
-                piece_letter = sq_piece.symbol().lower()
-                piece_value = PIECE_VALUES.get(piece_letter, 0)
-                is_king = (sq_piece.piece_type == chess.KING)
-                # Check if it's valuable (>= 300cp) or if it's the king (check)
-                if piece_value >= self.MIN_TARGET_PIECE_VALUE or is_king:
-                    # Verify the attacker can actually attack this target along this line
-                    # by checking if attacker, blocker, and target are collinear
-                    target_file = chess.square_file(sq)
-                    target_rank = chess.square_rank(sq)
-                    
-                    # Calculate direction from attacker to target
-                    att_to_targ_df = target_file - attacker_file
-                    att_to_targ_dr = target_rank - attacker_rank
-                    
-                    # Normalize
-                    if att_to_targ_df != 0:
-                        att_to_targ_df_norm = att_to_targ_df // abs(att_to_targ_df)
-                    else:
-                        att_to_targ_df_norm = 0
-                    if att_to_targ_dr != 0:
-                        att_to_targ_dr_norm = att_to_targ_dr // abs(att_to_targ_dr)
-                    else:
-                        att_to_targ_dr_norm = 0
-                    
-                    # Attacker, blocker, and target must be on the same line
-                    if att_to_targ_df_norm == direction_df and att_to_targ_dr_norm == direction_dr:
-                        return True
-            else:
-                # Our own piece blocks the ray
-                break
-        
-        return False
-    
+            piece = board.piece_at(sq)
+            if piece is not None:
+                return piece, sq
+        return None, None
+
+    @staticmethod
+    def _ray_clear_between(
+        board: chess.Board, from_sq: chess.Square, to_sq: chess.Square
+    ) -> bool:
+        """True if every square strictly between from_sq and to_sq is empty."""
+        f0, r0 = chess.square_file(from_sq), chess.square_rank(from_sq)
+        f1, r1 = chess.square_file(to_sq), chess.square_rank(to_sq)
+        df, dr = f1 - f0, r1 - r0
+        if df == 0 and dr == 0:
+            return False
+        step_f = 0 if df == 0 else df // abs(df)
+        step_r = 0 if dr == 0 else dr // abs(dr)
+        # Must be a straight rook/bishop ray.
+        if df != 0 and dr != 0 and abs(df) != abs(dr):
+            return False
+        f, r = f0 + step_f, r0 + step_r
+        while (f, r) != (f1, r1):
+            if board.piece_at(chess.square(f, r)) is not None:
+                return False
+            f += step_f
+            r += step_r
+        return True
+
     def _is_meaningful_discovered_attack(self, board: chess.Board, attacker_square: chess.Square,
                                         target_piece_letter: str, opponent_color: chess.Color, is_check: bool) -> bool:
         """Check if a discovered attack is meaningful (not trivial).

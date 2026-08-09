@@ -40,6 +40,21 @@ class HighlightDetector:
         self.good_move_max_cpl = good_move_max_cpl
         self.inaccuracy_max_cpl = inaccuracy_max_cpl
         self.mistake_max_cpl = mistake_max_cpl
+
+    @staticmethod
+    def _prefer_single_line_tactic(
+        highlights: List[GameHighlight],
+    ) -> List[GameHighlight]:
+        """Keep only one of fork/skewer on the same move (highest priority wins)."""
+        overlap = {"fork", "skewer"}
+        present = [h for h in highlights if h.rule_type in overlap]
+        if len(present) <= 1:
+            return highlights
+        keep_type = present[0].rule_type  # list is priority-sorted desc
+        return [
+            h for h in highlights
+            if h.rule_type not in overlap or h.rule_type == keep_type
+        ]
     
     def detect_highlights(self, moves: List[MoveData], total_moves: int,
                          opening_end: int, middlegame_end: int) -> List[GameHighlight]:
@@ -446,6 +461,8 @@ class HighlightDetector:
             for key, highlight_list in combined_highlights.items():
                 # Sort by priority (descending) to keep the most important ones
                 highlight_list.sort(key=lambda x: -x.priority)
+                # Fork / skewer / pin describe the same double-attack idea; keep one.
+                highlight_list = self._prefer_single_line_tactic(highlight_list)
                 # Take up to max_per_move highlights
                 selected = highlight_list[:max_per_move]
                 

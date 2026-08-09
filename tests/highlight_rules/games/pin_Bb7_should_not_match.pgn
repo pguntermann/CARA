@@ -1,0 +1,21 @@
+[Event "Highlight rule review: pin"]
+[Site "CARA"]
+[Date "2026.08.09"]
+[Round "-"]
+[White "Review"]
+[Black "Review"]
+[Result "*"]
+[Annotator "CARA highlight-rules"]
+[Rule "pin"]
+[Expectation "should_not_match"]
+[TriggerMove "42...Bb7"]
+[Side "black"]
+[Comment "White walks into the pin with 42.Ke4: Black's bishop on c6 already pins Nd5 to the king. 42...Bb7 only slides along the same diagonal. After Game Analysis, pin should NOT fire on 42...Bb7 (Black did not create the pin)."]
+
+1. e4 c5 2. c3 e5 3. d4 cxd4 4. cxd4 Nf6 5. dxe5 Bb4+ 6. Nc3 Nxe4 7. Qd4 Qh4 8.
+g3 Bxc3+ 9. bxc3 Qd8 10. Qxe4 Qa5 11. Bd2 Na6 12. Bxa6 Qxa6 13. Nf3 O-O 14. Ng5
+Qg6 15. Qxg6 fxg6 16. Bf4 h6 17. Ne4 d5 18. Nd6 b6 19. O-O Bh3 20. Rfe1 Be6 21.
+a4 Rab8 22. Reb1 Kh7 23. a5 Kh8 24. axb6 axb6 25. Ra6 Bd7 26. Raxb6 Rxb6 27.
+Rxb6 Be6 28. Nb5 Bc8 29. e6 g5 30. Bd6 Rg8 31. Rb8 Bxe6 32. Rxg8+ Kxg8 33. Nc7
+Bf5 34. Nxd5 Kh7 35. c4 Bd3 36. c5 Bb5 37. f4 Bd7 38. Be7 gxf4 39. gxf4 Kg6 40.
+Kf2 Kf7 41. Kf3 Bc6 42. Ke4 Bb7 *

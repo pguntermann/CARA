@@ -25,7 +25,7 @@ class ForkRule(HighlightRule):
         move_num = move.move_number
         
         # White's fork
-        if move.white_move and move.cpl_white and context.move_index > 0:
+        if move.white_move and move.cpl_white is not None and move.cpl_white != "" and context.move_index > 0:
             try:
                 cpl = float(move.cpl_white)
                 if cpl >= context.good_move_max_cpl:
@@ -40,35 +40,22 @@ class ForkRule(HighlightRule):
                                 move.white_move, board_before, board_after, chess.WHITE
                             )
                             if moved_piece_square is not None:
-                                if self._is_fork(board_after, moved_piece_square, chess.WHITE):
-                                    # Verify fork actually caused good CPL: check if CPL < 30 AND PV2/PV3 CPL > 50
-                                    fork_was_best = cpl < 30
-                                    if fork_was_best and move.cpl_white_2 and move.cpl_white_3:
-                                        try:
-                                            cpl_2 = float(move.cpl_white_2)
-                                            cpl_3 = float(move.cpl_white_3)
-                                            # If 2nd and 3rd best moves have high CPL (>50), fork was clearly best option
-                                            if cpl_2 > 50 and cpl_3 > 50:
-                                                fork_was_best = True
-                                            else:
-                                                fork_was_best = False
-                                        except (ValueError, TypeError):
-                                            pass  # Fall back to basic check if PV2/PV3 data unavailable
-                                    
-                                    if fork_was_best:
-                                        highlights.append(GameHighlight(
-                                            move_number=move_num,
-                                            is_white=True,
-                                            move_notation=f"{move_num}. {move.white_move}",
-                                            description="White executed a fork",
-                                            priority=45,
-                                            rule_type="fork"
-                                        ))
+                                if self._is_fork(
+                                    board_after, moved_piece_square, chess.WHITE
+                                ):
+                                    highlights.append(GameHighlight(
+                                        move_number=move_num,
+                                        is_white=True,
+                                        move_notation=f"{move_num}. {move.white_move}",
+                                        description="White executed a fork",
+                                        priority=45,
+                                        rule_type="fork"
+                                    ))
             except (ValueError, TypeError, AttributeError):
                 pass
         
         # Black's fork
-        if move.black_move and move.cpl_black:
+        if move.black_move and move.cpl_black is not None and move.cpl_black != "":
             try:
                 cpl = float(move.cpl_black)
                 if cpl >= context.good_move_max_cpl:
@@ -83,30 +70,17 @@ class ForkRule(HighlightRule):
                                 move.black_move, board_before, board_after, chess.BLACK
                             )
                             if moved_piece_square is not None:
-                                if self._is_fork(board_after, moved_piece_square, chess.BLACK):
-                                    # Verify fork actually caused good CPL: check if CPL < 30 AND PV2/PV3 CPL > 50
-                                    fork_was_best = cpl < 30
-                                    if fork_was_best and move.cpl_black_2 and move.cpl_black_3:
-                                        try:
-                                            cpl_2 = float(move.cpl_black_2)
-                                            cpl_3 = float(move.cpl_black_3)
-                                            # If 2nd and 3rd best moves have high CPL (>50), fork was clearly best option
-                                            if cpl_2 > 50 and cpl_3 > 50:
-                                                fork_was_best = True
-                                            else:
-                                                fork_was_best = False
-                                        except (ValueError, TypeError):
-                                            pass  # Fall back to basic check if PV2/PV3 data unavailable
-                                    
-                                    if fork_was_best:
-                                        highlights.append(GameHighlight(
-                                            move_number=move_num,
-                                            is_white=False,
-                                            move_notation=f"{move_num}. ...{move.black_move}",
-                                            description="Black executed a fork",
-                                            priority=45,
-                                            rule_type="fork"
-                                        ))
+                                if self._is_fork(
+                                    board_after, moved_piece_square, chess.BLACK
+                                ):
+                                    highlights.append(GameHighlight(
+                                        move_number=move_num,
+                                        is_white=False,
+                                        move_notation=f"{move_num}. ...{move.black_move}",
+                                        description="Black executed a fork",
+                                        priority=45,
+                                        rule_type="fork"
+                                    ))
             except (ValueError, TypeError, AttributeError):
                 pass
         
@@ -168,85 +142,101 @@ class ForkRule(HighlightRule):
             pass
         return None
     
-    def _is_fork(self, board: chess.Board, piece_square: chess.Square, color: chess.Color) -> bool:
+    def _is_fork(
+        self,
+        board: chess.Board,
+        piece_square: chess.Square,
+        color: chess.Color,
+    ) -> bool:
         """Check if a piece on the given square creates a fork.
-        
-        Args:
-            board: Board position after the move.
-            piece_square: Square of the piece to check.
-            color: Color of the piece.
-        
-        Returns:
-            True if the piece forks two or more enemy pieces, with at least one undefended or net material gain.
+
+        A fork requires attacking two or more enemy pieces after the move.
+        Capturing an undefended piece with check is not itself a fork — the
+        captured unit is gone (e.g. Rxf4+ only checks the king afterward).
+
+        Exploitable forks include:
+        - undefended target worth more than the forker
+        - forker cheaper than every valuable target (up after a recapture)
+        - royal fork that also attacks free material still on the board
+          (e.g. Nxc7+ checks the king and attacks an undefended pawn on a6)
         """
         opponent_color = chess.BLACK if color == chess.WHITE else chess.WHITE
         piece = board.piece_at(piece_square)
         if piece is None or piece.color != color:
             return False
-        
-        # Check if the attacking piece can be captured by an equal or less valuable piece
-        # If so, the fork is not exploitable (opponent can just trade)
+
+        # Forker safety / cheap elimination:
+        # - Hanging forker (not defended by its own side) that the opponent can capture
+        #   is not an exploitable fork — they simply take it (e.g. Bxc3 hanging to Qxc3).
+        # - If the forker is defended, equal-or-lesser capturers can still trade out cheaply.
         piece_letter = piece.symbol().lower()
         attacker_value = PIECE_VALUES.get(piece_letter, 0)
-        can_be_captured_by_equal_or_less = False
-        
-        if board.is_attacked_by(opponent_color, piece_square):
-            # Check all pieces attacking this square
-            for attacker_sq in board.attackers(opponent_color, piece_square):
-                attacker_piece = board.piece_at(attacker_sq)
-                if attacker_piece:
-                    attacker_piece_letter = attacker_piece.symbol().lower()
-                    attacker_piece_value = PIECE_VALUES.get(attacker_piece_letter, 0)
-                    # If opponent can capture with equal or less valuable piece, fork is not exploitable
-                    if attacker_piece_value <= attacker_value:
-                        can_be_captured_by_equal_or_less = True
-                        break
-        
-        if can_be_captured_by_equal_or_less:
+        forker_defended = board.is_attacked_by(color, piece_square)
+        opponent_attackers = list(board.attackers(opponent_color, piece_square))
+
+        if opponent_attackers and not forker_defended:
             return False
-        
-        # Get all squares attacked by this piece
+
+        if forker_defended:
+            for attacker_sq in opponent_attackers:
+                attacker_piece = board.piece_at(attacker_sq)
+                if attacker_piece is None:
+                    continue
+                attacker_piece_value = PIECE_VALUES.get(
+                    attacker_piece.symbol().lower(), 0
+                )
+                if attacker_piece_value <= attacker_value:
+                    return False
+
         attacked_squares = board.attacks(piece_square)
-        
-        # Find enemy pieces on attacked squares
+
         enemy_pieces = []
-        valuable_pieces = []
-        undefended_valuable_count = 0
+        valuable_values: List[int] = []
+        undefended_higher_value_count = 0
+        undefended_free_count = 0
         attacks_king = False
-        
+
         for sq in attacked_squares:
             enemy_piece = board.piece_at(sq)
             if enemy_piece and enemy_piece.color == opponent_color:
                 enemy_pieces.append((sq, enemy_piece))
-                piece_letter = enemy_piece.symbol().lower()
-                piece_value = PIECE_VALUES.get(piece_letter, 0)
-                
-                # Check if this is the king (special case for forks)
+                target_letter = enemy_piece.symbol().lower()
+                piece_value = PIECE_VALUES.get(target_letter, 0)
+
                 if enemy_piece.piece_type == chess.KING:
                     attacks_king = True
-                
-                # Track valuable pieces (>= 300cp: bishop/knight/rook/queen)
+                    continue
+
+                defended = board.is_attacked_by(opponent_color, sq)
+                # Free loot of any value (including pawns) for royal-fork material.
+                if piece_value >= 100 and not defended:
+                    undefended_free_count += 1
+                    if piece_value > attacker_value:
+                        undefended_higher_value_count += 1
+
+                # Valuable pieces (>= 300cp: bishop/knight/rook/queen)
                 if piece_value >= 300:
-                    valuable_pieces.append(sq)
-                    # Check if this valuable piece is undefended (not defended by opponent's own pieces)
-                    if not board.is_attacked_by(opponent_color, sq):
-                        undefended_valuable_count += 1
-        
-        # Fork requires attacking at least 2 enemy pieces
+                    valuable_values.append(piece_value)
+
+        # Fork requires attacking at least 2 enemy pieces after the move.
         if len(enemy_pieces) < 2:
             return False
-        
-        # Special case: Fork that includes the king (check) + at least one valuable piece
-        # This is a very powerful tactical pattern and should be recognized
-        if attacks_king and len(valuable_pieces) >= 1:
-            # If the valuable piece is undefended, it's a clear fork
-            if undefended_valuable_count == len(valuable_pieces):
-                return True
-        
-        # Standard fork: at least 2 valuable pieces (>= 300cp), all undefended
-        # This ensures the fork is actually exploitable (opponent can't save both pieces)
-        if len(valuable_pieces) >= 2 and undefended_valuable_count == len(valuable_pieces):
+
+        # Royal fork: king + valuable piece, or king + free material still on board.
+        # Standard fork: ≥2 valuable pieces.
+        if attacks_king:
+            has_secondary = len(valuable_values) >= 1 or undefended_free_count >= 1
+            if not has_secondary:
+                return False
+        elif len(valuable_values) < 2:
+            return False
+
+        if undefended_higher_value_count >= 1:
             return True
-        
+        if attacks_king and undefended_free_count >= 1:
+            return True
+        if valuable_values and attacker_value < min(valuable_values):
+            return True
+
         return False
 

@@ -1,0 +1,17 @@
+[Event "Highlight rule review: discovered_attack"]
+[Site "CARA"]
+[Date "2026.08.09"]
+[Round "-"]
+[White "Review"]
+[Black "Review"]
+[Result "*"]
+[Annotator "CARA highlight-rules"]
+[Rule "discovered_attack"]
+[Expectation "should_match"]
+[TriggerMove "16. Nc6+"]
+[Side "white"]
+[SetUp "1"]
+[FEN "r1bqk2r/ppp2ppp/5n2/4N3/2B5/8/PPPP1PPP/R1BQR1K1 w kq - 0 16"]
+[Comment "Classic discovered check / double attack: White's knight on e5 sits on the e-file between Re1 and Black's uncastled king. 16.Nc6+ steps off that file, so the rook checks the king while the knight also attacks the queen on d8. After Game Analysis, expect: \"White performed a discovered attack on Black's king\" on 16. Nc6+. Starts at move 16 to clear the opening-phase skip (rule ignores move_number <= opening_end)."]
+
+16. Nc6+ *
