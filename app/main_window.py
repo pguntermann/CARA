@@ -4686,10 +4686,20 @@ class MainWindow(QMainWindow):
                             enabled_tags = ga.get("auto_game_tagging_enabled_tags", []) if isinstance(ga, dict) else []
                         except Exception:
                             enabled_tags = []
+                        # Reuse summary already computed when analysis completed
+                        # (GameSummaryController refreshes on is_game_analyzed).
+                        precomputed_summary = None
+                        try:
+                            gsc = self.controller.get_game_summary_controller()
+                            if gsc:
+                                precomputed_summary = gsc.get_current_summary()
+                        except Exception:
+                            precomputed_summary = None
                         result = tagging_service.detect_tags(
                             moves,
                             game_result=getattr(game, "result", None),
                             enabled_tags=enabled_tags,
+                            summary=precomputed_summary,
                         )
                         merged = tagging_service.merge_with_existing_tags(
                             getattr(game, "game_tags_raw", "") or "",

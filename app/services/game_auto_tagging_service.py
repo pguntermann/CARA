@@ -11,7 +11,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import time
 
 from app.models.moveslist_model import MoveData
-from app.services.game_summary_service import GameSummaryService
+from app.services.game_summary_service import GameSummary, GameSummaryService
 from app.services.logging_service import LoggingService
 from app.utils.game_tags_utils import (
     apply_cara_game_tags_to_game_data,
@@ -73,8 +73,15 @@ class GameAutoTaggingService:
         *,
         game_result: Optional[str],
         enabled_tags: Optional[Sequence[str]] = None,
+        summary: Optional[GameSummary] = None,
     ) -> AutoTaggingResult:
-        """Return detected auto-tags based on evaluated move list."""
+        """Return detected auto-tags based on evaluated move list.
+
+        Args:
+            summary: Optional precomputed game summary. When provided with
+                evaluation data, skips a second ``calculate_summary`` pass
+                (common after single-game analysis where the summary UI already ran).
+        """
         t0 = time.perf_counter()
         if not moves:
             return AutoTaggingResult(detected_tags=[], reasons={})
@@ -84,10 +91,11 @@ class GameAutoTaggingService:
         else:
             enabled_set = {str(t).casefold() for t in enabled_tags if str(t).strip()}
 
-        summary_service = GameSummaryService(self.config)
         total_moves = len(moves)
         t_summary = time.perf_counter()
-        summary = summary_service.calculate_summary(list(moves), total_moves, game_result=game_result)
+        if summary is None or not getattr(summary, "evaluation_data", None):
+            summary_service = GameSummaryService(self.config)
+            summary = summary_service.calculate_summary(list(moves), total_moves, game_result=game_result)
         summary_ms = (time.perf_counter() - t_summary) * 1000.0
 
         # evaluation_data: list[(ply_index, eval_cp)] where eval is from White's perspective.
