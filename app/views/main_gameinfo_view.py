@@ -256,6 +256,10 @@ class MainGameInfoView(QWidget):
         self._update_encyclopedia_button()
 
     def _open_encyclopedia(self) -> None:
+        self.open_encyclopedia()
+
+    def open_encyclopedia(self) -> None:
+        """Open the encyclopedia for the current opening (same as the info button)."""
         entry = self._encyclopedia.lookup(self._current_name, self._current_eco)
         if entry is None:
             return

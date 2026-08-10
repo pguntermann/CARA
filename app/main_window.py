@@ -1512,6 +1512,14 @@ class MainWindow(QMainWindow):
         """
         if hasattr(self, 'game_info_action'):
             self.game_info_action.setChecked(show)
+
+    def _open_opening_encyclopedia(self) -> None:
+        """Open the opening encyclopedia for the current game (same as game-info ⓘ)."""
+        main_panel = getattr(self, "main_panel", None)
+        game_info_view = getattr(main_panel, "game_info_view", None) if main_panel else None
+        if game_info_view is None:
+            return
+        game_info_view.open_encyclopedia()
     
     def _on_playedmove_arrow_visibility_changed(self, visible: bool) -> None:
         """Handle played move arrow visibility change to update menu toggle.
