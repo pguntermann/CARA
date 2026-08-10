@@ -4883,7 +4883,7 @@
             4
           ],
           "selected_background_color": {
-            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+            "$ref": "$_COLOR_ACTIVE_MOVE_BACKGROUND"
           },
           "selected_border_radius": 4
         },
