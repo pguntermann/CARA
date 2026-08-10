@@ -26,7 +26,7 @@ class MainGameInfoView(QWidget):
         """
         super().__init__()
         self.config = config
-        self._encyclopedia = OpeningEncyclopediaService(config)
+        self._encyclopedia = OpeningEncyclopediaService.get_instance(config)
         self._current_eco = ""
         self._current_name = ""
         self._setup_ui()

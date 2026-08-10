@@ -313,7 +313,7 @@ class DetailOpeningExplorerView(QWidget):
         self._game_model: Optional[GameModel] = None
         self._game_controller = None
         self._opening_service = opening_service
-        self._encyclopedia_service = OpeningEncyclopediaService(config)
+        self._encyclopedia_service = OpeningEncyclopediaService.get_instance(config)
         self._path_show_all = False
         self._last_game_id: Any = None
         self._path_height_anim: Optional[QPropertyAnimation] = None
