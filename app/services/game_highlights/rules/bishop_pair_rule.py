@@ -1,93 +1,62 @@
-"""Rule for detecting bishop pair secured/gained."""
+"""Rule for detecting when a side secures the bishop pair."""
 
 from typing import List
+
 import chess
 
 from app.services.game_highlights.base_rule import HighlightRule, GameHighlight, RuleContext
-from app.services.game_highlights.helpers import parse_fen, bishops_opposite_colors
+from app.services.game_highlights.half_move import (
+    HalfMoveContext,
+    evaluate_for_each_side,
+    make_highlight,
+)
+from app.services.game_highlights.helpers import bishops_opposite_colors
 
 
 class BishopPairRule(HighlightRule):
-    """Detects when a side secures or gains the bishop pair."""
-    
-    def evaluate(self, move, context: RuleContext) -> List[GameHighlight]:
-        """Evaluate move for bishop pair highlights.
-        
-        Args:
-            move: Current move data.
-            context: Rule context.
-        
-        Returns:
-            List of GameHighlight instances.
-        """
-        highlights = []
-        move_num = move.move_number
-        
-        # White secures the bishop pair
-        if move.white_bishops == 2 and move.black_bishops < 2:
-            if context.prev_white_bishops < 2 or (context.prev_black_bishops >= 2 and move.white_capture == "b"):
-                board = parse_fen(move.fen_white)
-                if board and bishops_opposite_colors(board, chess.WHITE):
-                    is_equalized = False
-                    if context.next_move and context.next_move.black_capture == "b" and context.next_move.black_move:
-                        is_equalized = True
-                    if move.black_move and move.black_capture == "b":
-                        is_equalized = True
-                    
-                    if not is_equalized:
-                        highlights.append(GameHighlight(
-                            move_number=move_num,
-                            is_white=True,
-                            move_notation=f"{move_num}. {move.white_move}",
-                            description="White secured the bishop pair",
-                            priority=28,
-                            rule_type="bishop_pair"
-                        ))
-        
-        # Black secures the bishop pair
-        if move.black_bishops == 2 and move.white_bishops < 2:
-            if context.prev_black_bishops < 2 or (context.prev_white_bishops >= 2 and move.black_capture == "b"):
-                board = parse_fen(move.fen_black)
-                if board and bishops_opposite_colors(board, chess.BLACK):
-                    is_equalized = False
-                    if context.next_move and context.next_move.white_capture == "b" and context.next_move.white_move:
-                        is_equalized = True
-                    if move.white_move and move.white_capture == "b":
-                        is_equalized = True
-                    
-                    if not is_equalized:
-                        highlights.append(GameHighlight(
-                            move_number=move_num,
-                            is_white=False,
-                            move_notation=f"{move_num}. ...{move.black_move}",
-                            description="Black secured the bishop pair",
-                            priority=28,
-                            rule_type="bishop_pair"
-                        ))
-        
-        # White gained the bishop pair (through opponent's move)
-        if move.white_bishops == 2 and context.prev_white_bishops == 1:
-            if move.black_move and not move.white_capture and not move.white_move:
-                highlights.append(GameHighlight(
-                    move_number=move_num,
-                    is_white=False,
-                    move_notation=f"{move_num}. ...{move.black_move}",
-                    description="White gained the bishop pair",
-                    priority=32,
-                    rule_type="bishop_pair"
-                ))
-        
-        # Black gained the bishop pair (through opponent's move)
-        if move.black_bishops == 2 and context.prev_black_bishops == 1:
-            if move.white_move and not move.black_capture and not move.black_move:
-                highlights.append(GameHighlight(
-                    move_number=move_num,
-                    is_white=True,
-                    move_notation=f"{move_num}. {move.white_move}",
-                    description="Black gained the bishop pair",
-                    priority=32,
-                    rule_type="bishop_pair"
-                ))
-        
-        return highlights
+    """Detects when a side secures the (opposite-color) bishop pair against the opponent."""
 
+    def evaluate(self, move, context: RuleContext) -> List[GameHighlight]:
+        """Evaluate move for bishop pair highlights."""
+        return evaluate_for_each_side(move, context, self._evaluate_half)
+
+    def _evaluate_half(self, half: HalfMoveContext) -> List[GameHighlight]:
+        board_after = half.board_after()
+        if board_after is None:
+            return []
+
+        my_bishops = len(board_after.pieces(chess.BISHOP, half.color))
+        opp_bishops = len(board_after.pieces(chess.BISHOP, not half.color))
+        if my_bishops != 2 or opp_bishops >= 2:
+            return []
+
+        board_before = half.board_before()
+        if board_before is None:
+            return []
+        prev_mine = len(board_before.pieces(chess.BISHOP, half.color))
+        prev_opp = len(board_before.pieces(chess.BISHOP, not half.color))
+
+        captured_bishop = (half.capture or "").lower() == "b"
+        # Newly completed the pair, or destroyed the opponent's pair by taking a bishop.
+        if not (prev_mine < 2 or (prev_opp >= 2 and captured_bishop)):
+            return []
+
+        if not bishops_opposite_colors(board_after, half.color):
+            return []
+
+        if self._pair_equalized_on_reply(half):
+            return []
+
+        return [
+            make_highlight(
+                half,
+                f"{half.side_name} secured the bishop pair",
+                priority=28,
+                rule_type="bishop_pair",
+            )
+        ]
+
+    def _pair_equalized_on_reply(self, half: HalfMoveContext) -> bool:
+        """True if the opponent immediately recaptures a bishop, canceling the pair advantage."""
+        reply = half.reply()
+        return bool(reply and (reply.capture or "").lower() == "b")

@@ -2331,24 +2331,11 @@ class MainWindow(QMainWindow):
     def _debug_copy_game_highlights_json(self) -> None:
         """DEBUG: Copy game highlights data as JSON."""
         self.controller.get_debug_controller().copy_game_highlights_json_to_clipboard()
-    
-    def _debug_create_highlight_rule_test_data(self) -> None:
-        """DEBUG: Prompt for filename and save analysis JSON for highlight rule tests."""
-        from app.views.dialogs.input_dialog import InputDialog
 
-        filename, ok = InputDialog.get_text(
-            self.config,
-            "Create Highlight Rule Test Data",
-            "Enter filename (e.g., my_rule_case.json):",
-            "",
-            self,
-        )
-        if not ok or not filename:
-            return
+    def _debug_scan_highlight_rule_frequency(self) -> None:
+        """DEBUG: Count highlight rule hits across analyzed games in the active DB."""
+        self.controller.get_debug_controller().scan_highlight_rule_frequency(parent=self)
 
-        self.controller.get_debug_controller().create_highlight_rule_test_data_file(filename)
-    
-    
     def _update_moves_list_menu(self) -> None:
         """Update the Moves List menu with current profiles and columns."""
         from app.views.menus.moves_list_menu import rebuild_moves_list_menu

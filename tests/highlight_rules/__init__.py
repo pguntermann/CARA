@@ -1,2 +1,1 @@
-"""Test framework for highlight rules."""
-
+# Highlight rule unit tests

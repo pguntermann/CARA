@@ -41,20 +41,41 @@ class HighlightDetector:
         self.inaccuracy_max_cpl = inaccuracy_max_cpl
         self.mistake_max_cpl = mistake_max_cpl
 
-    @staticmethod
-    def _prefer_single_line_tactic(
+    # Sibling rule_types that describe the same idea on one ply.
+    # Optional preferred id wins even over a higher-priority sibling (e.g. clearly
+    # best tactical_resource must still yield to a plain undefended capture).
+    _SAME_MOVE_EXCLUSIVE_GROUPS = (
+        (frozenset({"fork", "skewer"}), None),
+        # Battery (attacks a unit on the line) subsumes plain open-file doubling.
+        (frozenset({"battery", "doubled_on_open_file"}), None),
+        (frozenset({"captured_undefended_piece", "tactical_resource"}), "captured_undefended_piece"),
+        # Multi-move forcing win story beats a one-move sacrifice/resource label.
+        (
+            frozenset({"tactical_sequence", "forcing_combination", "tactical_resource"}),
+            "tactical_sequence",
+        ),
+    )
+
+    @classmethod
+    def _prefer_exclusive_same_move_rules(
+        cls,
         highlights: List[GameHighlight],
     ) -> List[GameHighlight]:
-        """Keep only one of fork/skewer on the same move (highest priority wins)."""
-        overlap = {"fork", "skewer"}
-        present = [h for h in highlights if h.rule_type in overlap]
-        if len(present) <= 1:
-            return highlights
-        keep_type = present[0].rule_type  # list is priority-sorted desc
-        return [
-            h for h in highlights
-            if h.rule_type not in overlap or h.rule_type == keep_type
-        ]
+        """Drop siblings from exclusive groups on the same move."""
+        result = highlights
+        for overlap, preferred in cls._SAME_MOVE_EXCLUSIVE_GROUPS:
+            present = [h for h in result if h.rule_type in overlap]
+            if len(present) <= 1:
+                continue
+            if preferred and any(h.rule_type == preferred for h in present):
+                keep_type = preferred
+            else:
+                keep_type = present[0].rule_type  # list is priority-sorted desc
+            result = [
+                h for h in result
+                if h.rule_type not in overlap or h.rule_type == keep_type
+            ]
+        return result
     
     def detect_highlights(self, moves: List[MoveData], total_moves: int,
                          opening_end: int, middlegame_end: int) -> List[GameHighlight]:
@@ -461,8 +482,7 @@ class HighlightDetector:
             for key, highlight_list in combined_highlights.items():
                 # Sort by priority (descending) to keep the most important ones
                 highlight_list.sort(key=lambda x: -x.priority)
-                # Fork / skewer / pin describe the same double-attack idea; keep one.
-                highlight_list = self._prefer_single_line_tactic(highlight_list)
+                highlight_list = self._prefer_exclusive_same_move_rules(highlight_list)
                 # Take up to max_per_move highlights
                 selected = highlight_list[:max_per_move]
                 

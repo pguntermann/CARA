@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from app.services.game_highlights.rule_catalog import (
-    ALL_PHASES,
     BuiltinRuleMeta,
+    clamp_phases,
     get_category,
     get_rule_meta,
     list_builtin_rules,
@@ -42,6 +42,7 @@ class EffectiveHighlightRule:
     enabled: bool
     priority: int
     phases: Tuple[str, ...]
+    applicable_phases: Tuple[str, ...]
     default_enabled: bool
     default_priority: int
     default_phases: Tuple[str, ...]
@@ -429,6 +430,9 @@ class GameHighlightRulesService:
             if "phases" in override:
                 phases = normalize_phases(override.get("phases"))
 
+        # Hard ceiling: never enable a phase the rule cannot run in.
+        phases = clamp_phases(phases, meta.applicable_phases)
+
         if custom_order and order_index is not None:
             priority = self.priority_for_order_index(order_index)
             priority_overridden = True
@@ -446,6 +450,7 @@ class GameHighlightRulesService:
             enabled=enabled,
             priority=priority,
             phases=phases,
+            applicable_phases=meta.applicable_phases,
             default_enabled=meta.default_enabled,
             default_priority=meta.default_priority,
             default_phases=meta.default_phases,
@@ -475,7 +480,7 @@ class GameHighlightRulesService:
         if "enabled" in value and bool(value["enabled"]) != meta.default_enabled:
             entry["enabled"] = bool(value["enabled"])
         if "phases" in value:
-            phases = normalize_phases(value.get("phases"))
+            phases = clamp_phases(value.get("phases"), meta.applicable_phases)
             if phases != normalize_phases(meta.default_phases):
                 entry["phases"] = list(phases)
         return entry

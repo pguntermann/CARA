@@ -1,12 +1,16 @@
 """Rule for detecting skewers."""
 
 from typing import List, Optional, Set, Tuple
+
 import chess
 
 from app.services.game_highlights.base_rule import HighlightRule, GameHighlight, RuleContext
-from app.services.game_highlights.helpers import parse_fen
 from app.services.game_highlights.constants import PIECE_VALUES
-
+from app.services.game_highlights.half_move import (
+    HalfMoveContext,
+    evaluate_for_each_side,
+    make_highlight,
+)
 
 # (square, piece_value) for a skewer target
 Target = Tuple[chess.Square, int]
@@ -32,118 +36,34 @@ class SkewerRule(HighlightRule):
         Move quality is not required: a skewer can be real even when the engine
         prefers a faster win (e.g. Bb6 while dxe8=Q+ mates sooner).
         """
-        highlights = []
-        move_num = move.move_number
+        return evaluate_for_each_side(move, context, self._evaluate_half)
 
-        if move.white_move and context.move_index > 0:
-            try:
-                board_after = parse_fen(move.fen_white)
-                if board_after and context.prev_move and context.prev_move.fen_black:
-                    board_before = parse_fen(context.prev_move.fen_black)
-                    if board_before:
-                        moved_sq = self._find_moved_piece_square(
-                            move.white_move, board_before, board_after, chess.WHITE
-                        )
-                        if moved_sq is not None and self._is_skewer(
-                            board_after, moved_sq, chess.WHITE, context, is_white=True
-                        ):
-                            highlights.append(GameHighlight(
-                                move_number=move_num,
-                                is_white=True,
-                                move_notation=f"{move_num}. {move.white_move}",
-                                description="White executed a skewer",
-                                priority=46,
-                                rule_type="skewer",
-                            ))
-            except (ValueError, TypeError, AttributeError):
-                pass
+    def _evaluate_half(self, half: HalfMoveContext) -> List[GameHighlight]:
+        board_after = half.board_after()
+        piece_square = half.destination_square()
+        if board_after is None or piece_square is None:
+            return []
 
-        if move.black_move:
-            try:
-                board_after = parse_fen(move.fen_black)
-                if board_after and move.fen_white:
-                    board_before = parse_fen(move.fen_white)
-                    if board_before:
-                        moved_sq = self._find_moved_piece_square(
-                            move.black_move, board_before, board_after, chess.BLACK
-                        )
-                        if moved_sq is not None and self._is_skewer(
-                            board_after, moved_sq, chess.BLACK, context, is_white=False
-                        ):
-                            highlights.append(GameHighlight(
-                                move_number=move_num,
-                                is_white=False,
-                                move_notation=f"{move_num}. ...{move.black_move}",
-                                description="Black executed a skewer",
-                                priority=46,
-                                rule_type="skewer",
-                            ))
-            except (ValueError, TypeError, AttributeError):
-                pass
+        if not self._is_skewer(half, board_after, piece_square):
+            return []
 
-        return highlights
-
-    def _find_moved_piece_square(
-        self,
-        move_san: str,
-        board_before: chess.Board,
-        board_after: chess.Board,
-        color: chess.Color,
-    ) -> Optional[chess.Square]:
-        """Find the destination square of the piece that moved."""
-        try:
-            dest_part = move_san
-            if "=" in dest_part:
-                dest_part = dest_part.split("=")[0]
-            if "x" in dest_part:
-                parts = dest_part.split("x")
-                if len(parts) > 1:
-                    dest_part = parts[-1]
-            dest_part = dest_part.replace("+", "").replace("#", "")
-
-            if len(dest_part) < 2:
-                return None
-
-            dest_square = chess.parse_square(dest_part[-2:])
-
-            for piece_type in (
-                chess.PAWN,
-                chess.KNIGHT,
-                chess.BISHOP,
-                chess.ROOK,
-                chess.QUEEN,
-                chess.KING,
-            ):
-                pieces_before = list(board_before.pieces(piece_type, color))
-                pieces_after = list(board_after.pieces(piece_type, color))
-
-                for sq in pieces_before:
-                    if sq not in pieces_after:
-                        if dest_square in pieces_after or board_after.piece_at(
-                            dest_square
-                        ) == chess.Piece(piece_type, color):
-                            return dest_square
-
-                if len(pieces_after) > len(pieces_before) and dest_square in pieces_after:
-                    return dest_square
-
-            piece_at_dest = board_after.piece_at(dest_square)
-            if piece_at_dest and piece_at_dest.color == color:
-                return dest_square
-        except (ValueError, AttributeError):
-            pass
-        return None
+        return [
+            make_highlight(
+                half,
+                f"{half.side_name} executed a skewer",
+                priority=46,
+                rule_type="skewer",
+            )
+        ]
 
     def _is_skewer(
         self,
+        half: HalfMoveContext,
         board: chess.Board,
         piece_square: chess.Square,
-        color: chess.Color,
-        context: RuleContext,
-        *,
-        is_white: bool,
     ) -> bool:
         """True when the moved slider aligns two enemy pieces and wins material."""
+        color = half.color
         piece = board.piece_at(piece_square)
         if piece is None or piece.color != color:
             return False
@@ -156,13 +76,12 @@ class SkewerRule(HighlightRule):
         if not pairs:
             return False
 
-        # Any qualifying pair that wins material is enough.
         for targets in pairs:
             target_sqs = {sq for sq, _ in targets}
             if self._forces_material_gain(board, piece_square, color, target_sqs):
                 return True
             if self._realized_material_gain(
-                board, piece_square, color, target_sqs, context, is_white=is_white
+                board, piece_square, color, target_sqs, half
             ):
                 return True
         return False
@@ -335,12 +254,10 @@ class SkewerRule(HighlightRule):
         attacker_sq: chess.Square,
         color: chess.Color,
         target_sqs: Set[chess.Square],
-        context: RuleContext,
-        *,
-        is_white: bool,
+        half: HalfMoveContext,
     ) -> bool:
         """True when the game cashes the skewer in for a net material gain."""
-        sans = self._following_sans(context, is_white=is_white)
+        sans = [ply.san for ply in half.iter_following(limit=5)]
         if not sans:
             return False
 
@@ -393,33 +310,6 @@ class SkewerRule(HighlightRule):
                     return True
             i += 1
         return False
-
-    def _following_sans(self, context: RuleContext, *, is_white: bool) -> List[str]:
-        """SAN half-moves after the skewer, in play order."""
-        moves = context.moves
-        idx = context.move_index
-        if idx < 0 or idx >= len(moves):
-            return []
-
-        current = moves[idx]
-        sans: List[str] = []
-        if is_white:
-            if current.black_move:
-                sans.append(current.black_move)
-            for j in range(idx + 1, min(idx + 3, len(moves))):
-                md = moves[j]
-                if md.white_move:
-                    sans.append(md.white_move)
-                if md.black_move:
-                    sans.append(md.black_move)
-        else:
-            for j in range(idx + 1, min(idx + 3, len(moves))):
-                md = moves[j]
-                if md.white_move:
-                    sans.append(md.white_move)
-                if md.black_move:
-                    sans.append(md.black_move)
-        return sans
 
     def _capture_see(
         self, board: chess.Board, move: chess.Move, color: chess.Color

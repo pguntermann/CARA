@@ -11,7 +11,7 @@ from app.services.game_highlight_rules_service import (
     GameHighlightRulesService,
     HighlightComposerSettings,
 )
-from app.services.game_highlights.rule_catalog import ALL_PHASES, normalize_phases
+from app.services.game_highlights.rule_catalog import ALL_PHASES, clamp_phases
 
 
 class GameHighlightRulesController(QObject):
@@ -115,6 +115,7 @@ class GameHighlightRulesController(QObject):
             enabled=bool(enabled),
             priority=rule.priority,
             phases=rule.phases,
+            applicable_phases=rule.applicable_phases,
             default_enabled=rule.default_enabled,
             default_priority=rule.default_priority,
             default_phases=rule.default_phases,
@@ -127,6 +128,8 @@ class GameHighlightRulesController(QObject):
         phase: str,
         allowed: bool,
     ) -> EffectiveHighlightRule:
+        if phase not in rule.applicable_phases:
+            return rule
         current = set(rule.phases)
         if allowed:
             current.add(phase)
@@ -134,7 +137,10 @@ class GameHighlightRulesController(QObject):
             if phase in current and len(current) <= 1:
                 return rule
             current.discard(phase)
-        phases = normalize_phases(tuple(p for p in ALL_PHASES if p in current))
+        phases = clamp_phases(
+            tuple(p for p in ALL_PHASES if p in current),
+            rule.applicable_phases,
+        )
         return EffectiveHighlightRule(
             rule_id=rule.rule_id,
             display_name=rule.display_name,
@@ -144,6 +150,7 @@ class GameHighlightRulesController(QObject):
             enabled=rule.enabled,
             priority=rule.priority,
             phases=phases,
+            applicable_phases=rule.applicable_phases,
             default_enabled=rule.default_enabled,
             default_priority=rule.default_priority,
             default_phases=rule.default_phases,

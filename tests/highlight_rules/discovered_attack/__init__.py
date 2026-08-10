@@ -1,1 +1,0 @@
-# Discovered attack rule tests

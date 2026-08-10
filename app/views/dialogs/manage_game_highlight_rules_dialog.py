@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import QEvent, Qt, QTimer
 from PyQt6.QtGui import QBrush, QColor, QCursor, QShowEvent
@@ -1022,14 +1022,36 @@ class ManageGameHighlightRulesDialog(QDialog):
         item.setData(Qt.ItemDataRole.UserRole, rule.rule_id)
         self.table.setItem(row, column, item)
         cb = QCheckBox()
-        cb.setChecked(phase in rule.phases)
-        cb.setToolTip(tooltip)
+        applicable = phase in rule.applicable_phases
+        cb.setChecked(applicable and phase in rule.phases)
+        cb.setEnabled(applicable)
+        if applicable:
+            cb.setToolTip(tooltip)
+        else:
+            phase_label = {
+                PHASE_OPENING: "opening",
+                PHASE_MIDDLEGAME: "middlegame",
+                PHASE_ENDGAME: "endgame",
+            }.get(phase, phase)
+            cb.setToolTip(
+                f"Not applicable in the {phase_label} — this rule only runs in: "
+                f"{self._format_applicable_phases(rule.applicable_phases)}"
+            )
         cb.toggled.connect(
             lambda checked, rid=rule.rule_id, p=phase: self._on_phase_toggled(
                 rid, p, checked
             )
         )
         self._center_widget(row, column, cb)
+
+    @staticmethod
+    def _format_applicable_phases(phases: Tuple[str, ...]) -> str:
+        labels = {
+            PHASE_OPENING: "Opening",
+            PHASE_MIDDLEGAME: "Middlegame",
+            PHASE_ENDGAME: "Endgame",
+        }
+        return ", ".join(labels.get(p, p) for p in phases)
 
     def _on_enabled_toggled(self, rule_id: str, checked: bool) -> None:
         if self._updating_table:
@@ -1093,6 +1115,7 @@ class ManageGameHighlightRulesDialog(QDialog):
                 enabled=meta.default_enabled,
                 priority=meta.default_priority,
                 phases=meta.default_phases,
+                applicable_phases=meta.applicable_phases,
                 default_enabled=meta.default_enabled,
                 default_priority=meta.default_priority,
                 default_phases=meta.default_phases,
