@@ -33,13 +33,13 @@ def setup_edit_menu(mw, menu_bar: QMenuBar) -> None:
     edit_menu.addSeparator()
 
     mw.copy_selected_games_action = QAction("Copy selected Games", mw)
-    mw.copy_selected_games_action.setShortcut(QKeySequence("Ctrl+Shift+C"))
+    mw.copy_selected_games_action.setShortcut(QKeySequence("Ctrl+C"))
     set_menubar_themable_action_icon(mw, mw.copy_selected_games_action, SVG_MENU_COPY)
     mw.copy_selected_games_action.triggered.connect(mw._copy_selected_games)
     edit_menu.addAction(mw.copy_selected_games_action)
 
     mw.cut_selected_games_action = QAction("Cut selected Games", mw)
-    mw.cut_selected_games_action.setShortcut(QKeySequence("Ctrl+Shift+X"))
+    mw.cut_selected_games_action.setShortcut(QKeySequence("Ctrl+X"))
     set_menubar_themable_action_icon(mw, mw.cut_selected_games_action, SVG_MENU_CUT)
     mw.cut_selected_games_action.triggered.connect(mw._cut_selected_games)
     edit_menu.addAction(mw.cut_selected_games_action)
@@ -54,13 +54,13 @@ def setup_edit_menu(mw, menu_bar: QMenuBar) -> None:
     edit_menu.addSeparator()
 
     mw.paste_pgn_clipboard_db_action = QAction("Paste PGN to Clipboard DB", mw)
-    mw.paste_pgn_clipboard_db_action.setShortcut(QKeySequence("Ctrl+V"))
+    mw.paste_pgn_clipboard_db_action.setShortcut(QKeySequence("Ctrl+Alt+V"))
     set_menubar_themable_action_icon(mw, mw.paste_pgn_clipboard_db_action, SVG_MENU_PASTE_CLIPBOARD)
     mw.paste_pgn_clipboard_db_action.triggered.connect(mw._paste_pgn_to_clipboard_db)
     edit_menu.addAction(mw.paste_pgn_clipboard_db_action)
 
     mw.paste_pgn_active_db_action = QAction("Paste PGN to active DB", mw)
-    mw.paste_pgn_active_db_action.setShortcut(QKeySequence("Ctrl+Alt+V"))
+    mw.paste_pgn_active_db_action.setShortcut(QKeySequence("Ctrl+V"))
     set_menubar_themable_action_icon(mw, mw.paste_pgn_active_db_action, SVG_MENU_PASTE_ACTIVE_DB)
     mw.paste_pgn_active_db_action.triggered.connect(mw._paste_pgn_to_active_db)
     edit_menu.addAction(mw.paste_pgn_active_db_action)

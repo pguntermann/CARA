@@ -45,7 +45,7 @@ def setup_file_menu(mw, menu_bar: QMenuBar) -> None:
     file_menu.addAction(mw.close_all_databases_action)
 
     clear_clipboard_action = QAction("Clear Clipboard Database", mw)
-    clear_clipboard_action.setShortcut(QKeySequence("Ctrl+Shift+C"))
+    clear_clipboard_action.setShortcut(QKeySequence("Ctrl+Alt+C"))
     clear_clipboard_action.triggered.connect(mw._clear_clipboard_database)
     file_menu.addAction(clear_clipboard_action)
 

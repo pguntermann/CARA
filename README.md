@@ -178,7 +178,7 @@ For detailed instructions, see the [user manual](https://pguntermann.github.io/C
 
 1. **Ensure you have a chess engine configured**: Before starting, make sure you have at least one UCI-compatible chess engine added to CARA. Go to **Engines → Add Engine...** and select your UCI engine. If you're unsure which engine to choose, [Stockfish](https://stockfishchess.org/download/) is an excellent free option to get started.
 
-2. **Open a game or paste PGN**: Open a PGN database using **File → Open PGN Database** (`Ctrl+O` / `⌘+O`), or paste PGN text into the Clipboard database using **Edit → Paste PGN to Clipboard DB** (`Ctrl+V` / `⌘+V`)—the pasted game gets loaded automatically.
+2. **Open a game or paste PGN**: Open a PGN database using **File → Open PGN Database** (`Ctrl+O` / `⌘+O`), or paste PGN text into the Clipboard database using **Edit → Paste PGN to Clipboard DB** (`Ctrl+Alt+V` / `⌘+⌥+V`)—the pasted game gets loaded automatically.
 
 3. **Switch to the Moves List view**: Press `F1` to switch to the Moves List tab, then press `3` to select the "Game Analysis - Full" profile. This profile displays all the important analysis columns you'll need to review the game.
 
@@ -257,8 +257,8 @@ CARA was built in large part by an AI model under the author's direction. The au
 - `F5`: Switch to Game Summary tab
 - `Ctrl+Shift+K` / `⌘+Shift+K`: Configure classification settings
 - `Ctrl+O` / `⌘+O`: Open PGN database
-- `Ctrl+V` / `⌘+V`: Paste PGN to Clipboard database
-- `Ctrl+Alt+V` / `⌘+⌥+V`: Paste PGN to active database
+- `Ctrl+V` / `⌘+V`: Paste PGN to active database
+- `Ctrl+Alt+V` / `⌘+⌥+V`: Paste PGN to Clipboard database
 
 See the user manual for a [complete list of keyboard shortcuts](https://pguntermann.github.io/CARA/manual.html#complete-keyboard-shortcuts).
 

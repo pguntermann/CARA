@@ -42,6 +42,21 @@ _TEXT_EDITING_KEYS = frozenset(
     }
 )
 
+# Ctrl/Meta edit chords a focused editable field must keep (copy/paste/cut/…).
+# App shortcuts with the same keys (e.g. Paste PGN on Ctrl+V) still apply when
+# focus is not in an editable text widget. Alt is excluded so Ctrl+Alt+V keeps
+# Paste PGN to Clipboard DB.
+_TEXT_EDIT_CHORD_KEYS = frozenset(
+    {
+        Qt.Key.Key_C,  # copy
+        Qt.Key.Key_V,  # paste
+        Qt.Key.Key_X,  # cut
+        Qt.Key.Key_A,  # select all
+        Qt.Key.Key_Z,  # undo / redo (with Shift)
+        Qt.Key.Key_Y,  # redo
+    }
+)
+
 
 def _editable_text_widget(widget: Optional[QWidget]) -> Optional[QWidget]:
     """Return the focused editable text widget, if any (skips read-only)."""
@@ -59,10 +74,30 @@ def _editable_text_widget(widget: Optional[QWidget]) -> Optional[QWidget]:
     return None
 
 
+def _matches_standard_text_edit_key(event: QKeyEvent) -> bool:
+    """True if the event is a text-edit chord (copy/paste/cut/select-all/undo/redo)."""
+    mods = event.modifiers()
+    has_ctrl_or_meta = bool(
+        mods
+        & (
+            Qt.KeyboardModifier.ControlModifier
+            | Qt.KeyboardModifier.MetaModifier
+        )
+    )
+    has_alt = bool(mods & Qt.KeyboardModifier.AltModifier)
+    return (
+        has_ctrl_or_meta
+        and not has_alt
+        and event.key() in _TEXT_EDIT_CHORD_KEYS
+    )
+
+
 def _text_editing_should_receive(event: QKeyEvent) -> bool:
     """True when an editable text field should handle this key itself."""
     key = event.key()
     if key in _TEXT_EDITING_KEYS:
+        return True
+    if _matches_standard_text_edit_key(event):
         return True
     mods = event.modifiers() & (
         Qt.KeyboardModifier.ControlModifier
@@ -82,7 +117,9 @@ class ShortcutManager(QObject):
     is the sole activator (event filter consumes matches so Qt does not also
     fire character-based QAction shortcuts).
 
-    Editable text fields (notes, inputs) keep arrow keys and typing; read-only
+    Editable text fields (notes, inputs) keep typing, caret keys, and standard
+    edit chords (copy/paste/cut/select-all/undo/redo). The same keys still
+    activate app shortcuts when focus is not in an editable field. Read-only
     views such as the PGN pane still receive navigation shortcuts.
     """
 
