@@ -3162,6 +3162,15 @@ class MainWindow(QMainWindow):
         if hasattr(self.controller, "game_analysis_controller"):
             self.controller.game_analysis_controller.set_auto_game_tagging_enabled_tags(saved)
     
+    def _on_update_move_quality_nags_toggled(self, checked: bool) -> None:
+        """Handle Update move quality NAGs in PGN toggle."""
+        if hasattr(self, "_settings_service"):
+            self._settings_service.update_game_analysis(
+                {"update_move_quality_nags_in_pgn": bool(checked)}
+            )
+        if hasattr(self.controller, "game_analysis_controller"):
+            self.controller.game_analysis_controller.set_update_move_quality_nags(bool(checked))
+
     def _on_store_analysis_results_toggled(self, checked: bool) -> None:
         """Handle Store Analysis results in PGN Tag toggle.
         
@@ -4251,6 +4260,17 @@ class MainWindow(QMainWindow):
             self.controller.game_analysis_controller.set_auto_game_tagging_enabled_tags(
                 [t for t in list(AUTO_TAGS) if str(t).casefold() in enabled_cf]
             )
+
+        # Update move quality NAGs in PGN (default OFF)
+        update_move_quality_nags = game_analysis_settings.get(
+            "update_move_quality_nags_in_pgn", False
+        )
+        if hasattr(self, "update_move_quality_nags_action"):
+            self.update_move_quality_nags_action.setChecked(bool(update_move_quality_nags))
+        if hasattr(self.controller, "game_analysis_controller"):
+            self.controller.game_analysis_controller.set_update_move_quality_nags(
+                bool(update_move_quality_nags)
+            )
         
         # Return to PLY 0 after analysis completes
         return_to_first_move = game_analysis_settings.get("return_to_first_move_after_analysis", False)
@@ -4417,6 +4437,7 @@ class MainWindow(QMainWindow):
                 "normalized_evaluation_graph": self.normalized_graph_action.isChecked() if hasattr(self, 'normalized_graph_action') else False,
                 "brilliant_move_detection": self.brilliant_move_detection_action.isChecked() if hasattr(self, 'brilliant_move_detection_action') else False,
                 "auto_game_tagging": self.auto_game_tagging_action.isChecked() if hasattr(self, "auto_game_tagging_action") else True,
+                "update_move_quality_nags_in_pgn": self.update_move_quality_nags_action.isChecked() if hasattr(self, "update_move_quality_nags_action") else False,
                 "store_analysis_results_in_pgn_tag": self.store_analysis_results_action.isChecked() if hasattr(self, 'store_analysis_results_action') else False
             }
         

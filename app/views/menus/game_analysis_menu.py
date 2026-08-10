@@ -91,6 +91,14 @@ def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
     mw.select_auto_tags_menu.setEnabled(True)
     game_analysis_menu.addMenu(mw.select_auto_tags_menu)
 
+    mw.update_move_quality_nags_action = QAction("Update move quality NAGs in PGN", mw)
+    mw.update_move_quality_nags_action.setCheckable(True)
+    mw.update_move_quality_nags_action.setChecked(False)
+    mw.update_move_quality_nags_action.triggered.connect(
+        mw._on_update_move_quality_nags_toggled
+    )
+    game_analysis_menu.addAction(mw.update_move_quality_nags_action)
+
     game_analysis_menu.addSeparator()
 
     mw.return_to_first_move_action = QAction("Return to PLY 0 after analysis completes", mw)

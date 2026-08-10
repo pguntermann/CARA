@@ -2445,16 +2445,19 @@
                 <h5 id="select-tags-auto-tagging">6.7.9 Select Tags for Auto-Tagging</h5>
                 <p>Opens a submenu with a checkable entry for each supported auto-tag (see the table in <a href="#auto-tagging">section 5.5.5</a>). Only checked tags can be added or refreshed by auto-tagging; unchecked rules are skipped. Your selection is saved with your user preferences. This submenu is disabled while <span class="menu-item">Auto Tag Games</span> is turned off.</p>
                 
-                <h5>6.7.10 Return to PLY 0 after analysis completes</h5>
+                <h5 id="update-move-quality-nags">6.7.10 Update move quality NAGs in PGN</h5>
+                <p>When enabled (off by default), after game analysis completes CARA writes standard move-quality NAGs into the game’s PGN based on the analysis classifications. Existing quality NAGs (<code>$1</code>–<code>$6</code>) on mainline moves are replaced; other NAGs are left unchanged. Mapping: Brilliant → <code>$3</code> (<code>!!</code>), Best Move → <code>$1</code> (<code>!</code>), Inaccuracy → <code>$6</code> (<code>?!</code>), Mistake → <code>$2</code> (<code>?</code>), Miss and Blunder → <code>$4</code> (<code>??</code>). Good Move and Book Move write no quality NAG. Applies to single-game and bulk analysis. The setting is saved with your user preferences.</p>
+                
+                <h5>6.7.11 Return to PLY 0 after analysis completes</h5>
                 <p>Toggles whether CARA automatically navigates to the starting position (PLY 0) when analysis completes. When enabled, the board and Moves List automatically return to PLY 0 after analysis finishes.</p>
                 
-                <h5>6.7.11 Switch to Moves List at the start of Analysis</h5>
+                <h5>6.7.12 Switch to Moves List at the start of Analysis</h5>
                 <p>Toggles whether CARA automatically switches to the Moves List tab when analysis begins. This is enabled by default, ensuring you can immediately see analysis results as they are generated.</p>
                 
-                <h5>6.7.12 Switch to Game Summary after Analysis</h5>
+                <h5>6.7.13 Switch to Game Summary after Analysis</h5>
                 <p>Toggles whether CARA automatically switches to the Game Summary tab when analysis completes. When enabled, you are taken directly to the condensed overview of key game moments and statistics after analysis finishes.</p>
                 
-                <h5>6.7.13 Store Analysis results in PGN Tag</h5>
+                <h5>6.7.14 Store Analysis results in PGN Tag</h5>
                 <p>Toggles whether analysis results (evaluations, CPL values, move classifications) are saved in a PGN metadata tag for persistence across sessions. When enabled, analysis data is serialized and stored in the game's PGN, allowing you to preserve analysis results even after closing and reopening the database.</p>
             </div>
 

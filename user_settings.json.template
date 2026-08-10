@@ -866,6 +866,7 @@
       "Chaotic game",
       "Sharp"
     ],
+    "update_move_quality_nags_in_pgn": false,
     "store_analysis_results_in_pgn_tag": true,
     "switch_to_moves_list_at_start_of_analysis": true
   },

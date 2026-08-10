@@ -115,6 +115,7 @@ class GameAnalysisController(QObject):
         self._consecutive_errors = 0  # Track consecutive errors to detect engine failure
         self._brilliant_move_detection = False  # Brilliant move detection toggle
         self._auto_game_tagging = True  # Auto-tagging toggle (post-analysis)
+        self._update_move_quality_nags = False  # Write $1–$6 NAGs into PGN from assessments
         
         # Progress tracking
         self._last_progress_depth = 0
@@ -587,6 +588,27 @@ class GameAnalysisController(QObject):
                 
                 # Set flag to True after refinement (if enabled) completes
                 self.game_model.set_is_game_analyzed(True)
+
+                # Optionally rewrite mainline quality NAGs from assessments
+                if (
+                    self._update_move_quality_nags
+                    and self.game_model.active_game
+                    and self.moves_list_model
+                ):
+                    from app.services.move_quality_nag_service import MoveQualityNagService
+
+                    moves = self.moves_list_model.get_all_moves()
+                    if moves and MoveQualityNagService.apply_to_game(
+                        self.game_model.active_game, moves
+                    ):
+                        self.game_model.metadata_updated.emit()
+                        if self.database_controller:
+                            database_model = self.database_controller.find_database_model_for_game(
+                                self.game_model.active_game
+                            )
+                            if database_model:
+                                database_model.update_game(self.game_model.active_game)
+                                self.database_controller.mark_database_unsaved(database_model)
                 
                 # Store analysis results in PGN tag if enabled
                 if self.user_settings_service:
@@ -1430,6 +1452,14 @@ class GameAnalysisController(QObject):
             return list(getattr(self, "_auto_game_tagging_enabled_tags", []) or [])
         except Exception:
             return []
+
+    def set_update_move_quality_nags(self, enabled: bool) -> None:
+        """Set whether analysis should write move-quality NAGs into the PGN."""
+        self._update_move_quality_nags = bool(enabled)
+
+    def is_update_move_quality_nags_enabled(self) -> bool:
+        """Return whether move-quality NAG updates are enabled."""
+        return bool(getattr(self, "_update_move_quality_nags", False))
     
     def _calculate_material_sacrifice_with_lookahead(self, move_info: Dict[str, Any], lookahead_plies: int = 3) -> int:
         """Calculate material sacrifice using multi-ply look-ahead.
