@@ -57,6 +57,16 @@ class TestSameMoveExclusiveRules(unittest.TestCase):
         kept = HighlightDetector._prefer_exclusive_same_move_rules(highlights)
         self.assertEqual([h.rule_type for h in kept], ["tactical_sequence"])
 
+    def test_simplification_suppresses_exchange_sequence(self):
+        # Quiet queen trade: exchange_sequence has higher priority (30) but
+        # simplification is preferred when both describe the same trade.
+        highlights = [
+            _h("exchange_sequence", 30, "Queens were exchanged"),
+            _h("simplification", 22, "The position was simplified by a queen trade"),
+        ]
+        kept = HighlightDetector._prefer_exclusive_same_move_rules(highlights)
+        self.assertEqual([h.rule_type for h in kept], ["simplification"])
+
 
 if __name__ == "__main__":
     unittest.main()

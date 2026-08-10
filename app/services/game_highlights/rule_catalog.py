@@ -363,14 +363,14 @@ BUILTIN_RULES: Tuple[BuiltinRuleMeta, ...] = (
     BuiltinRuleMeta(
         "exchange_sequence",
         "Exchange sequence",
-        "Both sides capture a rook, or both capture a queen — a direct heavy-piece trade started by either side (evaluation may change)",
+        "Both sides capture a rook, or both capture a queen — a direct heavy-piece trade started by either side (evaluation may change). Yields to simplification when the same trade is a quiet even reduction",
         "material",
         30,
     ),
     BuiltinRuleMeta(
         "simplification",
         "Simplification",
-        "Both sides trade pieces of similar value off the board while the evaluation stays roughly the same — a quiet, even reduction of complexity",
+        "Both sides trade pieces of similar value off the board while the evaluation stays roughly the same — a quiet, even reduction of complexity. Preferred over exchange sequence when both match the same queen/rook trade",
         "material",
         22,
     ),

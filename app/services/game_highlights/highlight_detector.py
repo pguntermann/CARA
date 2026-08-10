@@ -54,6 +54,8 @@ class HighlightDetector:
             frozenset({"tactical_sequence", "forcing_combination", "tactical_resource"}),
             "tactical_sequence",
         ),
+        # Quiet Q/R trades also match simplification; keep the strategic label.
+        (frozenset({"exchange_sequence", "simplification"}), "simplification"),
     )
 
     @classmethod
