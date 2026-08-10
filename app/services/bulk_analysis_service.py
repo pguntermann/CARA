@@ -593,7 +593,7 @@ class BulkAnalysisService(QObject):
                 except Exception:
                     pass
 
-            # Store analysis results
+            # Post-steps: NAGs → store analysis tag (same order as single-game analysis).
             if analyzed_moves:
                 # Update game ECO from the last move with opening information (excluding repeat indicator)
                 # This matches the logic in GameController.get_game_info()
@@ -602,7 +602,30 @@ class BulkAnalysisService(QObject):
                         if move.eco and move.eco != opening_repeat_indicator:
                             game.eco = move.eco
                         break
-                
+
+                # Optionally rewrite mainline quality NAGs from assessments (before tag store
+                # so the exported PGN keeps both NAGs and a matching analysis snapshot).
+                if self._update_move_quality_nags and not self._cancelled:
+                    try:
+                        from app.services.move_quality_nag_service import MoveQualityNagService
+
+                        t_nag = time.perf_counter()
+                        ok = MoveQualityNagService.apply_to_game(game, analyzed_moves)
+                        try:
+                            LoggingService.get_instance().debug(
+                                "BulkAnalysis post-step: update_move_quality_nags "
+                                f"game_number={getattr(game, 'game_number', None)} "
+                                f"success={bool(ok)} "
+                                f"elapsed_ms={(time.perf_counter() - t_nag) * 1000.0:.1f}"
+                            )
+                        except Exception:
+                            pass
+                    except Exception as e:
+                        LoggingService.get_instance().warning(
+                            f"Move quality NAG update skipped due to error: {e}",
+                            exc_info=e,
+                        )
+
                 t_store = time.perf_counter()
                 success = AnalysisDataStorageService.store_analysis_data(
                     game,
@@ -620,7 +643,7 @@ class BulkAnalysisService(QObject):
                     )
                 except Exception:
                     pass
-                
+
                 if success:
                     game.analyzed = True
                     # Auto game tagging (if enabled): derive tags from evaluation curve and phases.
@@ -652,28 +675,6 @@ class BulkAnalysisService(QObject):
                         except Exception as e:
                             logging_service = LoggingService.get_instance()
                             logging_service.warning(f"Auto-tagging skipped due to error: {e}", exc_info=e)
-
-                    # Optionally rewrite mainline quality NAGs from assessments.
-                    if self._update_move_quality_nags and not self._cancelled:
-                        try:
-                            from app.services.move_quality_nag_service import MoveQualityNagService
-
-                            t_nag = time.perf_counter()
-                            ok = MoveQualityNagService.apply_to_game(game, analyzed_moves)
-                            try:
-                                LoggingService.get_instance().debug(
-                                    "BulkAnalysis post-step: update_move_quality_nags "
-                                    f"game_number={getattr(game, 'game_number', None)} "
-                                    f"success={bool(ok)} "
-                                    f"elapsed_ms={(time.perf_counter() - t_nag) * 1000.0:.1f}"
-                                )
-                            except Exception:
-                                pass
-                        except Exception as e:
-                            LoggingService.get_instance().warning(
-                                f"Move quality NAG update skipped due to error: {e}",
-                                exc_info=e,
-                            )
 
                     if progress_callback:
                         progress_callback(total_moves, total_moves, 0, True, f"Analysis complete: {total_moves} moves analyzed", None)

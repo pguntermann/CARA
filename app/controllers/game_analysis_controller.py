@@ -589,7 +589,11 @@ class GameAnalysisController(QObject):
                 # Set flag to True after refinement (if enabled) completes
                 self.game_model.set_is_game_analyzed(True)
 
-                # Optionally rewrite mainline quality NAGs from assessments
+                # Optionally rewrite mainline quality NAGs from assessments.
+                # Do not emit metadata_updated here: the moves-list rebuild overlays
+                # CARAAnalysisData from the PGN tag, which is still the *previous*
+                # analysis until store_analysis_data runs below.
+                nag_updated = False
                 if (
                     self._update_move_quality_nags
                     and self.game_model.active_game
@@ -601,16 +605,11 @@ class GameAnalysisController(QObject):
                     if moves and MoveQualityNagService.apply_to_game(
                         self.game_model.active_game, moves
                     ):
-                        self.game_model.metadata_updated.emit()
-                        if self.database_controller:
-                            database_model = self.database_controller.find_database_model_for_game(
-                                self.game_model.active_game
-                            )
-                            if database_model:
-                                database_model.update_game(self.game_model.active_game)
-                                self.database_controller.mark_database_unsaved(database_model)
-                
-                # Store analysis results in PGN tag if enabled
+                        nag_updated = True
+
+                # Store analysis results in PGN tag if enabled (after NAGs so the
+                # exported PGN keeps both fresh assessments and quality NAGs).
+                stored_ok = False
                 if self.user_settings_service:
                     settings = self.user_settings_service.get_settings()
                     game_analysis_settings = settings.get("game_analysis", {})
@@ -622,25 +621,23 @@ class GameAnalysisController(QObject):
                         moves = self.moves_list_model.get_all_moves()
                         if moves:
                             # Store analysis data in PGN tag (pass config for app version)
-                            success = AnalysisDataStorageService.store_analysis_data(
+                            stored_ok = AnalysisDataStorageService.store_analysis_data(
                                 self.game_model.active_game, 
                                 moves, 
                                 self.config
                             )
-                            if success:
-                                # Emit metadata_updated signal to notify views (e.g., PGN view, metadata view)
-                                self.game_model.metadata_updated.emit()
-                                
-                                # Update database model to persist the change and mark as unsaved
-                                if self.database_controller:
-                                    database_model = self.database_controller.find_database_model_for_game(
-                                        self.game_model.active_game
-                                    )
-                                    if database_model:
-                                        # Update the game in the database model
-                                        database_model.update_game(self.game_model.active_game)
-                                        # Mark database as having unsaved changes
-                                        self.database_controller.mark_database_unsaved(database_model)
+
+                # One metadata refresh after NAG + store so PGN/moves views see
+                # the updated tag (not a stale pre-analysis snapshot).
+                if nag_updated or stored_ok:
+                    self.game_model.metadata_updated.emit()
+                    if self.database_controller and self.game_model.active_game:
+                        database_model = self.database_controller.find_database_model_for_game(
+                            self.game_model.active_game
+                        )
+                        if database_model:
+                            database_model.update_game(self.game_model.active_game)
+                            self.database_controller.mark_database_unsaved(database_model)
             
             progress_service.hide_progress()
             

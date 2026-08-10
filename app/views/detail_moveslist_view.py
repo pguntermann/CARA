@@ -299,7 +299,12 @@ class DetailMovesListView(QWidget):
         self._on_active_move_changed(model.get_active_move_ply())
     
     def _on_metadata_updated_refresh_moves(self) -> None:
-        """Rebuild moves list when PGN changed (e.g. comments, headers)."""
+        """Rebuild moves list when PGN changed (e.g. comments, headers).
+
+        Prefer in-memory analysis fields over a possibly stale CARAAnalysisData
+        tag when the current model already has analysis (e.g. right after a live
+        analysis pass, before/without a matching tag write).
+        """
         if (
             not self._game_model
             or not self._game_model.active_game
@@ -309,7 +314,16 @@ class DetailMovesListView(QWidget):
             return
         game = self._game_model.active_game
         current_ply = self._game_model.get_active_move_ply()
+        existing = self._moveslist_model.get_all_moves()
         moves = self._game_controller.extract_moves_from_game(game)
+
+        from app.services.analysis_data_storage_service import (
+            merge_cara_analysis_overlay_onto_base,
+        )
+
+        if existing and moves and self._moveslist_model.has_analysis_data():
+            merge_cara_analysis_overlay_onto_base(moves, existing)
+
         self._moveslist_model.clear()
         for move in moves:
             self._moveslist_model.add_move(move)
