@@ -873,7 +873,7 @@
         "nag": 3
       },
       "Best Move": {
-        "enabled": true,
+        "enabled": false,
         "nag": 1
       },
       "Good Move": {
