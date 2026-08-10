@@ -46,10 +46,11 @@ QUALITY_NAG_CHOICES: Tuple[Tuple[str, Optional[int]], ...] = (
     ("?! ($6)", chess.pgn.NAG_DUBIOUS_MOVE),
 )
 
-# Per-classification defaults: enable + NAG (Good/Book off by design).
+# Per-classification defaults: enable + NAG (Best/Good/Book off by design;
+# Best keeps ! assigned so users can re-enable without re-picking the NAG).
 DEFAULT_MOVE_QUALITY_NAG_MAPPING: Dict[str, Dict[str, Any]] = {
     "Brilliant": {"enabled": True, "nag": chess.pgn.NAG_BRILLIANT_MOVE},
-    "Best Move": {"enabled": True, "nag": chess.pgn.NAG_GOOD_MOVE},
+    "Best Move": {"enabled": False, "nag": chess.pgn.NAG_GOOD_MOVE},
     "Good Move": {"enabled": False, "nag": None},
     "Book Move": {"enabled": False, "nag": None},
     "Inaccuracy": {"enabled": True, "nag": chess.pgn.NAG_DUBIOUS_MOVE},
