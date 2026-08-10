@@ -76,6 +76,11 @@ class HighlightRuleFrequencyDialog(QDialog):
         self._setup_ui(db_label, scanned, skipped, total_highlights)
         self._apply_styling()
         self._populate_table()
+        from app.views.widgets.themed_dialog_size_grip import (
+            install_themed_dialog_resize_grip,
+        )
+
+        install_themed_dialog_resize_grip(self, self.config)
 
     def _load_config(self) -> None:
         dialog_config = (

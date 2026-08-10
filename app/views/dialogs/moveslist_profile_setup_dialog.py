@@ -97,6 +97,11 @@ class MovesListProfileSetupDialog(QDialog):
         self._apply_styling()
         self._load_current_state()
         self.setWindowTitle("Setup Profile")
+        from app.views.widgets.themed_dialog_size_grip import (
+            install_themed_dialog_resize_grip,
+        )
+
+        install_themed_dialog_resize_grip(self, self.config)
         
         # Set splitter sizes after dialog is set up
         # Left panel: fixed width (narrower), Right panel: takes remaining space

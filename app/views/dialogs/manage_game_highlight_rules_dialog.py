@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from PyQt6.QtCore import QEvent, Qt, QTimer
-from PyQt6.QtGui import QBrush, QColor, QCursor, QShowEvent
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QShowEvent
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -18,7 +18,6 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSpinBox,
-    QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
@@ -40,111 +39,15 @@ from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.tooltip_utils import wrap_tooltip_text
 from app.views.dialogs.confirmation_dialog import ConfirmationDialog
 from app.views.style import StyleManager
+from app.views.widgets.row_hover_table_widget import RowHoverTableWidget
 
 
-class _ReorderableRulesTable(QTableWidget):
+class _ReorderableRulesTable(RowHoverTableWidget):
     """Table that reorders rows via InternalMove while preserving cell widgets."""
 
     def __init__(self, parent_dialog: "ManageGameHighlightRulesDialog") -> None:
         super().__init__()
         self.parent_dialog = parent_dialog
-        self._hover_row = -1
-        self.setMouseTracking(True)
-        self.viewport().setMouseTracking(True)
-        self.viewport().installEventFilter(self)
-        self.installEventFilter(self)
-
-    def clear_hover(self) -> None:
-        """Reset hover highlighting (e.g. after rebuilding rows)."""
-        self._set_hover_row(-1)
-
-    def eventFilter(self, watched, event) -> bool:  # type: ignore[override]
-        et = event.type()
-        if et in (
-            QEvent.Type.MouseMove,
-            QEvent.Type.HoverMove,
-            QEvent.Type.Enter,
-        ):
-            self._update_hover_from_cursor()
-        elif et == QEvent.Type.Leave:
-            # Child widgets (checkboxes) emit Leave; re-check after event settles
-            QTimer.singleShot(0, self._update_hover_from_cursor)
-        return super().eventFilter(watched, event)
-
-    def leaveEvent(self, event) -> None:  # type: ignore[override]
-        QTimer.singleShot(0, self._update_hover_from_cursor)
-        super().leaveEvent(event)
-
-    def _update_hover_from_cursor(self) -> None:
-        if not self.isVisible():
-            self._set_hover_row(-1)
-            return
-        pos = self.viewport().mapFromGlobal(QCursor.pos())
-        if not self.viewport().rect().contains(pos):
-            self._set_hover_row(-1)
-            return
-        index = self.indexAt(pos)
-        self._set_hover_row(index.row() if index.isValid() else -1)
-
-    def _set_hover_row(self, row: int) -> None:
-        if row == self._hover_row:
-            return
-        previous = self._hover_row
-        self._hover_row = row
-        if previous >= 0:
-            self._apply_row_chrome(previous)
-        if row >= 0:
-            self._apply_row_chrome(row)
-
-    def _apply_row_chrome(self, row: int) -> None:
-        if row < 0 or row >= self.rowCount():
-            return
-        dlg = self.parent_dialog
-        selected = False
-        model = self.selectionModel()
-        if model is not None:
-            selected = model.isRowSelected(row, self.rootIndex())
-
-        if selected:
-            # Selection styling comes from the stylesheet for items
-            item_bg = None
-            item_fg = None
-            widget_bg = (
-                f"background-color: rgb({dlg.table_selection_bg[0]}, "
-                f"{dlg.table_selection_bg[1]}, {dlg.table_selection_bg[2]});"
-            )
-        elif row == self._hover_row:
-            item_bg = QBrush(QColor(*dlg.table_hover_bg))
-            item_fg = QBrush(QColor(*dlg.table_hover_text))
-            widget_bg = (
-                f"background-color: rgb({dlg.table_hover_bg[0]}, "
-                f"{dlg.table_hover_bg[1]}, {dlg.table_hover_bg[2]});"
-            )
-        else:
-            item_bg = QBrush()
-            item_fg = QBrush()
-            widget_bg = "background-color: transparent;"
-
-        for col in range(self.columnCount()):
-            item = self.item(row, col)
-            if item is not None:
-                if item_bg is None:
-                    item.setData(Qt.ItemDataRole.BackgroundRole, None)
-                    item.setData(Qt.ItemDataRole.ForegroundRole, None)
-                else:
-                    item.setBackground(item_bg)
-                    item.setForeground(item_fg)
-            cell = self.cellWidget(row, col)
-            if cell is not None:
-                cell.setStyleSheet(widget_bg)
-
-    def track_cell_widget(self, widget: QWidget) -> None:
-        """Follow hover while the cursor is over embedded cell widgets."""
-        widget.setMouseTracking(True)
-        widget.installEventFilter(self)
-        for child in widget.findChildren(QWidget):
-            child.setMouseTracking(True)
-            child.installEventFilter(self)
 
     def dropEvent(self, event) -> None:  # type: ignore[override]
         if not self.parent_dialog._can_reorder():
@@ -248,6 +151,11 @@ class ManageGameHighlightRulesDialog(QDialog):
         self._setup_ui()
         self._apply_styling()
         self._reload_from_service()
+        from app.views.widgets.themed_dialog_size_grip import (
+            install_themed_dialog_resize_grip,
+        )
+
+        install_themed_dialog_resize_grip(self, self.config)
 
     def _load_config(self) -> None:
         dialog_config = (
@@ -703,7 +611,15 @@ class ManageGameHighlightRulesDialog(QDialog):
             f"QTableWidget::item {{"
             f"padding: {self.table_item_padding}px;"
             f"}}"
-            f"QTableWidget::item:selected {{"
+            # Match full-row hover chrome from RowHoverTableWidget. Without this,
+            # Windows paints a native per-cell mouse-over that only the cell under
+            # the cursor receives, so that cell looks differently highlighted.
+            f"QTableWidget::item:hover {{"
+            f"background-color: rgb({self.table_hover_bg[0]}, {self.table_hover_bg[1]}, {self.table_hover_bg[2]});"
+            f"color: rgb({self.table_hover_text[0]}, {self.table_hover_text[1]}, {self.table_hover_text[2]});"
+            f"}}"
+            f"QTableWidget::item:selected,"
+            f"QTableWidget::item:hover:selected {{"
             f"background-color: rgb({self.table_selection_bg[0]}, {self.table_selection_bg[1]}, {self.table_selection_bg[2]});"
             f"color: rgb({self.table_selection_text[0]}, {self.table_selection_text[1]}, {self.table_selection_text[2]});"
             f"}}"
@@ -715,6 +631,11 @@ class ManageGameHighlightRulesDialog(QDialog):
             f"font-family: {self.label_font_family};"
             f"font-size: {self.font_size}pt;"
             f"}}"
+        )
+        self.table.configure_row_chrome(
+            hover_bg=self.table_hover_bg,
+            hover_text=self.table_hover_text,
+            selection_bg=self.table_selection_bg,
         )
         self.table.setStyleSheet(table_style)
         StyleManager.style_table_scrollbar(
@@ -897,11 +818,7 @@ class ManageGameHighlightRulesDialog(QDialog):
             self.table.setDragEnabled(False)
 
     def _on_table_selection_changed(self) -> None:
-        # Refresh hover/selection chrome across visible rows that may have changed
-        for row in range(self.table.rowCount()):
-            self.table._apply_row_chrome(row)
-        if self.table._hover_row >= 0:
-            self.table._apply_row_chrome(self.table._hover_row)
+        self.table.refresh_row_chrome()
 
     def _item_flags(self) -> Qt.ItemFlag:
         flags = (

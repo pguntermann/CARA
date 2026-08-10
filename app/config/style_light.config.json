@@ -413,6 +413,15 @@
         "margin_top": 2,
         "margin_bottom": 2
       },
+      "dialog_resize_grip": {
+        "enabled": true,
+        "svg_path": "app/resources/icons/dialog_resize_grip.svg",
+        "size": 16,
+        "margin": 6,
+        "tint_color": {
+          "$ref": "$_COLOR_TEXT_4"
+        }
+      },
       "button": {
         "text_color": {
           "$ref": "$_COLOR_TEXT_SECONDARY"

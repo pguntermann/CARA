@@ -185,6 +185,12 @@ class InlineContentDialog(QDialog):
         )
         main_layout.addLayout(button_layout)
 
+        from app.views.widgets.themed_dialog_size_grip import (
+            install_themed_dialog_resize_grip,
+        )
+
+        install_themed_dialog_resize_grip(self, self.config)
+
     def showEvent(self, event) -> None:
         super().showEvent(event)
         # Scroll to top after layout; deferred so it runs after the dialog is shown
