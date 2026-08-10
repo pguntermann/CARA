@@ -11,9 +11,12 @@ from app.models.database_model import GameData
 from app.models.moveslist_model import MoveData
 from app.services.move_quality_nag_service import (
     ASSESSMENT_TO_QUALITY_NAG,
+    DEFAULT_MOVE_QUALITY_NAG_MAPPING,
     QUALITY_NAGS,
     MoveQualityNagService,
+    default_move_quality_nag_mapping,
     nag_for_assessment,
+    normalize_move_quality_nag_mapping,
 )
 
 
@@ -41,6 +44,22 @@ class TestNagForAssessment(unittest.TestCase):
         self.assertEqual(
             set(ASSESSMENT_TO_QUALITY_NAG),
             {"Brilliant", "Best Move", "Inaccuracy", "Mistake", "Miss", "Blunder"},
+        )
+
+    def test_custom_mapping_and_disabled(self):
+        mapping = default_move_quality_nag_mapping()
+        mapping["Best Move"] = {"enabled": False, "nag": 1}
+        mapping["Good Move"] = {"enabled": True, "nag": chess.pgn.NAG_GOOD_MOVE}
+        mapping["Blunder"] = {"enabled": True, "nag": chess.pgn.NAG_MISTAKE}
+        self.assertIsNone(nag_for_assessment("Best Move", mapping))
+        self.assertEqual(nag_for_assessment("Good Move", mapping), chess.pgn.NAG_GOOD_MOVE)
+        self.assertEqual(nag_for_assessment("Blunder", mapping), chess.pgn.NAG_MISTAKE)
+
+    def test_normalize_clamps_invalid_nag(self):
+        raw = {"Mistake": {"enabled": True, "nag": 99}}
+        normalized = normalize_move_quality_nag_mapping(raw)
+        self.assertEqual(
+            normalized["Mistake"]["nag"], DEFAULT_MOVE_QUALITY_NAG_MAPPING["Mistake"]["nag"]
         )
 
 
@@ -82,7 +101,8 @@ class TestApplyMoveQualityNags(unittest.TestCase):
                 assess_black="",
             ),
         ]
-        self.assertTrue(MoveQualityNagService.apply_to_game(game, moves))
+        mapping = default_move_quality_nag_mapping()
+        self.assertTrue(MoveQualityNagService.apply_to_game(game, moves, mapping))
 
         parsed = chess.pgn.read_game(io.StringIO(game.pgn))
         self.assertIsNotNone(parsed)
@@ -115,7 +135,8 @@ class TestApplyMoveQualityNags(unittest.TestCase):
                 assess_black="",
             ),
         ]
-        self.assertTrue(MoveQualityNagService.apply_to_game(game, moves))
+        mapping = default_move_quality_nag_mapping()
+        self.assertTrue(MoveQualityNagService.apply_to_game(game, moves, mapping))
         parsed = chess.pgn.read_game(io.StringIO(game.pgn))
         e4 = parsed.variation(0)
         self.assertIn(chess.pgn.NAG_DRAWISH_POSITION, e4.nags)
@@ -142,10 +163,39 @@ class TestApplyMoveQualityNags(unittest.TestCase):
                 assess_black="",
             ),
         ]
-        self.assertTrue(MoveQualityNagService.apply_to_game(game, moves))
+        mapping = default_move_quality_nag_mapping()
+        self.assertTrue(MoveQualityNagService.apply_to_game(game, moves, mapping))
         parsed = chess.pgn.read_game(io.StringIO(game.pgn))
         e4 = parsed.variation(0)
         self.assertEqual(e4.nags & QUALITY_NAGS, {chess.pgn.NAG_BLUNDER})
+
+    def test_custom_mapping_applied(self):
+        pgn = """[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "W"]
+[Black "B"]
+[Result "*"]
+
+1. e4 *
+"""
+        game = self._game_with_pgn(pgn)
+        moves = [
+            MoveData(
+                move_number=1,
+                white_move="e4",
+                black_move="",
+                assess_white="Inaccuracy",
+                assess_black="",
+            ),
+        ]
+        mapping = default_move_quality_nag_mapping()
+        mapping["Inaccuracy"] = {"enabled": True, "nag": chess.pgn.NAG_SPECULATIVE_MOVE}
+        self.assertTrue(MoveQualityNagService.apply_to_game(game, moves, mapping))
+        parsed = chess.pgn.read_game(io.StringIO(game.pgn))
+        e4 = parsed.variation(0)
+        self.assertEqual(e4.nags & QUALITY_NAGS, {chess.pgn.NAG_SPECULATIVE_MOVE})
 
 
 if __name__ == "__main__":

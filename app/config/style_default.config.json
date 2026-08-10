@@ -4111,6 +4111,117 @@
           }
         }
       },
+      "move_quality_nag_mapping": {
+        "window_title": "Move Quality NAG Mapping",
+        "width": 560,
+        "bottom_button_top_padding": 50,
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "layout": {
+          "spacing": 10,
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ]
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          }
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "focus_border_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ]
+        },
+        "table": {
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "alternate_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_4"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "border_radius": 3,
+          "header_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_3"
+          },
+          "header_text_color": {
+            "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "hover_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_6"
+          },
+          "hover_text_color": {
+            "$ref": "$_COLOR_TEXT_7"
+          },
+          "item_padding": 5,
+          "header_padding": 5,
+          "enabled_column_width": 80,
+          "classification_column_width": 140,
+          "nag_column_width": 120,
+          "row_height": 36,
+          "alternating_row_colors": true,
+          "header_section_border": false
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          }
+        }
+      },
       "ai_model_settings": {
         "width": 600,
         "bottom_button_top_padding": 50,

@@ -4016,6 +4016,117 @@
           }
         }
       },
+      "move_quality_nag_mapping": {
+        "window_title": "Move Quality NAG Mapping",
+        "width": 560,
+        "bottom_button_top_padding": 50,
+        "background_color": {
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_FOREST_OUTLINE"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_COCOA_BROWN"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "layout": {
+          "spacing": 10,
+          "margins": [
+            25,
+            25,
+            25,
+            25
+          ]
+        },
+        "labels": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_COCOA_BROWN"
+          }
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_INK_BODY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_PEACH_OUTLINE"
+          },
+          "focus_border_color": {
+            "$ref": "$_COLOR_DEEP_TEAL"
+          },
+          "border_radius": 3,
+          "padding": [
+            8,
+            6
+          ]
+        },
+        "table": {
+          "background_color": {
+            "$ref": "$_COLOR_WHEAT_CREAM"
+          },
+          "alternate_background_color": {
+            "$ref": "$_COLOR_SAGE_PAPER"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_INK_BODY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
+          },
+          "border_radius": 3,
+          "header_background_color": {
+            "$ref": "$_COLOR_SAGE_PAPER"
+          },
+          "header_text_color": {
+            "$ref": "$_COLOR_COCOA_BROWN"
+          },
+          "selection_background_color": {
+            "$ref": "$_COLOR_APRICOT_SELECTION"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_INK_BODY"
+          },
+          "hover_background_color": {
+            "$ref": "$_COLOR_KHAKI_DUST"
+          },
+          "hover_text_color": {
+            "$ref": "$_COLOR_MINK_BROWN"
+          },
+          "item_padding": 5,
+          "header_padding": 5,
+          "enabled_column_width": 80,
+          "classification_column_width": 140,
+          "nag_column_width": 120,
+          "row_height": 36,
+          "alternating_row_colors": true,
+          "header_section_border": false
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "border_color": {
+            "$ref": "$_COLOR_BOURBON_OUTLINE"
+          }
+        }
+      },
       "ai_model_settings": {
         "width": 600,
         "bottom_button_top_padding": 50,

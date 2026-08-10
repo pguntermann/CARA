@@ -4440,6 +4440,23 @@ class MainWindow(QMainWindow):
                 "update_move_quality_nags_in_pgn": self.update_move_quality_nags_action.isChecked() if hasattr(self, "update_move_quality_nags_action") else False,
                 "store_analysis_results_in_pgn_tag": self.store_analysis_results_action.isChecked() if hasattr(self, 'store_analysis_results_action') else False
             }
+            # Preserve nested prefs already held in memory (not represented as menu checks).
+            try:
+                settings_service = getattr(self, "_settings_service", None)
+                if settings_service is None:
+                    from app.services.user_settings_service import UserSettingsService
+                    settings_service = UserSettingsService.get_instance()
+                current_ga = settings_service.get_settings().get("game_analysis", {}) or {}
+                if "move_quality_nag_mapping" in current_ga:
+                    game_analysis_settings["move_quality_nag_mapping"] = current_ga[
+                        "move_quality_nag_mapping"
+                    ]
+                if "auto_game_tagging_enabled_tags" in current_ga:
+                    game_analysis_settings["auto_game_tagging_enabled_tags"] = current_ga[
+                        "auto_game_tagging_enabled_tags"
+                    ]
+            except Exception:
+                pass
         
         # Persist AI summary provider toggles before saving
         if hasattr(self, 'ai_summary_use_openai_action'):
@@ -4592,6 +4609,15 @@ class MainWindow(QMainWindow):
             classification_controller,
             self
         )
+        dialog.exec()
+
+    def _open_move_quality_nag_mapping(self) -> None:
+        """Open the move quality NAG mapping dialog."""
+        from app.views.dialogs.move_quality_nag_mapping_dialog import (
+            MoveQualityNagMappingDialog,
+        )
+
+        dialog = MoveQualityNagMappingDialog(self.config, self)
         dialog.exec()
 
     def _open_manage_highlight_rules(self) -> None:

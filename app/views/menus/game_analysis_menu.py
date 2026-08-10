@@ -99,6 +99,15 @@ def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
     )
     game_analysis_menu.addAction(mw.update_move_quality_nags_action)
 
+    mw.configure_move_quality_nag_mapping_action = QAction(
+        "Configure Move Quality NAG Mapping...", mw
+    )
+    mw.configure_move_quality_nag_mapping_action.setMenuRole(QAction.MenuRole.NoRole)
+    mw.configure_move_quality_nag_mapping_action.triggered.connect(
+        mw._open_move_quality_nag_mapping
+    )
+    game_analysis_menu.addAction(mw.configure_move_quality_nag_mapping_action)
+
     game_analysis_menu.addSeparator()
 
     mw.return_to_first_move_action = QAction("Return to PLY 0 after analysis completes", mw)
