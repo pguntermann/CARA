@@ -104,7 +104,7 @@ class MoveQualityNagMappingDialog(QDialog):
             table_config.get("classification_column_width", 140)
         )
         self.table_nag_width = int(table_config.get("nag_column_width", 120))
-        self.table_row_height = int(table_config.get("row_height", 36))
+        self.table_row_height = int(table_config.get("row_height", 40))
         self.table_alternating = bool(table_config.get("alternating_row_colors", True))
         self.table_alternate_bg = table_config.get(
             "alternate_background_color",
@@ -293,9 +293,15 @@ class MoveQualityNagMappingDialog(QDialog):
         layout = QHBoxLayout(container)
         layout.setContentsMargins(*margins)
         layout.setSpacing(0)
+        # Keep editors vertically centered in the taller row.
+        align = Qt.AlignmentFlag.AlignVCenter
         if center:
-            layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(widget)
+            align |= Qt.AlignmentFlag.AlignHCenter
+            layout.setAlignment(align)
+            layout.addWidget(widget)
+        else:
+            layout.setAlignment(align)
+            layout.addWidget(widget, 1)
         self.table.setCellWidget(row, column, container)
         self.table.track_cell_widget(container)
 
@@ -306,6 +312,9 @@ class MoveQualityNagMappingDialog(QDialog):
             item.setFlags(self._item_flags())
             self.table.setItem(row, self.COL_MEANING, item)
         item.setText(self._meaning_for_nag(nag))
+        item.setTextAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
 
     def _on_row_nag_changed(self, label: str, index: int) -> None:
         if self._updating_table:
@@ -360,6 +369,9 @@ class MoveQualityNagMappingDialog(QDialog):
             class_item = QTableWidgetItem(label)
             class_item.setFlags(flags)
             class_item.setData(Qt.ItemDataRole.UserRole, label)
+            class_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+            )
             self.table.setItem(row, self.COL_CLASSIFICATION, class_item)
 
             nag_item = QTableWidgetItem("")
@@ -535,8 +547,11 @@ class MoveQualityNagMappingDialog(QDialog):
             return
         # Unified ui.styles defaults (same as other dialogs).
         StyleManager.style_comboboxes(comboboxes, self.config)
+        # Leave a few pixels for cell margins so the combo is not clipped.
+        combo_min_h = max(26, self.table_row_height - 12)
         for combo in comboboxes:
-            combo.setMinimumHeight(max(26, self.table_row_height - 10))
+            combo.setMinimumHeight(combo_min_h)
+            combo.setMaximumHeight(combo_min_h)
             combo.setSizePolicy(
                 QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
             )

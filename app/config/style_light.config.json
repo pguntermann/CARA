@@ -4218,7 +4218,7 @@
           "enabled_column_width": 80,
           "classification_column_width": 140,
           "nag_column_width": 120,
-          "row_height": 36,
+          "row_height": 40,
           "alternating_row_colors": true,
           "header_section_border": true
         },
