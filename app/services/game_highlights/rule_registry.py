@@ -47,6 +47,9 @@ class RuleRegistry:
         from app.services.game_highlights.rules.positional_improvement_rule import PositionalImprovementRule
         from app.services.game_highlights.rules.initiative_rule import InitiativeRule
         from app.services.game_highlights.rules.tactical_resource_rule import TacticalResourceRule
+        from app.services.game_highlights.rules.captured_undefended_piece_rule import (
+            CapturedUndefendedPieceRule,
+        )
         from app.services.game_highlights.rules.centralization_rule import CentralizationRule
         from app.services.game_highlights.rules.pawn_storm_rule import PawnStormRule
         from app.services.game_highlights.rules.delayed_mating_rule import DelayedMatingRule
@@ -55,6 +58,7 @@ class RuleRegistry:
         from app.services.game_highlights.rules.pin_rule import PinRule
         from app.services.game_highlights.rules.discovered_attack_rule import DiscoveredAttackRule
         from app.services.game_highlights.rules.battery_rule import BatteryRule
+        from app.services.game_highlights.rules.doubled_on_open_file_rule import DoubledOnOpenFileRule
         from app.services.game_highlights.rules.decoy_rule import DecoyRule
         from app.services.game_highlights.rules.zwischenzug_rule import ZwischenzugRule
         from app.services.game_highlights.rules.interference_rule import InterferenceRule
@@ -93,6 +97,9 @@ class RuleRegistry:
         self.register_rule(PositionalImprovementRule(rules_config.get('positional_improvement', {})))
         self.register_rule(InitiativeRule(rules_config.get('initiative', {})))
         self.register_rule(TacticalResourceRule(rules_config.get('tactical_resource', {})))
+        self.register_rule(
+            CapturedUndefendedPieceRule(rules_config.get('captured_undefended_piece', {}))
+        )
         self.register_rule(CentralizationRule(rules_config.get('centralization', {})))
         self.register_rule(PawnStormRule(rules_config.get('pawn_storm', {})))
         self.register_rule(DelayedMatingRule(rules_config.get('delayed_mating', {})))
@@ -101,6 +108,7 @@ class RuleRegistry:
         self.register_rule(PinRule(rules_config.get('pin', {})))
         self.register_rule(DiscoveredAttackRule(rules_config.get('discovered_attack', {})))
         self.register_rule(BatteryRule(rules_config.get('battery', {})))
+        self.register_rule(DoubledOnOpenFileRule(rules_config.get('doubled_on_open_file', {})))
         self.register_rule(DecoyRule(rules_config.get('decoy', {})))
         self.register_rule(ZwischenzugRule(rules_config.get('zwischenzug', {})))
         self.register_rule(InterferenceRule(rules_config.get('interference', {})))

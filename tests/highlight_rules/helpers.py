@@ -1,297 +1,275 @@
-"""Helper utilities for highlight rule testing."""
+"""Helpers for game highlight rule unit tests.
 
-import sys
-import os
-import json
-from typing import List, Optional, Dict, Any, Tuple
-from pathlib import Path
+Build a moves list from PGN (FENs, captures, piece counts, material) and
+optionally overlay fake engine/analysis fields that rules consume.
+"""
 
-# Add project root to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from __future__ import annotations
+
+import re
+from typing import Any, Dict, List, Optional
+
+import chess
 
 from app.models.moveslist_model import MoveData
-from app.services.game_highlights.base_rule import GameHighlight, RuleContext
-from app.services.game_highlights.highlight_detector import HighlightDetector
-from app.services.game_highlights.rule_registry import RuleRegistry
-from app.config.config_loader import ConfigLoader
+from app.services.game_highlights.base_rule import GameHighlight, HighlightRule, RuleContext
+from app.utils.material_tracker import (
+    calculate_material_count,
+    count_pieces,
+    get_captured_piece_letter,
+)
+
+# analysis[move_number]["white"|"black"] -> field overrides for that half-move
+AnalysisMap = Dict[int, Dict[str, Dict[str, Any]]]
+
+_DEFAULT_ANALYSIS = {
+    "cpl": "0",
+    "assess": "Best Move",
+}
 
 
-def load_test_game(filename: str) -> List[MoveData]:
-    """Load a test game from JSON file and convert to MoveData list.
-    
-    Args:
-        filename: Name of JSON file in tests/highlight_rules/games/
-    
-    Returns:
-        List of MoveData objects.
+def _tokenize_pgn(pgn: str) -> List[str]:
+    """Extract SAN tokens from a PGN fragment or move list."""
+    text = pgn.strip()
+    text = re.sub(r"\{[^}]*\}", " ", text)
+    text = re.sub(r";[^\n]*", " ", text)
+    text = re.sub(r"\([^)]*\)", " ", text)
+    for result in ("1-0", "0-1", "1/2-1/2", "*"):
+        text = text.replace(result, " ")
+    text = re.sub(r"\d+\.(\.\.)?", " ", text)
+    return [t for t in text.split() if t]
+
+
+def _apply_side_analysis(move: MoveData, side: str, fields: Dict[str, Any]) -> None:
+    """Map short analysis keys onto MoveData white_/black_ fields."""
+    prefix = "white" if side == "white" else "black"
+    mapping = {
+        "cpl": f"cpl_{prefix}",
+        "cpl_2": f"cpl_{prefix}_2",
+        "cpl_3": f"cpl_{prefix}_3",
+        "assess": f"assess_{prefix}",
+        "eval": f"eval_{prefix}",
+        "best": f"best_{prefix}",
+        "best_2": f"best_{prefix}_2",
+        "best_3": f"best_{prefix}_3",
+        "is_top3": f"{prefix}_is_top3",
+        "depth": f"{prefix}_depth",
+        "seldepth": f"{prefix}_seldepth",
+    }
+    for key, value in fields.items():
+        attr = mapping.get(key, key)
+        if hasattr(move, attr):
+            setattr(move, attr, value)
+
+
+def _fill_board_stats(move: MoveData, board: chess.Board) -> None:
+    """Write material / piece counts for both sides onto MoveData."""
+    counts = count_pieces(board, is_white=True)
+    move.white_queens = counts[chess.QUEEN]
+    move.white_rooks = counts[chess.ROOK]
+    move.white_bishops = counts[chess.BISHOP]
+    move.white_knights = counts[chess.KNIGHT]
+    move.white_pawns = counts[chess.PAWN]
+    move.white_material = calculate_material_count(board, is_white=True)
+
+    counts = count_pieces(board, is_white=False)
+    move.black_queens = counts[chess.QUEEN]
+    move.black_rooks = counts[chess.ROOK]
+    move.black_bishops = counts[chess.BISHOP]
+    move.black_knights = counts[chess.KNIGHT]
+    move.black_pawns = counts[chess.PAWN]
+    move.black_material = calculate_material_count(board, is_white=False)
+
+
+def moves_from_pgn(
+    pgn: str,
+    *,
+    starting_fen: Optional[str] = None,
+    analysis: Optional[AnalysisMap] = None,
+) -> List[MoveData]:
+    """Build a MoveData list from PGN / SAN text.
+
+    Always fills board-derived fields: ``fen_*``, ``*_capture``, piece counts,
+    and material. Analysis fields default to a clean good move (``cpl="0"``,
+    ``assess="Best Move"``) so quality-gated rules work without boilerplate.
+
+    Override per half-move via ``analysis``::
+
+        analysis = {
+            21: {
+                "white": {"cpl": "0", "assess": "Best Move", "eval": "+3.7", "best": "Nxc7+"},
+                "black": {"cpl": "251", "assess": "Blunder", "eval": "+1.2"},
+            }
+        }
+
+    Short keys (``cpl``, ``assess``, ``eval``, ``best``, ``best_2``, ``best_3``,
+    ``cpl_2``, ``cpl_3``, ``is_top3``, ``depth``) map onto the matching
+    ``MoveData`` attributes. Full attribute names are also accepted.
     """
-    games_dir = Path(__file__).parent / "games"
-    filepath = games_dir / filename
-    
-    if not filepath.exists():
-        raise FileNotFoundError(f"Test game file not found: {filepath}")
-    
-    with open(filepath, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    
-    moves = []
-    for move_dict in data:
-        move = MoveData(
-            move_number=move_dict.get('move_number', 0),
-            white_move=move_dict.get('white_move', ''),
-            black_move=move_dict.get('black_move', ''),
-            eval_white=move_dict.get('eval_white', ''),
-            eval_black=move_dict.get('eval_black', ''),
-            cpl_white=move_dict.get('cpl_white', ''),
-            cpl_black=move_dict.get('cpl_black', ''),
-            cpl_white_2=move_dict.get('cpl_white_2', ''),
-            cpl_white_3=move_dict.get('cpl_white_3', ''),
-            cpl_black_2=move_dict.get('cpl_black_2', ''),
-            cpl_black_3=move_dict.get('cpl_black_3', ''),
-            assess_white=move_dict.get('assess_white', ''),
-            assess_black=move_dict.get('assess_black', ''),
-            best_white=move_dict.get('best_white', ''),
-            best_black=move_dict.get('best_black', ''),
-            best_white_2=move_dict.get('best_white_2', ''),
-            best_white_3=move_dict.get('best_white_3', ''),
-            best_black_2=move_dict.get('best_black_2', ''),
-            best_black_3=move_dict.get('best_black_3', ''),
-            white_is_top3=move_dict.get('white_is_top3', False),
-            black_is_top3=move_dict.get('black_is_top3', False),
-            white_depth=move_dict.get('white_depth', 0),
-            black_depth=move_dict.get('black_depth', 0),
-            eco=move_dict.get('eco', ''),
-            opening_name=move_dict.get('opening_name', ''),
-            comment=move_dict.get('comment', ''),
-            white_capture=move_dict.get('white_capture', ''),
-            black_capture=move_dict.get('black_capture', ''),
-            white_material=move_dict.get('white_material', 0),
-            black_material=move_dict.get('black_material', 0),
-            white_queens=move_dict.get('white_queens', 0),
-            white_rooks=move_dict.get('white_rooks', 0),
-            white_bishops=move_dict.get('white_bishops', 0),
-            white_knights=move_dict.get('white_knights', 0),
-            white_pawns=move_dict.get('white_pawns', 0),
-            black_queens=move_dict.get('black_queens', 0),
-            black_rooks=move_dict.get('black_rooks', 0),
-            black_bishops=move_dict.get('black_bishops', 0),
-            black_knights=move_dict.get('black_knights', 0),
-            black_pawns=move_dict.get('black_pawns', 0),
-            fen_white=move_dict.get('fen_white', ''),
-            fen_black=move_dict.get('fen_black', '')
-        )
-        moves.append(move)
-    
+    analysis = analysis or {}
+    board = chess.Board(starting_fen) if starting_fen else chess.Board()
+    sans = _tokenize_pgn(pgn)
+    moves: List[MoveData] = []
+    i = 0
+    move_number = board.fullmove_number
+
+    while i < len(sans):
+        md = MoveData(move_number=move_number)
+
+        if board.turn == chess.WHITE:
+            wsan = sans[i]
+            i += 1
+            wmove = board.parse_san(wsan)
+            wcap = get_captured_piece_letter(board, wmove)
+            board.push(wmove)
+            md.white_move = wsan
+            md.white_capture = wcap
+            md.fen_white = board.fen()
+            md.cpl_white = _DEFAULT_ANALYSIS["cpl"]
+            md.assess_white = _DEFAULT_ANALYSIS["assess"]
+            _fill_board_stats(md, board)
+        else:
+            # Black to move at the start of this full-move row (e.g. mid-game FEN).
+            # ``fen_white`` is the before-board for Black's half-move.
+            md.fen_white = board.fen()
+            _fill_board_stats(md, board)
+
+        if i < len(sans) and board.turn == chess.BLACK:
+            bsan = sans[i]
+            i += 1
+            bmove = board.parse_san(bsan)
+            bcap = get_captured_piece_letter(board, bmove)
+            board.push(bmove)
+            md.black_move = bsan
+            md.black_capture = bcap
+            md.fen_black = board.fen()
+            md.cpl_black = _DEFAULT_ANALYSIS["cpl"]
+            md.assess_black = _DEFAULT_ANALYSIS["assess"]
+            _fill_board_stats(md, board)
+
+        side_analysis = analysis.get(move_number, {})
+        if md.white_move and "white" in side_analysis:
+            _apply_side_analysis(md, "white", side_analysis["white"])
+        if md.black_move and "black" in side_analysis:
+            _apply_side_analysis(md, "black", side_analysis["black"])
+
+        moves.append(md)
+        move_number += 1
+
     return moves
 
 
-def create_highlight_detector() -> HighlightDetector:
-    """Create a HighlightDetector instance with configuration.
-    
-    Returns:
-        Configured HighlightDetector instance.
-    """
-    config_loader = ConfigLoader()
-    config = config_loader.load()
-    highlights_config = config.get('ui', {}).get('panels', {}).get('detail', {}).get('summary', {}).get('highlights', {})
-    
-    rule_registry = RuleRegistry(highlights_config.get('rules', {}))
-    
-    # Get CPL thresholds from config or use defaults
-    good_move_max_cpl = highlights_config.get('good_move_max_cpl', 50)
-    inaccuracy_max_cpl = highlights_config.get('inaccuracy_max_cpl', 100)
-    mistake_max_cpl = highlights_config.get('mistake_max_cpl', 200)
-    
-    detector = HighlightDetector(
-        highlights_config,
-        rule_registry,
-        good_move_max_cpl=good_move_max_cpl,
-        inaccuracy_max_cpl=inaccuracy_max_cpl,
-        mistake_max_cpl=mistake_max_cpl
+def make_rule_context(
+    moves: List[MoveData],
+    move_index: int,
+    **overrides: Any,
+) -> RuleContext:
+    """Build a RuleContext for ``moves[move_index]``."""
+    prev = moves[move_index - 1] if move_index > 0 else None
+    nxt = moves[move_index + 1] if move_index + 1 < len(moves) else None
+
+    if prev is not None:
+        prev_fields = dict(
+            prev_white_bishops=prev.white_bishops,
+            prev_black_bishops=prev.black_bishops,
+            prev_white_knights=prev.white_knights,
+            prev_black_knights=prev.black_knights,
+            prev_white_queens=prev.white_queens,
+            prev_black_queens=prev.black_queens,
+            prev_white_rooks=prev.white_rooks,
+            prev_black_rooks=prev.black_rooks,
+            prev_white_pawns=prev.white_pawns,
+            prev_black_pawns=prev.black_pawns,
+            prev_white_material=prev.white_material,
+            prev_black_material=prev.black_material,
+        )
+    else:
+        prev_fields = dict(
+            prev_white_bishops=2,
+            prev_black_bishops=2,
+            prev_white_knights=2,
+            prev_black_knights=2,
+            prev_white_queens=1,
+            prev_black_queens=1,
+            prev_white_rooks=2,
+            prev_black_rooks=2,
+            prev_white_pawns=8,
+            prev_black_pawns=8,
+            prev_white_material=0,
+            prev_black_material=0,
+        )
+
+    kwargs = dict(
+        move_index=move_index,
+        total_moves=len(moves),
+        opening_end=15,
+        middlegame_end=40,
+        prev_move=prev,
+        next_move=nxt,
+        last_book_move_number=0,
+        theory_departed=True,
+        good_move_max_cpl=50,
+        inaccuracy_max_cpl=100,
+        mistake_max_cpl=200,
+        shared_state={},
+        moves=moves,
+        **prev_fields,
     )
-    
-    return detector
+    kwargs.update(overrides)
+    return RuleContext(**kwargs)
 
 
-def run_highlight_detection(moves: List[MoveData]) -> List[GameHighlight]:
-    """Run highlight detection on a list of moves.
-    
-    Args:
-        moves: List of MoveData objects.
-    
-    Returns:
-        List of GameHighlight objects.
-    """
-    detector = create_highlight_detector()
-    
-    # Calculate phase boundaries (simplified - can be enhanced)
-    total_moves = len(moves)
-    opening_end = 10  # Default opening end
-    middlegame_end = 30  # Default middlegame end
-    
-    # Try to detect from moves
-    for move in moves:
-        if move.opening_name and move.opening_name != "*":
-            # Still in opening
-            if move.move_number > opening_end:
-                opening_end = move.move_number
-        if move.move_number > middlegame_end:
-            middlegame_end = move.move_number
-    
-    highlights = detector.detect_highlights(
-        moves,
-        total_moves=total_moves,
-        opening_end=opening_end,
-        middlegame_end=middlegame_end
+def evaluate_rule(
+    rule: HighlightRule,
+    moves: List[MoveData],
+    move_number: int,
+    **context_overrides: Any,
+) -> List[GameHighlight]:
+    """Evaluate ``rule`` on the row with the given move number."""
+    move_index = next(
+        (i for i, m in enumerate(moves) if m.move_number == move_number),
+        None,
     )
-    
+    if move_index is None:
+        raise ValueError(f"move_number {move_number} not found in moves list")
+    context = make_rule_context(moves, move_index, **context_overrides)
+    return rule.evaluate(moves[move_index], context)
+
+
+def evaluate_rule_sequence(
+    rule: HighlightRule,
+    moves: List[MoveData],
+    **context_overrides: Any,
+) -> List[GameHighlight]:
+    """Evaluate ``rule`` on every row, reusing one ``shared_state`` dict.
+
+    Needed for rules that accumulate streaks across moves (e.g. delayed mating).
+    """
+    shared_state = context_overrides.pop("shared_state", {})
+    highlights: List[GameHighlight] = []
+    for move_index, move in enumerate(moves):
+        context = make_rule_context(
+            moves, move_index, shared_state=shared_state, **context_overrides
+        )
+        highlights.extend(rule.evaluate(move, context))
     return highlights
 
 
-def find_highlights(highlights: List[GameHighlight], 
-                   move_number: int,
-                   rule_type: str,
-                   side: Optional[str] = None) -> List[GameHighlight]:
-    """Find highlights matching criteria.
-    
-    Args:
-        highlights: List of GameHighlight objects.
-        move_number: Move number to match.
-        rule_type: Rule type to match (e.g., "decoy", "fork").
-        side: Optional side filter ("white" or "black").
-    
-    Returns:
-        List of matching GameHighlight objects.
-    """
+def find_highlights(
+    highlights: List[GameHighlight],
+    move_number: int,
+    rule_type: str,
+    side: Optional[str] = None,
+) -> List[GameHighlight]:
+    """Filter highlights by move number, rule type, and optional side."""
     matching = []
     for h in highlights:
-        if h.move_number == move_number and h.rule_type == rule_type:
-            if side is None:
-                matching.append(h)
-            elif side == "white" and h.is_white:
-                matching.append(h)
-            elif side == "black" and not h.is_white:
-                matching.append(h)
+        if h.move_number != move_number or h.rule_type != rule_type:
+            continue
+        if side is None:
+            matching.append(h)
+        elif side == "white" and h.is_white:
+            matching.append(h)
+        elif side == "black" and not h.is_white:
+            matching.append(h)
     return matching
-
-
-def explain_failure(move_number: int,
-                    rule_type: str,
-                    side: str,
-                    moves: List[MoveData],
-                    highlights: List[GameHighlight]) -> None:
-    """Provide detailed failure analysis for debugging.
-    
-    Args:
-        move_number: Move number that should have matched.
-        rule_type: Rule type that should have matched.
-        side: Side ("white" or "black").
-        moves: Full list of moves.
-        highlights: All highlights found.
-    """
-    print(f"\n{'='*80}")
-    print(f"FAILURE ANALYSIS: Move {move_number} - {rule_type} ({side})")
-    print(f"{'='*80}\n")
-    
-    # Find the move
-    move = None
-    move_index = None
-    for i, m in enumerate(moves):
-        if m.move_number == move_number:
-            move = m
-            move_index = i
-            break
-    
-    if not move:
-        print(f"ERROR: Move {move_number} not found in game data!")
-        return
-    
-    is_white = (side == "white")
-    move_san = move.white_move if is_white else move.black_move
-    
-    print(f"Target Move: {move_number}. {move_san} ({side})")
-    print(f"Expected Rule: {rule_type}")
-    print()
-    
-    # Show move details
-    print(f"Move Details:")
-    print(f"  Move: {move_san}")
-    if is_white:
-        print(f"  CPL: {move.cpl_white}")
-        print(f"  Assessment: {move.assess_white}")
-        print(f"  Material (before): {move.white_material}")
-        print(f"  Material (after): {move.black_material if move_index < len(moves) - 1 else 'N/A'}")
-        print(f"  Capture: {move.white_capture}")
-    else:
-        print(f"  CPL: {move.cpl_black}")
-        print(f"  Assessment: {move.assess_black}")
-        print(f"  Material (before): {move.black_material}")
-        print(f"  Material (after): {moves[move_index + 1].white_material if move_index < len(moves) - 1 else 'N/A'}")
-        print(f"  Capture: {move.black_capture}")
-    print()
-    
-    # Show FEN positions
-    if is_white:
-        print(f"Position After Move:")
-        print(f"  FEN: {move.fen_white}")
-    else:
-        print(f"Position After Move:")
-        print(f"  FEN: {move.fen_black}")
-    print()
-    
-    # Show follow-up moves
-    if move_index < len(moves) - 1:
-        next_move = moves[move_index + 1]
-        print(f"Follow-up Move:")
-        if is_white:
-            print(f"  {next_move.move_number}. ... {next_move.black_move}")
-        else:
-            print(f"  {next_move.move_number}. {next_move.white_move} ...")
-        if move_index < len(moves) - 2:
-            next_next = moves[move_index + 2]
-            if is_white:
-                print(f"  {next_next.move_number}. {next_next.white_move} ...")
-            else:
-                print(f"  {next_next.move_number}. ... {next_next.black_move}")
-    print()
-    
-    # Show what highlights were found for this move
-    move_highlights = [h for h in highlights if h.move_number == move_number]
-    if move_highlights:
-        print(f"Highlights Found for Move {move_number}:")
-        for h in move_highlights:
-            print(f"  - {h.rule_type} ({'white' if h.is_white else 'black'}): {h.description}")
-            print(f"    Priority: {h.priority}")
-    else:
-        print(f"No highlights found for move {move_number}")
-    print()
-    
-    # Show all highlights for context
-    print(f"All Highlights in Game:")
-    for h in highlights:
-        print(f"  Move {h.move_number}: {h.rule_type} ({'white' if h.is_white else 'black'}) - {h.description}")
-    print()
-    
-    # Material analysis for decoy/fork rules
-    if rule_type in ["decoy", "fork", "pin", "skewer"]:
-        print(f"Material Analysis:")
-        if move_index > 0:
-            prev_move = moves[move_index - 1]
-            if is_white:
-                material_before = prev_move.black_material
-                material_after = move.black_material
-                material_change = material_after - material_before
-                print(f"  Black material before: {material_before}")
-                print(f"  Black material after: {material_after}")
-                print(f"  Material change: {material_change}")
-            else:
-                material_before = prev_move.white_material
-                material_after = move.white_material
-                material_change = material_after - material_before
-                print(f"  White material before: {material_before}")
-                print(f"  White material after: {material_after}")
-                print(f"  Material change: {material_change}")
-        print()
-    
-    print(f"{'='*80}\n")
-

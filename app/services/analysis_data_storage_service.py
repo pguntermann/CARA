@@ -240,6 +240,16 @@ class AnalysisDataStorageService:
             
             # Update analyzed field
             game.analyzed = True
+
+            LoggingService.get_instance().debug(
+                "Wrote CARAAnalysisData tag: "
+                f"game_number={getattr(game, 'game_number', None)} "
+                f"moves={len(moves)} "
+                f"json_bytes={len(data_bytes)} "
+                f"encoded_len={len(encoded)} "
+                f"checksum={checksum} "
+                f"info={info_str!r}"
+            )
             
             return True
         except Exception as e:

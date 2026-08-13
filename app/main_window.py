@@ -1512,6 +1512,19 @@ class MainWindow(QMainWindow):
         """
         if hasattr(self, 'game_info_action'):
             self.game_info_action.setChecked(show)
+
+    def _open_opening_encyclopedia(self) -> None:
+        """Open the opening encyclopedia for the current game (same as game-info ⓘ)."""
+        main_panel = getattr(self, "main_panel", None)
+        game_info_view = getattr(main_panel, "game_info_view", None) if main_panel else None
+        if game_info_view is None or not game_info_view.is_encyclopedia_openable():
+            return
+        game_info_view.open_encyclopedia()
+
+    def _update_opening_encyclopedia_action_state(self, openable: bool) -> None:
+        """Enable Board/context Opening Encyclopedia when a lookup is possible."""
+        if hasattr(self, "opening_encyclopedia_action"):
+            self.opening_encyclopedia_action.setEnabled(bool(openable))
     
     def _on_playedmove_arrow_visibility_changed(self, visible: bool) -> None:
         """Handle played move arrow visibility change to update menu toggle.
@@ -1819,6 +1832,16 @@ class MainWindow(QMainWindow):
         evaluation_model = self.controller.get_evaluation_controller().get_evaluation_model()
         self.main_panel = MainPanel(self.config, board_model, game_model, game_controller, evaluation_model)
         top_splitter.addWidget(self.main_panel)
+
+        # Keep Board/context Opening Encyclopedia enabled in sync with game-info lookup.
+        game_info_view = getattr(self.main_panel, "game_info_view", None)
+        if game_info_view is not None:
+            game_info_view.encyclopedia_openable_changed.connect(
+                self._update_opening_encyclopedia_action_state
+            )
+            self._update_opening_encyclopedia_action_state(
+                game_info_view.is_encyclopedia_openable()
+            )
         
         # Connect positional heat-map model to chessboard widget
         positional_heatmap_controller = self.controller.get_positional_heatmap_controller()
@@ -2331,24 +2354,11 @@ class MainWindow(QMainWindow):
     def _debug_copy_game_highlights_json(self) -> None:
         """DEBUG: Copy game highlights data as JSON."""
         self.controller.get_debug_controller().copy_game_highlights_json_to_clipboard()
-    
-    def _debug_create_highlight_rule_test_data(self) -> None:
-        """DEBUG: Prompt for filename and save analysis JSON for highlight rule tests."""
-        from app.views.dialogs.input_dialog import InputDialog
 
-        filename, ok = InputDialog.get_text(
-            self.config,
-            "Create Highlight Rule Test Data",
-            "Enter filename (e.g., my_rule_case.json):",
-            "",
-            self,
-        )
-        if not ok or not filename:
-            return
+    def _debug_scan_highlight_rule_frequency(self) -> None:
+        """DEBUG: Count highlight rule hits across analyzed games in the active DB."""
+        self.controller.get_debug_controller().scan_highlight_rule_frequency(parent=self)
 
-        self.controller.get_debug_controller().create_highlight_rule_test_data_file(filename)
-    
-    
     def _update_moves_list_menu(self) -> None:
         """Update the Moves List menu with current profiles and columns."""
         from app.views.menus.moves_list_menu import rebuild_moves_list_menu
@@ -3167,6 +3177,15 @@ class MainWindow(QMainWindow):
         if hasattr(self.controller, "game_analysis_controller"):
             self.controller.game_analysis_controller.set_auto_game_tagging_enabled_tags(saved)
     
+    def _on_update_move_quality_nags_toggled(self, checked: bool) -> None:
+        """Handle Update move quality NAGs in PGN toggle."""
+        if hasattr(self, "_settings_service"):
+            self._settings_service.update_game_analysis(
+                {"update_move_quality_nags_in_pgn": bool(checked)}
+            )
+        if hasattr(self.controller, "game_analysis_controller"):
+            self.controller.game_analysis_controller.set_update_move_quality_nags(bool(checked))
+
     def _on_store_analysis_results_toggled(self, checked: bool) -> None:
         """Handle Store Analysis results in PGN Tag toggle.
         
@@ -4256,6 +4275,17 @@ class MainWindow(QMainWindow):
             self.controller.game_analysis_controller.set_auto_game_tagging_enabled_tags(
                 [t for t in list(AUTO_TAGS) if str(t).casefold() in enabled_cf]
             )
+
+        # Update move quality NAGs in PGN (default OFF)
+        update_move_quality_nags = game_analysis_settings.get(
+            "update_move_quality_nags_in_pgn", False
+        )
+        if hasattr(self, "update_move_quality_nags_action"):
+            self.update_move_quality_nags_action.setChecked(bool(update_move_quality_nags))
+        if hasattr(self.controller, "game_analysis_controller"):
+            self.controller.game_analysis_controller.set_update_move_quality_nags(
+                bool(update_move_quality_nags)
+            )
         
         # Return to PLY 0 after analysis completes
         return_to_first_move = game_analysis_settings.get("return_to_first_move_after_analysis", False)
@@ -4422,8 +4452,26 @@ class MainWindow(QMainWindow):
                 "normalized_evaluation_graph": self.normalized_graph_action.isChecked() if hasattr(self, 'normalized_graph_action') else False,
                 "brilliant_move_detection": self.brilliant_move_detection_action.isChecked() if hasattr(self, 'brilliant_move_detection_action') else False,
                 "auto_game_tagging": self.auto_game_tagging_action.isChecked() if hasattr(self, "auto_game_tagging_action") else True,
+                "update_move_quality_nags_in_pgn": self.update_move_quality_nags_action.isChecked() if hasattr(self, "update_move_quality_nags_action") else False,
                 "store_analysis_results_in_pgn_tag": self.store_analysis_results_action.isChecked() if hasattr(self, 'store_analysis_results_action') else False
             }
+            # Preserve nested prefs already held in memory (not represented as menu checks).
+            try:
+                settings_service = getattr(self, "_settings_service", None)
+                if settings_service is None:
+                    from app.services.user_settings_service import UserSettingsService
+                    settings_service = UserSettingsService.get_instance()
+                current_ga = settings_service.get_settings().get("game_analysis", {}) or {}
+                if "move_quality_nag_mapping" in current_ga:
+                    game_analysis_settings["move_quality_nag_mapping"] = current_ga[
+                        "move_quality_nag_mapping"
+                    ]
+                if "auto_game_tagging_enabled_tags" in current_ga:
+                    game_analysis_settings["auto_game_tagging_enabled_tags"] = current_ga[
+                        "auto_game_tagging_enabled_tags"
+                    ]
+            except Exception:
+                pass
         
         # Persist AI summary provider toggles before saving
         if hasattr(self, 'ai_summary_use_openai_action'):
@@ -4577,6 +4625,24 @@ class MainWindow(QMainWindow):
             self
         )
         dialog.exec()
+
+    def _open_move_quality_nag_mapping(self) -> None:
+        """Open the move quality NAG mapping dialog."""
+        from app.views.dialogs.move_quality_nag_mapping_dialog import (
+            MoveQualityNagMappingDialog,
+        )
+
+        dialog = MoveQualityNagMappingDialog(self.config, self)
+        dialog.exec()
+
+    def _open_manage_highlight_rules(self) -> None:
+        """Open the manage game highlight rules dialog."""
+        from app.views.dialogs.manage_game_highlight_rules_dialog import (
+            ManageGameHighlightRulesDialog,
+        )
+
+        dialog = ManageGameHighlightRulesDialog(self.config, parent=self)
+        dialog.exec()
     
     def _on_game_analysis_started(self) -> None:
         """Handle game analysis started signal."""
@@ -4635,10 +4701,20 @@ class MainWindow(QMainWindow):
                             enabled_tags = ga.get("auto_game_tagging_enabled_tags", []) if isinstance(ga, dict) else []
                         except Exception:
                             enabled_tags = []
+                        # Reuse summary already computed when analysis completed
+                        # (GameSummaryController refreshes on is_game_analyzed).
+                        precomputed_summary = None
+                        try:
+                            gsc = self.controller.get_game_summary_controller()
+                            if gsc:
+                                precomputed_summary = gsc.get_current_summary()
+                        except Exception:
+                            precomputed_summary = None
                         result = tagging_service.detect_tags(
                             moves,
                             game_result=getattr(game, "result", None),
                             enabled_tags=enabled_tags,
+                            summary=precomputed_summary,
                         )
                         merged = tagging_service.merge_with_existing_tags(
                             getattr(game, "game_tags_raw", "") or "",

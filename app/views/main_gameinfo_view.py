@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QToolButton, QVBoxLayout, QWidget
 
@@ -18,6 +18,10 @@ from app.views.dialogs.opening_encyclopedia_dialog import OpeningEncyclopediaDia
 class MainGameInfoView(QWidget):
     """Game information header view displaying player names, ELOs, and opening."""
 
+    # Emitted when menu/context "Opening Encyclopedia" should enable/disable
+    # (encyclopedia DB available + resolvable entry for current opening).
+    encyclopedia_openable_changed = pyqtSignal(bool)
+
     def __init__(self, config: Dict[str, Any]) -> None:
         """Initialize the game info view.
 
@@ -26,10 +30,12 @@ class MainGameInfoView(QWidget):
         """
         super().__init__()
         self.config = config
-        self._encyclopedia = OpeningEncyclopediaService(config)
+        self._encyclopedia = OpeningEncyclopediaService.get_instance(config)
         self._current_eco = ""
         self._current_name = ""
+        self._encyclopedia_openable = False
         self._setup_ui()
+        self._refresh_encyclopedia_openable(emit=True)
 
     def _encyclopedia_link_config(self) -> Dict[str, Any]:
         # Prefer gameinfo-local settings; fall back to Opening Explorer link config.
@@ -235,19 +241,41 @@ class MainGameInfoView(QWidget):
         self._current_eco = eco or ""
         self._current_name = name or ""
         self.opening_label.setText(f"{eco} - {name}")
+        self._refresh_encyclopedia_openable(emit=True)
         self._update_encyclopedia_button()
 
+    def is_encyclopedia_openable(self) -> bool:
+        """True when Board/context Opening Encyclopedia should be enabled.
+
+        Requires: encyclopedia DB available, a real opening name (not Starting /
+        Unknown), and a resolvable encyclopedia entry for name+ECO.
+        """
+        return bool(self._encyclopedia_openable)
+
+    def _compute_encyclopedia_openable(self) -> bool:
+        if not self._encyclopedia.available:
+            return False
+        if not self._current_name:
+            return False
+        if self._current_name in (OPENING_UNKNOWN.name, OPENING_STARTING.name):
+            return False
+        return self._encyclopedia.has_entry(self._current_name, self._current_eco)
+
+    def _refresh_encyclopedia_openable(self, *, emit: bool) -> None:
+        openable = self._compute_encyclopedia_openable()
+        if openable == self._encyclopedia_openable:
+            return
+        self._encyclopedia_openable = openable
+        if emit:
+            self.encyclopedia_openable_changed.emit(openable)
+
     def _update_encyclopedia_button(self) -> None:
-        show = False
-        if (
+        # Header ⓘ also requires the link toggle and a visible game-info header.
+        show = (
             self._encyclopedia_enabled
-            and self._encyclopedia.available
             and self.isVisible()
-            and self._current_name
-            and self._current_name != OPENING_UNKNOWN.name
-            and self._current_name != OPENING_STARTING.name
-        ):
-            show = self._encyclopedia.has_entry(self._current_name, self._current_eco)
+            and self._encyclopedia_openable
+        )
         self._encyclopedia_btn.setVisible(show)
 
     def showEvent(self, event) -> None:  # type: ignore[no-untyped-def]
@@ -256,6 +284,12 @@ class MainGameInfoView(QWidget):
         self._update_encyclopedia_button()
 
     def _open_encyclopedia(self) -> None:
+        self.open_encyclopedia()
+
+    def open_encyclopedia(self) -> None:
+        """Open the encyclopedia for the current opening (same as the info button)."""
+        if not self.is_encyclopedia_openable():
+            return
         entry = self._encyclopedia.lookup(self._current_name, self._current_eco)
         if entry is None:
             return

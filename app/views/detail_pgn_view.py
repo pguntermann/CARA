@@ -56,14 +56,6 @@ class ClickablePgnTextEdit(QTextEdit):
         self._move_checker: Optional[Callable[[int], int]] = None
         self._comment_double_click_handler: Optional[Callable[[int], bool]] = None
         self._key_handler: Optional[Callable[[QKeyEvent], bool]] = None
-        
-        # Install a shortcut to override default Ctrl+C behavior
-        # This ensures our custom copy() method is called even if Qt handles the shortcut
-        copy_shortcut = QShortcut(QKeySequence("Ctrl+C"), self)
-        copy_shortcut.activated.connect(self.copy)
-        # Also handle Cmd+C on macOS
-        copy_shortcut_mac = QShortcut(QKeySequence("Meta+C"), self)
-        copy_shortcut_mac.activated.connect(self.copy)
     
     def set_click_handler(self, handler: Callable[[int], int]) -> None:
         """Set the handler function to call when a move is clicked.
@@ -111,8 +103,10 @@ class ClickablePgnTextEdit(QTextEdit):
             ply_index = self._click_handler(click_pos)
             
             if ply_index > 0:
-                # Move was found and navigation should happen
-                # Don't call super() to prevent default text selection behavior
+                # Take keyboard focus even though we skip super() (no text
+                # selection). Otherwise the previous widget (e.g. notes) keeps
+                # focus and still receives edit chords like Ctrl+V.
+                self.setFocus(Qt.FocusReason.MouseFocusReason)
                 event.accept()
                 return
         
@@ -147,24 +141,11 @@ class ClickablePgnTextEdit(QTextEdit):
         self._key_handler = handler
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
-        """Override key press to intercept Ctrl+C (or Cmd+C on macOS) and use our custom copy.
-        
-        Args:
-            event: Key event.
-        """
-        # Check for Ctrl+C (or Cmd+C on macOS)
-        # ControlModifier works for both Ctrl on Windows/Linux and Cmd on macOS
-        if event.key() == Qt.Key.Key_C and (event.modifiers() & Qt.KeyboardModifier.ControlModifier):
-            # Call our custom copy method
-            self.copy()
-            event.accept()
-            return
-
+        """Forward optional key handler; otherwise use default QTextEdit behavior."""
         if self._key_handler is not None and self._key_handler(event):
             event.accept()
             return
-        
-        # For all other keys, use default behavior
+
         super().keyPressEvent(event)
     
     def contextMenuEvent(self, event: QContextMenuEvent) -> None:
@@ -186,7 +167,8 @@ class ClickablePgnTextEdit(QTextEdit):
             StyleManager.style_context_menu(menu, cfg)
             apply_dark_standard_textedit_context_menu_icons(menu, cfg)
 
-        # Find and replace the copy action to use our custom copy method
+        # Find and replace the copy action to use our custom copy method.
+        # No keyboard shortcut: Ctrl+C is reserved for Copy selected Games.
         copy_action = None
         for action in menu.actions():
             # Check for copy action by text (handles different locales)
@@ -196,6 +178,7 @@ class ClickablePgnTextEdit(QTextEdit):
                 break
         
         if copy_action:
+            copy_action.setShortcut(QKeySequence())
             # Disconnect any existing connections (ignore errors if not connected)
             try:
                 copy_action.triggered.disconnect()
@@ -220,9 +203,9 @@ class ClickablePgnTextEdit(QTextEdit):
         menu.exec(event.globalPos())
     
     def copy(self) -> None:
-        """Override copy to normalize PGN text before placing it on the clipboard.
+        """Copy cleaned PGN text (selection or full game) to the clipboard.
         
-        This intercepts both keyboard shortcuts (Ctrl+C) and context menu copy actions.
+        Invoked from the context menu; keyboard Ctrl+C is used for Copy selected Games.
         """
         # Get selected text or all text if no selection
         cursor = self.textCursor()

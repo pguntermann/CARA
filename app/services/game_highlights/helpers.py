@@ -1,8 +1,62 @@
 """Helper functions for game highlight detection."""
 
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Union
 import chess
 from app.services.game_highlights.constants import PIECE_VALUES
+
+
+def piece_type_from_letter(letter: str) -> Optional[chess.PieceType]:
+    """Map a piece letter (``n``/``N``, capture codes, etc.) to a ``chess.PieceType``."""
+    if not letter:
+        return None
+    try:
+        return chess.Piece.from_symbol(letter.lower()).piece_type
+    except ValueError:
+        return None
+
+
+def piece_type_from_san(san: str) -> Optional[chess.PieceType]:
+    """Infer the moving piece type from SAN (pawn file letters, ``NBRQK``, or ``O-O``)."""
+    if not san:
+        return None
+    if san.startswith("O"):
+        return chess.KING
+    ch = san[0]
+    if ch in "NBRQK":
+        return piece_type_from_letter(ch)
+    if ch in "abcdefgh":
+        return chess.PAWN
+    return None
+
+
+def piece_name(
+    piece: Union[str, chess.PieceType, chess.Piece, None],
+    *,
+    default: str = "",
+) -> str:
+    """Human-readable piece name (``knight``, ``queen``, …).
+
+    Accepts a letter (``n``/``N``), ``chess.PieceType``, ``chess.Piece``, or
+    already-lowercased name-like strings fall through to ``default`` / as-is.
+    """
+    if piece is None:
+        return default
+    if isinstance(piece, chess.Piece):
+        return chess.piece_name(piece.piece_type)
+    if isinstance(piece, int):
+        try:
+            return chess.piece_name(piece)
+        except (IndexError, ValueError, TypeError):
+            return default
+    letter = str(piece).strip()
+    if not letter:
+        return default
+    if len(letter) == 1:
+        piece_type = piece_type_from_letter(letter)
+        if piece_type is not None:
+            return chess.piece_name(piece_type)
+        return default or letter
+    return letter.lower()
 
 
 def parse_fen(fen: str) -> Optional[chess.Board]:
@@ -34,6 +88,33 @@ def is_central_square(square: chess.Square) -> bool:
     """
     from app.services.game_highlights.constants import CENTRAL_SQUARES
     return square in CENTRAL_SQUARES
+
+
+def is_file_open(board: chess.Board, file: int) -> bool:
+    """True if neither side has a pawn on ``file`` (0–7)."""
+    for color in (chess.WHITE, chess.BLACK):
+        if any(chess.square_file(sq) == file for sq in board.pieces(chess.PAWN, color)):
+            return False
+    return True
+
+
+def is_passed_pawn(
+    board: chess.Board, pawn_square: chess.Square, color: chess.Color
+) -> bool:
+    """True if no enemy pawn stands on the same or adjacent files ahead of this pawn."""
+    pawn_file = chess.square_file(pawn_square)
+    pawn_rank = chess.square_rank(pawn_square)
+    opponent = not color
+    ahead = range(pawn_rank + 1, 8) if color == chess.WHITE else range(pawn_rank - 1, -1, -1)
+
+    for check_file in (pawn_file - 1, pawn_file, pawn_file + 1):
+        if check_file < 0 or check_file > 7:
+            continue
+        for rank in ahead:
+            piece = board.piece_at(chess.square(check_file, rank))
+            if piece and piece.piece_type == chess.PAWN and piece.color == opponent:
+                return False
+    return True
 
 
 def get_piece_square(board: chess.Board, piece_type: chess.PieceType, color: chess.Color) -> Optional[chess.Square]:
@@ -146,6 +227,138 @@ def parse_evaluation(eval_str: Optional[str]) -> Optional[float]:
 
 # Minimum value for a piece to be considered "valuable" for tactical patterns
 MIN_VALUABLE_PIECE_VALUE = 300
+
+
+def is_attacked_by_pawn(
+    board: chess.Board, square: chess.Square, color: chess.Color
+) -> bool:
+    """True if a pawn of ``color`` currently attacks ``square``."""
+    for attacker in board.attackers(color, square):
+        piece = board.piece_at(attacker)
+        if piece is not None and piece.piece_type == chess.PAWN:
+            return True
+    return False
+
+
+def san_is_check(san: str) -> bool:
+    """True if SAN indicates check or mate."""
+    return "+" in (san or "") or "#" in (san or "")
+
+
+def san_is_tactical(san: str) -> bool:
+    """True if SAN is a capture, check, or mate."""
+    return "x" in (san or "") or "+" in (san or "") or "#" in (san or "")
+
+
+def _can_legally_capture(
+    board: chess.Board, from_square: chess.Square, to_square: chess.Square
+) -> bool:
+    """True if the piece on ``from_square`` can legally capture on ``to_square``.
+
+    ``board.attackers`` is geometric only (e.g. a king "attacks" a defended
+    square it cannot step onto). Fork safety must use legal moves.
+    """
+    piece = board.piece_at(from_square)
+    if piece is None or piece.color != board.turn:
+        return False
+    move = chess.Move(from_square, to_square)
+    if piece.piece_type == chess.PAWN and chess.square_rank(to_square) in (0, 7):
+        move = chess.Move(from_square, to_square, promotion=chess.QUEEN)
+    return move in board.legal_moves
+
+
+def is_exploitable_fork(
+    board: chess.Board,
+    piece_square: chess.Square,
+    color: chess.Color,
+) -> bool:
+    """True if the piece on ``piece_square`` creates an exploitable fork.
+
+    A fork requires attacking two or more enemy pieces after the move.
+    Capturing an undefended piece with check is not itself a fork — the
+    captured unit is gone (e.g. Rxf4+ only checks the king afterward).
+
+    Exploitable forks include:
+    - undefended target worth more than the forker
+    - forker cheaper than every valuable target (up after a recapture)
+    - royal fork that also attacks free material still on the board
+      (e.g. Nxc7+ checks the king and attacks an undefended pawn on a6)
+    """
+    opponent_color = not color
+    piece = board.piece_at(piece_square)
+    if piece is None or piece.color != color:
+        return False
+
+    # Forker safety / cheap elimination (legal captures only):
+    # - Hanging forker (not defended) that the opponent can capture is not exploitable.
+    # - If the forker is defended, equal-or-lesser capturers can still trade out cheaply.
+    attacker_value = PIECE_VALUES.get(piece.symbol().lower(), 0)
+    forker_defended = board.is_attacked_by(color, piece_square)
+    legal_capturers = [
+        sq
+        for sq in board.attackers(opponent_color, piece_square)
+        if _can_legally_capture(board, sq, piece_square)
+    ]
+
+    if legal_capturers and not forker_defended:
+        return False
+
+    if forker_defended:
+        for attacker_sq in legal_capturers:
+            attacker_piece = board.piece_at(attacker_sq)
+            if attacker_piece is None:
+                continue
+            attacker_piece_value = PIECE_VALUES.get(
+                attacker_piece.symbol().lower(), 0
+            )
+            if attacker_piece_value <= attacker_value:
+                return False
+
+    attacked_squares = board.attacks(piece_square)
+
+    enemy_pieces = []
+    valuable_values: List[int] = []
+    undefended_higher_value_count = 0
+    undefended_free_count = 0
+    attacks_king = False
+
+    for sq in attacked_squares:
+        enemy_piece = board.piece_at(sq)
+        if enemy_piece and enemy_piece.color == opponent_color:
+            enemy_pieces.append((sq, enemy_piece))
+            piece_value = PIECE_VALUES.get(enemy_piece.symbol().lower(), 0)
+
+            if enemy_piece.piece_type == chess.KING:
+                attacks_king = True
+                continue
+
+            defended = board.is_attacked_by(opponent_color, sq)
+            if piece_value >= 100 and not defended:
+                undefended_free_count += 1
+                if piece_value > attacker_value:
+                    undefended_higher_value_count += 1
+
+            if piece_value >= MIN_VALUABLE_PIECE_VALUE:
+                valuable_values.append(piece_value)
+
+    if len(enemy_pieces) < 2:
+        return False
+
+    if attacks_king:
+        has_secondary = len(valuable_values) >= 1 or undefended_free_count >= 1
+        if not has_secondary:
+            return False
+    elif len(valuable_values) < 2:
+        return False
+
+    if undefended_higher_value_count >= 1:
+        return True
+    if attacks_king and undefended_free_count >= 1:
+        return True
+    if valuable_values and attacker_value < min(valuable_values):
+        return True
+
+    return False
 
 
 def can_profitably_fork_square(board: chess.Board, attacker_square: chess.Square,
@@ -460,77 +673,32 @@ def check_tactical_pattern_on_follow_up_moves(board_after_capture: chess.Board,
         if board_after_follow_up.is_checkmate():
             if target_piece.piece_type == chess.KING:
                 return "checkmate"
-        
-        # Check if this move gives check and leads to material gain
-        # This handles cases like Rxe8+ where check wins material (e.g., captures a piece)
-        # For a decoy, we need to verify the check leads to a net material win by looking forward
-        if board_after_follow_up.is_check():
-            # Check material change on this move
+
+        # Check that captures material (e.g. Rxe8+ after a decoy): require an actual
+        # capture, not a bare check that merely happens while an unrelated piece is
+        # undefended (that mislabels mating nets as "fork").
+        if board_after_follow_up.is_check() and "x" in (move_san or ""):
             material_gain_this_move = 0
             if material_before is not None and material_after is not None:
                 material_gain_this_move = material_after - material_before
-            
-            # IMPORTANT: For a decoy, the check might capture material on the same move
-            # This is the case for Rxe8+ where the check itself captures the knight
-            # We should check if material increased on this move (indicating a capture)
             if material_gain_this_move >= MIN_VALUABLE_PIECE_VALUE:
-                return "fork"  # Generic "tactical pattern" for check+material gain
-            
-            # Also check if the move is a capture (indicated by 'x' in SAN)
-            # For a decoy, a check that captures material is profitable
-            # We check the board directly to verify a capture occurred, since material tracking
-            # might not be accurate or updated immediately
-            if "x" in move_san:
-                # Check if material increased (if tracking is accurate)
-                if material_before is not None and material_after is not None:
-                    if material_after - material_before >= 200:
-                        return "fork"  # Generic "tactical pattern" for check+capture
-                
-                # Even if material tracking doesn't show an increase, a check+capture is likely profitable
-                # This handles cases where material tracking is delayed or inaccurate
-                # For decoy purposes, if we have check + capture notation, it's a profitable tactical pattern
-                return "fork"  # Generic "tactical pattern" for check+capture
-            
-            # Look at the next move to see if material was gained (opponent's response)
-            # For a decoy, the check should lead to material gain after opponent responds
-            if i + 1 < len(follow_up_moves):
-                next_move = follow_up_moves[i + 1]
-                if color == chess.WHITE:
-                    material_after_next = next_move.white_material
-                else:
-                    material_after_next = next_move.black_material
-                
-                # Calculate net material gain after opponent's response
-                net_material_gain = material_after_next - material_before if material_before is not None else 0
-                
-                # If we gained material after the check sequence, it's profitable
+                return "fork"
+            # Capture+check is still a real tactical follow-up even if material
+            # fields are briefly stale.
+            return "fork"
+
+        # Check that leads to a clear material gain on the next ply
+        if board_after_follow_up.is_check() and i + 1 < len(follow_up_moves):
+            next_move = follow_up_moves[i + 1]
+            if color == chess.WHITE:
+                material_after_next = next_move.white_material
+            else:
+                material_after_next = next_move.black_material
+            if material_before is not None and material_after_next is not None:
+                net_material_gain = material_after_next - material_before
                 if net_material_gain >= MIN_VALUABLE_PIECE_VALUE:
-                    return "fork"  # Generic "tactical pattern" for check+material gain
-            
-            # Also check if target piece becomes vulnerable (undefended) after the check
-            target_after = board_after_follow_up.piece_at(target_square)
-            if target_after and target_after.color == opponent_color:
-                # Check if target is now undefended (can be captured)
-                if not board_after_follow_up.is_attacked_by(opponent_color, target_square):
-                    # Target is undefended - verify we can attack it or will gain material
-                    # For a decoy, if check + target is undefended, it's likely profitable
-                    if target_value >= MIN_VALUABLE_PIECE_VALUE:
-                        # Look ahead one more move to see if we capture it
-                        if i + 1 < len(follow_up_moves):
-                            next_move = follow_up_moves[i + 1]
-                            if color == chess.WHITE:
-                                material_after_next = next_move.white_material
-                            else:
-                                material_after_next = next_move.black_material
-                            
-                            net_gain = material_after_next - material_before if material_before is not None else 0
-                            if net_gain >= target_value - 200:  # Allow some tolerance
-                                return "fork"  # Generic tactical pattern
-                        else:
-                            # No next move, but check + undefended valuable piece is likely profitable
-                            if target_value >= MIN_VALUABLE_PIECE_VALUE:
-                                return "fork"  # Generic tactical pattern
-    
+                    return "fork"
+
     return None
 
 
@@ -558,6 +726,50 @@ def parse_destination_square(move_san: str) -> Optional[chess.Square]:
         
         if len(dest_part) >= 2:
             return chess.parse_square(dest_part[-2:])
+    except (ValueError, AttributeError):
+        pass
+    return None
+
+
+def find_moved_piece_square(
+    move_san: str,
+    board_before: chess.Board,
+    board_after: chess.Board,
+    color: chess.Color,
+) -> Optional[chess.Square]:
+    """Find the destination square of the piece that moved this half-move.
+
+    Shared replacement for the many per-rule ``_find_moved_piece_square`` copies.
+    """
+    dest_square = parse_destination_square(move_san)
+    if dest_square is None:
+        return None
+
+    try:
+        for piece_type in (
+            chess.PAWN,
+            chess.KNIGHT,
+            chess.BISHOP,
+            chess.ROOK,
+            chess.QUEEN,
+            chess.KING,
+        ):
+            pieces_before = list(board_before.pieces(piece_type, color))
+            pieces_after = list(board_after.pieces(piece_type, color))
+
+            for sq in pieces_before:
+                if sq not in pieces_after:
+                    if dest_square in pieces_after or board_after.piece_at(
+                        dest_square
+                    ) == chess.Piece(piece_type, color):
+                        return dest_square
+
+            if len(pieces_after) > len(pieces_before) and dest_square in pieces_after:
+                return dest_square
+
+        piece_at_dest = board_after.piece_at(dest_square)
+        if piece_at_dest and piece_at_dest.color == color:
+            return dest_square
     except (ValueError, AttributeError):
         pass
     return None

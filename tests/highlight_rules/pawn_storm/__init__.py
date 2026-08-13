@@ -1,2 +1,0 @@
-"""Pawn storm rule tests."""
-

@@ -27,10 +27,57 @@ class HighlightDetector:
         """
         self.config = config
         self.registry = rule_registry
-        self.highlights_per_phase_limit = config.get('highlights_per_phase_limit', 10)
+        self.highlights_per_phase_limit = int(config.get('highlights_per_phase_limit', 10))
+        self.max_per_move = max(1, int(config.get('max_per_move', 2)))
+        self.phase_dedupe_enabled = bool(config.get('phase_dedupe_enabled', True))
+        self.cross_phase_penalty_enabled = bool(
+            config.get('cross_phase_penalty_enabled', True)
+        )
+        self.cross_phase_penalty = max(0, int(config.get('cross_phase_penalty', 8)))
+        self.cross_phase_penalty_min_highlights = max(
+            0, int(config.get('cross_phase_penalty_min_highlights', 7))
+        )
         self.good_move_max_cpl = good_move_max_cpl
         self.inaccuracy_max_cpl = inaccuracy_max_cpl
         self.mistake_max_cpl = mistake_max_cpl
+
+    # Sibling rule_types that describe the same idea on one ply.
+    # Optional preferred id wins even over a higher-priority sibling (e.g. clearly
+    # best tactical_resource must still yield to a plain undefended capture).
+    _SAME_MOVE_EXCLUSIVE_GROUPS = (
+        (frozenset({"fork", "skewer"}), None),
+        # Battery (attacks a unit on the line) subsumes plain open-file doubling.
+        (frozenset({"battery", "doubled_on_open_file"}), None),
+        (frozenset({"captured_undefended_piece", "tactical_resource"}), "captured_undefended_piece"),
+        # Multi-move forcing win story beats a one-move sacrifice/resource label.
+        (
+            frozenset({"tactical_sequence", "forcing_combination", "tactical_resource"}),
+            "tactical_sequence",
+        ),
+        # Quiet Q/R trades also match simplification; keep the strategic label.
+        (frozenset({"exchange_sequence", "simplification"}), "simplification"),
+    )
+
+    @classmethod
+    def _prefer_exclusive_same_move_rules(
+        cls,
+        highlights: List[GameHighlight],
+    ) -> List[GameHighlight]:
+        """Drop siblings from exclusive groups on the same move."""
+        result = highlights
+        for overlap, preferred in cls._SAME_MOVE_EXCLUSIVE_GROUPS:
+            present = [h for h in result if h.rule_type in overlap]
+            if len(present) <= 1:
+                continue
+            if preferred and any(h.rule_type == preferred for h in present):
+                keep_type = preferred
+            else:
+                keep_type = present[0].rule_type  # list is priority-sorted desc
+            result = [
+                h for h in result
+                if h.rule_type not in overlap or h.rule_type == keep_type
+            ]
+        return result
     
     def detect_highlights(self, moves: List[MoveData], total_moves: int,
                          opening_end: int, middlegame_end: int) -> List[GameHighlight]:
@@ -123,7 +170,14 @@ class HighlightDetector:
             for rule in rules:
                 try:
                     rule_highlights = rule.evaluate(move, context)
-                    highlights.extend(rule_highlights)
+                    highlights.extend(
+                        self._apply_rule_overrides(
+                            rule,
+                            rule_highlights,
+                            opening_end,
+                            middlegame_end,
+                        )
+                    )
                 except Exception:
                     # Silently skip rules that fail (to prevent one bad rule from breaking everything)
                     pass
@@ -156,6 +210,46 @@ class HighlightDetector:
         highlights = self._post_process_highlights(highlights, shared_state, opening_end, middlegame_end)
         
         return highlights
+
+    def _phase_for_move(
+        self,
+        move_number: int,
+        opening_end: int,
+        middlegame_end: int,
+    ) -> str:
+        """Return opening/middlegame/endgame for a move number (start of multi-move)."""
+        if move_number <= opening_end:
+            return "opening"
+        if move_number < middlegame_end:
+            return "middlegame"
+        return "endgame"
+
+    def _apply_rule_overrides(
+        self,
+        rule: Any,
+        rule_highlights: List[GameHighlight],
+        opening_end: int,
+        middlegame_end: int,
+    ) -> List[GameHighlight]:
+        """Filter by allowed phases and apply optional priority override."""
+        if not rule_highlights:
+            return []
+        allowed = getattr(rule, "allowed_phases", None)
+        priority_override = getattr(rule, "priority_override", None)
+        if not allowed and priority_override is None:
+            return rule_highlights
+
+        filtered: List[GameHighlight] = []
+        for highlight in rule_highlights:
+            phase = self._phase_for_move(
+                highlight.move_number, opening_end, middlegame_end
+            )
+            if allowed and phase not in allowed:
+                continue
+            if priority_override is not None:
+                highlight.priority = int(priority_override)
+            filtered.append(highlight)
+        return filtered
     
     def _post_process_highlights(self, highlights: List[GameHighlight],
                                  shared_state: Dict[str, Any],
@@ -293,8 +387,8 @@ class HighlightDetector:
         
         # Track patterns seen in previous phases for dynamic prioritization
         # Priority penalty for highlights that appeared in previous phases
-        PRIORITY_PENALTY_FOR_REPEAT = 8
-        MIN_HIGHLIGHTS_FOR_PENALTY = 7
+        PRIORITY_PENALTY_FOR_REPEAT = self.cross_phase_penalty
+        MIN_HIGHLIGHTS_FOR_PENALTY = self.cross_phase_penalty_min_highlights
         
         # Apply dynamic prioritization: penalize highlights that appeared in previous phases
         def apply_cross_phase_penalty(phase_highlights: List[GameHighlight],
@@ -308,6 +402,9 @@ class HighlightDetector:
             Returns:
                 List of highlights with adjusted priorities, re-sorted.
             """
+            if not self.cross_phase_penalty_enabled or PRIORITY_PENALTY_FOR_REPEAT <= 0:
+                return phase_highlights
+
             # Only apply penalty if there are enough highlights to choose from
             if len(phase_highlights) <= MIN_HIGHLIGHTS_FOR_PENALTY:
                 return phase_highlights
@@ -328,7 +425,8 @@ class HighlightDetector:
                         move_notation=highlight.move_notation,
                         description=highlight.description,
                         move_number_end=highlight.move_number_end,
-                        priority=adjusted_priority
+                        priority=adjusted_priority,
+                        rule_type=highlight.rule_type,
                     )
                     adjusted_highlights.append(adjusted_highlight)
                 else:
@@ -344,6 +442,9 @@ class HighlightDetector:
         # Remove duplicate descriptions within each phase (keep only first occurrence)
         # This happens BEFORE move-level combination to ensure each rule appears only once per phase/side
         def deduplicate_phase(phase_highlights: List[GameHighlight], phase_name: str = "") -> List[GameHighlight]:
+            if not self.phase_dedupe_enabled:
+                return phase_highlights
+
             # Track count of each rule type per side (max 1 per rule type per phase)
             # Key: (is_white, rule_type) -> count
             rule_type_counts: Dict[Tuple[bool, str], int] = {}
@@ -368,7 +469,7 @@ class HighlightDetector:
         
         # Combine highlights that refer to the same move (within each phase, after deduplication)
         def combine_same_move_highlights(phase_highlights: List[GameHighlight]) -> List[GameHighlight]:
-            """Combine highlights on the same move, keeping max 2 descriptions."""
+            """Combine highlights on the same move, keeping up to max_per_move descriptions."""
             # Group by (move_number, is_white)
             combined_highlights: Dict[Tuple[int, bool], List[GameHighlight]] = {}
             for highlight in phase_highlights:
@@ -377,13 +478,15 @@ class HighlightDetector:
                     combined_highlights[key] = []
                 combined_highlights[key].append(highlight)
             
-            # Merge highlights for each move, keeping max 2 descriptions
+            # Merge highlights for each move
             merged_highlights: List[GameHighlight] = []
+            max_per_move = self.max_per_move
             for key, highlight_list in combined_highlights.items():
                 # Sort by priority (descending) to keep the most important ones
                 highlight_list.sort(key=lambda x: -x.priority)
-                # Take up to 2 highlights
-                selected = highlight_list[:2]
+                highlight_list = self._prefer_exclusive_same_move_rules(highlight_list)
+                # Take up to max_per_move highlights
+                selected = highlight_list[:max_per_move]
                 
                 if len(selected) == 1:
                     merged_highlights.append(selected[0])

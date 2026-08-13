@@ -39,7 +39,8 @@ class BulkAnalysisService(QObject):
                  movetime_override: Optional[int] = None,
                  brilliant_move_detection: bool = False,
                  auto_game_tagging: bool = True,
-                 auto_game_tagging_enabled_tags: Optional[List[str]] = None) -> None:
+                 auto_game_tagging_enabled_tags: Optional[List[str]] = None,
+                 update_move_quality_nags: bool = False) -> None:
         """Initialize bulk analysis service.
         
         Args:
@@ -51,6 +52,9 @@ class BulkAnalysisService(QObject):
             threads_override: Optional override for engine threads (used for parallel analysis).
             movetime_override: Optional override for movetime in ms.
             brilliant_move_detection: Whether to run brilliancy detection after each game.
+            auto_game_tagging: Whether to run auto-tagging after each game.
+            auto_game_tagging_enabled_tags: Enabled auto-tag names.
+            update_move_quality_nags: Whether to write quality NAGs into the PGN.
         """
         super().__init__()
         self.config = config
@@ -65,7 +69,7 @@ class BulkAnalysisService(QObject):
         self._brilliant_move_detection = brilliant_move_detection
         self._auto_game_tagging = bool(auto_game_tagging)
         self._auto_game_tagging_enabled_tags = list(auto_game_tagging_enabled_tags or [])
-
+        self._update_move_quality_nags = bool(update_move_quality_nags)
         # Note: Opening service should be loaded before creating BulkAnalysisService instances
         # to avoid blocking during analysis. We don't load it here to avoid blocking worker threads.
         
@@ -589,7 +593,7 @@ class BulkAnalysisService(QObject):
                 except Exception:
                     pass
 
-            # Store analysis results
+            # Post-steps: NAGs → store analysis tag (same order as single-game analysis).
             if analyzed_moves:
                 # Update game ECO from the last move with opening information (excluding repeat indicator)
                 # This matches the logic in GameController.get_game_info()
@@ -598,7 +602,30 @@ class BulkAnalysisService(QObject):
                         if move.eco and move.eco != opening_repeat_indicator:
                             game.eco = move.eco
                         break
-                
+
+                # Optionally rewrite mainline quality NAGs from assessments (before tag store
+                # so the exported PGN keeps both NAGs and a matching analysis snapshot).
+                if self._update_move_quality_nags and not self._cancelled:
+                    try:
+                        from app.services.move_quality_nag_service import MoveQualityNagService
+
+                        t_nag = time.perf_counter()
+                        ok = MoveQualityNagService.apply_to_game(game, analyzed_moves)
+                        try:
+                            LoggingService.get_instance().debug(
+                                "BulkAnalysis post-step: update_move_quality_nags "
+                                f"game_number={getattr(game, 'game_number', None)} "
+                                f"success={bool(ok)} "
+                                f"elapsed_ms={(time.perf_counter() - t_nag) * 1000.0:.1f}"
+                            )
+                        except Exception:
+                            pass
+                    except Exception as e:
+                        LoggingService.get_instance().warning(
+                            f"Move quality NAG update skipped due to error: {e}",
+                            exc_info=e,
+                        )
+
                 t_store = time.perf_counter()
                 success = AnalysisDataStorageService.store_analysis_data(
                     game,
@@ -616,7 +643,7 @@ class BulkAnalysisService(QObject):
                     )
                 except Exception:
                     pass
-                
+
                 if success:
                     game.analyzed = True
                     # Auto game tagging (if enabled): derive tags from evaluation curve and phases.

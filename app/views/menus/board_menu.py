@@ -30,6 +30,15 @@ def setup_board_menu(mw, menu_bar: QMenuBar) -> None:
 
     board_menu.addSeparator()
 
+    # Unbound by default; assignable in Keyboard Shortcuts.
+    # Enabled only when the encyclopedia has a resolvable entry for the current opening.
+    mw.opening_encyclopedia_action = QAction("Opening Encyclopedia", mw)
+    mw.opening_encyclopedia_action.setEnabled(False)
+    mw.opening_encyclopedia_action.triggered.connect(mw._open_opening_encyclopedia)
+    board_menu.addAction(mw.opening_encyclopedia_action)
+
+    board_menu.addSeparator()
+
     mw.game_info_action = QAction("Show Game Info", mw)
     mw.game_info_action.setShortcut(QKeySequence("Alt+I"))
     mw.game_info_action.setCheckable(True)

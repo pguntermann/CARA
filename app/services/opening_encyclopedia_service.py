@@ -232,7 +232,13 @@ def _opening_in_family_scope(
 
 
 class OpeningEncyclopediaService:
-    """Lookup encyclopedia entries by explorer ``(display_name, eco)``."""
+    """Lookup encyclopedia entries by explorer ``(display_name, eco)``.
+
+    The SQLite catalog is loaded lazily on first use. Prefer
+    :meth:`get_instance` so UI surfaces share one in-memory catalog.
+    """
+
+    _instance: Optional["OpeningEncyclopediaService"] = None
 
     def __init__(self, config: Dict[str, Any]) -> None:
         self._config = config
@@ -246,11 +252,25 @@ class OpeningEncyclopediaService:
         self._search_abbrevs: Dict[str, _SearchAbbrev] = {}
         self._image_cache: Dict[Tuple[str, int], Optional[bytes]] = {}
         self._available = False
-        self._load()
+        self._load_attempted = False
 
+    @classmethod
+    def get_instance(cls, config: Dict[str, Any]) -> "OpeningEncyclopediaService":
+        """Return the process-wide shared encyclopedia service (lazy-loads DB)."""
+        if cls._instance is None:
+            cls._instance = cls(config)
+        return cls._instance
+
+    def _ensure_loaded(self) -> None:
+        """Load the catalog once, on first access."""
+        if self._load_attempted:
+            return
+        self._load_attempted = True
+        self._load()
 
     @property
     def available(self) -> bool:
+        self._ensure_loaded()
         return self._available
 
     def _db_path(self) -> Path:
@@ -438,6 +458,7 @@ class OpeningEncyclopediaService:
                 pass
 
     def _resolve_opening_id(self, display_name: str, eco: Optional[str]) -> Optional[str]:
+        self._ensure_loaded()
         if not self._available:
             return None
         key = normalize_opening_name(display_name)
@@ -568,6 +589,7 @@ class OpeningEncyclopediaService:
         Returns a page of at most ``limit`` hits plus ``total`` untruncated count
         so the UI can show an overflow hint when results are truncated.
         """
+        self._ensure_loaded()
         if not self._available or not query or not query.strip():
             return EncyclopediaSearchPage(results=[], total=0)
         q, family_scope = _rewrite_search_query(query.strip(), self._search_abbrevs)
@@ -621,12 +643,14 @@ class OpeningEncyclopediaService:
 
     def get_entry_by_id(self, opening_id: str) -> Optional[EncyclopediaEntry]:
         """Look up an entry by opening_id, walking to a ready ancestor if needed."""
+        self._ensure_loaded()
         if not opening_id:
             return None
         return self._walk_to_ready(opening_id)
 
     def get_image_bytes(self, opening_id: str, slot: int = 1) -> Optional[bytes]:
         """Lazy-load image BLOB for ``opening_id`` slot 1 or 2 (cached)."""
+        self._ensure_loaded()
         if not self._available or not self._conn or not opening_id:
             return None
         if slot not in (1, 2):

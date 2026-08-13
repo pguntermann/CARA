@@ -866,6 +866,41 @@
       "Chaotic game",
       "Sharp"
     ],
+    "update_move_quality_nags_in_pgn": false,
+    "move_quality_nag_mapping": {
+      "Brilliant": {
+        "enabled": true,
+        "nag": 3
+      },
+      "Best Move": {
+        "enabled": false,
+        "nag": 1
+      },
+      "Good Move": {
+        "enabled": false,
+        "nag": null
+      },
+      "Book Move": {
+        "enabled": false,
+        "nag": null
+      },
+      "Inaccuracy": {
+        "enabled": true,
+        "nag": 6
+      },
+      "Mistake": {
+        "enabled": true,
+        "nag": 2
+      },
+      "Miss": {
+        "enabled": true,
+        "nag": 4
+      },
+      "Blunder": {
+        "enabled": true,
+        "nag": 4
+      }
+    },
     "store_analysis_results_in_pgn_tag": true,
     "switch_to_moves_list_at_start_of_analysis": true
   },
@@ -883,6 +918,11 @@
       "exclude_already_winning_enabled": true,
       "exclude_already_winning_threshold_cpl": 600
     }
+  },
+  "game_highlight_rules": {
+    "overrides": {},
+    "priority_order": [],
+    "composer": {}
   },
   "manual_analysis": {
     "max_pieces_to_explore": 3,

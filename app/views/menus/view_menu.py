@@ -5,6 +5,11 @@ from __future__ import annotations
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenuBar
 
+from app.utils.themed_icon import (
+    SVG_MENU_KEYBOARD,
+    set_menubar_themable_action_icon,
+)
+
 
 def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
     view_menu = menu_bar.addMenu("View")
@@ -15,6 +20,9 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
     view_menu.addSeparator()
 
     mw.view_keyboard_shortcuts_action = QAction("Keyboard Shortcuts...", mw)
+    set_menubar_themable_action_icon(
+        mw, mw.view_keyboard_shortcuts_action, SVG_MENU_KEYBOARD
+    )
     mw.view_keyboard_shortcuts_action.triggered.connect(
         mw._show_keyboard_shortcuts_dialog
     )

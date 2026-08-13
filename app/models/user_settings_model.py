@@ -1,7 +1,7 @@
 """User settings model for managing application-wide user preferences."""
 
 from PyQt6.QtCore import QObject, pyqtSignal
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 
 class UserSettingsModel(QObject):
@@ -521,6 +521,59 @@ class UserSettingsModel(QObject):
             if "overrides" in partial and isinstance(partial["overrides"], dict):
                 cur["overrides"] = partial["overrides"]
         self.set_keyboard_shortcuts(cur)
+
+    def get_game_highlight_rules(self) -> Dict[str, Any]:
+        """Get game highlight rule preferences (overrides + priority order + composer)."""
+        raw = self._settings.get("game_highlight_rules", {})
+        if not isinstance(raw, dict):
+            return {"overrides": {}, "priority_order": [], "composer": {}}
+        overrides = raw.get("overrides", {})
+        if not isinstance(overrides, dict):
+            overrides = {}
+        cleaned: Dict[str, Any] = {}
+        for key, value in overrides.items():
+            if isinstance(key, str) and key.strip() and isinstance(value, dict):
+                cleaned[key.strip()] = value
+        order_raw = raw.get("priority_order", [])
+        order: List[str] = []
+        if isinstance(order_raw, list):
+            for item in order_raw:
+                if isinstance(item, str) and item.strip() and item.strip() not in order:
+                    order.append(item.strip())
+        composer_raw = raw.get("composer", {})
+        composer: Dict[str, Any] = {}
+        if isinstance(composer_raw, dict):
+            composer = dict(composer_raw)
+        return {
+            "overrides": cleaned,
+            "priority_order": order,
+            "composer": composer,
+        }
+
+    def set_game_highlight_rules(self, settings: Dict[str, Any]) -> None:
+        """Replace game highlight rule preferences."""
+        overrides_in = settings.get("overrides", {}) if isinstance(settings, dict) else {}
+        cleaned: Dict[str, Any] = {}
+        if isinstance(overrides_in, dict):
+            for key, value in overrides_in.items():
+                if isinstance(key, str) and key.strip() and isinstance(value, dict):
+                    cleaned[key.strip()] = value
+        order_in = settings.get("priority_order", []) if isinstance(settings, dict) else []
+        order: List[str] = []
+        if isinstance(order_in, list):
+            for item in order_in:
+                if isinstance(item, str) and item.strip() and item.strip() not in order:
+                    order.append(item.strip())
+        composer_in = settings.get("composer", {}) if isinstance(settings, dict) else {}
+        composer: Dict[str, Any] = {}
+        if isinstance(composer_in, dict):
+            composer = dict(composer_in)
+        self._settings["game_highlight_rules"] = {
+            "overrides": cleaned,
+            "priority_order": order,
+            "composer": composer,
+        }
+        self.settings_changed.emit()
 
     def update_from_dict(self, settings: Dict[str, Any]) -> None:
         """Update settings from a dictionary (used when loading from file).

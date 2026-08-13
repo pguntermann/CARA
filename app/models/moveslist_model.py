@@ -716,3 +716,17 @@ class MovesListModel(QAbstractTableModel):
             bottom_right = self.index(len(self._moves) - 1, self.columnCount() - 1)
             self.dataChanged.emit(top_left, bottom_right)
 
+    def has_analysis_data(self) -> bool:
+        """True if any move row has engine assessment / CPL / eval fields filled."""
+        for move in self._moves:
+            if (
+                move.assess_white
+                or move.assess_black
+                or move.cpl_white
+                or move.cpl_black
+                or move.eval_white
+                or move.eval_black
+            ):
+                return True
+        return False
+

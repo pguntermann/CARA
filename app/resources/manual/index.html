@@ -756,7 +756,7 @@
                 <h5 id="database-tabs">4.4.1 Database Tabs</h5>
                 <p>The panel uses tabs to organize multiple databases:</p>
                 <ul>
-                    <li><strong>Clipboard Tab:</strong> Always appears first and contains games that have been pasted or imported temporarily. Unlike regular database tabs that are linked to PGN files on your computer, the Clipboard database itself does not exist as a file on disk. It's a special temporary database perfect for quickly pasting PGN games into the app. You can save its contents to a new PGN file at any time using <span class="menu-item">File → Save PGN Database as...</span> (<code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>), or clear it at any time using <span class="menu-item">File → Clear Clipboard Database</span> (<code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code>).</li>
+                    <li><strong>Clipboard Tab:</strong> Always appears first and contains games that have been pasted or imported temporarily. Unlike regular database tabs that are linked to PGN files on your computer, the Clipboard database itself does not exist as a file on disk. It's a special temporary database perfect for quickly pasting PGN games into the app. You can save its contents to a new PGN file at any time using <span class="menu-item">File → Save PGN Database as...</span> (<code>Ctrl+Shift+S</code> / <code>⌘+Shift+S</code>), or clear it at any time using <span class="menu-item">File → Clear Clipboard Database</span> (<code>Ctrl+Alt+C</code> / <code>⌘+Alt+C</code>).</li>
                     <li><strong>File-Based Database Tabs:</strong> Each opened PGN file appears as a separate tab, labeled with the filename (without extension). You can open multiple PGN files simultaneously, each in its own tab.</li>
                     <li><strong>Search Results Tab:</strong> When you perform a search across databases, the results appear in a dedicated "Search Results" tab. This tab includes an additional "Source DB" column showing which database each game came from.</li>
                     <li><strong>"+" Tab:</strong> Always appears last. Clicking this tab opens the file dialog to add a new PGN database to the panel.</li>
@@ -835,7 +835,7 @@
                 </ul>
                 
                 <div class="tip-box">
-                    <strong>Quick Tip:</strong> You can quickly paste PGN games from your system clipboard into either the Clipboard database or the active database. If you have PGN text copied to your clipboard (from another application, a website, or elsewhere), use <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+V</code> / <code>⌘+V</code>) to paste into the Clipboard database, or <span class="menu-item">Edit → Paste PGN to active DB</span> (<code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>) to paste into the active database instead.
+                    <strong>Quick Tip:</strong> You can quickly paste PGN games from your system clipboard into either the Clipboard database or the active database. If you have PGN text copied to your clipboard (from another application, a website, or elsewhere), use <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>) to paste into the Clipboard database, or <span class="menu-item">Edit → Paste PGN to active DB</span> (<code>Ctrl+V</code> / <code>⌘+V</code>) to paste into the active database instead.
                 </div>
             </div>
             <div class="outline-item">
@@ -1164,13 +1164,13 @@
                 
                 <h5>4.6.8 Edit Operations</h5>
                 <ul>
-                    <li><code>Ctrl+V</code> / <code>⌘+V</code>: Paste PGN to Clipboard database</li>
-                    <li><code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>: Paste PGN to active database</li>
+                    <li><code>Ctrl+V</code> / <code>⌘+V</code>: Paste PGN to active database</li>
+                    <li><code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>: Paste PGN to Clipboard database</li>
                     <li><code>Ctrl+P</code> / <code>⌘+P</code>: Copy PGN to clipboard</li>
                     <li><code>Shift+F</code>: Copy FEN to clipboard</li>
                     <li><code>Ctrl+F</code> / <code>⌘+F</code>: Paste FEN to board</li>
-                    <li><code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code>: Copy selected games</li>
-                    <li><code>Ctrl+Shift+X</code>: Cut selected games</li>
+                    <li><code>Ctrl+C</code> / <code>⌘+C</code>: Copy selected games</li>
+                    <li><code>Ctrl+X</code> / <code>⌘+X</code>: Cut selected games</li>
                 </ul>
                 
                 <h5>4.6.9 PGN Display Options</h5>
@@ -1223,7 +1223,7 @@
                     Before starting, make sure you have at least one UCI-compatible chess engine added to CARA. See <a href="#configuring-engines">section 5.1</a> for instructions on configuring engines. For engine suggestions, see <a href="#recommended-engines">section 7.10</a>.</li>
                     
                     <li><strong>Open a game or paste PGN:</strong><br>
-                    Open a PGN database using <span class="menu-item">File → Open PGN Database</span> (<code>Ctrl+O</code> / <code>⌘+O</code>), or paste PGN text into the Clipboard database using <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+V</code> / <code>⌘+V</code>)—the pasted game gets loaded automatically.</li>
+                    Open a PGN database using <span class="menu-item">File → Open PGN Database</span> (<code>Ctrl+O</code> / <code>⌘+O</code>), or paste PGN text into the Clipboard database using <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>)—the pasted game gets loaded automatically.</li>
                     
                     <li><strong>Switch to the Moves List view:</strong><br>
                     Press <code>F1</code> to switch to the Moves List tab, then press <code>3</code> to select the "Game Analysis - Full" profile. This profile displays all the important analysis columns you'll need to review the game.</li>
@@ -1304,7 +1304,7 @@
                     Copy PGN game data from any source (website, text file, another application) to your system clipboard.</li>
                     
                     <li><strong>Paste into CARA:</strong><br>
-                    Use <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+V</code> / <code>⌘+V</code>) to paste into the Clipboard database, or <span class="menu-item">Edit → Paste PGN to active DB</span> (<code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>) to paste into the currently active database. The pasted game gets loaded automatically and becomes the active game.</li>
+                    Use <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>) to paste into the Clipboard database, or <span class="menu-item">Edit → Paste PGN to active DB</span> (<code>Ctrl+V</code> / <code>⌘+V</code>) to paste into the currently active database. The pasted game gets loaded automatically and becomes the active game.</li>
                 </ol>
                 
                 <div class="tip-box">
@@ -2068,7 +2068,7 @@
                     In the Database Panel, select one or more games in the game table. You can select multiple games by holding <code>Ctrl</code> (individual selection) or <code>Shift</code> (range selection) while clicking.</li>
                     
                     <li><strong>Copy to clipboard:</strong><br>
-                    Use <span class="menu-item">Edit → Copy selected Games</span> (<code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code>) to copy the selected games to your system clipboard as PGN text. The games remain in the source database.</li>
+                    Use <span class="menu-item">Edit → Copy selected Games</span> (<code>Ctrl+C</code> / <code>⌘+C</code>) to copy the selected games to your system clipboard as PGN text. The games remain in the source database.</li>
                 </ol>
                 <p>The copied games are stored as standard PGN text, separated by double newlines. You can paste them into another database in CARA, or into any other application that accepts PGN text.</p>
                 
@@ -2079,7 +2079,7 @@
                     In the Database Panel, select one or more games in the game table.</li>
                     
                     <li><strong>Cut to clipboard:</strong><br>
-                    Use <span class="menu-item">Edit → Cut selected Games</span> (<code>Ctrl+Shift+X</code>) to copy the selected games to your system clipboard and remove them from the source database. If the active game is among the cut games, it will be cleared.</li>
+                    Use <span class="menu-item">Edit → Cut selected Games</span> (<code>Ctrl+X</code> / <code>⌘+X</code>) to copy the selected games to your system clipboard and remove them from the source database. If the active game is among the cut games, it will be cleared.</li>
                 </ol>
                 <p>The cut games are stored as PGN text in your clipboard, ready to be pasted into another database. The source database is marked as having unsaved changes.</p>
                 
@@ -2093,7 +2093,7 @@
                     Activate the database tab where you want to paste the games, or use the Clipboard database.</li>
                     
                     <li><strong>Paste games:</strong><br>
-                    Use <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+V</code> / <code>⌘+V</code>) to paste into the Clipboard database, or <span class="menu-item">Edit → Paste PGN to active DB</span> (<code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>) to paste into the currently active database.</li>
+                    Use <span class="menu-item">Edit → Paste PGN to Clipboard DB</span> (<code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>) to paste into the Clipboard database, or <span class="menu-item">Edit → Paste PGN to active DB</span> (<code>Ctrl+V</code> / <code>⌘+V</code>) to paste into the currently active database.</li>
                 </ol>
                 <p>All games in the clipboard PGN text are added to the selected database. If the clipboard contains multiple games, all are added, and the first game automatically becomes the active game. The destination database is marked as having unsaved changes.</p>
                 
@@ -2146,7 +2146,7 @@
                 <p>Closes all file-based database tabs. The Clipboard and Search Results tabs are preserved. Any unsaved changes will be lost if you haven't saved the databases first.<br>See <a href="#common-database-actions">section 4.4.5</a> for more information.</p>
                 
                 <h5>6.1.5 Clear Clipboard Database</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Alt+C</code> / <code>⌘+Alt+C</code></p>
                 <p>Removes all games from the Clipboard database.</p>
                 
                 <h5>6.1.6 Save PGN Database</h5>
@@ -2195,11 +2195,11 @@
                 <p>Copies the currently active game's complete PGN text to your system clipboard.<br>See <a href="#copying-active-game-pgn">section 5.9.4</a> for more information.</p>
                 
                 <h5>6.2.3 Copy selected Games</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+C</code> / <code>⌘+C</code></p>
                 <p>Copies the selected games from the active database to your system clipboard as PGN text. The games remain in the source database.<br>See <a href="#copying-selected-games">section 5.9.1</a> for more information.</p>
                 
                 <h5>6.2.4 Cut selected Games</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+X</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+X</code> / <code>⌘+X</code></p>
                 <p>Copies the selected games to your system clipboard and removes them from the source database.<br>See <a href="#cutting-selected-games">section 5.9.2</a> for more information.</p>
                 
                 <h5>6.2.5 Paste FEN to Board</h5>
@@ -2207,11 +2207,11 @@
                 <p>Pastes a FEN position from your clipboard and updates the chessboard to that position. The active game is cleared when a FEN is pasted.<br>See <a href="#copying-pasting-positions">section 5.9.5</a> for more information.</p>
                 
                 <h5>6.2.6 Paste PGN to Clipboard DB</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+V</code> / <code>⌘+V</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code></p>
                 <p>Pastes PGN text from your system clipboard into the Clipboard database. All games in the clipboard are added, and the first game becomes active.<br>See <a href="#copy-from-clipboard">section 5.2.1</a> and <a href="#pasting-games">section 5.9.3</a> for more information.</p>
                 
                 <h5>6.2.7 Paste PGN to active DB</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code></p>
+                <p><strong>Shortcut:</strong> <code>Ctrl+V</code> / <code>⌘+V</code></p>
                 <p>Pastes PGN text from your system clipboard into the currently active database. All games in the clipboard are added, and the first game becomes active.<br>See <a href="#copy-from-clipboard">section 5.2.1</a> and <a href="#pasting-games">section 5.9.3</a> for more information.</p>
             </div>
 
@@ -2428,30 +2428,39 @@
                 <h5 id="classification-settings">6.7.4 Configure Classification Settings...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+K</code> / <code>⌘+Shift+K</code></p>
                 <p>Opens a dialog to customize the thresholds used for move classification (Brilliant, Best Move, Good Move, Inaccuracy, Mistake, Blunder). These thresholds determine how moves are categorized based on Centipawn Loss (CPL) values. The dialog also includes settings for brilliancy detection, including shallow depth ranges, minimum agreement requirements, and candidate move selection. See <a href="#analysis-results">section 5.5.2</a> for more information about move classifications and <a href="#brilliant-move-detection">section 5.5.3</a> for details on brilliancy detection.</p>
+
+                <h5 id="manage-game-highlight-rules">6.7.5 Manage Game Highlight Rules...</h5>
+                <p>Opens a dialog to control which game-highlight detection rules are active, which game phases each rule may fire in, and their relative priority. The same dialog includes highlights composition settings (limits per phase and per move, and related ranking options).</p>
                 
-                <h5>6.7.5 Normalized Evaluation Graph</h5>
+                <h5>6.7.6 Normalized Evaluation Graph</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+N</code> / <code>⌘+Shift+N</code></p>
                 <p>Toggles the normalized evaluation graph display mode in the Moves List. When enabled, evaluation values are normalized to a scale that better highlights relative evaluation changes throughout the game, making it easier to identify critical moments and evaluation swings.</p>
                 
-                <h5>6.7.6 Brilliant Move Detection</h5>
+                <h5>6.7.7 Brilliant Move Detection</h5>
                 <p>Toggles whether CARA performs brilliancy detection after initial game analysis. When enabled, CARA analyzes candidate moves at shallow engine depths to identify exceptional moves that appear suboptimal at shallow depths but are actually strong when analyzed more deeply. This detection step runs automatically after the main analysis completes. See <a href="#brilliant-move-detection">section 5.5.3</a> for a detailed explanation of how brilliancy detection works.</p>
 
-                <h5>6.7.7 Auto Tag Games</h5>
-                <p>Toggles whether CARA performs <a href="#auto-tagging">auto-tagging</a> after analysis completes. When enabled, CARA may assign <a href="#game-tagging">game tags</a> according to the rules described in <a href="#auto-tagging">section 5.5.5</a> and the tags you allow under <span class="menu-item">Select Tags for Auto-Tagging</span> (see <a href="#select-tags-auto-tagging">section 6.7.8</a>). When disabled, no automatic game tags are applied by this feature.</p>
+                <h5>6.7.8 Auto Tag Games</h5>
+                <p>Toggles whether CARA performs <a href="#auto-tagging">auto-tagging</a> after analysis completes. When enabled, CARA may assign <a href="#game-tagging">game tags</a> according to the rules described in <a href="#auto-tagging">section 5.5.5</a> and the tags you allow under <span class="menu-item">Select Tags for Auto-Tagging</span> (see <a href="#select-tags-auto-tagging">section 6.7.9</a>). When disabled, no automatic game tags are applied by this feature.</p>
                 
-                <h5 id="select-tags-auto-tagging">6.7.8 Select Tags for Auto-Tagging</h5>
+                <h5 id="select-tags-auto-tagging">6.7.9 Select Tags for Auto-Tagging</h5>
                 <p>Opens a submenu with a checkable entry for each supported auto-tag (see the table in <a href="#auto-tagging">section 5.5.5</a>). Only checked tags can be added or refreshed by auto-tagging; unchecked rules are skipped. Your selection is saved with your user preferences. This submenu is disabled while <span class="menu-item">Auto Tag Games</span> is turned off.</p>
                 
-                <h5>6.7.9 Return to PLY 0 after analysis completes</h5>
+                <h5 id="update-move-quality-nags">6.7.10 Update move quality NAGs in PGN</h5>
+                <p>When enabled (off by default), after game analysis completes CARA writes standard move-quality NAGs into the game’s PGN based on the analysis classifications. Existing quality NAGs (<code>$1</code>–<code>$6</code>) on mainline moves are replaced; other NAGs are left unchanged. The default mapping is: Brilliant → <code>$3</code> (<code>!!</code>), Best Move → <code>$1</code> (<code>!</code>), Inaccuracy → <code>$6</code> (<code>?!</code>), Mistake → <code>$2</code> (<code>?</code>), Miss and Blunder → <code>$4</code> (<code>??</code>). Good Move and Book Move write no quality NAG by default. Applies to single-game and bulk analysis. The setting is saved with your user preferences.</p>
+                
+                <h5 id="configure-move-quality-nag-mapping">6.7.11 Configure Move Quality NAG Mapping...</h5>
+                <p>Opens a tabular dialog to customize which quality NAG (if any) is written for each move classification.</p>
+                
+                <h5>6.7.12 Return to PLY 0 after analysis completes</h5>
                 <p>Toggles whether CARA automatically navigates to the starting position (PLY 0) when analysis completes. When enabled, the board and Moves List automatically return to PLY 0 after analysis finishes.</p>
                 
-                <h5>6.7.10 Switch to Moves List at the start of Analysis</h5>
+                <h5>6.7.13 Switch to Moves List at the start of Analysis</h5>
                 <p>Toggles whether CARA automatically switches to the Moves List tab when analysis begins. This is enabled by default, ensuring you can immediately see analysis results as they are generated.</p>
                 
-                <h5>6.7.11 Switch to Game Summary after Analysis</h5>
+                <h5>6.7.14 Switch to Game Summary after Analysis</h5>
                 <p>Toggles whether CARA automatically switches to the Game Summary tab when analysis completes. When enabled, you are taken directly to the condensed overview of key game moments and statistics after analysis finishes.</p>
                 
-                <h5>6.7.12 Store Analysis results in PGN Tag</h5>
+                <h5>6.7.15 Store Analysis results in PGN Tag</h5>
                 <p>Toggles whether analysis results (evaluations, CPL values, move classifications) are saved in a PGN metadata tag for persistence across sessions. When enabled, analysis data is serialized and stored in the game's PGN, allowing you to preserve analysis results even after closing and reopening the database.</p>
             </div>
 
@@ -2750,8 +2759,8 @@
                 <h5>6.16.5 Importing and Opening Games</h5>
                 <p>Shortcuts for importing and opening games:</p>
                 <ul>
-                    <li><code>Ctrl+V</code> / <code>⌘+V</code>: Paste PGN to Clipboard database</li>
-                    <li><code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>: Paste PGN to active database</li>
+                    <li><code>Ctrl+V</code> / <code>⌘+V</code>: Paste PGN to active database</li>
+                    <li><code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code>: Paste PGN to Clipboard database</li>
                     <li><code>Ctrl+Shift+I</code> / <code>⌘+Shift+I</code>: Import games from online platforms</li>
                 </ul>
                 
@@ -2761,8 +2770,8 @@
                     <li><code>Ctrl+P</code> / <code>⌘+P</code>: Copy active game PGN to clipboard</li>
                     <li><code>Shift+F</code>: Copy current board position (FEN) to clipboard</li>
                     <li><code>Ctrl+F</code> / <code>⌘+F</code>: Paste FEN position to board</li>
-                    <li><code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code>: Copy selected games to clipboard</li>
-                    <li><code>Ctrl+Shift+X</code>: Cut selected games to clipboard</li>
+                    <li><code>Ctrl+C</code> / <code>⌘+C</code>: Copy selected games to clipboard</li>
+                    <li><code>Ctrl+X</code> / <code>⌘+X</code>: Cut selected games to clipboard</li>
                 </ul>
                 
                 <h5>6.16.7 Moves List Column Profiles</h5>
@@ -2823,7 +2832,7 @@
                     <li><code>Ctrl+Shift+W</code> / <code>⌘+Shift+W</code>: Close search results tab</li>
                     <li><code>Ctrl+Shift+B</code> / <code>⌘+Shift+B</code>: Bulk Operations</li>
                     <li><code>Ctrl+Shift+U</code> / <code>⌘+Shift+U</code>: Deduplicate games</li>
-                    <li><code>Ctrl+Shift+C</code> / <code>⌘+Shift+C</code>: Clear Clipboard database</li>
+                    <li><code>Ctrl+Alt+C</code> / <code>⌘+Alt+C</code>: Clear Clipboard database</li>
                 </ul>
                 
                 <h5>6.16.13 PGN Display Options</h5>

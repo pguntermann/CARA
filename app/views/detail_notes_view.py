@@ -152,14 +152,17 @@ class DetailNotesView(QWidget):
         StyleManager.style_text_edit_scrollbar(self._notes_edit, self.config, pane_bg, [60, 60, 65], style)
         self._notes_edit.setPlaceholderText(notes_config.get("placeholder_text", "Add notes about this game..."))
 
-        copy_shortcut = QShortcut(QKeySequence("Ctrl+C"), self._notes_edit)
-        copy_shortcut.activated.connect(self._notes_edit.copy)
-        meta_c = QShortcut(QKeySequence("Meta+C"), self._notes_edit)
-        meta_c.activated.connect(self._notes_edit.copy)
-        paste_shortcut = QShortcut(QKeySequence("Ctrl+V"), self._notes_edit)
-        paste_shortcut.activated.connect(self._notes_edit.paste)
-        meta_v = QShortcut(QKeySequence("Meta+V"), self._notes_edit)
-        meta_v.activated.connect(self._notes_edit.paste)
+        # WidgetShortcut only: WindowShortcut would still paste/copy into notes
+        # after focus moves elsewhere (e.g. PGN pane).
+        for seq, slot in (
+            ("Ctrl+C", self._notes_edit.copy),
+            ("Meta+C", self._notes_edit.copy),
+            ("Ctrl+V", self._notes_edit.paste),
+            ("Meta+V", self._notes_edit.paste),
+        ):
+            shortcut = QShortcut(QKeySequence(seq), self._notes_edit)
+            shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
+            shortcut.activated.connect(slot)
 
         self._setup_format_toolbar(layout, pane_bg, notes_text_color, font_family, font_size)
 

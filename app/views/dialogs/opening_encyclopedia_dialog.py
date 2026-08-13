@@ -1202,6 +1202,12 @@ class OpeningEncyclopediaDialog(QDialog):
                 gallery_cfg,
             )
 
+        from app.views.widgets.themed_dialog_size_grip import (
+            install_themed_dialog_resize_grip,
+        )
+
+        install_themed_dialog_resize_grip(self, self.config)
+
     def _build_tags_row(
         self,
         entry: EncyclopediaEntry,

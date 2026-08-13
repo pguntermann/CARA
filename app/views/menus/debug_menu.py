@@ -35,11 +35,13 @@ def setup_debug_menu(mw, menu_bar: QMenuBar) -> None:
     debug_copy_highlights_json_action.triggered.connect(mw._debug_copy_game_highlights_json)
     debug_menu.addAction(debug_copy_highlights_json_action)
 
-    debug_menu.addSeparator()
-
-    debug_create_highlight_test_data_action = QAction("Create Highlight Rule Test Data", mw)
-    debug_create_highlight_test_data_action.triggered.connect(mw._debug_create_highlight_rule_test_data)
-    debug_menu.addAction(debug_create_highlight_test_data_action)
+    debug_scan_highlight_rules_action = QAction(
+        "Scan Highlight Rule Frequency (Active DB)", mw
+    )
+    debug_scan_highlight_rules_action.triggered.connect(
+        mw._debug_scan_highlight_rule_frequency
+    )
+    debug_menu.addAction(debug_scan_highlight_rules_action)
 
     debug_menu.addSeparator()
 

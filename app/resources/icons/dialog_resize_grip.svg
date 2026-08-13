@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+  <!-- Bottom-right resize affordance (template #ffffff for theme tint). -->
+  <path stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" d="M6 15 L15 6"/>
+  <path stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" d="M10 15 L15 10"/>
+  <path stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" d="M14 15 L15 14"/>
+</svg>

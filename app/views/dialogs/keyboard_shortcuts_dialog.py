@@ -16,7 +16,6 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSizePolicy,
-    QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
@@ -31,6 +30,7 @@ from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.keyboard_shortcuts_catalog import ShortcutEntry, shortcut_from_key_event
 from app.views.dialogs.confirmation_dialog import ConfirmationDialog
 from app.views.style import StyleManager
+from app.views.widgets.row_hover_table_widget import RowHoverTableWidget
 
 
 class _ShortcutCaptureOverlay(QWidget):
@@ -309,6 +309,11 @@ class KeyboardShortcutsDialog(QDialog):
         self._setup_ui()
         self._apply_styling()
         self._reload_entries()
+        from app.views.widgets.themed_dialog_size_grip import (
+            install_themed_dialog_resize_grip,
+        )
+
+        install_themed_dialog_resize_grip(self, self.config)
 
     def _load_config(self) -> None:
         dialog_config = (
@@ -469,7 +474,8 @@ class KeyboardShortcutsDialog(QDialog):
         self.status_label.setWordWrap(True)
         main_layout.addWidget(self.status_label)
 
-        self.table = QTableWidget(0, 3)
+        self.table = RowHoverTableWidget()
+        self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(["Category", "Action", "Shortcut"])
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -481,6 +487,7 @@ class KeyboardShortcutsDialog(QDialog):
         self.table.verticalHeader().setVisible(False)
         self.table.setSortingEnabled(False)
         self.table.itemDoubleClicked.connect(self._on_item_double_clicked)
+        self.table.itemSelectionChanged.connect(self._on_table_selection_changed)
 
         header = self.table.horizontalHeader()
         header.setStretchLastSection(False)
@@ -605,15 +612,14 @@ class KeyboardShortcutsDialog(QDialog):
             f"QTableWidget::item {{"
             f"padding: {self.table_item_padding}px;"
             f"}}"
-            f"QTableWidget::item:selected {{"
-            f"background-color: rgb({self.table_selection_bg[0]}, {self.table_selection_bg[1]}, {self.table_selection_bg[2]});"
-            f"color: rgb({self.table_selection_text[0]}, {self.table_selection_text[1]}, {self.table_selection_text[2]});"
-            f"}}"
+            # Match full-row hover chrome from RowHoverTableWidget. Without this,
+            # Windows paints a native per-cell mouse-over on only the hovered cell.
             f"QTableWidget::item:hover {{"
             f"background-color: rgb({self.table_hover_bg[0]}, {self.table_hover_bg[1]}, {self.table_hover_bg[2]});"
             f"color: rgb({self.table_hover_text[0]}, {self.table_hover_text[1]}, {self.table_hover_text[2]});"
             f"}}"
-            f"QTableWidget::item:selected:hover {{"
+            f"QTableWidget::item:selected,"
+            f"QTableWidget::item:hover:selected {{"
             f"background-color: rgb({self.table_selection_bg[0]}, {self.table_selection_bg[1]}, {self.table_selection_bg[2]});"
             f"color: rgb({self.table_selection_text[0]}, {self.table_selection_text[1]}, {self.table_selection_text[2]});"
             f"}}"
@@ -625,6 +631,11 @@ class KeyboardShortcutsDialog(QDialog):
             f"font-family: {self.label_font_family};"
             f"font-size: {self.font_size}pt;"
             f"}}"
+        )
+        self.table.configure_row_chrome(
+            hover_bg=self.table_hover_bg,
+            hover_text=self.table_hover_text,
+            selection_bg=self.table_selection_bg,
         )
         self.table.setStyleSheet(table_style)
         StyleManager.style_table_scrollbar(
@@ -658,6 +669,7 @@ class KeyboardShortcutsDialog(QDialog):
         *,
         prefer_binding_id: Optional[str] = None,
     ) -> None:
+        self.table.clear_hover()
         self.table.setRowCount(0)
         self.table.setRowCount(len(entries))
 
@@ -693,6 +705,9 @@ class KeyboardShortcutsDialog(QDialog):
         if select_row >= 0:
             self.table.selectRow(select_row)
         self._update_status_label(len(entries), len(self._all_entries))
+
+    def _on_table_selection_changed(self) -> None:
+        self.table.refresh_row_chrome()
 
     def _on_filter_changed(self, text: str) -> None:
         if self._is_capturing():

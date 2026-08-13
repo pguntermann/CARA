@@ -23,8 +23,10 @@ The game highlights detection system follows a **rule-based service pattern** wi
 **HighlightDetector** (`app/services/game_highlights/highlight_detector.py`):
 - Stateless service that orchestrates rule evaluation
 - Iterates through moves and evaluates all enabled rules
+- Skips rules whose `allowed_phases` exclude the current phase
+- Applies optional `priority_override` from user settings onto emitted highlights
 - Handles post-processing: deduplication, filtering, sorting, limiting
-- Manages cross-phase priority adjustments
+- Manages cross-phase priority adjustments using composer settings
 - Groups highlights by game phase (opening, middlegame, endgame)
 - Uses shared state dictionary for cross-move tracking
 
@@ -32,16 +34,34 @@ The game highlights detection system follows a **rule-based service pattern** wi
 - Manages all highlight detection rules
 - Handles rule discovery and registration from configuration
 - Provides enabled/disabled rule filtering
-- Loads rules from `config.json` under `ui.panels.detail.summary.highlights.rules`
+- Receives an effective per-rule config map (catalog defaults + `config.json` + user overrides)
 
 **HighlightRule** (`app/services/game_highlights/base_rule.py`):
 - Abstract base class for all highlight rules
 - Defines the rule interface (`evaluate()` method)
+- Reads `allowed_phases` and `priority_override` from rule config
 - Provides configuration support
 - Each rule is independent and testable
 
+**Rule catalog** (`app/services/game_highlights/rule_catalog.py`):
+- Built-in metadata for every rule (id, display name, description, UI category, default enabled/priority/phases)
+- Stable rule IDs match `rule_type` / registry config keys
+
+**GameHighlightRulesService** (`app/services/game_highlight_rules_service.py`):
+- Loads/saves sparse user preferences under `user_settings.json` → `game_highlight_rules`
+- Merges catalog defaults with per-rule overrides and optional custom priority order
+- Builds the registry config passed into `RuleRegistry`
+- Exposes composer settings (max per phase/move, cross-phase penalty knobs)
+
+**Manage Game Highlight Rules UI**:
+- Controller: `app/controllers/game_highlight_rules_controller.py`
+- Dialog: `app/views/dialogs/manage_game_highlight_rules_dialog.py`
+- Menu: `Game Analysis → Manage Game Highlight Rules...`
+- Lets users enable/disable rules, restrict phases, reorder priority, and edit composition settings
+
 **GameSummaryService** (`app/services/game_summary_service.py`):
 - Integrates highlight detection into game summary calculation
+- Asks `GameHighlightRulesService` for effective rule config and composer settings
 - Creates `RuleRegistry` and `HighlightDetector` instances
 - Passes CPL thresholds from `MoveClassificationModel` to detector
 - Includes highlights in `GameSummary` object
@@ -50,21 +70,25 @@ The game highlights detection system follows a **rule-based service pattern** wi
 
 **Highlight Detection Flow**:
 1. `GameSummaryService.calculate_summary()` is called with moves and phase boundaries
-2. Service creates `RuleRegistry` with rule configurations from `config.json`
-3. Service creates `HighlightDetector` with:
+2. Service loads `ui.panels.detail.summary.highlights` from `config.json` (e.g. default `max_per_phase`)
+3. `GameHighlightRulesService.build_registry_config()` merges catalog defaults, optional `config.json` rule entries, and user overrides
+4. Service creates `RuleRegistry` with that effective rule config
+5. Service creates `HighlightDetector` with:
    - Rule registry instance
    - CPL thresholds from `MoveClassificationModel`
-   - Configuration (highlights per phase limit)
-4. Service calls `detect_highlights()` with moves, total moves, and phase boundaries
-5. `HighlightDetector` iterates through moves:
+   - Composer settings (`max_per_phase`, `max_per_move`, phase dedupe, cross-phase penalty)
+6. Service calls `detect_highlights()` with moves, total moves, and phase boundaries
+7. `HighlightDetector` iterates through moves:
    - Creates `RuleContext` for each move (with previous/next moves, material counts, phase info)
    - Gets enabled rules from registry
+   - Skips rules not allowed in the current phase
    - Evaluates each rule with move and context
+   - Applies `priority_override` when present
    - Collects all highlights from all rules
-6. Detector applies post-processing (deduplication, filtering, sorting, limiting)
-7. Returns list of `GameHighlight` instances
-8. Highlights included in `GameSummary` object
-9. UI displays highlights grouped by phase
+8. Detector applies post-processing (deduplication, filtering, sorting, limiting)
+9. Returns list of `GameHighlight` instances
+10. Highlights included in `GameSummary` object
+11. UI displays highlights grouped by phase
 
 **Rule Evaluation Flow**:
 1. For each move, `HighlightDetector` creates `RuleContext` with:
@@ -74,9 +98,11 @@ The game highlights detection system follows a **rule-based service pattern** wi
    - Classification thresholds (CPL limits)
    - Shared state dictionary for cross-move tracking
 2. Detector gets enabled rules from `RuleRegistry`
-3. Each rule's `evaluate()` method is called with move and context
-4. Rules return list of `GameHighlight` instances (empty list if no highlight)
-5. All highlights collected and passed to post-processing
+3. Rules whose `allowed_phases` exclude the current phase are skipped
+4. Each remaining rule's `evaluate()` method is called with move and context
+5. Rules return list of `GameHighlight` instances (empty list if no highlight)
+6. If the rule has `priority_override`, that value replaces each highlight's priority
+7. All highlights collected and passed to post-processing
 
 ### Data Structures
 
@@ -174,15 +200,26 @@ The system includes 44 rules covering various aspects of chess:
 
 ### Rule Configuration
 
-Rules are configured via config.json under:
+**Built-in defaults** live in `rule_catalog.py` (enabled, display name, description, category, default priority, default phases).
+
+**Optional `config.json` rule entries** under `ui.panels.detail.summary.highlights.rules` can still supply rule-specific algorithm parameters (and legacy name/description/enabled). The factory default for composition limit is:
+
 ```
-ui.panels.detail.summary.highlights.rules
+ui.panels.detail.summary.highlights.max_per_phase   # default 7
 ```
 
-Each rule can have:
+**User overrides** are stored sparsely in `user_settings.json` under `game_highlight_rules`:
+
+- `overrides`: per-rule diffs from catalog defaults (`enabled`, `phases`, …)
+- `priority_order`: optional full rule-id order when the user customizes ranking (empty = catalog defaults)
+- `composer`: sparse diffs for composition settings (see Configuration)
+
+`GameHighlightRulesService.build_registry_config()` merges catalog → config.json → user overrides into the map consumed by `RuleRegistry`. Each effective rule config may include:
+
 - `enabled`: Boolean to enable/disable the rule
-- `name`: Display name for the rule
-- `description`: Description of what the rule detects
+- `allowed_phases`: Subset of `opening` / `middlegame` / `endgame`
+- `priority_override`: Integer used when the user has customized priority order
+- `name` / `description`: Display metadata
 - Rule-specific parameters (varies by rule)
 
 ## Processing Pipeline
@@ -191,22 +228,22 @@ The highlight detection process is described in the "Component Interactions" sec
 
 1. **Filter delayed mating sequences**: Suppress individual "missed mate" highlights within delayed mating ranges
 2. **Add evaluation swing highlights**: Special handling for evaluation swings (see "Deduplication Logic")
-3. **Combine highlights on same move**: Maximum 2 highlights per move (selected by priority)
+3. **Combine highlights on same move**: Keep up to `max_per_move` highlights per move (selected by priority; default 2)
 4. **Group by phase**: Separate highlights into opening, middlegame, endgame
 5. **Sort by priority**: Descending priority, then move number for ties
 6. **Apply cross-phase priority penalties**: See "Cross-Phase Priority Adjustment"
-7. **Deduplicate within each phase**: See "Deduplication Logic"
-8. **Limit per phase**: Default 10 highlights per phase (configurable)
+7. **Deduplicate within each phase**: See "Deduplication Logic" (always enabled)
+8. **Limit per phase**: Keep top `max_per_phase` highlights (default 7; overridable via composer / config)
 9. **Final output**: Combine highlights from all phases, sort by move number for chronological display
 
 ### Cross-Phase Priority Adjustment
 
-To increase variety across phases, the system applies dynamic prioritization:
+To increase variety across phases, the system applies dynamic prioritization when the composer penalty is greater than zero:
 
-- Track which highlight patterns appeared in previous phases
-- Apply -8 priority penalty to highlights matching previous patterns
-- Only apply penalty if >7 highlights available in current phase (MIN_HIGHLIGHTS_FOR_PENALTY = 7)
-- This ensures different types of highlights appear in different phases
+- Track which highlight **rule types** appeared in previous phases
+- Subtract `cross_phase_penalty` (default 8) from priority for repeats
+- Only apply the penalty if the current phase has more than `cross_phase_penalty_min_highlights` candidates (default 7)
+- Setting the penalty to 0 disables cross-phase down-ranking
 
 ### Deduplication Logic
 
@@ -214,10 +251,11 @@ The system uses multi-level deduplication:
 
 1. **Move-Level Combination**
    - Highlights on the same move (same move_number and is_white) are combined
-   - Maximum 2 highlights per move (selected by priority)
+   - Up to `max_per_move` highlights per move (selected by priority; default 2)
    - Descriptions are merged with ". " separator
 
 2. **Phase-Level Deduplication**
+   - Always on (not user-togglable)
    - Within each phase, track description patterns per side
    - Pattern matching uses primary message (first sentence before period)
    - Maximum 1 occurrence per (side, pattern) per phase
@@ -263,7 +301,7 @@ When selecting highlights:
 2. Then by move number (ascending) for ties
 3. Apply cross-phase penalties
 4. Deduplicate
-5. Take top N per phase (default: 10)
+5. Take top N per phase (`max_per_phase`, default: 7)
 
 ## Classification Thresholds
 
@@ -336,21 +374,25 @@ To add a new highlight rule:
    - Inherit from `HighlightRule`
    - Implement `evaluate(move, context) -> List[GameHighlight]`
    - Return empty list if no highlight, or list of `GameHighlight` instances
+   - Set `rule_type` on emitted highlights to the stable snake_case rule id
 
 2. **Register rule** in `RuleRegistry._load_rules()`
    - Import the rule class
    - Register with: `self.register_rule(RuleClass(config))`
 
-3. **Add rule configuration** to config.json
-   - Under `ui.panels.detail.summary.highlights.rules`
-   - Include enabled, name, description, and rule-specific params
+3. **Add catalog metadata** in `app/services/game_highlights/rule_catalog.py`
+   - `BuiltinRuleMeta` with id, display name, description, category, default priority/phases/enabled
+   - Required so the Manage dialog and user overrides recognize the rule
 
-4. **Set appropriate priority**
+4. **Optional `config.json` entry** under `ui.panels.detail.summary.highlights.rules`
+   - Only needed for rule-specific algorithm parameters beyond catalog defaults
+
+5. **Set appropriate priority**
    - Higher priority = more interesting/rare
    - Consider existing priority hierarchy
    - Test to ensure appropriate frequency
 
-5. **Consider deduplication**
+6. **Consider deduplication**
    - Use unique description patterns
    - Consider if rule should be limited per phase
    - Check for conflicts with existing rules
@@ -368,7 +410,8 @@ class MyNewRule(HighlightRule):
                 is_white=True,
                 move_notation=f"{move.move_number}. {move.white_move}",
                 description="Description text",
-                priority=30  # Set appropriate priority
+                priority=30,  # Set appropriate priority
+                rule_type="my_new_rule",
             ))
         return highlights
 ```
@@ -405,7 +448,7 @@ class MyNewRule(HighlightRule):
 
 ## Configuration
 
-The highlight system is configured in config.json:
+### Factory defaults (`config.json`)
 
 ```json
 {
@@ -414,12 +457,10 @@ The highlight system is configured in config.json:
       "detail": {
         "summary": {
           "highlights": {
-            "highlights_per_phase_limit": 10,
+            "max_per_phase": 7,
             "rules": {
               "forcing_combination": {
-                "enabled": true,
-                "name": "Forcing Combination",
-                "description": "Detects material sacrifices with forced responses"
+                "some_rule_specific_param": true
               }
             }
           }
@@ -429,6 +470,36 @@ The highlight system is configured in config.json:
   }
 }
 ```
+
+`max_per_phase` in config is the factory default for the composer; user composer overrides win when present.
+
+### User preferences (`user_settings.json` → `game_highlight_rules`)
+
+Sparse storage only (empty objects/lists mean “use defaults”):
+
+```json
+{
+  "game_highlight_rules": {
+    "overrides": {
+      "castling": {
+        "enabled": false
+      },
+      "fork": {
+        "phases": ["middlegame", "endgame"]
+      }
+    },
+    "priority_order": [],
+    "composer": {
+      "max_per_phase": 5,
+      "max_per_move": 2,
+      "cross_phase_penalty": 8,
+      "cross_phase_penalty_min_highlights": 7
+    }
+  }
+}
+```
+
+Composer defaults (when not overridden): `max_per_phase` 7 (or config value), `max_per_move` 2, `cross_phase_penalty` 8, `cross_phase_penalty_min_highlights` 7. Phase-level dedupe is always on. A `cross_phase_penalty` of 0 disables cross-phase down-ranking.
 
 ## Performance Considerations
 

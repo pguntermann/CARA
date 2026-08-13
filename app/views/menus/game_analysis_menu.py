@@ -50,6 +50,11 @@ def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
     mw.configure_classification_action.triggered.connect(mw._open_classification_settings)
     game_analysis_menu.addAction(mw.configure_classification_action)
 
+    mw.manage_highlight_rules_action = QAction("Manage Game Highlight Rules...", mw)
+    mw.manage_highlight_rules_action.setMenuRole(QAction.MenuRole.NoRole)
+    mw.manage_highlight_rules_action.triggered.connect(mw._open_manage_highlight_rules)
+    game_analysis_menu.addAction(mw.manage_highlight_rules_action)
+
     game_analysis_menu.addSeparator()
 
     mw.normalized_graph_action = QAction("Normalized Evaluation Graph", mw)
@@ -85,6 +90,23 @@ def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
         mw.auto_game_tagging_tag_actions[tag] = act
     mw.select_auto_tags_menu.setEnabled(True)
     game_analysis_menu.addMenu(mw.select_auto_tags_menu)
+
+    mw.update_move_quality_nags_action = QAction("Update move quality NAGs in PGN", mw)
+    mw.update_move_quality_nags_action.setCheckable(True)
+    mw.update_move_quality_nags_action.setChecked(False)
+    mw.update_move_quality_nags_action.triggered.connect(
+        mw._on_update_move_quality_nags_toggled
+    )
+    game_analysis_menu.addAction(mw.update_move_quality_nags_action)
+
+    mw.configure_move_quality_nag_mapping_action = QAction(
+        "Configure Move Quality NAG Mapping...", mw
+    )
+    mw.configure_move_quality_nag_mapping_action.setMenuRole(QAction.MenuRole.NoRole)
+    mw.configure_move_quality_nag_mapping_action.triggered.connect(
+        mw._open_move_quality_nag_mapping
+    )
+    game_analysis_menu.addAction(mw.configure_move_quality_nag_mapping_action)
 
     game_analysis_menu.addSeparator()
 

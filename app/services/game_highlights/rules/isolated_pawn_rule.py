@@ -1,115 +1,85 @@
 """Rule for detecting isolated pawns."""
 
 from typing import List
+
 import chess
 
 from app.services.game_highlights.base_rule import HighlightRule, GameHighlight, RuleContext
-from app.services.game_highlights.helpers import parse_fen
+from app.services.game_highlights.half_move import (
+    HalfMoveContext,
+    evaluate_for_each_side,
+    make_highlight,
+)
+from app.services.game_highlights.helpers import piece_type_from_san
 
 
 class IsolatedPawnRule(HighlightRule):
-    """Detects when a pawn becomes isolated (no friendly pawns on adjacent files)."""
-    
+    """Detects when a pawn move creates a newly isolated friendly pawn."""
+
     def evaluate(self, move, context: RuleContext) -> List[GameHighlight]:
-        """Evaluate move for isolated pawn highlights.
-        
-        Args:
-            move: Current move data.
-            context: Rule context.
-        
-        Returns:
-            List of GameHighlight instances.
-        """
-        highlights = []
-        move_num = move.move_number
-        
-        # White's isolated pawn
-        if move.white_move and len(move.white_move) >= 2 and move.white_move[0].islower():
-            board_after = parse_fen(move.fen_white)
-            if board_after and context.prev_move and context.prev_move.fen_black:
-                board_before = parse_fen(context.prev_move.fen_black)
-                if board_before:
-                    isolated_pawns = self._find_new_isolated_pawns(board_before, board_after, chess.WHITE)
-                    if isolated_pawns:
-                        highlights.append(GameHighlight(
-                            move_number=move_num,
-                            is_white=True,
-                            move_notation=f"{move_num}. {move.white_move}",
-                            description="White created an isolated pawn",
-                            priority=21,
-                            rule_type="isolated_pawn"
-                        ))
-        
-        # Black's isolated pawn
-        if move.black_move and len(move.black_move) >= 2 and move.black_move[0].islower():
-            board_after = parse_fen(move.fen_black)
-            if board_after and move.fen_white:
-                board_before = parse_fen(move.fen_white)
-                if board_before:
-                    isolated_pawns = self._find_new_isolated_pawns(board_before, board_after, chess.BLACK)
-                    if isolated_pawns:
-                        highlights.append(GameHighlight(
-                            move_number=move_num,
-                            is_white=False,
-                            move_notation=f"{move_num}. ...{move.black_move}",
-                            description="Black created an isolated pawn",
-                            priority=21,
-                            rule_type="isolated_pawn"
-                        ))
-        
-        return highlights
-    
-    def _find_new_isolated_pawns(self, board_before: chess.Board, board_after: chess.Board, 
-                                 color: chess.Color) -> List[chess.Square]:
-        """Find pawns that became isolated after the move."""
+        """Evaluate move for isolated pawn highlights."""
+        return evaluate_for_each_side(move, context, self._evaluate_half)
+
+    def _evaluate_half(self, half: HalfMoveContext) -> List[GameHighlight]:
+        # Isolation from this rule is attributed to a pawn move by that side.
+        if piece_type_from_san(half.san) != chess.PAWN:
+            return []
+
+        board_before = half.board_before()
+        board_after = half.board_after()
+        if board_before is None or board_after is None:
+            return []
+
+        if not self._find_new_isolated_pawns(board_before, board_after, half.color):
+            return []
+
+        return [
+            make_highlight(
+                half,
+                f"{half.side_name} created an isolated pawn",
+                priority=21,
+                rule_type="isolated_pawn",
+            )
+        ]
+
+    def _find_new_isolated_pawns(
+        self,
+        board_before: chess.Board,
+        board_after: chess.Board,
+        color: chess.Color,
+    ) -> List[chess.Square]:
+        """Find friendly pawns that became isolated after the move."""
         pawns_before = list(board_before.pieces(chess.PAWN, color))
         pawns_after = list(board_after.pieces(chess.PAWN, color))
-        
-        new_isolated = []
-        
-        # Check all pawns that exist after the move
+        new_isolated: List[chess.Square] = []
+
         for pawn_sq in pawns_after:
             pawn_file = chess.square_file(pawn_sq)
-            
-            # Check if pawn was isolated before
-            was_isolated_before = self._is_isolated(pawns_before, pawn_file)
-            
-            # Check if pawn is isolated after
-            is_isolated_after = self._is_isolated(pawns_after, pawn_file)
-            
-            # If it became isolated (wasn't before, is now)
-            if not was_isolated_before and is_isolated_after:
+            was_isolated = self._is_isolated(pawns_before, pawn_file)
+            is_isolated = self._is_isolated(pawns_after, pawn_file)
+            if not was_isolated and is_isolated:
                 new_isolated.append(pawn_sq)
-        
-        # Also check if a pawn was removed that made remaining pawns isolated
+
+        # A pawn that left its file may isolate neighbors on adjacent files.
         for pawn_sq_before in pawns_before:
-            if pawn_sq_before not in pawns_after:
-                # A pawn was removed - check if remaining pawns became isolated
-                removed_file = chess.square_file(pawn_sq_before)
-                for pawn_sq_after in pawns_after:
-                    pawn_file = chess.square_file(pawn_sq_after)
-                    # Check if this pawn is on adjacent file to removed pawn
-                    if abs(pawn_file - removed_file) == 1:
-                        # Check if this pawn is now isolated
-                        if self._is_isolated(pawns_after, pawn_file):
-                            if pawn_sq_after not in new_isolated:
-                                new_isolated.append(pawn_sq_after)
-        
-        return new_isolated
-    
-    def _is_isolated(self, pawns: List[chess.Square], file: int) -> bool:
-        """Check if a pawn on the given file is isolated."""
-        # Check adjacent files
-        adjacent_files = [file - 1, file + 1]
-        
-        for adj_file in adjacent_files:
-            if adj_file < 0 or adj_file > 7:
+            if pawn_sq_before in pawns_after:
                 continue
-            
-            # Check if there's a pawn on this adjacent file
+            removed_file = chess.square_file(pawn_sq_before)
+            for pawn_sq_after in pawns_after:
+                pawn_file = chess.square_file(pawn_sq_after)
+                if abs(pawn_file - removed_file) != 1:
+                    continue
+                if self._is_isolated(pawns_after, pawn_file) and pawn_sq_after not in new_isolated:
+                    new_isolated.append(pawn_sq_after)
+
+        return new_isolated
+
+    def _is_isolated(self, pawns: List[chess.Square], file: int) -> bool:
+        """True if ``file`` has no friendly pawns on either adjacent file."""
+        for adj_file in (file - 1, file + 1):
+            if not 0 <= adj_file <= 7:
+                continue
             for pawn_sq in pawns:
                 if chess.square_file(pawn_sq) == adj_file:
-                    return False  # Not isolated, has adjacent pawn
-        
-        return True  # Isolated, no pawns on adjacent files
-
+                    return False
+        return True
