@@ -1517,9 +1517,14 @@ class MainWindow(QMainWindow):
         """Open the opening encyclopedia for the current game (same as game-info ⓘ)."""
         main_panel = getattr(self, "main_panel", None)
         game_info_view = getattr(main_panel, "game_info_view", None) if main_panel else None
-        if game_info_view is None:
+        if game_info_view is None or not game_info_view.is_encyclopedia_openable():
             return
         game_info_view.open_encyclopedia()
+
+    def _update_opening_encyclopedia_action_state(self, openable: bool) -> None:
+        """Enable Board/context Opening Encyclopedia when a lookup is possible."""
+        if hasattr(self, "opening_encyclopedia_action"):
+            self.opening_encyclopedia_action.setEnabled(bool(openable))
     
     def _on_playedmove_arrow_visibility_changed(self, visible: bool) -> None:
         """Handle played move arrow visibility change to update menu toggle.
@@ -1827,6 +1832,16 @@ class MainWindow(QMainWindow):
         evaluation_model = self.controller.get_evaluation_controller().get_evaluation_model()
         self.main_panel = MainPanel(self.config, board_model, game_model, game_controller, evaluation_model)
         top_splitter.addWidget(self.main_panel)
+
+        # Keep Board/context Opening Encyclopedia enabled in sync with game-info lookup.
+        game_info_view = getattr(self.main_panel, "game_info_view", None)
+        if game_info_view is not None:
+            game_info_view.encyclopedia_openable_changed.connect(
+                self._update_opening_encyclopedia_action_state
+            )
+            self._update_opening_encyclopedia_action_state(
+                game_info_view.is_encyclopedia_openable()
+            )
         
         # Connect positional heat-map model to chessboard widget
         positional_heatmap_controller = self.controller.get_positional_heatmap_controller()
