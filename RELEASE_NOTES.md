@@ -1,5 +1,35 @@
 # Release Notes
 
+# CARA v2.8.4 - Game Highlight Revisited
+
+**Release Date:** 13.08.2026
+
+This release adds a **Manage Game Highlight Rules** dialog and a major refactoring of the highlight detection rules, optional writing of **move-quality NAGs** into PGN after analysis (with a configurable mapping), and several smaller UI/UX improvements.
+
+## Game Highlight Rules
+
+- **Manage Game Highlight Rules…:** Open **Game Analysis → Manage Game Highlight Rules…** to enable or disable individual highlight rules, choose which game phases each rule may fire in, set relative priority, and adjust composition settings.
+- **Detection overhaul:** Highlight rule logic was refactored and corrected across the rule set, which should lead to more reliable detection, especially for tactical rules like skewer, fork, etc. and should also lead to improved variety. While the rules should now apply much more consistently, of course false-flags are still possible. If you observe a false positive, please share this with me with a sample PGN and why you think the rule shouldn't have been applied. I will collect this feedback for future updates. You can mail me your cases to: pguntermann@me.com
+
+## Other Improvements
+
+- **Update move quality NAGs in PGN:** Optional (off by default). After game analysis (single or bulk), CARA can write standard quality NAGs (`$1`–`$6`) onto mainline moves from analysis classifications. The mapping can be configured through a new **Configure Move Quality NAG Mapping…** dialog to choose, per classification, whether a NAG is written and which glyph to use. 
+- **Board → Opening Encyclopedia** Added a shortcut-bindable menu item to open the Opening Encyclopedia based on the detected opening in the game.
+- **Opening Encyclopedia:** Added roughly 100 additional opening variation entries; 
+- **Keyboard shortcuts:** Default shortcuts for game copy / cut / paste were adjusted to be more intuitive.
+- **Dialog size grip** User-resizable dialogs now show a corresponding resize-grip to better communicate which dialogs are resizable and which are using a fixed size.
+
+## Bug Fixes
+
+- **Bulk Operations:** Corrected row highlight color on the Light theme.
+- **Copy / cut / paste:** ... now works again in text edit controls, like **Notes** - If a text-edit control has focus, it takes priority over global keyboard shortcut mappings.
+- **Logic workflow fixes:** Fixed several small unnecessary processing, for example a second game analysis pass when automatic game tagging is enabled and a second persisting of user settings during app termination.
+## Documentation
+
+- **HTML manual:** Updated in connection with new features in this version.
+
+---
+
 # CARA v2.8.3 - Customizable Keyboard Shortcuts and Get Stockfish Wizard
 
 **Release Date:** 07.08.2026
