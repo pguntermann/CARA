@@ -78,6 +78,7 @@ from app.views.delegates.encyclopedia_search_result_delegate import (
 from app.views.style import StyleManager
 from app.views.style.menu_bar import apply_menu_styling
 from app.views.style.tooltip import tooltip_qss_block
+from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
 from app.views.widgets.pixel_aligned_hline import PixelAlignedHLine
 
 # Window-size presets as percent-of-available-screen keys stored in user settings.
@@ -1049,6 +1050,16 @@ class OpeningEncyclopediaDialog(QDialog):
             self._body_labels.append(lab)
             # Stash the body label on the block for width-specific measuring.
             block._encyclopedia_body = lab  # type: ignore[attr-defined]
+            if heading is None:
+                fen = encyclopedia_service.tabiya_fen(entry.opening_id)
+                if fen:
+                    board = MiniChessBoardWidget(
+                        config,
+                        fen,
+                        is_flipped=False,
+                        embedded=True,
+                    )
+                    col.addWidget(board, 0, Qt.AlignmentFlag.AlignLeft)
             return block
 
         self._section_blocks = []
@@ -2722,40 +2733,60 @@ class OpeningEncyclopediaDialog(QDialog):
             lab.setFixedHeight(h)
         return h
 
-    def _estimate_block_height(self, block: QWidget, width: int) -> int:
-        """Measure block height at ``width`` without mutating widgets."""
+    def _layout_widget_height(self, widget: QWidget) -> int:
+        """Exact height of a non-wrapping layout child (e.g. mini board, heading)."""
+        min_h = int(widget.minimumHeight())
+        max_h = int(widget.maximumHeight())
+        if min_h > 0 and min_h == max_h:
+            return min_h
+        hint = max(int(widget.sizeHint().height()), int(widget.minimumSizeHint().height()))
+        return max(hint, min_h, 0)
+
+    def _block_chrome_height(self, block: QWidget, body: Optional[QLabel]) -> int:
+        """Height of layout children other than the wrapping body label, plus spacing."""
+        lay = block.layout()
+        if lay is None:
+            return 0
+        chrome = 0
+        child_count = 0
+        for i in range(lay.count()):
+            item = lay.itemAt(i)
+            if item is None:
+                continue
+            widget = item.widget()
+            if widget is None:
+                continue
+            child_count += 1
+            if widget is body:
+                continue
+            chrome += self._layout_widget_height(widget)
+        if child_count > 1:
+            chrome += max(0, lay.spacing()) * (child_count - 1)
+        return chrome
+
+    def _measure_block_height(self, block: QWidget, width: int) -> int:
+        """Compute block height at ``width`` without mutating widgets."""
         lab = getattr(block, "_encyclopedia_body", None)
         body_h = (
             self._measure_label_height(lab, width) if isinstance(lab, QLabel) else 0
         )
-        chrome = 0
-        lay = block.layout()
-        if lay is not None:
-            for i in range(lay.count()):
-                item = lay.itemAt(i)
-                w = item.widget() if item is not None else None
-                if w is None or w is lab:
-                    continue
-                chrome += max(0, w.sizeHint().height())
-            chrome += max(0, lay.spacing()) * max(0, lay.count() - 1)
+        chrome = self._block_chrome_height(
+            block, lab if isinstance(lab, QLabel) else None
+        )
         if body_h:
             return body_h + chrome
-        return max(1, block.sizeHint().height())
+        return max(1, chrome, block.sizeHint().height())
+
+    def _estimate_block_height(self, block: QWidget, width: int) -> int:
+        return self._measure_block_height(block, width)
 
     def _fit_block_to_width(self, block: QWidget, width: int) -> int:
         lab = getattr(block, "_encyclopedia_body", None)
         body_h = self._fit_label_to_width(lab, width) if isinstance(lab, QLabel) else 0
-        chrome = 0
-        lay = block.layout()
-        if lay is not None:
-            for i in range(lay.count()):
-                item = lay.itemAt(i)
-                w = item.widget() if item is not None else None
-                if w is None or w is lab:
-                    continue
-                chrome += max(0, w.sizeHint().height())
-            chrome += max(0, lay.spacing()) * max(0, lay.count() - 1)
-        return body_h + chrome if body_h else max(1, block.sizeHint().height())
+        chrome = self._block_chrome_height(
+            block, lab if isinstance(lab, QLabel) else None
+        )
+        return body_h + chrome if body_h else max(1, chrome, block.sizeHint().height())
 
     def _clear_layout(self, layout: QVBoxLayout) -> None:
         while layout.count():

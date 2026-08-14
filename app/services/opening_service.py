@@ -6,7 +6,7 @@ import chess.pgn
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Sequence, Tuple, List
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -82,6 +82,117 @@ class OpeningContinuation:
     move_uci: str
 
 
+@dataclass(frozen=True)
+class EcoBookRow:
+    """One ECO book position (base or interpolated)."""
+
+    fen: str
+    name: str
+    eco: str
+    moves: str
+
+
+def parse_move_sans(moves: str) -> List[str]:
+    """Parse a book ``moves`` string like ``1. e4 e5 2. Nf3`` into SAN tokens."""
+    sans: List[str] = []
+    for token in str(moves or "").replace("...", " ").split():
+        raw = token.strip()
+        if not raw:
+            continue
+        if raw.endswith("."):
+            continue
+        if raw.isdigit():
+            continue
+        if raw[0].isdigit() and "." in raw:
+            raw = raw.split(".", 1)[1]
+        san = raw.rstrip("+#!?")
+        if san:
+            sans.append(san)
+    return sans
+
+
+def fen_after_sans(sans: Sequence[str]) -> Optional[str]:
+    """Replay ``sans`` from the standard start. ``None`` if a token is illegal."""
+    board = chess.Board()
+    try:
+        for san in sans:
+            board.push_san(san)
+    except ValueError:
+        return None
+    return board.fen()
+
+
+def _lcp_len(sequences: Sequence[Sequence[str]]) -> int:
+    if not sequences:
+        return 0
+    shortest = min(len(seq) for seq in sequences)
+    first = sequences[0]
+    n = 0
+    while n < shortest and all(seq[n] == first[n] for seq in sequences):
+        n += 1
+    return n
+
+
+def _fen_from_lcp(
+    items: Sequence[Tuple[int, EcoBookRow, List[str]]],
+    lcp_len: int,
+) -> Optional[str]:
+    """Book row on the prefix if present; otherwise replay. Empty prefix → shallowest."""
+    if not items:
+        return None
+    if lcp_len <= 0:
+        return items[0][1].fen
+    lcp = items[0][2][:lcp_len]
+    for _depth, row, sans in items:
+        if sans == lcp:
+            return row.fen
+    parent = fen_after_sans(lcp)
+    return parent if parent else items[0][1].fen
+
+
+def compute_tabiya_fen(
+    rows: Sequence[EcoBookRow],
+    *,
+    family: bool = False,
+) -> Optional[str]:
+    """Choose one diagram FEN from book rows.
+
+    Dedup transpositions (placement + side to move).
+
+    Named entries (``family=False``): use the shallowest unique position. If
+    several min-depth positions are siblings, pop to their common parent.
+
+    Family roots (``family=True``): use the longest common SAN prefix of all
+    unique lines so a shallow sideline does not steal the diagram.
+    Unrelated move orders (empty prefix) keep the shallowest FEN, not startpos.
+    """
+    if not rows:
+        return None
+
+    by_key: Dict[str, Tuple[int, EcoBookRow, List[str]]] = {}
+    for row in rows:
+        sans = parse_move_sans(row.moves)
+        depth = len(sans)
+        key = OpeningService.book_key(row.fen)
+        prev = by_key.get(key)
+        if prev is None or depth < prev[0]:
+            by_key[key] = (depth, row, sans)
+
+    items = list(by_key.values())
+    if not items:
+        return None
+    items.sort(key=lambda item: (item[0], item[1].fen))
+
+    if family:
+        return _fen_from_lcp(items, _lcp_len([sans for _d, _r, sans in items]))
+
+    min_depth = items[0][0]
+    shallow = [item for item in items if item[0] == min_depth]
+    if len(shallow) == 1:
+        return shallow[0][1].fen
+    return _fen_from_lcp(shallow, _lcp_len([sans for _d, _r, sans in shallow]))
+
+
 class OpeningService:
     """Service for looking up opening information from FEN positions.
     
@@ -116,6 +227,7 @@ class OpeningService:
         # Lazy reverse indexes for diagram lookup (ECO → FEN, ECO+name → FEN).
         self._fen_by_eco: Optional[Dict[str, str]] = None
         self._fen_by_eco_name: Optional[Dict[Tuple[str, str], str]] = None
+        self._book_rows: Optional[List[EcoBookRow]] = None
         self._loaded = False
     
     def load(self) -> None:
@@ -154,6 +266,7 @@ class OpeningService:
             self._eco_base or {},
             self._eco_interpolated or {},
         )
+        self._book_rows = None
         
         self._loaded = True
         
@@ -284,6 +397,29 @@ class OpeningService:
         self._fen_by_eco = {eco: fen for eco, (_n, fen) in by_eco.items()}
         self._fen_by_eco_name = {key: fen for key, (_n, fen) in by_eco_name.items()}
 
+    def iter_book_rows(self) -> List[EcoBookRow]:
+        """All unique ECO book positions (interpolated overrides base on the same FEN)."""
+        if not self._loaded:
+            self.load()
+        if self._book_rows is not None:
+            return self._book_rows
+        by_fen: Dict[str, EcoBookRow] = {}
+        for book in (self._eco_base or {}, self._eco_interpolated or {}):
+            for fen, entry in book.items():
+                if not isinstance(entry, dict):
+                    continue
+                name = str(entry.get("name") or "").strip()
+                if not name:
+                    continue
+                by_fen[str(fen)] = EcoBookRow(
+                    fen=str(fen),
+                    name=name,
+                    eco=str(entry.get("eco") or "").strip(),
+                    moves=str(entry.get("moves") or "").strip(),
+                )
+        self._book_rows = list(by_fen.values())
+        return self._book_rows
+
     def find_representative_fen(
         self, eco: Optional[str], name: Optional[str] = None
     ) -> Optional[str]:
@@ -333,21 +469,7 @@ class OpeningService:
     @staticmethod
     def lichess_moves_path(moves: str) -> str:
         """Convert a book moves string like ``1. e4 e5 2. Nf3`` to ``e4_e5_Nf3``."""
-        sans: List[str] = []
-        for token in str(moves or "").replace("...", " ").split():
-            raw = token.strip()
-            if not raw:
-                continue
-            if raw.endswith("."):
-                # Move number like "1."
-                continue
-            if raw[0].isdigit() and "." in raw:
-                # Rare glued form "1.e4"
-                raw = raw.split(".", 1)[1]
-            san = raw.rstrip("+#!?")
-            if san:
-                sans.append(san)
-        return "_".join(sans)
+        return "_".join(parse_move_sans(moves))
 
     @staticmethod
     def lichess_analysis_url(fen: str) -> str:

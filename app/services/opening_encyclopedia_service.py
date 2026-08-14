@@ -253,6 +253,9 @@ class OpeningEncyclopediaService:
         self._image_cache: Dict[Tuple[str, int], Optional[bytes]] = {}
         self._available = False
         self._load_attempted = False
+        self._opening_service: Optional[Any] = None
+        self._rows_by_oid: Optional[Dict[str, List[Any]]] = None
+        self._tabiya_fen_by_oid: Dict[str, Optional[str]] = {}
 
     @classmethod
     def get_instance(cls, config: Dict[str, Any]) -> "OpeningEncyclopediaService":
@@ -679,3 +682,82 @@ class OpeningEncyclopediaService:
         blob = bytes(data) if not isinstance(data, bytes) else data
         self._image_cache[cache_key] = blob
         return blob
+
+    def _get_opening_service(self):
+        """Lazy OpeningService for ECO book rows (same config as this encyclopedia)."""
+        if self._opening_service is None:
+            from app.services.opening_service import OpeningService
+
+            self._opening_service = OpeningService(self._config)
+        return self._opening_service
+
+    def _ensure_rows_by_oid(self) -> Dict[str, List[Any]]:
+        """Index ECO book rows by exact ``opening_id`` (from name_resolution)."""
+        if self._rows_by_oid is not None:
+            return self._rows_by_oid
+        self._ensure_loaded()
+        buckets: Dict[str, List[Any]] = {}
+        if self._available:
+            for row in self._get_opening_service().iter_book_rows():
+                oid = self._resolve_opening_id(row.name, row.eco)
+                if not oid:
+                    continue
+                buckets.setdefault(oid, []).append(row)
+        self._rows_by_oid = buckets
+        return buckets
+
+    def _is_under_opening(self, oid: str, ancestor: str) -> bool:
+        """True if ``oid`` is ``ancestor`` or a descendant (slash id or family_id)."""
+        if not oid or not ancestor:
+            return False
+        if oid == ancestor or oid.startswith(ancestor + "/"):
+            return True
+        seen: set[str] = set()
+        node: Optional[str] = oid
+        while node and node not in seen:
+            if node == ancestor:
+                return True
+            seen.add(node)
+            raw = self._openings.get(node)
+            if raw is None:
+                break
+            family = raw.get("family_id")
+            node = str(family).strip() if family else None
+            if not node:
+                break
+        return False
+
+    def _rows_for_tabiya(self, opening_id: str) -> List[Any]:
+        """Book rows for this opening and its descendant encyclopedia ids."""
+        collected: List[Any] = []
+        for oid, rows in self._ensure_rows_by_oid().items():
+            if self._is_under_opening(oid, opening_id):
+                collected.extend(rows)
+        return collected
+
+    def tabiya_fen(self, opening_id: str) -> Optional[str]:
+        """Return the named-tabiya FEN for ``opening_id``, or ``None``.
+
+        If ECO names resolve to this id, use those rows and the shallowest
+        unique named position (sibling pop only at min depth). That keeps
+        transpositional move orders (e.g. ``1. e4 e5`` vs ``1. e4 d6``) from
+        collapsing the diagram to ``1. e4``.
+
+        If this id has no book name of its own, include descendant ids and
+        take the common SAN prefix so a parent still gets a defining diagram.
+        Cached per opening_id.
+        """
+        oid = (opening_id or "").strip()
+        if not oid:
+            return None
+        if oid in self._tabiya_fen_by_oid:
+            return self._tabiya_fen_by_oid[oid]
+        from app.services.opening_service import compute_tabiya_fen
+
+        exact = self._ensure_rows_by_oid().get(oid, [])
+        if exact:
+            fen = compute_tabiya_fen(exact, family=False)
+        else:
+            fen = compute_tabiya_fen(self._rows_for_tabiya(oid), family=True)
+        self._tabiya_fen_by_oid[oid] = fen
+        return fen
