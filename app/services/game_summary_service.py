@@ -1,7 +1,8 @@
 """Game summary service for calculating game statistics from analysis data."""
 
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Callable, Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
+import math
 
 from asteval import Interpreter
 
@@ -167,16 +168,17 @@ class AccuracyProgressXScale:
 
     @property
     def shows_first_scored_axis_label(self) -> bool:
-        return self.is_compressed and self.compressed_units >= 1.0
+        # Allow labeling the first scored move unless the strip is extremely narrow.
+        return self.is_compressed and self.compressed_units >= 0.5
 
     @staticmethod
     def default_compressed_units(
         first_scored_move: int,
         last_scored_move: int,
         *,
-        fraction: float = 0.12,
-        min_units: float = 1.2,
-        max_units: float = 4.0,
+        fraction: float = 0.045,
+        min_units: float = 0.55,
+        max_units: float = 1.0,
     ) -> float:
         scored_span = max(int(last_scored_move) - int(first_scored_move), 1)
         return min(float(max_units), max(float(min_units), float(scored_span) * float(fraction)))
@@ -188,9 +190,9 @@ class AccuracyProgressXScale:
         *,
         enabled: bool = True,
         compressed_units: Optional[float] = None,
-        fraction: float = 0.12,
-        min_units: float = 1.2,
-        max_units: float = 4.0,
+        fraction: float = 0.045,
+        min_units: float = 0.55,
+        max_units: float = 1.0,
     ) -> "AccuracyProgressXScale":
         moves = sorted({int(m) for m in scored_moves if int(m) > 0})
         first = moves[0] if moves else 1
@@ -228,9 +230,9 @@ class AccuracyProgressXScale:
         return cls.from_move_numbers(
             move_numbers,
             enabled=bool(chart_cfg.get("opening_compression_enabled", True)),
-            fraction=float(chart_cfg.get("opening_compression_fraction", 0.12)),
-            min_units=float(chart_cfg.get("opening_compression_min_units", 1.2)),
-            max_units=float(chart_cfg.get("opening_compression_max_units", 4.0)),
+            fraction=float(chart_cfg.get("opening_compression_fraction", 0.045)),
+            min_units=float(chart_cfg.get("opening_compression_min_units", 0.55)),
+            max_units=float(chart_cfg.get("opening_compression_max_units", 1.0)),
         )
 
     def plot_x(self, move_number: int) -> float:
@@ -274,17 +276,80 @@ class AccuracyProgressXScale:
         return marks
 
     @staticmethod
+    def filter_overlapping_axis_marks(
+        marks: List[Tuple[float, str]],
+        *,
+        x_to_pixel: Callable[[float], float],
+        text_width: Callable[[str], float],
+        min_gap_px: float = 6.0,
+    ) -> List[Tuple[float, str]]:
+        """Drop later labels whose text boxes collide with an earlier one.
+
+        Marks are assumed left-to-right in plot order. The compressed opening
+        label is first, so a colliding first-scored move label (e.g. ``11`` next
+        to ``0...10``) is skipped while later ticks are kept.
+        """
+        kept: List[Tuple[float, str]] = []
+        last_right: Optional[float] = None
+        gap = max(0.0, float(min_gap_px))
+        for plot_x, label in marks:
+            width = float(text_width(label))
+            center = float(x_to_pixel(plot_x))
+            left_edge = center - width / 2.0
+            right_edge = center + width / 2.0
+            if last_right is not None and left_edge < last_right + gap:
+                continue
+            kept.append((plot_x, label))
+            last_right = right_edge
+        return kept
+
+    @staticmethod
+    def _nice_step(raw_step: int) -> int:
+        """Round a raw step up to a readable interval (1, 2, 5, 10, …)."""
+        step = max(1, int(raw_step))
+        if step <= 1:
+            return 1
+        magnitude = 10 ** max(0, len(str(step)) - 1)
+        for factor in (1, 2, 5, 10):
+            candidate = factor * magnitude
+            if candidate >= step:
+                return candidate
+        return step
+
+    @staticmethod
     def _sample_move_numbers(lo: int, hi: int, desired_count: int) -> List[int]:
-        span = hi - lo
+        """Evenly spaced full-move ticks for the non-compressed chart region.
+
+        Always includes ``lo`` and ``hi``. Intermediate ticks use a uniform nice
+        step so labels do not show irregular single-move gaps.
+        """
+        lo_i, hi_i = int(lo), int(hi)
+        if hi_i < lo_i:
+            lo_i, hi_i = hi_i, lo_i
+        span = hi_i - lo_i
         if span <= 0:
-            return [lo]
-        if span + 1 <= desired_count:
-            return list(range(lo, hi + 1))
-        picked: List[int] = []
-        for i in range(desired_count):
-            value = lo + int(round(i / (desired_count - 1) * span))
-            if not picked or picked[-1] != value:
-                picked.append(value)
+            return [lo_i]
+        desired = max(2, int(desired_count))
+        if span + 1 <= desired:
+            return list(range(lo_i, hi_i + 1))
+
+        raw_step = int(math.ceil(span / float(desired - 1)))
+        step = AccuracyProgressXScale._nice_step(raw_step)
+
+        picked: List[int] = [lo_i]
+        # Snap intermediates to the step grid (e.g. …, 15, 20, 25, …) while
+        # keeping the first scored move as the left endpoint.
+        first_mid = ((lo_i // step) + 1) * step
+        for move in range(first_mid, hi_i, step):
+            if move > lo_i:
+                picked.append(move)
+
+        if picked[-1] != hi_i:
+            # Drop a trailing intermediate that would crowd the final label.
+            if len(picked) > 1 and (hi_i - picked[-1]) < (step * 0.6):
+                picked[-1] = hi_i
+            else:
+                picked.append(hi_i)
         return picked
 
 

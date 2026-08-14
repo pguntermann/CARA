@@ -1606,9 +1606,9 @@
             "min_move_labels": 3,
             "show_legend": true,
             "opening_compression_enabled": true,
-            "opening_compression_fraction": 0.12,
-            "opening_compression_min_units": 1.2,
-            "opening_compression_max_units": 4.0,
+            "opening_compression_fraction": 0.045,
+            "opening_compression_min_units": 0.55,
+            "opening_compression_max_units": 1.0,
             "compression_end_line_color": {
               "$ref": "$_COLOR_TEXT_4"
             },

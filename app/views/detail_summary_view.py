@@ -556,8 +556,9 @@ class EvaluationGraphWidget(QWidget):
         # Draw phase transition indicators (vertical lines) - draw after critical moment lines, before current move indicator
         # Note: Phase transition lines are drawn before current move line so current move line renders on top
         if self.max_ply > 0:
+            last_move = ply_to_fullmove(self.max_ply)
             # Draw opening-to-middlegame transition line
-            if self.opening_end > 0:
+            if self.opening_end > 0 and self.opening_end < last_move:
                 # Convert move number to ply index (opening_end is move number, need to find the ply after that move)
                 # Opening ends at move N, so transition is after move N (ply = N * 2)
                 opening_end_ply = self.opening_end * 2
@@ -566,8 +567,8 @@ class EvaluationGraphWidget(QWidget):
                     painter.setPen(QPen(self.phase_transition_line_color, self.phase_transition_line_width, self.phase_transition_line_style))
                     painter.drawLine(int(x), int(top), int(x), int(bottom))
             
-            # Draw middlegame-to-endgame transition line
-            if self.middlegame_end > 0:
+            # Draw middlegame-to-endgame transition line (omit when it is the last move)
+            if self.middlegame_end > 0 and self.middlegame_end < last_move:
                 # Convert move number to ply index (middlegame_end is move number, need to find the ply after that move)
                 # Middlegame ends at move N, so transition is after move N (ply = N * 2)
                 middlegame_end_ply = self.middlegame_end * 2
@@ -893,7 +894,13 @@ class AccuracyCurveWidget(QWidget):
             {ply_to_fullmove(p) for p in self._available_plys if ply_to_fullmove(p) > 0}
         )
         desired = max(self.min_move_labels, int(graph_width / max(1, self.min_label_spacing)))
-        for plot_x, label in self._x_scale.axis_marks(scored_moves, desired_count=desired):
+        axis_marks = AccuracyProgressXScale.filter_overlapping_axis_marks(
+            self._x_scale.axis_marks(scored_moves, desired_count=desired),
+            x_to_pixel=lambda plot_x: self._x_to_pixel(plot_x, left, graph_width),
+            text_width=lambda label: float(fm.horizontalAdvance(label)),
+            min_gap_px=6.0,
+        )
+        for plot_x, label in axis_marks:
             x = self._x_to_pixel(plot_x, left, graph_width)
             painter.setPen(self.text_color)
             painter.drawText(
@@ -940,19 +947,25 @@ class AccuracyCurveWidget(QWidget):
                 )
                 painter.drawLine(int(x), int(top), int(x), int(bottom))
 
-        # Phase transition lines in compressed plot space
+        # Phase transition lines in compressed plot space.
+        # Skip boundaries that sit on/after the last scored move (redundant at chart edge).
+        last_move = max(
+            (ply_to_fullmove(p) for p in self._available_plys if ply_to_fullmove(p) > 0),
+            default=0,
+        )
         for move_end in (self.opening_end, self.middlegame_end):
-            if move_end and move_end > 0:
-                x = self._x_to_pixel(self._x_scale.plot_x(move_end), left, graph_width)
-                if left - 1 <= x <= right + 1:
-                    painter.setPen(
-                        QPen(
-                            self.phase_transition_line_color,
-                            self.phase_transition_line_width,
-                            self.phase_transition_line_style,
-                        )
+            if not move_end or move_end <= 0 or (last_move > 0 and move_end >= last_move):
+                continue
+            x = self._x_to_pixel(self._x_scale.plot_x(move_end), left, graph_width)
+            if left - 1 <= x <= right + 1:
+                painter.setPen(
+                    QPen(
+                        self.phase_transition_line_color,
+                        self.phase_transition_line_width,
+                        self.phase_transition_line_style,
                     )
-                    painter.drawLine(int(x), int(top), int(x), int(bottom))
+                )
+                painter.drawLine(int(x), int(top), int(x), int(bottom))
 
         if self.current_ply >= 0:
             x = self._x_to_pixel(

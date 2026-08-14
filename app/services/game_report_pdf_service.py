@@ -1712,11 +1712,13 @@ class GameReportPDFService(BasePDFReportService):
 
         # Phase boundaries (move number → approximate ply)
         painter.setPen(QPen(self._graph_phase, 1.0, Qt.PenStyle.DashLine))
+        last_move = ply_to_fullmove(max_ply) if max_ply > 0 else 0
         for move_end in (summary.opening_end, summary.middlegame_end):
-            if move_end and move_end > 0:
-                ply = min(max_ply, int(move_end) * 2)
-                xx = x_for(ply)
-                painter.drawLine(int(xx), int(top), int(xx), int(bottom))
+            if not move_end or move_end <= 0 or (last_move > 0 and int(move_end) >= last_move):
+                continue
+            ply = min(max_ply, int(move_end) * 2)
+            xx = x_for(ply)
+            painter.drawLine(int(xx), int(top), int(xx), int(bottom))
 
         # Eval polyline
         points = sorted(data, key=lambda t: t[0])
@@ -1837,13 +1839,14 @@ class GameReportPDFService(BasePDFReportService):
             yy = y_for(float(value))
             painter.drawLine(int(left), int(yy), int(right), int(yy))
 
-        # Phase boundaries (compressed X)
+        # Phase boundaries (compressed X); omit when boundary is the last move.
         painter.setPen(QPen(self._accuracy_phase, 1.0, Qt.PenStyle.DashLine))
         for move_end in (summary.opening_end, summary.middlegame_end):
-            if move_end and move_end > 0:
-                xx = x_for_move(int(move_end))
-                if left - 1 <= xx <= right + 1:
-                    painter.drawLine(int(xx), int(top), int(xx), int(bottom))
+            if not move_end or move_end <= 0 or int(move_end) >= max_move:
+                continue
+            xx = x_for_move(int(move_end))
+            if left - 1 <= xx <= right + 1:
+                painter.drawLine(int(xx), int(top), int(xx), int(bottom))
 
         # End of compressed opening strip
         if x_scale.is_compressed:
@@ -1901,7 +1904,12 @@ class GameReportPDFService(BasePDFReportService):
             tw = fm.horizontalAdvance(label)
             painter.drawText(int(left - tw - 4), int(yy + fm.ascent() / 2), label)
 
-        for plot_x, label in x_scale.axis_marks(scored_moves, desired_count=6):
+        for plot_x, label in AccuracyProgressXScale.filter_overlapping_axis_marks(
+            x_scale.axis_marks(scored_moves, desired_count=6),
+            x_to_pixel=x_for_plot,
+            text_width=lambda text: float(fm.horizontalAdvance(text)),
+            min_gap_px=4.0,
+        ):
             xx = x_for_plot(plot_x)
             tw = fm.horizontalAdvance(label)
             painter.drawText(int(xx - tw / 2), int(bottom + fm.ascent() + 2), label)
