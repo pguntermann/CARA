@@ -439,6 +439,8 @@ class TestMissedTacticDisplay(unittest.TestCase):
             endgame_type=None,
             endgame_type_group=None,
             highlights=[],
+            white_accuracy_curve=[],
+            black_accuracy_curve=[],
         )
         text = "\n".join(
             SummaryTextFormatter.format_critical_moments(summary, "Alice", "Bob")

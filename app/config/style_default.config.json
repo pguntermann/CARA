@@ -1544,6 +1544,62 @@
             "critical_moment_line_width": 1,
             "critical_moment_line_style": "dotted"
           },
+
+          "accuracy_curve": {
+            "height": 160,
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+            },
+            "grid_color": {
+              "$ref": "$_COLOR_CHART_GRIDLINE"
+            },
+            "white_line_color": {
+              "$ref": "$_COLOR_CHART_LINE_MAIN"
+            },
+            "black_line_color": [
+              200,
+              130,
+              130
+            ],
+            "line_width": 2,
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            },
+            "axis_color": {
+              "$ref": "$_COLOR_CHART_AXIS"
+            },
+            "padding": [
+              40,
+              16,
+              20,
+              36
+            ],
+            "min_grid_spacing": 30,
+            "min_grid_lines": 3,
+            "min_font_size": 8,
+            "y_axis_label_spacing": 5,
+            "x_axis_label_spacing": 5,
+            "min_label_spacing": 40,
+            "min_move_labels": 3,
+            "show_legend": true,
+            "phase_transition_line_color": {
+              "$ref": "$_COLOR_CHART_LINE_3"
+            },
+            "phase_transition_line_width": 2,
+            "phase_transition_line_style": "dashed",
+            "current_move_line_color": [
+              255,
+              255,
+              0
+            ],
+            "current_move_line_width": 2
+          },
           "colors": {
             "book_move": [
               150,
@@ -1673,6 +1729,7 @@
             "max_comment_diagrams": 3,
             "include_symbols": true,
             "eval_chart_height": 110,
+            "accuracy_chart_height": 110,
             "pie_size": 108,
             "pie_slice_border_width": 1.75,
             "fonts": {
@@ -1751,6 +1808,44 @@
                   160,
                   165,
                   175
+                ],
+                "phase_line": [
+                  100,
+                  140,
+                  190
+                ],
+                "border": [
+                  200,
+                  205,
+                  210
+                ]
+              },
+
+              "accuracy_graph": {
+                "background": [
+                  255,
+                  255,
+                  255
+                ],
+                "grid": [
+                  220,
+                  224,
+                  230
+                ],
+                "axis": [
+                  120,
+                  125,
+                  135
+                ],
+                "white_line": [
+                  35,
+                  80,
+                  120
+                ],
+                "black_line": [
+                  185,
+                  90,
+                  85
                 ],
                 "phase_line": [
                   100,

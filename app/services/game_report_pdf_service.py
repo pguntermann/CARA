@@ -145,6 +145,7 @@ class GameReportPDFService(BasePDFReportService):
         self._max_comment_diagrams = max(0, int(self._cfg.get("max_comment_diagrams", 3)))
         self._include_symbols = bool(self._cfg.get("include_symbols", True))
         self._eval_chart_height = float(self._cfg.get("eval_chart_height", 110))
+        self._accuracy_chart_height = float(self._cfg.get("accuracy_chart_height", 110))
         self._pie_size = float(self._cfg.get("pie_size", 108))
         self._opening_repeat = str(
             config.get("resources", {}).get("opening_repeat_indicator", "*")
@@ -160,6 +161,21 @@ class GameReportPDFService(BasePDFReportService):
         self._graph_zero = self._rgb(graph_colors.get("zero_line"), (160, 165, 175))
         self._graph_phase = self._rgb(graph_colors.get("phase_line"), (100, 140, 190))
         self._graph_border = self._rgb(graph_colors.get("border"), (200, 205, 210))
+
+        accuracy_colors = colors.get("accuracy_graph", {})
+        if not isinstance(accuracy_colors, dict):
+            accuracy_colors = {}
+        self._accuracy_bg = self._rgb(accuracy_colors.get("background"), (255, 255, 255))
+        self._accuracy_grid = self._rgb(accuracy_colors.get("grid"), (220, 224, 230))
+        self._accuracy_axis = self._rgb(accuracy_colors.get("axis"), (120, 125, 135))
+        self._accuracy_phase = self._rgb(accuracy_colors.get("phase_line"), (100, 140, 190))
+        self._accuracy_border = self._rgb(accuracy_colors.get("border"), (200, 205, 210))
+        self._accuracy_white_line = self._rgb(
+            accuracy_colors.get("white_line"), (35, 80, 120)
+        )
+        self._accuracy_black_line = self._rgb(
+            accuracy_colors.get("black_line"), (185, 90, 85)
+        )
 
     def export(
         self,
@@ -772,6 +788,7 @@ class GameReportPDFService(BasePDFReportService):
 
         y = self._draw_overview_card(painter, writer, content, y, summary, white_name, black_name, game)
         y = self._draw_evaluation_chart(painter, writer, content, y, summary)
+        y = self._draw_accuracy_chart(painter, writer, content, y, summary)
         y = self._draw_classification_table(painter, writer, content, y, summary, white_name, black_name)
         y = self._draw_phase_table(painter, writer, content, y, summary, white_name, black_name)
         y = self._draw_highlights_block(painter, writer, content, y, summary, moves)
@@ -1721,6 +1738,163 @@ class GameReportPDFService(BasePDFReportService):
             label = move_label_for_ply(ply)
             tw = fm.horizontalAdvance(label)
             painter.drawText(int(xx - tw / 2), int(bottom + fm.ascent() + 2), label)
+
+        return y + chart_h + 10
+
+    def _draw_accuracy_chart(
+        self,
+        painter: QPainter,
+        writer: QPdfWriter,
+        content: QRectF,
+        y: float,
+        summary: GameSummary,
+    ) -> float:
+        """Draw print-friendly White/Black running-accuracy curves with phase lines."""
+        white_data = list(getattr(summary, "white_accuracy_curve", None) or [])
+        black_data = list(getattr(summary, "black_accuracy_curve", None) or [])
+        if not white_data and not black_data:
+            return y
+
+        chart_h = self._accuracy_chart_height
+        y = self._section_heading(
+            painter, writer, content, y, "Accuracy", keep_with=chart_h
+        )
+
+        rect = QRectF(content.left(), y, content.width(), chart_h)
+        painter.setPen(QPen(self._accuracy_border, 0.8))
+        painter.setBrush(self._accuracy_bg)
+        painter.drawRoundedRect(rect, 4, 4)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        pad_l, pad_t, pad_r, pad_b = 28.0, 8.0, 10.0, 18.0
+        left = rect.left() + pad_l
+        top = rect.top() + pad_t
+        right = rect.right() - pad_r
+        bottom = rect.bottom() - pad_b
+        gw = max(1.0, right - left)
+        gh = max(1.0, bottom - top)
+
+        accs = [float(a) for _, a in white_data]
+        accs.extend(float(a) for _, a in black_data)
+        lo = min(accs) if accs else 0.0
+        hi = max(accs) if accs else 100.0
+        span = hi - lo
+        if span < 5.0:
+            mid = (lo + hi) / 2.0
+            lo, hi = mid - 2.5, mid + 2.5
+            span = 5.0
+        pad = max(2.0, span * 0.05)
+        min_acc = max(0.0, lo - pad)
+        max_acc = min(100.0, hi + pad)
+        acc_range = max(1.0, max_acc - min_acc)
+
+        max_ply = 1
+        if white_data or black_data:
+            max_ply = max(
+                [int(p) for p, _ in white_data] + [int(p) for p, _ in black_data] + [1]
+            )
+
+        def x_for(ply: int) -> float:
+            return left + (float(ply) / float(max_ply)) * gw
+
+        def y_for(acc: float) -> float:
+            acc = max(min_acc, min(max_acc, acc))
+            return bottom - ((acc - min_acc) / acc_range) * gh
+
+        # Horizontal grid
+        painter.setPen(QPen(self._accuracy_grid, 0.7))
+        step = 10 if acc_range >= 25 else (5 if acc_range >= 12 else 2)
+        y_start = int(min_acc // step * step)
+        y_end = int((max_acc + step - 0.01) // step * step)
+        grid_values = [
+            v for v in range(y_start, y_end + 1, step) if min_acc - 0.01 <= v <= max_acc + 0.01
+        ]
+        for value in grid_values:
+            yy = y_for(float(value))
+            painter.drawLine(int(left), int(yy), int(right), int(yy))
+
+        # Phase boundaries
+        painter.setPen(QPen(self._accuracy_phase, 1.0, Qt.PenStyle.DashLine))
+        for move_end in (summary.opening_end, summary.middlegame_end):
+            if move_end and move_end > 0:
+                ply = min(max_ply, int(move_end) * 2)
+                xx = x_for(ply)
+                painter.drawLine(int(xx), int(top), int(xx), int(bottom))
+
+        def draw_series(
+            data: List[Tuple[int, float]], color: QColor, width: float = 1.6
+        ) -> None:
+            if not data:
+                return
+            points = sorted(data, key=lambda t: t[0])
+            painter.setPen(QPen(color, width))
+            prev = None
+            for ply, acc in points:
+                pt = (x_for(int(ply)), y_for(float(acc)))
+                if prev is not None:
+                    painter.drawLine(
+                        int(prev[0]), int(prev[1]), int(pt[0]), int(pt[1])
+                    )
+                prev = pt
+            if len(points) == 1:
+                ply, acc = points[0]
+                painter.drawEllipse(
+                    int(x_for(int(ply)) - 1.5),
+                    int(y_for(float(acc)) - 1.5),
+                    3,
+                    3,
+                )
+
+        draw_series(white_data, self._accuracy_white_line)
+        draw_series(black_data, self._accuracy_black_line)
+
+        # Axis labels
+        painter.setFont(self._font_body)
+        painter.setPen(self._accuracy_axis)
+        fm = QFontMetrics(self._font_body)
+        label_values = grid_values
+        if not label_values:
+            label_values = [int(round(min_acc)), int(round(max_acc))]
+        # Avoid overcrowding: keep ends + optional mid
+        if len(label_values) > 4:
+            label_values = [label_values[0], label_values[len(label_values) // 2], label_values[-1]]
+        for value in label_values:
+            label = f"{value}%"
+            yy = y_for(float(value))
+            tw = fm.horizontalAdvance(label)
+            painter.drawText(int(left - tw - 4), int(yy + fm.ascent() / 2), label)
+
+        for ply in (0, max_ply // 2, max_ply):
+            xx = x_for(ply)
+            label = str((int(ply) + 1) // 2)
+            tw = fm.horizontalAdvance(label)
+            painter.drawText(int(xx - tw / 2), int(bottom + fm.ascent() + 2), label)
+
+        # Compact legend
+        legend_y = rect.top() + 4.0 + fm.ascent()
+        gap = 10.0
+        sw = 12.0
+        white_label = "White"
+        black_label = "Black"
+        legend_w = (
+            sw
+            + 4
+            + fm.horizontalAdvance(white_label)
+            + gap
+            + sw
+            + 4
+            + fm.horizontalAdvance(black_label)
+        )
+        lx = right - legend_w
+        painter.setPen(QPen(self._accuracy_white_line, 1.6))
+        painter.drawLine(int(lx), int(legend_y - 3), int(lx + sw), int(legend_y - 3))
+        painter.setPen(self._accuracy_axis)
+        painter.drawText(int(lx + sw + 4), int(legend_y), white_label)
+        bx = lx + sw + 4 + fm.horizontalAdvance(white_label) + gap
+        painter.setPen(QPen(self._accuracy_black_line, 1.6))
+        painter.drawLine(int(bx), int(legend_y - 3), int(bx + sw), int(legend_y - 3))
+        painter.setPen(self._accuracy_axis)
+        painter.drawText(int(bx + sw + 4), int(legend_y), black_label)
 
         return y + chart_h + 10
 

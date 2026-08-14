@@ -580,6 +580,313 @@ class EvaluationGraphWidget(QWidget):
             painter.drawLine(int(x), int(top), int(x), int(bottom))
 
 
+class AccuracyCurveWidget(QWidget):
+    """Running accuracy for White and Black over plies, with phase demarcation lines."""
+
+    def __init__(self, config: Dict[str, Any], parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.config = config
+        ui_config = config.get("ui", {})
+        panel_config = ui_config.get("panels", {}).get("detail", {})
+        summary_config = panel_config.get("summary", {})
+        chart_config = summary_config.get("accuracy_curve", {})
+        eval_config = summary_config.get("evaluation_graph", {})
+
+        self._height = int(chart_config.get("height", 160))
+        self.background_color = QColor(*chart_config.get("background_color", [30, 30, 35]))
+        self.grid_color = QColor(*chart_config.get("grid_color", [60, 60, 65]))
+        self.white_line_color = QColor(*chart_config.get("white_line_color", [255, 255, 255]))
+        self.black_line_color = QColor(*chart_config.get("black_line_color", [200, 130, 130]))
+        self.line_width = int(chart_config.get("line_width", 2))
+        self.text_color = QColor(*chart_config.get("text_color", [200, 200, 200]))
+        self.axis_color = QColor(*chart_config.get("axis_color", [150, 150, 150]))
+        self.padding = chart_config.get("padding", [40, 16, 20, 36])
+        self.font_family = resolve_font_family(chart_config.get("font_family", "Helvetica Neue"))
+        self.font_size = int(scale_font_size(chart_config.get("font_size", 10)))
+        self.min_font_size = int(scale_font_size(chart_config.get("min_font_size", 8)))
+        self.min_grid_spacing = int(chart_config.get("min_grid_spacing", 30))
+        self.min_grid_lines = int(chart_config.get("min_grid_lines", 3))
+        self.y_axis_label_spacing = int(chart_config.get("y_axis_label_spacing", 5))
+        self.x_axis_label_spacing = int(chart_config.get("x_axis_label_spacing", 5))
+        self.min_label_spacing = int(chart_config.get("min_label_spacing", 40))
+        self.min_move_labels = int(chart_config.get("min_move_labels", 3))
+        self._y_padding_pct = float(chart_config.get("y_padding_pct", 0.05))
+        self._y_min_range = float(chart_config.get("y_min_range", 5.0))
+        self.show_legend = bool(chart_config.get("show_legend", True))
+
+        # Prefer accuracy_curve phase line keys; fall back to evaluation_graph.
+        phase_color = chart_config.get(
+            "phase_transition_line_color",
+            eval_config.get("phase_transition_line_color", [100, 150, 255]),
+        )
+        self.phase_transition_line_color = QColor(*phase_color)
+        self.phase_transition_line_width = int(
+            chart_config.get(
+                "phase_transition_line_width",
+                eval_config.get("phase_transition_line_width", 2),
+            )
+        )
+        phase_style = str(
+            chart_config.get(
+                "phase_transition_line_style",
+                eval_config.get("phase_transition_line_style", "dashed"),
+            )
+        ).lower()
+        if phase_style == "dotted":
+            self.phase_transition_line_style = Qt.PenStyle.DotLine
+        elif phase_style == "dash_dot":
+            self.phase_transition_line_style = Qt.PenStyle.DashDotLine
+        elif phase_style == "solid":
+            self.phase_transition_line_style = Qt.PenStyle.SolidLine
+        else:
+            self.phase_transition_line_style = Qt.PenStyle.DashLine
+
+        current_color = chart_config.get(
+            "current_move_line_color",
+            eval_config.get("current_move_line_color", [255, 255, 0]),
+        )
+        self.current_move_line_color = QColor(*current_color)
+        self.current_move_line_width = int(
+            chart_config.get(
+                "current_move_line_width",
+                eval_config.get("current_move_line_width", 2),
+            )
+        )
+
+        self.white_data: List[Tuple[int, float]] = []
+        self.black_data: List[Tuple[int, float]] = []
+        self._available_plys: List[int] = []
+        self.max_ply: int = 0
+        self.current_ply: int = 0
+        self.opening_end: int = 0
+        self.middlegame_end: int = 0
+        self._navigate_to_ply_callback: Optional[Callable[[int], None]] = None
+
+        self.setFixedHeight(self._height)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def set_navigation_callback(self, callback: Optional[Callable[[int], None]]) -> None:
+        self._navigate_to_ply_callback = callback
+
+    def set_data(
+        self,
+        white_data: List[Tuple[int, float]],
+        black_data: List[Tuple[int, float]],
+    ) -> None:
+        self.white_data = list(white_data or [])
+        self.black_data = list(black_data or [])
+        plys = {ply for ply, _ in self.white_data}
+        plys.update(ply for ply, _ in self.black_data)
+        self._available_plys = sorted(plys)
+        self.max_ply = max(self._available_plys) if self._available_plys else 0
+        self.update()
+
+    def set_phase_boundaries(self, opening_end: int, middlegame_end: int) -> None:
+        if self.opening_end != opening_end or self.middlegame_end != middlegame_end:
+            self.opening_end = opening_end
+            self.middlegame_end = middlegame_end
+            self.update()
+
+    def set_current_ply(self, ply: int) -> None:
+        if self.current_ply != ply:
+            self.current_ply = ply
+            self.update()
+
+    def _accuracy_range(self) -> Tuple[float, float]:
+        accs = [acc for _, acc in self.white_data]
+        accs.extend(acc for _, acc in self.black_data)
+        if not accs:
+            return 0.0, 100.0
+        lo, hi = min(accs), max(accs)
+        r = hi - lo
+        if r < self._y_min_range:
+            mid = (lo + hi) / 2.0
+            half = self._y_min_range / 2.0
+            lo, hi = mid - half, mid + half
+            r = self._y_min_range
+        pad = max(2.0, r * self._y_padding_pct)
+        return max(0.0, lo - pad), min(100.0, hi + pad)
+
+    def _plot_rect(self) -> Tuple[float, float, float, float, float, float]:
+        width = self.width()
+        height = self.height()
+        left = float(self.padding[0])
+        top = float(self.padding[1])
+        right = float(width - self.padding[2])
+        bottom = float(height - self.padding[3])
+        return left, top, right, bottom, right - left, bottom - top
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        if not self._navigate_to_ply_callback or self.max_ply <= 0:
+            super().mousePressEvent(event)
+            return
+        left, top, right, bottom, graph_width, _ = self._plot_rect()
+        if graph_width <= 0:
+            super().mousePressEvent(event)
+            return
+        x = float(event.position().x())
+        y = float(event.position().y())
+        if x < left or x > right or y < top or y > bottom:
+            super().mousePressEvent(event)
+            return
+        ply_est = int(round(((x - left) / graph_width) * self.max_ply))
+        ply_est = max(0, min(self.max_ply, ply_est))
+        if self._available_plys:
+            ply = min(self._available_plys, key=lambda p: abs(p - ply_est))
+        else:
+            ply = ply_est
+        self._navigate_to_ply_callback(ply)
+        event.accept()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        width = self.width()
+        height = self.height()
+        painter.fillRect(0, 0, width, height, self.background_color)
+
+        if self.max_ply <= 0 or (not self.white_data and not self.black_data):
+            painter.setPen(self.text_color)
+            painter.setFont(QFont(self.font_family, self.font_size))
+            painter.drawText(
+                QRect(0, 0, width, height),
+                Qt.AlignmentFlag.AlignCenter,
+                "No accuracy data",
+            )
+            return
+
+        left, top, right, bottom, graph_width, graph_height = self._plot_rect()
+        if graph_width <= 0 or graph_height <= 0:
+            return
+
+        min_acc, max_acc = self._accuracy_range()
+        acc_range = max_acc - min_acc
+        if acc_range <= 0:
+            acc_range = 1.0
+
+        font = QFont(self.font_family, self.font_size)
+        painter.setFont(font)
+        fm = QFontMetrics(font)
+
+        # Axes
+        painter.setPen(QPen(self.axis_color, 1))
+        painter.drawLine(int(left), int(top), int(left), int(bottom))
+        painter.drawLine(int(left), int(bottom), int(right), int(bottom))
+
+        # Horizontal grid + Y labels
+        painter.setPen(self.text_color)
+        approx_lines = max(self.min_grid_lines, int(graph_height / max(1, self.min_grid_spacing)))
+        step_candidates = (1, 2, 5, 10, 20, 25)
+        step = 10
+        for candidate in step_candidates:
+            if (acc_range / candidate) <= approx_lines + 1:
+                step = candidate
+                break
+        y_start = int(math.floor(min_acc / step) * step)
+        y_end = int(math.ceil(max_acc / step) * step)
+        for value in range(y_start, y_end + 1, step):
+            if value < min_acc - 0.01 or value > max_acc + 0.01:
+                continue
+            y = bottom - ((value - min_acc) / acc_range * graph_height)
+            painter.setPen(QPen(self.grid_color, 1, Qt.PenStyle.DotLine))
+            painter.drawLine(int(left), int(y), int(right), int(y))
+            painter.setPen(self.text_color)
+            label = f"{value}%"
+            painter.drawText(
+                int(left - fm.horizontalAdvance(label) - self.y_axis_label_spacing),
+                int(y + fm.height() / 2 - 2),
+                label,
+            )
+
+        # X-axis move labels
+        max_move_labels = max(self.min_move_labels, int(graph_width / max(1, self.min_label_spacing)))
+        label_interval = max(1, self.max_ply // max_move_labels)
+        for ply in range(0, self.max_ply + 1, label_interval):
+            x = left + (ply / self.max_ply * graph_width)
+            move_num = (ply + 1) // 2
+            label = str(move_num)
+            painter.setPen(self.text_color)
+            painter.drawText(
+                int(x - fm.horizontalAdvance(label) / 2),
+                int(bottom + fm.height() + self.x_axis_label_spacing),
+                label,
+            )
+
+        def _draw_series(data: List[Tuple[int, float]], color: QColor) -> None:
+            if len(data) < 1:
+                return
+            sorted_data = sorted(data, key=lambda item: item[0])
+            points: List[QPointF] = []
+            for ply, acc in sorted_data:
+                x = left + (ply / self.max_ply * graph_width)
+                y = bottom - ((acc - min_acc) / acc_range * graph_height)
+                y = max(top, min(bottom, y))
+                points.append(QPointF(x, y))
+            if len(points) == 1:
+                painter.setPen(QPen(color, self.line_width))
+                painter.drawEllipse(points[0], 2.5, 2.5)
+                return
+            painter.setPen(QPen(color, self.line_width))
+            for i in range(len(points) - 1):
+                painter.drawLine(points[i], points[i + 1])
+
+        _draw_series(self.white_data, self.white_line_color)
+        _draw_series(self.black_data, self.black_line_color)
+
+        # Phase transition lines (same ply mapping as evaluation graph)
+        if self.opening_end > 0:
+            opening_end_ply = self.opening_end * 2
+            if opening_end_ply <= self.max_ply:
+                x = left + (opening_end_ply / self.max_ply * graph_width)
+                painter.setPen(
+                    QPen(
+                        self.phase_transition_line_color,
+                        self.phase_transition_line_width,
+                        self.phase_transition_line_style,
+                    )
+                )
+                painter.drawLine(int(x), int(top), int(x), int(bottom))
+        if self.middlegame_end > 0:
+            middlegame_end_ply = self.middlegame_end * 2
+            if middlegame_end_ply <= self.max_ply:
+                x = left + (middlegame_end_ply / self.max_ply * graph_width)
+                painter.setPen(
+                    QPen(
+                        self.phase_transition_line_color,
+                        self.phase_transition_line_width,
+                        self.phase_transition_line_style,
+                    )
+                )
+                painter.drawLine(int(x), int(top), int(x), int(bottom))
+
+        if self.current_ply >= 0 and self.max_ply > 0:
+            x = left + (self.current_ply / self.max_ply * graph_width)
+            painter.setPen(QPen(self.current_move_line_color, self.current_move_line_width))
+            painter.drawLine(int(x), int(top), int(x), int(bottom))
+
+        if self.show_legend:
+            legend_font = QFont(self.font_family, max(self.min_font_size, self.font_size - 1))
+            painter.setFont(legend_font)
+            lfm = QFontMetrics(legend_font)
+            gap = 10
+            swatch = 12
+            white_label = "White"
+            black_label = "Black"
+            legend_w = swatch + 4 + lfm.horizontalAdvance(white_label) + gap + swatch + 4 + lfm.horizontalAdvance(black_label)
+            lx = int(right - legend_w)
+            ly = int(top + lfm.ascent())
+            painter.setPen(QPen(self.white_line_color, self.line_width))
+            painter.drawLine(lx, ly - 3, lx + swatch, ly - 3)
+            painter.setPen(self.text_color)
+            painter.drawText(lx + swatch + 4, ly, white_label)
+            bx = lx + swatch + 4 + lfm.horizontalAdvance(white_label) + gap
+            painter.setPen(QPen(self.black_line_color, self.line_width))
+            painter.drawLine(bx, ly - 3, bx + swatch, ly - 3)
+            painter.setPen(self.text_color)
+            painter.drawText(bx + swatch + 4, ly, black_label)
+
+
 PIE_CLASSIFICATION_CATEGORY_ORDER: Tuple[str, ...] = (
     "Book Move",
     "Brilliant",
@@ -1106,6 +1413,7 @@ class DetailSummaryView(QWidget):
         
         # Evaluation graph (top, resizable)
         self.evaluation_graph = EvaluationGraphWidget(self.config)
+        self.accuracy_curve: Optional[AccuracyCurveWidget] = None
         splitter.addWidget(self.evaluation_graph)
         
         # Scrollable content area (bottom, resizable)
@@ -1224,6 +1532,8 @@ class DetailSummaryView(QWidget):
         self._game_controller = game_controller
         if hasattr(self, 'evaluation_graph') and self.evaluation_graph:
             self.evaluation_graph.set_navigation_callback(self._navigate_to_ply_from_graph)
+        if hasattr(self, 'accuracy_curve') and self.accuracy_curve:
+            self.accuracy_curve.set_navigation_callback(self._navigate_to_ply_from_graph)
         self._connect_board_flip()
 
     def _board_model(self):
@@ -1312,6 +1622,11 @@ class DetailSummaryView(QWidget):
         except RuntimeError:
             # Widget was deleted, ignore
             pass
+        if hasattr(self, 'accuracy_curve') and self.accuracy_curve:
+            try:
+                self.accuracy_curve.set_current_ply(ply_index)
+            except RuntimeError:
+                pass
     
     def _handle_summary_updated(self, summary: GameSummary, moves: List[MoveData]) -> None:
         """Render the summary content when new data is available."""
@@ -1399,6 +1714,7 @@ class DetailSummaryView(QWidget):
     
     def _clear_content(self) -> None:
         """Clear all content widgets except placeholder."""
+        self.accuracy_curve = None
         # Clear widgets safely to prevent accessing deleted widgets
         while self.content_layout.count() > 1:  # Keep placeholder
             item = self.content_layout.takeAt(0)
@@ -1570,6 +1886,33 @@ class DetailSummaryView(QWidget):
         
         # Phase Analysis Section
         self._add_section_header("Phase Analysis", header_font, header_text_color)
+
+        # Full-width running accuracy chart (both players) above phase cards
+        if self.current_summary and (
+            getattr(self.current_summary, "white_accuracy_curve", None)
+            or getattr(self.current_summary, "black_accuracy_curve", None)
+        ):
+            accuracy_curve = AccuracyCurveWidget(self.config)
+            accuracy_curve.set_data(
+                getattr(self.current_summary, "white_accuracy_curve", None) or [],
+                getattr(self.current_summary, "black_accuracy_curve", None) or [],
+            )
+            accuracy_curve.set_phase_boundaries(
+                self.current_summary.opening_end,
+                self.current_summary.middlegame_end,
+            )
+            accuracy_curve.set_navigation_callback(self._navigate_to_ply_from_graph)
+            if self._game_model:
+                try:
+                    accuracy_curve.set_current_ply(self._game_model.get_active_move_ply())
+                except Exception:
+                    pass
+            self.accuracy_curve = accuracy_curve
+            self.content_layout.addWidget(accuracy_curve)
+            self.content_layout.addSpacing(max(6, int(player_spacing)))
+        else:
+            self.accuracy_curve = None
+
         phase_layout = QHBoxLayout()
         phase_layout.setSpacing(player_spacing)
         

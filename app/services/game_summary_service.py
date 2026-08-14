@@ -154,12 +154,14 @@ class GameSummary:
     black_top_best: List[CriticalMove]
     white_missed_tactics: List[CriticalMove]
     black_missed_tactics: List[CriticalMove]
-    evaluation_data: List[Tuple[int, float]]  # (move_number, evaluation) pairs
+    evaluation_data: List[Tuple[int, float]]  # (ply_index, evaluation) pairs
     opening_end: int  # Move number where opening phase ends
     middlegame_end: int  # Move number where middlegame phase ends
     endgame_type: Optional[str]  # Specific endgame type from classifier (e.g. "Pawn", "Rook", "Queen + Two Minor Piece")
     endgame_type_group: Optional[str]  # Group for UI aggregation: "Pawn", "Rook", "Queen", "Minor Piece", "Heavy Piece", "Other", or None
     highlights: List[GameHighlight]  # Game highlights (key moments and facts)
+    white_accuracy_curve: List[Tuple[int, float]]  # (ply_index, running accuracy %)
+    black_accuracy_curve: List[Tuple[int, float]]  # (ply_index, running accuracy %)
 
 
 class GameSummaryService:
@@ -504,6 +506,7 @@ class GameSummaryService:
         
         # Extract evaluation data for graph
         evaluation_data = self._extract_evaluation_data(moves)
+        white_accuracy_curve, black_accuracy_curve = self._extract_accuracy_curves(moves)
         
         # Detect game highlights
         # Use new highlight detector
@@ -558,7 +561,9 @@ class GameSummaryService:
             middlegame_end=middlegame_end,
             endgame_type=endgame_type,
             endgame_type_group=endgame_type_group,
-            highlights=highlights
+            highlights=highlights,
+            white_accuracy_curve=white_accuracy_curve,
+            black_accuracy_curve=black_accuracy_curve,
         )
         
         logging_service.debug(f"Completed game summary calculation: opening_end={opening_end}, middlegame_end={middlegame_end}, white_accuracy={white_stats.accuracy:.1f}%, black_accuracy={black_stats.accuracy:.1f}%, endgame_type={endgame_type or 'None'}")
@@ -1607,6 +1612,56 @@ class GameSummaryService:
                     evaluation_data.append((ply_index, eval_cp))
         
         return evaluation_data
+
+    def _extract_accuracy_curves(
+        self, moves: List[MoveData]
+    ) -> Tuple[List[Tuple[int, float]], List[Tuple[int, float]]]:
+        """Build running accuracy series for White and Black keyed by ply index.
+
+        After each side's move, accuracy is recomputed from that player's moves
+        so far using the same formula as overall game accuracy (Player Stats
+        progress chart uses the same approach on progress bins).
+        """
+        white_prefix: List[PlayerMoveInfo] = []
+        black_prefix: List[PlayerMoveInfo] = []
+        white_curve: List[Tuple[int, float]] = []
+        black_curve: List[Tuple[int, float]] = []
+
+        for move in moves:
+            if move.white_move:
+                white_prefix.append(
+                    PlayerMoveInfo(
+                        move_san=move.white_move,
+                        assessment=getattr(move, "assess_white", "") or "",
+                        cpl=getattr(move, "cpl_white", None) or None,
+                        is_top3=bool(getattr(move, "white_is_top3", False)),
+                    )
+                )
+                stats = self._calculate_player_statistics(
+                    white_prefix,
+                    opening_moves=len(white_prefix),
+                    middlegame_moves=0,
+                    endgame_moves=0,
+                )
+                white_curve.append((move.move_number * 2 - 1, float(stats.accuracy)))
+            if move.black_move:
+                black_prefix.append(
+                    PlayerMoveInfo(
+                        move_san=move.black_move,
+                        assessment=getattr(move, "assess_black", "") or "",
+                        cpl=getattr(move, "cpl_black", None) or None,
+                        is_top3=bool(getattr(move, "black_is_top3", False)),
+                    )
+                )
+                stats = self._calculate_player_statistics(
+                    black_prefix,
+                    opening_moves=len(black_prefix),
+                    middlegame_moves=0,
+                    endgame_moves=0,
+                )
+                black_curve.append((move.move_number * 2, float(stats.accuracy)))
+
+        return white_curve, black_curve
     
     def _parse_evaluation(self, eval_str: str) -> Optional[float]:
         """Parse evaluation string to centipawns.
