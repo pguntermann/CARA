@@ -88,10 +88,12 @@ class PlayerStatsProfileController:
             ts = _section_dict("player_stats_time_series")
             ah = _section_dict("player_stats_activity_heatmap")
             ad = _section_dict("player_stats_accuracy_distribution")
+            ep = _section_dict("player_stats_error_patterns")
             model.set_player_stats_section_visibility(vis)
             model.set_player_stats_time_series(ts)
             model.set_player_stats_activity_heatmap(ah)
             model.set_player_stats_accuracy_distribution(ad)
+            model.set_player_stats_error_patterns(ep)
             model.set_player_stats_active_profile(name)
         finally:
             try:
@@ -114,6 +116,10 @@ class PlayerStatsProfileController:
             pass
         try:
             model.player_stats_accuracy_distribution_changed.emit()
+        except Exception:
+            pass
+        try:
+            model.player_stats_error_patterns_changed.emit()
         except Exception:
             pass
         try:
@@ -144,6 +150,7 @@ class PlayerStatsProfileController:
         pdata["player_stats_time_series"] = model.get_player_stats_time_series()
         pdata["player_stats_activity_heatmap"] = model.get_player_stats_activity_heatmap()
         pdata["player_stats_accuracy_distribution"] = model.get_player_stats_accuracy_distribution()
+        pdata["player_stats_error_patterns"] = model.get_player_stats_error_patterns()
 
         model.set_player_stats_profiles(profiles)
         model.set_player_stats_active_profile(name)
@@ -168,6 +175,7 @@ class PlayerStatsProfileController:
             "player_stats_time_series": model.get_player_stats_time_series(),
             "player_stats_activity_heatmap": model.get_player_stats_activity_heatmap(),
             "player_stats_accuracy_distribution": model.get_player_stats_accuracy_distribution(),
+            "player_stats_error_patterns": model.get_player_stats_error_patterns(),
         }
         model.set_player_stats_profiles(profiles)
         LoggingService.get_instance().debug(f"[PlayerStatsProfile] save_as created={name!r}")

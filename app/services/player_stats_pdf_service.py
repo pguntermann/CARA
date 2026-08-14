@@ -3171,7 +3171,11 @@ class PlayerStatsPDFService(BasePDFReportService):
 
     def _error_pattern_freq_text(self, pattern: Any) -> str:
         ref_plies = getattr(pattern, "related_ref_plies", None)
-        pct = float(getattr(pattern, "percentage", 0.0) or 0.0)
+        pct = float(
+            getattr(pattern, "game_coverage", None)
+            if getattr(pattern, "game_coverage", None) is not None
+            else (getattr(pattern, "percentage", 0.0) or 0.0)
+        )
         if ref_plies:
             n_occ = len(ref_plies)
             n_games = len(getattr(pattern, "related_games", None) or [])
@@ -3179,6 +3183,10 @@ class PlayerStatsPDFService(BasePDFReportService):
                 f"{n_occ} occurrence{'s' if n_occ != 1 else ''} in "
                 f"{n_games} game{'s' if n_games != 1 else ''} · {pct:.1f}%"
             )
+        related = getattr(pattern, "related_games", None) or []
+        if related:
+            n_games = len(related)
+            return f"{n_games} game{'s' if n_games != 1 else ''} · {pct:.1f}%"
         freq = int(getattr(pattern, "frequency", 0) or 0)
         return f"{freq} occurrence{'s' if freq != 1 else ''} · {pct:.1f}%"
 
@@ -3199,6 +3207,7 @@ class PlayerStatsPDFService(BasePDFReportService):
                 self._SEVERITY_RANK.get(
                     str(getattr(p, "severity", "") or "").lower(), 9
                 ),
+                -float(getattr(p, "game_coverage", 0.0) or 0.0),
                 -float(getattr(p, "percentage", 0.0) or 0.0),
             )
         )

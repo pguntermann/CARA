@@ -22,7 +22,13 @@ import chess
 
 from app.models.game_model import GameModel
 from app.models.moveslist_model import MoveData
-from app.services.game_summary_service import GameSummary, GameHighlight, format_best_move_stat, format_missed_tactic_line
+from app.services.game_summary_service import (
+    GameSummary,
+    GameHighlight,
+    critical_moments_display_counts,
+    format_best_move_stat,
+    format_missed_tactic_line,
+)
 from app.controllers.game_controller import GameController
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.tooltip_utils import wrap_tooltip_text
@@ -2269,6 +2275,7 @@ class DetailSummaryView(QWidget):
         section_spacing = widgets_config.get('section_spacing', 8)
         critical_moments_list_spacing = widgets_config.get('critical_moments_list_spacing', 3)
         critical_moments_section_spacing = widgets_config.get('critical_moments_section_spacing', 10)
+        worst_n, best_n, missed_n = critical_moments_display_counts(self.config)
         
         # Get player name label styling
         player_name_config = widgets_config.get('player_name_label', {})
@@ -2315,14 +2322,14 @@ class DetailSummaryView(QWidget):
         layout.addWidget(name_label)
         
         # Top 3 Worst Moves
-        worst_label = QLabel("Top 3 Worst Moves")
+        worst_label = QLabel(f"Top {worst_n} Worst Moves")
         worst_label.setFont(label_font)
         worst_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); font-weight: bold; border: none;")
         layout.addWidget(worst_label)
         
         worst_layout = QVBoxLayout()
         worst_layout.setSpacing(critical_moments_list_spacing)
-        for i, move in enumerate(top_worst[:3], 1):
+        for i, move in enumerate(top_worst[:worst_n], 1):
             # Defensive checks for None/missing values in CriticalMove
             if not move:
                 continue
@@ -2385,7 +2392,7 @@ class DetailSummaryView(QWidget):
         layout.addSpacing(critical_moments_section_spacing)
         
         # Top 3 Best Moves
-        best_label = QLabel("Top 3 Best Moves")
+        best_label = QLabel(f"Top {best_n} Best Moves")
         best_label.setFont(label_font)
         best_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); font-weight: bold; border: none;")
         layout.addWidget(best_label)
@@ -2410,7 +2417,7 @@ class DetailSummaryView(QWidget):
             f"QWidget {{ border: none; background: transparent; }}\n"
             f"{tip_qss}"
         )
-        for i, move in enumerate(top_best[:3], 1):
+        for i, move in enumerate(top_best[:best_n], 1):
             # Defensive checks for None/missing values in CriticalMove
             if not move:
                 continue
@@ -2458,7 +2465,7 @@ class DetailSummaryView(QWidget):
             best_layout.addWidget(move_container)
         layout.addLayout(best_layout)
 
-        missed_list = [m for m in (missed_tactics or []) if m][:3]
+        missed_list = [m for m in (missed_tactics or []) if m][:missed_n]
         if missed_list:
             layout.addSpacing(critical_moments_section_spacing)
             missed_label = QLabel("Missed Tactics")
@@ -3106,7 +3113,9 @@ class DetailSummaryView(QWidget):
             black_name = "Black"
         
         from app.utils.summary_text_formatter import SummaryTextFormatter
-        text = SummaryTextFormatter.format_section(self.current_summary, section_name, white_name, black_name)
+        text = SummaryTextFormatter.format_section(
+            self.current_summary, section_name, white_name, black_name, self.config
+        )
         
         if text:
             clipboard = QApplication.clipboard()
@@ -3132,7 +3141,9 @@ class DetailSummaryView(QWidget):
             black_name = "Black"
         
         from app.utils.summary_text_formatter import SummaryTextFormatter
-        text = SummaryTextFormatter.format_full_summary(self.current_summary, white_name, black_name)
+        text = SummaryTextFormatter.format_full_summary(
+            self.current_summary, white_name, black_name, self.config
+        )
         
         if text:
             clipboard = QApplication.clipboard()

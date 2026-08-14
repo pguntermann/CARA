@@ -24,7 +24,12 @@ from PyQt6.QtGui import (
 
 from app.models.database_model import GameData
 from app.models.moveslist_model import MoveData
-from app.services.game_summary_service import GameSummary, format_best_move_stat, format_missed_tactic_line
+from app.services.game_summary_service import (
+    GameSummary,
+    critical_moments_display_counts,
+    format_best_move_stat,
+    format_missed_tactic_line,
+)
 from app.services.pdf_report_base import BasePDFReportService
 from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
 
@@ -1435,12 +1440,13 @@ class GameReportPDFService(BasePDFReportService):
         black_name: str,
     ) -> float:
         """Critical Moments as two player columns (lists), not a cramped 2×2 table."""
-        white_worst = list(summary.white_top_worst or [])[:3]
-        white_best = list(summary.white_top_best or [])[:3]
-        black_worst = list(summary.black_top_worst or [])[:3]
-        black_best = list(summary.black_top_best or [])[:3]
-        white_missed = list(getattr(summary, "white_missed_tactics", None) or [])[:3]
-        black_missed = list(getattr(summary, "black_missed_tactics", None) or [])[:3]
+        worst_n, best_n, missed_n = critical_moments_display_counts(self.config)
+        white_worst = list(summary.white_top_worst or [])[:worst_n]
+        white_best = list(summary.white_top_best or [])[:best_n]
+        black_worst = list(summary.black_top_worst or [])[:worst_n]
+        black_best = list(summary.black_top_best or [])[:best_n]
+        white_missed = list(getattr(summary, "white_missed_tactics", None) or [])[:missed_n]
+        black_missed = list(getattr(summary, "black_missed_tactics", None) or [])[:missed_n]
         if not (
             white_worst or white_best or black_worst or black_best
             or white_missed or black_missed

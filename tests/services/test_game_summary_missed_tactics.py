@@ -201,16 +201,35 @@ class TestFindTopMissedTactics(unittest.TestCase):
         self.assertEqual(top, [])
 
     def test_caps_at_three(self) -> None:
-        rows = []
-        for n, cpl in enumerate(("500", "400", "300", "200"), start=10):
-            row = _played_from_fen(
-                QUIET_FORK_FEN, "Ke2", cpl=cpl, best="Nd6"
-            )
-            row.move_number = n
-            rows.extend(_with_white_before(QUIET_FORK_FEN, row))
-        top = _svc()._find_top_missed_tactics(rows, is_white=True, count=3)
+        fork_row = _played_from_fen(QUIET_FORK_FEN, "Ke2", cpl="500", best="Nd6")
+        mate_row = _played_from_fen(
+            MATE_FEN, "Kf1", assess="Blunder", cpl="400", best="Qe8#"
+        )
+        capture_row = _played_from_fen(CAPTURE_FEN, "Ke2", cpl="300", best="Qxd5")
+        check_row = _played_from_fen(CHECK_FEN, "Ke2", cpl="200", best="Qh5+")
+        moves = (
+            _with_white_before(QUIET_FORK_FEN, fork_row)
+            + _with_white_before(MATE_FEN, mate_row)
+            + _with_white_before(CAPTURE_FEN, capture_row)
+            + _with_white_before(CHECK_FEN, check_row)
+        )
+        top = _svc()._find_top_missed_tactics(moves, is_white=True, count=3)
         self.assertEqual(len(top), 3)
-        self.assertEqual([m.cpl for m in top], [500.0, 400.0, 300.0])
+        self.assertEqual([m.best_move for m in top], ["Qe8#", "Nd6", "Qxd5"])
+
+    def test_collapses_same_engine_move_to_best_ranked_ply(self) -> None:
+        first = _played_from_fen(QUIET_FORK_FEN, "Ke2", cpl="180", best="Nd6")
+        first.move_number = 42
+        second = _played_from_fen(QUIET_FORK_FEN, "Ke2", cpl="250", best="Nd6")
+        second.move_number = 43
+        moves = _with_white_before(QUIET_FORK_FEN, first) + _with_white_before(
+            QUIET_FORK_FEN, second
+        )
+        top = _svc()._find_top_missed_tactics(moves, is_white=True, count=10)
+        self.assertEqual(len(top), 1)
+        self.assertEqual(top[0].move_number, 43)
+        self.assertEqual(top[0].best_move, "Nd6")
+        self.assertAlmostEqual(top[0].cpl, 250.0)
 
     def test_black_uses_same_row_fen_white(self) -> None:
         fen = "R3K3/8/8/8/8/8/8/4k2q b - - 0 10"

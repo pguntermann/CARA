@@ -104,6 +104,39 @@ def format_best_move_stat(move: "CriticalMove") -> str:
     return f"CPL: {n:.0f}"
 
 
+def critical_moments_display_counts(
+    config: Optional[Dict[str, Any]] = None,
+) -> Tuple[int, int, int]:
+    """Display caps for worst / best / missed-tactics rows in summary UI, clipboard, and PDF.
+
+    Storage caps (especially missed tactics) can be higher so player stats can
+    aggregate more occurrences than the summary strip shows.
+    """
+    cm: Dict[str, Any] = {}
+    if isinstance(config, dict):
+        raw = (
+            config.get("ui", {})
+            .get("panels", {})
+            .get("detail", {})
+            .get("summary", {})
+            .get("critical_moments", {})
+        )
+        if isinstance(raw, dict):
+            cm = raw
+
+    def _count(key: str, default: int) -> int:
+        try:
+            return max(1, int(cm.get(key, default)))
+        except (TypeError, ValueError):
+            return default
+
+    return (
+        _count("worst_count", 3),
+        _count("best_count", 3),
+        _count("missed_tactics_display_count", 99),
+    )
+
+
 @dataclass
 class GameSummary:
     """Complete game summary statistics."""
@@ -166,6 +199,11 @@ class GameSummaryService:
         # Get highlights config
         highlights_config = summary_config.get('highlights', {})
         self.highlights_per_phase_limit = highlights_config.get('max_per_phase', 7)
+        critical_config = summary_config.get('critical_moments', {})
+        self.worst_move_count = max(1, int(critical_config.get('worst_count', 3)))
+        self.best_move_count = max(1, int(critical_config.get('best_count', 3)))
+        self.missed_tactics_count = max(1, int(critical_config.get('missed_tactics_count', 99)))
+        self.missed_tactics_display_count = max(1, int(critical_config.get('missed_tactics_display_count', 99)))
         self._best_move_tactic_rules = None
         self._missed_tactic_rules = None
     
@@ -453,12 +491,16 @@ class GameSummaryService:
         )
         
         # Find critical moves
-        white_top_worst = self._find_top_worst_moves(moves, is_white=True, count=3)
-        white_top_best = self._find_top_best_moves(moves, is_white=True, count=3)
-        black_top_worst = self._find_top_worst_moves(moves, is_white=False, count=3)
-        black_top_best = self._find_top_best_moves(moves, is_white=False, count=3)
-        white_missed_tactics = self._find_top_missed_tactics(moves, is_white=True, count=3)
-        black_missed_tactics = self._find_top_missed_tactics(moves, is_white=False, count=3)
+        white_top_worst = self._find_top_worst_moves(moves, is_white=True, count=self.worst_move_count)
+        white_top_best = self._find_top_best_moves(moves, is_white=True, count=self.best_move_count)
+        black_top_worst = self._find_top_worst_moves(moves, is_white=False, count=self.worst_move_count)
+        black_top_best = self._find_top_best_moves(moves, is_white=False, count=self.best_move_count)
+        white_missed_tactics = self._find_top_missed_tactics(
+            moves, is_white=True, count=self.missed_tactics_count
+        )
+        black_missed_tactics = self._find_top_missed_tactics(
+            moves, is_white=False, count=self.missed_tactics_count
+        )
         
         # Extract evaluation data for graph
         evaluation_data = self._extract_evaluation_data(moves)

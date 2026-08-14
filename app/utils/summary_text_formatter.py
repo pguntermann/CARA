@@ -4,9 +4,10 @@ This module provides utilities to format game summary data as plain text,
 matching exactly what is displayed in the UI sections.
 """
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from app.services.game_summary_service import (
     GameSummary, PlayerStatistics, PhaseStatistics, CriticalMove, GameHighlight,
+    critical_moments_display_counts,
     format_best_move_stat,
     format_missed_tactic_line,
 )
@@ -228,24 +229,31 @@ class SummaryTextFormatter:
         return lines
     
     @staticmethod
-    def format_critical_moments(summary: GameSummary, white_name: str, black_name: str) -> List[str]:
+    def format_critical_moments(
+        summary: GameSummary,
+        white_name: str,
+        black_name: str,
+        config: Optional[Dict[str, Any]] = None,
+    ) -> List[str]:
         """Format critical moments section matching the UI display.
         
         Args:
             summary: GameSummary instance.
             white_name: White player name.
             black_name: Black player name.
+            config: Optional app config for display caps.
             
         Returns:
             List of formatted lines.
         """
+        worst_n, best_n, missed_n = critical_moments_display_counts(config)
         lines = []
         lines.append("Critical Moments")
         lines.append("-" * 17)
         
         if summary.white_top_worst:
-            lines.append(f"\n{white_name} (White) - Top 3 Worst Moves:")
-            for i, move in enumerate(summary.white_top_worst[:3], 1):
+            lines.append(f"\n{white_name} (White) - Top {worst_n} Worst Moves:")
+            for i, move in enumerate(summary.white_top_worst[:worst_n], 1):
                 move_notation = move.move_notation if move.move_notation else "N/A"
                 assessment = move.assessment if move.assessment else "N/A"
                 cpl = move.cpl if move.cpl is not None else 0.0
@@ -254,8 +262,8 @@ class SummaryTextFormatter:
                     lines.append(f"     Best: {move.best_move}")
         
         if summary.white_top_best:
-            lines.append(f"\n{white_name} (White) - Top 3 Best Moves:")
-            for i, move in enumerate(summary.white_top_best[:3], 1):
+            lines.append(f"\n{white_name} (White) - Top {best_n} Best Moves:")
+            for i, move in enumerate(summary.white_top_best[:best_n], 1):
                 move_notation = move.move_notation if move.move_notation else "N/A"
                 assessment = move.assessment if move.assessment else "N/A"
                 lines.append(
@@ -264,7 +272,7 @@ class SummaryTextFormatter:
 
         if getattr(summary, "white_missed_tactics", None):
             lines.append(f"\n{white_name} (White) - Missed Tactics:")
-            for i, move in enumerate(summary.white_missed_tactics[:3], 1):
+            for i, move in enumerate(summary.white_missed_tactics[:missed_n], 1):
                 move_notation = move.move_notation if move.move_notation else "N/A"
                 assessment = move.assessment if move.assessment else "N/A"
                 lines.append(f"  {i}. {move_notation} ({assessment})")
@@ -273,8 +281,8 @@ class SummaryTextFormatter:
                     lines.append(f"     {missed_line}")
         
         if summary.black_top_worst:
-            lines.append(f"\n{black_name} (Black) - Top 3 Worst Moves:")
-            for i, move in enumerate(summary.black_top_worst[:3], 1):
+            lines.append(f"\n{black_name} (Black) - Top {worst_n} Worst Moves:")
+            for i, move in enumerate(summary.black_top_worst[:worst_n], 1):
                 move_notation = move.move_notation if move.move_notation else "N/A"
                 assessment = move.assessment if move.assessment else "N/A"
                 cpl = move.cpl if move.cpl is not None else 0.0
@@ -283,8 +291,8 @@ class SummaryTextFormatter:
                     lines.append(f"     Best: {move.best_move}")
         
         if summary.black_top_best:
-            lines.append(f"\n{black_name} (Black) - Top 3 Best Moves:")
-            for i, move in enumerate(summary.black_top_best[:3], 1):
+            lines.append(f"\n{black_name} (Black) - Top {best_n} Best Moves:")
+            for i, move in enumerate(summary.black_top_best[:best_n], 1):
                 move_notation = move.move_notation if move.move_notation else "N/A"
                 assessment = move.assessment if move.assessment else "N/A"
                 lines.append(
@@ -293,7 +301,7 @@ class SummaryTextFormatter:
 
         if getattr(summary, "black_missed_tactics", None):
             lines.append(f"\n{black_name} (Black) - Missed Tactics:")
-            for i, move in enumerate(summary.black_missed_tactics[:3], 1):
+            for i, move in enumerate(summary.black_missed_tactics[:missed_n], 1):
                 move_notation = move.move_notation if move.move_notation else "N/A"
                 assessment = move.assessment if move.assessment else "N/A"
                 lines.append(f"  {i}. {move_notation} ({assessment})")
@@ -304,7 +312,13 @@ class SummaryTextFormatter:
         return lines
     
     @staticmethod
-    def format_section(summary: GameSummary, section_name: str, white_name: str, black_name: str) -> str:
+    def format_section(
+        summary: GameSummary,
+        section_name: str,
+        white_name: str,
+        black_name: str,
+        config: Optional[Dict[str, Any]] = None,
+    ) -> str:
         """Format a specific section as text.
         
         Args:
@@ -338,13 +352,20 @@ class SummaryTextFormatter:
             lines.extend(section_lines[2:])  # Skip "Game Highlights" and "----------------"
         elif section_name == "Critical Moments":
             # Skip the header line from format_critical_moments
-            section_lines = SummaryTextFormatter.format_critical_moments(summary, white_name, black_name)
+            section_lines = SummaryTextFormatter.format_critical_moments(
+                summary, white_name, black_name, config
+            )
             lines.extend(section_lines[2:])  # Skip "Critical Moments" and "-----------------"
         
         return "\n".join(lines)
     
     @staticmethod
-    def format_full_summary(summary: GameSummary, white_name: str, black_name: str) -> str:
+    def format_full_summary(
+        summary: GameSummary,
+        white_name: str,
+        black_name: str,
+        config: Optional[Dict[str, Any]] = None,
+    ) -> str:
         """Format the full summary as text.
         
         Args:
@@ -368,7 +389,9 @@ class SummaryTextFormatter:
         if summary.highlights:
             lines.extend(SummaryTextFormatter.format_game_highlights(summary.highlights))
             lines.append("")
-        lines.extend(SummaryTextFormatter.format_critical_moments(summary, white_name, black_name))
+        lines.extend(SummaryTextFormatter.format_critical_moments(
+            summary, white_name, black_name, config
+        ))
         
         return "\n".join(lines)
 

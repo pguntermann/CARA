@@ -41,6 +41,14 @@ _KIND_LABELS = {
     "check": "check",
 }
 
+STATS_MISS_KIND_LABELS = {
+    "fork": "forks",
+    "skewer": "skewers",
+    "pin": "pins",
+    "discovered_attack": "discovered attacks",
+    "mate": "mates",
+}
+
 
 @dataclass(frozen=True)
 class RankedMissedTactic:
@@ -55,6 +63,7 @@ class RankedMissedTactic:
     tactic_type: str
     selection_reason: str
     eval_drop: float = 0.0
+    pv_uci: str = ""
 
 
 def missed_kind_label(kind: str) -> str:
@@ -288,6 +297,26 @@ def _classify_miss(
     return None
 
 
+def _collapse_duplicate_pv1(
+    ranked: List[Tuple[int, float, float, int, RankedMissedTactic]],
+) -> List[RankedMissedTactic]:
+    """Keep the best-ranked miss for each engine move (from-to), dropping repeats.
+
+    The same hanging capture or tactic often stays PV1 for several plies
+    (e.g. 42. Rf7 and 43. Rf4+ both missing Bxa3).
+    """
+    seen: set[str] = set()
+    unique: List[RankedMissedTactic] = []
+    for item in ranked:
+        miss = item[4]
+        key = miss.pv_uci or str(miss.best_move or "").strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        unique.append(miss)
+    return unique
+
+
 def select_top_missed_tactics(
     moves: List[MoveData],
     *,
@@ -408,9 +437,10 @@ def select_top_missed_tactics(
                         kind=kind,
                     ),
                     eval_drop=eval_drop,
+                    pv_uci=pv_move.uci(),
                 ),
             )
         )
 
     ranked.sort(key=lambda item: (item[0], item[1], item[2], item[3]))
-    return [item[4] for item in ranked[: max(0, int(count))]]
+    return _collapse_duplicate_pv1(ranked)[: max(0, int(count))]

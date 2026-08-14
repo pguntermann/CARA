@@ -27,6 +27,7 @@ class UserSettingsModel(QObject):
     player_stats_time_series_changed = pyqtSignal()  # Player Stats time-series binning / display prefs
     player_stats_activity_heatmap_changed = pyqtSignal()  # Player Stats activity heatmap display prefs
     player_stats_accuracy_distribution_changed = pyqtSignal()  # Player Stats accuracy histogram prefs
+    player_stats_error_patterns_changed = pyqtSignal()  # Player Stats error-pattern coverage cutoff
 
     def __init__(self, settings: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the user settings model.
@@ -390,6 +391,32 @@ class UserSettingsModel(QObject):
         self._settings["player_stats_accuracy_distribution"] = normalize_player_stats_accuracy_distribution_settings(settings)
         self.player_stats_accuracy_distribution_changed.emit()
         self.settings_changed.emit()
+
+    def get_player_stats_error_patterns(self) -> Dict[str, Any]:
+        """User overrides for Player Stats error-pattern display (coverage cutoff)."""
+        from app.services.error_pattern_service import normalize_player_stats_error_patterns_settings
+
+        raw = self._settings.get("player_stats_error_patterns")
+        return normalize_player_stats_error_patterns_settings(
+            raw if isinstance(raw, dict) else None
+        )
+
+    def set_player_stats_error_patterns(self, settings: Dict[str, Any]) -> None:
+        """Replace stored Player Stats error-pattern display settings."""
+        from app.services.error_pattern_service import normalize_player_stats_error_patterns_settings
+
+        self._settings["player_stats_error_patterns"] = normalize_player_stats_error_patterns_settings(
+            settings if isinstance(settings, dict) else None
+        )
+        self.player_stats_error_patterns_changed.emit()
+        self.settings_changed.emit()
+
+    def update_player_stats_error_patterns(self, partial: Dict[str, Any]) -> None:
+        """Merge keys into Player Stats error-pattern display settings."""
+        cur = self.get_player_stats_error_patterns()
+        if isinstance(partial, dict):
+            cur.update(partial)
+        self.set_player_stats_error_patterns(cur)
 
     def get_player_stats_profiles(self) -> Dict[str, Any]:
         """Get persisted Player Stats profiles map (name -> profile dict)."""

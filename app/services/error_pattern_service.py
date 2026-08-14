@@ -6,11 +6,102 @@ from dataclasses import dataclass
 from app.models.database_model import GameData
 from app.models.moveslist_model import MoveData
 from app.services.game_summary_service import GameSummary, PlayerStatistics, PhaseStatistics
-from app.services.game_highlights.base_rule import GameHighlight
-from app.services.game_highlights.highlight_detector import HighlightDetector
-from app.services.game_highlights.rule_registry import RuleRegistry
 from app.controllers.game_controller import GameController
 from app.services.opening_service import OpeningService
+from app.services.missed_tactic_ranking import STATS_MISS_KIND_LABELS
+
+COVERAGE_CUTOFF_MIN = 5.0
+COVERAGE_CUTOFF_MAX = 95.0
+COVERAGE_CUTOFF_DEFAULT = 25.0
+
+
+def error_pattern_config_block(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Return the error-patterns config block (UI path, then top-level fallback)."""
+    cfg = config if isinstance(config, dict) else {}
+    top = (cfg.get("player_stats") or {}).get("error_patterns")
+    if isinstance(top, dict) and top:
+        return top
+    ui_block = (
+        ((cfg.get("ui") or {}).get("panels") or {})
+        .get("detail", {})
+        .get("player_stats", {})
+        .get("error_patterns")
+    )
+    return ui_block if isinstance(ui_block, dict) else {}
+
+
+def coverage_cutoff_range(config: Optional[Dict[str, Any]] = None) -> Tuple[float, float, float]:
+    """Return ``(min, max, default)`` for the display-only coverage slider."""
+    block = error_pattern_config_block(config)
+    raw = block.get("coverage_cutoff")
+    cc = raw if isinstance(raw, dict) else {}
+    try:
+        min_pct = float(cc.get("min", COVERAGE_CUTOFF_MIN))
+    except (TypeError, ValueError):
+        min_pct = COVERAGE_CUTOFF_MIN
+    try:
+        max_pct = float(cc.get("max", COVERAGE_CUTOFF_MAX))
+    except (TypeError, ValueError):
+        max_pct = COVERAGE_CUTOFF_MAX
+    try:
+        default = float(cc.get("default", COVERAGE_CUTOFF_DEFAULT))
+    except (TypeError, ValueError):
+        default = COVERAGE_CUTOFF_DEFAULT
+    if max_pct < min_pct:
+        min_pct, max_pct = max_pct, min_pct
+    default = min(max_pct, max(min_pct, default))
+    return min_pct, max_pct, default
+
+
+def clamp_coverage_cutoff(
+    value: Any,
+    *,
+    min_pct: float = COVERAGE_CUTOFF_MIN,
+    max_pct: float = COVERAGE_CUTOFF_MAX,
+    default: float = COVERAGE_CUTOFF_DEFAULT,
+) -> float:
+    """Clamp a coverage cutoff to the allowed slider range."""
+    try:
+        cutoff = float(value)
+    except (TypeError, ValueError):
+        cutoff = float(default)
+    if cutoff != cutoff:  # NaN
+        cutoff = float(default)
+    return max(float(min_pct), min(float(max_pct), cutoff))
+
+
+def filter_patterns_by_coverage(
+    patterns: Optional[List["ErrorPattern"]],
+    cutoff: float,
+) -> List["ErrorPattern"]:
+    """Keep patterns whose ``game_coverage`` is at least ``cutoff`` (0–100)."""
+    if not patterns:
+        return []
+    floor = float(cutoff)
+    return [
+        p for p in patterns
+        if float(getattr(p, "game_coverage", 0.0) or 0.0) + 1e-9 >= floor
+    ]
+
+
+def normalize_player_stats_error_patterns_settings(
+    raw: Optional[Dict[str, Any]],
+    config: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Normalize persisted Error Patterns display settings."""
+    min_pct, max_pct, default = coverage_cutoff_range(config)
+    cutoff = default
+    if isinstance(raw, dict) and "coverage_cutoff" in raw:
+        cutoff = clamp_coverage_cutoff(
+            raw.get("coverage_cutoff"),
+            min_pct=min_pct,
+            max_pct=max_pct,
+            default=default,
+        )
+    else:
+        cutoff = default
+    return {"coverage_cutoff": cutoff}
+
 
 @dataclass
 class ErrorPattern:
@@ -18,11 +109,14 @@ class ErrorPattern:
     pattern_type: str  # e.g., "phase_blunders", "tactical_misses", "opening_errors"
     description: str  # Human-readable description
     frequency: int  # Number of occurrences
-    percentage: float  # Percentage (0-100)
+    percentage: float  # Pattern-specific rate (0-100); card wording may use this
     severity: str  # "low", "moderate", "high", "critical"
     related_games: List[GameData]  # Games where this pattern occurs
     # Optional: (game, ref_ply) per occurrence for jump-to-move (e.g. repeated position, brilliant/miss/blunder)
     related_ref_plies: Optional[List[Tuple[GameData, int]]] = None  # (game, ply) for each occurrence
+    # Share of relevant games (0-100) used by the display slider. Opportunity-based
+    # patterns use the situation denominator (winning / worse / this opening).
+    game_coverage: float = 0.0
 
 
 class ErrorPatternService:
@@ -39,12 +133,15 @@ class ErrorPatternService:
         self.game_controller = game_controller
         self.opening_service = OpeningService(config)
         
-        # Get thresholds from config
-        pattern_config = config.get('player_stats', {}).get('error_patterns', {})
-        self.thresholds = pattern_config.get('thresholds', {})
+        pattern_config = error_pattern_config_block(config)
+        self.thresholds = pattern_config.get('thresholds', {}) if isinstance(pattern_config.get('thresholds'), dict) else {}
         self.phase_blunder_threshold = self.thresholds.get('phase_blunder_percentage', 20.0)
-        self.tactical_miss_threshold = self.thresholds.get('tactical_miss_count', 10)
+        self.tactical_miss_threshold = self.thresholds.get('tactical_miss_count', 2)
         self.opening_error_threshold = self.thresholds.get('opening_error_rate', 30.0)
+        try:
+            self.min_pattern_games = max(1, int(pattern_config.get('min_pattern_games', 2)))
+        except (TypeError, ValueError):
+            self.min_pattern_games = 2
 
     def _moves_for(
         self,
@@ -63,6 +160,37 @@ class ErrorPatternService:
             except Exception:
                 return None
         return None
+
+    @staticmethod
+    def _unique_games(items: List[GameData]) -> List[GameData]:
+        related: List[GameData] = []
+        seen = set()
+        for game in items:
+            if id(game) not in seen:
+                seen.add(id(game))
+                related.append(game)
+        return related
+
+    @staticmethod
+    def _coverage(hits: int, base: int) -> float:
+        if base <= 0:
+            return 0.0
+        return (hits / base) * 100.0
+
+    def _meets_game_floor(self, n_games: int) -> bool:
+        return n_games >= self.min_pattern_games
+
+    @staticmethod
+    def _player_lost(game: GameData, player_name: str) -> bool:
+        result = (getattr(game, "result", None) or "").strip()
+        is_white = game.white == player_name
+        if is_white:
+            return result == "0-1"
+        return result == "1-0"
+
+    @staticmethod
+    def _player_stats(summary: Any, is_white: bool) -> Any:
+        return summary.white_stats if is_white else summary.black_stats
 
     def detect_error_patterns(
         self,
@@ -97,9 +225,9 @@ class ErrorPatternService:
         )
         patterns.extend(phase_patterns)
         
-        # Pattern 2: Tactical misses
+        # Pattern 2: Tactical misses (named PV1 tactics / mates from game summaries)
         tactical_patterns = self._detect_tactical_miss_patterns(
-            player_name, games
+            player_name, games, game_summaries
         )
         patterns.extend(tactical_patterns)
         
@@ -117,7 +245,7 @@ class ErrorPatternService:
         
         # Pattern 5: Missed top 3 moves
         missed_top3_patterns = self._detect_missed_top3_patterns(
-            player_name, aggregated_stats
+            player_name, games, game_summaries, aggregated_stats
         )
         patterns.extend(missed_top3_patterns)
         
@@ -135,7 +263,7 @@ class ErrorPatternService:
         
         # Pattern 8: Consistent inaccuracies (many small errors)
         inaccuracy_patterns = self._detect_consistent_inaccuracies(
-            player_name, aggregated_stats
+            player_name, games, game_summaries, aggregated_stats
         )
         patterns.extend(inaccuracy_patterns)
         
@@ -145,12 +273,7 @@ class ErrorPatternService:
         )
         patterns.extend(repeated_position_patterns)
         
-        # Sort patterns: those without related_games first, then by severity/percentage
-        patterns.sort(key=lambda p: (
-            0 if p.related_games else 1,  # No games first (0 < 1)
-            -p.percentage,  # Then by percentage descending
-        ))
-        
+        patterns.sort(key=lambda p: (-p.game_coverage, -p.percentage))
         return patterns
     
     def _detect_phase_blunder_patterns(
@@ -185,49 +308,98 @@ class ErrorPatternService:
         # Sort by blunder count (descending)
         phase_blunders.sort(key=lambda x: x[1], reverse=True)
         
-        # Only add pattern for the phase with the most blunders (if it meets threshold)
+        # Only add pattern for the phase with the most blunders
         if phase_blunders and phase_blunders[0][1] > 0:
             phase_name, phase_blunder_count = phase_blunders[0]
             phase_percentage = (phase_blunder_count / total_blunders) * 100
-            if phase_percentage >= self.phase_blunder_threshold:
-                related_games = self._find_games_with_phase_blunders(
-                    player_name, games, game_summaries, phase_name
-                )
-                related_ref_plies = self._collect_phase_blunder_ref_plies(
-                    player_name, games, game_summaries, phase_name, precomputed_moves
-                )
-                severity = self._determine_severity(phase_percentage, [30, 50, 70])
-                patterns.append(ErrorPattern(
-                    pattern_type="phase_blunders",
-                    description=f"Frequent blunders in {phase_name} ({phase_percentage:.1f}% of blunders)",
-                    frequency=phase_blunder_count,
-                    percentage=phase_percentage,
-                    severity=severity,
-                    related_games=related_games,
-                    related_ref_plies=related_ref_plies or None,
-                ))
+            related_games = self._find_games_with_phase_blunders(
+                player_name, games, game_summaries, phase_name
+            )
+            if not self._meets_game_floor(len(related_games)):
+                return patterns
+            related_ref_plies = self._collect_phase_blunder_ref_plies(
+                player_name, games, game_summaries, phase_name, precomputed_moves
+            )
+            coverage = self._coverage(len(related_games), len(games))
+            severity = self._determine_severity(phase_percentage, [30, 50, 70])
+            patterns.append(ErrorPattern(
+                pattern_type="phase_blunders",
+                description=f"Frequent blunders in {phase_name} ({phase_percentage:.1f}% of blunders)",
+                frequency=phase_blunder_count,
+                percentage=phase_percentage,
+                severity=severity,
+                related_games=related_games,
+                related_ref_plies=related_ref_plies or None,
+                game_coverage=coverage,
+            ))
         
         return patterns
     
-    def _detect_tactical_miss_patterns(self, player_name: str, games: List[GameData]) -> List[ErrorPattern]:
-        """Detect missed tactical opportunities."""
+    def _detect_tactical_miss_patterns(
+        self,
+        player_name: str,
+        games: List[GameData],
+        game_summaries: List[GameSummary],
+    ) -> List[ErrorPattern]:
+        """Detect repeated missed tactics from each game's missed-tactics list.
+
+        Uses the summary ranking (not the highlight composer). Named board tactics
+        and missed mates are counted; generic capture/check misses are ignored.
+        """
         patterns: List[ErrorPattern] = []
-        
-        if not self.game_controller:
-            return patterns
-        
-        # Count missed tactical opportunities across games
-        missed_forks = 0
-        missed_pins = 0
-        missed_skewers = 0
-        related_games_forks: List[GameData] = []
-        related_games_pins: List[GameData] = []
-        related_games_skewers: List[GameData] = []
-        
-        # This would require running highlight detection on all games
-        # For now, return empty - this can be enhanced later
-        # TODO: Implement tactical miss detection using HighlightDetector
-        
+        by_kind: Dict[str, List[Tuple[GameData, int]]] = {
+            kind: [] for kind in STATS_MISS_KIND_LABELS
+        }
+
+        for i, game in enumerate(games):
+            if i >= len(game_summaries):
+                continue
+            summary = game_summaries[i]
+            is_white = game.white == player_name
+            misses = (
+                getattr(summary, "white_missed_tactics", None)
+                if is_white
+                else getattr(summary, "black_missed_tactics", None)
+            ) or []
+            for move in misses:
+                kind = str(getattr(move, "tactic_type", "") or "").strip()
+                if kind not in by_kind:
+                    continue
+                move_number = int(getattr(move, "move_number", 0) or 0)
+                if move_number <= 0:
+                    continue
+                ref_ply = move_number * 2 - 1 if is_white else move_number * 2
+                by_kind[kind].append((game, ref_ply))
+
+        occ_floor = max(1, int(self.tactical_miss_threshold))
+        for kind, pairs in by_kind.items():
+            related_games = self._unique_games([game for game, _ply in pairs])
+            n_occ = len(pairs)
+            n_games = len(related_games)
+            if n_occ < occ_floor or not self._meets_game_floor(n_games):
+                continue
+            coverage = self._coverage(n_games, len(games))
+            plural = STATS_MISS_KIND_LABELS[kind]
+            severity = self._determine_severity(
+                n_occ, [occ_floor, occ_floor * 2, occ_floor * 3]
+            )
+            patterns.append(
+                ErrorPattern(
+                    pattern_type="tactical_misses",
+                    description=(
+                        f"Frequently misses {plural} ({n_occ} occurrence"
+                        f"{'s' if n_occ != 1 else ''} in {n_games} game"
+                        f"{'s' if n_games != 1 else ''})"
+                    ),
+                    frequency=n_occ,
+                    percentage=coverage,
+                    severity=severity,
+                    related_games=related_games,
+                    related_ref_plies=pairs,
+                    game_coverage=coverage,
+                )
+            )
+
         return patterns
     
     def _detect_opening_error_patterns(
@@ -278,6 +450,7 @@ class ErrorPatternService:
             if eco not in opening_stats:
                 opening_stats[eco] = {
                     'games': [],
+                    'lost_games': [],
                     'total_moves': 0,
                     'errors': 0,
                     'blunders': 0,
@@ -285,9 +458,13 @@ class ErrorPatternService:
                     'opening_name': opening_name,  # Store opening name from first game with this ECO
                     # Concrete (game, ref_ply) locations of opening-phase errors for this ECO.
                     'ref_plies': [],
+                    'lost_ref_plies': [],
                 }
             
             opening_stats[eco]['games'].append(game)
+            lost = self._player_lost(game, player_name)
+            if lost:
+                opening_stats[eco]['lost_games'].append(game)
             
             # Store opening name if we found one and haven't stored one yet
             if opening_name and not opening_stats[eco]['opening_name']:
@@ -317,6 +494,8 @@ class ErrorPatternService:
                             if assess in ("Inaccuracy", "Mistake", "Miss", "Blunder"):
                                 ref_ply = mv.move_number * 2 - 1
                                 opening_stats[eco]['ref_plies'].append((game, ref_ply))
+                                if lost:
+                                    opening_stats[eco]['lost_ref_plies'].append((game, ref_ply))
                     elif (not is_white) and getattr(mv, "black_move", None):
                         player_move_index += 1
                         if player_move_index <= opening_moves:
@@ -324,6 +503,8 @@ class ErrorPatternService:
                             if assess in ("Inaccuracy", "Mistake", "Miss", "Blunder"):
                                 ref_ply = mv.move_number * 2
                                 opening_stats[eco]['ref_plies'].append((game, ref_ply))
+                                if lost:
+                                    opening_stats[eco]['lost_ref_plies'].append((game, ref_ply))
         
         # Check for openings with high error rates
         for eco, stats in opening_stats.items():
@@ -331,26 +512,29 @@ class ErrorPatternService:
                 continue
             
             error_rate = (stats['errors'] / stats['total_moves']) * 100
-            if error_rate >= self.opening_error_threshold:
-                # Get opening name from stored value (from last move with non-"*" opening name)
-                opening_name = stats.get('opening_name')
-                
-                # Build description with ECO and opening name if available
-                if opening_name and eco != "Unknown":
-                    description = f"High error rate in {eco} ({opening_name}) ({error_rate:.1f}% of moves)"
-                else:
-                    description = f"High error rate in {eco} ({error_rate:.1f}% of moves)"
-                
-                severity = self._determine_severity(error_rate, [40, 50, 60])
-                patterns.append(ErrorPattern(
-                    pattern_type="opening_errors",
-                    description=description,
-                    frequency=stats['errors'],
-                    percentage=error_rate,
-                    severity=severity,
-                    related_games=stats['games'],
-                    related_ref_plies=stats.get('ref_plies') or None,
-                ))
+            if error_rate < self.opening_error_threshold:
+                continue
+            lost_games = self._unique_games(stats.get('lost_games') or [])
+            opening_games = stats.get('games') or []
+            if not self._meets_game_floor(len(lost_games)):
+                continue
+            coverage = self._coverage(len(lost_games), len(opening_games))
+            opening_name = stats.get('opening_name')
+            if opening_name and eco != "Unknown":
+                description = f"High error rate in {eco} ({opening_name}) ({error_rate:.1f}% of moves)"
+            else:
+                description = f"High error rate in {eco} ({error_rate:.1f}% of moves)"
+            severity = self._determine_severity(error_rate, [40, 50, 60])
+            patterns.append(ErrorPattern(
+                pattern_type="opening_errors",
+                description=description,
+                frequency=stats['errors'],
+                percentage=error_rate,
+                severity=severity,
+                related_games=lost_games,
+                related_ref_plies=stats.get('lost_ref_plies') or None,
+                game_coverage=coverage,
+            ))
         
         return patterns
     
@@ -458,85 +642,111 @@ class ErrorPatternService:
         aggregated_stats: Any,
         precomputed_moves: Optional[List[Optional[List[MoveData]]]],
     ) -> List[ErrorPattern]:
-        """Detect patterns of consistently high centipawn loss."""
+        """Detect games with high centipawn loss (no career-average gate)."""
         patterns: List[ErrorPattern] = []
         
-        avg_cpl = aggregated_stats.player_stats.average_cpl
         high_cpl_threshold = self.thresholds.get('high_cpl_threshold', 50.0)
-        
-        if avg_cpl >= high_cpl_threshold:
-            # Find games with high CPL
-            related_games: List[GameData] = []
-            related_ref_plies: List[Tuple[GameData, int]] = []
-            for i, game in enumerate(games):
-                if i >= len(game_summaries):
+        related_games: List[GameData] = []
+        related_ref_plies: List[Tuple[GameData, int]] = []
+        cpl_values: List[float] = []
+        for i, game in enumerate(games):
+            if i >= len(game_summaries):
+                continue
+            is_white = (game.white == player_name)
+            summary = game_summaries[i]
+            player_stats = self._player_stats(summary, is_white)
+            game_cpl = float(getattr(player_stats, "average_cpl", 0.0) or 0.0)
+            if game_cpl < high_cpl_threshold:
+                continue
+            related_games.append(game)
+            cpl_values.append(game_cpl)
+            moves = self._moves_for(i, game, precomputed_moves)
+            if not moves:
+                continue
+            cpl_field = "cpl_white" if is_white else "cpl_black"
+            move_field = "white_move" if is_white else "black_move"
+            worst: List[Tuple[float, int]] = []
+            for mv in moves:
+                if not getattr(mv, move_field, None):
                     continue
-                is_white = (game.white == player_name)
-                summary = game_summaries[i]
-                player_stats = summary.white_stats if is_white else summary.black_stats
-                if player_stats.average_cpl >= high_cpl_threshold:
-                    related_games.append(game)
-                    # Collect a few of the worst moves by CPL for jump-to-move
-                    moves = self._moves_for(i, game, precomputed_moves)
-                    if not moves:
-                        continue
-                    cpl_field = "cpl_white" if is_white else "cpl_black"
-                    move_field = "white_move" if is_white else "black_move"
-                    worst: List[Tuple[float, int]] = []
-                    for mv in moves:
-                        if not getattr(mv, move_field, None):
-                            continue
-                        cpl_str = getattr(mv, cpl_field, "") or ""
-                        if not cpl_str:
-                            continue
-                        try:
-                            cpl_val = float(cpl_str)
-                        except (ValueError, TypeError):
-                            continue
-                        if is_white:
-                            ref_ply = mv.move_number * 2 - 1
-                        else:
-                            ref_ply = mv.move_number * 2
-                        worst.append((cpl_val, ref_ply))
-                    if worst:
-                        worst.sort(key=lambda x: x[0], reverse=True)
-                        for _, ref_ply in worst[:3]:
-                            related_ref_plies.append((game, ref_ply))
-            
-            severity = self._determine_severity(avg_cpl, [60, 80, 100])
-            patterns.append(ErrorPattern(
-                pattern_type="high_cpl",
-                description=f"Consistently high centipawn loss (avg {avg_cpl:.1f} CPL)",
-                frequency=len(related_games),
-                percentage=(len(related_games) / len(games) * 100) if games else 0.0,
-                severity=severity,
-                related_games=related_games,
-                related_ref_plies=related_ref_plies or None,
-            ))
+                cpl_str = getattr(mv, cpl_field, "") or ""
+                if not cpl_str:
+                    continue
+                try:
+                    cpl_val = float(cpl_str)
+                except (TypeError, ValueError):
+                    continue
+                if is_white:
+                    ref_ply = mv.move_number * 2 - 1
+                else:
+                    ref_ply = mv.move_number * 2
+                worst.append((cpl_val, ref_ply))
+            if worst:
+                worst.sort(key=lambda x: x[0], reverse=True)
+                for _, ref_ply in worst[:3]:
+                    related_ref_plies.append((game, ref_ply))
+
+        if not self._meets_game_floor(len(related_games)):
+            return patterns
+
+        avg_cpl = sum(cpl_values) / len(cpl_values) if cpl_values else 0.0
+        coverage = self._coverage(len(related_games), len(games))
+        severity = self._determine_severity(avg_cpl, [60, 80, 100])
+        patterns.append(ErrorPattern(
+            pattern_type="high_cpl",
+            description=(
+                f"High centipawn loss ({len(related_games)} game"
+                f"{'s' if len(related_games) != 1 else ''}, avg {avg_cpl:.1f} CPL)"
+            ),
+            frequency=len(related_games),
+            percentage=coverage,
+            severity=severity,
+            related_games=related_games,
+            related_ref_plies=related_ref_plies or None,
+            game_coverage=coverage,
+        ))
         
         return patterns
     
-    def _detect_missed_top3_patterns(self, player_name: str,
-                                     aggregated_stats: Any) -> List[ErrorPattern]:
-        """Detect patterns of frequently missing top 3 moves."""
+    def _detect_missed_top3_patterns(
+        self,
+        player_name: str,
+        games: List[GameData],
+        game_summaries: List[GameSummary],
+        aggregated_stats: Any,
+    ) -> List[ErrorPattern]:
+        """Detect games where the player's own top-3 hit rate is below the bar."""
         patterns: List[ErrorPattern] = []
-        
-        top3_percentage = aggregated_stats.player_stats.top3_move_percentage
         missed_top3_threshold = self.thresholds.get('missed_top3_threshold', 60.0)
-        
-        if top3_percentage < missed_top3_threshold:
-            missed_moves = aggregated_stats.player_stats.total_moves - int(
-                aggregated_stats.player_stats.total_moves * top3_percentage / 100
-            )
-            severity = self._determine_severity(100 - top3_percentage, [30, 40, 50])
-            patterns.append(ErrorPattern(
-                pattern_type="missed_top3",
-                description=f"Frequently misses top 3 moves ({top3_percentage:.1f}% in top 3)",
-                frequency=missed_moves,
-                percentage=100 - top3_percentage,
-                severity=severity,
-                related_games=[]  # Would need to analyze individual games to find specific instances
-            ))
+        related_games: List[GameData] = []
+        for i, game in enumerate(games):
+            if i >= len(game_summaries):
+                continue
+            is_white = (game.white == player_name)
+            player_stats = self._player_stats(game_summaries[i], is_white)
+            top3 = getattr(player_stats, "top3_move_percentage", None)
+            if top3 is None:
+                continue
+            if float(top3) < missed_top3_threshold:
+                related_games.append(game)
+
+        if not self._meets_game_floor(len(related_games)):
+            return patterns
+
+        career_top3 = float(
+            getattr(getattr(aggregated_stats, "player_stats", None), "top3_move_percentage", 0.0) or 0.0
+        )
+        coverage = self._coverage(len(related_games), len(games))
+        severity = self._determine_severity(coverage, [30, 50, 70])
+        patterns.append(ErrorPattern(
+            pattern_type="missed_top3",
+            description=f"Frequently misses top 3 moves ({career_top3:.1f}% in top 3)",
+            frequency=len(related_games),
+            percentage=coverage,
+            severity=severity,
+            related_games=related_games,
+            game_coverage=coverage,
+        ))
         
         return patterns
     
@@ -545,10 +755,8 @@ class ErrorPatternService:
         """Detect problems converting winning positions."""
         patterns: List[ErrorPattern] = []
         
-        if not self.game_controller:
-            return patterns
-        
         conversion_issues = 0
+        winning_games = 0
         related_games: List[GameData] = []
         related_ref_plies: List[Tuple[GameData, int]] = []
         winning_threshold = self.thresholds.get('winning_eval_threshold', 200.0)  # +2.0 pawns
@@ -584,6 +792,7 @@ class ErrorPatternService:
             
             # Check if player lost or drew despite having winning position
             if had_winning_position:
+                winning_games += 1
                 if is_white and game.result in ["0-1", "1/2-1/2"]:
                     conversion_issues += 1
                     related_games.append(game)
@@ -595,19 +804,23 @@ class ErrorPatternService:
                     if winning_ply_indices:
                         related_ref_plies.append((game, int(winning_ply_indices[-1])))
         
-        if conversion_issues > 0:
-            conversion_rate = (conversion_issues / len(games) * 100) if games else 0.0
-            if conversion_rate >= self.thresholds.get('conversion_issue_threshold', 15.0):
-                severity = self._determine_severity(conversion_rate, [20, 30, 40])
-                patterns.append(ErrorPattern(
-                    pattern_type="conversion_issues",
-                    description=f"Struggles to convert winning positions ({conversion_issues} games)",
-                    frequency=conversion_issues,
-                    percentage=conversion_rate,
-                    severity=severity,
-                    related_games=related_games,
-                    related_ref_plies=related_ref_plies or None,
-                ))
+        if not self._meets_game_floor(conversion_issues) or winning_games <= 0:
+            return patterns
+        conversion_rate = self._coverage(conversion_issues, winning_games)
+        severity = self._determine_severity(conversion_rate, [20, 30, 40])
+        patterns.append(ErrorPattern(
+            pattern_type="conversion_issues",
+            description=(
+                f"Struggles to convert winning positions "
+                f"({conversion_issues} of {winning_games} games)"
+            ),
+            frequency=conversion_issues,
+            percentage=conversion_rate,
+            severity=severity,
+            related_games=related_games,
+            related_ref_plies=related_ref_plies or None,
+            game_coverage=conversion_rate,
+        ))
         
         return patterns
     
@@ -622,6 +835,7 @@ class ErrorPatternService:
         patterns: List[ErrorPattern] = []
         
         defensive_errors = 0
+        worse_games = 0
         related_games: List[GameData] = []
         related_ref_plies: List[Tuple[GameData, int]] = []
         losing_threshold = self.thresholds.get('losing_eval_threshold', -200.0)  # -2.0 pawns
@@ -674,52 +888,76 @@ class ErrorPatternService:
                             ref_ply = ply_before + 1
                             game_ref_plies.append((game, ref_ply))
             
-            if had_losing_position and defensive_blunders >= 2:
-                defensive_errors += 1
-                related_games.append(game)
-                if game_ref_plies:
-                    related_ref_plies.extend(game_ref_plies)
+            if had_losing_position:
+                worse_games += 1
+                if defensive_blunders >= 2:
+                    defensive_errors += 1
+                    related_games.append(game)
+                    if game_ref_plies:
+                        related_ref_plies.extend(game_ref_plies)
         
-        if defensive_errors > 0:
-            defensive_rate = (defensive_errors / len(games) * 100) if games else 0.0
-            if defensive_rate >= self.thresholds.get('defensive_weakness_threshold', 20.0):
-                severity = self._determine_severity(defensive_rate, [25, 35, 45])
-                patterns.append(ErrorPattern(
-                    pattern_type="defensive_weaknesses",
-                    description=f"Struggles when defending ({defensive_errors} games with multiple blunders)",
-                    frequency=defensive_errors,
-                    percentage=defensive_rate,
-                    severity=severity,
-                    related_games=related_games,
-                    related_ref_plies=related_ref_plies or None,
-                ))
+        if not self._meets_game_floor(defensive_errors) or worse_games <= 0:
+            return patterns
+        defensive_rate = self._coverage(defensive_errors, worse_games)
+        severity = self._determine_severity(defensive_rate, [25, 35, 45])
+        patterns.append(ErrorPattern(
+            pattern_type="defensive_weaknesses",
+            description=(
+                f"Struggles when defending "
+                f"({defensive_errors} of {worse_games} games with multiple blunders)"
+            ),
+            frequency=defensive_errors,
+            percentage=defensive_rate,
+            severity=severity,
+            related_games=related_games,
+            related_ref_plies=related_ref_plies or None,
+            game_coverage=defensive_rate,
+        ))
         
         return patterns
     
-    def _detect_consistent_inaccuracies(self, player_name: str,
-                                       aggregated_stats: Any) -> List[ErrorPattern]:
-        """Detect patterns of many small errors (inaccuracies)."""
+    def _detect_consistent_inaccuracies(
+        self,
+        player_name: str,
+        games: List[GameData],
+        game_summaries: List[GameSummary],
+        aggregated_stats: Any,
+    ) -> List[ErrorPattern]:
+        """Detect games where inaccuracies are a large share of that game's moves."""
         patterns: List[ErrorPattern] = []
-        
-        inaccuracies = aggregated_stats.player_stats.inaccuracies
-        total_moves = aggregated_stats.player_stats.total_moves
-        
-        if total_moves == 0:
-            return patterns
-        
-        inaccuracy_rate = (inaccuracies / total_moves * 100)
         inaccuracy_threshold = self.thresholds.get('inaccuracy_rate_threshold', 25.0)
-        
-        if inaccuracy_rate >= inaccuracy_threshold:
-            severity = self._determine_severity(inaccuracy_rate, [30, 40, 50])
-            patterns.append(ErrorPattern(
-                pattern_type="consistent_inaccuracies",
-                description=f"Many small errors ({inaccuracy_rate:.1f}% of moves are inaccuracies)",
-                frequency=inaccuracies,
-                percentage=inaccuracy_rate,
-                severity=severity,
-                related_games=[]  # Would need individual game analysis for specific instances
-            ))
+        related_games: List[GameData] = []
+        for i, game in enumerate(games):
+            if i >= len(game_summaries):
+                continue
+            is_white = (game.white == player_name)
+            player_stats = self._player_stats(game_summaries[i], is_white)
+            total_moves = int(getattr(player_stats, "total_moves", 0) or 0)
+            if total_moves <= 0:
+                continue
+            inaccuracies = int(getattr(player_stats, "inaccuracies", 0) or 0)
+            rate = (inaccuracies / total_moves) * 100
+            if rate >= inaccuracy_threshold:
+                related_games.append(game)
+
+        if not self._meets_game_floor(len(related_games)):
+            return patterns
+
+        career_stats = getattr(aggregated_stats, "player_stats", None)
+        career_total = int(getattr(career_stats, "total_moves", 0) or 0)
+        career_inacc = int(getattr(career_stats, "inaccuracies", 0) or 0)
+        career_rate = (career_inacc / career_total * 100) if career_total > 0 else 0.0
+        coverage = self._coverage(len(related_games), len(games))
+        severity = self._determine_severity(coverage, [30, 50, 70])
+        patterns.append(ErrorPattern(
+            pattern_type="consistent_inaccuracies",
+            description=f"Many small errors ({career_rate:.1f}% of moves are inaccuracies)",
+            frequency=len(related_games),
+            percentage=coverage,
+            severity=severity,
+            related_games=related_games,
+            game_coverage=coverage,
+        ))
         
         return patterns
     
@@ -808,17 +1046,20 @@ class ErrorPatternService:
                         all_games.append(g)
             num_positions = len(positions_with_repeats)
             num_games = len(all_games)
-            percentage = (num_games / len(games) * 100) if games else 0.0
+            if not self._meets_game_floor(num_games):
+                continue
+            coverage = self._coverage(num_games, len(games))
             severity = self._determine_severity(num_games, [3, 5, 8])
             desc = f"{description_label} ({num_positions} position{'s' if num_positions != 1 else ''} in {num_games} game{'s' if num_games != 1 else ''})"
             patterns.append(ErrorPattern(
                 pattern_type=pattern_type,
                 description=desc,
                 frequency=num_positions,
-                percentage=percentage,
+                percentage=coverage,
                 severity=severity,
                 related_games=all_games,
                 related_ref_plies=related_ref_plies,
+                game_coverage=coverage,
             ))
         
         return patterns

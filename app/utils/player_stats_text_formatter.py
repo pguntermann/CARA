@@ -660,16 +660,24 @@ class PlayerStatsTextFormatter:
         for pattern in patterns:
             lines.append(f"{pattern.description}")
             ref_plies = getattr(pattern, "related_ref_plies", None)
+            coverage = float(getattr(pattern, "game_coverage", None) or pattern.percentage or 0.0)
             if ref_plies:
                 num_occurrences = len(ref_plies)
                 num_games = len(pattern.related_games)
                 lines.append(
                     f"  Frequency: {num_occurrences} occurrence"
                     f"{'s' if num_occurrences != 1 else ''} in {num_games} game"
-                    f"{'s' if num_games != 1 else ''} ({pattern.percentage:.1f}%)"
+                    f"{'s' if num_games != 1 else ''} ({coverage:.1f}%)"
                 )
             else:
-                lines.append(f"  Frequency: {pattern.frequency} ({pattern.percentage:.1f}%)")
+                n_games = len(getattr(pattern, "related_games", None) or [])
+                if n_games:
+                    lines.append(
+                        f"  Frequency: {n_games} game"
+                        f"{'s' if n_games != 1 else ''} ({coverage:.1f}%)"
+                    )
+                else:
+                    lines.append(f"  Frequency: {pattern.frequency} ({coverage:.1f}%)")
             lines.append("")
         
         return lines

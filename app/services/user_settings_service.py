@@ -277,6 +277,7 @@ class UserSettingsService:
             "player_stats_time_series",
             "player_stats_activity_heatmap",
             "player_stats_accuracy_distribution",
+            "player_stats_error_patterns",
         ]
 
         # Fill missing sections for each profile.
@@ -512,6 +513,7 @@ class UserSettingsService:
                         "player_stats_time_series",
                         "player_stats_activity_heatmap",
                         "player_stats_accuracy_distribution",
+                        "player_stats_error_patterns",
                     ):
                         settings.pop(k, None)
             except Exception:
@@ -866,7 +868,8 @@ class UserSettingsService:
         """Apply Player Stats-related keys from ``user_settings.json.template`` and save.
 
         Updates: ``player_stats_section_visibility``, ``player_stats_time_series``,
-        ``player_stats_activity_heatmap``, ``player_stats_accuracy_distribution``.
+        ``player_stats_activity_heatmap``, ``player_stats_accuracy_distribution``,
+        ``player_stats_error_patterns``.
         Keys absent from the template are left unchanged.
 
         Returns:
@@ -891,6 +894,8 @@ class UserSettingsService:
                 model.set_player_stats_activity_heatmap(self._deep_copy(tmpl_default["player_stats_activity_heatmap"]))
             if "player_stats_accuracy_distribution" in tmpl_default and isinstance(tmpl_default["player_stats_accuracy_distribution"], dict):
                 model.set_player_stats_accuracy_distribution(self._deep_copy(tmpl_default["player_stats_accuracy_distribution"]))
+            if "player_stats_error_patterns" in tmpl_default and isinstance(tmpl_default["player_stats_error_patterns"], dict):
+                model.set_player_stats_error_patterns(self._deep_copy(tmpl_default["player_stats_error_patterns"]))
         else:
             if "player_stats_section_visibility" in tmpl:
                 raw_vis = tmpl["player_stats_section_visibility"]
@@ -909,6 +914,10 @@ class UserSettingsService:
                 ad = tmpl["player_stats_accuracy_distribution"]
                 if isinstance(ad, dict):
                     model.set_player_stats_accuracy_distribution(self._deep_copy(ad))
+            if "player_stats_error_patterns" in tmpl:
+                ep = tmpl["player_stats_error_patterns"]
+                if isinstance(ep, dict):
+                    model.set_player_stats_error_patterns(self._deep_copy(ep))
         return bool(self.save())
 
     def get_player_stats_default_profile_from_template(self) -> Optional[Dict[str, Any]]:
@@ -954,6 +963,10 @@ class UserSettingsService:
     def update_player_stats_accuracy_distribution(self, partial: Dict[str, Any]) -> None:
         """Merge keys into Player Stats accuracy distribution chart user settings."""
         self.get_model().update_player_stats_accuracy_distribution(partial)
+
+    def update_player_stats_error_patterns(self, partial: Dict[str, Any]) -> None:
+        """Merge keys into Player Stats error-pattern display settings."""
+        self.get_model().update_player_stats_error_patterns(partial)
 
     def update_engines(self, engines: list) -> None:
         """Update engine list.

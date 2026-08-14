@@ -7,7 +7,8 @@ from datetime import date, timedelta
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
     QGridLayout, QSizePolicy, QComboBox, QPushButton, QApplication,
-    QGraphicsOpacityEffect, QMenu, QTreeWidget, QTreeWidgetItem, QToolButton, QToolTip
+    QGraphicsOpacityEffect, QMenu, QTreeWidget, QTreeWidgetItem, QToolButton, QToolTip,
+    QSlider,
 )
 from PyQt6.QtCore import (
     Qt,
@@ -107,6 +108,16 @@ def _player_stats_section_title_label(title: str, header_font: QFont, header_tex
     h.setMinimumWidth(0)
     h.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
     return h
+
+
+def _qcolor_from_rgb(value: Any, fallback: QColor) -> QColor:
+    """Build a QColor from a config RGB list; return ``fallback`` if the value is unusable."""
+    if isinstance(value, (list, tuple)) and len(value) >= 3:
+        try:
+            return QColor(int(value[0]), int(value[1]), int(value[2]))
+        except (TypeError, ValueError):
+            pass
+    return QColor(fallback)
 
 
 PHASE_BAR_PHASE_ORDER: Tuple[str, ...] = ("Opening", "Middlegame", "Endgame")
@@ -2765,6 +2776,17 @@ class DetailPlayerStatsView(QWidget):
         # Error patterns responsive handling
         self._error_patterns_widget: Optional[QWidget] = None
         self._error_pattern_items: List[Dict[str, Any]] = []  # List of {item, button, desc_label, full_text}
+        self._error_pattern_coverage_slider: Optional[QSlider] = None
+        self._error_pattern_coverage_value_label: Optional[QLabel] = None
+        self._error_pattern_empty_label: Optional[QLabel] = None
+        self._error_pattern_cutoff_applying: bool = False
+        self._error_pattern_cutoff_pending: Optional[float] = None
+        self._error_pattern_cutoff_debounce_ms: int = 150
+        self._error_pattern_cutoff_debounce_timer = QTimer(self)
+        self._error_pattern_cutoff_debounce_timer.setSingleShot(True)
+        self._error_pattern_cutoff_debounce_timer.timeout.connect(
+            self._on_error_pattern_coverage_debounce_timeout
+        )
         # Top games responsive handling (shares behavior with error patterns buttons)
         self._top_games_widget: Optional[QWidget] = None
         self._top_games_items: List[Dict[str, Any]] = []  # List of {button}
@@ -2829,6 +2851,9 @@ class DetailPlayerStatsView(QWidget):
         UserSettingsService.get_instance().get_model().player_stats_accuracy_distribution_changed.connect(
             self._on_player_stats_accuracy_distribution_settings_changed
         )
+        UserSettingsService.get_instance().get_model().player_stats_error_patterns_changed.connect(
+            self._on_player_stats_error_patterns_settings_changed
+        )
 
         # Event filter will be installed on scroll_area in _setup_ui
 
@@ -2872,6 +2897,50 @@ class DetailPlayerStatsView(QWidget):
             self._accuracy_distribution_widget.refresh_from_settings()
         else:
             QTimer.singleShot(0, self._deferred_build_stats_content)
+
+    def _on_player_stats_error_patterns_settings_changed(self) -> None:
+        if not self._error_patterns_widget:
+            return
+        self._cancel_error_pattern_coverage_debounce()
+        cutoff = self._error_pattern_coverage_cutoff()
+        slider = getattr(self, "_error_pattern_coverage_slider", None)
+        if slider is not None:
+            rounded = int(round(cutoff))
+            if slider.value() != rounded:
+                self._error_pattern_cutoff_applying = True
+                try:
+                    slider.setValue(rounded)
+                finally:
+                    self._error_pattern_cutoff_applying = False
+        self._apply_error_pattern_coverage_filter(cutoff)
+
+    def _error_pattern_coverage_cutoff(self) -> float:
+        from app.services.error_pattern_service import (
+            clamp_coverage_cutoff,
+            coverage_cutoff_range,
+        )
+        from app.services.user_settings_service import UserSettingsService
+
+        min_pct, max_pct, default = coverage_cutoff_range(self.config)
+        try:
+            raw = (
+                UserSettingsService.get_instance()
+                .get_model()
+                .get_player_stats_error_patterns()
+                .get("coverage_cutoff", default)
+            )
+        except Exception:
+            raw = default
+        return clamp_coverage_cutoff(
+            raw, min_pct=min_pct, max_pct=max_pct, default=default
+        )
+
+    def _visible_error_patterns(self) -> List["ErrorPattern"]:
+        from app.services.error_pattern_service import filter_patterns_by_coverage
+
+        return filter_patterns_by_coverage(
+            self.current_patterns, self._error_pattern_coverage_cutoff()
+        )
 
     def cleanup(self) -> None:
         """Clean up resources when view is being destroyed."""
@@ -3202,6 +3271,7 @@ class DetailPlayerStatsView(QWidget):
         """Reload visibility map from disk (e.g. after app settings load)."""
         self._reload_player_stats_section_visibility_prefs()
         self.apply_player_stats_section_visibility_after_build()
+        self._on_player_stats_error_patterns_settings_changed()
 
     def _player_stats_section_pref_visible(self, section_id: str) -> bool:
         return bool(self._section_visibility_prefs.get(section_id, True))
@@ -3603,6 +3673,11 @@ class DetailPlayerStatsView(QWidget):
         self._openings_widget = None
         self._openings_grids = []
         self._error_patterns_widget = None
+        self._error_pattern_items = []
+        self._error_pattern_coverage_slider = None
+        self._error_pattern_coverage_value_label = None
+        self._error_pattern_empty_label = None
+        self._cancel_error_pattern_coverage_debounce()
         self._activity_heatmap_widget = None
         self._activity_heatmap_subcaption_label = None
         self._accuracy_distribution_widget = None
@@ -3686,6 +3761,11 @@ class DetailPlayerStatsView(QWidget):
         self._openings_widget = None
         self._openings_grids = []
         self._error_patterns_widget = None
+        self._error_pattern_items = []
+        self._error_pattern_coverage_slider = None
+        self._error_pattern_coverage_value_label = None
+        self._error_pattern_empty_label = None
+        self._cancel_error_pattern_coverage_debounce()
         self._activity_heatmap_widget = None
         self._activity_heatmap_subcaption_label = None
         self._accuracy_distribution_widget = None
@@ -6128,6 +6208,103 @@ class DetailPlayerStatsView(QWidget):
         self._error_patterns_value_font = value_font
         self._error_patterns_text_color = text_color
 
+        ui_config = self.config.get('ui', {})
+        panel_config = ui_config.get('panels', {}).get('detail', {})
+        player_stats_config = panel_config.get('player_stats', {})
+        error_patterns_config = player_stats_config.get('error_patterns', {})
+        slider_cfg = error_patterns_config.get('coverage_slider', {}) if isinstance(
+            error_patterns_config.get('coverage_slider'), dict
+        ) else {}
+        slider_label_text = slider_cfg.get('label', 'Min. share of games')
+        slider_tooltip = slider_cfg.get(
+            'tooltip',
+            'Show patterns that appear in at least this share of relevant games',
+        )
+        empty_text = slider_cfg.get(
+            'empty_text',
+            'No patterns at this cutoff. Lower the slider to see less frequent issues.',
+        )
+        try:
+            self._error_pattern_cutoff_debounce_ms = max(
+                0, int(slider_cfg.get("debounce_ms", 150))
+            )
+        except (TypeError, ValueError):
+            self._error_pattern_cutoff_debounce_ms = 150
+
+        from app.services.error_pattern_service import coverage_cutoff_range
+
+        min_pct, max_pct, _default = coverage_cutoff_range(self.config)
+        cutoff = self._error_pattern_coverage_cutoff()
+
+        slider_row = QWidget()
+        slider_row.setStyleSheet("background: transparent; border: none;")
+        slider_layout = QHBoxLayout(slider_row)
+        slider_layout.setContentsMargins(0, 0, 0, 0)
+        slider_layout.setSpacing(8)
+        slider_caption = QLabel(str(slider_label_text))
+        slider_caption.setFont(label_font)
+        slider_caption.setStyleSheet(
+            f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+            "background: transparent; border: none;"
+        )
+        slider_caption.setToolTip(str(slider_tooltip))
+        slider_layout.addWidget(slider_caption)
+
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setMinimum(int(round(min_pct)))
+        slider.setMaximum(int(round(max_pct)))
+        slider.setValue(int(round(cutoff)))
+        slider.setSingleStep(1)
+        slider.setPageStep(5)
+        slider.setToolTip(str(slider_tooltip))
+        groove_color = _qcolor_from_rgb(slider_cfg.get("groove_color"), border_color)
+        handle_color = _qcolor_from_rgb(slider_cfg.get("handle_color"), text_color)
+        groove = f"rgb({groove_color.red()}, {groove_color.green()}, {groove_color.blue()})"
+        handle = f"rgb({handle_color.red()}, {handle_color.green()}, {handle_color.blue()})"
+        slider.setStyleSheet(
+            f"""
+            QSlider {{ background: transparent; border: none; }}
+            QSlider::groove:horizontal {{
+                height: 4px;
+                background: {groove};
+                border-radius: 2px;
+            }}
+            QSlider::handle:horizontal {{
+                width: 12px;
+                height: 12px;
+                margin: -4px 0;
+                background: {handle};
+                border-radius: 6px;
+            }}
+            """
+        )
+        slider_layout.addWidget(slider, 1)
+        value_label = QLabel(f"{int(round(cutoff))}%")
+        value_label.setFont(value_font)
+        value_label.setStyleSheet(
+            f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+            "background: transparent; border: none;"
+        )
+        value_label.setMinimumWidth(36)
+        slider_layout.addWidget(value_label)
+        layout.addWidget(slider_row)
+        self._error_pattern_coverage_slider = slider
+        self._error_pattern_coverage_value_label = value_label
+
+        empty_label = QLabel(str(empty_text))
+        empty_label.setFont(label_font)
+        empty_label.setWordWrap(True)
+        empty_label.setStyleSheet(
+            f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
+            "background: transparent; border: none;"
+        )
+        empty_label.setVisible(False)
+        layout.addWidget(empty_label)
+        self._error_pattern_empty_label = empty_label
+
+        slider.valueChanged.connect(self._on_error_pattern_coverage_slider_changed)
+        slider.sliderReleased.connect(self._on_error_pattern_coverage_slider_released)
+
         # Add each pattern
         for i, pattern in enumerate(patterns):
             pattern_data = self._create_error_pattern_item(
@@ -6142,10 +6319,91 @@ class DetailPlayerStatsView(QWidget):
                 # Add explicit spacing to guarantee bottom margin is visible
                 layout.addSpacing(2)
         
+        self._apply_error_pattern_coverage_filter(cutoff)
         # Update visibility based on initial width
         QTimer.singleShot(0, self._update_error_patterns_visibility)
         
         return widget
+
+    def _on_error_pattern_coverage_slider_changed(self, value: int) -> None:
+        if getattr(self, "_error_pattern_cutoff_applying", False):
+            return
+        label = getattr(self, "_error_pattern_coverage_value_label", None)
+        if label is not None:
+            label.setText(f"{int(value)}%")
+        self._error_pattern_cutoff_pending = float(value)
+        delay = int(getattr(self, "_error_pattern_cutoff_debounce_ms", 150) or 0)
+        timer = getattr(self, "_error_pattern_cutoff_debounce_timer", None)
+        if delay <= 0 or timer is None:
+            self._flush_error_pattern_coverage_cutoff()
+            return
+        timer.stop()
+        timer.start(delay)
+
+    def _on_error_pattern_coverage_slider_released(self) -> None:
+        if getattr(self, "_error_pattern_cutoff_applying", False):
+            return
+        self._flush_error_pattern_coverage_cutoff()
+
+    def _on_error_pattern_coverage_debounce_timeout(self) -> None:
+        self._flush_error_pattern_coverage_cutoff()
+
+    def _cancel_error_pattern_coverage_debounce(self) -> None:
+        timer = getattr(self, "_error_pattern_cutoff_debounce_timer", None)
+        if timer is not None:
+            timer.stop()
+        self._error_pattern_cutoff_pending = None
+
+    def _flush_error_pattern_coverage_cutoff(self) -> None:
+        timer = getattr(self, "_error_pattern_cutoff_debounce_timer", None)
+        if timer is not None:
+            timer.stop()
+        pending = self._error_pattern_cutoff_pending
+        if pending is None:
+            slider = getattr(self, "_error_pattern_coverage_slider", None)
+            if slider is None:
+                return
+            pending = float(slider.value())
+        self._error_pattern_cutoff_pending = None
+        self._apply_error_pattern_coverage_filter(pending)
+        try:
+            from app.services.user_settings_service import UserSettingsService
+
+            UserSettingsService.get_instance().update_player_stats_error_patterns(
+                {"coverage_cutoff": float(pending)}
+            )
+        except Exception:
+            pass
+
+    def _apply_error_pattern_coverage_filter(self, cutoff: Optional[float] = None) -> None:
+        if cutoff is None:
+            cutoff = self._error_pattern_coverage_cutoff()
+        shown = 0
+        for pattern_data in getattr(self, "_error_pattern_items", []) or []:
+            pattern = pattern_data.get("pattern")
+            item = pattern_data.get("item")
+            coverage = float(getattr(pattern, "game_coverage", 0.0) or 0.0) if pattern is not None else 0.0
+            visible = coverage + 1e-9 >= float(cutoff)
+            if item is not None:
+                try:
+                    item.setVisible(visible)
+                except RuntimeError:
+                    continue
+            if visible:
+                shown += 1
+        empty = getattr(self, "_error_pattern_empty_label", None)
+        if empty is not None:
+            try:
+                empty.setVisible(shown == 0)
+            except RuntimeError:
+                pass
+        label = getattr(self, "_error_pattern_coverage_value_label", None)
+        if label is not None:
+            try:
+                label.setText(f"{int(round(float(cutoff)))}%")
+            except RuntimeError:
+                pass
+        self._update_error_patterns_visibility()
     
     def _create_error_pattern_item(self, pattern: "ErrorPattern",
                                   text_color: QColor, label_font: QFont, value_font: QFont,
@@ -6169,14 +6427,24 @@ class DetailPlayerStatsView(QWidget):
         severity_color = severity_colors.get(pattern.severity, severity_colors_config.get('default', [150, 150, 150]))
         
         ref_plies = getattr(pattern, "related_ref_plies", None)
+        coverage = float(getattr(pattern, "game_coverage", None) or pattern.percentage or 0.0)
         if ref_plies:
             num_occurrences = len(ref_plies)
             num_games = len(pattern.related_games)
-            freq_text = f"({num_occurrences} occurrence{'s' if num_occurrences != 1 else ''} in {num_games} game{'s' if num_games != 1 else ''}, {pattern.percentage:.1f}%)"
+            freq_text = (
+                f"({num_occurrences} occurrence{'s' if num_occurrences != 1 else ''} in "
+                f"{num_games} game{'s' if num_games != 1 else ''}, {coverage:.1f}%)"
+            )
             button_text = f"View {num_occurrences} →" if pattern.related_games else None
         else:
-            freq_text = f"({pattern.frequency} occurrences, {pattern.percentage:.1f}%)"
-            button_text = f"View {len(pattern.related_games)} →" if pattern.related_games else None
+            n_games = len(pattern.related_games or [])
+            if n_games:
+                freq_text = (
+                    f"({n_games} game{'s' if n_games != 1 else ''}, {coverage:.1f}%)"
+                )
+            else:
+                freq_text = f"({pattern.frequency} occurrences, {coverage:.1f}%)"
+            button_text = f"View {n_games} →" if n_games else None
         
         row_data = self._create_indicator_item_row(
             title_text=pattern.description,
@@ -6203,6 +6471,7 @@ class DetailPlayerStatsView(QWidget):
             'freq_label': row_data["detail_label"],
             'full_text': pattern.description,
             'freq_text': freq_text,
+            'pattern': pattern,
         }
     
     def _on_view_pattern_games(self, pattern: "ErrorPattern") -> None:
@@ -7241,7 +7510,7 @@ class DetailPlayerStatsView(QWidget):
         else:
             text = PlayerStatsTextFormatter.format_section(
                 self.current_stats,
-                self.current_patterns,
+                self._visible_error_patterns() if section_name == "Error Patterns" else self.current_patterns,
                 section_name,
                 current_player or "Player",
                 top_games_summary=top_games_summary,
@@ -7387,7 +7656,7 @@ class DetailPlayerStatsView(QWidget):
 
         text = PlayerStatsTextFormatter.format_full_stats(
             self.current_stats,
-            self.current_patterns,
+            self._visible_error_patterns(),
             current_player or "Player",
             top_games_summary=top_games_summary,
             opening_tree_summary_lines=opening_tree_summary_lines if opening_tree_summary_lines else None,
@@ -7504,7 +7773,7 @@ class DetailPlayerStatsView(QWidget):
             PlayerStatsPDFService(self.config).export(
                 path,
                 stats=self.current_stats,
-                patterns=self.current_patterns or [],
+                patterns=self._visible_error_patterns(),
                 player_name=current_player,
                 section_visibility=self._section_visibility_prefs,
                 profile_name=profile_name,

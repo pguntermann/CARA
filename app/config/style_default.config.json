@@ -2205,6 +2205,18 @@
               6
             ],
             "two_line_gap_factor": 0.15,
+            "coverage_slider": {
+              "label": "Min. share of games",
+              "tooltip": "Show patterns that appear in at least this share of relevant games",
+              "empty_text": "No patterns at this cutoff. Lower the slider to see less frequent issues.",
+              "debounce_ms": 150,
+              "groove_color": {
+                "$ref": "$_COLOR_BUTTON_BORDER"
+              },
+              "handle_color": {
+                "$ref": "$_COLOR_TEXT_3"
+              }
+            },
             "button": {
               "height": 28
             },

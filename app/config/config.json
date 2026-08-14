@@ -86,6 +86,12 @@
             "cards": {
               "show_move_arrows": true
             }
+          },
+          "critical_moments": {
+            "worst_count": 3,
+            "best_count": 3,
+            "missed_tactics_count": 99,
+            "missed_tactics_display_count": 99
           }
         },
         "player_stats": {
@@ -150,9 +156,15 @@
             "max_worst": 3
           },
           "error_patterns": {
+            "min_pattern_games": 2,
+            "coverage_cutoff": {
+              "min": 5.0,
+              "max": 95.0,
+              "default": 25.0
+            },
             "thresholds": {
               "phase_blunder_percentage": 20.0,
-              "tactical_miss_count": 10,
+              "tactical_miss_count": 2,
               "opening_error_rate": 30.0,
               "high_cpl_threshold": 50.0,
               "missed_top3_threshold": 60.0,
