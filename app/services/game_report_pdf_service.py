@@ -26,9 +26,12 @@ from app.models.database_model import GameData
 from app.models.moveslist_model import MoveData
 from app.services.game_summary_service import (
     GameSummary,
+    AccuracyProgressXScale,
+    accuracy_legend_prefers_bottom,
     critical_moments_display_counts,
     format_best_move_stat,
     format_missed_tactic_line,
+    ply_to_fullmove,
 )
 from app.services.pdf_report_base import BasePDFReportService
 from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
@@ -175,6 +178,12 @@ class GameReportPDFService(BasePDFReportService):
         )
         self._accuracy_black_line = self._rgb(
             accuracy_colors.get("black_line"), (185, 90, 85)
+        )
+        self._accuracy_compression_end = self._rgb(
+            accuracy_colors.get("compression_end_line"), (140, 145, 155)
+        )
+        self._accuracy_compression_end_width = float(
+            accuracy_colors.get("compression_end_line_width", 1.0)
         )
 
     def export(
@@ -1786,16 +1795,31 @@ class GameReportPDFService(BasePDFReportService):
         pad = max(2.0, span * 0.05)
         min_acc = max(0.0, lo - pad)
         max_acc = min(100.0, hi + pad)
+
+        x_scale = AccuracyProgressXScale.from_curve_points(
+            white_data, black_data, config=self.config
+        )
         acc_range = max(1.0, max_acc - min_acc)
 
-        max_ply = 1
-        if white_data or black_data:
-            max_ply = max(
-                [int(p) for p, _ in white_data] + [int(p) for p, _ in black_data] + [1]
-            )
+        scored_moves = sorted(
+            {
+                ply_to_fullmove(int(p))
+                for p, _ in white_data + black_data
+                if ply_to_fullmove(int(p)) > 0
+            }
+        )
+        max_move = scored_moves[-1] if scored_moves else 1
+        x0, x1 = x_scale.domain(max_move)
+        x_span = max(1e-6, x1 - x0)
 
-        def x_for(ply: int) -> float:
-            return left + (float(ply) / float(max_ply)) * gw
+        def x_for_plot(plot_x: float) -> float:
+            return left + ((plot_x - x0) / x_span) * gw
+
+        def x_for_move(move_number: int) -> float:
+            return x_for_plot(x_scale.plot_x(move_number))
+
+        def x_for_ply(ply: int) -> float:
+            return x_for_plot(x_scale.plot_x_for_ply(ply))
 
         def y_for(acc: float) -> float:
             acc = max(min_acc, min(max_acc, acc))
@@ -1813,12 +1837,25 @@ class GameReportPDFService(BasePDFReportService):
             yy = y_for(float(value))
             painter.drawLine(int(left), int(yy), int(right), int(yy))
 
-        # Phase boundaries
+        # Phase boundaries (compressed X)
         painter.setPen(QPen(self._accuracy_phase, 1.0, Qt.PenStyle.DashLine))
         for move_end in (summary.opening_end, summary.middlegame_end):
             if move_end and move_end > 0:
-                ply = min(max_ply, int(move_end) * 2)
-                xx = x_for(ply)
+                xx = x_for_move(int(move_end))
+                if left - 1 <= xx <= right + 1:
+                    painter.drawLine(int(xx), int(top), int(xx), int(bottom))
+
+        # End of compressed opening strip
+        if x_scale.is_compressed:
+            xx = x_for_plot(float(x_scale.compressed_units))
+            if left - 1 <= xx <= right + 1:
+                painter.setPen(
+                    QPen(
+                        self._accuracy_compression_end,
+                        self._accuracy_compression_end_width,
+                        Qt.PenStyle.DashLine,
+                    )
+                )
                 painter.drawLine(int(xx), int(top), int(xx), int(bottom))
 
         def draw_series(
@@ -1830,7 +1867,7 @@ class GameReportPDFService(BasePDFReportService):
             painter.setPen(QPen(color, width))
             prev = None
             for ply, acc in points:
-                pt = (x_for(int(ply)), y_for(float(acc)))
+                pt = (x_for_ply(int(ply)), y_for(float(acc)))
                 if prev is not None:
                     painter.drawLine(
                         int(prev[0]), int(prev[1]), int(pt[0]), int(pt[1])
@@ -1839,14 +1876,15 @@ class GameReportPDFService(BasePDFReportService):
             if len(points) == 1:
                 ply, acc = points[0]
                 painter.drawEllipse(
-                    int(x_for(int(ply)) - 1.5),
+                    int(x_for_ply(int(ply)) - 1.5),
                     int(y_for(float(acc)) - 1.5),
                     3,
                     3,
                 )
 
-        draw_series(white_data, self._accuracy_white_line)
+        # Series start at first scored (non-book) move; compressed strip stays empty.
         draw_series(black_data, self._accuracy_black_line)
+        draw_series(white_data, self._accuracy_white_line)
 
         # Axis labels
         painter.setFont(self._font_body)
@@ -1855,7 +1893,6 @@ class GameReportPDFService(BasePDFReportService):
         label_values = grid_values
         if not label_values:
             label_values = [int(round(min_acc)), int(round(max_acc))]
-        # Avoid overcrowding: keep ends + optional mid
         if len(label_values) > 4:
             label_values = [label_values[0], label_values[len(label_values) // 2], label_values[-1]]
         for value in label_values:
@@ -1864,16 +1901,15 @@ class GameReportPDFService(BasePDFReportService):
             tw = fm.horizontalAdvance(label)
             painter.drawText(int(left - tw - 4), int(yy + fm.ascent() / 2), label)
 
-        for ply in (0, max_ply // 2, max_ply):
-            xx = x_for(ply)
-            label = str((int(ply) + 1) // 2)
+        for plot_x, label in x_scale.axis_marks(scored_moves, desired_count=6):
+            xx = x_for_plot(plot_x)
             tw = fm.horizontalAdvance(label)
             painter.drawText(int(xx - tw / 2), int(bottom + fm.ascent() + 2), label)
 
-        # Compact legend
-        legend_y = rect.top() + 4.0 + fm.ascent()
+        # Compact legend with opaque backdrop; flip to bottom when top-right is busy
         gap = 10.0
         sw = 12.0
+        pad = 5.0
         white_label = "White"
         black_label = "Black"
         legend_w = (
@@ -1885,7 +1921,43 @@ class GameReportPDFService(BasePDFReportService):
             + 4
             + fm.horizontalAdvance(black_label)
         )
+        band_h = fm.height() + 2 * pad
         lx = right - legend_w
+        zone_left = right - legend_w - 2 * pad
+        samples: List[float] = []
+        for data in (white_data, black_data):
+            if not data:
+                continue
+            sorted_pts = sorted(data, key=lambda t: t[0])
+            prev_xy: Optional[Tuple[float, float]] = None
+            for ply, acc in sorted_pts:
+                xx = x_for_ply(int(ply))
+                yy = y_for(float(acc))
+                if xx >= zone_left:
+                    samples.append(yy)
+                if prev_xy is not None:
+                    x0, y0 = prev_xy
+                    if x0 < zone_left <= xx and abs(xx - x0) > 1e-6:
+                        t = (zone_left - x0) / (xx - x0)
+                        samples.append(y0 + t * (yy - y0))
+                prev_xy = (xx, yy)
+        prefer_bottom = accuracy_legend_prefers_bottom(
+            samples, top=top, bottom=bottom, legend_band_height=band_h
+        )
+        if prefer_bottom:
+            rect_top = bottom - band_h
+            legend_y = rect_top + pad + fm.ascent() - 2
+        else:
+            rect_top = rect.top() + 2.0
+            legend_y = rect.top() + 4.0 + fm.ascent()
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(self._accuracy_bg)
+        painter.drawRoundedRect(
+            QRectF(lx - pad, rect_top, legend_w + 2 * pad, band_h - 2),
+            3,
+            3,
+        )
+        painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.setPen(QPen(self._accuracy_white_line, 1.6))
         painter.drawLine(int(lx), int(legend_y - 3), int(lx + sw), int(legend_y - 3))
         painter.setPen(self._accuracy_axis)

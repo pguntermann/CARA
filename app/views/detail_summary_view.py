@@ -25,9 +25,12 @@ from app.models.moveslist_model import MoveData
 from app.services.game_summary_service import (
     GameSummary,
     GameHighlight,
+    AccuracyProgressXScale,
+    accuracy_legend_prefers_bottom,
     critical_moments_display_counts,
     format_best_move_stat,
     format_missed_tactic_line,
+    ply_to_fullmove,
 )
 from app.controllers.game_controller import GameController
 from app.utils.font_utils import resolve_font_family, scale_font_size
@@ -613,6 +616,20 @@ class AccuracyCurveWidget(QWidget):
         self._y_padding_pct = float(chart_config.get("y_padding_pct", 0.05))
         self._y_min_range = float(chart_config.get("y_min_range", 5.0))
         self.show_legend = bool(chart_config.get("show_legend", True))
+        self._x_scale = AccuracyProgressXScale.from_move_numbers([], enabled=True)
+        self._x_domain: Tuple[float, float] = (0.0, 1.0)
+
+        def _pen_style(style: str, default: Qt.PenStyle = Qt.PenStyle.DashLine) -> Qt.PenStyle:
+            s = (style or "").strip().lower()
+            if s == "dotted":
+                return Qt.PenStyle.DotLine
+            if s == "dash_dot":
+                return Qt.PenStyle.DashDotLine
+            if s == "solid":
+                return Qt.PenStyle.SolidLine
+            if s == "dashed":
+                return Qt.PenStyle.DashLine
+            return default
 
         # Prefer accuracy_curve phase line keys; fall back to evaluation_graph.
         phase_color = chart_config.get(
@@ -626,20 +643,27 @@ class AccuracyCurveWidget(QWidget):
                 eval_config.get("phase_transition_line_width", 2),
             )
         )
-        phase_style = str(
-            chart_config.get(
-                "phase_transition_line_style",
-                eval_config.get("phase_transition_line_style", "dashed"),
+        self.phase_transition_line_style = _pen_style(
+            str(
+                chart_config.get(
+                    "phase_transition_line_style",
+                    eval_config.get("phase_transition_line_style", "dashed"),
+                )
             )
-        ).lower()
-        if phase_style == "dotted":
-            self.phase_transition_line_style = Qt.PenStyle.DotLine
-        elif phase_style == "dash_dot":
-            self.phase_transition_line_style = Qt.PenStyle.DashDotLine
-        elif phase_style == "solid":
-            self.phase_transition_line_style = Qt.PenStyle.SolidLine
-        else:
-            self.phase_transition_line_style = Qt.PenStyle.DashLine
+        )
+
+        # Vertical marker at the end of the compressed opening strip.
+        compression_color = chart_config.get(
+            "compression_end_line_color",
+            chart_config.get("text_color", [150, 150, 150]),
+        )
+        self.compression_end_line_color = QColor(*compression_color)
+        self.compression_end_line_width = int(
+            chart_config.get("compression_end_line_width", 1)
+        )
+        self.compression_end_line_style = _pen_style(
+            str(chart_config.get("compression_end_line_style", "dashed"))
+        )
 
         current_color = chart_config.get(
             "current_move_line_color",
@@ -680,6 +704,11 @@ class AccuracyCurveWidget(QWidget):
         plys.update(ply for ply, _ in self.black_data)
         self._available_plys = sorted(plys)
         self.max_ply = max(self._available_plys) if self._available_plys else 0
+        self._x_scale = AccuracyProgressXScale.from_curve_points(
+            self.white_data, self.black_data, config=self.config
+        )
+        max_move = max((ply_to_fullmove(p) for p in self._available_plys), default=1)
+        self._x_domain = self._x_scale.domain(max_move)
         self.update()
 
     def set_phase_boundaries(self, opening_end: int, middlegame_end: int) -> None:
@@ -717,8 +746,67 @@ class AccuracyCurveWidget(QWidget):
         bottom = float(height - self.padding[3])
         return left, top, right, bottom, right - left, bottom - top
 
+    def _x_to_pixel(self, plot_x: float, left: float, graph_width: float) -> float:
+        x0, x1 = self._x_domain
+        span = max(1e-6, x1 - x0)
+        return left + ((plot_x - x0) / span) * graph_width
+
+    def _legend_y_samples(
+        self,
+        *,
+        left: float,
+        top: float,
+        bottom: float,
+        graph_width: float,
+        graph_height: float,
+        min_acc: float,
+        acc_range: float,
+        zone_left: float,
+    ) -> List[float]:
+        """Y pixel samples of series points/segments that enter the legend's right-hand zone."""
+
+        def y_for(acc: float) -> float:
+            y = bottom - ((float(acc) - min_acc) / acc_range * graph_height)
+            return max(top, min(bottom, y))
+
+        samples: List[float] = []
+        for data in (self.white_data, self.black_data):
+            if not data:
+                continue
+            sorted_data = sorted(data, key=lambda item: item[0])
+            prev_xy: Optional[Tuple[float, float]] = None
+            for ply, acc in sorted_data:
+                x = self._x_to_pixel(self._x_scale.plot_x_for_ply(ply), left, graph_width)
+                y = y_for(acc)
+                if x >= zone_left:
+                    samples.append(y)
+                if prev_xy is not None:
+                    x0, y0 = prev_xy
+                    # Segment crosses into the legend zone — sample at the boundary.
+                    if x0 < zone_left <= x and abs(x - x0) > 1e-6:
+                        t = (zone_left - x0) / (x - x0)
+                        samples.append(y0 + t * (y - y0))
+                prev_xy = (x, y)
+        return samples
+
+    @staticmethod
+    def _legend_prefers_bottom(
+        samples: List[float],
+        *,
+        top: float,
+        bottom: float,
+        legend_band_height: float,
+    ) -> bool:
+        """True when the top-right is busier than the bottom-right."""
+        return accuracy_legend_prefers_bottom(
+            samples,
+            top=top,
+            bottom=bottom,
+            legend_band_height=legend_band_height,
+        )
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        if not self._navigate_to_ply_callback or self.max_ply <= 0:
+        if not self._navigate_to_ply_callback or not self._available_plys:
             super().mousePressEvent(event)
             return
         left, top, right, bottom, graph_width, _ = self._plot_rect()
@@ -730,12 +818,13 @@ class AccuracyCurveWidget(QWidget):
         if x < left or x > right or y < top or y > bottom:
             super().mousePressEvent(event)
             return
-        ply_est = int(round(((x - left) / graph_width) * self.max_ply))
-        ply_est = max(0, min(self.max_ply, ply_est))
-        if self._available_plys:
-            ply = min(self._available_plys, key=lambda p: abs(p - ply_est))
-        else:
-            ply = ply_est
+        # Snap to closest scored ply in compressed plot space.
+        ply = min(
+            self._available_plys,
+            key=lambda p: abs(
+                self._x_to_pixel(self._x_scale.plot_x_for_ply(p), left, graph_width) - x
+            ),
+        )
         self._navigate_to_ply_callback(ply)
         event.accept()
 
@@ -746,7 +835,7 @@ class AccuracyCurveWidget(QWidget):
         height = self.height()
         painter.fillRect(0, 0, width, height, self.background_color)
 
-        if self.max_ply <= 0 or (not self.white_data and not self.black_data):
+        if not self._available_plys or (not self.white_data and not self.black_data):
             painter.setPen(self.text_color)
             painter.setFont(QFont(self.font_family, self.font_size))
             painter.drawText(
@@ -799,13 +888,13 @@ class AccuracyCurveWidget(QWidget):
                 label,
             )
 
-        # X-axis move labels
-        max_move_labels = max(self.min_move_labels, int(graph_width / max(1, self.min_label_spacing)))
-        label_interval = max(1, self.max_ply // max_move_labels)
-        for ply in range(0, self.max_ply + 1, label_interval):
-            x = left + (ply / self.max_ply * graph_width)
-            move_num = (ply + 1) // 2
-            label = str(move_num)
+        # X-axis marks (compressed opening label + sampled move numbers)
+        scored_moves = sorted(
+            {ply_to_fullmove(p) for p in self._available_plys if ply_to_fullmove(p) > 0}
+        )
+        desired = max(self.min_move_labels, int(graph_width / max(1, self.min_label_spacing)))
+        for plot_x, label in self._x_scale.axis_marks(scored_moves, desired_count=desired):
+            x = self._x_to_pixel(plot_x, left, graph_width)
             painter.setPen(self.text_color)
             painter.drawText(
                 int(x - fm.horizontalAdvance(label) / 2),
@@ -813,15 +902,18 @@ class AccuracyCurveWidget(QWidget):
                 label,
             )
 
+        def _y_for_acc(acc: float) -> float:
+            y = bottom - ((acc - min_acc) / acc_range * graph_height)
+            return max(top, min(bottom, y))
+
         def _draw_series(data: List[Tuple[int, float]], color: QColor) -> None:
             if len(data) < 1:
                 return
             sorted_data = sorted(data, key=lambda item: item[0])
             points: List[QPointF] = []
             for ply, acc in sorted_data:
-                x = left + (ply / self.max_ply * graph_width)
-                y = bottom - ((acc - min_acc) / acc_range * graph_height)
-                y = max(top, min(bottom, y))
+                x = self._x_to_pixel(self._x_scale.plot_x_for_ply(ply), left, graph_width)
+                y = _y_for_acc(float(acc))
                 points.append(QPointF(x, y))
             if len(points) == 1:
                 painter.setPen(QPen(color, self.line_width))
@@ -831,39 +923,44 @@ class AccuracyCurveWidget(QWidget):
             for i in range(len(points) - 1):
                 painter.drawLine(points[i], points[i + 1])
 
-        _draw_series(self.white_data, self.white_line_color)
+        # Series start at first scored (non-book) move; compressed strip stays empty.
         _draw_series(self.black_data, self.black_line_color)
+        _draw_series(self.white_data, self.white_line_color)
 
-        # Phase transition lines (same ply mapping as evaluation graph)
-        if self.opening_end > 0:
-            opening_end_ply = self.opening_end * 2
-            if opening_end_ply <= self.max_ply:
-                x = left + (opening_end_ply / self.max_ply * graph_width)
+        # Vertical dashed marker where the compressed opening strip ends.
+        if self._x_scale.is_compressed:
+            x = self._x_to_pixel(float(self._x_scale.compressed_units), left, graph_width)
+            if left - 1 <= x <= right + 1:
                 painter.setPen(
                     QPen(
-                        self.phase_transition_line_color,
-                        self.phase_transition_line_width,
-                        self.phase_transition_line_style,
-                    )
-                )
-                painter.drawLine(int(x), int(top), int(x), int(bottom))
-        if self.middlegame_end > 0:
-            middlegame_end_ply = self.middlegame_end * 2
-            if middlegame_end_ply <= self.max_ply:
-                x = left + (middlegame_end_ply / self.max_ply * graph_width)
-                painter.setPen(
-                    QPen(
-                        self.phase_transition_line_color,
-                        self.phase_transition_line_width,
-                        self.phase_transition_line_style,
+                        self.compression_end_line_color,
+                        self.compression_end_line_width,
+                        self.compression_end_line_style,
                     )
                 )
                 painter.drawLine(int(x), int(top), int(x), int(bottom))
 
-        if self.current_ply >= 0 and self.max_ply > 0:
-            x = left + (self.current_ply / self.max_ply * graph_width)
-            painter.setPen(QPen(self.current_move_line_color, self.current_move_line_width))
-            painter.drawLine(int(x), int(top), int(x), int(bottom))
+        # Phase transition lines in compressed plot space
+        for move_end in (self.opening_end, self.middlegame_end):
+            if move_end and move_end > 0:
+                x = self._x_to_pixel(self._x_scale.plot_x(move_end), left, graph_width)
+                if left - 1 <= x <= right + 1:
+                    painter.setPen(
+                        QPen(
+                            self.phase_transition_line_color,
+                            self.phase_transition_line_width,
+                            self.phase_transition_line_style,
+                        )
+                    )
+                    painter.drawLine(int(x), int(top), int(x), int(bottom))
+
+        if self.current_ply >= 0:
+            x = self._x_to_pixel(
+                self._x_scale.plot_x_for_ply(self.current_ply), left, graph_width
+            )
+            if left - 1 <= x <= right + 1:
+                painter.setPen(QPen(self.current_move_line_color, self.current_move_line_width))
+                painter.drawLine(int(x), int(top), int(x), int(bottom))
 
         if self.show_legend:
             legend_font = QFont(self.font_family, max(self.min_font_size, self.font_size - 1))
@@ -871,11 +968,55 @@ class AccuracyCurveWidget(QWidget):
             lfm = QFontMetrics(legend_font)
             gap = 10
             swatch = 12
+            pad = 6
             white_label = "White"
             black_label = "Black"
-            legend_w = swatch + 4 + lfm.horizontalAdvance(white_label) + gap + swatch + 4 + lfm.horizontalAdvance(black_label)
-            lx = int(right - legend_w)
-            ly = int(top + lfm.ascent())
+            legend_w = (
+                swatch
+                + 4
+                + lfm.horizontalAdvance(white_label)
+                + gap
+                + swatch
+                + 4
+                + lfm.horizontalAdvance(black_label)
+            )
+            legend_h = lfm.height()
+            band_h = legend_h + 2 * pad
+            lx = int(right - legend_w - pad)
+            zone_left = right - legend_w - 2 * pad
+            samples = self._legend_y_samples(
+                left=left,
+                top=top,
+                bottom=bottom,
+                graph_width=graph_width,
+                graph_height=graph_height,
+                min_acc=min_acc,
+                acc_range=acc_range,
+                zone_left=zone_left,
+            )
+            prefer_bottom = self._legend_prefers_bottom(
+                samples, top=top, bottom=bottom, legend_band_height=band_h
+            )
+            if prefer_bottom:
+                rect_top = int(bottom - band_h)
+                ly = int(rect_top + pad + lfm.ascent() - 2)
+            else:
+                rect_top = int(top + 2)
+                ly = int(top + lfm.ascent() + pad)
+            # Solid backdrop so series lines cannot cross the labels.
+            bg = QColor(self.background_color)
+            bg.setAlpha(235)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(bg)
+            painter.drawRoundedRect(
+                int(lx - pad),
+                rect_top,
+                int(legend_w + 2 * pad),
+                int(band_h - 2),
+                4,
+                4,
+            )
+            painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.setPen(QPen(self.white_line_color, self.line_width))
             painter.drawLine(lx, ly - 3, lx + swatch, ly - 3)
             painter.setPen(self.text_color)

@@ -1635,6 +1635,15 @@
             "min_label_spacing": 40,
             "min_move_labels": 3,
             "show_legend": true,
+            "opening_compression_enabled": true,
+            "opening_compression_fraction": 0.12,
+            "opening_compression_min_units": 1.2,
+            "opening_compression_max_units": 4.0,
+            "compression_end_line_color": {
+              "$ref": "$_COLOR_DRIFTWOOD"
+            },
+            "compression_end_line_width": 1,
+            "compression_end_line_style": "dashed",
             "phase_transition_line_color": {
               "$ref": "$_COLOR_BRONZE_RUST"
             },
@@ -1871,6 +1880,11 @@
                   170,
                   95,
                   85
+                ],
+                "compression_end_line": [
+                  150,
+                  130,
+                  110
                 ],
                 "phase_line": [
                   90,

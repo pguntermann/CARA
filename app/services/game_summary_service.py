@@ -137,6 +137,181 @@ def critical_moments_display_counts(
     )
 
 
+def ply_to_fullmove(ply: int) -> int:
+    """Convert 0-based/1-based ply index to full-move number (ply 1→1, 2→1, 3→2, …)."""
+    return max(0, (int(ply) + 1) // 2)
+
+
+@dataclass(frozen=True)
+class AccuracyProgressXScale:
+    """Piecewise X mapping that compresses book moves before the first scored point.
+
+    Mirrors Chess Recorder's AccuracyProgressXScale: when the first scored full-move
+    is ≥ 3, moves ``1…bookEnd`` squeeze into a short strip, then scored moves advance
+    one plot unit per full-move.
+    """
+
+    first_scored_move: int
+    compressed_units: float
+    enabled: bool = True
+
+    @property
+    def is_compressed(self) -> bool:
+        return bool(self.enabled) and self.first_scored_move >= 3
+
+    @property
+    def book_end_move(self) -> Optional[int]:
+        if not self.is_compressed:
+            return None
+        return self.first_scored_move - 1
+
+    @property
+    def shows_first_scored_axis_label(self) -> bool:
+        return self.is_compressed and self.compressed_units >= 1.0
+
+    @staticmethod
+    def default_compressed_units(
+        first_scored_move: int,
+        last_scored_move: int,
+        *,
+        fraction: float = 0.12,
+        min_units: float = 1.2,
+        max_units: float = 4.0,
+    ) -> float:
+        scored_span = max(int(last_scored_move) - int(first_scored_move), 1)
+        return min(float(max_units), max(float(min_units), float(scored_span) * float(fraction)))
+
+    @classmethod
+    def from_move_numbers(
+        cls,
+        scored_moves: List[int],
+        *,
+        enabled: bool = True,
+        compressed_units: Optional[float] = None,
+        fraction: float = 0.12,
+        min_units: float = 1.2,
+        max_units: float = 4.0,
+    ) -> "AccuracyProgressXScale":
+        moves = sorted({int(m) for m in scored_moves if int(m) > 0})
+        first = moves[0] if moves else 1
+        last = moves[-1] if moves else first
+        if compressed_units is None:
+            units = cls.default_compressed_units(
+                first, last, fraction=fraction, min_units=min_units, max_units=max_units
+            )
+        else:
+            units = max(0.15, float(compressed_units))
+        return cls(first_scored_move=first, compressed_units=units, enabled=enabled)
+
+    @classmethod
+    def from_curve_points(
+        cls,
+        white_data: List[Tuple[int, float]],
+        black_data: List[Tuple[int, float]],
+        *,
+        config: Optional[Dict[str, Any]] = None,
+    ) -> "AccuracyProgressXScale":
+        """Build scale from (ply, accuracy) curve points using summary theme config."""
+        chart_cfg: Dict[str, Any] = {}
+        if isinstance(config, dict):
+            raw = (
+                config.get("ui", {})
+                .get("panels", {})
+                .get("detail", {})
+                .get("summary", {})
+                .get("accuracy_curve", {})
+            )
+            if isinstance(raw, dict):
+                chart_cfg = raw
+        move_numbers = [ply_to_fullmove(ply) for ply, _ in (white_data or [])]
+        move_numbers.extend(ply_to_fullmove(ply) for ply, _ in (black_data or []))
+        return cls.from_move_numbers(
+            move_numbers,
+            enabled=bool(chart_cfg.get("opening_compression_enabled", True)),
+            fraction=float(chart_cfg.get("opening_compression_fraction", 0.12)),
+            min_units=float(chart_cfg.get("opening_compression_min_units", 1.2)),
+            max_units=float(chart_cfg.get("opening_compression_max_units", 4.0)),
+        )
+
+    def plot_x(self, move_number: int) -> float:
+        move_number = int(move_number)
+        if not self.is_compressed or self.book_end_move is None:
+            return float(move_number)
+        book_end = self.book_end_move
+        if move_number <= book_end:
+            if book_end <= 0:
+                return 0.0
+            return float(move_number) / float(book_end) * self.compressed_units
+        return self.compressed_units + float(move_number - book_end)
+
+    def plot_x_for_ply(self, ply: int) -> float:
+        return self.plot_x(ply_to_fullmove(ply))
+
+    def domain(self, max_move_number: int) -> Tuple[float, float]:
+        upper = self.plot_x(max(int(max_move_number), self.first_scored_move))
+        lower = 0.0 if self.is_compressed else self.plot_x(self.first_scored_move)
+        return lower, max(upper, lower + 1.0)
+
+    def axis_marks(
+        self, scored_moves: List[int], desired_count: int = 6
+    ) -> List[Tuple[float, str]]:
+        unique_sorted = sorted({int(m) for m in scored_moves if int(m) > 0})
+        if not unique_sorted:
+            return []
+        lo, hi = unique_sorted[0], unique_sorted[-1]
+        marks: List[Tuple[float, str]] = []
+        if self.is_compressed and self.book_end_move is not None:
+            # Center under the compressed strip so "0...N" reads as the opening span.
+            marks.append((self.compressed_units * 0.5, f"0...{self.book_end_move}"))
+        for move in self._sample_move_numbers(lo, hi, desired_count):
+            if (
+                self.is_compressed
+                and move == self.first_scored_move
+                and not self.shows_first_scored_axis_label
+            ):
+                continue
+            marks.append((self.plot_x(move), str(move)))
+        return marks
+
+    @staticmethod
+    def _sample_move_numbers(lo: int, hi: int, desired_count: int) -> List[int]:
+        span = hi - lo
+        if span <= 0:
+            return [lo]
+        if span + 1 <= desired_count:
+            return list(range(lo, hi + 1))
+        picked: List[int] = []
+        for i in range(desired_count):
+            value = lo + int(round(i / (desired_count - 1) * span))
+            if not picked or picked[-1] != value:
+                picked.append(value)
+        return picked
+
+
+def accuracy_legend_prefers_bottom(
+    samples: List[float],
+    *,
+    top: float,
+    bottom: float,
+    legend_band_height: float,
+) -> bool:
+    """True when the top-right chart corner is busier than the bottom-right.
+
+    Used to flip the White/Black legend away from overlapping series lines.
+    """
+    if not samples:
+        return False
+    margin = 4.0
+    top_limit = top + legend_band_height + margin
+    bottom_start = bottom - legend_band_height - margin
+    top_hits = sum(1 for y in samples if y <= top_limit)
+    bottom_hits = sum(1 for y in samples if y >= bottom_start)
+    if top_hits == bottom_hits:
+        avg = sum(samples) / len(samples)
+        return avg < (top + bottom) / 2.0
+    return top_hits > bottom_hits
+
+
 @dataclass
 class GameSummary:
     """Complete game summary statistics."""
@@ -1618,9 +1793,10 @@ class GameSummaryService:
     ) -> Tuple[List[Tuple[int, float]], List[Tuple[int, float]]]:
         """Build running accuracy series for White and Black keyed by ply index.
 
-        After each side's move, accuracy is recomputed from that player's moves
-        so far using the same formula as overall game accuracy (Player Stats
-        progress chart uses the same approach on progress bins).
+        Book moves are included in the running prefix (so later accuracy matches
+        overall stats) but are omitted from the plotted series — matching Chess
+        Recorder — so a long theory stretch does not dominate the X-axis.
+        Opening compression is applied at draw time via ``AccuracyProgressXScale``.
         """
         white_prefix: List[PlayerMoveInfo] = []
         black_prefix: List[PlayerMoveInfo] = []
@@ -1629,37 +1805,41 @@ class GameSummaryService:
 
         for move in moves:
             if move.white_move:
+                assessment = getattr(move, "assess_white", "") or ""
                 white_prefix.append(
                     PlayerMoveInfo(
                         move_san=move.white_move,
-                        assessment=getattr(move, "assess_white", "") or "",
+                        assessment=assessment,
                         cpl=getattr(move, "cpl_white", None) or None,
                         is_top3=bool(getattr(move, "white_is_top3", False)),
                     )
                 )
-                stats = self._calculate_player_statistics(
-                    white_prefix,
-                    opening_moves=len(white_prefix),
-                    middlegame_moves=0,
-                    endgame_moves=0,
-                )
-                white_curve.append((move.move_number * 2 - 1, float(stats.accuracy)))
+                if assessment != "Book Move":
+                    stats = self._calculate_player_statistics(
+                        white_prefix,
+                        opening_moves=len(white_prefix),
+                        middlegame_moves=0,
+                        endgame_moves=0,
+                    )
+                    white_curve.append((move.move_number * 2 - 1, float(stats.accuracy)))
             if move.black_move:
+                assessment = getattr(move, "assess_black", "") or ""
                 black_prefix.append(
                     PlayerMoveInfo(
                         move_san=move.black_move,
-                        assessment=getattr(move, "assess_black", "") or "",
+                        assessment=assessment,
                         cpl=getattr(move, "cpl_black", None) or None,
                         is_top3=bool(getattr(move, "black_is_top3", False)),
                     )
                 )
-                stats = self._calculate_player_statistics(
-                    black_prefix,
-                    opening_moves=len(black_prefix),
-                    middlegame_moves=0,
-                    endgame_moves=0,
-                )
-                black_curve.append((move.move_number * 2, float(stats.accuracy)))
+                if assessment != "Book Move":
+                    stats = self._calculate_player_statistics(
+                        black_prefix,
+                        opening_moves=len(black_prefix),
+                        middlegame_moves=0,
+                        endgame_moves=0,
+                    )
+                    black_curve.append((move.move_number * 2, float(stats.accuracy)))
 
         return white_curve, black_curve
     
