@@ -2,9 +2,11 @@
 
 A miss is the engine PV1 on the position *before* the played ply, scored with
 the same allowlisted board-tactic rules used for best-move ranking (fork,
-skewer, pin, discovered attack). Mate, capture, and check on PV1 are a fast
-accept and a rank boost — they do not gate the tactic pass, so a quiet fork
-with no ``x`` / ``+`` / ``#`` still counts.
+skewer, pin, discovered attack). Mate and underdefended capture on PV1 are a
+fast accept and a rank boost — they do not gate the tactic pass, so a quiet
+fork with no ``x`` / ``+`` / ``#`` still counts. Bare checks alone do not
+count. Bare "missed capture" only counts when the target is underdefended
+(fewer defenders than attackers) and the player did not capture at all.
 
 This scans analyzed error plies (Miss / Mistake / Blunder). It does not use
 the Game Highlights composer or reply-dependent rules.
@@ -29,7 +31,6 @@ ALREADY_LOST_CP = 500.0
 KIND_RANK_MATE = 0
 KIND_RANK_TACTIC = 1
 KIND_RANK_CAPTURE = 2
-KIND_RANK_CHECK = 3
 
 _KIND_LABELS = {
     "mate": "mate",
@@ -280,27 +281,100 @@ def _classify_miss(
     pv1_san: str,
     tactic_type: str,
 ) -> Optional[Tuple[str, int]]:
-    """Kind + sort rank, or None if PV1 is not a tactic / mate / capture / check."""
+    """Kind + sort rank, or None if PV1 is not a tactic / mate / underdefended capture.
+
+    Bare checks (no mate, no named tactic, no capture) are ignored.
+    """
     after = board_before.copy()
     after.push(pv_move)
     is_mate = after.is_checkmate() or "#" in pv1_san
     is_capture = board_before.is_capture(pv_move) or "x" in pv1_san
-    is_check = (not is_mate) and (after.is_check() or "+" in pv1_san)
     if is_mate:
         return "mate", KIND_RANK_MATE
     if tactic_type:
         return tactic_type, KIND_RANK_TACTIC
     if is_capture:
         return "capture", KIND_RANK_CAPTURE
-    if is_check:
-        return "check", KIND_RANK_CHECK
     return None
+
+
+def _normalize_san(san: str) -> str:
+    """Strip check/mate suffixes so ``Bxa3+`` matches ``Bxa3``."""
+    return str(san or "").replace("+", "").replace("#", "").strip()
+
+
+def _played_is_capture(
+    board: chess.Board,
+    played_move: Optional[chess.Move],
+    played_san: str,
+) -> bool:
+    """True when the move the player actually made captured something."""
+    if played_move is not None and board.is_capture(played_move):
+        return True
+    return "x" in str(played_san or "")
+
+
+def _capture_target_square(board: chess.Board, move: chess.Move) -> Optional[int]:
+    """Square of the unit that ``move`` would take, including en passant."""
+    if board.is_en_passant(move):
+        return chess.square(
+            chess.square_file(move.to_square),
+            chess.square_rank(move.from_square),
+        )
+    if board.is_capture(move):
+        return move.to_square
+    return None
+
+
+def _is_underdefended_capture(
+    board: chess.Board,
+    pv_move: chess.Move,
+    *,
+    is_white: bool,
+) -> bool:
+    """True when PV1 takes a unit that has more attackers than defenders.
+
+    Uses geometric attacker counts on the target square before the capture.
+    Equal trades (1 vs 1, 2 vs 2, …) do not count as a bare missed capture.
+    """
+    target = _capture_target_square(board, pv_move)
+    if target is None:
+        return False
+    mover = chess.WHITE if is_white else chess.BLACK
+    attackers = len(board.attackers(mover, target))
+    defenders = len(board.attackers(not mover, target))
+    return attackers > defenders
+
+
+def _collapse_key(miss: RankedMissedTactic) -> str:
+    """Identity for duplicate misses of the same idea.
+
+    Captures collapse by destination square so the same hanging unit is one
+    row even when a different piece could take it (``Qxd5`` vs ``Nxd5``).
+
+    Named tactics / checks / mates collapse by piece + destination so the same
+    idea survives when the piece starts from a different square across plies
+    (e.g. ``Qc7+`` while the queen moved between move 46 and 49).
+    """
+    uci = str(miss.pv_uci or "").strip().lower()
+    san = _normalize_san(miss.best_move)
+    is_capture = miss.tactic_type == "capture" or "x" in san
+    if len(uci) >= 4:
+        to_sq = uci[2:4]
+        if is_capture:
+            return f"cap:{to_sq}"
+        piece = san[0] if san and san[0] in "KQRBN" else "P"
+        kind = str(miss.tactic_type or "move").strip() or "move"
+        return f"{kind}:{piece}:{to_sq}"
+    if san:
+        return f"san:{san}"
+    return ""
 
 
 def _collapse_duplicate_pv1(
     ranked: List[Tuple[int, float, float, int, RankedMissedTactic]],
 ) -> List[RankedMissedTactic]:
-    """Keep the best-ranked miss for each engine move (from-to), dropping repeats.
+    """Keep the best-ranked miss for each idea, dropping repeats.
 
     The same hanging capture or tactic often stays PV1 for several plies
     (e.g. 42. Rf7 and 43. Rf4+ both missing Bxa3).
@@ -309,7 +383,7 @@ def _collapse_duplicate_pv1(
     unique: List[RankedMissedTactic] = []
     for item in ranked:
         miss = item[4]
-        key = miss.pv_uci or str(miss.best_move or "").strip()
+        key = _collapse_key(miss)
         if not key or key in seen:
             continue
         seen.add(key)
@@ -412,6 +486,15 @@ def select_top_missed_tactics(
         if classified is None:
             continue
         kind, kind_rank = classified
+        # A "missed capture" is skipping a take entirely — not taking the
+        # hanging unit with a different piece than PV1.
+        if kind == "capture" and _played_is_capture(board_before, played_move, played):
+            continue
+        # Bare capture only when the target is hanging / underdefended.
+        if kind == "capture" and not _is_underdefended_capture(
+            board_before, pv_move, is_white=is_white
+        ):
+            continue
         gain = display_eval_gain_cp(moves, index, is_white, parse_eval)
         eval_drop = max(0.0, -gain)
         notation = f"{move.move_number}. {played}"

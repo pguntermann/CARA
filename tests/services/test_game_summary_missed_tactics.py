@@ -154,14 +154,32 @@ class TestFindTopMissedTactics(unittest.TestCase):
         self.assertIn(top[0].tactic_type, ("capture", "fork", "skewer", "pin"))
         self.assertTrue(format_missed_tactic_line(top[0]).startswith("Missed: Qxd5"))
 
-    def test_check_is_accepted_without_named_tactic(self) -> None:
+    def test_skips_capture_when_target_is_adequately_defended(self) -> None:
+        # Black queen on d5 is attacked by White's queen and defended by a pawn on e6.
+        fen = "4k3/8/4p3/3q4/8/8/8/3QK3 w - - 0 10"
+        row = _played_from_fen(fen, "Ke2", best="Qxd5")
+        top = _svc()._find_top_missed_tactics(
+            _with_white_before(fen, row), is_white=True, count=3
+        )
+        self.assertEqual(top, [])
+
+    def test_keeps_capture_when_attackers_outnumber_defenders(self) -> None:
+        # Queen + knight attack d5; only the e6-pawn defends.
+        fen = "4k3/8/4p3/3q4/8/2N5/8/3QK3 w - - 0 10"
+        row = _played_from_fen(fen, "Ke2", best="Qxd5")
+        top = _svc()._find_top_missed_tactics(
+            _with_white_before(fen, row), is_white=True, count=3
+        )
+        self.assertEqual(len(top), 1)
+        self.assertEqual(top[0].tactic_type, "capture")
+        self.assertEqual(top[0].best_move, "Qxd5")
+
+    def test_bare_check_is_not_accepted(self) -> None:
         row = _played_from_fen(CHECK_FEN, "Ke2", best="Qh5+")
         top = _svc()._find_top_missed_tactics(
             _with_white_before(CHECK_FEN, row), is_white=True, count=3
         )
-        self.assertEqual(len(top), 1)
-        self.assertEqual(top[0].best_move, "Qh5+")
-        self.assertIn(top[0].tactic_type, ("check", "fork", "skewer", "pin"))
+        self.assertEqual(top, [])
 
     def test_skips_book_and_inaccuracy_and_played_pv1(self) -> None:
         book = _played_from_fen(
@@ -206,6 +224,7 @@ class TestFindTopMissedTactics(unittest.TestCase):
             MATE_FEN, "Kf1", assess="Blunder", cpl="400", best="Qe8#"
         )
         capture_row = _played_from_fen(CAPTURE_FEN, "Ke2", cpl="300", best="Qxd5")
+        # Bare check must not fill a slot.
         check_row = _played_from_fen(CHECK_FEN, "Ke2", cpl="200", best="Qh5+")
         moves = (
             _with_white_before(QUIET_FORK_FEN, fork_row)
@@ -216,6 +235,7 @@ class TestFindTopMissedTactics(unittest.TestCase):
         top = _svc()._find_top_missed_tactics(moves, is_white=True, count=3)
         self.assertEqual(len(top), 3)
         self.assertEqual([m.best_move for m in top], ["Qe8#", "Nd6", "Qxd5"])
+        self.assertNotIn("Qh5+", [m.best_move for m in top])
 
     def test_collapses_same_engine_move_to_best_ranked_ply(self) -> None:
         first = _played_from_fen(QUIET_FORK_FEN, "Ke2", cpl="180", best="Nd6")
@@ -230,6 +250,79 @@ class TestFindTopMissedTactics(unittest.TestCase):
         self.assertEqual(top[0].move_number, 43)
         self.assertEqual(top[0].best_move, "Nd6")
         self.assertAlmostEqual(top[0].cpl, 250.0)
+
+    def test_collapses_same_tactic_from_different_origin_squares(self) -> None:
+        # Same queen fork landing on c7, but from different origin squares (as in
+        # Qc7+ remaining PV1 after the queen moved between plies).
+        from app.services.missed_tactic_ranking import (
+            RankedMissedTactic,
+            _collapse_duplicate_pv1,
+        )
+
+        early = RankedMissedTactic(
+            move_number=46,
+            move_notation="46. h6",
+            cpl=180.0,
+            assessment="Mistake",
+            evaluation="-1.50",
+            best_move="Qc7+",
+            tactic_type="fork",
+            selection_reason="",
+            pv_uci="c2c7",
+        )
+        late = RankedMissedTactic(
+            move_number=49,
+            move_notation="49. Qg5+",
+            cpl=320.0,
+            assessment="Blunder",
+            evaluation="-4.00",
+            best_move="Qc7+",
+            tactic_type="fork",
+            selection_reason="",
+            pv_uci="c4c7",
+        )
+        # Pre-sorted like select_top_missed_tactics: better CPL first.
+        ranked = [
+            (1, -320.0, 0.0, 1, late),
+            (1, -180.0, 0.0, 0, early),
+        ]
+        unique = _collapse_duplicate_pv1(ranked)
+        self.assertEqual(len(unique), 1)
+        self.assertEqual(unique[0].move_number, 49)
+        self.assertEqual(unique[0].best_move, "Qc7+")
+        self.assertEqual(unique[0].pv_uci, "c4c7")
+
+    def test_collapses_captures_of_the_same_hanging_unit(self) -> None:
+        queen_take = "4k3/8/8/3q4/8/8/8/3QK3 w - - 0 10"
+        knight_take = "4k3/8/8/3q4/8/2N5/8/4K3 w - - 0 11"
+        first = _played_from_fen(queen_take, "Ke2", cpl="180", best="Qxd5")
+        first.move_number = 10
+        second = _played_from_fen(knight_take, "Ke2", cpl="220", best="Nxd5")
+        second.move_number = 11
+        moves = _with_white_before(queen_take, first) + _with_white_before(
+            knight_take, second
+        )
+        top = _svc()._find_top_missed_tactics(moves, is_white=True, count=10)
+        self.assertEqual(len(top), 1)
+        self.assertEqual(top[0].best_move, "Nxd5")
+        self.assertEqual(top[0].move_number, 11)
+
+    def test_skips_capture_when_player_already_captured(self) -> None:
+        # Hanging black queen on d5; player takes a pawn with the knight instead.
+        fen = "4k3/8/8/3q4/4p3/2N5/8/3QK3 w - - 0 10"
+        row = _played_from_fen(fen, "Nxe4", best="Qxd5")
+        top = _svc()._find_top_missed_tactics(
+            _with_white_before(fen, row), is_white=True, count=3
+        )
+        self.assertEqual(top, [])
+
+    def test_keeps_capture_when_player_did_not_capture(self) -> None:
+        row = _played_from_fen(CAPTURE_FEN, "Ke2", best="Qxd5")
+        top = _svc()._find_top_missed_tactics(
+            _with_white_before(CAPTURE_FEN, row), is_white=True, count=3
+        )
+        self.assertEqual(len(top), 1)
+        self.assertEqual(top[0].tactic_type, "capture")
 
     def test_black_uses_same_row_fen_white(self) -> None:
         fen = "R3K3/8/8/8/8/8/8/4k2q b - - 0 10"

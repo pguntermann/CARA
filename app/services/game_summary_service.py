@@ -1540,10 +1540,11 @@ class GameSummaryService:
     def _find_top_missed_tactics(
         self, moves: List[MoveData], is_white: bool, count: int
     ) -> List[CriticalMove]:
-        """Find top N missed tactics: mate, named tactic, capture, check; then CPL / eval drop.
+        """Find top N missed tactics: mate, named tactic, underdefended capture; then CPL / eval drop.
 
         Book moves and already-lost desperation positions are excluded. PV1 is
         scored on the before-board; quiet forks with no capture/check still count.
+        Bare checks are not listed.
         """
         opening_end, middlegame_end = self._determine_phase_boundaries(
             moves, len(moves)
