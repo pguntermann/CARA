@@ -1588,6 +1588,9 @@
             "text": {
               "$ref": "$_COLOR_TEXT_3"
             },
+            "secondary_text": {
+              "$ref": "$_COLOR_TEXT_4"
+            },
             "header_text": {
               "$ref": "$_COLOR_TEXT_PRIMARY"
             },

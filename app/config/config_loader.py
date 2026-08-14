@@ -2433,6 +2433,7 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.panels.detail.summary.colors.miss",
     "ui.panels.detail.summary.colors.mistake",
     "ui.panels.detail.summary.colors.section_background",
+    "ui.panels.detail.summary.colors.secondary_text",
     "ui.panels.detail.summary.colors.text",
     "ui.panels.detail.summary.critical_moments.best_count",
     "ui.panels.detail.summary.critical_moments.missed_tactics_count",

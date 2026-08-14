@@ -1441,6 +1441,9 @@ class DetailSummaryView(QWidget):
         # Config uses ui.panels.detail.summary.colors.text. Keep backward compatibility
         # with older configs that used "text_color".
         text_color = QColor(*colors_config.get('text', colors_config.get('text_color', [220, 220, 220])))
+        secondary_text_color = QColor(*colors_config.get(
+            'secondary_text', colors_config.get('text_secondary', [150, 150, 150])
+        ))
         header_text_color = QColor(*colors_config.get('header_text', [240, 240, 240]))
         background_color = QColor(*colors_config.get('background', [40, 40, 45]))
         section_bg_color = QColor(*colors_config.get('section_background', [35, 35, 40]))
@@ -1667,6 +1670,7 @@ class DetailSummaryView(QWidget):
                 text_color, label_font, value_font, section_bg_color, border_color,
                 is_white=True,
                 missed_tactics=getattr(self.current_summary, "white_missed_tactics", None) or [],
+                secondary_text_color=secondary_text_color,
             )
             critical_layout.addWidget(white_critical_widget, 1)
         
@@ -1681,6 +1685,7 @@ class DetailSummaryView(QWidget):
                 text_color, label_font, value_font, section_bg_color, border_color,
                 is_white=False,
                 missed_tactics=getattr(self.current_summary, "black_missed_tactics", None) or [],
+                secondary_text_color=secondary_text_color,
             )
             critical_layout.addWidget(black_critical_widget, 1)
         
@@ -2246,7 +2251,8 @@ class DetailSummaryView(QWidget):
                                         text_color: QColor, label_font: QFont, value_font: QFont,
                                         bg_color: QColor, border_color: QColor,
                                         is_white: bool = True,
-                                        missed_tactics: Optional[List] = None) -> QWidget:
+                                        missed_tactics: Optional[List] = None,
+                                        secondary_text_color: Optional[QColor] = None) -> QWidget:
         """Create a widget displaying critical moments.
         
         Args:
@@ -2260,10 +2266,45 @@ class DetailSummaryView(QWidget):
             border_color: Border color.
             is_white: True for White's column.
             missed_tactics: Optional list of CriticalMove instances (missed tactics).
+            secondary_text_color: Color for Best:/Missed: sublines under played moves.
             
         Returns:
             QWidget with critical moments.
         """
+        if secondary_text_color is None:
+            secondary_text_color = text_color
+        alt_r, alt_g, alt_b = (
+            secondary_text_color.red(),
+            secondary_text_color.green(),
+            secondary_text_color.blue(),
+        )
+        secondary_label_qss = (
+            f"color: rgb({alt_r}, {alt_g}, {alt_b}); border: none;"
+        )
+        secondary_label_scoped_qss = (
+            f"QLabel {{ color: rgb({alt_r}, {alt_g}, {alt_b}); border: none; "
+            f"background: transparent; padding: 0px; margin: 0px; }}"
+        )
+        prefix_metrics = QFontMetrics(value_font)
+
+        def _aligned_subline(prefix_text: str, text: str, *, scoped: bool = False) -> Tuple[QWidget, QLabel]:
+            """Subline indented to match move text after the list prefix (e.g. '1. ')."""
+            row = QWidget()
+            row.setStyleSheet("border: none; background: transparent;")
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(0)
+            spacer = QWidget()
+            spacer.setFixedWidth(prefix_metrics.horizontalAdvance(prefix_text))
+            spacer.setStyleSheet("border: none; background: transparent;")
+            row_layout.addWidget(spacer)
+            label = QLabel(text)
+            label.setFont(value_font)
+            label.setStyleSheet(secondary_label_scoped_qss if scoped else secondary_label_qss)
+            row_layout.addWidget(label)
+            row_layout.addStretch()
+            return row, label
+
         # Get widget config
         ui_config = self.config.get('ui', {})
         panel_config = ui_config.get('panels', {}).get('detail', {})
@@ -2349,7 +2390,8 @@ class DetailSummaryView(QWidget):
             move_line_layout.setSpacing(0)
             
             # Prefix (e.g., "1. ")
-            prefix_label = QLabel(f"{i}. ")
+            prefix_text = f"{i}. "
+            prefix_label = QLabel(prefix_text)
             prefix_label.setFont(value_font)
             prefix_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
             move_line_layout.addWidget(prefix_label)
@@ -2379,12 +2421,10 @@ class DetailSummaryView(QWidget):
             full_move_layout.setSpacing(0)
             full_move_layout.addWidget(move_container)
             
-            # Best move line if available
+            # Best move line if available — align with move notation (after list prefix)
             if best_move:
-                best_move_label = QLabel(f"   Best: {best_move}")
-                best_move_label.setFont(value_font)
-                best_move_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
-                full_move_layout.addWidget(best_move_label)
+                best_row, _best_label = _aligned_subline(prefix_text, f"Best: {best_move}")
+                full_move_layout.addWidget(best_row)
             
             worst_layout.addWidget(full_move_container)
         layout.addLayout(worst_layout)
@@ -2507,7 +2547,8 @@ class DetailSummaryView(QWidget):
                 move_line_layout.setContentsMargins(0, 0, 0, 0)
                 move_line_layout.setSpacing(0)
 
-                prefix_label = QLabel(f"{i}. ")
+                prefix_text = f"{i}. "
+                prefix_label = QLabel(prefix_text)
                 prefix_label.setFont(value_font)
                 prefix_label.setStyleSheet(label_qss)
                 move_line_layout.addWidget(prefix_label)
@@ -2527,11 +2568,15 @@ class DetailSummaryView(QWidget):
                 move_line_layout.addStretch()
                 full_move_layout.addWidget(move_container)
 
-                missed_sub = QLabel(f"   {missed_line}" if missed_line else "")
-                missed_sub.setFont(value_font)
-                missed_sub.setStyleSheet(label_qss)
+                missed_sub = None
                 if missed_line:
-                    full_move_layout.addWidget(missed_sub)
+                    missed_row, missed_sub = _aligned_subline(
+                        prefix_text, missed_line, scoped=True
+                    )
+                    missed_sub.setStyleSheet(
+                        f"{secondary_label_scoped_qss}\n{tip_qss}"
+                    )
+                    full_move_layout.addWidget(missed_row)
 
                 reason = str(getattr(move, "selection_reason", "") or "")
                 if reason:
@@ -2541,7 +2586,8 @@ class DetailSummaryView(QWidget):
                     prefix_label.setToolTip(tip)
                     move_clickable.setToolTip(tip)
                     assessment_label.setToolTip(tip)
-                    missed_sub.setToolTip(tip)
+                    if missed_sub is not None:
+                        missed_sub.setToolTip(tip)
                 missed_layout.addWidget(full_move_container)
             layout.addLayout(missed_layout)
         

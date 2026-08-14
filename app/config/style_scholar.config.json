@@ -1619,6 +1619,9 @@
             "text": {
               "$ref": "$_COLOR_BURNT_UMBER"
             },
+            "secondary_text": {
+              "$ref": "$_COLOR_DRIFTWOOD"
+            },
             "header_text": {
               "$ref": "$_COLOR_INK_BODY"
             },
