@@ -24,7 +24,7 @@ from PyQt6.QtGui import (
 
 from app.models.database_model import GameData
 from app.models.moveslist_model import MoveData
-from app.services.game_summary_service import GameSummary, format_best_move_stat
+from app.services.game_summary_service import GameSummary, format_best_move_stat, format_missed_tactic_line
 from app.services.pdf_report_base import BasePDFReportService
 from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
 
@@ -1439,7 +1439,12 @@ class GameReportPDFService(BasePDFReportService):
         white_best = list(summary.white_top_best or [])[:3]
         black_worst = list(summary.black_top_worst or [])[:3]
         black_best = list(summary.black_top_best or [])[:3]
-        if not (white_worst or white_best or black_worst or black_best):
+        white_missed = list(getattr(summary, "white_missed_tactics", None) or [])[:3]
+        black_missed = list(getattr(summary, "black_missed_tactics", None) or [])[:3]
+        if not (
+            white_worst or white_best or black_worst or black_best
+            or white_missed or black_missed
+        ):
             return y
 
         gap = 14.0
@@ -1449,21 +1454,25 @@ class GameReportPDFService(BasePDFReportService):
         sub_h = float(QFontMetrics(self._font_caption).height()) + 1.0
         header_h = float(QFontMetrics(self._font_body_bold).height()) + 8.0
 
-        def column_height(worst: List[Any], best: List[Any]) -> float:
+        def column_height(worst: List[Any], best: List[Any], missed: List[Any]) -> float:
             h = header_h + 4.0
-            for group in (worst, best):
+            groups = [worst, best]
+            if missed:
+                groups.append(missed)
+            for group in groups:
                 h += line_h + 4.0  # group title
                 for m in group:
-                    h += line_h
+                    h += line_h  # rank + move
+                    h += sub_h  # assessment meta
                     if getattr(m, "best_move", None):
-                        h += sub_h
+                        h += sub_h  # Best: / Missed:
                     h += 3.0
                 h += 8.0
             return h
 
         need = max(
-            column_height(white_worst, white_best),
-            column_height(black_worst, black_best),
+            column_height(white_worst, white_best, white_missed),
+            column_height(black_worst, black_best, black_missed),
         )
         y = self._section_heading(
             painter, writer, content, y, "Critical Moments", keep_with=need
@@ -1478,6 +1487,7 @@ class GameReportPDFService(BasePDFReportService):
             white_worst,
             white_best,
             is_white=True,
+            missed_tactics=white_missed,
         )
         y_black = self._draw_critical_player_column(
             painter,
@@ -1488,6 +1498,7 @@ class GameReportPDFService(BasePDFReportService):
             black_worst,
             black_best,
             is_white=False,
+            missed_tactics=black_missed,
         )
         return max(y_white, y_black) + 4
 
@@ -1510,8 +1521,9 @@ class GameReportPDFService(BasePDFReportService):
         top_best: Sequence[Any],
         *,
         is_white: bool,
+        missed_tactics: Optional[Sequence[Any]] = None,
     ) -> float:
-        """One player's worst/best lists stacked vertically."""
+        """One player's worst/best/missed lists stacked vertically."""
         pad = 6.0
         inner_w = max(40.0, width - pad * 2)
 
@@ -1527,11 +1539,13 @@ class GameReportPDFService(BasePDFReportService):
         )
         y += header_h + 6.0
 
-        groups = (
-            ("Worst moves", top_worst, True),
-            ("Best moves", top_best, False),
-        )
-        for group_idx, (title, moves, show_best_alt) in enumerate(groups):
+        groups = [
+            ("Worst moves", top_worst, "worst"),
+            ("Best moves", top_best, "best"),
+        ]
+        if missed_tactics:
+            groups.append(("Missed tactics", missed_tactics, "missed"))
+        for group_idx, (title, moves, kind) in enumerate(groups):
             if group_idx > 0:
                 y += 6.0
             painter.setFont(self._font_body_bold)
@@ -1568,11 +1582,13 @@ class GameReportPDFService(BasePDFReportService):
                 )
                 y += fm.height() + 1.0
 
-                # Worst: assessment · CPL. Best: assessment · CP gain.
-                if show_best_alt:
+                # Worst: assessment · CPL. Best: assessment · CP gain. Missed: assessment.
+                if kind == "worst":
                     meta = f"{assessment} · CPL {cpl_s}"
-                else:
+                elif kind == "best":
                     meta = f"{assessment} · {format_best_move_stat(move)}"
+                else:
+                    meta = assessment
                 painter.setFont(self._font_caption)
                 color = self._assess_colors.get(assessment, self._muted)
                 painter.setPen(color)
@@ -1580,7 +1596,7 @@ class GameReportPDFService(BasePDFReportService):
                 painter.drawText(int(x + pad + 10), int(y + cfm.ascent()), meta)
                 y += cfm.height() + 1.0
 
-                if show_best_alt and best_alt:
+                if kind == "worst" and best_alt:
                     painter.setPen(self._muted)
                     painter.drawText(
                         int(x + pad + 10),
@@ -1588,6 +1604,16 @@ class GameReportPDFService(BasePDFReportService):
                         f"Best: {best_alt}",
                     )
                     y += cfm.height() + 1.0
+                elif kind == "missed":
+                    missed_line = format_missed_tactic_line(move)
+                    if missed_line:
+                        painter.setPen(self._muted)
+                        painter.drawText(
+                            int(x + pad + 10),
+                            int(y + cfm.ascent()),
+                            missed_line,
+                        )
+                        y += cfm.height() + 1.0
                 y += 3.0
 
         return y

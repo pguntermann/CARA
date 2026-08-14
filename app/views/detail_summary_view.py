@@ -22,7 +22,7 @@ import chess
 
 from app.models.game_model import GameModel
 from app.models.moveslist_model import MoveData
-from app.services.game_summary_service import GameSummary, GameHighlight, format_best_move_stat
+from app.services.game_summary_service import GameSummary, GameHighlight, format_best_move_stat, format_missed_tactic_line
 from app.controllers.game_controller import GameController
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.tooltip_utils import wrap_tooltip_text
@@ -1659,7 +1659,8 @@ class DetailSummaryView(QWidget):
                 self.current_summary.white_top_worst or [],
                 self.current_summary.white_top_best or [],
                 text_color, label_font, value_font, section_bg_color, border_color,
-                is_white=True
+                is_white=True,
+                missed_tactics=getattr(self.current_summary, "white_missed_tactics", None) or [],
             )
             critical_layout.addWidget(white_critical_widget, 1)
         
@@ -1672,7 +1673,8 @@ class DetailSummaryView(QWidget):
                 self.current_summary.black_top_worst or [],
                 self.current_summary.black_top_best or [],
                 text_color, label_font, value_font, section_bg_color, border_color,
-                is_white=False
+                is_white=False,
+                missed_tactics=getattr(self.current_summary, "black_missed_tactics", None) or [],
             )
             critical_layout.addWidget(black_critical_widget, 1)
         
@@ -2237,7 +2239,8 @@ class DetailSummaryView(QWidget):
     def _create_critical_moments_widget(self, player_name: str, top_worst: List, top_best: List,
                                         text_color: QColor, label_font: QFont, value_font: QFont,
                                         bg_color: QColor, border_color: QColor,
-                                        is_white: bool = True) -> QWidget:
+                                        is_white: bool = True,
+                                        missed_tactics: Optional[List] = None) -> QWidget:
         """Create a widget displaying critical moments.
         
         Args:
@@ -2249,6 +2252,8 @@ class DetailSummaryView(QWidget):
             value_font: Font for values.
             bg_color: Background color.
             border_color: Border color.
+            is_white: True for White's column.
+            missed_tactics: Optional list of CriticalMove instances (missed tactics).
             
         Returns:
             QWidget with critical moments.
@@ -2452,6 +2457,86 @@ class DetailSummaryView(QWidget):
                 assessment_label.setToolTip(tip)
             best_layout.addWidget(move_container)
         layout.addLayout(best_layout)
+
+        missed_list = [m for m in (missed_tactics or []) if m][:3]
+        if missed_list:
+            layout.addSpacing(critical_moments_section_spacing)
+            missed_label = QLabel("Missed Tactics")
+            missed_label.setFont(label_font)
+            missed_label.setStyleSheet(
+                f"color: rgb({r}, {g}, {b}); font-weight: bold; border: none;"
+            )
+            layout.addWidget(missed_label)
+
+            missed_layout = QVBoxLayout()
+            missed_layout.setSpacing(critical_moments_list_spacing)
+            for i, move in enumerate(missed_list, 1):
+                move_notation = (
+                    move.move_notation
+                    if hasattr(move, "move_notation") and move.move_notation
+                    else "N/A"
+                )
+                assessment = (
+                    move.assessment
+                    if hasattr(move, "assessment") and move.assessment
+                    else "N/A"
+                )
+                move_number = (
+                    move.move_number
+                    if hasattr(move, "move_number") and move.move_number is not None
+                    else 1
+                )
+                missed_line = format_missed_tactic_line(move)
+
+                full_move_container = QWidget()
+                full_move_container.setStyleSheet(row_qss)
+                full_move_layout = QVBoxLayout(full_move_container)
+                full_move_layout.setContentsMargins(0, 0, 0, 0)
+                full_move_layout.setSpacing(0)
+
+                move_container = QWidget()
+                move_container.setStyleSheet(row_qss)
+                move_line_layout = QHBoxLayout(move_container)
+                move_line_layout.setContentsMargins(0, 0, 0, 0)
+                move_line_layout.setSpacing(0)
+
+                prefix_label = QLabel(f"{i}. ")
+                prefix_label.setFont(value_font)
+                prefix_label.setStyleSheet(label_qss)
+                move_line_layout.addWidget(prefix_label)
+
+                move_clickable = ClickableMoveLabel(
+                    move_notation, move_number, is_white, self._game_controller
+                )
+                move_clickable.setFont(value_font)
+                move_clickable.setFrameShape(QLabel.Shape.NoFrame)
+                move_clickable.setStyleSheet(clickable_qss)
+                move_line_layout.addWidget(move_clickable)
+
+                assessment_label = QLabel(f" ({assessment})")
+                assessment_label.setFont(value_font)
+                assessment_label.setStyleSheet(label_qss)
+                move_line_layout.addWidget(assessment_label)
+                move_line_layout.addStretch()
+                full_move_layout.addWidget(move_container)
+
+                missed_sub = QLabel(f"   {missed_line}" if missed_line else "")
+                missed_sub.setFont(value_font)
+                missed_sub.setStyleSheet(label_qss)
+                if missed_line:
+                    full_move_layout.addWidget(missed_sub)
+
+                reason = str(getattr(move, "selection_reason", "") or "")
+                if reason:
+                    tip = wrap_tooltip_text(reason)
+                    full_move_container.setToolTip(tip)
+                    move_container.setToolTip(tip)
+                    prefix_label.setToolTip(tip)
+                    move_clickable.setToolTip(tip)
+                    assessment_label.setToolTip(tip)
+                    missed_sub.setToolTip(tip)
+                missed_layout.addWidget(full_move_container)
+            layout.addLayout(missed_layout)
         
         layout.addStretch()
         

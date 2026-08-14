@@ -16,6 +16,11 @@ from app.services.best_move_ranking import (
 )
 from app.services.game_highlights.base_rule import GameHighlight
 from app.services.logging_service import LoggingService
+from app.services.missed_tactic_ranking import (
+    format_missed_tactic_line as format_missed_tactic_line,
+    load_missed_tactic_rules,
+    select_top_missed_tactics,
+)
 
 
 @dataclass
@@ -77,7 +82,8 @@ class CriticalMove:
     evaluation: str
     best_move: str = ""  # Best alternative move suggested by engine
     eval_improvement: float = 0.0  # Capped mover-perspective CP gain (display; ranking may discount it)
-    selection_reason: str = ""  # Why this ply made the top-best list (tooltip)
+    selection_reason: str = ""  # Why this ply made a critical list (tooltip)
+    tactic_type: str = ""  # Missed-tactic kind (fork, mate, capture, …); empty for best/worst
 
 
 def format_cp_gain(gain: float) -> str:
@@ -113,6 +119,8 @@ class GameSummary:
     white_top_best: List[CriticalMove]
     black_top_worst: List[CriticalMove]
     black_top_best: List[CriticalMove]
+    white_missed_tactics: List[CriticalMove]
+    black_missed_tactics: List[CriticalMove]
     evaluation_data: List[Tuple[int, float]]  # (move_number, evaluation) pairs
     opening_end: int  # Move number where opening phase ends
     middlegame_end: int  # Move number where middlegame phase ends
@@ -159,6 +167,7 @@ class GameSummaryService:
         highlights_config = summary_config.get('highlights', {})
         self.highlights_per_phase_limit = highlights_config.get('max_per_phase', 7)
         self._best_move_tactic_rules = None
+        self._missed_tactic_rules = None
     
     def _evaluate_formula(self, formula: Optional[str], default_formula: str, value_on_error: Any,
                           clamp_min: Optional[float] = None, clamp_max: Optional[float] = None,
@@ -448,6 +457,8 @@ class GameSummaryService:
         white_top_best = self._find_top_best_moves(moves, is_white=True, count=3)
         black_top_worst = self._find_top_worst_moves(moves, is_white=False, count=3)
         black_top_best = self._find_top_best_moves(moves, is_white=False, count=3)
+        white_missed_tactics = self._find_top_missed_tactics(moves, is_white=True, count=3)
+        black_missed_tactics = self._find_top_missed_tactics(moves, is_white=False, count=3)
         
         # Extract evaluation data for graph
         evaluation_data = self._extract_evaluation_data(moves)
@@ -498,6 +509,8 @@ class GameSummaryService:
             white_top_best=white_top_best,
             black_top_worst=black_top_worst,
             black_top_best=black_top_best,
+            white_missed_tactics=white_missed_tactics,
+            black_missed_tactics=black_missed_tactics,
             evaluation_data=evaluation_data,
             opening_end=opening_end,
             middlegame_end=middlegame_end,
@@ -1463,6 +1476,58 @@ class GameSummaryService:
                 best_move=item.best_move,
                 eval_improvement=item.display_gain,
                 selection_reason=item.selection_reason,
+            )
+            for item in ranked
+        ]
+
+    def _get_missed_tactic_rules(self):
+        """Allowlisted board-tactic rules for missed-PV1 detection (not the highlight story list)."""
+        if self._missed_tactic_rules is None:
+            highlights = (
+                self.config.get("ui", {})
+                .get("panels", {})
+                .get("detail", {})
+                .get("summary", {})
+                .get("highlights", {})
+            )
+            self._missed_tactic_rules = load_missed_tactic_rules(
+                highlights.get("rules", {})
+            )
+        return self._missed_tactic_rules
+
+    def _find_top_missed_tactics(
+        self, moves: List[MoveData], is_white: bool, count: int
+    ) -> List[CriticalMove]:
+        """Find top N missed tactics: mate, named tactic, capture, check; then CPL / eval drop.
+
+        Book moves and already-lost desperation positions are excluded. PV1 is
+        scored on the before-board; quiet forks with no capture/check still count.
+        """
+        opening_end, middlegame_end = self._determine_phase_boundaries(
+            moves, len(moves)
+        )
+        ranked = select_top_missed_tactics(
+            moves,
+            is_white=is_white,
+            count=count,
+            parse_eval=self._parse_evaluation,
+            good_move_max_cpl=self.good_move_max_cpl,
+            inaccuracy_max_cpl=self.inaccuracy_max_cpl,
+            mistake_max_cpl=self.mistake_max_cpl,
+            opening_end=opening_end,
+            middlegame_end=middlegame_end,
+            tactic_rules=self._get_missed_tactic_rules(),
+        )
+        return [
+            CriticalMove(
+                move_number=item.move_number,
+                move_notation=item.move_notation,
+                cpl=item.cpl,
+                assessment=item.assessment,
+                evaluation=item.evaluation,
+                best_move=item.best_move,
+                selection_reason=item.selection_reason,
+                tactic_type=item.tactic_type,
             )
             for item in ranked
         ]

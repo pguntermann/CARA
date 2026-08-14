@@ -8,6 +8,7 @@ from typing import List, Optional
 from app.services.game_summary_service import (
     GameSummary, PlayerStatistics, PhaseStatistics, CriticalMove, GameHighlight,
     format_best_move_stat,
+    format_missed_tactic_line,
 )
 
 
@@ -260,6 +261,16 @@ class SummaryTextFormatter:
                 lines.append(
                     f"  {i}. {move_notation} ({assessment}, {format_best_move_stat(move)})"
                 )
+
+        if getattr(summary, "white_missed_tactics", None):
+            lines.append(f"\n{white_name} (White) - Missed Tactics:")
+            for i, move in enumerate(summary.white_missed_tactics[:3], 1):
+                move_notation = move.move_notation if move.move_notation else "N/A"
+                assessment = move.assessment if move.assessment else "N/A"
+                lines.append(f"  {i}. {move_notation} ({assessment})")
+                missed_line = format_missed_tactic_line(move)
+                if missed_line:
+                    lines.append(f"     {missed_line}")
         
         if summary.black_top_worst:
             lines.append(f"\n{black_name} (Black) - Top 3 Worst Moves:")
@@ -279,6 +290,16 @@ class SummaryTextFormatter:
                 lines.append(
                     f"  {i}. {move_notation} ({assessment}, {format_best_move_stat(move)})"
                 )
+
+        if getattr(summary, "black_missed_tactics", None):
+            lines.append(f"\n{black_name} (Black) - Missed Tactics:")
+            for i, move in enumerate(summary.black_missed_tactics[:3], 1):
+                move_notation = move.move_notation if move.move_notation else "N/A"
+                assessment = move.assessment if move.assessment else "N/A"
+                lines.append(f"  {i}. {move_notation} ({assessment})")
+                missed_line = format_missed_tactic_line(move)
+                if missed_line:
+                    lines.append(f"     {missed_line}")
         
         return lines
     
