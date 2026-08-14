@@ -24,7 +24,7 @@ from PyQt6.QtGui import (
 
 from app.models.database_model import GameData
 from app.models.moveslist_model import MoveData
-from app.services.game_summary_service import GameSummary
+from app.services.game_summary_service import GameSummary, format_best_move_stat
 from app.services.pdf_report_base import BasePDFReportService
 from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
 
@@ -1568,8 +1568,11 @@ class GameReportPDFService(BasePDFReportService):
                 )
                 y += fm.height() + 1.0
 
-                # Assessment · CPL (colored by assessment when known)
-                meta = f"{assessment} · CPL {cpl_s}"
+                # Worst: assessment · CPL. Best: assessment · CP gain.
+                if show_best_alt:
+                    meta = f"{assessment} · CPL {cpl_s}"
+                else:
+                    meta = f"{assessment} · {format_best_move_stat(move)}"
                 painter.setFont(self._font_caption)
                 color = self._assess_colors.get(assessment, self._muted)
                 painter.setPen(color)

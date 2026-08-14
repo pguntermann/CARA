@@ -6,7 +6,8 @@ matching exactly what is displayed in the UI sections.
 
 from typing import List, Optional
 from app.services.game_summary_service import (
-    GameSummary, PlayerStatistics, PhaseStatistics, CriticalMove, GameHighlight
+    GameSummary, PlayerStatistics, PhaseStatistics, CriticalMove, GameHighlight,
+    format_best_move_stat,
 )
 
 
@@ -256,8 +257,9 @@ class SummaryTextFormatter:
             for i, move in enumerate(summary.white_top_best[:3], 1):
                 move_notation = move.move_notation if move.move_notation else "N/A"
                 assessment = move.assessment if move.assessment else "N/A"
-                cpl = move.cpl if move.cpl is not None else 0.0
-                lines.append(f"  {i}. {move_notation} ({assessment}, CPL: {cpl:.0f})")
+                lines.append(
+                    f"  {i}. {move_notation} ({assessment}, {format_best_move_stat(move)})"
+                )
         
         if summary.black_top_worst:
             lines.append(f"\n{black_name} (Black) - Top 3 Worst Moves:")
@@ -274,8 +276,9 @@ class SummaryTextFormatter:
             for i, move in enumerate(summary.black_top_best[:3], 1):
                 move_notation = move.move_notation if move.move_notation else "N/A"
                 assessment = move.assessment if move.assessment else "N/A"
-                cpl = move.cpl if move.cpl is not None else 0.0
-                lines.append(f"  {i}. {move_notation} ({assessment}, CPL: {cpl:.0f})")
+                lines.append(
+                    f"  {i}. {move_notation} ({assessment}, {format_best_move_stat(move)})"
+                )
         
         return lines
     

@@ -7,7 +7,7 @@ branches that only differ in which MoveData fields they read.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import Iterator, List, Optional, Tuple
+from typing import Any, Iterator, List, Optional, Tuple
 
 import chess
 
@@ -448,6 +448,70 @@ def _parse_optional_float(raw: str) -> Optional[float]:
         return float(raw)
     except (ValueError, TypeError):
         return None
+
+
+def make_rule_context(
+    moves: List[MoveData],
+    move_index: int,
+    **overrides: Any,
+) -> RuleContext:
+    """Build a ``RuleContext`` centered on ``moves[move_index]``.
+
+    Previous piece counts and material come from the prior row when present.
+    Pass ``RuleContext`` field overrides (``opening_end``, thresholds, etc.)
+    as keyword arguments.
+    """
+    prev = moves[move_index - 1] if move_index > 0 else None
+    nxt = moves[move_index + 1] if move_index + 1 < len(moves) else None
+    if prev is not None:
+        prev_fields = dict(
+            prev_white_bishops=prev.white_bishops,
+            prev_black_bishops=prev.black_bishops,
+            prev_white_knights=prev.white_knights,
+            prev_black_knights=prev.black_knights,
+            prev_white_queens=prev.white_queens,
+            prev_black_queens=prev.black_queens,
+            prev_white_rooks=prev.white_rooks,
+            prev_black_rooks=prev.black_rooks,
+            prev_white_pawns=prev.white_pawns,
+            prev_black_pawns=prev.black_pawns,
+            prev_white_material=prev.white_material,
+            prev_black_material=prev.black_material,
+        )
+    else:
+        prev_fields = dict(
+            prev_white_bishops=2,
+            prev_black_bishops=2,
+            prev_white_knights=2,
+            prev_black_knights=2,
+            prev_white_queens=1,
+            prev_black_queens=1,
+            prev_white_rooks=2,
+            prev_black_rooks=2,
+            prev_white_pawns=8,
+            prev_black_pawns=8,
+            prev_white_material=0,
+            prev_black_material=0,
+        )
+
+    kwargs = dict(
+        move_index=move_index,
+        total_moves=len(moves),
+        opening_end=15,
+        middlegame_end=40,
+        prev_move=prev,
+        next_move=nxt,
+        last_book_move_number=0,
+        theory_departed=True,
+        good_move_max_cpl=50,
+        inaccuracy_max_cpl=100,
+        mistake_max_cpl=200,
+        shared_state={},
+        moves=moves,
+        **prev_fields,
+    )
+    kwargs.update(overrides)
+    return RuleContext(**kwargs)
 
 
 def context_for_move_index(base: RuleContext, move_index: int) -> RuleContext:

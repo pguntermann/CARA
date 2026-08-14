@@ -22,10 +22,11 @@ import chess
 
 from app.models.game_model import GameModel
 from app.models.moveslist_model import MoveData
-from app.services.game_summary_service import GameSummary, GameHighlight
+from app.services.game_summary_service import GameSummary, GameHighlight, format_best_move_stat
 from app.controllers.game_controller import GameController
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.tooltip_utils import wrap_tooltip_text
+from app.views.style.tooltip import tooltip_qss_block
 from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
 
 if TYPE_CHECKING:
@@ -2281,6 +2282,7 @@ class DetailSummaryView(QWidget):
                 border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
                 border-radius: {border_radius}px;
             }}
+            {tooltip_qss_block(self.config)}
         """)
         
         layout = QVBoxLayout(widget)
@@ -2385,6 +2387,24 @@ class DetailSummaryView(QWidget):
         
         best_layout = QVBoxLayout()
         best_layout.setSpacing(critical_moments_list_spacing)
+        # Scope label rules so unscoped padding/border cannot leak onto QToolTip.
+        tip_qss = tooltip_qss_block(self.config)
+        r, g, b = text_color.red(), text_color.green(), text_color.blue()
+        label_qss = (
+            f"QLabel {{ color: rgb({r}, {g}, {b}); border: none; "
+            f"background: transparent; padding: 0px; margin: 0px; }}\n"
+            f"{tip_qss}"
+        )
+        clickable_qss = (
+            f"QLabel {{ color: rgb({r}, {g}, {b}); border: none; "
+            f"background: transparent; padding: 0px; margin: 0px; "
+            f"text-decoration: underline; }}\n"
+            f"{tip_qss}"
+        )
+        row_qss = (
+            f"QWidget {{ border: none; background: transparent; }}\n"
+            f"{tip_qss}"
+        )
         for i, move in enumerate(top_best[:3], 1):
             # Defensive checks for None/missing values in CriticalMove
             if not move:
@@ -2393,12 +2413,11 @@ class DetailSummaryView(QWidget):
             # Safe access to move attributes with fallbacks
             move_notation = move.move_notation if hasattr(move, 'move_notation') and move.move_notation else "N/A"
             assessment = move.assessment if hasattr(move, 'assessment') and move.assessment else "N/A"
-            cpl = move.cpl if hasattr(move, 'cpl') and move.cpl is not None else 0.0
             move_number = move.move_number if hasattr(move, 'move_number') and move.move_number is not None else 1
             
             # Create a container widget with horizontal layout for the move line
             move_container = QWidget()
-            move_container.setStyleSheet("border: none; background: transparent;")
+            move_container.setStyleSheet(row_qss)
             move_line_layout = QHBoxLayout(move_container)
             move_line_layout.setContentsMargins(0, 0, 0, 0)
             move_line_layout.setSpacing(0)
@@ -2406,25 +2425,31 @@ class DetailSummaryView(QWidget):
             # Prefix (e.g., "1. ")
             prefix_label = QLabel(f"{i}. ")
             prefix_label.setFont(value_font)
-            prefix_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
+            prefix_label.setStyleSheet(label_qss)
             move_line_layout.addWidget(prefix_label)
             
             # Clickable move notation (e.g., "5. d5")
             move_clickable = ClickableMoveLabel(move_notation, move_number, is_white, self._game_controller)
             move_clickable.setFont(value_font)
             move_clickable.setFrameShape(QLabel.Shape.NoFrame)
-            base_style = f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent; padding: 0px; margin: 0px;"
-            move_clickable.setStyleSheet(base_style + " text-decoration: underline;")
+            move_clickable.setStyleSheet(clickable_qss)
             move_line_layout.addWidget(move_clickable)
             
-            # Assessment part (e.g., " (Best Move, CPL: 0)")
-            assessment_text = f" ({assessment}, CPL: {cpl:.0f})"
+            # Assessment part (e.g., " (Best Move, CP gain: +130)")
+            assessment_text = f" ({assessment}, {format_best_move_stat(move)})"
             assessment_label = QLabel(assessment_text)
             assessment_label.setFont(value_font)
-            assessment_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
+            assessment_label.setStyleSheet(label_qss)
             move_line_layout.addWidget(assessment_label)
             
             move_line_layout.addStretch()
+            reason = str(getattr(move, "selection_reason", "") or "")
+            if reason:
+                tip = wrap_tooltip_text(reason)
+                move_container.setToolTip(tip)
+                prefix_label.setToolTip(tip)
+                move_clickable.setToolTip(tip)
+                assessment_label.setToolTip(tip)
             best_layout.addWidget(move_container)
         layout.addLayout(best_layout)
         

@@ -7,6 +7,13 @@ from asteval import Interpreter
 
 from app.models.moveslist_model import MoveData
 from app.models.move_classification_model import MoveClassificationModel
+from app.services.best_move_ranking import (
+    EVAL_IMPROVEMENT_CAP_CP as _EVAL_IMPROVEMENT_CAP_CP,
+    display_eval_gain_cp,
+    eval_before_cp,
+    load_best_move_tactic_rules,
+    select_top_best_moves,
+)
 from app.services.game_highlights.base_rule import GameHighlight
 from app.services.logging_service import LoggingService
 
@@ -69,6 +76,26 @@ class CriticalMove:
     assessment: str
     evaluation: str
     best_move: str = ""  # Best alternative move suggested by engine
+    eval_improvement: float = 0.0  # Capped mover-perspective CP gain (display; ranking may discount it)
+    selection_reason: str = ""  # Why this ply made the top-best list (tooltip)
+
+
+def format_cp_gain(gain: float) -> str:
+    """Format mover-perspective centipawn gain; negative values display as 0."""
+    n = max(0, int(round(float(gain or 0.0))))
+    if n == 0:
+        return "CP gain: 0"
+    return f"CP gain: {n:+d}"
+
+
+def format_best_move_stat(move: "CriticalMove") -> str:
+    """Metric shown next to a top-best-move: CP gain for Best/Brilliant, else CPL."""
+    assessment = str(getattr(move, "assessment", "") or "")
+    if assessment == "Best Move" or assessment.startswith("Brilliant"):
+        return format_cp_gain(getattr(move, "eval_improvement", 0.0))
+    cpl = getattr(move, "cpl", None)
+    n = 0.0 if cpl is None else float(cpl)
+    return f"CPL: {n:.0f}"
 
 
 @dataclass
@@ -131,6 +158,7 @@ class GameSummaryService:
         # Get highlights config
         highlights_config = summary_config.get('highlights', {})
         self.highlights_per_phase_limit = highlights_config.get('max_per_phase', 7)
+        self._best_move_tactic_rules = None
     
     def _evaluate_formula(self, formula: Optional[str], default_formula: str, value_on_error: Any,
                           clamp_min: Optional[float] = None, clamp_max: Optional[float] = None,
@@ -1371,76 +1399,73 @@ class GameSummaryService:
         critical_moves.sort(key=lambda x: x.cpl, reverse=True)
         return critical_moves[:count]
     
-    def _find_top_best_moves(self, moves: List[MoveData], is_white: bool, count: int) -> List[CriticalMove]:
-        """Find top N best moves (lowest CPL, excluding book moves).
-        
-        Args:
-            moves: List of MoveData instances.
-            is_white: True for White, False for Black.
-            count: Number of moves to return.
-            
-        Returns:
-            List of CriticalMove instances sorted by CPL ascending.
+    def _eval_before_cp(
+        self, moves: List[MoveData], index: int, is_white: bool
+    ) -> Optional[float]:
+        """White-relative eval of the position immediately before this half-move."""
+        return eval_before_cp(moves, index, is_white, self._parse_evaluation)
+
+    def _eval_improvement_cp(
+        self, moves: List[MoveData], index: int, is_white: bool
+    ) -> float:
+        """Mover-perspective eval change in centipawns (positive = better for mover).
+
+        Mate-sized jumps are capped so they rank above quiet Best Moves without
+        crowding out every other candidate. Ranking may discount this further.
         """
-        if is_white:
-            cpl_field = 'cpl_white'
-            assess_field = 'assess_white'
-            eval_field = 'eval_white'
-            move_field = 'white_move'
-            best_field = 'best_white'
-        else:
-            cpl_field = 'cpl_black'
-            assess_field = 'assess_black'
-            eval_field = 'eval_black'
-            move_field = 'black_move'
-            best_field = 'best_black'
-        
-        critical_moves: List[CriticalMove] = []
-        
-        for move in moves:
-            move_str = getattr(move, move_field)
-            if not move_str:
-                continue
-            
-            assessment = getattr(move, assess_field)
-            # Skip book moves for best moves
-            if assessment == "Book Move":
-                continue
-            
-            cpl_str = getattr(move, cpl_field)
-            if not cpl_str:
-                continue
-            
-            try:
-                cpl = float(cpl_str)
-                evaluation = getattr(move, eval_field)
-                best_move = getattr(move, best_field, "") or ""
-                
-                # Format move notation (e.g., "23. Qd4")
-                move_notation = f"{move.move_number}. {move_str}"
-                
-                critical_moves.append(CriticalMove(
-                    move_number=move.move_number,
-                    move_notation=move_notation,
-                    cpl=cpl,
-                    assessment=assessment,
-                    evaluation=evaluation,
-                    best_move=best_move
-                ))
-            except (ValueError, TypeError):
-                continue
-        
-        # Sort to prioritize brilliant moves: brilliant moves first (by CPL ascending), then others (by CPL ascending)
-        brilliant_moves = [m for m in critical_moves if m.assessment.startswith("Brilliant")]
-        other_moves = [m for m in critical_moves if not m.assessment.startswith("Brilliant")]
-        
-        # Sort each group by CPL ascending
-        brilliant_moves.sort(key=lambda x: x.cpl)
-        other_moves.sort(key=lambda x: x.cpl)
-        
-        # Combine: brilliant moves first, then others
-        sorted_moves = brilliant_moves + other_moves
-        return sorted_moves[:count]
+        return display_eval_gain_cp(moves, index, is_white, self._parse_evaluation)
+
+    def _get_best_move_tactic_rules(self):
+        """Allowlisted tactic rules for best-move ranking (not the highlight story list)."""
+        if self._best_move_tactic_rules is None:
+            highlights = (
+                self.config.get("ui", {})
+                .get("panels", {})
+                .get("detail", {})
+                .get("summary", {})
+                .get("highlights", {})
+            )
+            self._best_move_tactic_rules = load_best_move_tactic_rules(
+                highlights.get("rules", {})
+            )
+        return self._best_move_tactic_rules
+
+    def _find_top_best_moves(self, moves: List[MoveData], is_white: bool, count: int) -> List[CriticalMove]:
+        """Find top N best moves: Brilliant/Best first, then tactics, uniqueness, CPL, gain.
+
+        Book moves are excluded. Fill three slots from Brilliant and Best when
+        possible; Good Moves are fillers only. Displayed CP gain is the capped
+        eval change; ranking discounts recaptures, search-noise jumps, and
+        already-winning positions.
+        """
+        opening_end, middlegame_end = self._determine_phase_boundaries(
+            moves, len(moves)
+        )
+        ranked = select_top_best_moves(
+            moves,
+            is_white=is_white,
+            count=count,
+            parse_eval=self._parse_evaluation,
+            good_move_max_cpl=self.good_move_max_cpl,
+            inaccuracy_max_cpl=self.inaccuracy_max_cpl,
+            mistake_max_cpl=self.mistake_max_cpl,
+            opening_end=opening_end,
+            middlegame_end=middlegame_end,
+            tactic_rules=self._get_best_move_tactic_rules(),
+        )
+        return [
+            CriticalMove(
+                move_number=item.move_number,
+                move_notation=item.move_notation,
+                cpl=item.cpl,
+                assessment=item.assessment,
+                evaluation=item.evaluation,
+                best_move=item.best_move,
+                eval_improvement=item.display_gain,
+                selection_reason=item.selection_reason,
+            )
+            for item in ranked
+        ]
     
     def _extract_evaluation_data(self, moves: List[MoveData]) -> List[Tuple[int, float]]:
         """Extract evaluation data for graph (move number, evaluation in centipawns).
