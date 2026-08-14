@@ -28,6 +28,8 @@ SVG_CONTEXT_DELETE = "app/resources/icons/context_delete.svg"
 SVG_MENU_TAG_BUBBLE = "app/resources/icons/tag_bubble.svg"
 SVG_MENU_BOOK = "app/resources/icons/menu_book.svg"
 SVG_MENU_CHECKMARK = "app/resources/icons/checkmark.svg"
+SVG_MENU_CHESSBOARD = "app/resources/icons/menu_chessboard.svg"
+SVG_MENU_CHESSBOARD_OFF = "app/resources/icons/menu_chessboard_off.svg"
 SVG_MENU_CLEAR_ALL_GAME_TAGS = "app/resources/icons/clear_all_game_tags.svg"
 SVG_MENU_EYE_OFF = "app/resources/icons/eye_off.svg"
 SVG_MENU_FOLDER_OPEN = "app/resources/icons/folder_open.svg"
@@ -98,23 +100,21 @@ def _tint_svg_bytes(data: bytes, rgb: Tuple[int, int, int]) -> QByteArray:
     return QByteArray(svg_str.encode("utf-8"))
 
 
-def themed_icon_from_svg(relative_path: str, rgb: Sequence[int]) -> QIcon:
-    """Load an SVG from the app bundle, tint template white to ``rgb``, return a multi-size QIcon."""
+def _add_themed_svg_pixmaps(
+    icon: QIcon,
+    relative_path: str,
+    rgb: Sequence[int],
+    state: QIcon.State,
+) -> None:
     path = get_app_resource_path(relative_path)
     if not path.is_file():
-        return QIcon()
-
-    data = path.read_bytes()
-    triplet = (int(rgb[0]), int(rgb[1]), int(rgb[2]))
-    ba = _tint_svg_bytes(data, triplet)
+        return
+    ba = _tint_svg_bytes(path.read_bytes(), (int(rgb[0]), int(rgb[1]), int(rgb[2])))
     if ba.isEmpty():
-        return QIcon()
-
+        return
     renderer = QSvgRenderer(ba)
     if not renderer.isValid():
-        return QIcon()
-
-    icon = QIcon()
+        return
     for size in (16, 20, 22, 24, 32):
         img = QImage(size, size, QImage.Format.Format_ARGB32_Premultiplied)
         img.fill(Qt.GlobalColor.transparent)
@@ -122,7 +122,16 @@ def themed_icon_from_svg(relative_path: str, rgb: Sequence[int]) -> QIcon:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         renderer.render(painter, QRectF(0, 0, float(size), float(size)))
         painter.end()
-        icon.addPixmap(QPixmap.fromImage(img), QIcon.Mode.Normal, QIcon.State.Off)
+        pixmap = QPixmap.fromImage(img)
+        icon.addPixmap(pixmap, QIcon.Mode.Normal, state)
+        icon.addPixmap(pixmap, QIcon.Mode.Selected, state)
+        icon.addPixmap(pixmap, QIcon.Mode.Active, state)
+
+
+def themed_icon_from_svg(relative_path: str, rgb: Sequence[int]) -> QIcon:
+    """Load an SVG from the app bundle, tint template white to ``rgb``, return a multi-size QIcon."""
+    icon = QIcon()
+    _add_themed_svg_pixmaps(icon, relative_path, rgb, QIcon.State.Off)
     return icon
 
 

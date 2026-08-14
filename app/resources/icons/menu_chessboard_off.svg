@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+  <mask id="board-off">
+    <rect width="24" height="24" fill="white"/>
+    <path stroke="black" stroke-width="3.5" stroke-linecap="round" d="M3.5 3.5 20.5 20.5"/>
+  </mask>
+  <g mask="url(#board-off)">
+    <rect x="3.5" y="3.5" width="17" height="17" rx="1.25" stroke="#ffffff" stroke-width="1.5"/>
+    <path fill="#ffffff" d="M5 5h3.5v3.5H5zm7 0h3.5v3.5H12zM8.5 8.5H12V12H8.5zm7 0H19V12h-3.5zM5 12h3.5v3.5H5zm7 0h3.5v3.5H12zM8.5 15.5H12V19H8.5zm7 0H19V19h-3.5z"/>
+  </g>
+  <path stroke="#ffffff" stroke-width="2" stroke-linecap="round" d="M4 4 20 20"/>
+</svg>

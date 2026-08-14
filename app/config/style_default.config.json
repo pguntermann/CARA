@@ -5481,6 +5481,12 @@
               }
             ]
           },
+          "miniature_board": {
+            "label": "Miniature board",
+            "icon_svg": "app/resources/icons/menu_chessboard.svg",
+            "icon_unchecked_svg": "app/resources/icons/menu_chessboard_off.svg",
+            "default": true
+          },
           "screen_margin": 8
         },
         "feedback": {

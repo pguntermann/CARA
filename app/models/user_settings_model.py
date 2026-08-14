@@ -438,7 +438,7 @@ class UserSettingsModel(QObject):
         self.set_player_stats_accuracy_distribution(cur)
 
     def get_opening_encyclopedia_dialog(self) -> Dict[str, Any]:
-        """Get Opening Encyclopedia dialog window-size preferences."""
+        """Get Opening Encyclopedia dialog preferences (size, text, miniature board)."""
         return self._settings.get("opening_encyclopedia_dialog", {}).copy()
 
     def set_opening_encyclopedia_dialog(self, settings: Dict[str, Any]) -> None:

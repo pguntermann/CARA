@@ -60,6 +60,8 @@ from app.services.opening_encyclopedia_service import (
 from app.utils.external_open import open_url
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.themed_icon import (
+    SVG_MENU_CHESSBOARD,
+    SVG_MENU_CHESSBOARD_OFF,
     SVG_MENU_EXCLAMATION,
     SVG_MENU_MAXIMIZE,
     SVG_MENU_RESET,
@@ -111,6 +113,7 @@ _TEXT_SIZE_LABELS = {
     "medium": "Medium",
     "large": "Large",
 }
+_MINIATURE_BOARD_DEFAULT = True
 
 # SAN-aware matcher for encyclopedia prose (aligned with notes formatter ideas).
 _FILE = r"[a-h]"
@@ -137,6 +140,21 @@ _ELLIPSIS_MOVE = re.compile(
     rf"(?<![A-Za-z0-9])(?P<full>{_ELLIPSIS}\s*(?P<m>{_SAN})){_TOKEN_END}"
 )
 _BARE_SAN = re.compile(rf"{_BOUNDARY}(?P<full>{_SAN}){_TOKEN_END}")
+
+
+def _coerce_bool(value: Any, default: bool) -> bool:
+    """Parse a persisted bool; unknown values keep ``default``."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in ("1", "true", "yes", "on"):
+            return True
+        if lowered in ("0", "false", "no", "off"):
+            return False
+    return default
 
 
 def _rgb(value: Any, default: list[int]) -> list[int]:
@@ -715,6 +733,7 @@ class OpeningEncyclopediaDialog(QDialog):
         self._top_row: Optional[QWidget] = None
         self._image_panel: Optional[QWidget] = None
         self._image_text_gap: int = 16
+        self._tabiya_board: Optional[MiniChessBoardWidget] = None
         self._beside_block_count: Optional[int] = None
         self._resize_sync_timer = QTimer(self)
         self._resize_sync_timer.setSingleShot(True)
@@ -869,6 +888,25 @@ class OpeningEncyclopediaDialog(QDialog):
         self._text_size_key = stored_text
         self._text_size_scale = float(
             self._text_size_scales.get(stored_text, _TEXT_SIZE_SCALES[_TEXT_SIZE_DEFAULT])
+        )
+
+        board_cfg = size_cfg.get("miniature_board", {})
+        if not isinstance(board_cfg, dict):
+            board_cfg = {}
+        self._miniature_board_label = str(
+            board_cfg.get("label") or "Miniature board"
+        )
+        self._miniature_board_icon_svg = str(
+            board_cfg.get("icon_svg") or SVG_MENU_CHESSBOARD
+        )
+        self._miniature_board_icon_unchecked_svg = str(
+            board_cfg.get("icon_unchecked_svg") or SVG_MENU_CHESSBOARD_OFF
+        )
+        cfg_default = board_cfg.get("default", _MINIATURE_BOARD_DEFAULT)
+        stored_board = self._load_size_settings().get("show_miniature_board")
+        self._show_miniature_board = _coerce_bool(
+            stored_board if stored_board is not None else cfg_default,
+            _MINIATURE_BOARD_DEFAULT,
         )
 
         root = QVBoxLayout(self)
@@ -1059,7 +1097,9 @@ class OpeningEncyclopediaDialog(QDialog):
                         is_flipped=False,
                         embedded=True,
                     )
+                    board.setVisible(self._show_miniature_board)
                     col.addWidget(board, 0, Qt.AlignmentFlag.AlignLeft)
+                    self._tabiya_board = board
             return block
 
         self._section_blocks = []
@@ -1628,6 +1668,25 @@ class OpeningEncyclopediaDialog(QDialog):
         except Exception:
             pass
 
+    def _set_show_miniature_board(self, show: bool) -> None:
+        show = bool(show)
+        if show == bool(self._show_miniature_board):
+            return
+        self._show_miniature_board = show
+        board = getattr(self, "_tabiya_board", None)
+        if board is not None:
+            board.setVisible(show)
+        self._beside_block_count = None
+        self._sync_scroll_content_size()
+        try:
+            from app.services.user_settings_service import UserSettingsService
+
+            UserSettingsService.get_instance().update_opening_encyclopedia_dialog(
+                {"show_miniature_board": show}
+            )
+        except Exception:
+            pass
+
     def _usable_screen_size(self) -> Tuple[int, int]:
         avail = self._available_geometry()
         margin = self._size_screen_margin
@@ -1966,6 +2025,7 @@ class OpeningEncyclopediaDialog(QDialog):
             "width": self.width(),
             "height": self.height(),
             "text_size": self._text_size_key,
+            "show_miniature_board": bool(self._show_miniature_board),
         }
         try:
             from app.services.user_settings_service import UserSettingsService
@@ -2244,6 +2304,18 @@ class OpeningEncyclopediaDialog(QDialog):
             text_group.addAction(action)
             text_menu.addAction(action)
 
+        board_action = QAction(self._miniature_board_label, menu)
+        board_svg = (
+            self._miniature_board_icon_svg
+            if self._show_miniature_board
+            else self._miniature_board_icon_unchecked_svg
+        )
+        board_action.setIcon(themed_icon_from_svg(board_svg, icon_tint))
+        board_action.setCheckable(True)
+        board_action.setChecked(bool(self._show_miniature_board))
+        board_action.setData(("miniature_board", None))
+        menu.addAction(board_action)
+
         if equal_key is None:
             menu.addSeparator()
             if (
@@ -2286,6 +2358,9 @@ class OpeningEncyclopediaDialog(QDialog):
             return
         if kind == "text_size":
             self._set_text_size(str(value))
+            return
+        if kind == "miniature_board":
+            self._set_show_miniature_board(not bool(self._show_miniature_board))
             return
         try:
             fraction = float(value)
@@ -2748,20 +2823,20 @@ class OpeningEncyclopediaDialog(QDialog):
         if lay is None:
             return 0
         chrome = 0
-        child_count = 0
+        visible_count = 0
         for i in range(lay.count()):
             item = lay.itemAt(i)
             if item is None:
                 continue
             widget = item.widget()
-            if widget is None:
+            if widget is None or widget.isHidden():
                 continue
-            child_count += 1
+            visible_count += 1
             if widget is body:
                 continue
             chrome += self._layout_widget_height(widget)
-        if child_count > 1:
-            chrome += max(0, lay.spacing()) * (child_count - 1)
+        if visible_count > 1:
+            chrome += max(0, lay.spacing()) * (visible_count - 1)
         return chrome
 
     def _measure_block_height(self, block: QWidget, width: int) -> int:

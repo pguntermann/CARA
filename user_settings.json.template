@@ -1027,7 +1027,8 @@
     "height_pct": 0,
     "width": 0,
     "height": 0,
-    "text_size": "medium"
+    "text_size": "medium",
+    "show_miniature_board": true
   },
   "player_stats_section_visibility": {
     "overview": true,

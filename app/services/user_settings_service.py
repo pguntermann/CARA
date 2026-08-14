@@ -445,6 +445,8 @@ class UserSettingsService:
                         model.set_ai_models(section_dict)
                     elif key == "ai_summary":
                         model.set_ai_summary(section_dict)
+                    elif key == "opening_encyclopedia_dialog":
+                        model.set_opening_encyclopedia_dialog(section_dict)
                     needs_save = True
                     # Refresh current_settings after model update
                     current_settings = model.get_settings()
@@ -600,7 +602,7 @@ class UserSettingsService:
         return self.get_model().get_settings()
 
     def get_opening_encyclopedia_dialog(self) -> Dict[str, Any]:
-        """Get Opening Encyclopedia dialog window-size preferences."""
+        """Get Opening Encyclopedia dialog preferences (size, text, miniature board)."""
         return self.get_model().get_opening_encyclopedia_dialog()
 
     def update_opening_encyclopedia_dialog(self, partial: Dict[str, Any]) -> None:
