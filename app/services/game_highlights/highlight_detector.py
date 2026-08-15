@@ -548,3 +548,26 @@ class HighlightDetector:
         
         return all_highlights
 
+
+def prefer_tactic_type(highlights: List[GameHighlight]) -> str:
+    """Pick one tactic ``rule_type`` using priority and exclusive groups.
+
+    Used by missed-tactic and best-move ranking when several allowlisted rules
+    fire on the same ply (e.g. fork vs skewer). Higher ``priority`` wins; tied
+    priorities break alphabetically for stability. Exclusive sibling groups
+    match Game Highlights (skewer preferred over fork when both apply).
+    """
+    candidates = [h for h in highlights if str(getattr(h, "rule_type", "") or "")]
+    if not candidates:
+        return ""
+    candidates.sort(
+        key=lambda h: (-int(getattr(h, "priority", 0) or 0), str(h.rule_type))
+    )
+    narrowed = HighlightDetector._prefer_exclusive_same_move_rules(candidates)
+    if not narrowed:
+        return ""
+    narrowed.sort(
+        key=lambda h: (-int(getattr(h, "priority", 0) or 0), str(h.rule_type))
+    )
+    return str(narrowed[0].rule_type or "")
+

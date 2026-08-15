@@ -70,7 +70,7 @@
         },
         "summary": {
           "placeholder_text_not_analyzed": "Run Game Analysis to view Game Summary",
-          "placeholder_text_to_be_implemented": "to be implemented...",
+          "placeholder_text_to_be_implemented": "This game's analysis can't be read. Please re-analyze the game to view the Game Summary.",
           "evaluation_graph": {
             "scale_cap_cp": 1000.0
           },

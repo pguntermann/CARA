@@ -2,7 +2,9 @@
 
 A miss is the engine PV1 on the position *before* the played ply, scored with
 the same allowlisted board-tactic rules used for best-move ranking (fork,
-skewer, pin, discovered attack). Mate and underdefended capture on PV1 are a
+skewer, pin, discovered attack). When several rules fire, the label follows
+rule priority and Game Highlights exclusive groups (e.g. skewer over fork).
+Mate and underdefended capture on PV1 are a
 fast accept and a rank boost — they do not gate the tactic pass, so a quiet
 fork with no ``x`` / ``+`` / ``#`` still counts. Bare checks alone do not
 count. Bare "missed capture" only counts when the target is underdefended
@@ -247,6 +249,8 @@ def detect_pv1_tactic(
     """Allowlisted tactic ``rule_type`` for PV1 on this side, or empty if none fires."""
     if not tactic_rules:
         return ""
+    from app.services.game_highlights.highlight_detector import prefer_tactic_type
+
     synth_moves = list(moves)
     synth_moves[index] = synth
     overrides = dict(
@@ -263,6 +267,7 @@ def detect_pv1_tactic(
             dummy.fen_black = fen_before
             overrides["prev_move"] = dummy
     context = make_rule_context(synth_moves, index, **overrides)
+    matches = []
     for rule in tactic_rules:
         try:
             highlights = rule.evaluate(synth, context)
@@ -270,8 +275,8 @@ def detect_pv1_tactic(
             continue
         for highlight in highlights:
             if highlight.is_white == is_white:
-                return str(highlight.rule_type or "")
-    return ""
+                matches.append(highlight)
+    return prefer_tactic_type(matches)
 
 
 def _classify_miss(

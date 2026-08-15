@@ -1533,7 +1533,7 @@ class DetailSummaryView(QWidget):
         )
         self.placeholder_text_to_be_implemented = summary_config.get(
             'placeholder_text_to_be_implemented',
-            'to be implemented...'
+            "This game's analysis can't be read. Please re-analyze the game to view the Game Summary.",
         )
         
         self._setup_ui()

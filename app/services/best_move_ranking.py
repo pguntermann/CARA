@@ -4,7 +4,8 @@ Order: classification, tactic hit, only-move, CPL, then discounted eval gain.
 The displayed CP gain stays the capped mover-perspective change; ranking uses
 a stricter gain that ignores recaptures, search-noise jumps, and already-won
 positions. Tactic detection is a dedicated allowlisted pass on candidates,
-not a boost from the Game Highlights story list.
+not a boost from the Game Highlights story list. When several rules fire,
+the label follows rule priority and exclusive groups (same as Highlights).
 """
 
 from __future__ import annotations
@@ -267,6 +268,8 @@ def detect_best_tactic(
     """Allowlisted tactic ``rule_type`` for this side, or empty if none fires."""
     if not tactic_rules:
         return ""
+    from app.services.game_highlights.highlight_detector import prefer_tactic_type
+
     context = make_rule_context(
         moves,
         index,
@@ -277,6 +280,7 @@ def detect_best_tactic(
         mistake_max_cpl=mistake_max_cpl,
     )
     move = moves[index]
+    matches = []
     for rule in tactic_rules:
         try:
             highlights = rule.evaluate(move, context)
@@ -284,8 +288,8 @@ def detect_best_tactic(
             continue
         for highlight in highlights:
             if highlight.is_white == is_white:
-                return str(highlight.rule_type or "")
-    return ""
+                matches.append(highlight)
+    return prefer_tactic_type(matches)
 
 
 @dataclass
