@@ -44,6 +44,26 @@ def normalize_opening_name(name: str) -> str:
     return s.strip(" .,;:")
 
 
+def prefer_rows_matching_display_name(
+    rows: List[Any],
+    display_name: str,
+) -> List[Any]:
+    """Prefer book rows whose name matches ``display_name``; else keep ``rows``.
+
+    Encyclopedia family ids often absorb differently labeled ECO names (e.g.
+    ``Reti: KIA`` → ``kings-indian-attack``). Using every mapped name for the
+    tabiya can collapse the diagram to an almost-empty opening position.
+    Title-matched rows keep the miniature aligned with the article the user opened.
+    """
+    if not rows:
+        return []
+    key = normalize_opening_name(display_name)
+    if not key:
+        return list(rows)
+    matched = [row for row in rows if normalize_opening_name(getattr(row, "name", "")) == key]
+    return matched if matched else list(rows)
+
+
 def _fold_search_text(text: str) -> str:
     """Lowercase, expand umlauts, and strip punctuation for tolerant search matching.
 
@@ -738,10 +758,12 @@ class OpeningEncyclopediaService:
     def tabiya_fen(self, opening_id: str) -> Optional[str]:
         """Return the named-tabiya FEN for ``opening_id``, or ``None``.
 
-        If ECO names resolve to this id, use those rows and the shallowest
+        If ECO names resolve to this id, prefer rows whose book name matches
+        this opening's encyclopedia display name, then take the shallowest
         unique named position (sibling pop only at min depth). That keeps
-        transpositional move orders (e.g. ``1. e4 e5`` vs ``1. e4 d6``) from
-        collapsing the diagram to ``1. e4``.
+        alias labels mapped onto the same id (e.g. ``Reti: KIA`` under
+        King's Indian Attack) from collapsing the diagram to ``1. Nf3``,
+        and still avoids transpositional move orders collapsing to ``1. e4``.
 
         If this id has no book name of its own, include descendant ids and
         take the common SAN prefix so a parent still gets a defining diagram.
@@ -756,7 +778,12 @@ class OpeningEncyclopediaService:
 
         exact = self._ensure_rows_by_oid().get(oid, [])
         if exact:
-            fen = compute_tabiya_fen(exact, family=False)
+            self._ensure_loaded()
+            display = str((self._openings.get(oid) or {}).get("display_name") or "")
+            fen = compute_tabiya_fen(
+                prefer_rows_matching_display_name(exact, display),
+                family=False,
+            )
         else:
             fen = compute_tabiya_fen(self._rows_for_tabiya(oid), family=True)
         self._tabiya_fen_by_oid[oid] = fen

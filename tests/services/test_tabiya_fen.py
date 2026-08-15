@@ -10,7 +10,10 @@ import chess
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from app.services.opening_encyclopedia_service import OpeningEncyclopediaService
+from app.services.opening_encyclopedia_service import (
+    OpeningEncyclopediaService,
+    prefer_rows_matching_display_name,
+)
 from app.services.opening_service import (
     EcoBookRow,
     OpeningService,
@@ -106,6 +109,29 @@ class TestComputeTabiyaFen(unittest.TestCase):
         )
 
 
+class TestPreferRowsMatchingDisplayName(unittest.TestCase):
+    def test_prefers_title_matched_rows(self) -> None:
+        title = _row("1. Nf3 d5 2. g3", name="King's Indian Attack", eco="A07")
+        alias = _row("1. Nf3 Nf6 2. g3", name="Reti: KIA", eco="A05")
+        preferred = prefer_rows_matching_display_name(
+            [alias, title], "King's Indian Attack"
+        )
+        self.assertEqual(preferred, [title])
+        chosen = compute_tabiya_fen(preferred)
+        self.assertEqual(
+            OpeningService.book_key(chosen or ""),
+            OpeningService.book_key(title.fen),
+        )
+
+    def test_falls_back_when_no_title_match(self) -> None:
+        alias = _row("1. Nf3 Nf6 2. g3", name="Reti: KIA", eco="A05")
+        rows = [alias]
+        self.assertEqual(
+            prefer_rows_matching_display_name(rows, "King's Indian Attack"),
+            rows,
+        )
+
+
 class TestEncyclopediaTabiyaFen(unittest.TestCase):
     def setUp(self) -> None:
         root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -174,6 +200,20 @@ class TestEncyclopediaTabiyaFen(unittest.TestCase):
     def test_unknown_id_returns_none(self) -> None:
         self.assertIsNone(self.svc.tabiya_fen("not-an-opening"))
         self.assertIsNone(self.svc.tabiya_fen(""))
+
+    def test_kings_indian_attack_does_not_collapse_to_nf3(self) -> None:
+        """Alias Reti:KIA lines must not pop the KIA family diagram to 1.Nf3."""
+        fen = self.svc.tabiya_fen("kings-indian-attack")
+        expected = fen_after_sans(parse_move_sans("1. Nf3 d5 2. g3"))
+        self.assertIsNotNone(fen)
+        self.assertEqual(
+            OpeningService.book_key(fen or ""),
+            OpeningService.book_key(expected or ""),
+        )
+        self.assertNotEqual(
+            OpeningService.book_key(fen or ""),
+            OpeningService.book_key(fen_after_sans(["Nf3"]) or ""),
+        )
 
 
 if __name__ == "__main__":
