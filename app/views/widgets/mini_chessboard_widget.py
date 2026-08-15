@@ -4,11 +4,10 @@ from PyQt6.QtWidgets import QWidget
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QPolygonF
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtCore import Qt, QRect, QRectF, QPointF
-from pathlib import Path
 import chess
-import sys
 from typing import Dict, Any, Optional, List, Tuple
 from app.services.logging_service import LoggingService
+from app.utils.path_resolver import get_app_resource_path
 
 # Shared across all mini boards: piece-set directory -> SVG renderers.
 _SVG_RENDERER_CACHE: Dict[str, Dict[Tuple[str, str], QSvgRenderer]] = {}
@@ -123,15 +122,7 @@ class MiniChessBoardWidget(QWidget):
     
     def _load_pieces(self) -> None:
         """Load chess piece SVG files from the configured path (shared cache)."""
-        # Resolve path relative to repository root (stable regardless of module location)
-        repo_root = Path(__file__).resolve().parents[3]
-        svg_path = Path(self.svg_path)
-        pieces_dir = svg_path if svg_path.is_absolute() else (repo_root / svg_path)
-
-        # Backward compatibility: some configs might be relative to app/ instead of repo root
-        if not pieces_dir.exists():
-            app_root = Path(__file__).resolve().parents[2]
-            pieces_dir = svg_path if svg_path.is_absolute() else (app_root / svg_path)
+        pieces_dir = get_app_resource_path(self.svg_path)
 
         if not pieces_dir.exists():
             logging_service = LoggingService.get_instance()

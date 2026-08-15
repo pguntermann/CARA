@@ -28,6 +28,7 @@ from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 
 from app.models.board_model import BoardModel
 from app.utils.pgn_variation_path import is_mainline_path
+from app.utils.path_resolver import get_app_resource_path
 
 if TYPE_CHECKING:
     from app.models.moveslist_model import MovesListModel
@@ -220,7 +221,7 @@ class ChessBoardWidget(QWidget):
         
         # Pieces
         pieces_config = board_config.get('pieces', {})
-        self.svg_path = pieces_config.get('svg_path', 'resources/chesspieces/default')
+        self.svg_path = pieces_config.get('svg_path', 'app/resources/chesspieces/default')
         self.piece_padding_ratio = max(0.0, min(0.5, float(pieces_config.get('padding_ratio', 0.1))))
 
         anim_config = board_config.get('piece_move_animation', {}) or {}
@@ -1516,15 +1517,7 @@ class ChessBoardWidget(QWidget):
     
     def _load_pieces(self) -> None:
         """Load chess piece SVG files from the configured path."""
-        # Resolve path relative to repository root (stable regardless of module location)
-        repo_root = Path(__file__).resolve().parents[3]
-        svg_path = Path(self.svg_path)
-        pieces_dir = svg_path if svg_path.is_absolute() else (repo_root / svg_path)
-
-        # Backward compatibility: some configs might be relative to app/ instead of repo root
-        if not pieces_dir.exists():
-            app_root = Path(__file__).resolve().parents[2]
-            pieces_dir = svg_path if svg_path.is_absolute() else (app_root / svg_path)
+        pieces_dir = get_app_resource_path(self.svg_path)
         
         if not pieces_dir.exists():
             logging_service = LoggingService.get_instance()
