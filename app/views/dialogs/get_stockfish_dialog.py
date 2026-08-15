@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QColor, QShowEvent
 from PyQt6.QtWidgets import (
     QButtonGroup,
@@ -18,6 +19,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QRadioButton,
     QScrollArea,
+    QSizePolicy,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -30,6 +32,7 @@ from app.services.stockfish_download_service import (
     format_bytes,
 )
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.themed_icon import SVG_MENU_FOLDER_OPEN, themed_icon_from_svg
 from app.views.style import StyleManager
 
 
@@ -139,6 +142,9 @@ class GetStockfishDialog(QDialog):
         self.input_border_radius = int(inputs_config.get("border_radius", 3))
         self.input_padding = inputs_config.get("padding", [8, 6])
         self.input_min_height = int(inputs_config.get("minimum_height", 30))
+        self.browse_button_icon_svg = str(
+            inputs_config.get("browse_button_icon_svg") or SVG_MENU_FOLDER_OPEN
+        )
 
         buttons_config = dialog_config.get("buttons", {})
         self.button_width = int(buttons_config.get("width", 110))
@@ -326,11 +332,21 @@ class GetStockfishDialog(QDialog):
 
         row = QHBoxLayout()
         row.setSpacing(8)
+        row.setContentsMargins(0, 0, 0, 0)
         row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         self.folder_edit = QLineEdit()
         self.folder_edit.setText(str(self.controller.install_directory))
-        row.addWidget(self.folder_edit, 1)
-        self.browse_button = QPushButton(self.copy_button_browse)
+        self.folder_edit.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        row.addWidget(self.folder_edit, 1, Qt.AlignmentFlag.AlignVCenter)
+        # Icon-only browse control — same pattern as Add Engine dialog.
+        self.browse_button = QPushButton()
+        self.browse_button.setToolTip(self.copy_button_browse)
+        self.browse_button.setAccessibleName(self.copy_button_browse)
+        self.browse_button.setSizePolicy(
+            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
+        )
         self.browse_button.clicked.connect(self._browse_folder)
         row.addWidget(self.browse_button, 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addLayout(row)
@@ -496,14 +512,34 @@ class GetStockfishDialog(QDialog):
         ):
             button.setFixedHeight(self.button_height)
 
-        # Match Browse to the folder field height (not the dialog footer buttons).
+        # Match Browse to the folder field (Add Engine style: themed folder icon).
+        input_v_pad = (
+            int(self.input_padding[1])
+            if isinstance(self.input_padding, (list, tuple))
+            and len(self.input_padding) >= 2
+            else 6
+        )
         StyleManager.style_buttons(
             [self.browse_button],
             self.config,
             self.dialog_bg,
-            self.button_border,
-            min_height=self.input_min_height,
+            self.input_border,
+            text_color=self.input_text,
+            font_family=self.input_font_family,
+            font_size=self.input_font_size,
+            border_radius=self.input_border_radius,
+            padding=input_v_pad,
         )
+        browse_tint = (
+            int(self.input_text[0]),
+            int(self.input_text[1]),
+            int(self.input_text[2]),
+        )
+        self.browse_button.setIcon(
+            themed_icon_from_svg(self.browse_button_icon_svg, browse_tint)
+        )
+        self.browse_button.setText("")
+        self.browse_button.setIconSize(QSize(20, 20))
         self._align_folder_row_heights()
 
         self._style_binary_scroll_area()
@@ -537,18 +573,34 @@ class GetStockfishDialog(QDialog):
         widget.setPalette(palette)
 
     def _align_folder_row_heights(self) -> None:
-        """Force folder path field and Browse button to the same height."""
+        """Square icon Browse button matching the folder field height (Add Engine)."""
+        self.folder_edit.updateGeometry()
+        self.browse_button.updateGeometry()
         height = max(
             int(self.input_min_height),
             int(self.folder_edit.sizeHint().height()),
             int(self.browse_button.sizeHint().height()),
         )
-        self.folder_edit.setFixedHeight(height)
-        self.browse_button.setFixedHeight(height)
-        self.browse_button.setMinimumWidth(0)
-        # Prefer content width for Browse so it does not stretch like footer buttons.
-        hint_w = max(int(self.browse_button.sizeHint().width()), height)
-        self.browse_button.setFixedWidth(hint_w)
+        icon_px = max(16, min(24, height - 8))
+        self.browse_button.setIconSize(QSize(icon_px, icon_px))
+
+        for widget in (self.folder_edit, self.browse_button):
+            widget.setFixedHeight(height)
+            widget.setMinimumHeight(height)
+            widget.setMaximumHeight(height)
+        self.browse_button.setContentsMargins(0, 0, 0, 0)
+        self.browse_button.setFixedWidth(height)
+        self.browse_button.setSizePolicy(
+            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
+        )
+
+        sheet = self.browse_button.styleSheet()
+        sheet = re.sub(r"(min-height|max-height|height|min-width|max-width|width):\s*\d+px;?", "", sheet)
+        if "margin:" not in sheet:
+            sheet = sheet.replace("QPushButton {", "QPushButton {\nmargin: 0px;")
+        else:
+            sheet = re.sub(r"margin:\s*[^;]+;", "margin: 0px;", sheet)
+        self.browse_button.setStyleSheet(sheet)
 
     def _style_binary_scroll_area(self) -> None:
         """Theme scroll chrome without stylesheet rules that retarget child QWidgets.
