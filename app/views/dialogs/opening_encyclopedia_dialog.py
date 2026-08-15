@@ -734,6 +734,7 @@ class OpeningEncyclopediaDialog(QDialog):
         self._image_panel: Optional[QWidget] = None
         self._image_text_gap: int = 16
         self._tabiya_board: Optional[MiniChessBoardWidget] = None
+        self._tabiya_board_pending_show = False
         self._beside_block_count: Optional[int] = None
         self._resize_sync_timer = QTimer(self)
         self._resize_sync_timer.setSingleShot(True)
@@ -1097,9 +1098,12 @@ class OpeningEncyclopediaDialog(QDialog):
                         is_flipped=False,
                         embedded=True,
                     )
-                    board.setVisible(self._show_miniature_board)
+                    # Keep hidden until after the first showEvent size apply. A visible
+                    # ~160px child on the min-sized first frame causes a choppy open.
+                    board.setVisible(False)
                     col.addWidget(board, 0, Qt.AlignmentFlag.AlignLeft)
                     self._tabiya_board = board
+                    self._tabiya_board_pending_show = bool(self._show_miniature_board)
             return block
 
         self._section_blocks = []
@@ -1686,6 +1690,18 @@ class OpeningEncyclopediaDialog(QDialog):
             )
         except Exception:
             pass
+
+    def _reveal_tabiya_board_after_initial_size(self) -> None:
+        """Show the tabiya board only after the dialog has its real geometry."""
+        self._tabiya_board_pending_show = False
+        if not self._show_miniature_board:
+            return
+        board = self._tabiya_board
+        if board is None or board.isVisible():
+            return
+        board.setVisible(True)
+        self._beside_block_count = None
+        self._sync_scroll_content_size()
 
     def _usable_screen_size(self) -> Tuple[int, int]:
         avail = self._available_geometry()
@@ -3042,6 +3058,8 @@ class OpeningEncyclopediaDialog(QDialog):
             self._size_applied_on_show = True
         self._beside_block_count = None  # force initial placement
         self._sync_scroll_content_size()
+        if self._tabiya_board_pending_show:
+            self._reveal_tabiya_board_after_initial_size()
 
     @staticmethod
     def show_entry(
