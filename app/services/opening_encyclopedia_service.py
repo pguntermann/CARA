@@ -353,7 +353,7 @@ class OpeningEncyclopediaService:
             return
 
         try:
-            conn = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+            conn = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True)
             conn.row_factory = sqlite3.Row
             self._conn = conn
             alias_buckets: Dict[str, List[str]] = {}
