@@ -1,5 +1,28 @@
 # Release Notes
 
+# CARA v2.8.5 - Missed Tactics, Improved "Best-moves" detection, and Encyclopedia Diagrams
+
+**Release Date:** 16.08.2026
+
+This release adds **Missed Tactics** to the Critical Moments section (when applicable), improves the selection of the top best moves, adds a running **accuracy curves** chart to the Game Summary, adds an (optional) **miniature board diagram** to the Opening Encyclopedia, and includes several further smaller refinements and bug fixes.
+
+## New Features
+
+- **Missed tactics:** The critical-moments section now lists top missed tactics (forks, skewers, pins, mates, free captures) based on the engine’s best move on error plies — alongside Best and Worst moves. Only shown when missed tactics have actually been detected.
+- **Best-move selection:** Improved how Best Moves are selected for the summary. Classification, tactics, only-move, CPL/CPG are now factored into the decision.
+- **Accuracy curves:** Black and White running accuracy curve shown in the Phase accuracy section.
+- **Opening Encyclopedia - Miniature board:** Encyclopedia entries now show a diagram of the variation’s defining (tabiya) position. Visibility is toggled from the "layout" menu.
+- **Player stats - Error patterns:** Added a game-coverage slider, controlling the frequency cut-off for error patterns.
+
+## Other Improvements and Bug Fixes
+
+- **Opening Encyclopedia:** Added 100 additional entries to the opening encyclopedia database, bringing the current number of included entries to 1400.
+- **Get Stockfish wizard:** Folder browse control aligned with the Add Engine icon button style.
+- **Piece SVG paths:** Shared, cleaner path lookup for main and miniature boards.
+- **Various small refinements:** Various small UX/UI improvements and small bug fixes.
+
+---
+
 # CARA v2.8.4 - Game Highlight Revisited
 
 **Release Date:** 13.08.2026
