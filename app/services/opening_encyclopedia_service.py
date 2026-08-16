@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.utils.path_resolver import get_app_root
+from app.utils.path_resolver import get_app_resource_path
 
 _SPELLING = {
     "defence": "defense",
@@ -304,9 +304,9 @@ class OpeningEncyclopediaService:
             )
         )
         path = Path(str(rel))
-        if not path.is_absolute():
-            path = get_app_root() / path
-        return path
+        if path.is_absolute():
+            return path
+        return get_app_resource_path(str(path))
 
     @staticmethod
     def _images_from_row(row: sqlite3.Row) -> Tuple[EncyclopediaImage, ...]:
@@ -353,7 +353,10 @@ class OpeningEncyclopediaService:
             return
 
         try:
-            conn = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True)
+            # Plain path open (not URI): drive letters and Parallels UNC shares
+            # (\\Mac\...) both work. query_only keeps the shipped DB read-only.
+            conn = sqlite3.connect(str(path.resolve()))
+            conn.execute("PRAGMA query_only=ON")
             conn.row_factory = sqlite3.Row
             self._conn = conn
             alias_buckets: Dict[str, List[str]] = {}
