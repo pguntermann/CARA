@@ -1,5 +1,30 @@
 # Release Notes
 
+# CARA v2.8.6 - Maintenance Release
+
+**Release Date:** 17.08.2026
+
+This is a **maintenance and bugfix** release focused mainly **opening name lookup** and **Opening Encyclopedia** name resolution, and some code refactoring.
+
+## New Features
+
+- **Opening Encyclopedia – Enlarge diagram:** Click the miniature board to open a larger in-dialog overlay. Close with Esc, Enter/Space, or a click.
+- **Accuracy curves:** Hovering the Game Summary running-accuracy chart in the Phase Analysis section shows the move and White/Black running accuracies.
+
+## Enhancements
+
+- **Opening lookup:** Book lookup now follows the curated named (eco_base) positions. Interpolated in-between positions stay in-book and carry forward the last valid opening name until the next named tabiya.
+- **Encyclopedia name resolution:** Lookup better resolves compound labels. Better name resolution for incomplete family-branches, specifically when sibling entries under a different family root are already available.
+- **Coverage slider:** The Player Stats %-coverage slider no longer consumes mouse-wheel scrolling; resulting in a better scrolling experience.
+
+## Bug Fixes
+
+- **Encyclopedia articles:** Fixed some plain wrong name resolutions in the resolution table.
+- **Player Stats – opening error patterns:** Fixed an issue when opening related error patterns were not correctly grouped and the %-coverage slider value was not correctly applied.
+
+
+---
+
 # CARA v2.8.5 - Missed Tactics, Improved "Best-moves" detection, and Encyclopedia Diagrams
 
 **Release Date:** 16.08.2026
