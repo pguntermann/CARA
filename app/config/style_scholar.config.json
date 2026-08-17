@@ -1654,7 +1654,8 @@
               255,
               0
             ],
-            "current_move_line_width": 2
+            "current_move_line_width": 2,
+            "hover_circle_radius": 6
           },
           "colors": {
             "book_move": {

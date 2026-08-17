@@ -2449,6 +2449,7 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.panels.detail.summary.accuracy_curve.font_size",
     "ui.panels.detail.summary.accuracy_curve.grid_color",
     "ui.panels.detail.summary.accuracy_curve.height",
+    "ui.panels.detail.summary.accuracy_curve.hover_circle_radius",
     "ui.panels.detail.summary.accuracy_curve.line_width",
     "ui.panels.detail.summary.accuracy_curve.min_font_size",
     "ui.panels.detail.summary.accuracy_curve.min_grid_lines",
