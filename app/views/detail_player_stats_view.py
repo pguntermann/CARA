@@ -2599,6 +2599,13 @@ class MoveQualityOverTimeChartWidget(QWidget):
         self.update()
 
 
+class NoWheelSlider(QSlider):
+    """Slider that ignores mouse wheel so the outer scroll area handles scrolling."""
+
+    def wheelEvent(self, event) -> None:
+        event.ignore()
+
+
 class NoWheelTreeWidget(QTreeWidget):
     """Tree widget that ignores mouse wheel events so the outer scroll area handles scrolling,
     and uses double-click only for custom handlers (no auto expand/collapse)."""
@@ -6250,7 +6257,7 @@ class DetailPlayerStatsView(QWidget):
         slider_caption.setToolTip(str(slider_tooltip))
         slider_layout.addWidget(slider_caption)
 
-        slider = QSlider(Qt.Orientation.Horizontal)
+        slider = NoWheelSlider(Qt.Orientation.Horizontal)
         slider.setMinimum(int(round(min_pct)))
         slider.setMaximum(int(round(max_pct)))
         slider.setValue(int(round(cutoff)))
