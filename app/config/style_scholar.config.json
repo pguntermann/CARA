@@ -5562,6 +5562,11 @@
               240,
               230
             ]
+          },
+          "board_overlay": {
+            "tooltip": "Click to enlarge",
+            "caption": "Tabiya",
+            "min_size": 240
           }
         },
         "buttons": {
