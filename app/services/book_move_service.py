@@ -78,10 +78,8 @@ class BookMoveService:
         # after the move is in ECO database
         board_copy = board.copy()
         board_copy.push(move)
-        fen_after = board_copy.fen().split(' ')[0]  # Just position part
-        
-        eco_info = self.opening_service.get_opening_info(fen_after)
-        if eco_info[0] is not None:  # ECO code found
+        fen_after = board_copy.fen()
+        if self.opening_service.is_book_position(fen_after):
             return True
         
         # 2. Check Polyglot books (move-based)
