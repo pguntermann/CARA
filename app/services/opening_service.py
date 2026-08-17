@@ -158,6 +158,39 @@ def _fen_from_lcp(
     return parent if parent else items[0][1].fen
 
 
+def prefer_largest_move_order_cluster(
+    rows: Sequence[EcoBookRow],
+) -> List[EcoBookRow]:
+    """If mapped lines share at most one ply, keep the largest next-move group.
+
+    Named variations sometimes mix two move orders on one encyclopedia id
+    (Sicilian ``1.e4 c5`` vs Modern ``1.e4 g6``). Their common prefix is only
+    ``e4``; using every row then draws a false family diagram. First-move
+    families (King's / Queen's Pawn) should not call this helper.
+    """
+    if len(rows) < 2:
+        return list(rows)
+    parsed: List[Tuple[EcoBookRow, List[str]]] = [
+        (row, parse_move_sans(row.moves)) for row in rows
+    ]
+    lcp = _lcp_len([sans for _row, sans in parsed])
+    if lcp > 1:
+        return list(rows)
+    groups: Dict[str, List[EcoBookRow]] = {}
+    group_sans: Dict[str, List[List[str]]] = {}
+    for row, sans in parsed:
+        branch = sans[lcp] if lcp < len(sans) else ""
+        groups.setdefault(branch, []).append(row)
+        group_sans.setdefault(branch, []).append(sans)
+    if len(groups) < 2:
+        return list(rows)
+    best_branch = min(
+        groups,
+        key=lambda san: (-len(groups[san]), -_lcp_len(group_sans[san]), san),
+    )
+    return groups[best_branch]
+
+
 def compute_tabiya_fen(
     rows: Sequence[EcoBookRow],
     *,
