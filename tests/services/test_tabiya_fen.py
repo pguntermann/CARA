@@ -20,6 +20,7 @@ from app.services.opening_service import (
     compute_tabiya_fen,
     fen_after_sans,
     parse_move_sans,
+    prefer_largest_move_order_cluster,
 )
 
 
@@ -131,6 +132,75 @@ class TestPreferRowsMatchingDisplayName(unittest.TestCase):
             rows,
         )
 
+    def test_prefix_comma_when_no_exact_title(self) -> None:
+        unpin = _row(
+            "1. e4 c5 2. Nf3 g6 3. d4 Bg7 4. Nc3 Qa5 5. Bd2",
+            name="Pterodactyl Defense: Sicilian, Unpin",
+            eco="B27",
+        )
+        comma = _row(
+            "1. e4 g6 2. d4 Bg7 3. Nc3 c5 4. Nf3 Qa5 5. Be3",
+            name="Pterodactyl Defense, Sicilian",
+            eco="B06",
+        )
+        preferred = prefer_rows_matching_display_name(
+            [comma, unpin], "Pterodactyl Defense: Sicilian"
+        )
+        self.assertEqual(preferred, [unpin])
+
+    def test_exact_title_wins_over_comma_children(self) -> None:
+        root = _row("1. d4 d5", name="Queen's Pawn Game", eco="D00")
+        child = _row(
+            "1. d4 g6",
+            name="Queen's Pawn Game: Modern Defense",
+            eco="A40",
+        )
+        preferred = prefer_rows_matching_display_name(
+            [root, child], "Queen's Pawn Game"
+        )
+        self.assertEqual(preferred, [root])
+
+    def test_space_is_not_a_title_continuation(self) -> None:
+        attack = _row("1. Nf3 d5 2. g3", name="King's Indian Attack", eco="A07")
+        other = _row("1. d4 Nf6 2. c4 e6", name="Nimzo-Indian Defense", eco="E20")
+        rows = [attack, other]
+        self.assertEqual(
+            prefer_rows_matching_display_name(rows, "King's Indian"),
+            rows,
+        )
+
+
+class TestPreferLargestMoveOrderCluster(unittest.TestCase):
+    def test_keeps_majority_branch_when_lcp_is_one_ply(self) -> None:
+        c5_a = _row(
+            "1. e4 c5 2. Nf3 g6 3. d4 Bg7 4. Nc3 Qa5 5. Bd2",
+            name="Pterodactyl Defense: Sicilian, Unpin",
+        )
+        c5_b = _row(
+            "1. e4 c5 2. Nf3 g6 3. d4 Bg7 4. Nc3 Qa5 5. Be3",
+            name="Pterodactyl Defense: Sicilian, Anhanguera",
+        )
+        g6 = _row(
+            "1. e4 g6 2. d4 Bg7 3. Nc3 c5 4. Nf3 Qa5 5. Bc4",
+            name="Pterodactyl Defense: Sicilian, Siroccopteryx",
+        )
+        clustered = prefer_largest_move_order_cluster([g6, c5_a, c5_b])
+        self.assertEqual(clustered, [c5_a, c5_b])
+        chosen = compute_tabiya_fen(clustered)
+        expected = fen_after_sans(
+            parse_move_sans("1. e4 c5 2. Nf3 g6 3. d4 Bg7 4. Nc3 Qa5")
+        )
+        self.assertEqual(
+            OpeningService.book_key(chosen or ""),
+            OpeningService.book_key(expected or ""),
+        )
+
+    def test_leaves_coherent_lines_unchanged(self) -> None:
+        a = _row("1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5")
+        b = _row("1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6")
+        rows = [a, b]
+        self.assertEqual(prefer_largest_move_order_cluster(rows), rows)
+
 
 class TestEncyclopediaTabiyaFen(unittest.TestCase):
     def setUp(self) -> None:
@@ -213,6 +283,38 @@ class TestEncyclopediaTabiyaFen(unittest.TestCase):
         self.assertNotEqual(
             OpeningService.book_key(fen or ""),
             OpeningService.book_key(fen_after_sans(["Nf3"]) or ""),
+        )
+
+    def test_pterodactyl_sicilian_uses_c5_move_order(self) -> None:
+        """Colon Sicilian lines must not mix with Modern 1.e4 g6 into 1.e4."""
+        fen = self.svc.tabiya_fen("pterodactyl-defense/sicilian")
+        expected = fen_after_sans(
+            parse_move_sans("1. e4 c5 2. Nf3 g6 3. d4 Bg7")
+        )
+        self.assertIsNotNone(fen)
+        self.assertEqual(
+            OpeningService.book_key(fen or ""),
+            OpeningService.book_key(expected or ""),
+        )
+        self.assertNotEqual(
+            OpeningService.book_key(fen or ""),
+            OpeningService.book_key(fen_after_sans(["e4"]) or ""),
+        )
+
+    def test_kings_pawn_game_tabiya_is_e4(self) -> None:
+        fen = self.svc.tabiya_fen("kings-pawn-game")
+        self.assertIsNotNone(fen)
+        self.assertEqual(
+            OpeningService.book_key(fen or ""),
+            OpeningService.book_key(fen_after_sans(["e4"]) or ""),
+        )
+
+    def test_queens_pawn_game_tabiya_is_d4(self) -> None:
+        fen = self.svc.tabiya_fen("queens-pawn-game")
+        self.assertIsNotNone(fen)
+        self.assertEqual(
+            OpeningService.book_key(fen or ""),
+            OpeningService.book_key(fen_after_sans(["d4"]) or ""),
         )
 
 

@@ -423,15 +423,15 @@ class BulkReplaceService:
         progress_callback: Optional[BulkProgressCallback] = None,
         cancel_flag: Optional[Callable[[], bool]] = None
     ) -> BulkOperationStats:
-        """Update ECO tags based on opening analysis of game moves.
-        
+        """Update ECO tags from OpeningService.get_final_eco_for_game.
+
         Args:
             database: DatabaseModel instance to process.
             opening_service: OpeningService instance for ECO lookup.
             game_indices: Optional list of game indices to process (None = all games).
             progress_callback: Optional callback(completed, total, message, updated, failed, skipped).
             cancel_flag: Optional function that returns True if operation should be cancelled.
-            
+
         Returns:
             BulkOperationStats with operation statistics.
         """

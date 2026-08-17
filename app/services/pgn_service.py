@@ -6,7 +6,6 @@ import json
 import multiprocessing
 import os
 import re
-from pathlib import Path
 from typing import Optional, List, Dict, Any, Callable, Tuple
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -14,6 +13,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from app.services.logging_service import LoggingService, init_worker_logging
 from app.services.pgn_formatter_service import PGN_MOVE_RESULT_RE
 from app.utils.concurrency_utils import get_process_pool_max_workers
+from app.utils.path_resolver import get_app_resource_path
 
 
 class PgnParseResult:
@@ -640,8 +640,7 @@ class PgnService:
         if PgnService._export_config_cache is None:
             try:
                 # Read config file directly without validation to avoid potential issues
-                config_dir = Path(__file__).parent.parent / "config"
-                config_path = config_dir / "config.json"
+                config_path = get_app_resource_path("app/config/config.json")
                 
                 if config_path.exists():
                     with open(config_path, "r", encoding="utf-8") as f:

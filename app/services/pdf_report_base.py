@@ -20,6 +20,7 @@ from PyQt6.QtGui import (
 )
 
 from app.utils.pdf_report_config import resolve_pdf_report_config
+from app.utils.path_resolver import get_app_resource_path
 
 
 class BasePDFReportService:
@@ -125,10 +126,9 @@ class BasePDFReportService:
         if raw.is_absolute():
             candidates.append(raw)
         else:
-            repo_root = Path(__file__).resolve().parents[2]
-            candidates.append(repo_root / raw)
-            candidates.append(repo_root / "appicon.svg")
-            candidates.append(repo_root / "app" / "resources" / "icons" / "cara120.png")
+            candidates.append(get_app_resource_path(str(raw)))
+            candidates.append(get_app_resource_path("appicon.svg"))
+            candidates.append(get_app_resource_path("app/resources/icons/cara120.png"))
         for path in candidates:
             if path.exists():
                 self._logo_file = path

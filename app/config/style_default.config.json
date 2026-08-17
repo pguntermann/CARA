@@ -1607,7 +1607,8 @@
               255,
               0
             ],
-            "current_move_line_width": 2
+            "current_move_line_width": 2,
+            "hover_circle_radius": 6
           },
           "colors": {
             "book_move": [
@@ -5430,7 +5431,18 @@
             130
           ],
           "fallback_tooltip_pending": "This line isn't researched yet \u2014 showing {parent}.",
-          "fallback_tooltip_skipped": "No dedicated entry \u2014 showing {parent}."
+          "fallback_tooltip_skipped": "No dedicated entry \u2014 showing {parent}.",
+          "nearest_background": [
+            48,
+            58,
+            70
+          ],
+          "nearest_text_color": [
+            150,
+            185,
+            220
+          ],
+          "nearest_tooltip": "Explorer label \"{explorer}\" — article \"{article}\"."
         },
         "search": {
           "icon_size": 18,
@@ -5664,6 +5676,11 @@
               235,
               240
             ]
+          },
+          "board_overlay": {
+            "tooltip": "Click to enlarge",
+            "caption": "Tabiya",
+            "min_size": 240
           }
         },
         "buttons": {

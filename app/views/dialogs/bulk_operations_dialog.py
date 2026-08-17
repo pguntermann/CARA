@@ -66,6 +66,7 @@ from app.utils.bulk_regex_presets import (
 from app.models.database_model import DatabaseModel
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.path_display_utils import truncate_path_for_display, truncate_text_middle
+from app.utils.path_resolver import get_app_resource_path
 from app.utils.themed_icon import themed_icon_from_svg
 from app.views.delegates.combobox_separator_delegate import (
     apply_combobox_separator_delegate,
@@ -1172,7 +1173,7 @@ class _OperationEditorOverlay(QWidget):
             self.label_font_size,
             bg,
             border,
-            Path(__file__).resolve().parents[2] / "resources" / "icons" / "checkmark.svg",
+            get_app_resource_path("app/resources/icons/checkmark.svg"),
         )
         self._lock_card_height_to_full_form()
         self._on_mode_changed()
@@ -2521,7 +2522,7 @@ class BulkOperationsDialog(QDialog):
         if radios:
             StyleManager.style_radio_buttons(radios, self.config)
 
-        checkmark = Path(__file__).resolve().parents[2] / "resources" / "icons" / "checkmark.svg"
+        checkmark = get_app_resource_path("app/resources/icons/checkmark.svg")
         dialog_checks = [
             c
             for c in self.findChildren(QCheckBox)

@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
     QGridLayout, QSizePolicy, QSplitter, QMenu, QApplication, QToolButton, QButtonGroup,
-    QFileDialog, QMessageBox,
+    QFileDialog, QMessageBox, QToolTip,
 )
 from PyQt6.QtCore import Qt, QEvent, QRect, QRectF, QPointF, QPoint, QVariantAnimation, QEasingCurve
 from PyQt6.QtGui import (
@@ -15,6 +15,7 @@ from PyQt6.QtGui import (
     QMouseEvent,
     QContextMenuEvent,
     QPainterPath,
+    QBrush,
 )
 from typing import Dict, Any, Optional, List, Tuple, TYPE_CHECKING, Callable
 import math
@@ -677,6 +678,7 @@ class AccuracyCurveWidget(QWidget):
                 eval_config.get("current_move_line_width", 2),
             )
         )
+        self._hover_circle_radius = int(chart_config.get("hover_circle_radius", 6))
 
         self.white_data: List[Tuple[int, float]] = []
         self.black_data: List[Tuple[int, float]] = []
@@ -686,10 +688,12 @@ class AccuracyCurveWidget(QWidget):
         self.opening_end: int = 0
         self.middlegame_end: int = 0
         self._navigate_to_ply_callback: Optional[Callable[[int], None]] = None
+        self._hover_ply: Optional[int] = None
 
         self.setFixedHeight(self._height)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setMouseTracking(True)
 
     def set_navigation_callback(self, callback: Optional[Callable[[int], None]]) -> None:
         self._navigate_to_ply_callback = callback
@@ -710,6 +714,7 @@ class AccuracyCurveWidget(QWidget):
         )
         max_move = max((ply_to_fullmove(p) for p in self._available_plys), default=1)
         self._x_domain = self._x_scale.domain(max_move)
+        self._hover_ply = None
         self.update()
 
     def set_phase_boundaries(self, opening_end: int, middlegame_end: int) -> None:
@@ -806,6 +811,88 @@ class AccuracyCurveWidget(QWidget):
             legend_band_height=legend_band_height,
         )
 
+    def _snap_ply_at_x(self, x: float, left: float, graph_width: float) -> Optional[int]:
+        if not self._available_plys or graph_width <= 0:
+            return None
+        best: Optional[int] = None
+        best_dist = float("inf")
+        for ply in self._available_plys:
+            dist = abs(
+                self._x_to_pixel(self._x_scale.plot_x_for_ply(ply), left, graph_width) - x
+            )
+            # White and Black of the same full-move share X; prefer the later ply on a tie.
+            if dist < best_dist - 1e-6 or (
+                best is not None and abs(dist - best_dist) <= 1e-6 and ply > best
+            ):
+                best_dist = dist
+                best = ply
+            elif best is None:
+                best_dist = dist
+                best = ply
+        return best
+
+    @staticmethod
+    def _accuracy_at_move(
+        data: List[Tuple[int, float]], move: int
+    ) -> Optional[float]:
+        exact: Optional[float] = None
+        before: Optional[float] = None
+        before_move = -1
+        for point_ply, acc in data:
+            point_move = ply_to_fullmove(int(point_ply))
+            if point_move == move:
+                exact = float(acc)
+            elif point_move < move and point_move >= before_move:
+                before_move = point_move
+                before = float(acc)
+        return exact if exact is not None else before
+
+    def _series_pixel_points(
+        self,
+        data: List[Tuple[int, float]],
+        left: float,
+        graph_width: float,
+        y_for_acc: Callable[[float], float],
+    ) -> List[QPointF]:
+        points: List[QPointF] = []
+        for ply, acc in sorted(data, key=lambda item: item[0]):
+            x = self._x_to_pixel(self._x_scale.plot_x_for_ply(ply), left, graph_width)
+            points.append(QPointF(x, y_for_acc(float(acc))))
+        return points
+
+    @staticmethod
+    def _y_on_polyline(points: List[QPointF], x: float) -> Optional[float]:
+        if not points:
+            return None
+        if len(points) == 1 or x <= points[0].x():
+            return float(points[0].y())
+        for i in range(len(points) - 1):
+            x0 = float(points[i].x())
+            x1 = float(points[i + 1].x())
+            y0 = float(points[i].y())
+            y1 = float(points[i + 1].y())
+            if x0 <= x <= x1 or x1 <= x <= x0:
+                if abs(x1 - x0) <= 1e-6:
+                    return y1
+                t = (x - x0) / (x1 - x0)
+                return y0 + t * (y1 - y0)
+        return float(points[-1].y())
+
+    def _hover_tooltip_text(self, ply: int) -> str:
+        move = ply_to_fullmove(ply)
+        white_acc = self._accuracy_at_move(self.white_data, move)
+        black_acc = self._accuracy_at_move(self.black_data, move)
+        white_line = f"White: {white_acc:.1f}%" if white_acc is not None else "White: n/a"
+        black_line = f"Black: {black_acc:.1f}%" if black_acc is not None else "Black: n/a"
+        return f"Move {move}\n{white_line}\n{black_line}"
+
+    def _clear_hover(self) -> None:
+        had = self._hover_ply is not None
+        self._hover_ply = None
+        QToolTip.hideText()
+        if had:
+            self.update()
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if not self._navigate_to_ply_callback or not self._available_plys:
             super().mousePressEvent(event)
@@ -819,15 +906,46 @@ class AccuracyCurveWidget(QWidget):
         if x < left or x > right or y < top or y > bottom:
             super().mousePressEvent(event)
             return
-        # Snap to closest scored ply in compressed plot space.
-        ply = min(
-            self._available_plys,
-            key=lambda p: abs(
-                self._x_to_pixel(self._x_scale.plot_x_for_ply(p), left, graph_width) - x
-            ),
-        )
+        ply = self._snap_ply_at_x(x, left, graph_width)
+        if ply is None:
+            super().mousePressEvent(event)
+            return
         self._navigate_to_ply_callback(ply)
         event.accept()
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        if not self._available_plys:
+            self._clear_hover()
+            return
+        left, top, right, bottom, graph_width, _ = self._plot_rect()
+        if graph_width <= 0:
+            self._clear_hover()
+            return
+        x = float(event.position().x())
+        y = float(event.position().y())
+        if x < left or x > right or y < top or y > bottom:
+            self._clear_hover()
+            return
+        ply = self._snap_ply_at_x(x, left, graph_width)
+        if ply is None:
+            self._clear_hover()
+            return
+        ply_changed = ply != self._hover_ply
+        self._hover_ply = ply
+        QToolTip.showText(
+            event.globalPosition().toPoint(),
+            self._hover_tooltip_text(ply),
+            self,
+            QRect(),
+            4000,
+        )
+        if ply_changed:
+            self.update()
+
+    def leaveEvent(self, event) -> None:
+        super().leaveEvent(event)
+        self._clear_hover()
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
@@ -974,6 +1092,27 @@ class AccuracyCurveWidget(QWidget):
             if left - 1 <= x <= right + 1:
                 painter.setPen(QPen(self.current_move_line_color, self.current_move_line_width))
                 painter.drawLine(int(x), int(top), int(x), int(bottom))
+
+        if self._hover_ply is not None:
+            hx = self._x_to_pixel(
+                self._x_scale.plot_x_for_ply(self._hover_ply), left, graph_width
+            )
+            if left - 1 <= hx <= right + 1:
+                radius = float(max(2, self._hover_circle_radius))
+                for data, color in (
+                    (self.black_data, self.black_line_color),
+                    (self.white_data, self.white_line_color),
+                ):
+                    hy = self._y_on_polyline(
+                        self._series_pixel_points(data, left, graph_width, _y_for_acc),
+                        hx,
+                    )
+                    if hy is None:
+                        continue
+                    painter.setPen(QPen(color, max(2, self.line_width)))
+                    painter.setBrush(QBrush(self.background_color))
+                    painter.drawEllipse(QPointF(hx, hy), radius, radius)
+                painter.setBrush(Qt.BrushStyle.NoBrush)
 
         if self.show_legend:
             legend_font = QFont(self.font_family, max(self.min_font_size, self.font_size - 1))

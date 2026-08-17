@@ -1,9 +1,9 @@
 """Mini chessboard widget for displaying positions in popups."""
 
 from PyQt6.QtWidgets import QWidget
-from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QPolygonF
+from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QPolygonF, QMouseEvent
 from PyQt6.QtSvg import QSvgRenderer
-from PyQt6.QtCore import Qt, QRect, QRectF, QPointF
+from PyQt6.QtCore import Qt, QRect, QRectF, QPointF, pyqtSignal
 import chess
 from typing import Dict, Any, Optional, List, Tuple
 from app.services.logging_service import LoggingService
@@ -15,6 +15,8 @@ _SVG_RENDERER_CACHE: Dict[str, Dict[Tuple[str, str], QSvgRenderer]] = {}
 
 class MiniChessBoardWidget(QWidget):
     """Mini chessboard widget displaying pieces (popup or embedded), following main-board style."""
+
+    clicked = pyqtSignal()
     
     def __init__(
         self,
@@ -26,6 +28,7 @@ class MiniChessBoardWidget(QWidget):
         embedded: bool = False,
         size_override: Optional[int] = None,
         mini_board_config: Optional[Dict[str, Any]] = None,
+        clickable: bool = False,
     ) -> None:
         """Initialize the mini chessboard widget.
         
@@ -38,6 +41,7 @@ class MiniChessBoardWidget(QWidget):
             size_override: Optional base board size in pixels (before scale_factor).
             mini_board_config: Optional mini-board style overrides (size/border); falls back
                 to ui.styles.mini_board when omitted.
+            clickable: If True, emit ``clicked`` on left-click (embedded boards only).
         """
         super().__init__()
         self.config = config
@@ -49,9 +53,13 @@ class MiniChessBoardWidget(QWidget):
         self._embedded = embedded
         self._size_override = size_override
         self._mini_board_config_override = mini_board_config
+        self._clickable = bool(clickable) and bool(embedded)
         self._load_config()
         self._setup_board()
         self._load_position_from_fen(fen)
+
+        if self._clickable:
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         if not embedded:
             # Popup / PV-hover behavior
@@ -111,6 +119,20 @@ class MiniChessBoardWidget(QWidget):
         # Calculate widget size (board + border)
         widget_size = self.board_size + self.border_size * 2
         self.setFixedSize(int(widget_size), int(widget_size))
+
+    def set_size_override(self, size: int) -> None:
+        """Resize the board to an integer square grid (``size`` before scale_factor)."""
+        size = max(8, int(size))
+        if self._size_override == size:
+            return
+        self._size_override = size
+        self._load_config()
+        self.update()
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if self._clickable and event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)
     
     def _setup_board(self) -> None:
         """Setup the board data structure."""

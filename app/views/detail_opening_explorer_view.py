@@ -1186,8 +1186,12 @@ class DetailOpeningExplorerView(QWidget):
         # Starting position is not in ECO tables but is a valid book root with many continuations.
         if current_display is None and OpeningService.is_standard_start_fen(current_fen):
             current_display = OPENING_STARTING
-        in_book = current_display is not None and current_display is not OPENING_UNKNOWN
-
+        if current_display is None and path:
+            current_display = path[-1].display
+        in_book = (
+            OpeningService.is_standard_start_fen(current_fen)
+            or self._opening_service.is_book_position(current_fen)
+        )
         next_uci: Optional[str] = None
         next_san: Optional[str] = None
         if game is not None and in_book:
@@ -1317,7 +1321,9 @@ class DetailOpeningExplorerView(QWidget):
             empty.setFont(QFont(self._font_family, int(self._font_size)))
             self._cont_container.addWidget(empty)
         else:
-            conts = self._opening_service.continuations(current_fen)
+            conts = self._opening_service.continuations(
+                current_fen, fallback_display=current_display
+            )
             if not conts:
                 empty = QLabel("No known book continuations from this position.")
                 empty.setStyleSheet(
@@ -1634,7 +1640,11 @@ class _ContinuationNode(QWidget):
         expand_size = int(colors.get("expand_button_size", 28))
         expand_font = int(colors.get("expand_font_size", 16))
         can_expand = depth < max_depth and bool(
-            opening_service.continuations(continuation.fen_after, limit=1)
+            opening_service.continuations(
+                continuation.fen_after,
+                limit=1,
+                fallback_display=continuation.display,
+            )
         )
         self._can_expand = can_expand
 
@@ -1818,7 +1828,10 @@ class _ContinuationNode(QWidget):
 
     def _load_children(self) -> None:
         self._children_loaded = True
-        conts = self._opening_service.continuations(self._continuation.fen_after)
+        conts = self._opening_service.continuations(
+            self._continuation.fen_after,
+            fallback_display=self._continuation.display,
+        )
         for cont in conts:
             child = _ContinuationNode(
                 config=self._config,

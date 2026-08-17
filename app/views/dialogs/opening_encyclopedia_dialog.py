@@ -673,6 +673,170 @@ class EncyclopediaGalleryOverlay(QWidget):
         super().keyPressEvent(event)
 
 
+class EncyclopediaBoardOverlay(QWidget):
+    """In-dialog enlarged tabiya board: same dimmed overlay language as the gallery."""
+
+    closed = pyqtSignal()
+
+    def __init__(
+        self,
+        parent: QWidget,
+        config: Dict[str, Any],
+        fen: str,
+        caption: str,
+        gallery_config: Dict[str, Any],
+        board_overlay_config: Dict[str, Any],
+    ) -> None:
+        super().__init__(parent)
+        self._app_config = config
+        self._fen = fen
+        self._board: Optional[MiniChessBoardWidget] = None
+        overlay_cfg = gallery_config if isinstance(gallery_config, dict) else {}
+        board_cfg = board_overlay_config if isinstance(board_overlay_config, dict) else {}
+
+        overlay_rgb = _rgb(overlay_cfg.get("overlay_color"), [0, 0, 0])
+        opacity = float(overlay_cfg.get("overlay_opacity", 0.78))
+        opacity = max(0.0, min(1.0, opacity))
+        alpha = int(round(255 * opacity))
+        padding = int(overlay_cfg.get("padding", 28))
+        self._padding = max(8, padding)
+        self._min_size = max(64, int(board_cfg.get("min_size", 240)))
+
+        caption_color = _rgb(overlay_cfg.get("caption_color"), [220, 220, 225])
+        caption_size = int(scale_font_size(overlay_cfg.get("caption_font_size", 10)))
+        caption_text = str(caption or board_cfg.get("caption") or "Tabiya").strip()
+
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet(
+            f"background-color: rgba({overlay_rgb[0]}, {overlay_rgb[1]}, {overlay_rgb[2]}, {alpha});"
+        )
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.hide()
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(self._padding, self._padding, self._padding, self._padding)
+        root.setSpacing(10)
+        root.addStretch(1)
+
+        self._board_host = QWidget()
+        self._board_host.setStyleSheet("background: transparent;")
+        host_col = QVBoxLayout(self._board_host)
+        host_col.setContentsMargins(0, 0, 0, 0)
+        host_col.setSpacing(0)
+        host_col.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._board_host_layout = host_col
+        root.addWidget(self._board_host, 0, Qt.AlignmentFlag.AlignCenter)
+
+        self._caption = QLabel(caption_text)
+        self._caption.setWordWrap(True)
+        self._caption.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        self._caption.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
+        )
+        self._caption.setStyleSheet(
+            f"color: rgb({caption_color[0]}, {caption_color[1]}, {caption_color[2]}); "
+            f"font-size: {caption_size}pt; background: transparent; border: none;"
+        )
+        self._caption.setVisible(bool(caption_text))
+        root.addWidget(self._caption)
+        root.addStretch(1)
+
+    def open_overlay(self) -> None:
+        parent = self.parentWidget()
+        if parent is not None:
+            self.setGeometry(parent.rect())
+        self.show()
+        self.raise_()
+        self.setFocus(Qt.FocusReason.PopupFocusReason)
+        self._fit_board()
+        QTimer.singleShot(0, self._fit_board)
+
+    def close_overlay(self) -> None:
+        if not self.isVisible():
+            return
+        self.hide()
+        self.closed.emit()
+
+    def refresh_geometry(self) -> None:
+        parent = self.parentWidget()
+        if parent is not None:
+            self.setGeometry(parent.rect())
+        if self.isVisible():
+            self._fit_board()
+
+    def _footer_height(self, content_width: int) -> int:
+        if not self._caption.isVisible() or not self._caption.text():
+            return 0
+        layout = self.layout()
+        spacing = int(layout.spacing()) if layout is not None else 10
+        fm = self._caption.fontMetrics()
+        text = self._caption.text()
+        if fm.horizontalAdvance(text) <= content_width:
+            caption_h = fm.height()
+        else:
+            caption_h = self._caption.heightForWidth(content_width)
+            if caption_h < 0:
+                caption_h = self._caption.sizeHint().height()
+        return max(int(caption_h), fm.height()) + spacing
+
+    def _fit_board(self) -> None:
+        if self.width() <= 1 or self.height() <= 1:
+            parent = self.parentWidget()
+            if parent is not None:
+                self.setGeometry(parent.rect())
+
+        max_w = max(1, self.width() - 2 * self._padding)
+        footer_h = self._footer_height(max_w)
+        max_h = max(1, self.height() - 2 * self._padding - footer_h)
+        avail = max(self._min_size, min(max_w, max_h))
+        inner = max(8, (int(avail) // 8) * 8)
+
+        if self._board is None:
+            self._board = MiniChessBoardWidget(
+                self._app_config,
+                self._fen,
+                is_flipped=False,
+                embedded=True,
+                size_override=inner,
+                clickable=True,
+            )
+            self._board.clicked.connect(self.close_overlay)
+            self._board_host_layout.addWidget(
+                self._board, 0, Qt.AlignmentFlag.AlignCenter
+            )
+        else:
+            self._board.set_size_override(inner)
+
+        extra = max(0, int(self._board.width()) - int(self._board.board_size))
+        fit_w = max(8, ((max_w - extra) // 8) * 8)
+        fit_h = max(8, ((max_h - extra) // 8) * 8)
+        fitted = max(8, min(int(self._board.board_size), fit_w, fit_h))
+        fitted = (fitted // 8) * 8
+        if fitted != int(self._board.board_size):
+            self._board.set_size_override(fitted)
+
+        layout = self.layout()
+        if layout is not None:
+            layout.activate()
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.close_overlay()
+            return
+        super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
+        if event.key() in (
+            Qt.Key.Key_Escape,
+            Qt.Key.Key_Return,
+            Qt.Key.Key_Enter,
+            Qt.Key.Key_Space,
+        ):
+            self.close_overlay()
+            return
+        super().keyPressEvent(event)
+
+
 def build_encyclopedia_tag_chip(
     prefix: str,
     value: str = "",
@@ -716,6 +880,8 @@ class OpeningEncyclopediaDialog(QDialog):
         self._entry = entry
         self._encyclopedia = encyclopedia_service
         self._gallery_overlay: Optional[EncyclopediaGalleryOverlay] = None
+        self._board_overlay: Optional[EncyclopediaBoardOverlay] = None
+        self._tabiya_fen: Optional[str] = None
         self._gallery_pixmaps: List[QPixmap] = []
         self._gallery_images: List[EncyclopediaImage] = []
         self._gallery_captions: List[Optional[str]] = []
@@ -909,6 +1075,17 @@ class OpeningEncyclopediaDialog(QDialog):
             stored_board if stored_board is not None else cfg_default,
             _MINIATURE_BOARD_DEFAULT,
         )
+        gallery_cfg = dialog_config.get("gallery", {})
+        if not isinstance(gallery_cfg, dict):
+            gallery_cfg = {}
+        self._gallery_cfg = gallery_cfg
+        board_overlay_cfg = gallery_cfg.get("board_overlay", {})
+        if not isinstance(board_overlay_cfg, dict):
+            board_overlay_cfg = {}
+        self._board_overlay_cfg = board_overlay_cfg
+        self._board_overlay_tooltip = str(
+            board_overlay_cfg.get("tooltip") or "Click to enlarge"
+        )
 
         root = QVBoxLayout(self)
         margins = layout_config.get("margins", [20, 20, 20, 20])
@@ -1097,12 +1274,16 @@ class OpeningEncyclopediaDialog(QDialog):
                         fen,
                         is_flipped=False,
                         embedded=True,
+                        clickable=True,
                     )
+                    board.setToolTip(self._board_overlay_tooltip)
+                    board.clicked.connect(self._open_board_overlay)
                     # Keep hidden until after the first showEvent size apply. A visible
                     # ~160px child on the min-sized first frame causes a choppy open.
                     board.setVisible(False)
                     col.addWidget(board, 0, Qt.AlignmentFlag.AlignLeft)
                     self._tabiya_board = board
+                    self._tabiya_fen = fen
                     self._tabiya_board_pending_show = bool(self._show_miniature_board)
             return block
 
@@ -1318,7 +1499,7 @@ class OpeningEncyclopediaDialog(QDialog):
                 None,
             ))
 
-        if not tag_defs and not entry.used_fallback:
+        if not tag_defs and not entry.used_fallback and not entry.used_nearest:
             return None
 
         row = QWidget()
@@ -1369,6 +1550,33 @@ class OpeningEncyclopediaDialog(QDialog):
                     "",
                     bg=_rgb(tags_cfg.get("fallback_background"), [70, 58, 48]),
                     fg=_rgb(tags_cfg.get("fallback_text_color"), [220, 175, 130]),
+                    font_size=font_size,
+                    border_radius=border_radius,
+                    padding=list(pad),
+                    tooltip=tip,
+                )
+            )
+        elif entry.used_nearest:
+            explorer = entry.explorer_display_name or "this line"
+            tip_tmpl = str(
+                tags_cfg.get(
+                    "nearest_tooltip",
+                    "Explorer label “{explorer}” — article “{article}”.",
+                )
+            )
+            try:
+                tip = tip_tmpl.format(
+                    explorer=explorer,
+                    article=entry.display_name or "this opening",
+                )
+            except (KeyError, ValueError):
+                tip = tip_tmpl
+            h.addWidget(
+                build_encyclopedia_tag_chip(
+                    "Nearest article",
+                    "",
+                    bg=_rgb(tags_cfg.get("nearest_background"), [48, 58, 70]),
+                    fg=_rgb(tags_cfg.get("nearest_text_color"), [150, 185, 220]),
                     font_size=font_size,
                     border_radius=border_radius,
                     padding=list(pad),
@@ -1680,6 +1888,8 @@ class OpeningEncyclopediaDialog(QDialog):
         board = getattr(self, "_tabiya_board", None)
         if board is not None:
             board.setVisible(show)
+        if not show:
+            self._close_board_overlay()
         self._beside_block_count = None
         self._sync_scroll_content_size()
         try:
@@ -2705,9 +2915,33 @@ class OpeningEncyclopediaDialog(QDialog):
         return host
 
     def _open_gallery(self, index: int) -> None:
+        self._close_board_overlay()
         if self._gallery_overlay is None:
             return
         self._gallery_overlay.open_at(index)
+
+    def _close_board_overlay(self) -> None:
+        overlay = getattr(self, "_board_overlay", None)
+        if overlay is not None and overlay.isVisible():
+            overlay.close_overlay()
+
+    def _open_board_overlay(self) -> None:
+        fen = getattr(self, "_tabiya_fen", None)
+        if not fen or not self._show_miniature_board:
+            return
+        if self._gallery_overlay is not None:
+            self._gallery_overlay.close_gallery()
+        if self._board_overlay is None:
+            caption = str(getattr(self._entry, "display_name", "") or "").strip()
+            self._board_overlay = EncyclopediaBoardOverlay(
+                self,
+                self.config,
+                fen,
+                caption,
+                getattr(self, "_gallery_cfg", {}),
+                getattr(self, "_board_overlay_cfg", {}),
+            )
+        self._board_overlay.open_overlay()
 
     def _build_image_block(
         self,
@@ -3024,6 +3258,8 @@ class OpeningEncyclopediaDialog(QDialog):
 
         if self._gallery_overlay is not None and self._gallery_overlay.isVisible():
             self._gallery_overlay.refresh_geometry()
+        if self._board_overlay is not None and self._board_overlay.isVisible():
+            self._board_overlay.refresh_geometry()
         # Keep width in sync immediately; debounce full text reflow to avoid flicker.
         if self._content_host is not None and self._scroll is not None:
             vw = self._scroll.viewport().width()
@@ -3045,6 +3281,9 @@ class OpeningEncyclopediaDialog(QDialog):
         if event.key() == Qt.Key.Key_Escape:
             if self._gallery_overlay is not None and self._gallery_overlay.isVisible():
                 self._gallery_overlay.close_gallery()
+                return
+            if self._board_overlay is not None and self._board_overlay.isVisible():
+                self._board_overlay.close_overlay()
                 return
             if self._search_open:
                 self._close_search()

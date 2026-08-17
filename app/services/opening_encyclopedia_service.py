@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import json
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,6 +45,25 @@ def normalize_opening_name(name: str) -> str:
     return s.strip(" .,;:")
 
 
+def _display_name_is_variation(display_name: str) -> bool:
+    """True when the article title already names a line (``Family: Line``)."""
+    return any(ch in (display_name or "") for ch in ":,")
+
+
+def _book_name_continues_title(book_name: str, title_key: str) -> bool:
+    """True when ``book_name`` is ``title`` plus a ``,`` / ``:`` continuation.
+
+    ``King's Indian Attack`` is not a continuation of ``King's Indian``.
+    ``Pterodactyl Defense, Sicilian`` is not a continuation of
+    ``Pterodactyl Defense: Sicilian`` (colon vs comma are different names).
+    """
+    name = normalize_opening_name(book_name)
+    if not name.startswith(title_key):
+        return False
+    rest = name[len(title_key):].lstrip()
+    return bool(rest) and rest[0] in ",:"
+
+
 def prefer_rows_matching_display_name(
     rows: List[Any],
     display_name: str,
@@ -54,14 +74,28 @@ def prefer_rows_matching_display_name(
     ``Reti: KIA`` → ``kings-indian-attack``). Using every mapped name for the
     tabiya can collapse the diagram to an almost-empty opening position.
     Title-matched rows keep the miniature aligned with the article the user opened.
+
+    Exact title wins. If none match, rows whose book name continues the title
+    with ``,`` or ``:`` are preferred (``Pterodactyl Defense: Sicilian, Unpin``).
     """
     if not rows:
         return []
     key = normalize_opening_name(display_name)
     if not key:
         return list(rows)
-    matched = [row for row in rows if normalize_opening_name(getattr(row, "name", "")) == key]
-    return matched if matched else list(rows)
+    exact = [
+        row
+        for row in rows
+        if normalize_opening_name(getattr(row, "name", "")) == key
+    ]
+    if exact:
+        return exact
+    continued = [
+        row
+        for row in rows
+        if _book_name_continues_title(getattr(row, "name", ""), key)
+    ]
+    return continued if continued else list(rows)
 
 
 def _fold_search_text(text: str) -> str:
@@ -80,6 +114,211 @@ _SEARCH_RANK_NAME_SUBSTRING = 1
 _SEARCH_RANK_ID_OR_FAMILY = 2
 _SEARCH_RANK_ECO = 3
 _SEARCH_RANK_ALIAS = 4
+
+# Title vs explorer suffix: lower rank = better match for specificity lookup.
+_SUFFIX_RANK_EXACT = 0
+_SUFFIX_RANK_FULL = 1
+_SUFFIX_RANK_PREFIX = 2
+_SUFFIX_RANK_NONE = 99
+
+_GENERIC_SUFFIX_WORDS = (
+    " variation",
+)
+
+# Explorer labels like ``Mieses: 1...d5`` share the SAN tail across families.
+_MOVE_NOTATION_SUFFIX = re.compile(r"^\d+\.(?:\.\.)?\s*\S")
+
+
+def _is_move_notation_suffix(text: str) -> bool:
+    """True when ``text`` is a move list (``1...d5``, ``2.Nf3 e6``), not a name."""
+    compact = (text or "").strip().replace("…", "...")
+    return bool(compact) and _MOVE_NOTATION_SUFFIX.match(compact) is not None
+
+
+def _split_family_and_tail(label: str) -> Tuple[str, str]:
+    """Normalized ``(family, tail)`` split on the first colon."""
+    text = (label or "").strip().replace("…", "...")
+    if ":" not in text:
+        return normalize_opening_name(text), ""
+    head, tail = text.split(":", 1)
+    return normalize_opening_name(head), normalize_opening_name(tail)
+
+
+def _families_compatible(explorer_family: str, title_family: str) -> bool:
+    """``Scandinavian`` matches ``Scandinavian Defense``; ``Mieses`` does not match Amar."""
+    if not explorer_family or not title_family:
+        return False
+    if explorer_family == title_family:
+        return True
+    return explorer_family.startswith(title_family + " ") or title_family.startswith(
+        explorer_family + " "
+    )
+
+
+def _is_move_prefix(prefix: str, full: str) -> bool:
+    """True when ``prefix`` is ``full`` or a token prefix (``2...qxd5`` of a longer line)."""
+    if not prefix or not full:
+        return False
+    if prefix == full:
+        return True
+    return full.startswith(prefix + " ")
+
+
+def _strip_generic_suffix_words(text: str) -> str:
+    out = normalize_opening_name(text)
+    changed = True
+    while changed and out:
+        changed = False
+        for suffix in _GENERIC_SUFFIX_WORDS:
+            if out.endswith(suffix):
+                out = out[: -len(suffix)].strip(" ,;:")
+                changed = True
+    return out
+
+
+def _extract_suffix_candidates(display_name: str) -> List[Tuple[str, int]]:
+    """Explorer label fragments to match against ready article titles.
+
+    Returns ``(candidate, clause_rank)`` where lower ``clause_rank`` is more
+    specific. Later comma clauses after ``:`` outrank earlier ones so
+    ``Parent: Broad, Specific Variation`` can deepen to the child article.
+    """
+    name = (display_name or "").strip()
+    if not name:
+        return []
+    out: List[Tuple[str, int]] = []
+    seen: set[Tuple[str, int]] = set()
+
+    def add(part: str, clause_rank: int) -> None:
+        part = part.strip()
+        item = (part, clause_rank)
+        if part and item not in seen:
+            seen.add(item)
+            out.append(item)
+
+    add(name, 50)
+    if ":" in name:
+        after = name.split(":", 1)[1].strip()
+        add(after, 40)
+        if "," in after:
+            clauses = [part.strip() for part in after.split(",") if part.strip()]
+            for idx, clause in enumerate(clauses):
+                clause_rank = max(0, len(clauses) - idx - 1)
+                add(clause, clause_rank)
+    return out
+
+
+def _eco_codes_list(eco_codes: Optional[str]) -> List[str]:
+    if not eco_codes:
+        return []
+    text = str(eco_codes).strip()
+    if text.startswith("["):
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                return [str(c).strip().upper() for c in parsed if str(c).strip()]
+        except Exception:
+            pass
+    return [text.upper()] if text else []
+
+
+def _eco_overlaps(eco: Optional[str], eco_codes: Optional[str]) -> bool:
+    if not eco or not str(eco).strip():
+        return True
+    eco_key = str(eco).strip().upper()
+    return eco_key in _eco_codes_list(eco_codes)
+
+
+def _title_match_rank(title_keys: List[str], suffix_key: str, full_key: str) -> int:
+    best = _SUFFIX_RANK_NONE
+    for title_key in title_keys:
+        if suffix_key and title_key == suffix_key:
+            best = min(best, _SUFFIX_RANK_EXACT)
+        if full_key and title_key == full_key:
+            best = min(best, _SUFFIX_RANK_FULL)
+        if suffix_key and title_key.startswith(suffix_key + " "):
+            best = min(best, _SUFFIX_RANK_PREFIX)
+    return best
+
+
+def _title_match_keys(title: str) -> List[str]:
+    """Comparable title fragments for suffix specificity checks."""
+    out: List[str] = []
+    seen: set[str] = set()
+
+    def add(text: str) -> None:
+        key = _strip_generic_suffix_words(text)
+        if key and key not in seen:
+            seen.add(key)
+            out.append(key)
+
+    add(title)
+    if ":" in title:
+        add(title.split(":", 1)[1].strip())
+    return out
+
+
+def _is_ancestor_opening(ancestor_id: Optional[str], opening_id: Optional[str]) -> bool:
+    if not ancestor_id or not opening_id or ancestor_id == opening_id:
+        return False
+    prefix = ancestor_id + "/"
+    return str(opening_id).startswith(prefix)
+
+
+def _encyclopedia_family_key(
+    opening_id: Optional[str], openings: Dict[str, Dict[str, Any]]
+) -> Optional[str]:
+    """Family root id for ``opening_id`` (``family_id``, else the id itself)."""
+    if not opening_id:
+        return None
+    raw = openings.get(opening_id) or {}
+    family = raw.get("family_id")
+    fid = str(family).strip() if family else ""
+    return fid or opening_id
+
+
+def _specificity_rank(
+    match_rank: int, clause_rank: int, opening_id: str, eco_codes: Optional[str]
+) -> Tuple[int, int, int, int]:
+    depth = opening_id.count("/")
+    eco_count = len(_eco_codes_list(eco_codes))
+    # Lower is better. Strong exact-style matches may deepen to a child, but broad
+    # prefix matches should stay conservative and avoid drifting into descendants.
+    depth_rank = -depth if match_rank <= _SUFFIX_RANK_FULL else depth
+    return (match_rank, clause_rank, depth_rank, eco_count)
+
+
+def _best_ready_preference(
+    specific_id: Optional[str], nr_id: Optional[str], openings: Dict[str, Dict[str, Any]]
+) -> Optional[str]:
+    """Choose between a runtime suffix hit and a ready name_resolution target.
+
+    Suffix matching may deepen past NR (keep the child) or rescue a different
+    family (Colle, Modern). A ready NR target wins over a suffix ancestor and
+    over a same-family sibling, so an earlier comma clause like ``Closed``
+    cannot replace ``Grand Prix Attack`` when NR already mapped the line.
+    """
+    if not nr_id:
+        return specific_id
+    nr_raw = openings.get(nr_id)
+    if not nr_raw:
+        return specific_id or nr_id
+    nr_ready = (
+        (nr_raw.get("content_state") or "") == "ready"
+        and bool(str(nr_raw.get("summary") or "").strip())
+    )
+    if not nr_ready:
+        return specific_id or nr_id
+    if specific_id and _is_ancestor_opening(nr_id, specific_id):
+        return specific_id
+    if specific_id and _is_ancestor_opening(specific_id, nr_id):
+        return nr_id
+    if specific_id and (
+        _encyclopedia_family_key(specific_id, openings)
+        == _encyclopedia_family_key(nr_id, openings)
+    ):
+        return nr_id
+    return specific_id or nr_id
 
 
 def _search_match_rank(
@@ -156,6 +395,8 @@ class EncyclopediaEntry:
     matched_opening_id: Optional[str] = None
     matched_display_name: Optional[str] = None
     matched_content_state: Optional[str] = None  # pending | skipped | ready
+    # Explorer / lookup request label (for Nearest chip when it differs from title).
+    explorer_display_name: Optional[str] = None
 
     @property
     def has_image(self) -> bool:
@@ -167,6 +408,21 @@ class EncyclopediaEntry:
         matched = self.matched_opening_id
         return bool(matched and matched != self.opening_id)
 
+    @property
+    def used_nearest(self) -> bool:
+        """True when the article title differs from the explorer request label.
+
+        Covers compound ECO names (``Parent: Child`` → ``Child`` article) and
+        NR remaps. Mutually exclusive with :attr:`used_fallback`.
+        """
+        if self.used_fallback:
+            return False
+        explorer = (self.explorer_display_name or "").strip()
+        if not explorer:
+            return False
+        return normalize_opening_name(explorer) != normalize_opening_name(
+            self.display_name or ""
+        )
 
 @dataclass(frozen=True)
 class EncyclopediaSearchResult:
@@ -276,6 +532,7 @@ class OpeningEncyclopediaService:
         self._opening_service: Optional[Any] = None
         self._rows_by_oid: Optional[Dict[str, List[Any]]] = None
         self._tabiya_fen_by_oid: Dict[str, Optional[str]] = {}
+        self._last_lookup_log: Optional[str] = None
 
     @classmethod
     def get_instance(cls, config: Dict[str, Any]) -> "OpeningEncyclopediaService":
@@ -496,6 +753,118 @@ class OpeningEncyclopediaService:
             oid = self._by_name.get(key)
         return oid
 
+    def _resolve_most_specific_ready(
+        self, display_name: str, eco: Optional[str]
+    ) -> Optional[str]:
+        """Pick the best ready article for an explorer label (suffix + ECO overlap).
+
+        Named suffixes (``Colle System``) match any ready title. Move-list
+        suffixes (``2...Qxd5 3.Nc3 …``) only deepen inside a compatible family,
+        and only when the article's move tail is a prefix of the played line.
+        """
+        self._ensure_loaded()
+        if not self._available:
+            return None
+        full_key = normalize_opening_name(display_name)
+        if not full_key:
+            return None
+        explorer_family, explorer_tail = _split_family_and_tail(display_name)
+
+        best_oid: Optional[str] = None
+        best_rank: Tuple[int, int, int, int] = (_SUFFIX_RANK_NONE, 99, 0, 99)
+
+        for suffix_raw, clause_rank in _extract_suffix_candidates(display_name):
+            suffix_key = _strip_generic_suffix_words(suffix_raw)
+            if not suffix_key:
+                continue
+            move_suffix = _is_move_notation_suffix(suffix_raw)
+            explorer_moves = (
+                normalize_opening_name(suffix_raw.replace("…", "..."))
+                if move_suffix
+                else explorer_tail
+            )
+            for oid, raw in self._openings.items():
+                if not self._is_ready(raw):
+                    continue
+                if not _eco_overlaps(eco, raw.get("eco_codes")):
+                    continue
+                title = str(raw.get("display_name") or "")
+                if move_suffix:
+                    title_family, title_moves = _split_family_and_tail(title)
+                    if not _families_compatible(explorer_family, title_family):
+                        continue
+                    if not _is_move_prefix(title_moves, explorer_moves):
+                        continue
+                    match_rank = _SUFFIX_RANK_EXACT
+                else:
+                    title_keys = _title_match_keys(title)
+                    if not title_keys:
+                        continue
+                    match_rank = _title_match_rank(title_keys, suffix_key, full_key)
+                    if match_rank >= _SUFFIX_RANK_NONE:
+                        continue
+                rank = _specificity_rank(
+                    match_rank, clause_rank, oid, raw.get("eco_codes")
+                )
+                if rank < best_rank:
+                    best_rank = rank
+                    best_oid = oid
+        return best_oid
+
+    def _debug(self, message: str) -> None:
+        try:
+            from app.services.logging_service import LoggingService
+
+            LoggingService.get_instance(self._config).debug(message)
+        except Exception:
+            pass
+
+    def _log_lookup(
+        self,
+        display_name: str,
+        eco: Optional[str],
+        entry: Optional[EncyclopediaEntry],
+        specific: Optional[str],
+        nr: Optional[str],
+    ) -> None:
+        """One compact debug line per distinct lookup result (skips UI probe spam)."""
+        eco_s = eco or "-"
+        if entry is None:
+            detail = f"no article (specific={specific or '-'} nr={nr or '-'})"
+        else:
+            if entry.used_fallback:
+                chip = "fallback"
+            elif entry.used_nearest:
+                chip = "nearest"
+            else:
+                chip = "direct"
+            chosen = entry.matched_opening_id or entry.opening_id
+            if specific and nr and specific != nr:
+                via = "nr" if chosen == nr else "specific"
+                extra = f" specific={specific} nr={nr}"
+            elif specific:
+                via = "specific"
+                extra = ""
+            else:
+                via = "nr"
+                extra = ""
+            detail = f"{entry.opening_id} {chip} via={via}{extra}"
+            if entry.used_fallback and entry.matched_opening_id:
+                detail += f" from={entry.matched_opening_id}"
+        msg = f'Encyclopedia lookup: "{display_name}" {eco_s} -> {detail}'
+        if msg == self._last_lookup_log:
+            return
+        self._last_lookup_log = msg
+        self._debug(msg)
+
+    def _resolve_opening_node(
+        self, display_name: str, eco: Optional[str]
+    ) -> Optional[str]:
+        """Resolve with runtime specificity, but keep a ready NR child over an ancestor."""
+        specific = self._resolve_most_specific_ready(display_name, eco)
+        nr = self._resolve_opening_id(display_name, eco)
+        return _best_ready_preference(specific, nr, self._openings)
+
     def _entry_from_ready(
         self,
         raw: Dict[str, Any],
@@ -504,10 +873,12 @@ class OpeningEncyclopediaService:
         matched_display_name: Optional[str] = None,
         matched_content_state: Optional[str] = None,
         fallback_display_name: Optional[str] = None,
+        explorer_display_name: Optional[str] = None,
     ) -> EncyclopediaEntry:
         """Build an ``EncyclopediaEntry`` from a ready in-memory opening row."""
         family_id = raw.get("family_id")
         display = str(raw.get("display_name") or fallback_display_name or "")
+        explorer = (explorer_display_name or fallback_display_name or "").strip() or None
         return EncyclopediaEntry(
             opening_id=str(raw["opening_id"]),
             display_name=display,
@@ -522,6 +893,7 @@ class OpeningEncyclopediaService:
             matched_opening_id=matched_opening_id,
             matched_display_name=matched_display_name,
             matched_content_state=matched_content_state,
+            explorer_display_name=explorer,
         )
 
     @staticmethod
@@ -539,14 +911,14 @@ class OpeningEncyclopediaService:
         self,
         start_id: str,
         *,
-        fallback_display_name: Optional[str] = None,
+        explorer_display_name: Optional[str] = None,
     ) -> Optional[EncyclopediaEntry]:
         """Walk ``family_id`` from ``start_id`` until a ready prose row."""
         matched_raw = self._openings.get(start_id)
         matched_name = (
             str(matched_raw.get("display_name") or "")
             if matched_raw
-            else (fallback_display_name or "")
+            else (explorer_display_name or "")
         )
         matched_state = (
             str(matched_raw.get("content_state") or "pending")
@@ -567,7 +939,7 @@ class OpeningEncyclopediaService:
                     matched_opening_id=start_id if used_fallback else None,
                     matched_display_name=matched_name if used_fallback else None,
                     matched_content_state=matched_state if used_fallback else None,
-                    fallback_display_name=fallback_display_name,
+                    explorer_display_name=explorer_display_name,
                 )
             family = raw.get("family_id")
             node = str(family) if family else None
@@ -578,16 +950,26 @@ class OpeningEncyclopediaService:
     ) -> Optional[EncyclopediaEntry]:
         """Resolve name → node, then walk family_id until a ready prose row.
 
-        When the matched node is a ``pending`` / ``skipped`` stub, the returned
-        entry carries fallback metadata so the UI can show a Fallback chip.
+        Resolution prefers the most specific ready article matching the explorer
+        suffix and ECO; ``name_resolution`` is used when no such candidate exists.
+        Pending / skipped stubs still inherit via ``family_id`` (Fallback chip).
         """
-        node = self._resolve_opening_id(display_name, eco)
-        if not node:
-            return None
-        return self._walk_to_ready(node, fallback_display_name=display_name)
+        specific = self._resolve_most_specific_ready(display_name, eco)
+        nr = self._resolve_opening_id(display_name, eco)
+        node = _best_ready_preference(specific, nr, self._openings)
+        entry = (
+            self._walk_to_ready(node, explorer_display_name=display_name)
+            if node
+            else None
+        )
+        self._log_lookup(display_name, eco, entry, specific, nr)
+        return entry
 
     def has_entry(self, display_name: str, eco: Optional[str] = None) -> bool:
-        return self.lookup(display_name, eco) is not None
+        node = self._resolve_opening_node(display_name, eco)
+        if not node:
+            return False
+        return self._walk_to_ready(node, explorer_display_name=display_name) is not None
 
     def search(self, query: str, limit: int = 20) -> EncyclopediaSearchPage:
         """Free-text search over display_name, opening_id, eco_codes, family_id,
@@ -711,7 +1093,7 @@ class OpeningEncyclopediaService:
         if self._opening_service is None:
             from app.services.opening_service import OpeningService
 
-            self._opening_service = OpeningService(self._config)
+            self._opening_service = OpeningService.get_instance(self._config)
         return self._opening_service
 
     def _ensure_rows_by_oid(self) -> Dict[str, List[Any]]:
@@ -762,11 +1144,12 @@ class OpeningEncyclopediaService:
         """Return the named-tabiya FEN for ``opening_id``, or ``None``.
 
         If ECO names resolve to this id, prefer rows whose book name matches
-        this opening's encyclopedia display name, then take the shallowest
-        unique named position (sibling pop only at min depth). That keeps
-        alias labels mapped onto the same id (e.g. ``Reti: KIA`` under
-        King's Indian Attack) from collapsing the diagram to ``1. Nf3``,
-        and still avoids transpositional move orders collapsing to ``1. e4``.
+        this opening's encyclopedia display name (exact, else a ``,`` / ``:``
+        continuation). Variation titles that still mix move orders keep the
+        largest first-branch cluster. Then take the shallowest unique named
+        position (sibling pop only at min depth). That keeps alias labels
+        mapped onto the same id (e.g. ``Reti: KIA`` under King's Indian
+        Attack) from collapsing to ``1. Nf3``.
 
         If this id has no book name of its own, include descendant ids and
         take the common SAN prefix so a parent still gets a defining diagram.
@@ -777,16 +1160,19 @@ class OpeningEncyclopediaService:
             return None
         if oid in self._tabiya_fen_by_oid:
             return self._tabiya_fen_by_oid[oid]
-        from app.services.opening_service import compute_tabiya_fen
+        from app.services.opening_service import (
+            compute_tabiya_fen,
+            prefer_largest_move_order_cluster,
+        )
 
         exact = self._ensure_rows_by_oid().get(oid, [])
         if exact:
             self._ensure_loaded()
             display = str((self._openings.get(oid) or {}).get("display_name") or "")
-            fen = compute_tabiya_fen(
-                prefer_rows_matching_display_name(exact, display),
-                family=False,
-            )
+            selected = prefer_rows_matching_display_name(exact, display)
+            if _display_name_is_variation(display):
+                selected = prefer_largest_move_order_cluster(selected)
+            fen = compute_tabiya_fen(selected, family=False)
         else:
             fen = compute_tabiya_fen(self._rows_for_tabiya(oid), family=True)
         self._tabiya_fen_by_oid[oid] = fen

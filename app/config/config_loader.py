@@ -6,12 +6,25 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional, Set, Tuple
 
+from app.utils.path_resolver import get_app_resource_path
+
 # Import logging service - may not be initialized during config loading
 try:
     from app.services.logging_service import LoggingService
     _logging_available = True
 except ImportError:
     _logging_available = False
+
+
+def _log_config_error(message: str) -> None:
+    """Log a config load failure; fall back to stderr if logging is unavailable."""
+    if _logging_available:
+        try:
+            LoggingService.get_instance().error(message)
+            return
+        except Exception:
+            pass
+    print(message, file=sys.stderr)
 
 
 def _expand_config_refs(config: Any) -> Any:
@@ -165,19 +178,17 @@ def _deep_merge_dicts(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str
 
 
 def resolve_style_config_path(*, base_config_path: Path, style_ref: str) -> Path:
-    """Resolve a style config path relative to config.json and repo root."""
+    """Resolve a style config path relative to config.json and the app root."""
     # 1) Relative to the directory containing config.json
     candidate = (base_config_path.parent / style_ref).resolve()
     if candidate.is_file():
         return candidate
 
-    # 2) Relative to repo root (config.json is typically <repo>/app/config/config.json)
-    try:
-        repo_root = base_config_path.resolve().parents[2]
-    except Exception:
-        repo_root = base_config_path.parent
-    candidate = (repo_root / style_ref).resolve()
-    return candidate
+    # 2) App resource root (dev repo root, or frozen Resources / _internal)
+    style_path = Path(style_ref)
+    if style_path.is_absolute():
+        return style_path
+    return get_app_resource_path(str(style_path))
 
 
 def read_default_style_config_ref(config_path: Path) -> Optional[str]:
@@ -1503,6 +1514,9 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.dialogs.opening_encyclopedia_dialog.tags.fallback_text_color",
     "ui.dialogs.opening_encyclopedia_dialog.tags.fallback_tooltip_pending",
     "ui.dialogs.opening_encyclopedia_dialog.tags.fallback_tooltip_skipped",
+    "ui.dialogs.opening_encyclopedia_dialog.tags.nearest_background",
+    "ui.dialogs.opening_encyclopedia_dialog.tags.nearest_text_color",
+    "ui.dialogs.opening_encyclopedia_dialog.tags.nearest_tooltip",
     "ui.dialogs.opening_encyclopedia_dialog.feedback.enabled",
     "ui.dialogs.opening_encyclopedia_dialog.feedback.icon_size",
     "ui.dialogs.opening_encyclopedia_dialog.feedback.icon_svg",
@@ -1538,6 +1552,9 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.dialogs.opening_encyclopedia_dialog.gallery.nav.spacing",
     "ui.dialogs.opening_encyclopedia_dialog.gallery.nav.dot_color",
     "ui.dialogs.opening_encyclopedia_dialog.gallery.nav.dot_active_color",
+    "ui.dialogs.opening_encyclopedia_dialog.gallery.board_overlay.tooltip",
+    "ui.dialogs.opening_encyclopedia_dialog.gallery.board_overlay.caption",
+    "ui.dialogs.opening_encyclopedia_dialog.gallery.board_overlay.min_size",
     "ui.dialogs.opening_encyclopedia_dialog.thumbnail_max_height",
     "ui.dialogs.opening_encyclopedia_dialog.thumbnail_max_height_dual",
     "ui.dialogs.opening_encyclopedia_dialog.thumbnail_max_width",
@@ -2254,7 +2271,6 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.panels.detail.player_stats.error_patterns.thresholds.inaccuracy_rate_threshold",
     "ui.panels.detail.player_stats.error_patterns.thresholds.losing_eval_threshold",
     "ui.panels.detail.player_stats.error_patterns.thresholds.missed_top3_threshold",
-    "ui.panels.detail.player_stats.error_patterns.thresholds.opening_error_rate",
     "ui.panels.detail.player_stats.error_patterns.thresholds.phase_blunder_percentage",
     "ui.panels.detail.player_stats.error_patterns.thresholds.repeated_position_min_games_blunder",
     "ui.panels.detail.player_stats.error_patterns.thresholds.repeated_position_min_games_inaccuracy",
@@ -2433,6 +2449,7 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.panels.detail.summary.accuracy_curve.font_size",
     "ui.panels.detail.summary.accuracy_curve.grid_color",
     "ui.panels.detail.summary.accuracy_curve.height",
+    "ui.panels.detail.summary.accuracy_curve.hover_circle_radius",
     "ui.panels.detail.summary.accuracy_curve.line_width",
     "ui.panels.detail.summary.accuracy_curve.min_font_size",
     "ui.panels.detail.summary.accuracy_curve.min_grid_lines",
@@ -3084,9 +3101,7 @@ class ConfigLoader:
             config_path: Path to config.json. If None, uses default location.
         """
         if config_path is None:
-            # Default: config.json in app/config directory
-            config_dir = Path(__file__).parent
-            config_path = config_dir / "config.json"
+            config_path = get_app_resource_path("app/config/config.json")
         
         self.config_path = config_path
         self._config: Dict[str, Any] = {}
@@ -3238,16 +3253,7 @@ class ConfigLoader:
         Args:
             message: Error message to display.
         """
-        logged = False
-        if _logging_available:
-            try:
-                logging_service = LoggingService.get_instance()
-                logging_service.error(f"Configuration Error: {message}")
-                logged = True
-            except Exception:
-                pass
-        if not logged:
-            print(f"Configuration Error: {message}", file=sys.stderr)
+        _log_config_error(f"Configuration Error: {message}")
         sys.exit(1)
 
 def read_ui_dialog_section(
@@ -3265,15 +3271,23 @@ def read_ui_dialog_section(
         or the section is absent or not a dict.
     """
     if config_path is None:
-        config_path = Path(__file__).resolve().parent / "config.json"
+        config_path = get_app_resource_path("app/config/config.json")
     try:
         if not config_path.is_file():
+            _log_config_error(
+                f"Configuration Error: dialog section '{dialog_key}' "
+                f"could not be loaded (file not found: {config_path})"
+            )
             return None
         data = _load_merged_config(config_path)
         data = _expand_config_refs(data)
         section = data.get("ui", {}).get("dialogs", {}).get(dialog_key)
         return section if isinstance(section, dict) else None
-    except (OSError, json.JSONDecodeError, TypeError):
+    except (OSError, json.JSONDecodeError, TypeError) as exc:
+        _log_config_error(
+            f"Configuration Error: dialog section '{dialog_key}' "
+            f"could not be loaded from {config_path}: {exc}"
+        )
         return None
 
 

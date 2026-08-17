@@ -131,13 +131,12 @@ class ErrorPatternService:
         """
         self.config = config
         self.game_controller = game_controller
-        self.opening_service = OpeningService(config)
+        self.opening_service = OpeningService.get_instance(config)
         
         pattern_config = error_pattern_config_block(config)
         self.thresholds = pattern_config.get('thresholds', {}) if isinstance(pattern_config.get('thresholds'), dict) else {}
         self.phase_blunder_threshold = self.thresholds.get('phase_blunder_percentage', 20.0)
         self.tactical_miss_threshold = self.thresholds.get('tactical_miss_count', 2)
-        self.opening_error_threshold = self.thresholds.get('opening_error_rate', 30.0)
         try:
             self.min_pattern_games = max(1, int(pattern_config.get('min_pattern_games', 2)))
         except (TypeError, ValueError):
@@ -160,6 +159,44 @@ class ErrorPatternService:
             except Exception:
                 return None
         return None
+
+    @staticmethod
+    def _mainline_fens_from_moves(moves: List[MoveData]) -> List[str]:
+        """FENs after each ply, from already-extracted move rows (no PGN parse)."""
+        fens: List[str] = []
+        for mv in moves:
+            white_fen = (getattr(mv, "fen_white", None) or "").strip()
+            if white_fen:
+                fens.append(white_fen)
+            black_fen = (getattr(mv, "fen_black", None) or "").strip()
+            if black_fen:
+                fens.append(black_fen)
+        return fens
+
+    def _opening_for_game(
+        self, game: GameData, moves: List[MoveData]
+    ) -> Tuple[str, Optional[str]]:
+        """Last named book opening for a game, using extracted move FENs.
+
+        Falls back to the last non-repeat move-table label, then the PGN header ECO.
+        """
+        fens = self._mainline_fens_from_moves(moves)
+        if fens:
+            last_opening = self.opening_service.last_opening_from_fens(fens)
+            if last_opening:
+                return last_opening.eco, last_opening.name
+        repeat_indicator = self.config.get("resources", {}).get(
+            "opening_repeat_indicator", "*"
+        )
+        for move in reversed(moves):
+            name = (getattr(move, "opening_name", None) or "").strip()
+            if name and name != repeat_indicator:
+                eco = (getattr(move, "eco", None) or "").strip() or "Unknown"
+                return eco, name
+        header_eco = (getattr(game, "eco", None) or "").strip()
+        if header_eco:
+            return header_eco, None
+        return "Unknown", None
 
     @staticmethod
     def _unique_games(items: List[GameData]) -> List[GameData]:
@@ -413,10 +450,7 @@ class ErrorPatternService:
         """Detect opening-specific error patterns."""
         patterns: List[ErrorPattern] = []
         
-        # Get repeat indicator from config
-        repeat_indicator = self.config.get('resources', {}).get('opening_repeat_indicator', '*')
-        
-        # Group games by opening (ECO) - get ECO from last move with non-"*" opening name
+        # Group games by last named book opening (from extracted move FENs).
         opening_stats: Dict[str, Dict[str, Any]] = {}
         
         for i, game in enumerate(games):
@@ -432,44 +466,29 @@ class ErrorPatternService:
             if not moves:
                 continue
             
-            # Find the last move with a non-"*" opening name
-            # Use both ECO and opening name from that move
-            eco = "Unknown"
-            opening_name = None
-            for move in reversed(moves):
-                if move.opening_name and move.opening_name != repeat_indicator:
-                    eco = move.eco if move.eco else "Unknown"
-                    opening_name = move.opening_name
-                    break
+            eco, opening_name = self._opening_for_game(game, moves)
+            opening_key = (eco, opening_name or "")
             
-            # If no move with opening name found, fall back to game header ECO
-            if eco == "Unknown" and not opening_name:
-                eco = game.eco if game.eco else "Unknown"
-            
-            # Use ECO as key (may include opening name in the value for description)
-            if eco not in opening_stats:
-                opening_stats[eco] = {
+            # Group by last named ECO + name so D02 London is not mixed with D02 Queen's Pawn.
+            if opening_key not in opening_stats:
+                opening_stats[opening_key] = {
+                    'eco': eco,
+                    'opening_name': opening_name,
                     'games': [],
                     'lost_games': [],
                     'total_moves': 0,
                     'errors': 0,
                     'blunders': 0,
                     'mistakes': 0,
-                    'opening_name': opening_name,  # Store opening name from first game with this ECO
-                    # Concrete (game, ref_ply) locations of opening-phase errors for this ECO.
                     'ref_plies': [],
                     'lost_ref_plies': [],
                 }
             
-            opening_stats[eco]['games'].append(game)
+            opening_stats[opening_key]['games'].append(game)
             lost = self._player_lost(game, player_name)
             if lost:
-                opening_stats[eco]['lost_games'].append(game)
-            
-            # Store opening name if we found one and haven't stored one yet
-            if opening_name and not opening_stats[eco]['opening_name']:
-                opening_stats[eco]['opening_name'] = opening_name
-            
+                opening_stats[opening_key]['lost_games'].append(game)
+             
             # Get player stats for this game
             if is_white:
                 stats = summary.white_opening
@@ -478,10 +497,10 @@ class ErrorPatternService:
                 stats = summary.black_opening
                 opening_moves = summary.black_opening.moves
             
-            opening_stats[eco]['total_moves'] += stats.moves
-            opening_stats[eco]['errors'] += stats.inaccuracies + stats.mistakes + stats.blunders
-            opening_stats[eco]['blunders'] += stats.blunders
-            opening_stats[eco]['mistakes'] += stats.mistakes
+            opening_stats[opening_key]['total_moves'] += stats.moves
+            opening_stats[opening_key]['errors'] += stats.inaccuracies + stats.mistakes + stats.blunders
+            opening_stats[opening_key]['blunders'] += stats.blunders
+            opening_stats[opening_key]['mistakes'] += stats.mistakes
 
             # Collect specific opening-phase errors for jump-to-move support.
             if opening_moves > 0:
@@ -493,30 +512,32 @@ class ErrorPatternService:
                             assess = (getattr(mv, "assess_white", "") or "").strip()
                             if assess in ("Inaccuracy", "Mistake", "Miss", "Blunder"):
                                 ref_ply = mv.move_number * 2 - 1
-                                opening_stats[eco]['ref_plies'].append((game, ref_ply))
+                                opening_stats[opening_key]['ref_plies'].append((game, ref_ply))
                                 if lost:
-                                    opening_stats[eco]['lost_ref_plies'].append((game, ref_ply))
+                                    opening_stats[opening_key]['lost_ref_plies'].append((game, ref_ply))
                     elif (not is_white) and getattr(mv, "black_move", None):
                         player_move_index += 1
                         if player_move_index <= opening_moves:
                             assess = (getattr(mv, "assess_black", "") or "").strip()
                             if assess in ("Inaccuracy", "Mistake", "Miss", "Blunder"):
                                 ref_ply = mv.move_number * 2
-                                opening_stats[eco]['ref_plies'].append((game, ref_ply))
+                                opening_stats[opening_key]['ref_plies'].append((game, ref_ply))
                                 if lost:
-                                    opening_stats[eco]['lost_ref_plies'].append((game, ref_ply))
+                                    opening_stats[opening_key]['lost_ref_plies'].append((game, ref_ply))
         
-        # Check for openings with high error rates
-        for eco, stats in opening_stats.items():
+        # Emit openings that meet the loss and occurrence floors; coverage slider is the rate gate.
+        for stats in opening_stats.values():
+            eco = stats['eco']
             if stats['total_moves'] < 10:  # Need minimum moves for meaningful stats
                 continue
             
             error_rate = (stats['errors'] / stats['total_moves']) * 100
-            if error_rate < self.opening_error_threshold:
-                continue
             lost_games = self._unique_games(stats.get('lost_games') or [])
             opening_games = stats.get('games') or []
+            lost_ref_plies = stats.get('lost_ref_plies') or []
             if not self._meets_game_floor(len(lost_games)):
+                continue
+            if not self._meets_game_floor(len(lost_ref_plies)):
                 continue
             coverage = self._coverage(len(lost_games), len(opening_games))
             opening_name = stats.get('opening_name')
@@ -532,7 +553,7 @@ class ErrorPatternService:
                 percentage=error_rate,
                 severity=severity,
                 related_games=lost_games,
-                related_ref_plies=stats.get('lost_ref_plies') or None,
+                related_ref_plies=lost_ref_plies or None,
                 game_coverage=coverage,
             ))
         

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from app.config.config_loader import ConfigLoader
-from app.utils.path_resolver import get_app_resource_path, resolve_data_file_path
+from app.utils.path_resolver import get_app_root, get_app_resource_path, resolve_data_file_path
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ def discover_style_configs(*, config_path: Path) -> List[ThemeOption]:
     """
     config_path = config_path.resolve()
     config_dir = config_path.parent
-    repo_root = config_path.parents[2] if len(config_path.parents) >= 3 else config_dir
+    repo_root = get_app_root()
 
     opts: List[ThemeOption] = []
     for p in sorted(config_dir.glob("style_*.config.json")):

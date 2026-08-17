@@ -19,10 +19,10 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPalette, QColor, QShowEvent
 from typing import Dict, Any, Optional, List
-from pathlib import Path
 import os
 
 from app.models.database_model import DatabaseModel, GameData
+from app.utils.path_resolver import get_app_resource_path
 
 
 class BulkAnalysisDialog(QDialog):
@@ -647,8 +647,8 @@ class BulkAnalysisDialog(QDialog):
         from app.views.style import StyleManager
         
         # Get checkmark icon path
-        app_root = Path(__file__).resolve().parents[2]
-        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
+        from app.utils.path_resolver import get_app_resource_path
+        checkmark_path = get_app_resource_path("app/resources/icons/checkmark.svg")
         
         # Use input border and background colors for checkbox indicator
         input_border_color = dialog_config.get('border_color', [60, 60, 65])
