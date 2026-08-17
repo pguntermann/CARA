@@ -23,7 +23,6 @@ from app.services.game_summary_service import CriticalMove
 def _svc(**threshold_overrides) -> ErrorPatternService:
     thresholds = {
         "tactical_miss_count": 2,
-        "opening_error_rate": 30.0,
         "high_cpl_threshold": 50.0,
         "missed_top3_threshold": 60.0,
         "inaccuracy_rate_threshold": 25.0,
@@ -256,6 +255,182 @@ class TestOpeningLossCoverage(unittest.TestCase):
         # Losses / games in this opening = 2/4.
         self.assertAlmostEqual(patterns[0].game_coverage, 50.0)
         self.assertTrue(all(g.result == "0-1" for g in patterns[0].related_games))
+
+    def test_emits_when_move_error_rate_is_below_former_gate(self) -> None:
+        games = [
+            _game(1, result="0-1", eco="B20"),
+            _game(2, result="0-1", eco="B20"),
+            _game(3, result="1-0", eco="B20"),
+            _game(4, result="1-0", eco="B20"),
+        ]
+        summaries = [
+            _summary(white_opening=_phase(moves=10, inaccuracies=2, mistakes=0, blunders=0))
+            for _ in games
+        ]
+        moves = [
+            [
+                MoveData(
+                    1,
+                    white_move="e4",
+                    assess_white="Inaccuracy",
+                    eco="B20",
+                    opening_name="Sicilian",
+                )
+            ]
+            for _ in games
+        ]
+        patterns = _svc()._detect_opening_error_patterns(
+            "Alice", games, summaries, _agg(), moves
+        )
+        self.assertEqual(len(patterns), 1)
+        self.assertAlmostEqual(patterns[0].percentage, 20.0)
+        self.assertAlmostEqual(patterns[0].game_coverage, 50.0)
+
+    def test_groups_by_last_named_fen_not_header_eco(self) -> None:
+        italian_fen = (
+            "r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4"
+        )
+        games = [
+            _game(1, result="0-1", eco="B20"),
+            _game(2, result="0-1", eco="B20"),
+        ]
+        summaries = [
+            _summary(white_opening=_phase(moves=10, inaccuracies=4, mistakes=0, blunders=0))
+            for _ in games
+        ]
+        moves = [
+            [
+                MoveData(
+                    1,
+                    white_move="Bc4",
+                    black_move="Bc5",
+                    assess_white="Inaccuracy",
+                    eco="*",
+                    opening_name="*",
+                    fen_white="",
+                    fen_black=italian_fen,
+                )
+            ]
+            for _ in games
+        ]
+        patterns = _svc()._detect_opening_error_patterns(
+            "Alice", games, summaries, _agg(), moves
+        )
+        self.assertEqual(len(patterns), 1)
+        self.assertIn("C50", patterns[0].description)
+        self.assertIn("Italian", patterns[0].description)
+        self.assertNotIn("B20", patterns[0].description)
+
+    def test_same_eco_different_names_are_not_mixed(self) -> None:
+        london = "Queen's Pawn Game: London System, with ... h6"
+        qpg = "Queen's Pawn Game"
+        games = [
+            _game(1, result="0-1", eco="D02"),
+            _game(2, result="0-1", eco="D02"),
+            _game(3, result="0-1", eco="D02"),
+            _game(4, result="0-1", eco="D02"),
+        ]
+        summaries = [
+            _summary(white_opening=_phase(moves=10, inaccuracies=4, mistakes=0, blunders=0))
+            for _ in games
+        ]
+        names = [london, london, qpg, qpg]
+        moves = [
+            [
+                MoveData(
+                    1,
+                    white_move="d4",
+                    assess_white="Inaccuracy",
+                    eco="D02",
+                    opening_name=name,
+                )
+            ]
+            for name in names
+        ]
+        patterns = _svc()._detect_opening_error_patterns(
+            "Alice", games, summaries, _agg(), moves
+        )
+        self.assertEqual(len(patterns), 2)
+        london_pattern = next(p for p in patterns if london in p.description)
+        qpg_pattern = next(p for p in patterns if f"({qpg})" in p.description)
+        self.assertEqual({g.game_number for g in london_pattern.related_games}, {1, 2})
+        self.assertEqual({g.game_number for g in qpg_pattern.related_games}, {3, 4})
+        self.assertNotIn(london, qpg_pattern.description)
+        self.assertAlmostEqual(london_pattern.game_coverage, 100.0)
+        self.assertAlmostEqual(qpg_pattern.game_coverage, 100.0)
+
+    def test_single_occurrence_is_omitted(self) -> None:
+        games = [
+            _game(1, result="0-1", eco="E00"),
+            _game(2, result="0-1", eco="E00"),
+            _game(3, result="1-0", eco="E00"),
+            _game(4, result="1-0", eco="E00"),
+        ]
+        summaries = [
+            _summary(white_opening=_phase(moves=10, inaccuracies=1, mistakes=0, blunders=0)),
+            _summary(white_opening=_phase(moves=10, inaccuracies=0, mistakes=0, blunders=0)),
+            _summary(white_opening=_phase(moves=10, inaccuracies=0, mistakes=0, blunders=0)),
+            _summary(white_opening=_phase(moves=10, inaccuracies=0, mistakes=0, blunders=0)),
+        ]
+        moves = [
+            [
+                MoveData(
+                    1,
+                    white_move="d4",
+                    assess_white="Inaccuracy",
+                    eco="E00",
+                    opening_name="Catalan",
+                )
+            ],
+            [
+                MoveData(
+                    1,
+                    white_move="d4",
+                    eco="E00",
+                    opening_name="Catalan",
+                )
+            ],
+            [
+                MoveData(
+                    1,
+                    white_move="d4",
+                    eco="E00",
+                    opening_name="Catalan",
+                )
+            ],
+            [
+                MoveData(
+                    1,
+                    white_move="d4",
+                    eco="E00",
+                    opening_name="Catalan",
+                )
+            ],
+        ]
+        patterns = _svc()._detect_opening_error_patterns(
+            "Alice", games, summaries, _agg(), moves
+        )
+        self.assertEqual(patterns, [])
+
+    def test_summary_errors_without_jump_plies_are_omitted(self) -> None:
+        """Game-summary error counts alone must not emit a card with no occurrences."""
+        games = [
+            _game(1, result="0-1", eco="D30"),
+            _game(2, result="0-1", eco="D30"),
+            _game(3, result="1-0", eco="D30"),
+        ]
+        summaries = [
+            _summary(white_opening=_phase(moves=10, inaccuracies=3, mistakes=0, blunders=0))
+            for _ in games
+        ]
+        moves = [
+            [MoveData(1, white_move="d4", eco="D30", opening_name="Queen's Gambit Declined")]
+            for _ in games
+        ]
+        patterns = _svc()._detect_opening_error_patterns(
+            "Alice", games, summaries, _agg(), moves
+        )
+        self.assertEqual(patterns, [])
 
     def test_draws_do_not_count_as_losses(self) -> None:
         games = [

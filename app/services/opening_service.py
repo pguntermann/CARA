@@ -245,7 +245,6 @@ class OpeningService:
         self._book_rows: Optional[List[EcoBookRow]] = None
         self._loaded = False
         self._load_lock = threading.Lock()
-        self._last_lookup_log: Optional[str] = None
 
     @classmethod
     def get_instance(cls, config: Dict[str, Any]) -> "OpeningService":
@@ -302,11 +301,21 @@ class OpeningService:
             logging_service = LoggingService.get_instance()
             base_count = len(self._eco_base) if self._eco_base else 0
             interpolated_count = len(self._eco_interpolated) if self._eco_interpolated else 0
+            classified_count = len(self._classified_by_book_key)
+            theory_count = len(self._theory_book_keys)
+            book_row_count = len(self._book_rows or [])
+            fen_eco_count = len(self._fen_by_eco or {})
+            fen_eco_name_count = len(self._fen_by_eco_name or {})
+            logging_service.debug(
+                f"Opening lookup index built: classified_keys={classified_count}, "
+                f"theory_keys={theory_count}, book_rows={book_row_count}, "
+                f"fen_by_eco={fen_eco_count}, fen_by_eco_name={fen_eco_name_count}"
+            )
             logging_service.info(
                 f"Opening book loaded: path={ecolists_path}, base_positions={base_count}, "
                 f"interpolated_positions={interpolated_count}, "
-                f"classified_keys={len(self._classified_by_book_key)}, "
-                f"theory_keys={len(self._theory_book_keys)}"
+                f"classified_keys={classified_count}, "
+                f"theory_keys={theory_count}"
             )
 
     @staticmethod
@@ -441,26 +450,8 @@ class OpeningService:
         if entry is None:
             found = self._classified_by_book_key.get(self.book_key(fen))
             entry = found if isinstance(found, dict) else None
-        self._log_lookup(entry)
         return entry
 
-    def _log_lookup(self, entry: Optional[Dict[str, Any]]) -> None:
-        """One compact debug line per distinct named hit (skips unnamed FENs)."""
-        if not entry:
-            return
-        eco = str(entry.get("eco") or "").strip() or "-"
-        name = str(entry.get("name") or "").strip() or "-"
-        msg = f'Opening lookup: {eco} "{name}"'
-        if msg == self._last_lookup_log:
-            return
-        self._last_lookup_log = msg
-        try:
-            from app.services.logging_service import LoggingService
-
-            LoggingService.get_instance().debug(msg)
-        except Exception:
-            pass
-    
     def get_opening_info(self, fen: str) -> Tuple[Optional[str], Optional[str]]:
         """Get ECO code and opening name for a FEN position.
 

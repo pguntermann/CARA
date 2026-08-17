@@ -2268,7 +2268,6 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.panels.detail.player_stats.error_patterns.thresholds.inaccuracy_rate_threshold",
     "ui.panels.detail.player_stats.error_patterns.thresholds.losing_eval_threshold",
     "ui.panels.detail.player_stats.error_patterns.thresholds.missed_top3_threshold",
-    "ui.panels.detail.player_stats.error_patterns.thresholds.opening_error_rate",
     "ui.panels.detail.player_stats.error_patterns.thresholds.phase_blunder_percentage",
     "ui.panels.detail.player_stats.error_patterns.thresholds.repeated_position_min_games_blunder",
     "ui.panels.detail.player_stats.error_patterns.thresholds.repeated_position_min_games_inaccuracy",
