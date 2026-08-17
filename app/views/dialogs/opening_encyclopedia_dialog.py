@@ -1318,7 +1318,7 @@ class OpeningEncyclopediaDialog(QDialog):
                 None,
             ))
 
-        if not tag_defs and not entry.used_fallback:
+        if not tag_defs and not entry.used_fallback and not entry.used_nearest:
             return None
 
         row = QWidget()
@@ -1369,6 +1369,33 @@ class OpeningEncyclopediaDialog(QDialog):
                     "",
                     bg=_rgb(tags_cfg.get("fallback_background"), [70, 58, 48]),
                     fg=_rgb(tags_cfg.get("fallback_text_color"), [220, 175, 130]),
+                    font_size=font_size,
+                    border_radius=border_radius,
+                    padding=list(pad),
+                    tooltip=tip,
+                )
+            )
+        elif entry.used_nearest:
+            explorer = entry.explorer_display_name or "this line"
+            tip_tmpl = str(
+                tags_cfg.get(
+                    "nearest_tooltip",
+                    "Explorer label “{explorer}” — article “{article}”.",
+                )
+            )
+            try:
+                tip = tip_tmpl.format(
+                    explorer=explorer,
+                    article=entry.display_name or "this opening",
+                )
+            except (KeyError, ValueError):
+                tip = tip_tmpl
+            h.addWidget(
+                build_encyclopedia_tag_chip(
+                    "Nearest article",
+                    "",
+                    bg=_rgb(tags_cfg.get("nearest_background"), [48, 58, 70]),
+                    fg=_rgb(tags_cfg.get("nearest_text_color"), [150, 185, 220]),
                     font_size=font_size,
                     border_radius=border_radius,
                     padding=list(pad),

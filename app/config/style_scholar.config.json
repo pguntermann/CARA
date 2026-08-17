@@ -5317,7 +5317,18 @@
             120
           ],
           "fallback_tooltip_pending": "This line isn't researched yet \u2014 showing {parent}.",
-          "fallback_tooltip_skipped": "No dedicated entry \u2014 showing {parent}."
+          "fallback_tooltip_skipped": "No dedicated entry \u2014 showing {parent}.",
+          "nearest_background": [
+            48,
+            58,
+            70
+          ],
+          "nearest_text_color": [
+            150,
+            185,
+            220
+          ],
+          "nearest_tooltip": "Explorer label \"{explorer}\" — article \"{article}\"."
         },
         "search": {
           "icon_size": 18,
