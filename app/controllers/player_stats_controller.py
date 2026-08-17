@@ -381,7 +381,7 @@ class PlayerStatsController(QObject):
         self.player_stats_service = PlayerStatsService(config, game_controller)
         self.error_pattern_service = ErrorPatternService(config, game_controller)
         self.summary_service = GameSummaryService(config)
-        self._opening_service = OpeningService(config)
+        self._opening_service = OpeningService.get_instance(config)
         
         self.current_stats: Optional[AggregatedPlayerStats] = None
         self.current_patterns: List[ErrorPattern] = []

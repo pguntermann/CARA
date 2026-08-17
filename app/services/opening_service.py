@@ -1,6 +1,12 @@
-"""Opening service for looking up ECO codes and opening names from FEN positions."""
+"""Opening service for looking up ECO codes and opening names.
+
+Position lookups use FEN. Game-level ECO (header, bulk analysis, bulk ECO
+update) uses :meth:`OpeningService.last_opening_for_pgn` — the last named
+book ply on the main line.
+"""
 
 import json
+import threading
 import chess
 import chess.pgn
 from dataclasses import dataclass
@@ -195,13 +201,18 @@ def compute_tabiya_fen(
 
 class OpeningService:
     """Service for looking up opening information from FEN positions.
-    
-    This service loads ECO files and provides lookup functionality to identify
-    opening ECO codes and names from chess positions.
+
+    Production code should use :meth:`get_instance` so the ECO book is loaded
+    once per process. Tests may still construct ``OpeningService(config)`` for
+    isolation. After :meth:`load`, lookups are read-only and safe to share
+    across threads.
     """
 
     MAX_CONTINUATIONS_PER_NODE = 12
     MAX_CONTINUATION_DEPTH = 8
+
+    _instance: Optional["OpeningService"] = None
+    _instance_lock = threading.Lock()
 
     _PREFERRED_MOVE_ORDER = {
         san: i
@@ -231,59 +242,69 @@ class OpeningService:
         self._fen_by_eco_name: Optional[Dict[Tuple[str, str], str]] = None
         self._book_rows: Optional[List[EcoBookRow]] = None
         self._loaded = False
-    
+        self._load_lock = threading.Lock()
+        self._last_lookup_log: Optional[str] = None
+
+    @classmethod
+    def get_instance(cls, config: Dict[str, Any]) -> "OpeningService":
+        """Return the process-wide shared opening book (lazy; call ``load()`` as needed)."""
+        if cls._instance is None:
+            with cls._instance_lock:
+                if cls._instance is None:
+                    cls._instance = cls(config)
+        return cls._instance
+
     def load(self) -> None:
-        """Load ECO files into memory.
-        
-        This method loads the eco_base.json and eco_interpolated.json files.
-        It should be called once before using lookup methods.
+        """Load ECO files and derived indexes into memory.
+
+        Thread-safe. After return, lookup maps are immutable and shared reads
+        do not need a lock.
         """
         if self._loaded:
             return
-        
-        # Get ecolists path from config
-        ecolists_path_str = self.config.get('resources', {}).get('ecolists_path', 'app/resources/ecolists')
-        
-        # Resolve path relative to app root
-        app_root = Path(__file__).parent.parent.parent
-        ecolists_path = app_root / ecolists_path_str
-        
-        # Load eco_base.json
-        eco_base_file = ecolists_path / "eco_base.json"
-        if eco_base_file.exists():
-            with open(eco_base_file, "r", encoding="utf-8") as f:
-                self._eco_base = json.load(f)
-        else:
-            self._eco_base = {}
-        
-        # Load eco_interpolated.json
-        eco_interpolated_file = ecolists_path / "eco_interpolated.json"
-        if eco_interpolated_file.exists():
-            with open(eco_interpolated_file, "r", encoding="utf-8") as f:
-                self._eco_interpolated = json.load(f)
-        else:
-            self._eco_interpolated = {}
+        with self._load_lock:
+            if self._loaded:
+                return
 
-        self._classified_by_book_key = self._build_classified_index(self._eco_base or {})
-        self._theory_book_keys = self._build_theory_keys(
-            self._eco_base or {},
-            self._eco_interpolated or {},
-        )
-        self._book_rows = None
-        
-        self._loaded = True
-        
-        # Log opening book loaded
-        from app.services.logging_service import LoggingService
-        logging_service = LoggingService.get_instance()
-        base_count = len(self._eco_base) if self._eco_base else 0
-        interpolated_count = len(self._eco_interpolated) if self._eco_interpolated else 0
-        logging_service.info(
-            f"Opening book loaded: path={ecolists_path}, base_positions={base_count}, "
-            f"interpolated_positions={interpolated_count}, "
-            f"classified_keys={len(self._classified_by_book_key)}, "
-            f"theory_keys={len(self._theory_book_keys)}"
-        )
+            ecolists_path_str = self.config.get('resources', {}).get(
+                'ecolists_path', 'app/resources/ecolists'
+            )
+            app_root = Path(__file__).parent.parent.parent
+            ecolists_path = app_root / ecolists_path_str
+
+            eco_base_file = ecolists_path / "eco_base.json"
+            if eco_base_file.exists():
+                with open(eco_base_file, "r", encoding="utf-8") as f:
+                    self._eco_base = json.load(f)
+            else:
+                self._eco_base = {}
+
+            eco_interpolated_file = ecolists_path / "eco_interpolated.json"
+            if eco_interpolated_file.exists():
+                with open(eco_interpolated_file, "r", encoding="utf-8") as f:
+                    self._eco_interpolated = json.load(f)
+            else:
+                self._eco_interpolated = {}
+
+            self._classified_by_book_key = self._build_classified_index(self._eco_base or {})
+            self._theory_book_keys = self._build_theory_keys(
+                self._eco_base or {},
+                self._eco_interpolated or {},
+            )
+            self._book_rows = self._build_book_rows()
+            self._fen_by_eco, self._fen_by_eco_name = self._build_fen_reverse_indexes()
+            self._loaded = True
+
+            from app.services.logging_service import LoggingService
+            logging_service = LoggingService.get_instance()
+            base_count = len(self._eco_base) if self._eco_base else 0
+            interpolated_count = len(self._eco_interpolated) if self._eco_interpolated else 0
+            logging_service.info(
+                f"Opening book loaded: path={ecolists_path}, base_positions={base_count}, "
+                f"interpolated_positions={interpolated_count}, "
+                f"classified_keys={len(self._classified_by_book_key)}, "
+                f"theory_keys={len(self._theory_book_keys)}"
+            )
 
     @staticmethod
     def book_key(fen: str) -> str:
@@ -333,6 +354,52 @@ class OpeningService:
                     keys.add(self.book_key(str(fen)))
         return keys
 
+    def _build_book_rows(self) -> List[EcoBookRow]:
+        """Unique ECO book positions (interpolated overrides base on the same FEN)."""
+        by_fen: Dict[str, EcoBookRow] = {}
+        for book in (self._eco_base or {}, self._eco_interpolated or {}):
+            for fen, entry in book.items():
+                if not isinstance(entry, dict):
+                    continue
+                name = str(entry.get("name") or "").strip()
+                if not name:
+                    continue
+                by_fen[str(fen)] = EcoBookRow(
+                    fen=str(fen),
+                    name=name,
+                    eco=str(entry.get("eco") or "").strip(),
+                    moves=str(entry.get("moves") or "").strip(),
+                )
+        return list(by_fen.values())
+
+    def _build_fen_reverse_indexes(
+        self,
+    ) -> Tuple[Dict[str, str], Dict[Tuple[str, str], str]]:
+        """ECO / ECO+name → FEN maps (shortest move-list wins per key)."""
+        by_eco: Dict[str, Tuple[int, str]] = {}
+        by_eco_name: Dict[Tuple[str, str], Tuple[int, str]] = {}
+        for book in (self._eco_base or {}, self._eco_interpolated or {}):
+            for fen, entry in book.items():
+                if not isinstance(entry, dict):
+                    continue
+                eco = str(entry.get("eco") or "").strip()
+                if not eco:
+                    continue
+                name = str(entry.get("name") or "").strip()
+                move_len = len(str(entry.get("moves") or ""))
+                prev = by_eco.get(eco)
+                if prev is None or move_len < prev[0]:
+                    by_eco[eco] = (move_len, fen)
+                if name:
+                    key = (eco, name)
+                    prev_n = by_eco_name.get(key)
+                    if prev_n is None or move_len < prev_n[0]:
+                        by_eco_name[key] = (move_len, fen)
+        return (
+            {eco: fen for eco, (_n, fen) in by_eco.items()},
+            {key: fen for key, (_n, fen) in by_eco_name.items()},
+        )
+
     def _display_from_entry(self, entry: Dict[str, Any]) -> Optional[OpeningDisplay]:
         eco = entry.get("eco") or ""
         name = entry.get("name") or ""
@@ -363,81 +430,98 @@ class OpeningService:
         if not self._loaded:
             self.load()
 
+        entry: Optional[Dict[str, Any]] = None
         if self._eco_base and fen in self._eco_base:
-            entry = self._eco_base[fen]
-            if isinstance(entry, dict):
-                return entry
+            found = self._eco_base[fen]
+            if isinstance(found, dict):
+                entry = found
+        if entry is None:
+            found = self._classified_by_book_key.get(self.book_key(fen))
+            entry = found if isinstance(found, dict) else None
+        self._log_lookup(entry)
+        return entry
 
-        return self._classified_by_book_key.get(self.book_key(fen))
+    def _log_lookup(self, entry: Optional[Dict[str, Any]]) -> None:
+        """One compact debug line per distinct named hit (skips unnamed FENs)."""
+        if not entry:
+            return
+        eco = str(entry.get("eco") or "").strip() or "-"
+        name = str(entry.get("name") or "").strip() or "-"
+        msg = f'Opening lookup: {eco} "{name}"'
+        if msg == self._last_lookup_log:
+            return
+        self._last_lookup_log = msg
+        try:
+            from app.services.logging_service import LoggingService
+
+            LoggingService.get_instance().debug(msg)
+        except Exception:
+            pass
     
     def get_opening_info(self, fen: str) -> Tuple[Optional[str], Optional[str]]:
         """Get ECO code and opening name for a FEN position.
-        
+
+        Position lookup only. Game-level ECO (header, bulk analysis, bulk
+        ECO update) must use :meth:`last_opening_for_pgn` /
+        :meth:`get_final_eco_for_game`.
+
         Args:
             fen: FEN position string.
-            
+
         Returns:
             Tuple of (eco_code, opening_name). Both are None if not found.
         """
-        opening = self.lookup_opening(fen)
-        if opening:
-            eco = opening.get('eco', None)
-            name = opening.get('name', None)
-            return (eco, name)
+        display = self.lookup_opening_display(fen)
+        if display:
+            return (display.eco, display.name)
         return (None, None)
 
-    def _ensure_fen_reverse_indexes(self) -> None:
-        """Build ECO / ECO+name → FEN maps (shortest move-list wins per key)."""
-        if self._fen_by_eco is not None and self._fen_by_eco_name is not None:
-            return
+    def last_opening_from_fens(
+        self, fens: Sequence[str]
+    ) -> Optional[OpeningDisplay]:
+        """Last curated opening among ``fens``, scanning from the end.
+
+        This is the single game-level rule: the last mainline ply that is a
+        named book position. Callers must not reimplement last-row / ``*``
+        scans on move tables.
+        """
         if not self._loaded:
             self.load()
+        for fen in reversed(list(fens)):
+            display = self.lookup_opening_display(fen)
+            if display:
+                return display
+        return None
 
-        by_eco: Dict[str, Tuple[int, str]] = {}
-        by_eco_name: Dict[Tuple[str, str], Tuple[int, str]] = {}
-        for book in (self._eco_base or {}, self._eco_interpolated or {}):
-            for fen, entry in book.items():
-                if not isinstance(entry, dict):
-                    continue
-                eco = str(entry.get("eco") or "").strip()
-                if not eco:
-                    continue
-                name = str(entry.get("name") or "").strip()
-                move_len = len(str(entry.get("moves") or ""))
-                prev = by_eco.get(eco)
-                if prev is None or move_len < prev[0]:
-                    by_eco[eco] = (move_len, fen)
-                if name:
-                    key = (eco, name)
-                    prev_n = by_eco_name.get(key)
-                    if prev_n is None or move_len < prev_n[0]:
-                        by_eco_name[key] = (move_len, fen)
+    def last_opening_for_pgn(self, pgn: str) -> Optional[OpeningDisplay]:
+        """Last curated opening on the PGN main line."""
+        return self.last_opening_from_fens(self._mainline_fens_after_each_move(pgn))
 
-        self._fen_by_eco = {eco: fen for eco, (_n, fen) in by_eco.items()}
-        self._fen_by_eco_name = {key: fen for key, (_n, fen) in by_eco_name.items()}
+    def _mainline_fens_after_each_move(self, pgn: str) -> List[str]:
+        """FENs after each mainline ply. Empty if the PGN cannot be parsed."""
+        try:
+            pgn_io = StringIO(pgn)
+            chess_game = chess.pgn.read_game(pgn_io)
+            if chess_game is None:
+                return []
+            fens: List[str] = []
+            node = chess_game
+            while node.variations:
+                node = node.variation(0)
+                fens.append(node.board().fen())
+            return fens
+        except Exception:
+            return []
+
+    def _ensure_fen_reverse_indexes(self) -> None:
+        if not self._loaded:
+            self.load()
 
     def iter_book_rows(self) -> List[EcoBookRow]:
         """All unique ECO book positions (interpolated overrides base on the same FEN)."""
         if not self._loaded:
             self.load()
-        if self._book_rows is not None:
-            return self._book_rows
-        by_fen: Dict[str, EcoBookRow] = {}
-        for book in (self._eco_base or {}, self._eco_interpolated or {}):
-            for fen, entry in book.items():
-                if not isinstance(entry, dict):
-                    continue
-                name = str(entry.get("name") or "").strip()
-                if not name:
-                    continue
-                by_fen[str(fen)] = EcoBookRow(
-                    fen=str(fen),
-                    name=name,
-                    eco=str(entry.get("eco") or "").strip(),
-                    moves=str(entry.get("moves") or "").strip(),
-                )
-        self._book_rows = list(by_fen.values())
-        return self._book_rows
+        return self._book_rows or []
 
     def find_representative_fen(
         self, eco: Optional[str], name: Optional[str] = None
@@ -764,60 +848,10 @@ class OpeningService:
         return results[: max(int(limit), 0)]
     
     def get_final_eco_for_game(self, pgn: str) -> Optional[str]:
-        """Get the final ECO code for a game by traversing moves backwards.
-        
-        This method parses the PGN, traverses all moves backwards, and looks up ECO codes
-        for each position. Returns the first ECO code found when traversing backwards
-        (which is the last opening played in the game). This is more efficient than
-        traversing forwards since we can stop once we find an opening.
-        
-        This follows the same pattern as GameController.extract_moves_from_game() but
-        traverses backwards for efficiency.
-        
-        Args:
-            pgn: PGN string of the game.
-            
-        Returns:
-            ECO code string if found, None otherwise.
+        """ECO of the last named book opening on the main line.
+
+        Thin wrapper over :meth:`last_opening_for_pgn`. Used by bulk ECO
+        update, bulk analysis, and the game header.
         """
-        if not self._loaded:
-            self.load()
-        
-        try:
-            # Parse the PGN
-            pgn_io = StringIO(pgn)
-            chess_game = chess.pgn.read_game(pgn_io)
-            
-            if chess_game is None:
-                return None
-            
-            # Navigate to end of game first
-            node = chess_game
-            move_nodes = []  # Store all move nodes for backwards traversal
-            
-            # Traverse forwards to collect all nodes
-            while node.variations:
-                next_node = node.variation(0)
-                move_nodes.append(next_node)
-                node = next_node
-            
-            # Traverse backwards to find the last opening
-            # This is more efficient - we can stop once we find an ECO
-            for move_idx in range(len(move_nodes) - 1, -1, -1):
-                move_node = move_nodes[move_idx]
-                
-                # Get the board position after the move (for opening lookup)
-                board_after = move_node.board()
-                fen_after = board_after.fen()  # Use full FEN string (matches GameController pattern)
-                
-                # Look up opening for this position (after the move)
-                eco, _ = self.get_opening_info(fen_after)
-                
-                if eco:
-                    return eco  # Found opening - return immediately
-            
-            return None
-            
-        except Exception:
-            # If parsing fails, return None
-            return None
+        opening = self.last_opening_for_pgn(pgn)
+        return opening.eco if opening else None

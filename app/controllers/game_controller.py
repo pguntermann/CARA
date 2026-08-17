@@ -142,7 +142,7 @@ class GameController:
         self.board_controller = board_controller
         
         # Initialize opening service
-        self.opening_service = OpeningService(config)
+        self.opening_service = OpeningService.get_instance(config)
         self.opening_service.load()
         
         # Get opening repeat indicator from config
@@ -814,27 +814,13 @@ class GameController:
             # On any error, use defaults
             pass
         
-        # Opening name: Use last known opening from calculated moves, or ECO from PGN header, or default
+        # Game-level opening: same OpeningService rule as bulk ECO update / bulk analysis.
         opening_name = DEFAULT_OPENING_NAME
-        
-        # Try to get last known opening from moves if available
-        if game:
-            moves = self.extract_moves_from_game(game)
-            if moves:
-                # Find the last move with an opening (work backwards from the end)
-                # This ensures we use the most recent opening classification, even if later positions
-                # don't have openings in the database
-                # Skip placeholder values (repeat indicator) - we want the actual opening
-                for move in reversed(moves):
-                    if move.opening_name and move.opening_name != self.opening_repeat_indicator:
-                        opening_name = move.opening_name
-                        # Also update ECO if we have a calculated one (overrides PGN header)
-                        # Skip placeholder values for ECO as well
-                        if move.eco and move.eco != self.opening_repeat_indicator:
-                            eco = move.eco
-                        break
-                # If no moves had openings but we have ECO from PGN, keep default name
-                # (opening_name already set to DEFAULT_OPENING_NAME)
+        if game and game.pgn:
+            last_opening = self.opening_service.last_opening_for_pgn(game.pgn)
+            if last_opening:
+                eco = last_opening.eco
+                opening_name = last_opening.name
         
         return GameInfo(
             white_name=white_name,

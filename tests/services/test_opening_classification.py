@@ -111,6 +111,27 @@ class TestOpeningClassification(unittest.TestCase):
 1. d4 g6 2. Nf3 Bg7 3. e3 d6 *"""
         eco = self.svc.get_final_eco_for_game(pgn)
         self.assertEqual(eco, "A40")
+        last = self.svc.last_opening_for_pgn(pgn)
+        self.assertIsNotNone(last)
+        self.assertEqual(last.eco, "A40")
+        self.assertIn("Modern", last.name)
+
+    def test_last_opening_prefers_later_book_ply(self) -> None:
+        """Game ECO is the last named ply, not an earlier row hidden by ``*``."""
+        pgn = """[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "W"]
+[Black "B"]
+[Result "*"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 *"""
+        last = self.svc.last_opening_for_pgn(pgn)
+        self.assertIsNotNone(last)
+        self.assertEqual(self.svc.get_final_eco_for_game(pgn), last.eco)
+        self.assertEqual(last.eco, "C50")
+        self.assertIn("Italian", last.name)
 
 
 if __name__ == "__main__":

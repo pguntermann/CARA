@@ -131,7 +131,7 @@ class ErrorPatternService:
         """
         self.config = config
         self.game_controller = game_controller
-        self.opening_service = OpeningService(config)
+        self.opening_service = OpeningService.get_instance(config)
         
         pattern_config = error_pattern_config_block(config)
         self.thresholds = pattern_config.get('thresholds', {}) if isinstance(pattern_config.get('thresholds'), dict) else {}
@@ -413,10 +413,7 @@ class ErrorPatternService:
         """Detect opening-specific error patterns."""
         patterns: List[ErrorPattern] = []
         
-        # Get repeat indicator from config
-        repeat_indicator = self.config.get('resources', {}).get('opening_repeat_indicator', '*')
-        
-        # Group games by opening (ECO) - get ECO from last move with non-"*" opening name
+        # Group games by last named book opening (OpeningService).
         opening_stats: Dict[str, Dict[str, Any]] = {}
         
         for i, game in enumerate(games):
@@ -432,19 +429,14 @@ class ErrorPatternService:
             if not moves:
                 continue
             
-            # Find the last move with a non-"*" opening name
-            # Use both ECO and opening name from that move
             eco = "Unknown"
             opening_name = None
-            for move in reversed(moves):
-                if move.opening_name and move.opening_name != repeat_indicator:
-                    eco = move.eco if move.eco else "Unknown"
-                    opening_name = move.opening_name
-                    break
-            
-            # If no move with opening name found, fall back to game header ECO
-            if eco == "Unknown" and not opening_name:
-                eco = game.eco if game.eco else "Unknown"
+            last_opening = self.opening_service.last_opening_for_pgn(game.pgn or "")
+            if last_opening:
+                eco = last_opening.eco
+                opening_name = last_opening.name
+            elif game.eco:
+                eco = game.eco
             
             # Use ECO as key (may include opening name in the value for description)
             if eco not in opening_stats:

@@ -737,7 +737,7 @@ class BulkOperationsController(QObject):
     def ensure_opening_service(self) -> OpeningService:
         """Load the opening book once (prefer calling from the UI thread before work)."""
         if self._opening_service is None:
-            service = OpeningService(self.config)
+            service = OpeningService.get_instance(self.config)
             service.load()
             self._opening_service = service
         return self._opening_service

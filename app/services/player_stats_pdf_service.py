@@ -2797,7 +2797,7 @@ class PlayerStatsPDFService(BasePDFReportService):
 
     def _opening_svc(self) -> OpeningService:
         if self._opening_service is None:
-            self._opening_service = OpeningService(self.config)
+            self._opening_service = OpeningService.get_instance(self.config)
             self._opening_service.load()
         return self._opening_service
 

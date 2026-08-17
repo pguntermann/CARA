@@ -436,6 +436,7 @@ class OpeningEncyclopediaService:
         self._opening_service: Optional[Any] = None
         self._rows_by_oid: Optional[Dict[str, List[Any]]] = None
         self._tabiya_fen_by_oid: Dict[str, Optional[str]] = {}
+        self._last_lookup_log: Optional[str] = None
 
     @classmethod
     def get_instance(cls, config: Dict[str, Any]) -> "OpeningEncyclopediaService":
@@ -693,6 +694,52 @@ class OpeningEncyclopediaService:
                     best_oid = oid
         return best_oid
 
+    def _debug(self, message: str) -> None:
+        try:
+            from app.services.logging_service import LoggingService
+
+            LoggingService.get_instance(self._config).debug(message)
+        except Exception:
+            pass
+
+    def _log_lookup(
+        self,
+        display_name: str,
+        eco: Optional[str],
+        entry: Optional[EncyclopediaEntry],
+        specific: Optional[str],
+        nr: Optional[str],
+    ) -> None:
+        """One compact debug line per distinct lookup result (skips UI probe spam)."""
+        eco_s = eco or "-"
+        if entry is None:
+            detail = f"no article (specific={specific or '-'} nr={nr or '-'})"
+        else:
+            if entry.used_fallback:
+                chip = "fallback"
+            elif entry.used_nearest:
+                chip = "nearest"
+            else:
+                chip = "direct"
+            chosen = entry.matched_opening_id or entry.opening_id
+            if specific and nr and specific != nr:
+                via = "nr" if chosen == nr else "specific"
+                extra = f" specific={specific} nr={nr}"
+            elif specific:
+                via = "specific"
+                extra = ""
+            else:
+                via = "nr"
+                extra = ""
+            detail = f"{entry.opening_id} {chip} via={via}{extra}"
+            if entry.used_fallback and entry.matched_opening_id:
+                detail += f" from={entry.matched_opening_id}"
+        msg = f'Encyclopedia lookup: "{display_name}" {eco_s} -> {detail}'
+        if msg == self._last_lookup_log:
+            return
+        self._last_lookup_log = msg
+        self._debug(msg)
+
     def _resolve_opening_node(
         self, display_name: str, eco: Optional[str]
     ) -> Optional[str]:
@@ -790,13 +837,22 @@ class OpeningEncyclopediaService:
         suffix and ECO; ``name_resolution`` is used when no such candidate exists.
         Pending / skipped stubs still inherit via ``family_id`` (Fallback chip).
         """
-        node = self._resolve_opening_node(display_name, eco)
-        if not node:
-            return None
-        return self._walk_to_ready(node, explorer_display_name=display_name)
+        specific = self._resolve_most_specific_ready(display_name, eco)
+        nr = self._resolve_opening_id(display_name, eco)
+        node = _best_ready_preference(specific, nr, self._openings)
+        entry = (
+            self._walk_to_ready(node, explorer_display_name=display_name)
+            if node
+            else None
+        )
+        self._log_lookup(display_name, eco, entry, specific, nr)
+        return entry
 
     def has_entry(self, display_name: str, eco: Optional[str] = None) -> bool:
-        return self.lookup(display_name, eco) is not None
+        node = self._resolve_opening_node(display_name, eco)
+        if not node:
+            return False
+        return self._walk_to_ready(node, explorer_display_name=display_name) is not None
 
     def search(self, query: str, limit: int = 20) -> EncyclopediaSearchPage:
         """Free-text search over display_name, opening_id, eco_codes, family_id,
@@ -920,7 +976,7 @@ class OpeningEncyclopediaService:
         if self._opening_service is None:
             from app.services.opening_service import OpeningService
 
-            self._opening_service = OpeningService(self._config)
+            self._opening_service = OpeningService.get_instance(self._config)
         return self._opening_service
 
     def _ensure_rows_by_oid(self) -> Dict[str, List[Any]]:

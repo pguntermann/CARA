@@ -595,13 +595,12 @@ class BulkAnalysisService(QObject):
 
             # Post-steps: NAGs → store analysis tag (same order as single-game analysis).
             if analyzed_moves:
-                # Update game ECO from the last move with opening information (excluding repeat indicator)
-                # This matches the logic in GameController.get_game_info()
-                for move in reversed(analyzed_moves):
-                    if move.opening_name and move.opening_name != opening_repeat_indicator:
-                        if move.eco and move.eco != opening_repeat_indicator:
-                            game.eco = move.eco
-                        break
+                # Game ECO is OpeningService's last named book ply — not the
+                # move-table ``*`` display values filled during analysis.
+                if self.opening_service:
+                    last_opening = self.opening_service.last_opening_for_pgn(game.pgn)
+                    if last_opening:
+                        game.eco = last_opening.eco
 
                 # Optionally rewrite mainline quality NAGs from assessments (before tag store
                 # so the exported PGN keeps both NAGs and a matching analysis snapshot).
