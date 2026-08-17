@@ -25,6 +25,7 @@ from html import escape
 from typing import Optional, Dict, Any, List
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.path_display_utils import truncate_path_for_display
+from app.utils.path_resolver import get_app_resource_path
 from app.utils.themed_icon import (
     SVG_MENU_COPY,
     SVG_MENU_PASTE_CLIPBOARD,
@@ -1427,8 +1428,8 @@ class EngineConfigurationDialog(QDialog):
         input_config = dialog_config.get('input_widgets', {})
         input_bg = input_config.get('background_color', [45, 45, 50])
         input_border = input_config.get('border_color', [60, 60, 65])
-        app_root = Path(__file__).resolve().parents[2]
-        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
+        from app.utils.path_resolver import get_app_resource_path
+        checkmark_path = get_app_resource_path("app/resources/icons/checkmark.svg")
         checkbox_font_family = resolve_font_family(label_font_family)
         
         from app.views.style import StyleManager

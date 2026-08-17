@@ -1092,9 +1092,8 @@ class MainWindow(QMainWindow):
     def _open_manual(self) -> None:
         """Open the user manual in the default browser."""
         from app.utils.external_open import open_path
-        # Get the path to the manual HTML file
-        # __file__ is app/main_window.py, so parent is app/, then resources/manual/index.html
-        manual_path = Path(__file__).resolve().parent / "resources" / "manual" / "index.html"
+        from app.utils.path_resolver import get_app_resource_path
+        manual_path = get_app_resource_path("app/resources/manual/index.html")
         open_path(manual_path, context="help.manual")
     
     def _open_video_tutorials(self) -> None:

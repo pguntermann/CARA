@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import Qt
@@ -36,6 +35,7 @@ from app.services.game_highlights.rule_catalog import (
     list_builtin_rules,
 )
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.path_resolver import get_app_resource_path
 from app.utils.tooltip_utils import wrap_tooltip_text
 from app.views.dialogs.confirmation_dialog import ConfirmationDialog
 from app.views.style import StyleManager
@@ -710,8 +710,8 @@ class ManageGameHighlightRulesDialog(QDialog):
         )
 
     def _style_table_editors(self) -> None:
-        app_root = Path(__file__).resolve().parents[2]
-        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
+        from app.utils.path_resolver import get_app_resource_path
+        checkmark_path = get_app_resource_path("app/resources/icons/checkmark.svg")
         checkboxes = list(self.findChildren(QCheckBox))
         if checkboxes:
             StyleManager.style_checkboxes(

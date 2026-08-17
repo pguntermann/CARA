@@ -1095,11 +1095,10 @@ class MovesListProfileSetupDialog(QDialog):
         
         # Checkbox styling using StyleManager
         from app.views.style import StyleManager
-        from pathlib import Path
+        from app.utils.path_resolver import get_app_resource_path
         
         # Get checkmark icon path
-        app_root = Path(__file__).resolve().parents[2]
-        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
+        checkmark_path = get_app_resource_path("app/resources/icons/checkmark.svg")
         
         # Use input border and background colors for checkbox indicator
         inputs_config = dialog_config.get('inputs', {})

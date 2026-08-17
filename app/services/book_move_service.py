@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 
 from app.services.opening_service import OpeningService
+from app.utils.path_resolver import get_app_resource_path
 
 
 class BookMoveService:
@@ -40,11 +41,12 @@ class BookMoveService:
         
         book_config = self.config.get("game_analysis", {}).get("book_move_detection", {})
         book_files = book_config.get("opening_book_files", [])
-        books_path_str = self.config.get("resources", {}).get("opening_books_path", "app/resources/openingbooks/lpb")
-        
-        # Resolve path relative to app root
-        app_root = Path(__file__).parent.parent.parent
-        books_path = app_root / books_path_str
+        books_path_str = self.config.get("resources", {}).get(
+            "opening_books_path", "app/resources/openingbooks/lpb"
+        )
+        books_path = Path(str(books_path_str))
+        if not books_path.is_absolute():
+            books_path = get_app_resource_path(str(books_path))
         
         if not books_path.exists():
             self._is_loaded = True

@@ -1,6 +1,5 @@
 """About dialog for displaying application information."""
 
-from pathlib import Path
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -13,6 +12,7 @@ from PyQt6.QtGui import QColor, QIcon, QShowEvent
 from PyQt6.QtCore import Qt
 from typing import Dict, Any
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.path_resolver import get_app_resource_path
 
 
 class AboutDialog(QDialog):
@@ -61,8 +61,7 @@ class AboutDialog(QDialog):
         icon_config = dialog_config.get('icon', {})
         icon_size = icon_config.get('size', 120)
         icon_label = QLabel()
-        repo_root = Path(__file__).resolve().parents[3]
-        icon_path = repo_root / "appicon.svg"
+        icon_path = get_app_resource_path("appicon.svg")
         if icon_path.exists():
             icon = QIcon(str(icon_path))
             pixmap = icon.pixmap(icon_size, icon_size)

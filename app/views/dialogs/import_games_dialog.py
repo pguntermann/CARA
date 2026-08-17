@@ -372,14 +372,13 @@ class ImportGamesDialog(QDialog):
     def _apply_checkbox_styling(self) -> None:
         """Apply checkbox styling to all checkboxes."""
         from app.views.style import StyleManager
-        from pathlib import Path
+        from app.utils.path_resolver import get_app_resource_path
         
         input_border_color = self.input_border_color
         input_bg_color = self.input_bg_color
         
         # Get checkmark icon path
-        app_root = Path(__file__).resolve().parents[2]
-        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
+        checkmark_path = get_app_resource_path("app/resources/icons/checkmark.svg")
         
         # Convert QColor to [R, G, B] lists
         text_color = [self.label_text_color.red(), self.label_text_color.green(), self.label_text_color.blue()]

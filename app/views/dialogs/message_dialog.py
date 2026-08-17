@@ -11,12 +11,12 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QPalette, QColor, QFont, QFontMetrics, QShowEvent
 from PyQt6.QtCore import Qt, QUrl
 import re
-from pathlib import Path
 from typing import Dict, Any, Literal
 import sys
 import subprocess
 
 from app.utils.font_utils import scale_font_size
+from app.utils.path_resolver import get_app_resource_path
 from app.views.style import StyleManager
 
 
@@ -211,9 +211,7 @@ class MessageDialog(QDialog):
         if link.startswith("manual://"):
             # Extract anchor (everything after manual://)
             anchor = link.replace("manual://", "")
-            # Get the path to the manual HTML file (stable regardless of this module's location)
-            # message_dialog.py lives under app/views/dialogs/, so parents[2] is app/
-            manual_path = Path(__file__).resolve().parents[2] / "resources" / "manual" / "index.html"
+            manual_path = get_app_resource_path("app/resources/manual/index.html")
             
             # On macOS, use osascript to preserve URL fragments (QDesktopServices strips them)
             if sys.platform == "darwin":

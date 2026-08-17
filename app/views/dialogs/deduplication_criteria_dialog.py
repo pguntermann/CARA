@@ -349,11 +349,8 @@ class DeduplicationCriteriaDialog(QDialog):
         )
         
         # Apply checkbox styling using StyleManager
-        from pathlib import Path
-        
-        # Get checkmark icon path (stable regardless of this module's location)
-        app_root = Path(__file__).resolve().parents[2]
-        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
+        from app.utils.path_resolver import get_app_resource_path
+        checkmark_path = get_app_resource_path("app/resources/icons/checkmark.svg")
         
         # Use input border and background colors for checkbox indicator
         input_bg_color = self.input_bg_color

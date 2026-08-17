@@ -18,7 +18,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QShowEvent, QPalette, QColor, QAction, QIcon
 from typing import Dict, Any, Optional, List
-from pathlib import Path
 
 
 class ModelDiscoveryThread(QThread):
@@ -870,10 +869,9 @@ class AIModelSettingsDialog(QDialog):
         # Checkboxes (e.g. Enable custom endpoint)
         checkboxes = self.findChildren(QCheckBox)
         if checkboxes:
-            from pathlib import Path
+            from app.utils.path_resolver import get_app_resource_path
             from app.views.style import StyleManager
-            app_root = Path(__file__).resolve().parents[2]
-            checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
+            checkmark_path = get_app_resource_path("app/resources/icons/checkmark.svg")
             checkbox_bg = self.inputs_config.get('background_color', [45, 45, 50])
             checkbox_border = self.inputs_config.get('border_color', [60, 60, 65])
             StyleManager.style_checkboxes(

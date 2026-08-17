@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 from PyQt6.QtCore import Qt
@@ -29,6 +28,7 @@ from app.services.move_quality_nag_service import (
 )
 from app.services.pgn_formatter_service import get_nag_text
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.path_resolver import get_app_resource_path
 from app.views.style import StyleManager
 from app.views.widgets.row_hover_table_widget import RowHoverTableWidget
 
@@ -527,8 +527,7 @@ class MoveQualityNagMappingDialog(QDialog):
         self._style_table_editors()
 
     def _style_table_editors(self) -> None:
-        app_root = Path(__file__).resolve().parents[2]
-        checkmark_path = app_root / "resources" / "icons" / "checkmark.svg"
+        checkmark_path = get_app_resource_path("app/resources/icons/checkmark.svg")
         checkboxes = list(self.findChildren(QCheckBox))
         if checkboxes:
             StyleManager.style_checkboxes(

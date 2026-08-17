@@ -947,8 +947,9 @@ class ChessBoardWidget(QWidget):
         painter.setBrush(QBrush(QColor(color_rgb[0], color_rgb[1], color_rgb[2])))
         painter.drawEllipse(QPointF(center_x, center_y), badge_radius, badge_radius)
         icon_size = badge_radius * 2
-        app_root = Path(__file__).resolve().parents[2]
-        icon_path = app_root / "resources" / "icons" / "move_classification" / f"{config_key}.svg"
+        icon_path = get_app_resource_path(
+            f"app/resources/icons/move_classification/{config_key}.svg"
+        )
         if icon_path.exists():
             try:
                 svg_bytes = icon_path.read_bytes()

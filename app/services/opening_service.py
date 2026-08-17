@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Sequence, Tuple, List, Set
 from typing import TYPE_CHECKING
 
+from app.utils.path_resolver import get_app_resource_path
+
 if TYPE_CHECKING:
     from app.config.config_loader import ConfigLoader
 
@@ -269,8 +271,9 @@ class OpeningService:
             ecolists_path_str = self.config.get('resources', {}).get(
                 'ecolists_path', 'app/resources/ecolists'
             )
-            app_root = Path(__file__).parent.parent.parent
-            ecolists_path = app_root / ecolists_path_str
+            ecolists_path = Path(str(ecolists_path_str))
+            if not ecolists_path.is_absolute():
+                ecolists_path = get_app_resource_path(str(ecolists_path))
 
             eco_base_file = ecolists_path / "eco_base.json"
             if eco_base_file.exists():
