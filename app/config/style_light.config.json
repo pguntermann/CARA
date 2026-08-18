@@ -365,6 +365,26 @@
         "min_height": 20,
         "add_line_height": 0
       },
+      "tab_bar_scroll_buttons": {
+        "background_color": {
+          "$ref": "$_COLOR_SCROLLBAR_BUTTON_COLOR"
+        },
+        "hover_background_color": [
+          160,
+          162,
+          170
+        ],
+        "pressed_background_color": [
+          148,
+          150,
+          158
+        ],
+        "icon_svg_path": "app/resources/icons/tab_scroll/light",
+        "scroller_width": 32,
+        "arrow_width": 20,
+        "arrow_height": 16,
+        "border_radius": 0
+      },
       "checkbox": {
         "spacing": 5,
         "indicator_width": 16,

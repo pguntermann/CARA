@@ -21,6 +21,7 @@ from app.views.style.date_edit import apply_date_edit_styling
 from app.views.style.group_box import apply_group_box_styling
 from app.views.style.context_menu import apply_context_menu_styling
 from app.views.style.tree_view import apply_tree_view_styling
+from app.views.style.tab_bar import generate_tab_bar_scroll_button_stylesheet
 
 
 class StyleManager:
@@ -774,4 +775,17 @@ class StyleManager:
             hover_text_color, item_padding, separator_height, separator_color,
             separator_margin
         )
+
+    @staticmethod
+    def tab_bar_scroll_button_qss(
+        config: Dict[str, Any],
+        background_color: Optional[List[int]] = None,
+    ) -> str:
+        """Return themed QSS for QTabBar overflow scroll buttons.
+
+        Args:
+            config: Configuration dictionary.
+            background_color: Optional plate color override (panel ``scroll_button_color``).
+        """
+        return generate_tab_bar_scroll_button_stylesheet(config, background_color)
 

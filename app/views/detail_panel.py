@@ -24,6 +24,7 @@ from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.models.database_model import DatabaseModel
 from app.controllers.game_controller import GameController
 from app.controllers.notes_controller import NotesController
+from app.views.style import StyleManager
 from typing import Optional
 
 
@@ -262,18 +263,7 @@ class DetailPanel(QWidget):
                 margin-right: 0px;
             }}
             
-            QTabBar QToolButton {{
-                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
-                border: none;
-            }}
-            
-            QTabBar QToolButton:hover {{
-                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
-            }}
-            
-            QTabBar QToolButton:pressed {{
-                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
-            }}
+            {StyleManager.tab_bar_scroll_button_qss(self.config, scroll_button_color)}
         """
         
         self.tab_widget.setStyleSheet(stylesheet)

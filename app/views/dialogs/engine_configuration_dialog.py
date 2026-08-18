@@ -1102,6 +1102,7 @@ class EngineConfigurationDialog(QDialog):
         self._apply_engine_info_path_style(dialog_config)
         
         # Tab widget styling (aligned with DetailPanel._apply_tab_styling)
+        from app.views.style import StyleManager
         tabs_config = dialog_config.get('tabs', {})
         tab_font_family = resolve_font_family(tabs_config.get('font_family', 'Helvetica Neue'))
         tab_font_size = scale_font_size(tabs_config.get('font_size', 10))
@@ -1199,18 +1200,7 @@ class EngineConfigurationDialog(QDialog):
             QTabBar::tab:last:selected {{
                 margin-right: 0px;
             }}
-            QTabBar QToolButton {{
-                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
-                border: none;
-            }}
-            
-            QTabBar QToolButton:hover {{
-                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
-            }}
-            
-            QTabBar QToolButton:pressed {{
-                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
-            }}
+            {StyleManager.tab_bar_scroll_button_qss(self.config, scroll_button_color)}
         """
         self.tab_widget.setStyleSheet(tab_stylesheet)
         
