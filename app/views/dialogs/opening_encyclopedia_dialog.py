@@ -1758,7 +1758,7 @@ class OpeningEncyclopediaDialog(QDialog):
             resolve_font_family("Helvetica Neue"),
             result_font_size,
         ))
-        results.setStyleSheet(
+        list_style = (
             f"QListWidget {{ background-color: rgb({result_bg[0]}, {result_bg[1]}, {result_bg[2]}); "
             f"color: rgb({result_fg[0]}, {result_fg[1]}, {result_fg[2]}); "
             f"border: 1px solid rgb({result_border[0]}, {result_border[1]}, {result_border[2]}); "
@@ -1767,6 +1767,13 @@ class OpeningEncyclopediaDialog(QDialog):
             f"QListWidget::item:hover {{ background-color: rgb({result_hover[0]}, {result_hover[1]}, {result_hover[2]}); }} "
             f"QListWidget::item:selected {{ background-color: rgb({result_selected_bg[0]}, {result_selected_bg[1]}, {result_selected_bg[2]}); "
             f"color: rgb({result_selected_fg[0]}, {result_selected_fg[1]}, {result_selected_fg[2]}); }}"
+        )
+        StyleManager.style_list_widget_scrollbar(
+            results,
+            self.config,
+            list(result_bg),
+            list(result_border),
+            list_style,
         )
         tags_cfg = dialog_config.get("tags", {})
         if not isinstance(tags_cfg, dict):

@@ -269,6 +269,52 @@ def apply_table_scrollbar_styling(
     
 
 
+def apply_list_widget_scrollbar_styling(
+    list_widget,
+    config: Dict[str, Any],
+    bg_color: List[int],
+    border_color: List[int],
+    list_style: str,
+) -> None:
+    """Apply shared scrollbar styling to a QListWidget.
+
+    Same approach as tables/combos: QSS on the list plus a direct stylesheet
+    and fixed size on the bar widgets so native (Linux/macOS) chrome does not win.
+    """
+    list_scrollbar_style = generate_scrollbar_stylesheet(
+        config, bg_color, border_color, widget_selector="QListWidget QScrollBar"
+    )
+    list_widget.setStyleSheet(list_style + list_scrollbar_style)
+
+    styles_config = config.get("ui", {}).get("styles", {})
+    scrollbar_config = styles_config.get("scrollbar", {})
+    scrollbar_bg_color = scrollbar_config.get("background_color", bg_color)
+    scrollbar_width = scrollbar_config.get("width", 8)
+    bar_qss = generate_scrollbar_stylesheet(config, bg_color, border_color)
+
+    vertical_scrollbar = list_widget.verticalScrollBar()
+    if vertical_scrollbar:
+        vertical_scrollbar.setStyleSheet(bar_qss)
+        vertical_scrollbar.setFixedWidth(scrollbar_width)
+        pal = vertical_scrollbar.palette()
+        pal.setColor(vertical_scrollbar.backgroundRole(), QColor(*scrollbar_bg_color))
+        pal.setColor(pal.ColorRole.Base, QColor(*scrollbar_bg_color))
+        pal.setColor(pal.ColorRole.Window, QColor(*scrollbar_bg_color))
+        vertical_scrollbar.setPalette(pal)
+        vertical_scrollbar.setAutoFillBackground(True)
+
+    horizontal_scrollbar = list_widget.horizontalScrollBar()
+    if horizontal_scrollbar:
+        horizontal_scrollbar.setStyleSheet(bar_qss)
+        horizontal_scrollbar.setFixedHeight(scrollbar_width)
+        pal = horizontal_scrollbar.palette()
+        pal.setColor(horizontal_scrollbar.backgroundRole(), QColor(*scrollbar_bg_color))
+        pal.setColor(pal.ColorRole.Base, QColor(*scrollbar_bg_color))
+        pal.setColor(pal.ColorRole.Window, QColor(*scrollbar_bg_color))
+        horizontal_scrollbar.setPalette(pal)
+        horizontal_scrollbar.setAutoFillBackground(True)
+
+
 def apply_table_view_scrollbar_styling(
     table_view,
     config: Dict[str, Any],

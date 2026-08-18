@@ -8,6 +8,7 @@ from app.views.style.scrollbar import (
     apply_scrollbar_styling,
     apply_table_scrollbar_styling,
     apply_table_view_scrollbar_styling,
+    apply_list_widget_scrollbar_styling,
     apply_text_edit_scrollbar_styling
 )
 from app.views.style.checkbox import apply_checkbox_styling
@@ -91,6 +92,19 @@ class StyleManager:
             table_style: Existing table stylesheet to append scrollbar styles to.
         """
         apply_table_view_scrollbar_styling(table_view, config, bg_color, border_color, table_style)
+
+    @staticmethod
+    def style_list_widget_scrollbar(
+        list_widget,
+        config: Dict[str, Any],
+        bg_color: List[int],
+        border_color: List[int],
+        list_style: str,
+    ) -> None:
+        """Apply scrollbar styling to a QListWidget (dropdowns, result lists)."""
+        apply_list_widget_scrollbar_styling(
+            list_widget, config, bg_color, border_color, list_style
+        )
     
     @staticmethod
     def style_text_edit_scrollbar(
