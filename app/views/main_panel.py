@@ -276,7 +276,9 @@ class MainPanel(QWidget):
         self.game_info_view.set_white_player(game_info.white_name, game_info.white_elo)
         self.game_info_view.set_black_player(game_info.black_name, game_info.black_elo)
         self.game_info_view.set_result(game_info.result)
-        self.game_info_view.set_opening(game_info.eco, game_info.opening_name)
+        self.game_info_view.set_opening(
+            game_info.eco, game_info.opening_name, fen=game_info.opening_fen
+        )
     
     def _clear_game_info(self) -> None:
         """Clear game info display to default values."""
@@ -300,5 +302,7 @@ class MainPanel(QWidget):
         self.game_info_view.set_white_player(game_info.white_name, game_info.white_elo)
         self.game_info_view.set_black_player(game_info.black_name, game_info.black_elo)
         self.game_info_view.set_result(game_info.result)
-        self.game_info_view.set_opening(game_info.eco, game_info.opening_name)
+        self.game_info_view.set_opening(
+            game_info.eco, game_info.opening_name, fen=game_info.opening_fen
+        )
 

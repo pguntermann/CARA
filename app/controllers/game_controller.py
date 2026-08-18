@@ -122,6 +122,7 @@ class GameInfo:
     result: str
     eco: str
     opening_name: str
+    opening_fen: Optional[str] = None
 
 
 class GameController:
@@ -816,9 +817,11 @@ class GameController:
         
         # Game-level opening: same OpeningService rule as bulk ECO update / bulk analysis.
         opening_name = DEFAULT_OPENING_NAME
+        opening_fen: Optional[str] = None
         if game and game.pgn:
-            last_opening = self.opening_service.last_opening_for_pgn(game.pgn)
-            if last_opening:
+            last_hit = self.opening_service.last_named_opening_for_pgn(game.pgn)
+            if last_hit:
+                last_opening, opening_fen = last_hit
                 eco = last_opening.eco
                 opening_name = last_opening.name
         
@@ -829,7 +832,8 @@ class GameController:
             black_elo=black_elo,
             result=result,
             eco=eco,
-            opening_name=opening_name
+            opening_name=opening_name,
+            opening_fen=opening_fen,
         )
     
     def extract_moves_from_game(self, game: Optional[GameData]) -> List[MoveData]:

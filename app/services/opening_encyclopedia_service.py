@@ -7,7 +7,7 @@ import json
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from app.utils.path_resolver import get_app_resource_path
 
@@ -265,6 +265,31 @@ def _is_ancestor_opening(ancestor_id: Optional[str], opening_id: Optional[str]) 
     return str(opening_id).startswith(prefix)
 
 
+def _placement_stm_key(fen: str) -> str:
+    """Placement + side-to-move (ignore EP and clocks), matching OpeningService.book_key."""
+    fields = (fen or "").split()
+    if len(fields) >= 2:
+        return f"{fields[0]} {fields[1]}"
+    return (fen or "").strip()
+
+
+def _prefer_name_then_fen_deepen(
+    name_id: Optional[str], fen_id: Optional[str]
+) -> Optional[str]:
+    """Keep the name-chooser node; FEN may only fill a miss or deepen to a descendant.
+
+    Same-family siblings, ancestors, and cross-family FEN hits never replace a
+    name/NR result — that is how a Taimanov seed must not beat Four Knights.
+    """
+    if not fen_id:
+        return name_id
+    if not name_id:
+        return fen_id
+    if name_id == fen_id or _is_ancestor_opening(name_id, fen_id):
+        return fen_id
+    return name_id
+
+
 def _encyclopedia_family_key(
     opening_id: Optional[str], openings: Dict[str, Dict[str, Any]]
 ) -> Optional[str]:
@@ -510,7 +535,9 @@ def _opening_in_family_scope(
 class OpeningEncyclopediaService:
     """Lookup encyclopedia entries by explorer ``(display_name, eco)``.
 
-    The SQLite catalog is loaded lazily on first use. Prefer
+    Optional ``fen`` is an identity hint from the classified book ply. It
+    never replaces the name chooser: it may only fill a miss or deepen to a
+    descendant. The SQLite catalog is loaded lazily on first use. Prefer
     :meth:`get_instance` so UI surfaces share one in-memory catalog.
     """
 
@@ -533,6 +560,16 @@ class OpeningEncyclopediaService:
         self._rows_by_oid: Optional[Dict[str, List[Any]]] = None
         self._tabiya_fen_by_oid: Dict[str, Optional[str]] = {}
         self._last_lookup_log: Optional[str] = None
+        self._lookup_cache: Dict[
+            Tuple[str, str, str], Optional[EncyclopediaEntry]
+        ] = {}
+        self._resolve_cache: Dict[
+            Tuple[str, str], Tuple[Optional[str], Optional[str], Optional[str]]
+        ] = {}
+        self._eco_id_by_fen: Dict[str, int] = {}
+        self._eco_id_by_book_key: Dict[str, int] = {}
+        self._eco_row_by_id: Dict[int, Tuple[str, str]] = {}
+        self._eco_maps_by_id: Dict[int, Tuple[str, ...]] = {}
 
     @classmethod
     def get_instance(cls, config: Dict[str, Any]) -> "OpeningEncyclopediaService":
@@ -715,6 +752,8 @@ class OpeningEncyclopediaService:
                     "images": self._images_from_row(row),
                 }
 
+            self._load_eco_fen_index(conn)
+
             self._available = True
             try:
                 from app.services.logging_service import LoggingService
@@ -723,7 +762,8 @@ class OpeningEncyclopediaService:
                     f"Opening encyclopedia loaded: path={path}, "
                     f"openings={len(self._openings)}, "
                     f"name_keys={len(self._by_name)}, "
-                    f"search_abbrevs={len(self._search_abbrevs)}"
+                    f"search_abbrevs={len(self._search_abbrevs)}, "
+                    f"eco_base={len(self._eco_row_by_id)}"
                 )
             except Exception:
                 pass
@@ -739,6 +779,77 @@ class OpeningEncyclopediaService:
                 )
             except Exception:
                 pass
+
+    def _load_eco_fen_index(self, conn: sqlite3.Connection) -> None:
+        """Index ``eco_entry`` base rows for optional FEN identity hints.
+
+        Exact FEN plus placement+STM (clock/EP-tolerant). Interpolated rows
+        are ignored, matching classification. Mapped seed slugs are stored
+        only when the opening exists in this catalog.
+        """
+        self._eco_id_by_fen = {}
+        self._eco_id_by_book_key = {}
+        self._eco_row_by_id = {}
+        self._eco_maps_by_id = {}
+        try:
+            from app.services.opening_service import parse_move_sans
+
+            book_key_best: Dict[str, Tuple[int, int]] = {}
+            for row in conn.execute(
+                "SELECT eco_entry_id, fen, name, eco, moves "
+                "FROM eco_entry WHERE book = 'base'"
+            ):
+                eco_id = int(row["eco_entry_id"])
+                fen = str(row["fen"] or "").strip()
+                name = str(row["name"] or "")
+                eco = str(row["eco"] or "")
+                if not fen or not name:
+                    continue
+                self._eco_id_by_fen[fen] = eco_id
+                self._eco_row_by_id[eco_id] = (name, eco)
+                key = _placement_stm_key(fen)
+                depth = len(parse_move_sans(str(row["moves"] or "")))
+                prev = book_key_best.get(key)
+                if prev is None or depth > prev[1]:
+                    book_key_best[key] = (eco_id, depth)
+            self._eco_id_by_book_key = {
+                key: eco_id for key, (eco_id, _depth) in book_key_best.items()
+            }
+
+            buckets: Dict[int, List[str]] = {}
+            for row in conn.execute(
+                "SELECT eco_entry_id, opening_id FROM opening_eco_entry"
+            ):
+                eco_id = int(row["eco_entry_id"])
+                oid = str(row["opening_id"] or "").strip()
+                if not oid or oid not in self._openings:
+                    continue
+                bucket = buckets.setdefault(eco_id, [])
+                if oid not in bucket:
+                    bucket.append(oid)
+            self._eco_maps_by_id = {
+                eco_id: tuple(oids) for eco_id, oids in buckets.items()
+            }
+        except sqlite3.OperationalError:
+            self._eco_id_by_fen = {}
+            self._eco_id_by_book_key = {}
+            self._eco_row_by_id = {}
+            self._eco_maps_by_id = {}
+
+    def _eco_base_for_fen(self, fen: str) -> Optional[Tuple[int, str, str]]:
+        """Return ``(eco_entry_id, name, eco)`` for a classified book FEN."""
+        fen_s = (fen or "").strip()
+        if not fen_s:
+            return None
+        eco_id = self._eco_id_by_fen.get(fen_s)
+        if eco_id is None:
+            eco_id = self._eco_id_by_book_key.get(_placement_stm_key(fen_s))
+        if eco_id is None:
+            return None
+        meta = self._eco_row_by_id.get(eco_id)
+        if not meta:
+            return None
+        return (eco_id, meta[0], meta[1])
 
     def _resolve_opening_id(self, display_name: str, eco: Optional[str]) -> Optional[str]:
         self._ensure_loaded()
@@ -826,6 +937,8 @@ class OpeningEncyclopediaService:
         entry: Optional[EncyclopediaEntry],
         specific: Optional[str],
         nr: Optional[str],
+        *,
+        fen_note: str = "",
     ) -> None:
         """One compact debug line per distinct lookup result (skips UI probe spam)."""
         eco_s = eco or "-"
@@ -851,19 +964,57 @@ class OpeningEncyclopediaService:
             detail = f"{entry.opening_id} {chip} via={via}{extra}"
             if entry.used_fallback and entry.matched_opening_id:
                 detail += f" from={entry.matched_opening_id}"
+        if fen_note:
+            detail += f" {fen_note}"
         msg = f'Encyclopedia lookup: "{display_name}" {eco_s} -> {detail}'
         if msg == self._last_lookup_log:
             return
         self._last_lookup_log = msg
         self._debug(msg)
 
+    def _resolve_opening_parts(
+        self, display_name: str, eco: Optional[str]
+    ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+        """Cached ``(specific, nr, chosen node)`` for a name+ECO chooser pass."""
+        self._ensure_loaded()
+        key = (display_name or "", eco or "")
+        cached = self._resolve_cache.get(key)
+        if cached is not None:
+            return cached
+        specific = self._resolve_most_specific_ready(display_name, eco)
+        nr = self._resolve_opening_id(display_name, eco)
+        node = _best_ready_preference(specific, nr, self._openings)
+        parts = (specific, nr, node)
+        self._resolve_cache[key] = parts
+        return parts
+
     def _resolve_opening_node(
         self, display_name: str, eco: Optional[str]
     ) -> Optional[str]:
         """Resolve with runtime specificity, but keep a ready NR child over an ancestor."""
-        specific = self._resolve_most_specific_ready(display_name, eco)
-        nr = self._resolve_opening_id(display_name, eco)
-        return _best_ready_preference(specific, nr, self._openings)
+        _specific, _nr, node = self._resolve_opening_parts(display_name, eco)
+        return node
+
+    def _merge_fen_candidates(
+        self,
+        name_id: Optional[str],
+        fen_name_id: Optional[str],
+        mapped_ids: Sequence[str],
+    ) -> Optional[str]:
+        """Name chooser first; FEN-name may deepen; mapped seeds only if both miss."""
+        chosen = _prefer_name_then_fen_deepen(name_id, fen_name_id)
+        if chosen is not None:
+            return chosen
+        best: Optional[str] = None
+        for oid in mapped_ids:
+            if oid not in self._openings:
+                continue
+            if best is None:
+                best = oid
+                continue
+            merged = _best_ready_preference(oid, best, self._openings)
+            best = merged or best
+        return best
 
     def _entry_from_ready(
         self,
@@ -946,30 +1097,66 @@ class OpeningEncyclopediaService:
         return None
 
     def lookup(
-        self, display_name: str, eco: Optional[str] = None
+        self,
+        display_name: str,
+        eco: Optional[str] = None,
+        fen: Optional[str] = None,
     ) -> Optional[EncyclopediaEntry]:
         """Resolve name → node, then walk family_id until a ready prose row.
 
         Resolution prefers the most specific ready article matching the explorer
         suffix and ECO; ``name_resolution`` is used when no such candidate exists.
         Pending / skipped stubs still inherit via ``family_id`` (Fallback chip).
+
+        Optional ``fen`` is the last named eco-book position. It does not replace
+        the name chooser: a FEN hit may only fill a miss or deepen to a
+        descendant. Same ``(name, eco, fen)`` results are cached.
         """
-        specific = self._resolve_most_specific_ready(display_name, eco)
-        nr = self._resolve_opening_id(display_name, eco)
-        node = _best_ready_preference(specific, nr, self._openings)
+        self._ensure_loaded()
+        cache_key = (display_name or "", eco or "", (fen or "").strip())
+        if cache_key in self._lookup_cache:
+            return self._lookup_cache[cache_key]
+        entry = self._lookup_uncached(display_name, eco, fen)
+        self._lookup_cache[cache_key] = entry
+        return entry
+
+    def _lookup_uncached(
+        self,
+        display_name: str,
+        eco: Optional[str],
+        fen: Optional[str],
+    ) -> Optional[EncyclopediaEntry]:
+        specific, nr, name_node = self._resolve_opening_parts(display_name, eco)
+        fen_name_id: Optional[str] = None
+        mapped: Tuple[str, ...] = ()
+        fen_s = (fen or "").strip()
+        if fen_s:
+            hit = self._eco_base_for_fen(fen_s)
+            if hit is not None:
+                _eco_id, book_name, book_eco = hit
+                _fs, _fn, fen_name_id = self._resolve_opening_parts(book_name, book_eco)
+                mapped = self._eco_maps_by_id.get(_eco_id, ())
+        node = self._merge_fen_candidates(name_node, fen_name_id, mapped)
         entry = (
             self._walk_to_ready(node, explorer_display_name=display_name)
             if node
             else None
         )
-        self._log_lookup(display_name, eco, entry, specific, nr)
+        fen_note = ""
+        if fen_s and node and node != name_node:
+            fen_note = "fen=hint"
+        self._log_lookup(
+            display_name, eco, entry, specific, nr, fen_note=fen_note
+        )
         return entry
 
-    def has_entry(self, display_name: str, eco: Optional[str] = None) -> bool:
-        node = self._resolve_opening_node(display_name, eco)
-        if not node:
-            return False
-        return self._walk_to_ready(node, explorer_display_name=display_name) is not None
+    def has_entry(
+        self,
+        display_name: str,
+        eco: Optional[str] = None,
+        fen: Optional[str] = None,
+    ) -> bool:
+        return self.lookup(display_name, eco, fen=fen) is not None
 
     def search(self, query: str, limit: int = 20) -> EncyclopediaSearchPage:
         """Free-text search over display_name, opening_id, eco_codes, family_id,
