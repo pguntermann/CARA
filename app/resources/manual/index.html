@@ -637,7 +637,7 @@
                     <li><strong>Database Panel</strong> (bottom): Manages your game collections with tabs for multiple PGN databases, searchable game tables, and column customization. This panel can be collapsed to maximize space for the main and detail panels.</li>
                 </ul>
                 
-                <p>You can resize any panel by dragging the splitter handles between them. The database panel can be collapsed by double-clicking its splitter handle or using <span class="menu-item">View → Hide Database Panel</span> (<code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>). The active visual theme can also be changed from <span class="menu-item">View → Theme</span>. The status bar at the bottom of the window displays status messages and progress indicators during long-running operations.</p>
+                <p>You can resize any panel by dragging the splitter handles between them. The PGN notation pane can be collapsed by double-clicking the splitter handle between it and the detail tabs, or using <span class="menu-item">View → Hide PGN Pane</span> (<code>Ctrl+Shift+↑</code> / <code>⌘+Shift+↑</code>). The database panel can be collapsed by double-clicking its splitter handle or using <span class="menu-item">View → Hide Database Panel</span> (<code>Ctrl+Shift+↓</code> / <code>⌘+Shift+↓</code>). The active visual theme can also be changed from <span class="menu-item">View → Theme</span>. The status bar at the bottom of the window displays status messages and progress indicators during long-running operations.</p>
             </div>
             <div class="outline-item">
                 <h4 id="main-panel-components">4.3 Main Panel Components</h4>
@@ -819,7 +819,7 @@
                 </ul>
                 
                 <h5 id="panel-management">4.4.4 Panel Management</h5>
-                <p>The Database Panel can be collapsed to maximize space for the main and detail panels. Double-click the horizontal splitter handle above the panel, or use <span class="menu-item">View → Hide Database Panel</span> (<code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>) to toggle its visibility. When collapsed, the panel is minimized to a thin strip, and you can expand it again using the same method.</p>
+                <p>The Database Panel can be collapsed to maximize space for the main and detail panels. Double-click the horizontal splitter handle above the panel, or use <span class="menu-item">View → Hide Database Panel</span> (<code>Ctrl+Shift+↓</code> / <code>⌘+Shift+↓</code>) to toggle its visibility. When collapsed, the panel is minimized to a thin strip, and you can expand it again using the same method.</p>
                 
                 <p>The panel automatically updates when games are added, removed, or modified in any database. Changes are reflected immediately in the table view, and unsaved indicators appear as needed to help you track which databases contain games with unsaved changes.</p>
                 
@@ -840,7 +840,7 @@
             </div>
             <div class="outline-item">
                 <h4 id="detail-panel">4.5 Detail Panel</h4>
-                <p>The Detail Panel contains the PGN Notation Pane at the top and a set of tabbed views below for detailed analysis.</p>
+                <p>The Detail Panel contains the PGN Notation Pane at the top and a set of tabbed views below for detailed analysis. The PGN pane can be collapsed to give more space to the tabs: double-click the splitter handle between the PGN pane and the tabs, or use <span class="menu-item">View → Hide PGN Pane</span> (<code>Ctrl+Shift+↑</code> / <code>⌘+Shift+↑</code>). When collapsed, only the splitter handle remains so it can still be double-clicked to expand again.</p>
                 
                 <p>The PGN Notation Pane displays the complete PGN notation for the current game. The PGN notation contains several different types of elements:</p>
                 <ul>
@@ -1200,7 +1200,8 @@
                 
                 <h5>4.6.12 View Options</h5>
                 <ul>
-                    <li><code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>: Toggle database panel visibility</li>
+                    <li><code>Ctrl+Shift+↑</code> / <code>⌘+Shift+↑</code>: Toggle PGN pane visibility</li>
+                    <li><code>Ctrl+Shift+↓</code> / <code>⌘+Shift+↓</code>: Toggle database panel visibility</li>
                 </ul>
                 
                 <h5>4.6.13 Notes</h5>
@@ -2680,8 +2681,12 @@
                 <p><strong>Shortcut:</strong> <code>F9</code></p>
                 <p>Switches the Detail Panel to the <strong>Notes</strong> tab.<br>See <a href="#notes">section 4.5.9</a> for more information.</p>
 
-                <h5>6.14.12 Hide Database Panel</h5>
-                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code></p>
+                <h5>6.14.12 Hide PGN Pane</h5>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+↑</code> / <code>⌘+Shift+↑</code></p>
+                <p>Toggles the visibility of the PGN notation pane in the Detail Panel to free more space for the analysis tabs. You can also double-click the splitter handle between the PGN pane and the tabs.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
+
+                <h5>6.14.13 Hide Database Panel</h5>
+                <p><strong>Shortcut:</strong> <code>Ctrl+Shift+↓</code> / <code>⌘+Shift+↓</code></p>
                 <p>Toggles the visibility of the Database Panel to free more space for the Main and Detail panels.<br>See <a href="#three-panel-layout">section 4.2</a> for more information.</p>
             </div>
 
@@ -2734,6 +2739,8 @@
                     <li><code>F7</code>: Switch to Annotations tab</li>
                     <li><code>F8</code>: Switch to AI Summary tab</li>
                     <li><code>F9</code>: Switch to Notes tab</li>
+                    <li><code>Ctrl+Shift+↑</code> / <code>⌘+Shift+↑</code>: Toggle PGN pane visibility</li>
+                    <li><code>Ctrl+Shift+↓</code> / <code>⌘+Shift+↓</code>: Toggle database panel visibility</li>
                 </ul>
                 
                 <h5>6.16.3 Game Analysis</h5>

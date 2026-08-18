@@ -3487,6 +3487,7 @@
         },
         "splitter": {
           "pgn_height": 200,
+          "pgn_collapsed_height": 0,
           "tabs_height": 300,
           "pgn_stretch_factor": 2,
           "tabs_stretch_factor": 3

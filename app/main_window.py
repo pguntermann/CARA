@@ -217,11 +217,18 @@ class MainWindow(QMainWindow):
             ps_source_sel = None
 
         db_collapsed = bool(getattr(self, "_database_panel_collapsed", False))
+        pgn_collapsed = bool(getattr(self, "_pgn_pane_collapsed", False))
         splitter_sizes = None
+        pgn_splitter_sizes = None
         try:
             splitter_sizes = self.middle_splitter.sizes() if hasattr(self, "middle_splitter") else None
         except Exception:
             splitter_sizes = None
+        try:
+            if hasattr(self, "detail_panel") and hasattr(self.detail_panel, "pgn_splitter"):
+                pgn_splitter_sizes = self.detail_panel.pgn_splitter.sizes()
+        except Exception:
+            pgn_splitter_sizes = None
 
         # Load merged config with the selected style defaults (no disk mutation).
         cfg_path = ConfigLoader().config_path
@@ -333,9 +340,21 @@ class MainWindow(QMainWindow):
             pass
 
         try:
+            if pgn_splitter_sizes and hasattr(self, "detail_panel") and hasattr(self.detail_panel, "pgn_splitter"):
+                self.detail_panel.pgn_splitter.setSizes(pgn_splitter_sizes)
+        except Exception:
+            pass
+
+        try:
             # Ensure collapsed state matches prior.
             if bool(getattr(self, "_database_panel_collapsed", False)) != db_collapsed:
                 self._toggle_database_panel()
+        except Exception:
+            pass
+
+        try:
+            if bool(getattr(self, "_pgn_pane_collapsed", False)) != pgn_collapsed:
+                self._toggle_pgn_pane()
         except Exception:
             pass
 
@@ -2005,9 +2024,12 @@ class MainWindow(QMainWindow):
         
         # Track collapsed state
         self._database_panel_collapsed = False
+        self._pgn_pane_collapsed = False
         ui_config = self.config.get('ui', {})
         database_config = ui_config.get('panels', {}).get('database', {})
         self._stored_size = database_config.get('default_height', 240)
+        detail_splitter_config = ui_config.get('panels', {}).get('detail', {}).get('splitter', {})
+        self._pgn_stored_size = detail_splitter_config.get('pgn_height', 200)
         
         # Set initial sizes for vertical splitter
         # Top panels: 80%, Database-Panel: 20%
@@ -2071,24 +2093,64 @@ class MainWindow(QMainWindow):
         # Update menu item checkmark state
         if hasattr(self, 'view_hide_database_panel_action'):
             self.view_hide_database_panel_action.setChecked(self._database_panel_collapsed)
-    
+
+    def _toggle_pgn_pane(self) -> None:
+        """Toggle collapse/expand state of the PGN notation pane."""
+        if not hasattr(self, "detail_panel") or not hasattr(self.detail_panel, "pgn_splitter"):
+            return
+
+        splitter_config = (
+            self.config.get("ui", {})
+            .get("panels", {})
+            .get("detail", {})
+            .get("splitter", {})
+        )
+        collapsed_height = splitter_config.get("pgn_collapsed_height", 0)
+        default_height = splitter_config.get("pgn_height", 200)
+        splitter = self.detail_panel.pgn_splitter
+
+        self._pgn_pane_collapsed = not self._pgn_pane_collapsed
+
+        if self._pgn_pane_collapsed:
+            current_sizes = splitter.sizes()
+            if current_sizes[0] > collapsed_height:
+                self._pgn_stored_size = current_sizes[0]
+            else:
+                self._pgn_stored_size = getattr(self, "_pgn_stored_size", default_height)
+            splitter.setSizes([collapsed_height, current_sizes[1]])
+        else:
+            current_sizes = splitter.sizes()
+            restored_size = getattr(self, "_pgn_stored_size", default_height)
+            splitter.setSizes([restored_size, current_sizes[1]])
+
+        self.detail_panel.pgn_view.set_collapsed_state(self._pgn_pane_collapsed)
+
+        if hasattr(self, "view_hide_pgn_pane_action"):
+            self.view_hide_pgn_pane_action.setChecked(self._pgn_pane_collapsed)
+
     def _setup_splitter_double_click(self) -> None:
-        """Setup double-click handler on the splitter handle to collapse/expand database panel."""
-        # Get the handle for the database panel (index 1)
+        """Setup double-click handlers on splitter handles to collapse/expand panes."""
+        # Handle after widget 0 is the visible bar (handle 0 is a dummy).
         handle = self.middle_splitter.handle(self.database_panel_index)
         if handle:
-            # Install event filter to detect double-clicks
             handle.installEventFilter(self)
-    
+        if hasattr(self, "detail_panel") and hasattr(self.detail_panel, "pgn_splitter"):
+            pgn_handle = self.detail_panel.pgn_splitter.handle(1)
+            if pgn_handle:
+                pgn_handle.installEventFilter(self)
+
     def eventFilter(self, obj, event) -> bool:
-        """Filter events to detect double-clicks on splitter handle."""
-        # Check if this is a double-click on the database panel splitter handle
+        """Filter events to detect double-clicks on splitter handles."""
         if event.type() == QEvent.Type.MouseButtonDblClick:
             handle = self.middle_splitter.handle(self.database_panel_index)
             if obj == handle:
                 self._toggle_database_panel()
-                return True  # Event handled
-        # Let other events pass through
+                return True
+            if hasattr(self, "detail_panel") and hasattr(self.detail_panel, "pgn_splitter"):
+                pgn_handle = self.detail_panel.pgn_splitter.handle(1)
+                if obj == pgn_handle:
+                    self._toggle_pgn_pane()
+                    return True
         return super().eventFilter(obj, event)
     
     def _fix_splitter_cursors(self) -> None:
@@ -2111,6 +2173,11 @@ class MainWindow(QMainWindow):
             handle = self.middle_splitter.handle(i)
             if handle:
                 handle.setCursor(Qt.CursorShape.SizeVerCursor)
+
+        if hasattr(self, "detail_panel") and hasattr(self.detail_panel, "pgn_splitter"):
+            pgn_handle = self.detail_panel.pgn_splitter.handle(1)
+            if pgn_handle:
+                pgn_handle.setCursor(Qt.CursorShape.SizeVerCursor)
     
     def _apply_splitter_styling(self) -> None:
         """Apply styling to splitter handles to prevent macOS theme override."""

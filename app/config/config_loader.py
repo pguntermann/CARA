@@ -2450,6 +2450,7 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.panels.detail.player_stats.widgets.row_spacing",
     "ui.panels.detail.player_stats.widgets.section_margins",
     "ui.panels.detail.player_stats.widgets.section_spacing",
+    "ui.panels.detail.splitter.pgn_collapsed_height",
     "ui.panels.detail.splitter.pgn_height",
     "ui.panels.detail.splitter.pgn_stretch_factor",
     "ui.panels.detail.splitter.tabs_height",

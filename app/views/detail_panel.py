@@ -88,12 +88,12 @@ class DetailPanel(QWidget):
         panel_config = ui_config.get('panels', {}).get('detail', {})
         
         # Vertical splitter to separate PGN notation from tabs
-        splitter = QSplitter(Qt.Orientation.Vertical)
-        layout.addWidget(splitter)
+        self.pgn_splitter = QSplitter(Qt.Orientation.Vertical)
+        layout.addWidget(self.pgn_splitter)
         
         # PGN Notation view (top) - will be connected to game model in set_game_model
         self.pgn_view = DetailPgnView(self.config, game_controller=self._game_controller)
-        splitter.addWidget(self.pgn_view)
+        self.pgn_splitter.addWidget(self.pgn_view)
         
         # Tab widget for different detail views (bottom)
         self.tab_widget = QTabWidget()
@@ -115,7 +115,7 @@ class DetailPanel(QWidget):
         # Must be done after tabs are added
         self._configure_tab_bar()
         
-        splitter.addWidget(self.tab_widget)
+        self.pgn_splitter.addWidget(self.tab_widget)
         
         # Set splitter sizes from config
         splitter_config = panel_config.get('splitter', {})
@@ -124,14 +124,14 @@ class DetailPanel(QWidget):
         pgn_stretch = splitter_config.get('pgn_stretch_factor', 2)
         tabs_stretch = splitter_config.get('tabs_stretch_factor', 3)
         
-        splitter.setSizes([pgn_height, tabs_height])
-        splitter.setStretchFactor(0, pgn_stretch)
-        splitter.setStretchFactor(1, tabs_stretch)
+        self.pgn_splitter.setSizes([pgn_height, tabs_height])
+        self.pgn_splitter.setStretchFactor(0, pgn_stretch)
+        self.pgn_splitter.setStretchFactor(1, tabs_stretch)
+        self.pgn_splitter.setCollapsible(0, True)
         
-        # Fix cursor on splitter handle for macOS compatibility
-        # Vertical splitter needs horizontal resize cursor
-        for i in range(splitter.count() - 1):
-            handle = splitter.handle(i)
+        # Handle after widget 0 is the visible bar between PGN and tabs (handle 0 is dummy).
+        for i in range(1, self.pgn_splitter.count()):
+            handle = self.pgn_splitter.handle(i)
             if handle:
                 handle.setCursor(Qt.CursorShape.SizeVerCursor)
         
@@ -139,7 +139,7 @@ class DetailPanel(QWidget):
         ui_config = self.config.get('ui', {})
         splitter_config = ui_config.get('splitter', {})
         handle_color = splitter_config.get('handle_color', [30, 30, 30])
-        splitter.setStyleSheet(f"""
+        self.pgn_splitter.setStyleSheet(f"""
             QSplitter::handle {{
                 background-color: rgb({handle_color[0]}, {handle_color[1]}, {handle_color[2]});
             }}

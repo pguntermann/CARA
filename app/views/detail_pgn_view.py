@@ -401,8 +401,30 @@ class DetailPgnView(QWidget):
         placeholder = pgn_config.get('placeholder_text', 'PGN notation will appear here...')
         self.pgn_text.setPlaceholderText(placeholder)
         layout.addWidget(self.pgn_text)
-    
-    
+
+    def set_collapsed_state(self, is_collapsed: bool) -> None:
+        """Hide PGN content when the pane is collapsed to a thin strip.
+
+        Args:
+            is_collapsed: True if the PGN pane is collapsed, False if expanded.
+        """
+        splitter_config = (
+            self.config.get('ui', {})
+            .get('panels', {})
+            .get('detail', {})
+            .get('splitter', {})
+        )
+        if is_collapsed:
+            collapsed_height = splitter_config.get('pgn_collapsed_height', 0)
+            self.pgn_text.setVisible(False)
+            self._branch_overlay.hide_overlay()
+            self.setFixedHeight(collapsed_height)
+            self.setMinimumHeight(0)
+        else:
+            self.pgn_text.setVisible(True)
+            self.setMinimumHeight(0)
+            self.setMaximumHeight(16777215)
+
     def set_pgn_text(self, text: str) -> None:
         """Set the PGN text content.
         
