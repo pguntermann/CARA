@@ -2831,6 +2831,19 @@
               "$ref": "$_COLOR_BACKGROUND_PRIMARY"
             }
           },
+          "overflow_hint": {
+            "color": {
+              "$ref": "$_COLOR_TEXT_4"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "marker_font_size": {
+              "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+            },
+            "spacing": 6,
+            "message_min_width": 100
+          },
           "info_bar": {
             "margins": [
               8,

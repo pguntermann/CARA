@@ -280,7 +280,11 @@
             "formula": "max(1, min(12, cpu_count - reserved_cores))"
           },
           "update_interval_ms": 100,
-          "max_depth": null
+          "max_depth": null,
+          "overflow_hint": {
+            "marker": "<",
+            "message": "Enlarge to reveal additional options"
+          }
         },
         "opening_explorer": {
           "enabled": true,

@@ -1,7 +1,7 @@
 """Manual Analysis view for detail panel."""
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy, QMenu, QApplication
+    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy, QMenu, QApplication
 )
 from PyQt6.QtCore import Qt, QEvent, QPropertyAnimation, QEasingCurve, QTimer, QPoint, QSize
 from PyQt6.QtGui import QPalette, QColor, QFont, QFontMetrics
@@ -26,6 +26,7 @@ from app.utils.themed_icon import (
 )
 from app.utils.pgn_variation_path import node_at_path
 from app.views.widgets.win_probability_bar_widget import WinProbabilityBarWidget
+from app.views.style.tooltip import tooltip_qss_block
 
 
 class DetailManualAnalysisView(QWidget):
@@ -195,6 +196,14 @@ class DetailManualAnalysisView(QWidget):
         trajectory_3_config = positional_plans_config.get('trajectory_3', {})
         self.trajectory_3_color = trajectory_3_config.get('color_end', [255, 150, 0])
 
+        overflow_hint_config = manual_analysis_config.get('overflow_hint', {})
+        self._overflow_hint_marker_text = str(overflow_hint_config.get('marker', '<'))
+        self._overflow_hint_message_text = str(
+            overflow_hint_config.get('message', 'Enlarge to reveal additional options')
+        )
+        self._overflow_hint_spacing = int(overflow_hint_config.get('spacing', 6))
+        self._overflow_hint_message_min_width = int(overflow_hint_config.get('message_min_width', 100))
+
     def _refresh_start_stop_button_icon(self, is_analyzing: bool) -> None:
         """Set the start/stop button icon based on analysis state."""
         if not hasattr(self, "start_stop_button"):
@@ -308,8 +317,11 @@ class DetailManualAnalysisView(QWidget):
         main_layout.setContentsMargins(margins[0], margins[1], margins[2], margins[3])
         main_layout.setSpacing(spacing)
         
-        # Row 1: Start Analysis and Lines controls
-        row1_layout = QHBoxLayout()
+        # Row 1: controls (column 0) and wrapping overflow hint (column 1)
+        self._row1_controls_widget = QWidget()
+        self._row1_controls_widget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
+        row1_layout = QHBoxLayout(self._row1_controls_widget)
+        row1_layout.setContentsMargins(0, 0, 0, 0)
         row1_layout.setSpacing(spacing)
         
         # Start/Stop Analysis button
@@ -351,10 +363,50 @@ class DetailManualAnalysisView(QWidget):
         self.add_line_button = QPushButton("+")
         self.add_line_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         row1_layout.addWidget(self.add_line_button, alignment=Qt.AlignmentFlag.AlignVCenter)
-        
-        row1_layout.addStretch()  # Push buttons to the left
-        
-        main_layout.addLayout(row1_layout)
+
+        self.overflow_hint_widget = QWidget()
+        self.overflow_hint_widget.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+        hint_layout = QHBoxLayout(self.overflow_hint_widget)
+        hint_layout.setContentsMargins(0, 0, 0, 0)
+        hint_layout.setSpacing(0)
+
+        self.overflow_hint_marker = QLabel(self._overflow_hint_marker_text)
+        self.overflow_hint_marker.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        self.overflow_hint_marker.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        hint_layout.addWidget(self.overflow_hint_marker, alignment=Qt.AlignmentFlag.AlignVCenter)
+
+        hint_tooltip = self._overflow_hint_message_text.strip() or self._overflow_hint_marker_text
+        self.overflow_hint_widget.setToolTip(hint_tooltip)
+        self.overflow_hint_marker.setToolTip(hint_tooltip)
+        self.overflow_hint_widget.hide()
+        row1_layout.addWidget(self.overflow_hint_widget, alignment=Qt.AlignmentFlag.AlignVCenter)
+
+        self.overflow_hint_message = QLabel(self._overflow_hint_message_text)
+        self.overflow_hint_message.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        self.overflow_hint_message.setWordWrap(True)
+        self.overflow_hint_message.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
+        self.overflow_hint_message.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+        )
+        self.overflow_hint_message.setToolTip(hint_tooltip)
+        self.overflow_hint_message.hide()
+
+        row1_grid = QGridLayout()
+        row1_grid.setContentsMargins(0, 0, 0, 0)
+        row1_grid.setHorizontalSpacing(self._overflow_hint_spacing)
+        row1_grid.setVerticalSpacing(0)
+        row1_grid.addWidget(
+            self._row1_controls_widget, 0, 0, alignment=Qt.AlignmentFlag.AlignVCenter
+        )
+        row1_grid.addWidget(
+            self.overflow_hint_message, 0, 1, alignment=Qt.AlignmentFlag.AlignVCenter
+        )
+        row1_grid.setColumnStretch(0, 0)
+        row1_grid.setColumnStretch(1, 1)
+        self._row1_grid = row1_grid
+        main_layout.addLayout(row1_grid)
         
         # Row 2: Exploration controls (in a widget so we can hide/show it)
         self.exploration_row_widget = QWidget()
@@ -526,6 +578,7 @@ class DetailManualAnalysisView(QWidget):
         
         # Show row 2 only if we have enough width
         should_show = frame_width >= min_width
+        self._update_overflow_hint(exploration_row_shown=should_show)
         
         # Get current state - check both visibility and if widget is actually shown
         # Also check if animation is running (if so, don't interrupt)
@@ -602,6 +655,44 @@ class DetailManualAnalysisView(QWidget):
         # Hide widget after animation completes
         if hasattr(self, 'exploration_row_widget'):
             self.exploration_row_widget.setVisible(False)
+        self._update_overflow_hint(exploration_row_shown=False)
+
+    def _update_overflow_hint(self, exploration_row_shown: bool) -> None:
+        """Show a subtle overflow cue while exploration controls are hidden for width."""
+        if not hasattr(self, 'overflow_hint_widget') or not hasattr(self, 'overflow_hint_message'):
+            return
+        if not hasattr(self, 'control_bar_frame'):
+            return
+
+        if exploration_row_shown:
+            self.overflow_hint_widget.hide()
+            self.overflow_hint_message.hide()
+            return
+
+        frame_width = self.control_bar_frame.width()
+        if frame_width <= 0:
+            self.overflow_hint_widget.hide()
+            self.overflow_hint_message.hide()
+            return
+
+        self.overflow_hint_marker.setVisible(True)
+        self.overflow_hint_widget.show()
+
+        frame_layout = self.control_bar_frame.layout()
+        margins = frame_layout.contentsMargins() if frame_layout is not None else None
+        margin_width = (margins.left() + margins.right()) if margins is not None else 0
+        left_width = 0
+        if hasattr(self, '_row1_controls_widget'):
+            left_width = self._row1_controls_widget.sizeHint().width()
+        leftover = frame_width - margin_width - left_width - self._overflow_hint_spacing
+        show_message = (
+            bool(self._overflow_hint_message_text.strip())
+            and leftover >= self._overflow_hint_message_min_width
+        )
+        self.overflow_hint_message.setVisible(show_message)
+        grid = getattr(self, '_row1_grid', None)
+        if grid is not None:
+            grid.setColumnStretch(1, 1 if show_message else 0)
     
     def _create_info_bar(self) -> QFrame:
         """Create the info bar showing position and engine information.
@@ -929,6 +1020,53 @@ class DetailManualAnalysisView(QWidget):
             label_palette.setColor(label.foregroundRole(), QColor(norm_text[0], norm_text[1], norm_text[2]))
             label.setPalette(label_palette)
             label.update()
+
+        overflow_hint_config = manual_analysis_config.get('overflow_hint', {})
+        hint_color = overflow_hint_config.get('color', [150, 150, 150])
+        if not (isinstance(hint_color, (list, tuple)) and len(hint_color) >= 3):
+            hint_color = [150, 150, 150]
+        hint_font_size = scale_font_size(overflow_hint_config.get('font_size', label_font_size))
+        marker_font_size = scale_font_size(overflow_hint_config.get('marker_font_size', hint_font_size))
+        self._overflow_hint_spacing = int(overflow_hint_config.get('spacing', 6))
+        self._overflow_hint_message_min_width = int(overflow_hint_config.get('message_min_width', 100))
+        if hasattr(self, 'overflow_hint_widget') and hasattr(self, 'overflow_hint_message'):
+            tip_qss = tooltip_qss_block(self.config)
+            self.overflow_hint_widget.setStyleSheet(
+                f"background: transparent; border: none;\n{tip_qss}"
+            )
+            hint_qcolor = QColor(int(hint_color[0]), int(hint_color[1]), int(hint_color[2]))
+            if hasattr(self, '_row1_grid') and self._row1_grid is not None:
+                self._row1_grid.setHorizontalSpacing(self._overflow_hint_spacing)
+            marker_stylesheet = f"""
+                QLabel {{
+                    color: rgb({int(hint_color[0])}, {int(hint_color[1])}, {int(hint_color[2])});
+                    font-family: "{font_family}";
+                    font-size: {marker_font_size}pt;
+                    background: transparent;
+                    border: none;
+                }}
+                {tip_qss}
+            """
+            message_stylesheet = f"""
+                QLabel {{
+                    color: rgb({int(hint_color[0])}, {int(hint_color[1])}, {int(hint_color[2])});
+                    font-family: "{font_family}";
+                    font-size: {hint_font_size}pt;
+                    background: transparent;
+                    border: none;
+                }}
+                {tip_qss}
+            """
+            for hint_label, hint_stylesheet, hint_pt in (
+                (self.overflow_hint_marker, marker_stylesheet, marker_font_size),
+                (self.overflow_hint_message, message_stylesheet, hint_font_size),
+            ):
+                hint_label.setStyleSheet(hint_stylesheet)
+                hint_label.setFont(QFont(font_family, hint_pt))
+                hint_palette = hint_label.palette()
+                hint_palette.setColor(hint_label.foregroundRole(), hint_qcolor)
+                hint_label.setPalette(hint_palette)
+                hint_label.update()
         
         # Control bar and info bar styling
         # Use control_bar background_color if available, otherwise fall back to pane_bg

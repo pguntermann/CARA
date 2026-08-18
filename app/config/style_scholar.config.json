@@ -2791,6 +2791,19 @@
               "$ref": "$_COLOR_LINEN_CREAM"
             }
           },
+          "overflow_hint": {
+            "color": {
+              "$ref": "$_COLOR_DRIFTWOOD"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "marker_font_size": {
+              "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+            },
+            "spacing": 6,
+            "message_min_width": 100
+          },
           "info_bar": {
             "margins": [
               8,
