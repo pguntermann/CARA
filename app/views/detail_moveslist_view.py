@@ -513,6 +513,14 @@ class DetailMovesListView(QWidget):
 
         if index.isValid() and index.column() == MovesListModel.COL_COMMENT:
             edit_comments_action = menu.addAction("Edit Comments")
+            from app.utils.themed_icon import (
+                SVG_MENU_PENCIL,
+                menu_icon_dark_tint_rgb,
+                themed_icon_from_svg,
+            )
+            edit_comments_action.setIcon(
+                themed_icon_from_svg(SVG_MENU_PENCIL, menu_icon_dark_tint_rgb(self.config))
+            )
             can_edit_comments = (
                 self._game_model is not None
                 and self._game_model.active_game is not None

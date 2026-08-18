@@ -1,6 +1,6 @@
 """Dialog to edit main-line move comments (white / black) for one row."""
 
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Optional, Tuple
 
 from PyQt6.QtWidgets import (
     QDialog,
@@ -31,10 +31,13 @@ class MoveCommentDialog(QDialog):
         black_initial: str,
         has_black_half: bool,
         parent=None,
+        *,
+        single_move_label: str = "",
     ) -> None:
         super().__init__(parent)
         self.config = config
         self._has_black_half = has_black_half
+        self._single_move_label = (single_move_label or "").strip()
 
         self._load_config()
         self._setup_ui(
@@ -151,7 +154,9 @@ class MoveCommentDialog(QDialog):
         )
 
         header = QLabel(
-            self._format_move_header(
+            self._single_move_label
+            if self._single_move_label
+            else self._format_move_header(
                 move_number, white_san, black_san, self._has_black_half
             )
         )
@@ -177,7 +182,7 @@ class MoveCommentDialog(QDialog):
 
         white_block = QVBoxLayout()
         white_block.setSpacing(self._form_spacing)
-        wl = QLabel("White")
+        wl = QLabel("Comment" if self._single_move_label else "White")
         wl.setFont(QFont(self._label_font_family, self._label_font_size))
         wl.setStyleSheet(
             f"color: rgb({self._label_text_color.red()}, {self._label_text_color.green()}, "
@@ -193,9 +198,9 @@ class MoveCommentDialog(QDialog):
         )
         white_block.addWidget(self._white_edit)
         body_layout.addLayout(white_block)
-        body_layout.addSpacing(self._section_spacing)
 
-        black_block = QVBoxLayout()
+        self._black_container = QWidget()
+        black_block = QVBoxLayout(self._black_container)
         black_block.setSpacing(self._form_spacing)
         bl = QLabel("Black")
         bl.setFont(QFont(self._label_font_family, self._label_font_size))
@@ -213,7 +218,12 @@ class MoveCommentDialog(QDialog):
         )
         self._black_edit.setEnabled(self._has_black_half)
         black_block.addWidget(self._black_edit)
-        body_layout.addLayout(black_block)
+        black_block.setContentsMargins(0, 0, 0, 0)
+        if self._single_move_label:
+            self._black_container.hide()
+        else:
+            body_layout.addSpacing(self._section_spacing)
+        body_layout.addWidget(self._black_container)
 
         main_layout.addWidget(body)
         main_layout.addSpacing(self._bottom_button_top_padding)
@@ -314,3 +324,33 @@ class MoveCommentDialog(QDialog):
         white = self._white_edit.toPlainText()
         black = self._black_edit.toPlainText() if self._has_black_half else ""
         return (white, black)
+
+    def get_comment(self) -> str:
+        """Return the single-field comment (same as White's field)."""
+        return self._white_edit.toPlainText()
+
+    @staticmethod
+    def edit_single_move(
+        config: Dict[str, Any],
+        move_number: int,
+        san: str,
+        is_white: bool,
+        initial: str,
+        parent=None,
+    ) -> Optional[str]:
+        """Show a one-half-move comment editor. ``None`` if the user cancels."""
+        label = f"{move_number}.{san}" if is_white else f"{move_number}...{san}"
+        dialog = MoveCommentDialog(
+            config,
+            move_number,
+            san,
+            "",
+            initial,
+            "",
+            False,
+            parent,
+            single_move_label=label,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+        return dialog.get_comment()

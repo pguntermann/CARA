@@ -20,11 +20,17 @@ from app.utils.pgn_variation_path import (
     mainline_rejoin_path,
     node_at_path,
     parent_path,
+    remap_path_after_sideline_remove,
 )
 from app.controllers.board_controller import BoardController
 from app.services.opening_service import OpeningService
 from app.services.logging_service import LoggingService
 from app.services.pgn_service import PgnService
+from app.services.pgn_variation_tree_service import (
+    VariationTreeError,
+    insert_san_prefix,
+    remove_variation_at_path as delete_sideline_at_path,
+)
 
 
 def _normalize_pgn_comment_text(text: str) -> str:
@@ -936,6 +942,128 @@ class GameController:
                 f"apply_mainline_move_comments: {e}", exc_info=e
             )
             return False, str(e) if str(e) else "Failed to update comments."
+
+    def read_comment_at_path(
+        self, game: GameData, path: Sequence[int]
+    ) -> Optional[Tuple[str, str, int, bool]]:
+        """Read the comment on the half-move at ``path``.
+
+        Returns ``(comment, san, move_number, is_white)`` or ``None``.
+        """
+        if not path or not game or not (game.pgn or "").strip():
+            return None
+        try:
+            chess_game = chess.pgn.read_game(io.StringIO(game.pgn))
+            if chess_game is None:
+                return None
+            node = node_at_path(chess_game, path)
+            if node is None or not isinstance(node, chess.pgn.ChildNode):
+                return None
+            board_before = node.parent.board()
+            san = board_before.san(node.move)
+            is_white = board_before.turn == chess.WHITE
+            move_number = int(board_before.fullmove_number)
+            comment = _pgn_child_node_comment_joined(node)
+            return (comment, san, move_number, is_white)
+        except Exception as e:
+            LoggingService.get_instance().error(
+                f"read_comment_at_path: {e}", exc_info=e
+            )
+            return None
+
+    def apply_comment_at_path(
+        self, game: GameData, path: Sequence[int], text: str
+    ) -> Tuple[bool, str]:
+        """Set the comment on the half-move at ``path`` and rewrite ``game.pgn``."""
+        if not path or not game or not (game.pgn or "").strip():
+            return False, "No PGN to edit."
+        try:
+            chess_game = chess.pgn.read_game(io.StringIO(game.pgn))
+            if chess_game is None:
+                return False, "Could not parse PGN."
+            node = node_at_path(chess_game, path)
+            if node is None or not isinstance(node, chess.pgn.ChildNode):
+                return False, "Current position is not in the game."
+            _set_pgn_child_node_comment(node, text)
+            game.pgn = PgnService.export_game_to_pgn(chess_game)
+            return True, ""
+        except Exception as e:
+            LoggingService.get_instance().error(
+                f"apply_comment_at_path: {e}", exc_info=e
+            )
+            return False, str(e) if str(e) else "Failed to update comment."
+
+    def add_variation_from_sans(
+        self, game: GameData, path: Sequence[int], tokens: Sequence[str]
+    ) -> Tuple[bool, str, int]:
+        """Merge SAN/UCI tokens into the PGN tree at ``path``.
+
+        Follows existing children; appends only the unmatched tail. Rewrites
+        ``game.pgn`` only when at least one move is added. Returns
+        ``(ok, error_message, added_count)``.
+        """
+        if not game or not (game.pgn or "").strip():
+            return False, "No PGN to edit.", 0
+        if not tokens:
+            return False, "No moves to add.", 0
+        try:
+            chess_game = chess.pgn.read_game(io.StringIO(game.pgn))
+            if chess_game is None:
+                return False, "Could not parse PGN.", 0
+
+            result = insert_san_prefix(chess_game, path, tokens)
+            if result.added == 0:
+                return True, "", 0
+            game.pgn = PgnService.export_game_to_pgn(chess_game)
+            plies = 0
+            node: chess.pgn.GameNode = chess_game
+            while node.variations:
+                node = node.variation(0)
+                plies += 1
+            game.moves = (plies + 1) // 2
+            return True, "", result.added
+        except VariationTreeError as e:
+            return False, str(e), 0
+        except Exception as e:
+            LoggingService.get_instance().error(
+                f"add_variation_from_sans: {e}", exc_info=e
+            )
+            return False, str(e) if str(e) else "Failed to add variation.", 0
+
+    def remove_variation_at_path(self, path: Sequence[int]) -> Tuple[bool, str]:
+        """Delete the innermost sideline containing ``path`` from the active game.
+
+        Rewrites ``game.pgn``. If the active path was on the deleted branch it
+        snaps to the fork; later sibling indices are remapped. Does not enter
+        another line.
+        """
+        game = self.game_model.active_game
+        if not game or not (game.pgn or "").strip():
+            return False, "No PGN to edit."
+        try:
+            chess_game = chess.pgn.read_game(io.StringIO(game.pgn))
+            if chess_game is None:
+                return False, "Could not parse PGN."
+            result = delete_sideline_at_path(chess_game, path)
+            game.pgn = PgnService.export_game_to_pgn(chess_game)
+            new_active = remap_path_after_sideline_remove(
+                self.game_model.get_active_path(),
+                result.fork_path,
+                result.removed_index,
+            )
+            if new_active != self.game_model.get_active_path():
+                self._clear_rejoin_mainline_arm()
+            self.game_model.set_active_path(new_active)
+            self._update_board_to_path(chess_game, new_active)
+            self.game_model.metadata_updated.emit()
+            return True, ""
+        except VariationTreeError as e:
+            return False, str(e)
+        except Exception as e:
+            LoggingService.get_instance().error(
+                f"remove_variation_at_path: {e}", exc_info=e
+            )
+            return False, str(e) if str(e) else "Failed to remove variation."
 
     def _extract_moves_from_pgn_only(self, game: GameData) -> List[MoveData]:
         """Build MoveData rows from game.pgn main line only (no CARAAnalysisData)."""

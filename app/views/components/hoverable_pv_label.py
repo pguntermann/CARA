@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QLabel
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QMouseEvent
 import chess
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
 from app.controllers.board_controller import BoardController
@@ -42,6 +42,9 @@ class HoverablePvLabel(QLabel):
         self.config = config
         self._multipv = multipv
         self._analysis_model = analysis_model
+        
+        # Let the analysis pane own the right-click menu (Copy PV / Add Variation to PGN).
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
         
         # Track hover state
         self._is_hovered = False
@@ -342,6 +345,17 @@ class HoverablePvLabel(QLabel):
         if self._mini_board:
             self._mini_board.hide()
     
+    def pv_prefix_through_this_move(self) -> Tuple[List[str], str]:
+        """SAN/UCI tokens from the start of this PV through this move, plus the analysis FEN.
+
+        Uses the frozen hover snapshot when present so a live engine update cannot
+        change the prefix after the user has already aimed at this move.
+        """
+        pv_moves = self._frozen_pv_moves if self._frozen_pv_moves is not None else self._pv_moves
+        fen = self._frozen_current_fen if self._frozen_current_fen is not None else self._current_fen
+        end = min(self._move_index + 1, len(pv_moves))
+        return list(pv_moves[:end]), fen or ""
+
     def update_pv(self, pv_moves: List[str], current_fen: str) -> None:
         """Update PV moves and FEN (only if not currently hovered).
         

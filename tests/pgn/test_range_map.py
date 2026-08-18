@@ -15,6 +15,7 @@ from app.services.pgn_formatter_service import (
     PgnFormatterService,
     build_pgn_range_map_from_fragments,
     parse_comment_href,
+    parse_path_comment_href,
     parse_ply_href,
 )
 from app.views.detail_pgn_view import _range_map_from_document
@@ -40,6 +41,24 @@ class TestPgnRangeMap(unittest.TestCase):
         self.assertIsNone(parse_ply_href("cara-cmt:1"))
         self.assertEqual(parse_comment_href("cara-cmt:3"), 3)
         self.assertIsNone(parse_comment_href("cara-ply:3"))
+        self.assertEqual(parse_path_comment_href("cara-pcmt:0.1"), (0, 1))
+        self.assertIsNone(parse_path_comment_href("cara-path:0.1"))
+
+    def test_formatter_emits_sideline_comment_anchors(self) -> None:
+        pgn = "1. e4 e5 (1... c5 {sicilian}) *"
+        html, _ = PgnFormatterService.format_pgn_to_html(pgn, self.config)
+        self.assertIn('href="cara-pcmt:', html)
+        self.assertIn("{sicilian}", html.replace("&lbrace;", "{"))
+
+        edit = QTextEdit()
+        edit.setHtml(html)
+        rm = _range_map_from_document(edit.document())
+        plain = edit.toPlainText()
+        self.assertTrue(rm.path_comments)
+        cmt = rm.path_comments[0]
+        self.assertEqual(cmt.path, (0, 1))
+        self.assertTrue(plain[cmt.start : cmt.end].startswith("{"))
+        self.assertEqual(rm.path_comment_at(cmt.start), (0, 1))
 
     def test_build_from_fragments(self) -> None:
         rm = build_pgn_range_map_from_fragments(

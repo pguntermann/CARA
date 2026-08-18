@@ -2,7 +2,7 @@
 
 from io import StringIO
 from pathlib import Path
-from typing import Dict, Any, Optional, Sequence
+from typing import Dict, Any, Optional, Sequence, Tuple, TYPE_CHECKING
 from PyQt6.QtCore import QTimer
 import chess
 import chess.pgn
@@ -14,6 +14,10 @@ from app.services.pv_plan_parser_service import PvPlanParserService
 from app.services.logging_service import LoggingService
 from app.controllers.engine_controller import TASK_MANUAL_ANALYSIS, TASK_EVALUATION
 from app.utils.pgn_variation_path import node_at_path
+from app.services.pgn_variation_tree_service import same_placement_and_turn
+
+if TYPE_CHECKING:
+    from app.controllers.database_controller import DatabaseController
 
 
 class ManualAnalysisController:
@@ -34,6 +38,7 @@ class ManualAnalysisController:
         self.config = config
         self.engine_controller = engine_controller
         self.game_controller = game_controller
+        self._database_controller: Optional["DatabaseController"] = None
         
         # Initialize analysis model
         self.analysis_model = ManualAnalysisModel()
@@ -107,6 +112,49 @@ class ManualAnalysisController:
             evaluation_controller: EvaluationController instance.
         """
         self._evaluation_controller = evaluation_controller
+
+    def set_database_controller(self, database_controller: Optional["DatabaseController"]) -> None:
+        """Set the database controller used to mark the active game unsaved."""
+        self._database_controller = database_controller
+
+    def add_variation_from_pv(
+        self, tokens: Sequence[str], analysis_fen: str
+    ) -> Tuple[bool, str, int]:
+        """Insert a PV prefix into the active game at the current path.
+
+        Follows existing children and appends only the unmatched tail. Does not
+        navigate into the new line. Returns ``(ok, error_message, added_count)``.
+        """
+        if not self.game_controller:
+            return False, "No game is currently active.", 0
+        game_model = self.game_controller.get_game_model()
+        game = game_model.active_game if game_model else None
+        if not game:
+            return False, "No game is currently active.", 0
+        if not (game.pgn or "").strip():
+            return False, "No PGN to edit.", 0
+        sans = [str(t).strip() for t in tokens if str(t).strip()]
+        if not sans:
+            return False, "No moves to add.", 0
+
+        path_fen = self._fen_for_active_path()
+        if not path_fen or not same_placement_and_turn(analysis_fen, path_fen):
+            return False, "This PV no longer matches the current position.", 0
+
+        path = game_model.get_active_path()
+        ok, err, added = self.game_controller.add_variation_from_sans(game, path, sans)
+        if not ok:
+            return False, err, 0
+        if added == 0:
+            return True, "", 0
+
+        if self._database_controller:
+            database_model = self._database_controller.find_database_model_for_game(game)
+            if database_model:
+                database_model.update_game(game)
+                self._database_controller.mark_database_unsaved(database_model)
+        game_model.metadata_updated.emit()
+        return True, "", added
     
     def get_analysis_model(self) -> ManualAnalysisModel:
         """Get the analysis model.

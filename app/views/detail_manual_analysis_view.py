@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QEvent, QPropertyAnimation, QEasingCurve, QTimer, QPoint, QSize
 from PyQt6.QtGui import QPalette, QColor, QFont, QFontMetrics
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 from io import StringIO
 import chess
 import chess.pgn
@@ -16,7 +16,14 @@ from app.models.manual_analysis_model import ManualAnalysisModel
 from app.controllers.manual_analysis_controller import ManualAnalysisController
 from app.controllers.engine_controller import TASK_MANUAL_ANALYSIS
 from app.views.dialogs.message_dialog import MessageDialog
-from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_PLAY, SVG_MENU_STOP, SVG_MENU_FREEZE
+from app.utils.themed_icon import (
+    themed_icon_from_svg,
+    SVG_MENU_PLAY,
+    SVG_MENU_STOP,
+    SVG_MENU_FREEZE,
+    SVG_MENU_PLUS,
+    menu_icon_dark_tint_rgb,
+)
 from app.utils.pgn_variation_path import node_at_path
 from app.views.widgets.win_probability_bar_widget import WinProbabilityBarWidget
 
@@ -2336,14 +2343,18 @@ class DetailManualAnalysisView(QWidget):
         return widget
 
     def _on_pv_context_menu(self, pos: QPoint) -> None:
-        """Show context menu for copying PV line(s) at the clicked position."""
+        """Show context menu for copying PV line(s) or adding a variation at the click."""
         from app.views.style import StyleManager
+        from app.views.components.hoverable_pv_label import HoverablePvLabel
 
         child = self.analysis_container.childAt(pos) if self.analysis_container else None
         # Walk up to find the line frame (click may land on inner label/widget which has no multipv)
         multipv = None
+        move_label: Optional[HoverablePvLabel] = None
         w = child
         while w:
+            if move_label is None and isinstance(w, HoverablePvLabel):
+                move_label = w
             pv = w.property("multipv")
             if pv is not None:
                 try:
@@ -2369,10 +2380,38 @@ class DetailManualAnalysisView(QWidget):
         copy_all_action.setEnabled(has_lines)
         copy_all_action.triggered.connect(self._copy_all_pv_lines)
 
+        if move_label is not None:
+            prefix, analysis_fen = move_label.pv_prefix_through_this_move()
+            game = self._game_model.active_game if self._game_model else None
+            can_add = bool(prefix) and bool(game and (game.pgn or "").strip())
+            menu.addSeparator()
+            add_action = menu.addAction("Add Variation to PGN")
+            add_action.setIcon(
+                themed_icon_from_svg(SVG_MENU_PLUS, menu_icon_dark_tint_rgb(self.config))
+            )
+            add_action.setEnabled(can_add)
+            add_action.triggered.connect(
+                lambda checked=False, t=list(prefix), f=analysis_fen: self._add_variation_from_pv(t, f)
+            )
+
         from app.views.style.context_menu import try_wire_context_menu_shared_action_icons
 
         try_wire_context_menu_shared_action_icons(menu)
         menu.exec(self.analysis_container.mapToGlobal(pos))
+
+    def _add_variation_from_pv(self, tokens: List[str], analysis_fen: str) -> None:
+        """Insert the PV prefix through the clicked move as a game variation."""
+        if not self._analysis_controller:
+            return
+        ok, err, added = self._analysis_controller.add_variation_from_pv(tokens, analysis_fen)
+        if not ok:
+            MessageDialog.show_warning(self.config, "Add Variation", err, self)
+            return
+        from app.services.progress_service import ProgressService
+        if added:
+            ProgressService.get_instance().set_status("Added variation")
+        else:
+            ProgressService.get_instance().set_status("Variation already in the game")
 
     def _format_pv_line_for_copy(self, line) -> str:
         """Format a single analysis line for clipboard: eval, depth, and full PV (plain text)."""

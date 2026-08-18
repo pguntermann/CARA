@@ -1936,13 +1936,15 @@ class MainWindow(QMainWindow):
                 )
             if hasattr(self.detail_panel, 'moves_view'):
                 self.detail_panel.moves_view.set_database_controller(database_controller)
+            if hasattr(self.detail_panel, 'pgn_view'):
+                self.detail_panel.pgn_view.set_database_controller(database_controller)
+            if hasattr(self.detail_panel, 'player_stats_view'):
                 self.detail_panel.player_stats_view._on_open_pattern_games_in_search_results = self._open_pattern_games_in_search_results
                 self.detail_panel.player_stats_view._on_open_best_games_in_search_results = self._open_best_games_in_search_results
                 self.detail_panel.player_stats_view._on_open_worst_games_in_search_results = self._open_worst_games_in_search_results
                 self.detail_panel.player_stats_view._on_open_brilliant_moves_in_search_results = self._open_brilliant_moves_in_search_results
                 self.detail_panel.player_stats_view._on_open_misses_in_search_results = self._open_misses_in_search_results
                 self.detail_panel.player_stats_view._on_open_blunders_in_search_results = self._open_blunders_in_search_results
-                # Database connections are now handled by the controller
             # Inject selected-games callback for Player Stats "Selected games (Active/All)" source
             player_stats_controller = self.controller.get_player_stats_controller()
             player_stats_controller.set_get_selected_games_callback(

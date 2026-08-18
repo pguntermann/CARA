@@ -89,6 +89,7 @@ class AppController:
         
         # Initialize manual analysis controller first (depends on engine controller and game controller)
         self.manual_analysis_controller = ManualAnalysisController(config, self.engine_controller, self.game_controller)
+        self.manual_analysis_controller.set_database_controller(self.database_controller)
         
         # Initialize evaluation controller (depends on engine controller and manual analysis controller)
         self.evaluation_controller = EvaluationController(config, self.engine_controller, self.manual_analysis_controller)
