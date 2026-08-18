@@ -88,15 +88,15 @@ def build_database_table_context_menu(
     enable_clear_game_tags_selected: bool = False,
     clicked_tag: Optional[str] = None,
 ) -> DatabaseTableContextMenu:
-    select_rows_menu = QMenu("Select rows", panel)
-    select_mode_menu = QMenu("Select mode", panel)
+    menu = QMenu(panel)
+    select_rows_menu = menu.addMenu("Select rows")
+    select_mode_menu = select_rows_menu.addMenu("Select mode")
     act_replace = select_mode_menu.addAction("Replace")
     act_replace.setCheckable(True)
     act_replace.setChecked(selection_mode == "replace")
     act_append = select_mode_menu.addAction("Append")
     act_append.setCheckable(True)
     act_append.setChecked(selection_mode == "append")
-    select_rows_menu.addMenu(select_mode_menu)
     select_rows_menu.addSeparator()
     act_select_all = select_rows_menu.addAction("Select all rows")
     act_unselect_all = select_rows_menu.addAction("Unselect all rows")
@@ -114,8 +114,6 @@ def build_database_table_context_menu(
             act_with_tag = select_rows_menu.addAction(f'With this tag: "{clicked_tag}"')
             act_without_tag = select_rows_menu.addAction(f'Without this tag: "{clicked_tag}"')
 
-    menu = QMenu(panel)
-    menu.addMenu(select_rows_menu)
     menu.addSeparator()
     act_copy_csv = menu.addAction("Copy table as CSV")
     act_copy_tsv = menu.addAction("Copy table as TSV")
