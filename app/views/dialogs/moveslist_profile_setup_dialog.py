@@ -168,7 +168,7 @@ class MovesListProfileSetupDialog(QDialog):
         # Store dialog width for splitter sizing
         self._dialog_width = dialog_config.get('width', 750)
         
-        main_layout.addSpacing(int(dialog_config.get('bottom_button_top_padding', 50)))
+        main_layout.addSpacing(int(dialog_config.get('bottom_button_top_padding', 25)))
         
         # Buttons
         button_layout = QHBoxLayout()

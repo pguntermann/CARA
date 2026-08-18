@@ -459,7 +459,7 @@ class ManageGameTagsDialog(QDialog):
         dlg_cfg = (self.config.get("ui", {}) or {}).get("dialogs", {}).get("manage_game_tags", {})
         self.dialog_width = int(dlg_cfg.get("width", 680))
         self.scroll_area_height = max(1, int(dlg_cfg.get("scroll_area_height", 120)))
-        self.bottom_button_top_padding = int(dlg_cfg.get("bottom_button_top_padding", 50))
+        self.bottom_button_top_padding = int(dlg_cfg.get("bottom_button_top_padding", 25))
         self.dialog_minimum_width = dlg_cfg.get("minimum_width")
         self.dialog_minimum_height = dlg_cfg.get("minimum_height")
         self.bg_color = QColor(*(dlg_cfg.get("background_color", [40, 40, 45])))

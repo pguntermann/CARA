@@ -1695,7 +1695,7 @@ class BulkOperationsDialog(QDialog):
         spacing_config = dialog_config.get("spacing", {})
         self.section_spacing = int(spacing_config.get("section", 14))
         self.result_spacing = int(spacing_config.get("result", 8))
-        self.bottom_button_top_padding = int(dialog_config.get("bottom_button_top_padding", 28))
+        self.bottom_button_top_padding = int(dialog_config.get("bottom_button_top_padding", 25))
 
         buttons_config = dialog_config.get("buttons", {})
         self.button_width = int(buttons_config.get("width", 120))

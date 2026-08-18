@@ -137,7 +137,7 @@ class AnnotationPreferencesDialog(QDialog):
         
         # Dialog dimensions
         self.dialog_width = int(dialog_config.get('width', 520))
-        self.bottom_button_top_padding = int(dialog_config.get('bottom_button_top_padding', 50))
+        self.bottom_button_top_padding = int(dialog_config.get('bottom_button_top_padding', 25))
         self.dialog_minimum_width = dialog_config.get('minimum_width')
         self.dialog_minimum_height = dialog_config.get('minimum_height')
         

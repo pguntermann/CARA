@@ -912,7 +912,7 @@ class OpeningEncyclopediaDialog(QDialog):
         )
         self._dialog_config = dialog_config
         layout_config = dialog_config.get("layout", {})
-        self.bottom_button_top_padding = int(dialog_config.get("bottom_button_top_padding", 24))
+        self.bottom_button_top_padding = int(dialog_config.get("bottom_button_top_padding", 25))
 
         self.setWindowTitle(entry.display_name or "Opening Encyclopedia")
 

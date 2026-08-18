@@ -53,7 +53,7 @@ class BulkAnalysisDialog(QDialog):
         
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {})
         self.dialog_width = int(dialog_config.get('width', 550))
-        self.bottom_button_top_padding = int(dialog_config.get('bottom_button_top_padding', 50))
+        self.bottom_button_top_padding = int(dialog_config.get('bottom_button_top_padding', 25))
         self.dialog_minimum_width = dialog_config.get('minimum_width')
         self.dialog_minimum_height = dialog_config.get('minimum_height')
         

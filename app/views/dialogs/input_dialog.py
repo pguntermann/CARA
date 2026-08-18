@@ -44,7 +44,7 @@ class InputDialog(QDialog):
 
         self.setWindowTitle(title)
         self.dialog_width = dialog_config.get("width", 420)
-        self.bottom_button_top_padding = dialog_config.get("bottom_button_top_padding", 50)
+        self.bottom_button_top_padding = dialog_config.get("bottom_button_top_padding", 25)
         self.dialog_minimum_width = dialog_config.get("minimum_width")
         self.dialog_minimum_height = dialog_config.get(
             "minimum_height", dialog_config.get("height", 220)

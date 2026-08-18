@@ -64,7 +64,7 @@ class DeduplicationCriteriaDialog(QDialog):
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('deduplication_criteria', {})
         
         self.dialog_width = dialog_config.get('width', 600)
-        self.bottom_button_top_padding = dialog_config.get('bottom_button_top_padding', 50)
+        self.bottom_button_top_padding = dialog_config.get('bottom_button_top_padding', 25)
         
         # Background and colors
         self.bg_color = dialog_config.get('background_color', [40, 40, 45])

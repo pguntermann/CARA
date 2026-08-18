@@ -47,7 +47,7 @@ class AddPgnHeaderDialog(QDialog):
     def _load_config(self) -> None:
         dialog_config = self.config.get("ui", {}).get("dialogs", {}).get(self.CONFIG_KEY, {})
         self.dialog_width = dialog_config.get("width", 420)
-        self.bottom_button_top_padding = dialog_config.get("bottom_button_top_padding", 50)
+        self.bottom_button_top_padding = dialog_config.get("bottom_button_top_padding", 25)
         self.dialog_minimum_width = dialog_config.get("minimum_width")
         self.dialog_minimum_height = dialog_config.get("minimum_height")
         self.dialog_bg_color = dialog_config.get("background_color", [40, 40, 45])

@@ -58,7 +58,7 @@ class MoveCommentDialog(QDialog):
         self._dialog_width = dialog_config.get("width", 500)
         spacing_config = dialog_config.get("spacing", {})
         self._bottom_button_top_padding = dialog_config.get(
-            "bottom_button_top_padding", spacing_config.get("before_buttons", 50)
+            "bottom_button_top_padding", spacing_config.get("before_buttons", 25)
         )
         self._dialog_minimum_width = dialog_config.get("minimum_width")
         self._dialog_minimum_height = dialog_config.get(
