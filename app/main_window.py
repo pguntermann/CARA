@@ -4171,8 +4171,8 @@ class MainWindow(QMainWindow):
         show_metadata = pgn_visibility.get("show_metadata", True)
         show_comments = pgn_visibility.get("show_comments", True)
         show_variations = pgn_visibility.get("show_variations", True)
-        indent_variations = pgn_visibility.get("indent_variations", False)
-        navigate_variations = pgn_visibility.get("navigate_variations", False)
+        indent_variations = pgn_visibility.get("indent_variations", True)
+        navigate_variations = pgn_visibility.get("navigate_variations", True)
         show_annotations = pgn_visibility.get("show_annotations", True)
         show_results = pgn_visibility.get("show_results", True)
         show_non_standard_tags = pgn_visibility.get("show_non_standard_tags", False)
@@ -4425,10 +4425,10 @@ class MainWindow(QMainWindow):
                     "show_metadata": pgn_view._show_metadata,
                     "show_comments": pgn_view._show_comments if hasattr(pgn_view, '_show_comments') else True,
                     "show_variations": pgn_view._show_variations if hasattr(pgn_view, '_show_variations') else True,
-                    "indent_variations": pgn_view._indent_variations if hasattr(pgn_view, '_indent_variations') else False,
+                    "indent_variations": pgn_view._indent_variations if hasattr(pgn_view, '_indent_variations') else True,
                     "navigate_variations": (
                         self.controller.get_game_controller().is_navigate_variations_enabled()
-                        if hasattr(self, 'controller') else False
+                        if hasattr(self, 'controller') else True
                     ),
                     "show_annotations": pgn_view._show_annotations if hasattr(pgn_view, '_show_annotations') else True,
                     "show_results": pgn_view._show_results if hasattr(pgn_view, '_show_results') else True,

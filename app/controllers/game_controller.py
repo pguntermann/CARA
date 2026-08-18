@@ -157,7 +157,7 @@ class GameController:
         
         # Initialize game model
         self.game_model = GameModel()
-        self._navigate_variations_enabled: bool = False
+        self._navigate_variations_enabled: bool = True
         # After reaching the end of a sideline, the first Right is a no-op that
         # arms rejoining; the next Right jumps to the mainline move at the fork.
         self._rejoin_mainline_armed: bool = False

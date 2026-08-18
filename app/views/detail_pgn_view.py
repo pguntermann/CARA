@@ -302,7 +302,7 @@ class DetailPgnView(QWidget):
         self._show_metadata: bool = True  # Whether to show metadata tags in PGN view
         self._show_comments: bool = True  # Whether to show comments in PGN view
         self._show_variations: bool = True  # Whether to show variations in PGN view
-        self._indent_variations: bool = False  # Traditional indented variation layout (display-only)
+        self._indent_variations: bool = True  # Traditional indented variation layout (display-only)
         self._show_annotations: bool = True  # Whether to show annotations in PGN view
         self._show_results: bool = True  # Whether to show results in PGN view
         self._show_non_standard_tags: bool = False  # Whether to show non-standard tags like [%evp], [%mdl] in comments
