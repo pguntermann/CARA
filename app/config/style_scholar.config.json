@@ -6032,6 +6032,14 @@
         "spinboxes": {
           "parallel_movetime_width": 104,
           "max_threads_min_width": 128
+        },
+        "standby_hint": {
+          "icon_svg": "app/resources/icons/menu_exclamation.svg",
+          "icon_size": 16,
+          "icon_text_spacing": 6,
+          "icon_tint_rgb": {
+            "$ref": "$_COLOR_DRIFTWOOD"
+          }
         }
       },
       "confirmation_dialog": {

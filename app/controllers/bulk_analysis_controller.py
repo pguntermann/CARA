@@ -1,5 +1,6 @@
 """Bulk analysis controller for managing bulk game analysis operations."""
 
+import html
 import os
 import threading
 import time
@@ -16,6 +17,53 @@ from app.services.book_move_service import BookMoveService
 from app.services.bulk_analysis_service import BulkAnalysisService
 from app.services.progress_service import ProgressService
 from app.services.logging_service import LoggingService
+
+
+_BULK_ANALYSIS_MESSAGE_DEFAULTS = {
+    "cancelled_by_user": "Analysis cancelled by user",
+    "incomplete_analysis_title": "Incomplete analysis results",
+    "incomplete_analysis": (
+        "Bulk Analysis has been aborted due to a failed integrity check "
+        "(incomplete analysis results).<br><br>"
+        "The integrity check failed on {game_label}.<br><br>"
+        "This can happen, if the operating system went into stand-by mode or "
+        "similar circumstances leading to the UCI engine not providing complete "
+        "results. Games which successfully completed remain analyzed, so you can "
+        "resume bulk analysis by running it again and leaving the "
+        "<b>Re-analyze already analyzed games</b> checkmark unchecked."
+    ),
+    "standby_warning": (
+        "It is advisable to deactivate standby and power-saving mode in the "
+        "host operating system during analysis. This is especially relevant "
+        "if the computer is not plugged in and is running on battery."
+    ),
+}
+
+
+def bulk_analysis_dialog_messages(config: Dict[str, Any]) -> Dict[str, str]:
+    """User-facing bulk-analysis strings from ``config.json``, with defaults."""
+    raw = (
+        (config or {})
+        .get("ui", {})
+        .get("dialogs", {})
+        .get("bulk_analysis_dialog", {})
+        .get("messages", {})
+        or {}
+    )
+    out: Dict[str, str] = {}
+    for key, default in _BULK_ANALYSIS_MESSAGE_DEFAULTS.items():
+        value = raw.get(key)
+        text = str(value).strip() if value is not None else ""
+        out[key] = text or default
+    return out
+
+
+def format_incomplete_analysis_message(template: str, game: GameData) -> str:
+    """Insert an HTML-escaped game label into the incomplete-analysis dialog body."""
+    label = html.escape(BulkAnalysisService.format_game_label(game), quote=False)
+    if "{game_label}" in template:
+        return template.replace("{game_label}", label)
+    return f"{template}<br><br>The integrity check failed on {label}."
 
 
 class ContinuousGameAnalysisWorker(QThread):
@@ -176,6 +224,12 @@ class BulkAnalysisThread(QThread):
         self._parallel_games = 0
         self._threads_per_engine = 0
         self._analysis_services: List[BulkAnalysisService] = []  # Store for cleanup
+        self._stop_lock = threading.Lock()
+        messages = bulk_analysis_dialog_messages(self.config)
+        self._message_cancelled = messages["cancelled_by_user"]
+        self._message_incomplete = messages["incomplete_analysis"]
+        self._finish_message = self._message_cancelled
+        self._stop_reason = ""
         # Incremental progress aggregation (avoid O(total_games) scans on UI thread).
         self._games_being_analyzed = 0  # excludes skipped
         self._game_progress_fraction: Dict[int, float] = {}  # original_idx -> [0.0..1.0]
@@ -188,6 +242,8 @@ class BulkAnalysisThread(QThread):
             Tuple of (game, original_idx) or None if no more games.
         """
         with QMutexLocker(self._queue_mutex):
+            if self._cancelled:
+                return None
             if self._next_game_idx >= len(self._games_to_analyze):
                 return None
             
@@ -197,11 +253,32 @@ class BulkAnalysisThread(QThread):
             return (game, original_idx)
     
     def cancel(self) -> None:
-        """Cancel the analysis."""
-        self._cancelled = True
-        for worker in self._workers:
+        """Cancel the analysis (same teardown as an incomplete-analysis abort)."""
+        self._request_stop(self._message_cancelled, reason="user_cancel")
+
+    def _request_stop(self, finish_message: str, *, reason: str) -> None:
+        """Stop all workers and engine sessions; first caller wins the finish message."""
+        with self._stop_lock:
+            if self._cancelled:
+                return
+            self._cancelled = True
+            self._finish_message = finish_message
+            self._stop_reason = reason
+        for worker in list(self._workers):
             worker.cancel()
-    
+
+    def _on_incomplete_analysis(self, game: GameData) -> None:
+        """Halt the bulk run after a game fails the best-move integrity check."""
+        finish_message = format_incomplete_analysis_message(self._message_incomplete, game)
+        try:
+            LoggingService.get_instance().warning(
+                "Bulk analysis halted: incomplete best-move data "
+                f"({BulkAnalysisService.format_game_label(game)}; possible OS standby)"
+            )
+        except Exception:
+            pass
+        self._request_stop(finish_message, reason="incomplete_analysis")
+
     def _on_worker_progress(self, game_idx: int, game_move_index: int, total_moves: int,
                            is_white_move: bool, status_message: str, engine_info: dict) -> None:
         """Handle progress update from a worker thread."""
@@ -607,6 +684,7 @@ class BulkAnalysisThread(QThread):
                     auto_game_tagging=auto_game_tagging,
                     auto_game_tagging_enabled_tags=enabled_auto_tags,
                     update_move_quality_nags=update_move_quality_nags,
+                    on_incomplete_analysis=self._on_incomplete_analysis,
                 )
                 self._analysis_services.append(service)
             
@@ -639,7 +717,7 @@ class BulkAnalysisThread(QThread):
             
             # Final status
             if self._cancelled:
-                self.finished.emit(False, "Analysis cancelled by user")
+                self.finished.emit(False, self._finish_message)
             else:
                 status = f"Completed: {self._analyzed_count} analyzed, {self._skipped_count} skipped, {self._error_count} errors"
                 self.finished.emit(True, status)
@@ -983,6 +1061,12 @@ class BulkAnalysisController(QObject):
             True if analysis thread exists and is cancelled, False otherwise.
         """
         return self._analysis_thread is not None and self._analysis_thread._cancelled
+
+    def last_stop_reason(self) -> str:
+        """Return ``incomplete_analysis``, ``user_cancel``, or empty if the last run did not stop early."""
+        if self._analysis_thread is None:
+            return ""
+        return str(getattr(self._analysis_thread, "_stop_reason", "") or "")
     
     def is_thread_running(self) -> bool:
         """Check if analysis thread is running.
