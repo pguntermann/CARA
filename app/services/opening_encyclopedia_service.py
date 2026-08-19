@@ -570,6 +570,8 @@ class OpeningEncyclopediaService:
         self._eco_id_by_book_key: Dict[str, int] = {}
         self._eco_row_by_id: Dict[int, Tuple[str, str]] = {}
         self._eco_maps_by_id: Dict[int, Tuple[str, ...]] = {}
+        self._eco_book_row_by_id: Dict[int, Any] = {}
+        self._eco_rows_by_opening_id: Dict[str, List[Any]] = {}
 
     @classmethod
     def get_instance(cls, config: Dict[str, Any]) -> "OpeningEncyclopediaService":
@@ -791,8 +793,26 @@ class OpeningEncyclopediaService:
         self._eco_id_by_book_key = {}
         self._eco_row_by_id = {}
         self._eco_maps_by_id = {}
+        self._eco_book_row_by_id = {}
+        self._eco_rows_by_opening_id = {}
         try:
-            from app.services.opening_service import parse_move_sans
+            from app.services.opening_service import EcoBookRow, parse_move_sans
+
+            for row in conn.execute(
+                "SELECT eco_entry_id, fen, name, eco, moves FROM eco_entry"
+            ):
+                eco_id = int(row["eco_entry_id"])
+                fen = str(row["fen"] or "").strip()
+                name = str(row["name"] or "")
+                eco = str(row["eco"] or "")
+                if not fen or not name:
+                    continue
+                self._eco_book_row_by_id[eco_id] = EcoBookRow(
+                    fen=fen,
+                    name=name,
+                    eco=eco,
+                    moves=str(row["moves"] or ""),
+                )
 
             book_key_best: Dict[str, Tuple[int, int]] = {}
             for row in conn.execute(
@@ -817,6 +837,7 @@ class OpeningEncyclopediaService:
             }
 
             buckets: Dict[int, List[str]] = {}
+            opening_rows: Dict[str, Dict[int, Any]] = {}
             for row in conn.execute(
                 "SELECT eco_entry_id, opening_id FROM opening_eco_entry"
             ):
@@ -827,14 +848,23 @@ class OpeningEncyclopediaService:
                 bucket = buckets.setdefault(eco_id, [])
                 if oid not in bucket:
                     bucket.append(oid)
+                book_row = self._eco_book_row_by_id.get(eco_id)
+                if book_row is not None:
+                    by_id = opening_rows.setdefault(oid, {})
+                    by_id[eco_id] = book_row
             self._eco_maps_by_id = {
                 eco_id: tuple(oids) for eco_id, oids in buckets.items()
+            }
+            self._eco_rows_by_opening_id = {
+                oid: list(by_id.values()) for oid, by_id in opening_rows.items()
             }
         except sqlite3.OperationalError:
             self._eco_id_by_fen = {}
             self._eco_id_by_book_key = {}
             self._eco_row_by_id = {}
             self._eco_maps_by_id = {}
+            self._eco_book_row_by_id = {}
+            self._eco_rows_by_opening_id = {}
 
     def _eco_base_for_fen(self, fen: str) -> Optional[Tuple[int, str, str]]:
         """Return ``(eco_entry_id, name, eco)`` for a classified book FEN."""
@@ -1327,19 +1357,49 @@ class OpeningEncyclopediaService:
                 collected.extend(rows)
         return collected
 
+    def _eco_book_rows_for_exact_title(
+        self, opening_id: str, display_name: str
+    ) -> List[Any]:
+        """ECO rows linked in ``opening_eco_entry`` whose book name matches the article title."""
+        self._ensure_loaded()
+        key = normalize_opening_name(display_name)
+        if not key:
+            return []
+        linked = self._eco_rows_by_opening_id.get(opening_id, [])
+        if not linked:
+            return []
+        return [
+            row
+            for row in linked
+            if normalize_opening_name(getattr(row, "name", "")) == key
+        ]
+
+    def _compute_tabiya_from_rows(
+        self,
+        rows: List[Any],
+        display_name: str,
+    ) -> Optional[str]:
+        from app.services.opening_service import (
+            compute_tabiya_fen,
+            prefer_largest_move_order_cluster,
+        )
+
+        if not rows:
+            return None
+        selected = prefer_rows_matching_display_name(rows, display_name)
+        if _display_name_is_variation(display_name):
+            selected = prefer_largest_move_order_cluster(selected)
+        return compute_tabiya_fen(selected, family=False)
+
     def tabiya_fen(self, opening_id: str) -> Optional[str]:
         """Return the named-tabiya FEN for ``opening_id``, or ``None``.
 
-        If ECO names resolve to this id, prefer rows whose book name matches
-        this opening's encyclopedia display name (exact, else a ``,`` / ``:``
-        continuation). Variation titles that still mix move orders keep the
-        largest first-branch cluster. Then take the shallowest unique named
-        position (sibling pop only at min depth). That keeps alias labels
-        mapped onto the same id (e.g. ``Reti: KIA`` under King's Indian
-        Attack) from collapsing to ``1. Nf3``.
-
-        If this id has no book name of its own, include descendant ids and
-        take the common SAN prefix so a parent still gets a defining diagram.
+        When ``opening_eco_entry`` links ECO rows whose book name exactly
+        matches the article title, those curated rows define the diagram
+        (shallowest unique named position). Otherwise, if ECO names resolve
+        to this id via ``name_resolution``, prefer title-matched rows there.
+        If this id has no direct book rows, include descendant ids and take
+        the common SAN prefix so a parent still gets a defining diagram.
         Cached per opening_id.
         """
         oid = (opening_id or "").strip()
@@ -1347,20 +1407,20 @@ class OpeningEncyclopediaService:
             return None
         if oid in self._tabiya_fen_by_oid:
             return self._tabiya_fen_by_oid[oid]
-        from app.services.opening_service import (
-            compute_tabiya_fen,
-            prefer_largest_move_order_cluster,
-        )
 
-        exact = self._ensure_rows_by_oid().get(oid, [])
-        if exact:
-            self._ensure_loaded()
-            display = str((self._openings.get(oid) or {}).get("display_name") or "")
-            selected = prefer_rows_matching_display_name(exact, display)
-            if _display_name_is_variation(display):
-                selected = prefer_largest_move_order_cluster(selected)
-            fen = compute_tabiya_fen(selected, family=False)
+        self._ensure_loaded()
+        display = str((self._openings.get(oid) or {}).get("display_name") or "")
+
+        linked_exact = self._eco_book_rows_for_exact_title(oid, display)
+        if linked_exact:
+            fen = self._compute_tabiya_from_rows(linked_exact, display)
         else:
-            fen = compute_tabiya_fen(self._rows_for_tabiya(oid), family=True)
+            exact = self._ensure_rows_by_oid().get(oid, [])
+            if exact:
+                fen = self._compute_tabiya_from_rows(exact, display)
+            else:
+                from app.services.opening_service import compute_tabiya_fen
+
+                fen = compute_tabiya_fen(self._rows_for_tabiya(oid), family=True)
         self._tabiya_fen_by_oid[oid] = fen
         return fen

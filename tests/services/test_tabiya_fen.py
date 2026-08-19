@@ -317,6 +317,41 @@ class TestEncyclopediaTabiyaFen(unittest.TestCase):
             OpeningService.book_key(fen_after_sans(["d4"]) or ""),
         )
 
+    def test_richter_veresov_tabiya_is_after_bg5(self) -> None:
+        """Family article: curated DB links must beat descendant SAN-prefix collapse."""
+        fen = self.svc.tabiya_fen("richter-veresov-attack")
+        expected = fen_after_sans(
+            parse_move_sans("1. d4 Nf6 2. Nc3 d5 3. Bg5")
+        )
+        self.assertIsNotNone(fen)
+        self.assertEqual(
+            OpeningService.book_key(fen or ""),
+            OpeningService.book_key(expected or ""),
+        )
+        self.assertNotEqual(
+            OpeningService.book_key(fen or ""),
+            OpeningService.book_key(fen_after_sans(["d4"]) or ""),
+        )
+
+    def test_tabiya_uses_exact_opening_eco_entry_links(self) -> None:
+        """When DB links share the article title, tabiya must come from those rows."""
+        self.svc._ensure_loaded()
+        failures: List[str] = []
+        for oid, raw in self.svc._openings.items():
+            if not self.svc._is_ready(raw):
+                continue
+            display = str(raw.get("display_name") or "")
+            linked = self.svc._eco_book_rows_for_exact_title(oid, display)
+            if not linked:
+                continue
+            expected = self.svc._compute_tabiya_from_rows(linked, display)
+            actual = self.svc.tabiya_fen(oid)
+            if OpeningService.book_key(actual or "") != OpeningService.book_key(
+                expected or ""
+            ):
+                failures.append(oid)
+        self.assertEqual(failures, [], msg=f"tabiya mismatches: {failures[:10]}")
+
 
 if __name__ == "__main__":
     unittest.main()
