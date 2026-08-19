@@ -1,8 +1,11 @@
 """Scrollbar styling utilities."""
 
-from PyQt6.QtWidgets import QScrollArea, QWidget
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QAbstractScrollArea, QScrollArea, QWidget
 from PyQt6.QtGui import QColor, QPalette
 from typing import List, Dict, Any
+
+from app.views.style.grab_friendly_scrollbar import GrabFriendlyScrollBar
 
 
 def generate_scrollbar_stylesheet(
@@ -192,6 +195,8 @@ def apply_scrollbar_styling(
         scrollbar.setPalette(scrollbar_palette)
         scrollbar.setAutoFillBackground(True)
 
+    install_grab_friendly_scrollbars(scroll_area, config)
+
 
 def apply_table_scrollbar_styling(
     table_widget,
@@ -266,7 +271,8 @@ def apply_table_scrollbar_styling(
         horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Window, QColor(*scrollbar_bg_color))
         horizontal_scrollbar.setPalette(horizontal_scrollbar_palette)
         horizontal_scrollbar.setAutoFillBackground(True)
-    
+
+    install_grab_friendly_scrollbars(table_widget, config)
 
 
 def apply_list_widget_scrollbar_styling(
@@ -313,6 +319,8 @@ def apply_list_widget_scrollbar_styling(
         pal.setColor(pal.ColorRole.Window, QColor(*scrollbar_bg_color))
         horizontal_scrollbar.setPalette(pal)
         horizontal_scrollbar.setAutoFillBackground(True)
+
+    install_grab_friendly_scrollbars(list_widget, config)
 
 
 def apply_table_view_scrollbar_styling(
@@ -389,6 +397,8 @@ def apply_table_view_scrollbar_styling(
         horizontal_scrollbar.setPalette(horizontal_scrollbar_palette)
         horizontal_scrollbar.setAutoFillBackground(True)
 
+    install_grab_friendly_scrollbars(table_view, config)
+
 
 def apply_text_edit_scrollbar_styling(
     text_edit,
@@ -463,3 +473,32 @@ def apply_text_edit_scrollbar_styling(
         horizontal_scrollbar_palette.setColor(horizontal_scrollbar_palette.ColorRole.Window, QColor(*scrollbar_bg_color))
         horizontal_scrollbar.setPalette(horizontal_scrollbar_palette)
         horizontal_scrollbar.setAutoFillBackground(True)
+
+    install_grab_friendly_scrollbars(text_edit, config)
+
+
+def install_grab_friendly_scrollbars(
+    widget: QAbstractScrollArea,
+    config: Dict[str, Any],
+) -> None:
+    """Replace a widget's native scrollbars with :class:`GrabFriendlyScrollBar`.
+
+    Safe to call multiple times — existing instances are reconfigured rather
+    than replaced, avoiding stale-pointer issues when Qt internally caches the
+    scrollbar reference.
+
+    Args:
+        widget: Any :class:`QAbstractScrollArea` (table, tree, text edit, …).
+        config: Theme configuration dictionary.
+    """
+    for orientation, getter, setter in (
+        (Qt.Orientation.Vertical, widget.verticalScrollBar, widget.setVerticalScrollBar),
+        (Qt.Orientation.Horizontal, widget.horizontalScrollBar, widget.setHorizontalScrollBar),
+    ):
+        bar = getter()
+        if isinstance(bar, GrabFriendlyScrollBar):
+            bar.apply_config(config)
+        else:
+            new_bar = GrabFriendlyScrollBar(orientation, widget, config=config)
+            setter(new_bar)
+            new_bar.install_grab_zone_filter(widget)

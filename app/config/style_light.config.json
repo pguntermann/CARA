@@ -361,9 +361,14 @@
         "handle_hover_color": {
           "$ref": "$_COLOR_SCROLLBAR_HANDLE_HOVER"
         },
+        "hover_handle_color": {
+          "$ref": "$_COLOR_SCROLLBAR_HANDLE_HOVER"
+        },
         "border_radius": 3,
         "min_height": 20,
-        "add_line_height": 0
+        "add_line_height": 0,
+        "grab_margin": 4,
+        "hover_handle_width_extra": 4
       },
       "tab_bar_scroll_buttons": {
         "background_color": {

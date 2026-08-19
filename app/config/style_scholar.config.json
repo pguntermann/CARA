@@ -479,9 +479,14 @@
         "handle_hover_color": {
           "$ref": "$_COLOR_MOCHA_DRAG"
         },
+        "hover_handle_color": {
+          "$ref": "$_COLOR_MOCHA_DRAG"
+        },
         "border_radius": 3,
         "min_height": 20,
-        "add_line_height": 0
+        "add_line_height": 0,
+        "grab_margin": 4,
+        "hover_handle_width_extra": 4
       },
       "tab_bar_scroll_buttons": {
         "background_color": {

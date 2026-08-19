@@ -9,7 +9,8 @@ from app.views.style.scrollbar import (
     apply_table_scrollbar_styling,
     apply_table_view_scrollbar_styling,
     apply_list_widget_scrollbar_styling,
-    apply_text_edit_scrollbar_styling
+    apply_text_edit_scrollbar_styling,
+    install_grab_friendly_scrollbars,
 )
 from app.views.style.checkbox import apply_checkbox_styling
 from app.views.style.combobox import apply_combobox_styling
@@ -788,4 +789,20 @@ class StyleManager:
             background_color: Optional plate color override (panel ``scroll_button_color``).
         """
         return generate_tab_bar_scroll_button_stylesheet(config, background_color)
+
+    @staticmethod
+    def install_grab_friendly_scrollbars(
+        widget,
+        config: Dict[str, Any],
+    ) -> None:
+        """Replace native scrollbars with grab-friendly custom scrollbars.
+
+        Provides an enlarged grab zone and a visual hover effect on the handle.
+        Safe to call repeatedly (reconfigures existing instances on theme switch).
+
+        Args:
+            widget: Any :class:`QAbstractScrollArea`.
+            config: Theme configuration dictionary.
+        """
+        install_grab_friendly_scrollbars(widget, config)
 
