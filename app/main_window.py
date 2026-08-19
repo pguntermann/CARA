@@ -2242,6 +2242,16 @@ class MainWindow(QMainWindow):
             self._navigate_to_next_game,
         )
         self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "First game"),
+            "",
+            self._navigate_to_first_game,
+        )
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Last game"),
+            "",
+            self._navigate_to_last_game,
+        )
+        self.shortcut_manager.register_shortcut(
             make_binding_id("Navigation", "Jump to start"),
             "Shift+Left",
             self._navigate_to_start,
@@ -3836,6 +3846,58 @@ class MainWindow(QMainWindow):
     def _navigate_to_next_game(self) -> None:
         """Load the next game in the current database list order."""
         self._navigate_to_adjacent_game(1)
+
+    def _navigate_to_first_game(self) -> None:
+        """Load the first game in the current database list order."""
+        self._navigate_to_edge_game(first=True)
+
+    def _navigate_to_last_game(self) -> None:
+        """Load the last game in the current database list order."""
+        self._navigate_to_edge_game(first=False)
+
+    def _navigate_to_edge_game(self, *, first: bool) -> None:
+        """Activate the first or last game in the owning database tab."""
+        if self.controller.is_game_analysis_running():
+            self.controller.set_status("Cannot load game while analysis is running")
+            return
+        if not hasattr(self, "database_panel") or self.database_panel is None:
+            return
+
+        game_controller = self.controller.get_game_controller()
+        active_game = game_controller.get_game_model().active_game
+        model: Optional[DatabaseModel] = None
+
+        if active_game is not None:
+            location = self.database_panel.find_game_location(active_game)
+            if location is not None:
+                model, _ = location
+
+        if model is None:
+            active_info = self.database_panel.get_active_database_info()
+            if not active_info:
+                return
+            model = active_info.get("model")
+            if model is None:
+                return
+
+        count = model.rowCount()
+        if count <= 0:
+            return
+
+        target_row = 0 if first else count - 1
+        game = model.get_game(target_row)
+        if game is None:
+            return
+
+        game_controller.set_active_game(game)
+        status_message = game_controller.format_active_game_status_message(game)
+        if status_message:
+            self.controller.set_status(status_message)
+        ref_ply = getattr(game, "ref_ply", 0)
+        if isinstance(ref_ply, int) and ref_ply > 0:
+            game_controller.navigate_to_ply(ref_ply)
+
+        self.database_panel.select_rows(model, [target_row])
 
     def _navigate_to_adjacent_game(self, delta: int) -> None:
         """Activate the game at current_row + delta in the owning database tab.
