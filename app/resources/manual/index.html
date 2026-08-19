@@ -859,7 +859,7 @@
                 </div>
                 
                 <p>As you navigate through the game using the <code>←</code> (Left Arrow) and <code>→</code> (Right Arrow) keys, the active move is highlighted in the PGN notation. A <strong>single click</strong> on any main-line move jumps to that position.</p>
-                <p><strong>Navigating into variations:</strong> By default, <code>←</code> / <code>→</code> and clicks stay on the main line—single clicks on variation moves do not change the position. Enable <span class="menu-item">PGN → Enable navigating into variations</span> (also available from the PGN notation context menu) to browse sidelines:</p>
+                <p><strong>Navigating into variations:</strong> With <span class="menu-item">PGN → Enable navigating into variations</span> enabled (also available from the PGN notation context menu), you can browse sidelines:</p>
                 <ul>
                     <li><strong>Click</strong> a variation move in the PGN pane to jump to that sideline position.</li>
                     <li><code>→</code> (Right Arrow) advances along the active line. When several continuations exist from the current node, a small <strong>branch selector</strong> appears: use <code>↑</code> / <code>↓</code> to highlight a choice, <code>→</code> / <code>Enter</code> to take it, and <code>←</code> / <code>Esc</code> to dismiss the overlay. The mainline continuation is listed first, separated visually from the sideline options.</li>
@@ -869,8 +869,12 @@
                     <li>The Moves List and other mainline-oriented views stay on the mainline ancestor while you browse a sideline.</li>
                 </ul>
                 <p>Turning variation navigation off (or hiding variations with <span class="menu-item">PGN → Show Variations</span>) snaps you back to the mainline ancestor of the current path if you were on a sideline.</p>
-                <p>With <span class="menu-item">PGN → Show Comments</span> enabled, <strong>double-click</strong> inside a <strong>main-line</strong> comment (text in curly braces on the main line) to open the move-comments editor for that full move. For what the dialog contains and how changes are saved, see <a href="#editing-move-comments">Editing move comments</a> in <a href="#moves-list">section 4.5.1</a>.</p>
-                <p><strong>Context menu:</strong> You can also <strong>right-click</strong> inside the PGN notation pane to open a context menu with quick access to common PGN actions. These entries mirror the corresponding options from the menu bar.</p>
+                <p>With <span class="menu-item">PGN → Show Comments</span> enabled, <strong>double-click</strong> a comment (text in curly braces) to open the move-comments editor for that move. For what the dialog contains and how changes are saved, see <a href="#editing-move-comments">Editing move comments</a> in <a href="#moves-list">section 4.5.1</a>.</p>
+                <p><strong>Context menu:</strong> <strong>Right-click</strong> inside the PGN notation pane to open a context menu. In addition to the standard PGN menu items, the context menu offers:</p>
+                <ul>
+                    <li><strong>Edit Comments:</strong> Opens the comment editor for the move at the click position.</li>
+                    <li><strong>Remove Variation:</strong> Deletes the variation (sideline) at the click position from the game. Available only when right-clicking inside a variation.</li>
+                </ul>
                 
                 <img src="screenshots/detail_panel.png" alt="CARA Detail Panel - Right-side panel showing PGN notation pane at the top and tabbed views below (Moves List, Metadata, Manual Analysis, Opening Explorer, Game Summary, Player Stats, Annotations, AI Summary, Notes) for detailed game analysis" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
@@ -932,7 +936,7 @@
                 
                 <img src="screenshots/manual_analysis.png" alt="CARA Manual Analysis View - MultiPV analysis display showing principal variation lines with evaluations, depths, and move sequences" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
-                <p><strong>MultiPV Analysis:</strong> The standard analysis mode displays multiple candidate moves and their evaluations. You can analyze any number of principal variation lines simultaneously, each displaying the engine's recommended moves, evaluations, and depths. The first three PV lines (PV1, PV2, PV3) have color-coded indicators in the analysis display that match the colors of the corresponding arrows on the chessboard when enabled. This visual connection helps you quickly identify which analysis line corresponds to which arrow on the board. Right-clicking on a PV line opens a context menu so you can copy that PV line or all PV lines to the clipboard. The following options are available:</p>
+                <p><strong>MultiPV Analysis:</strong> The standard analysis mode displays multiple candidate moves and their evaluations. You can analyze any number of principal variation lines simultaneously, each displaying the engine's recommended moves, evaluations, and depths. The first three PV lines (PV1, PV2, PV3) have color-coded indicators in the analysis display that match the colors of the corresponding arrows on the chessboard when enabled. This visual connection helps you quickly identify which analysis line corresponds to which arrow on the board. The following options are available:</p>
                 <ul>
                     <li><span class="menu-item">Manual Analysis → Start Manual Analysis</span> (<code>Alt+M</code> / <code>⌥+M</code>): Start or stop continuous engine analysis of the current position</li>
                     <li><span class="menu-item">Manual Analysis → Freeze Analysis</span>: Hold the currently displayed PV lines and statistics while the engine continues searching in the background. Unfreeze to resume live updates</li>
@@ -941,6 +945,7 @@
                     <li><span class="menu-item">Manual Analysis → Enable miniature preview</span>: Toggle display of a miniature board preview when hovering over PV moves</li>
                     <li><span class="menu-item">Manual Analysis → Show W/D/L probabilities</span>: When enabled and the assigned engine reports UCI W/D/L for the best line (PV1), show a win/draw/loss probability bar above the PV lines</li>
                 </ul>
+                <p>Right-clicking on a PV line opens a context menu to copy that line or all lines to the clipboard. When you right-click directly on a move within a PV line, the context menu also offers <strong>Add Variation to PGN</strong>, which inserts the moves from the start of the PV line up to and including the clicked move as a new variation into the game's PGN.</p>
                 
                 <p><strong>Win / Draw / Loss bar:</strong> Engines that support <code>UCI_ShowWDL</code> (for example recent Stockfish and Lc0 builds) can report white/draw/black probabilities for the best principal variation. CARA displays these as a stacked bar labeled “Win probability (best engine play)”. These values reflect strong engine self-play outcomes from the current position under best play—not human opening statistics or a claim of perfect play. If the engine does not emit WDL, the bar stays hidden.</p>
                 
@@ -1731,6 +1736,7 @@
                 <p>To analyze multiple games at once, use <span class="menu-item">Game Analysis → Bulk Analyze Database...</span>.</p>
                 <img src="screenshots/bulk_analyze_dialog.png" alt="CARA Bulk Analysis Dialog - Dialog for analyzing multiple games with game selection options, analysis settings, and progress tracking" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 <p>CARA automatically optimizes available CPU cores to analyze multiple games in parallel, maximizing analysis speed. Progress and estimated time remaining are displayed in the status bar, and you can cancel and resume bulk analysis at any time.</p>
+                <p>After each game, CARA validates the analysis integrity. If the results are incomplete—for example because the operating system went into standby or sleep during analysis—the bulk run is aborted and a warning is shown. Games that completed successfully keep their analysis, so you can resume by running bulk analysis again with <strong>Re-analyze already analyzed games</strong> unchecked. It is advisable to disable standby and power-saving modes while running bulk analysis, especially on battery power.</p>
             </div>
 
             <div class="outline-item">
