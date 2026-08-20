@@ -1,5 +1,37 @@
 # Release Notes
 
+# CARA v2.8.7 - Variations from PV, Bulk analysis sanity checks and more polish
+
+**Release Date:** 20.08.2026
+
+This release adds the ability to insert a **Manual Analysis** PV line as a **Variation** into the game PGN, a **Sanity check** during bulk analysis to detect incomplete analysis results due to standby/power-saving mode interruptions, further improves the **Opening Encyclopedia** lookup and contains a lot of additional **polish**.
+
+## New Features
+
+- **Manual Analysis – Add Variation to PGN:** Right-click on any move in any **Manual Analysis** PV line and select **Add Variation to PGN** to add the line up to and including the right-clicked move as a Variation into the game PGN.
+- **PGN - Remove Variation:** Right-click on any move that is part of a variation in the PGN pane and select **Remove Variation** to remove this variation (including its subtrees).
+- **PGN - Add or edit comments inside of Variations:** Similar to the existing ability to add/remove comments for main line moves, either **double-click** an existing comment inside of a variation to edit it, or right-click on any move (including variation moves) and select **Edit comments** in order to add or edit comments.
+- **Bulk Analysis - Validation:** Bulk analysis tries to detect incomplete engine analysis results and will abort processing. This can happen when the host operating system goes into a standby or power-saving mode, interrupting the UCI engine processes. Previously, this could lead to games receiving incomplete analysis data. Games that were successfully processed during the session will retain their analysis data, so users can simply re-run the process to **resume** analysis for the remaining games. Only games that pass the additional sanity check will receive the analyzed-flag.
+
+## Enhancements
+
+- **Opening Encyclopedia:** Lookup is more robust with optional FEN hints; tabiya miniature-board diagrams use curated `opening_eco_entry` links. The shipped openings catalog is updated.
+- **Hide PGN Pane:** Collapse the PGN notation pane via **View → Hide PGN Pane** (`Ctrl+Shift+↑` / `⌘+Shift+↑`) to give more space to the detail tabs.
+- **First / Last game shortcuts:** Bindable navigation shortcuts jump to the first or last game in the current database list.
+- **Scrollbars:** Improved scrollbar grab-ability. Some UI improvements make grabbing onto scrollbars easier. Additionally, missing theme integration of the Encyclopedia search dropdown has been fixed.
+- **Tab bar:** Overflow scroll arrows are now also integrated into the theme system to ensure consistent style throughout different platforms.
+- **Defaults:** Previously disabled by default, **Indent variations** and **Enable navigating into variations** now default to **enabled** (does not overwrite existing user settings).
+- **Dialogs:** Footer spacing above the bottom button row is reduced and unified across dialogs.
+- **HTML manual:** Updated for Hide PGN Pane, variation editing, and related UI.
+
+## Bug Fixes
+
+- **PGN header tags:** Double-click editing no longer loses the existing tag value.
+- **Linux Wayland:** Nested menus are parented to their grabbing `QMenu`.
+- **Encyclopedia diagrams:** Fixed wrong or missing tabiya boards when linking through curated opening ECO entries.
+
+---
+
 # CARA v2.8.6 - Maintenance Release
 
 **Release Date:** 17.08.2026
