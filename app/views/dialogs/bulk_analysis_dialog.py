@@ -16,13 +16,15 @@ from PyQt6.QtWidgets import (
     QApplication,
     QSpinBox,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QPalette, QColor, QShowEvent
 from typing import Dict, Any, Optional, List
 import os
 
 from app.models.database_model import DatabaseModel, GameData
+from app.controllers.bulk_analysis_controller import bulk_analysis_dialog_messages
 from app.utils.path_resolver import get_app_resource_path
+from app.utils.themed_icon import SVG_MENU_EXCLAMATION, themed_icon_from_svg
 
 
 class BulkAnalysisDialog(QDialog):
@@ -51,7 +53,7 @@ class BulkAnalysisDialog(QDialog):
         
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('bulk_analysis_dialog', {})
         self.dialog_width = int(dialog_config.get('width', 550))
-        self.bottom_button_top_padding = int(dialog_config.get('bottom_button_top_padding', 50))
+        self.bottom_button_top_padding = int(dialog_config.get('bottom_button_top_padding', 25))
         self.dialog_minimum_width = dialog_config.get('minimum_width')
         self.dialog_minimum_height = dialog_config.get('minimum_height')
         
@@ -310,6 +312,35 @@ class BulkAnalysisDialog(QDialog):
         
         layout.addWidget(self.progress_group)
         
+        layout.addSpacing(section_spacing)
+        messages = bulk_analysis_dialog_messages(self.config)
+        hint_cfg = dialog_config.get("standby_hint") or {}
+        hint_spacing = int(hint_cfg.get("icon_text_spacing", 6))
+        self._standby_hint_row = QHBoxLayout()
+        self._standby_hint_row.setContentsMargins(0, 0, 0, 0)
+        self._standby_hint_row.setSpacing(hint_spacing)
+
+        self.standby_hint_icon = QLabel()
+        self.standby_hint_icon.setObjectName("bulk_standby_hint_icon")
+        self.standby_hint_icon.setAlignment(
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter
+        )
+        self.standby_hint_icon.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+        self.standby_hint = QLabel(messages["standby_warning"])
+        self.standby_hint.setObjectName("bulk_standby_hint")
+        self.standby_hint.setWordWrap(True)
+        self.standby_hint.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.standby_hint.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+
+        self._standby_hint_row.addWidget(
+            self.standby_hint_icon, 0, Qt.AlignmentFlag.AlignTop
+        )
+        self._standby_hint_row.addWidget(
+            self.standby_hint, 1, Qt.AlignmentFlag.AlignTop
+        )
+        layout.addLayout(self._standby_hint_row)
+        
         # Buttons
         button_layout = QHBoxLayout()
         buttons_config = dialog_config.get('buttons', {})
@@ -517,8 +548,23 @@ class BulkAnalysisDialog(QDialog):
             self.cancel_button.clicked.disconnect()
             self.cancel_button.clicked.connect(self.accept)
         else:
-            # Check if this is a cancellation
-            if "cancelled" in message.lower():
+            stop_reason = self.controller.last_stop_reason()
+            messages = bulk_analysis_dialog_messages(self.config)
+            if stop_reason == "incomplete_analysis":
+                title = messages["incomplete_analysis_title"]
+                body = message.replace("\n", "<br>")
+                status_message = f"Bulk Analysis: {title}"
+                self.status_label.setText(title)
+                from app.views.dialogs.message_dialog import MessageDialog
+                dialog = MessageDialog(
+                    self.config,
+                    title,
+                    body,
+                    message_type="warning",
+                    parent=self,
+                )
+                dialog.exec()
+            elif "cancelled" in message.lower() or stop_reason == "user_cancel":
                 status_message = "Bulk Analysis: Cancelled by user"
                 self.status_label.setText("Cancelled by user")
             else:
@@ -570,6 +616,48 @@ class BulkAnalysisDialog(QDialog):
             self.controller.hide_progress()
         
         self.reject()
+
+    def _apply_standby_hint_style(self, dialog_config: Dict[str, Any], font_family: str) -> None:
+        """Style the standby hint like progress status (smaller, secondary colour)."""
+        if not hasattr(self, "standby_hint"):
+            return
+        from app.utils.font_utils import scale_font_size
+
+        progress_config = dialog_config.get("progress", {})
+        hint_font_size = scale_font_size(progress_config.get("status_font_size", 10))
+        hint_text_color = progress_config.get("status_text_color", [150, 150, 150])
+        self.standby_hint.setStyleSheet(
+            f"font-family: {font_family}; "
+            f"font-size: {hint_font_size}pt; "
+            f"color: rgb({hint_text_color[0]}, {hint_text_color[1]}, {hint_text_color[2]});"
+            f"margin: 0px;"
+            f"padding: 0px;"
+        )
+
+        hint_cfg = dialog_config.get("standby_hint") or {}
+        if hasattr(self, "_standby_hint_row"):
+            try:
+                self._standby_hint_row.setSpacing(int(hint_cfg.get("icon_text_spacing", 6)))
+            except (TypeError, ValueError):
+                self._standby_hint_row.setSpacing(6)
+        if not hasattr(self, "standby_hint_icon"):
+            return
+        try:
+            icon_size = max(8, int(hint_cfg.get("icon_size", 16)))
+        except (TypeError, ValueError):
+            icon_size = 16
+        icon_svg = str(hint_cfg.get("icon_svg") or SVG_MENU_EXCLAMATION)
+        tint = hint_cfg.get("icon_tint_rgb") or hint_text_color
+        if not isinstance(tint, (list, tuple)) or len(tint) < 3:
+            tint = hint_text_color
+        icon = themed_icon_from_svg(icon_svg, tint)
+        self.standby_hint.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        fm = self.standby_hint.fontMetrics()
+        # Sit the icon on the first line (cap-height), not the full wrapped block.
+        first_line_pad = max(0, (fm.ascent() - icon_size + fm.leading()) // 2)
+        self.standby_hint_icon.setContentsMargins(0, first_line_pad, 0, 0)
+        self.standby_hint_icon.setFixedSize(icon_size, icon_size + first_line_pad)
+        self.standby_hint_icon.setPixmap(icon.pixmap(QSize(icon_size, icon_size)))
     
     def _apply_styling(self) -> None:
         """Apply styling to UI elements based on configuration."""
@@ -605,7 +693,11 @@ class BulkAnalysisDialog(QDialog):
         )
         
         for label in self.findChildren(QLabel):
+            if label.objectName() in ("bulk_standby_hint", "bulk_standby_hint_icon"):
+                continue
             label.setStyleSheet(label_style)
+
+        self._apply_standby_hint_style(dialog_config, label_font_family)
         
         # Group box styling - use StyleManager
         groups_config = dialog_config.get('groups', {})

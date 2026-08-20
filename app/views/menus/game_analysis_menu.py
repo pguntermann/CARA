@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PyQt6.QtGui import QAction, QKeySequence
-from PyQt6.QtWidgets import QMenuBar, QMenu
+from PyQt6.QtWidgets import QMenuBar
 
 from app.services.game_auto_tagging_service import AUTO_TAGS
 from app.utils.keyboard_shortcuts_catalog import mark_shortcuts_excluded
@@ -77,7 +77,7 @@ def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
     game_analysis_menu.addAction(mw.auto_game_tagging_action)
 
     # Select which auto-tags/rules are applied
-    mw.select_auto_tags_menu = QMenu("Select Tags for Auto-Tagging", game_analysis_menu)
+    mw.select_auto_tags_menu = game_analysis_menu.addMenu("Select Tags for Auto-Tagging")
     mark_shortcuts_excluded(mw.select_auto_tags_menu)
     mw._apply_menu_styling(mw.select_auto_tags_menu)
     mw.auto_game_tagging_tag_actions = {}
@@ -89,7 +89,6 @@ def setup_game_analysis_menu(mw, menu_bar: QMenuBar) -> None:
         mw.select_auto_tags_menu.addAction(act)
         mw.auto_game_tagging_tag_actions[tag] = act
     mw.select_auto_tags_menu.setEnabled(True)
-    game_analysis_menu.addMenu(mw.select_auto_tags_menu)
 
     mw.update_move_quality_nags_action = QAction("Update move quality NAGs in PGN", mw)
     mw.update_move_quality_nags_action.setCheckable(True)

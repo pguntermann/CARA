@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PyQt6.QtGui import QAction, QKeySequence
-from PyQt6.QtWidgets import QMenu, QMenuBar
+from PyQt6.QtWidgets import QMenuBar
 
 from app.utils.themed_icon import (
     SVG_MENU_LAYERS,
@@ -26,11 +26,10 @@ def setup_file_menu(mw, menu_bar: QMenuBar) -> None:
     mw.open_pgn_database_action.triggered.connect(mw._open_pgn_database)
     file_menu.addAction(mw.open_pgn_database_action)
 
-    mw.open_recent_menu = QMenu("Open Recent", mw)
+    mw.open_recent_menu = file_menu.addMenu("Open Recent")
     mark_shortcuts_excluded(mw.open_recent_menu)
     mw._apply_menu_styling(mw.open_recent_menu)
     mw.open_recent_menu.aboutToShow.connect(mw._rebuild_open_recent_menu)
-    file_menu.addMenu(mw.open_recent_menu)
 
     file_menu.addSeparator()
 

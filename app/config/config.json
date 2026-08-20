@@ -280,7 +280,11 @@
             "formula": "max(1, min(12, cpu_count - reserved_cores))"
           },
           "update_interval_ms": 100,
-          "max_depth": null
+          "max_depth": null,
+          "overflow_hint": {
+            "marker": "<",
+            "message": "Enlarge to reveal additional options"
+          }
         },
         "opening_explorer": {
           "enabled": true,
@@ -397,6 +401,15 @@
           "max_progress_cap": 99.9999,
           "decimal_precision": 4,
           "percent_label_min_width": 80
+        },
+        "integrity_check": {
+          "max_missing_best_moves": 0
+        },
+        "messages": {
+          "cancelled_by_user": "Analysis cancelled by user",
+          "incomplete_analysis_title": "Incomplete analysis results",
+          "incomplete_analysis": "Bulk Analysis has been aborted due to a failed integrity check (incomplete analysis results).<br><br>The integrity check failed on <b>{game_label}</b>.<br><br>This can happen, if the operating system went into stand-by mode or similar circumstances leading to the UCI engine not providing complete results. Games which successfully completed remain analyzed, so you can resume bulk analysis by running it again and leaving the <b>Re-analyze already analyzed games</b> checkmark unchecked.",
+          "standby_warning": "It is advisable to deactivate standby and power-saving mode in the host operating system during analysis. This is especially relevant if the computer is not plugged in and is running on battery."
         }
       },
       "engine_validation_messages": {
@@ -1052,6 +1065,7 @@
     "show_debug_menu": false,
     "enable_debug_rand_colors": false,
     "enable_debug_backgrounds": false,
+    "dump_bulkanalysis_integrity_fail": false,
     "background_color_debug_mainpanel": [
       255,
       200,

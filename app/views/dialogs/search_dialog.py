@@ -1052,7 +1052,7 @@ class SearchDialog(QDialog):
         self.dialog_width = dialog_config.get("width", 800)
         self.dialog_minimum_width = dialog_config.get("minimum_width")
         self.dialog_minimum_height = dialog_config.get("minimum_height")
-        self.bottom_button_top_padding = dialog_config.get("bottom_button_top_padding", 50)
+        self.bottom_button_top_padding = dialog_config.get("bottom_button_top_padding", 25)
         self.criteria_scroll_area_height = max(1, int(dialog_config.get("scroll_area_height", 250)))
         
         # Background color

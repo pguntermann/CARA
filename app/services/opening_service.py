@@ -503,6 +503,22 @@ class OpeningService:
             return (display.eco, display.name)
         return (None, None)
 
+    def last_named_opening_from_fens(
+        self, fens: Sequence[str]
+    ) -> Optional[Tuple[OpeningDisplay, str]]:
+        """Last curated opening among ``fens``, scanning from the end.
+
+        Returns ``(display, fen)`` for that named book ply. Callers must not
+        reimplement last-row / ``*`` scans on move tables.
+        """
+        if not self._loaded:
+            self.load()
+        for fen in reversed(list(fens)):
+            display = self.lookup_opening_display(fen)
+            if display:
+                return (display, fen)
+        return None
+
     def last_opening_from_fens(
         self, fens: Sequence[str]
     ) -> Optional[OpeningDisplay]:
@@ -512,17 +528,21 @@ class OpeningService:
         named book position. Callers must not reimplement last-row / ``*``
         scans on move tables.
         """
-        if not self._loaded:
-            self.load()
-        for fen in reversed(list(fens)):
-            display = self.lookup_opening_display(fen)
-            if display:
-                return display
-        return None
+        hit = self.last_named_opening_from_fens(fens)
+        return hit[0] if hit else None
+
+    def last_named_opening_for_pgn(
+        self, pgn: str
+    ) -> Optional[Tuple[OpeningDisplay, str]]:
+        """Last curated opening on the PGN main line, with that ply's FEN."""
+        return self.last_named_opening_from_fens(
+            self._mainline_fens_after_each_move(pgn)
+        )
 
     def last_opening_for_pgn(self, pgn: str) -> Optional[OpeningDisplay]:
         """Last curated opening on the PGN main line."""
-        return self.last_opening_from_fens(self._mainline_fens_after_each_move(pgn))
+        hit = self.last_named_opening_for_pgn(pgn)
+        return hit[0] if hit else None
 
     def _mainline_fens_after_each_move(self, pgn: str) -> List[str]:
         """FENs after each mainline ply. Empty if the PGN cannot be parsed."""

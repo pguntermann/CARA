@@ -361,9 +361,34 @@
         "handle_hover_color": {
           "$ref": "$_COLOR_SCROLLBAR_HANDLE_HOVER"
         },
+        "hover_handle_color": {
+          "$ref": "$_COLOR_SCROLLBAR_HANDLE_HOVER"
+        },
         "border_radius": 3,
         "min_height": 20,
-        "add_line_height": 0
+        "add_line_height": 0,
+        "grab_margin": 4,
+        "hover_handle_width_extra": 4
+      },
+      "tab_bar_scroll_buttons": {
+        "background_color": {
+          "$ref": "$_COLOR_SCROLLBAR_BUTTON_COLOR"
+        },
+        "hover_background_color": [
+          160,
+          162,
+          170
+        ],
+        "pressed_background_color": [
+          148,
+          150,
+          158
+        ],
+        "icon_svg_path": "app/resources/icons/tab_scroll/light",
+        "scroller_width": 32,
+        "arrow_width": 20,
+        "arrow_height": 16,
+        "border_radius": 0
       },
       "checkbox": {
         "spacing": 5,
@@ -2831,6 +2856,19 @@
               "$ref": "$_COLOR_BACKGROUND_PRIMARY"
             }
           },
+          "overflow_hint": {
+            "color": {
+              "$ref": "$_COLOR_TEXT_4"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "marker_font_size": {
+              "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+            },
+            "spacing": 6,
+            "message_min_width": 100
+          },
           "info_bar": {
             "margins": [
               8,
@@ -3459,6 +3497,7 @@
         },
         "splitter": {
           "pgn_height": 200,
+          "pgn_collapsed_height": 0,
           "tabs_height": 300,
           "pgn_stretch_factor": 2,
           "tabs_stretch_factor": 3
@@ -3990,7 +4029,7 @@
     "dialogs": {
       "manage_game_tags": {
         "width": 600,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "scroll_area_height": 120,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
@@ -4113,7 +4152,7 @@
       },
       "classification_settings": {
         "width": 920,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -4248,7 +4287,7 @@
       "move_quality_nag_mapping": {
         "window_title": "Move Quality NAG Mapping",
         "width": 560,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -4358,7 +4397,7 @@
       },
       "ai_model_settings": {
         "width": 600,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "form_label_min_width": 180,
         "password_reveal_icon_tint_color": {
           "$ref": "$_COLOR_BUTTON_ACTIVE_BACKGROUND"
@@ -4457,7 +4496,7 @@
       },
       "engine_configuration": {
         "width": 620,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -4799,7 +4838,7 @@
       },
       "engine_dialog": {
         "width": 550,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -4905,7 +4944,7 @@
         "height": 480,
         "minimum_width": 520,
         "minimum_height": 420,
-        "bottom_button_top_padding": 18,
+        "bottom_button_top_padding": 25,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -4992,7 +5031,7 @@
       "bulk_operations": {
         "width": 640,
         "scroll_area_height": 150,
-        "bottom_button_top_padding": 28,
+        "bottom_button_top_padding": 25,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -5199,7 +5238,7 @@
       },
       "move_comment": {
         "width": 500,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "minimum_width": 440,
         "minimum_height": 370,
         "background_color": {
@@ -5292,7 +5331,7 @@
         "max_height": 640,
         "minimum_width": 520,
         "minimum_height": 360,
-        "bottom_button_top_padding": 24,
+        "bottom_button_top_padding": 25,
         "thumbnail_max_width": 160,
         "thumbnail_max_height": 220,
         "thumbnail_max_height_dual": 160,
@@ -5705,7 +5744,7 @@
         "window_title": "Report feedback",
         "width": 500,
         "minimum_height": 400,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -5803,7 +5842,7 @@
       },
       "search": {
         "width": 800,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "scroll_area_height": 250,
         "minimum_width": 700,
         "minimum_height": 500,
@@ -5934,7 +5973,7 @@
       },
       "import_games": {
         "width": 550,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -6039,7 +6078,7 @@
       },
       "bulk_analysis_dialog": {
         "width": 600,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -6148,11 +6187,19 @@
         "spinboxes": {
           "parallel_movetime_width": 104,
           "max_threads_min_width": 128
+        },
+        "standby_hint": {
+          "icon_svg": "app/resources/icons/menu_exclamation.svg",
+          "icon_size": 16,
+          "icon_text_spacing": 6,
+          "icon_tint_rgb": {
+            "$ref": "$_COLOR_TEXT_4"
+          }
         }
       },
       "confirmation_dialog": {
         "width": 420,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "minimum_height": 150,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
@@ -6201,7 +6248,7 @@
       "message_dialog": {
         "width": 420,
         "max_width": 600,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "minimum_height": 150,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
@@ -6252,7 +6299,7 @@
       },
       "input_dialog": {
         "width": 420,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "minimum_height": 220,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
@@ -6329,7 +6376,7 @@
         "height": 560,
         "minimum_width": 620,
         "minimum_height": 420,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -6509,7 +6556,7 @@
         "height": 560,
         "minimum_width": 720,
         "minimum_height": 520,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "priority_min": 0,
         "priority_max": 100,
         "background_color": {
@@ -6684,7 +6731,7 @@
 
       "add_tag_dialog": {
         "width": 420,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "minimum_width": 380,
         "minimum_height": 180,
         "background_color": {
@@ -6766,7 +6813,7 @@
       },
       "annotation_preferences": {
         "width": 520,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "minimum_width": 480,
         "minimum_height": 340,
         "background_color": {
@@ -6872,7 +6919,7 @@
       },
       "deduplication_criteria": {
         "width": 600,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -6973,7 +7020,7 @@
       },
       "about_dialog": {
         "width": 550,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -7097,7 +7144,7 @@
         "height": 500,
         "minimum_width": 500,
         "minimum_height": 400,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },
@@ -7208,7 +7255,7 @@
         "height": 600,
         "minimum_width": 600,
         "minimum_height": 400,
-        "bottom_button_top_padding": 50,
+        "bottom_button_top_padding": 25,
         "background_color": {
           "$ref": "$_COLOR_BACKGROUND_PRIMARY"
         },

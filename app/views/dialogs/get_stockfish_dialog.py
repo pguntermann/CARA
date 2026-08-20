@@ -95,7 +95,7 @@ class GetStockfishDialog(QDialog):
         self.dialog_width = int(dialog_config.get("width", 560))
         self.dialog_height = int(dialog_config.get("height", 480))
         self.bottom_button_top_padding = int(
-            dialog_config.get("bottom_button_top_padding", 18)
+            dialog_config.get("bottom_button_top_padding", 25)
         )
         self.dialog_bg = dialog_config.get("background_color", [40, 40, 45])
         self.dialog_border = dialog_config.get("border_color", [60, 60, 65])

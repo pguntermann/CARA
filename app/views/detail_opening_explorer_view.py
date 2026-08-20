@@ -481,7 +481,9 @@ class DetailOpeningExplorerView(QWidget):
             "encyclopedia_link_tooltip": self._encyclopedia_link_tooltip,
         }
 
-    def _encyclopedia_for_display(self, display: Optional[OpeningDisplay]):
+    def _encyclopedia_for_display(
+        self, display: Optional[OpeningDisplay], fen: Optional[str] = None
+    ):
         if (
             not self._encyclopedia_link_enabled
             or display is None
@@ -489,10 +491,14 @@ class DetailOpeningExplorerView(QWidget):
             or display is OPENING_STARTING
         ):
             return None
-        return self._encyclopedia_service.lookup(display.name, display.eco)
+        return self._encyclopedia_service.lookup(
+            display.name, display.eco, fen=fen
+        )
 
-    def _open_encyclopedia_entry(self, display: OpeningDisplay) -> None:
-        entry = self._encyclopedia_for_display(display)
+    def _open_encyclopedia_entry(
+        self, display: OpeningDisplay, fen: Optional[str] = None
+    ) -> None:
+        entry = self._encyclopedia_for_display(display, fen=fen)
         if entry is None:
             return
         OpeningEncyclopediaDialog.show_entry(
@@ -507,14 +513,17 @@ class DetailOpeningExplorerView(QWidget):
         display: Optional[OpeningDisplay],
         *,
         colors: Dict[str, Any],
+        fen: Optional[str] = None,
     ) -> Optional[QToolButton]:
-        entry = self._encyclopedia_for_display(display)
+        entry = self._encyclopedia_for_display(display, fen=fen)
         if entry is None or display is None:
             return None
         return _make_encyclopedia_button(
             colors=colors,
             tooltip=self._encyclopedia_link_tooltip,
-            on_click=lambda checked=False, d=display: self._open_encyclopedia_entry(d),
+            on_click=lambda checked=False, d=display, f=fen: self._open_encyclopedia_entry(
+                d, f
+            ),
         )
 
     def _setup_ui(self) -> None:
@@ -1103,6 +1112,7 @@ class DetailOpeningExplorerView(QWidget):
 
         info_btn = self._maybe_encyclopedia_button(
             step.display,
+            fen=step.fen,
             colors={
                 "text": self._text_color,
                 "muted": self._muted_color,
@@ -1251,7 +1261,9 @@ class DetailOpeningExplorerView(QWidget):
             board_size = self._mini_size if self._flow_boards else (
                 self._hero_size if is_current else self._mini_size
             )
-            encyclopedia_entry = self._encyclopedia_for_display(step.display)
+            encyclopedia_entry = self._encyclopedia_for_display(
+                step.display, fen=step.fen
+            )
             row = _OpeningStepRow(
                 config=self.config,
                 explorer_cfg=self._explorer_config(),
@@ -1271,7 +1283,7 @@ class DetailOpeningExplorerView(QWidget):
                 ),
                 encyclopedia_display=step.display if encyclopedia_entry is not None else None,
                 on_encyclopedia=(
-                    (lambda d=step.display: self._open_encyclopedia_entry(d))
+                    (lambda d=step.display, f=step.fen: self._open_encyclopedia_entry(d, f))
                     if encyclopedia_entry is not None
                     else None
                 ),
@@ -1595,7 +1607,7 @@ class _ContinuationNode(QWidget):
         played_next_label: str = "Played next →",
         on_expand_changed: Optional[Callable[["_ContinuationNode", bool], None]] = None,
         encyclopedia_service: Optional[OpeningEncyclopediaService] = None,
-        on_encyclopedia: Optional[Callable[[OpeningDisplay], None]] = None,
+        on_encyclopedia: Optional[Callable[[OpeningDisplay, Optional[str]], None]] = None,
     ) -> None:
         super().__init__()
         self._config = config
@@ -1742,13 +1754,17 @@ class _ContinuationNode(QWidget):
             colors.get("encyclopedia_link_enabled", True)
             and encyclopedia_service is not None
             and on_encyclopedia is not None
-            and encyclopedia_service.has_entry(continuation.display.name, continuation.display.eco)
+            and encyclopedia_service.has_entry(
+                continuation.display.name,
+                continuation.display.eco,
+                fen=continuation.fen_after,
+            )
         ):
             h.addWidget(
                 _make_encyclopedia_button(
                     colors=colors,
                     tooltip=str(colors.get("encyclopedia_link_tooltip", "Opening encyclopedia")),
-                    on_click=lambda checked=False, d=continuation.display: on_encyclopedia(d),
+                    on_click=lambda checked=False, d=continuation.display, f=continuation.fen_after: on_encyclopedia(d, f),
                 ),
                 0,
                 Qt.AlignmentFlag.AlignVCenter,

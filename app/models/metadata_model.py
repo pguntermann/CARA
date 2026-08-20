@@ -88,7 +88,7 @@ class MetadataModel(QAbstractTableModel):
         is_standard_tag = name in self._standard_tags
         
         # Handle different roles
-        if role == Qt.ItemDataRole.DisplayRole:
+        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
             if col == self.COL_NAME:
                 return name
             elif col == self.COL_VALUE:

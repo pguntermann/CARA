@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QFont
@@ -33,6 +33,7 @@ class MainGameInfoView(QWidget):
         self._encyclopedia = OpeningEncyclopediaService.get_instance(config)
         self._current_eco = ""
         self._current_name = ""
+        self._current_fen = ""
         self._encyclopedia_openable = False
         self._setup_ui()
         self._refresh_encyclopedia_openable(emit=True)
@@ -231,15 +232,17 @@ class MainGameInfoView(QWidget):
 
         self.result_label.setText(display_result)
 
-    def set_opening(self, eco: str, name: str) -> None:
+    def set_opening(self, eco: str, name: str, fen: Optional[str] = None) -> None:
         """Set opening ECO code and name.
 
         Args:
             eco: ECO code (e.g., "A00").
             name: Opening name (e.g., "Unknown Opening").
+            fen: Last named eco-book FEN, when known.
         """
         self._current_eco = eco or ""
         self._current_name = name or ""
+        self._current_fen = (fen or "").strip()
         self.opening_label.setText(f"{eco} - {name}")
         self._refresh_encyclopedia_openable(emit=True)
         self._update_encyclopedia_button()
@@ -259,7 +262,9 @@ class MainGameInfoView(QWidget):
             return False
         if self._current_name in (OPENING_UNKNOWN.name, OPENING_STARTING.name):
             return False
-        return self._encyclopedia.has_entry(self._current_name, self._current_eco)
+        return self._encyclopedia.has_entry(
+            self._current_name, self._current_eco, fen=self._current_fen or None
+        )
 
     def _refresh_encyclopedia_openable(self, *, emit: bool) -> None:
         openable = self._compute_encyclopedia_openable()
@@ -290,7 +295,9 @@ class MainGameInfoView(QWidget):
         """Open the encyclopedia for the current opening (same as the info button)."""
         if not self.is_encyclopedia_openable():
             return
-        entry = self._encyclopedia.lookup(self._current_name, self._current_eco)
+        entry = self._encyclopedia.lookup(
+            self._current_name, self._current_eco, fen=self._current_fen or None
+        )
         if entry is None:
             return
         OpeningEncyclopediaDialog.show_entry(

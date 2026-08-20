@@ -97,7 +97,15 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
 
     view_menu.addSeparator()
 
+    mw.view_hide_pgn_pane_action = QAction("Hide PGN Pane", mw)
+    mw.view_hide_pgn_pane_action.setShortcut(QKeySequence("Ctrl+Shift+Up"))
+    mw.view_hide_pgn_pane_action.setCheckable(True)
+    mw.view_hide_pgn_pane_action.setChecked(False)
+    mw.view_hide_pgn_pane_action.triggered.connect(mw._toggle_pgn_pane)
+    view_menu.addAction(mw.view_hide_pgn_pane_action)
+
     mw.view_hide_database_panel_action = QAction("Hide Database Panel", mw)
+    mw.view_hide_database_panel_action.setShortcut(QKeySequence("Ctrl+Shift+Down"))
     mw.view_hide_database_panel_action.setCheckable(True)
     mw.view_hide_database_panel_action.setChecked(False)
     mw.view_hide_database_panel_action.triggered.connect(mw._toggle_database_panel)

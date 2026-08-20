@@ -2,7 +2,8 @@
 
 Main-line moves and comments are tagged with stable ``href`` anchors
 (``cara-ply:N`` / ``cara-cmt:N``) so the PGN view can build a one-way
-plaintext range map after ``setHtml``.
+plaintext range map after ``setHtml``. Sideline moves use ``cara-path:``;
+sideline comments use ``cara-pcmt:``.
 """
 
 import re
@@ -18,6 +19,7 @@ from app.services.logging_service import LoggingService
 PGN_PLY_HREF_PREFIX = "cara-ply:"
 PGN_COMMENT_HREF_PREFIX = "cara-cmt:"
 PGN_PATH_HREF_PREFIX = "cara-path:"
+PGN_PATH_COMMENT_HREF_PREFIX = "cara-pcmt:"
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,7 @@ class PgnRangeMap:
     moves: Tuple[PgnTextRange, ...] = ()
     comments: Tuple[PgnTextRange, ...] = ()
     path_moves: Tuple[PgnPathRange, ...] = ()
+    path_comments: Tuple[PgnPathRange, ...] = ()
 
     def move_ply_at(self, position: int) -> int:
         for item in self.moves:
@@ -60,6 +63,12 @@ class PgnRangeMap:
 
     def path_at(self, position: int) -> Optional[Tuple[int, ...]]:
         for item in self.path_moves:
+            if item.start <= position < item.end:
+                return item.path
+        return None
+
+    def path_comment_at(self, position: int) -> Optional[Tuple[int, ...]]:
+        for item in self.path_comments:
             if item.start <= position < item.end:
                 return item.path
         return None
@@ -95,6 +104,13 @@ def path_href(path: Sequence[int]) -> str:
     return f"{PGN_PATH_HREF_PREFIX}{encode_path(path)}"
 
 
+def path_comment_href(path: Sequence[int]) -> str:
+    """Return the HTML href for a variation-path comment."""
+    from app.utils.pgn_variation_path import encode_path
+
+    return f"{PGN_PATH_COMMENT_HREF_PREFIX}{encode_path(path)}"
+
+
 def parse_ply_href(href: str) -> Optional[int]:
     if not href or not href.startswith(PGN_PLY_HREF_PREFIX):
         return None
@@ -123,6 +139,14 @@ def parse_path_href(href: str) -> Optional[Tuple[int, ...]]:
     return decode_path(href[len(PGN_PATH_HREF_PREFIX) :])
 
 
+def parse_path_comment_href(href: str) -> Optional[Tuple[int, ...]]:
+    if not href or not href.startswith(PGN_PATH_COMMENT_HREF_PREFIX):
+        return None
+    from app.utils.pgn_variation_path import decode_path
+
+    return decode_path(href[len(PGN_PATH_COMMENT_HREF_PREFIX) :])
+
+
 def _end_of_anchor_element(text: str, start: int) -> Optional[int]:
     """If ``text[start:]`` begins with ``<a ...>``, return index after matching ``</a>``."""
     if start < 0 or start >= len(text) or not text.startswith("<a", start):
@@ -143,6 +167,7 @@ def build_pgn_range_map_from_fragments(
     moves: List[PgnTextRange] = []
     comments: List[PgnTextRange] = []
     path_moves: List[PgnPathRange] = []
+    path_comments: List[PgnPathRange] = []
     for start, length, href in fragments:
         if length <= 0:
             continue
@@ -154,14 +179,22 @@ def build_pgn_range_map_from_fragments(
         if cply is not None:
             comments.append(PgnTextRange(ply=cply, start=start, end=start + length))
             continue
+        cpath = parse_path_comment_href(href)
+        if cpath is not None:
+            path_comments.append(PgnPathRange(path=cpath, start=start, end=start + length))
+            continue
         path = parse_path_href(href)
         if path is not None:
             path_moves.append(PgnPathRange(path=path, start=start, end=start + length))
     moves.sort(key=lambda r: (r.ply, r.start))
     comments.sort(key=lambda r: (r.start, r.ply))
     path_moves.sort(key=lambda r: (r.start, r.path))
+    path_comments.sort(key=lambda r: (r.start, r.path))
     return PgnRangeMap(
-        moves=tuple(moves), comments=tuple(comments), path_moves=tuple(path_moves)
+        moves=tuple(moves),
+        comments=tuple(comments),
+        path_moves=tuple(path_moves),
+        path_comments=tuple(path_comments),
     )
 
 
@@ -1285,6 +1318,64 @@ class PgnFormatterService:
         if mainline_ply <= 0:
             return None
         return mainline_ply
+
+    @staticmethod
+    def _comment_brace_is_in_variation(
+        formatted: str, open_brace_idx: int, header_color: Tuple[int, int, int]
+    ) -> bool:
+        """True when ``{`` at ``open_brace_idx`` sits inside a PGN parenthesis."""
+        if open_brace_idx < 0 or open_brace_idx >= len(formatted) or formatted[open_brace_idx] != "{":
+            return False
+        header_marker = f"color: rgb({header_color[0]}, {header_color[1]}, {header_color[2]})"
+        i = 0
+        in_header_span = False
+        pgn_comment_depth = 0
+        var_depth = 0
+        limit = open_brace_idx
+        while i < limit:
+            c = formatted[i]
+            if c == "<":
+                if i + 7 <= len(formatted) and formatted[i : i + 7] == "</span>":
+                    if in_header_span:
+                        in_header_span = False
+                    i += 7
+                    continue
+                tag_end = formatted.find(">", i)
+                if tag_end == -1:
+                    i += 1
+                    continue
+                tag = formatted[i : tag_end + 1]
+                if tag.startswith("<span") and header_marker in tag:
+                    in_header_span = True
+                i = tag_end + 1
+                continue
+            if in_header_span:
+                i += 1
+                continue
+            if pgn_comment_depth > 0:
+                if c == "{":
+                    pgn_comment_depth += 1
+                elif c == "}":
+                    pgn_comment_depth -= 1
+                i += 1
+                continue
+            if c == "{":
+                pgn_comment_depth = 1
+                i += 1
+                continue
+            if var_depth > 0:
+                if c == "(":
+                    var_depth += 1
+                elif c == ")":
+                    var_depth -= 1
+                i += 1
+                continue
+            if c == "(":
+                var_depth += 1
+                i += 1
+                continue
+            i += 1
+        return var_depth > 0
     
     @staticmethod
     def format_pgn_to_html(
@@ -1469,6 +1560,17 @@ class PgnFormatterService:
         comments_config = formatting.get('comments', {})
         comment_color = comments_config.get('color', [180, 200, 255])
         comment_italic = comments_config.get('italic', True)
+
+        parsed_game = None
+        try:
+            parsed_game = chess.pgn.read_game(io.StringIO(pgn_text))
+        except Exception:
+            parsed_game = None
+        variation_comment_queue: List[Tuple[int, ...]] = []
+        if parsed_game is not None:
+            from app.utils.pgn_variation_path import collect_variation_comment_paths
+
+            variation_comment_queue = list(collect_variation_comment_paths(parsed_game))
         
         # Build formatted text while processing comments
         result_parts = []
@@ -1529,6 +1631,25 @@ class PgnFormatterService:
                                 inner = styled_anchor(
                                     comment_text,
                                     comment_href(ply_own),
+                                    comment_color,
+                                    italic=comment_italic,
+                                )
+                                result_parts.append(
+                                    f'<span style="color: rgb({comment_color[0]}, {comment_color[1]}, {comment_color[2]})">'
+                                    f"{inner}</span>"
+                                )
+                            elif (
+                                variation_comment_queue
+                                and PgnFormatterService._comment_brace_is_in_variation(
+                                    formatted,
+                                    start,
+                                    (int(header_color[0]), int(header_color[1]), int(header_color[2])),
+                                )
+                            ):
+                                vpath = variation_comment_queue.pop(0)
+                                inner = styled_anchor(
+                                    comment_text,
+                                    path_comment_href(vpath),
                                     comment_color,
                                     italic=comment_italic,
                                 )
@@ -1678,14 +1799,10 @@ class PgnFormatterService:
         # NAG text is already styled above, so variation formatter will skip it
         # Build sideline path queue (PGN order) so variation SANs can get cara-path anchors.
         variation_path_queue: List[Tuple[Tuple[int, ...], str]] = []
-        try:
-            parsed_game = chess.pgn.read_game(io.StringIO(pgn_text))
-            if parsed_game is not None:
-                from app.utils.pgn_variation_path import collect_variation_move_paths
+        if parsed_game is not None:
+            from app.utils.pgn_variation_path import collect_variation_move_paths
 
-                variation_path_queue = list(collect_variation_move_paths(parsed_game))
-        except Exception:
-            variation_path_queue = []
+            variation_path_queue = list(collect_variation_move_paths(parsed_game))
 
         formatted = PgnFormatterService._format_variations_with_moves(
             formatted,
@@ -2174,16 +2291,11 @@ class PgnFormatterService:
                 last_match = matches2[-1]
                 pos = last_match.end(1)
                 return text[:pos] + '<br>' + text[pos:]
-            
-            # Additional fallback: any </span> followed by move number span (in case headers don't have ])
-            pattern3 = r'(</span>)(\s*)(<span[^>]*>)(\s*)(\d+\.)'
-            matches3 = list(re.finditer(pattern3, text))
-            if matches3:
-                # Use the LAST match
-                last_match = matches3[-1]
-                pos = last_match.end(1)
-                return text[:pos] + '<br>' + text[pos:]
-            
+
+            # Do not match a generic </span> + move-number span. After variations are
+            # styled, that pattern hits the opening '(' span (especially when metadata
+            # is hidden and indent puts a <br> after ')'), and inserts a line break
+            # between '(' and the first sideline move.
             return text
         
         formatted = add_break_after_last_tag(formatted)
@@ -2409,11 +2521,24 @@ class PgnFormatterService:
                             # Format the closing parenthesis with variation styling
                             result_parts.append(span_func(')', variation_color, italic=variation_italic))
 
-                            if indent_variations:
-                                # Put following mainline on its own line after a top-level sideline.
-                                result_parts.append('<br>')
-                            
                             i = end
+                            if indent_variations:
+                                # One break between sibling sidelines (not after+before = blank line).
+                                # After the last sibling, break so the mainline resumes on its own line.
+                                k = end
+                                while k < len(formatted) and formatted[k] in ' \t\n\r':
+                                    k += 1
+                                next_is_sibling = False
+                                if k < len(formatted) and formatted[k] == '(':
+                                    j = k + 1
+                                    while j < len(formatted) and formatted[j] in ' \t':
+                                        j += 1
+                                    next_is_sibling = j < len(formatted) and formatted[j].isdigit()
+                                if next_is_sibling:
+                                    i = k
+                                else:
+                                    result_parts.append('<br>')
+
                             found_end = True
                             break
                         else:

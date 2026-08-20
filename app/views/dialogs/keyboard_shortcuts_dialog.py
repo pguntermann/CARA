@@ -326,7 +326,7 @@ class KeyboardShortcutsDialog(QDialog):
         self.dialog_minimum_width = int(dialog_config.get("minimum_width", 620))
         self.dialog_minimum_height = int(dialog_config.get("minimum_height", 420))
         self.bottom_button_top_padding = int(
-            dialog_config.get("bottom_button_top_padding", 50)
+            dialog_config.get("bottom_button_top_padding", 25)
         )
 
         self.bg_color = dialog_config.get("background_color", [40, 40, 45])

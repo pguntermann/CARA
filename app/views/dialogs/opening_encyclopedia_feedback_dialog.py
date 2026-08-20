@@ -109,7 +109,7 @@ class OpeningEncyclopediaFeedbackDialog(QDialog):
         self.dialog_width = int(dialog_config.get("width", 500))
         self.dialog_minimum_height = int(dialog_config.get("minimum_height", 420))
         self.bottom_button_top_padding = int(
-            dialog_config.get("bottom_button_top_padding", 50)
+            dialog_config.get("bottom_button_top_padding", 25)
         )
         self._min_description_chars = max(
             1, int(dialog_config.get("min_description_chars", 25))

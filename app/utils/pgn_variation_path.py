@@ -72,6 +72,35 @@ def parent_path(path: Sequence[int]) -> Path:
     return tuple(path[:-1])
 
 
+def sideline_fork(path: Sequence[int]) -> Optional[Tuple[Path, int]]:
+    """Innermost sideline fork: ``(parent_path, child_index)``, or ``None`` on the mainline."""
+    for i in range(len(path) - 1, -1, -1):
+        if int(path[i]) != 0:
+            return tuple(int(x) for x in path[:i]), int(path[i])
+    return None
+
+
+def remap_path_after_sideline_remove(
+    active: Sequence[int], parent: Sequence[int], removed_index: int
+) -> Path:
+    """Adjust ``active`` after deleting ``parent``'s child ``removed_index``.
+
+    Paths on the deleted branch snap to ``parent``. Later siblings at that
+    fork shift down by one.
+    """
+    active_path = tuple(int(i) for i in active)
+    parent_path = tuple(int(i) for i in parent)
+    n = len(parent_path)
+    if len(active_path) <= n or active_path[:n] != parent_path:
+        return active_path
+    child = active_path[n]
+    if child == int(removed_index):
+        return parent_path
+    if child > int(removed_index):
+        return parent_path + (child - 1,) + active_path[n + 1 :]
+    return active_path
+
+
 def strip_san_suffixes(san: str) -> str:
     """Drop annotation glyphs so formatter SANs can match tree SANs."""
     text = (san or "").strip()
@@ -126,6 +155,49 @@ def collect_variation_move_paths(game: chess.pgn.Game) -> List[Tuple[Path, str]]
             sib = node.variation(i)
             sib_path = path_after_move(path, i)
             out.append((sib_path, strip_san_suffixes(board.san(sib.move))))
+            continue_after_variation_move(sib, sib_path)
+        continue_mainline(main, main_path)
+
+    continue_mainline(game, ())
+    return out
+
+
+def collect_variation_comment_paths(game: chess.pgn.Game) -> List[Path]:
+    """Sideline comment braces in PGN export order (starting_comment, then comment).
+
+    Same visit order as ``collect_variation_move_paths``. Used to attach
+    ``cara-pcmt`` anchors while formatting variation comments.
+    """
+    out: List[Path] = []
+
+    def visit(node: chess.pgn.GameNode, path: Path) -> None:
+        if (getattr(node, "starting_comment", None) or "").strip():
+            out.append(path)
+        if (getattr(node, "comment", None) or "").strip():
+            out.append(path)
+
+    def continue_after_variation_move(node: chess.pgn.GameNode, path: Path) -> None:
+        if not node.variations:
+            return
+        main = node.variation(0)
+        main_path = path_after_move(path, 0)
+        visit(main, main_path)
+        for i in range(1, len(node.variations)):
+            sib = node.variation(i)
+            sib_path = path_after_move(path, i)
+            visit(sib, sib_path)
+            continue_after_variation_move(sib, sib_path)
+        continue_after_variation_move(main, main_path)
+
+    def continue_mainline(node: chess.pgn.GameNode, path: Path) -> None:
+        if not node.variations:
+            return
+        main = node.variation(0)
+        main_path = path_after_move(path, 0)
+        for i in range(1, len(node.variations)):
+            sib = node.variation(i)
+            sib_path = path_after_move(path, i)
+            visit(sib, sib_path)
             continue_after_variation_move(sib, sib_path)
         continue_mainline(main, main_path)
 

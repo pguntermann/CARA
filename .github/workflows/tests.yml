@@ -37,4 +37,5 @@ jobs:
           # Headless runners have no display; offscreen avoids xcb plugin abort.
           QT_QPA_PLATFORM: "offscreen"
         run: |
+          # tests/opening_integrity is local-only (skipped when CI=true).
           python -m unittest discover -s tests -p "test_*.py" -v

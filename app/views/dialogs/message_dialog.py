@@ -76,7 +76,7 @@ class MessageDialog(QDialog):
         message_padding_for_width = message_config.get('padding', 5) * 2
         min_width = dialog_config.get("width", 420)
         max_width = dialog_config.get("max_width", 600)
-        self.bottom_button_top_padding = dialog_config.get("bottom_button_top_padding", 50)
+        self.bottom_button_top_padding = dialog_config.get("bottom_button_top_padding", 25)
         self.dialog_minimum_height = dialog_config.get(
             "minimum_height", dialog_config.get("height", 150)
         )

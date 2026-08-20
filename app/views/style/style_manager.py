@@ -8,7 +8,9 @@ from app.views.style.scrollbar import (
     apply_scrollbar_styling,
     apply_table_scrollbar_styling,
     apply_table_view_scrollbar_styling,
-    apply_text_edit_scrollbar_styling
+    apply_list_widget_scrollbar_styling,
+    apply_text_edit_scrollbar_styling,
+    install_grab_friendly_scrollbars,
 )
 from app.views.style.checkbox import apply_checkbox_styling
 from app.views.style.combobox import apply_combobox_styling
@@ -20,6 +22,7 @@ from app.views.style.date_edit import apply_date_edit_styling
 from app.views.style.group_box import apply_group_box_styling
 from app.views.style.context_menu import apply_context_menu_styling
 from app.views.style.tree_view import apply_tree_view_styling
+from app.views.style.tab_bar import generate_tab_bar_scroll_button_stylesheet
 
 
 class StyleManager:
@@ -91,6 +94,19 @@ class StyleManager:
             table_style: Existing table stylesheet to append scrollbar styles to.
         """
         apply_table_view_scrollbar_styling(table_view, config, bg_color, border_color, table_style)
+
+    @staticmethod
+    def style_list_widget_scrollbar(
+        list_widget,
+        config: Dict[str, Any],
+        bg_color: List[int],
+        border_color: List[int],
+        list_style: str,
+    ) -> None:
+        """Apply scrollbar styling to a QListWidget (dropdowns, result lists)."""
+        apply_list_widget_scrollbar_styling(
+            list_widget, config, bg_color, border_color, list_style
+        )
     
     @staticmethod
     def style_text_edit_scrollbar(
@@ -760,4 +776,33 @@ class StyleManager:
             hover_text_color, item_padding, separator_height, separator_color,
             separator_margin
         )
+
+    @staticmethod
+    def tab_bar_scroll_button_qss(
+        config: Dict[str, Any],
+        background_color: Optional[List[int]] = None,
+    ) -> str:
+        """Return themed QSS for QTabBar overflow scroll buttons.
+
+        Args:
+            config: Configuration dictionary.
+            background_color: Optional plate color override (panel ``scroll_button_color``).
+        """
+        return generate_tab_bar_scroll_button_stylesheet(config, background_color)
+
+    @staticmethod
+    def install_grab_friendly_scrollbars(
+        widget,
+        config: Dict[str, Any],
+    ) -> None:
+        """Replace native scrollbars with grab-friendly custom scrollbars.
+
+        Provides an enlarged grab zone and a visual hover effect on the handle.
+        Safe to call repeatedly (reconfigures existing instances on theme switch).
+
+        Args:
+            widget: Any :class:`QAbstractScrollArea`.
+            config: Theme configuration dictionary.
+        """
+        install_grab_friendly_scrollbars(widget, config)
 

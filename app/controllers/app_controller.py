@@ -89,6 +89,7 @@ class AppController:
         
         # Initialize manual analysis controller first (depends on engine controller and game controller)
         self.manual_analysis_controller = ManualAnalysisController(config, self.engine_controller, self.game_controller)
+        self.manual_analysis_controller.set_database_controller(self.database_controller)
         
         # Initialize evaluation controller (depends on engine controller and manual analysis controller)
         self.evaluation_controller = EvaluationController(config, self.engine_controller, self.manual_analysis_controller)
@@ -1373,8 +1374,8 @@ class AppController:
                 "show_metadata": pgn_visibility.get('show_metadata', True),
                 "show_comments": pgn_visibility.get('show_comments', True),
                 "show_variations": pgn_visibility.get('show_variations', True),
-                "indent_variations": pgn_visibility.get('indent_variations', False),
-                "navigate_variations": pgn_visibility.get('navigate_variations', False),
+                "indent_variations": pgn_visibility.get('indent_variations', True),
+                "navigate_variations": pgn_visibility.get('navigate_variations', True),
                 "show_annotations": pgn_visibility.get('show_annotations', True),
                 "show_results": pgn_visibility.get('show_results', True),
                 "show_non_standard_tags": pgn_visibility.get('show_non_standard_tags', False)

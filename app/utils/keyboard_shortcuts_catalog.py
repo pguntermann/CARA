@@ -50,6 +50,8 @@ NAVIGATION_SHORTCUTS: Tuple[Tuple[str, str, str], ...] = (
     ("Navigation", "Next move", "Right"),
     ("Navigation", "Previous game", ""),
     ("Navigation", "Next game", ""),
+    ("Navigation", "First game", ""),
+    ("Navigation", "Last game", ""),
     ("Navigation", "Jump to start", "Shift+Left"),
     ("Navigation", "Jump to first move", ""),
     ("Navigation", "Jump to last move", "Shift+Right"),

@@ -58,13 +58,13 @@ def setup_pgn_menu(mw, menu_bar: QMenuBar) -> None:
 
     mw.indent_variations_action = QAction("Indent variations", mw)
     mw.indent_variations_action.setCheckable(True)
-    mw.indent_variations_action.setChecked(False)
+    mw.indent_variations_action.setChecked(True)
     mw.indent_variations_action.triggered.connect(mw._on_indent_variations_toggled)
     pgn_menu.addAction(mw.indent_variations_action)
 
     mw.navigate_variations_action = QAction("Enable navigating into variations", mw)
     mw.navigate_variations_action.setCheckable(True)
-    mw.navigate_variations_action.setChecked(False)
+    mw.navigate_variations_action.setChecked(True)
     mw.navigate_variations_action.triggered.connect(mw._on_navigate_variations_toggled)
     pgn_menu.addAction(mw.navigate_variations_action)
 

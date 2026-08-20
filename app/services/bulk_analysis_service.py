@@ -6,7 +6,7 @@ import chess
 import chess.pgn
 import time
 import threading
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple, Callable, Iterator
 from pathlib import Path
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
 
@@ -29,6 +29,11 @@ from app.utils.material_tracker import (
 )
 
 
+_BOOK_MOVE_ASSESSMENT = "Book Move"
+_BEST_MOVE_ASSESSMENT = "Best Move"
+_DEFAULT_MAX_MISSING_BEST_MOVES = 0
+
+
 class BulkAnalysisService(QObject):
     """Service for analyzing multiple games in bulk without making them active."""
     
@@ -40,7 +45,8 @@ class BulkAnalysisService(QObject):
                  brilliant_move_detection: bool = False,
                  auto_game_tagging: bool = True,
                  auto_game_tagging_enabled_tags: Optional[List[str]] = None,
-                 update_move_quality_nags: bool = False) -> None:
+                 update_move_quality_nags: bool = False,
+                 on_incomplete_analysis: Optional[Callable[["GameData"], None]] = None) -> None:
         """Initialize bulk analysis service.
         
         Args:
@@ -55,6 +61,8 @@ class BulkAnalysisService(QObject):
             auto_game_tagging: Whether to run auto-tagging after each game.
             auto_game_tagging_enabled_tags: Enabled auto-tag names.
             update_move_quality_nags: Whether to write quality NAGs into the PGN.
+            on_incomplete_analysis: Optional callback when a game fails the best-move integrity check.
+                Receives the ``GameData`` that failed.
         """
         super().__init__()
         self.config = config
@@ -70,6 +78,7 @@ class BulkAnalysisService(QObject):
         self._auto_game_tagging = bool(auto_game_tagging)
         self._auto_game_tagging_enabled_tags = list(auto_game_tagging_enabled_tags or [])
         self._update_move_quality_nags = bool(update_move_quality_nags)
+        self._on_incomplete_analysis = on_incomplete_analysis
         # Note: Opening service should be loaded before creating BulkAnalysisService instances
         # to avoid blocking during analysis. We don't load it here to avoid blocking worker threads.
         
@@ -186,6 +195,157 @@ class BulkAnalysisService(QObject):
         if self._engine_service:
             self._engine_service.cleanup()
             self._engine_service = None
+
+    @staticmethod
+    def format_game_label(game: Optional[GameData]) -> str:
+        """Short identity line for dialogs and logs, e.g. ``game Nr. 48 Kramnik - Carlsen 1-0 (...)``."""
+        if game is None:
+            return "game Nr. ? Unknown - Unknown * (????.??.?? - 0 moves)"
+        number = getattr(game, "game_number", None)
+        if number is None or number == "":
+            number = "?"
+        white = str(getattr(game, "white", "") or "").strip() or "Unknown"
+        black = str(getattr(game, "black", "") or "").strip() or "Unknown"
+        result = str(getattr(game, "result", "") or "").strip() or "*"
+        date = str(getattr(game, "date", "") or "").strip() or "????.??.??"
+        try:
+            moves = int(getattr(game, "moves", 0) or 0)
+        except (TypeError, ValueError):
+            moves = 0
+        return f"game Nr. {number} {white} - {black} {result} ({date} - {moves} moves)"
+
+    @staticmethod
+    def iter_integrity_plies(
+        moves_data: List[Dict[str, Any]],
+        analyzed_moves: List[MoveData],
+    ) -> Iterator[Dict[str, Any]]:
+        """Yield per-ply integrity rows (played SAN, assessment, best SAN, missing flag)."""
+        for move_info in moves_data:
+            move_number = int(move_info.get("move_number") or 0)
+            is_white_move = bool(move_info.get("is_white_move"))
+            expected_san = str(move_info.get("move_san") or "").strip()
+            row_index = move_number - 1
+            played = ""
+            assess = ""
+            best = ""
+            skipped = False
+            if row_index < 0 or row_index >= len(analyzed_moves):
+                skipped = True
+            else:
+                move_data = analyzed_moves[row_index]
+                if is_white_move:
+                    played = (move_data.white_move or "").strip()
+                    assess = (move_data.assess_white or "").strip()
+                    best = (move_data.best_white or "").strip()
+                else:
+                    played = (move_data.black_move or "").strip()
+                    assess = (move_data.assess_black or "").strip()
+                    best = (move_data.best_black or "").strip()
+                if not played:
+                    skipped = True
+
+            if skipped:
+                missing = True
+            elif assess in (_BOOK_MOVE_ASSESSMENT, _BEST_MOVE_ASSESSMENT):
+                missing = False
+            else:
+                missing = not best
+
+            yield {
+                "move_number": move_number,
+                "is_white_move": is_white_move,
+                "played": played or expected_san,
+                "assess": assess,
+                "best": best,
+                "missing": missing,
+                "skipped": skipped,
+            }
+
+    @staticmethod
+    def missing_best_move_threshold(config: Optional[Dict[str, Any]] = None) -> int:
+        """Return how many missing best-move SANs are allowed before aborting the game."""
+        dialog = (
+            (config or {})
+            .get("ui", {})
+            .get("dialogs", {})
+            .get("bulk_analysis_dialog", {})
+        )
+        raw = (dialog.get("integrity_check") or {}).get(
+            "max_missing_best_moves", _DEFAULT_MAX_MISSING_BEST_MOVES
+        )
+        try:
+            return max(0, int(raw))
+        except (TypeError, ValueError):
+            return _DEFAULT_MAX_MISSING_BEST_MOVES
+
+    @staticmethod
+    def count_missing_best_moves(
+        moves_data: List[Dict[str, Any]],
+        analyzed_moves: List[MoveData],
+    ) -> int:
+        """Count non-book, non-best plies that have no best-move SAN (including skipped plies)."""
+        return sum(1 for ply in BulkAnalysisService.iter_integrity_plies(moves_data, analyzed_moves) if ply["missing"])
+
+    @staticmethod
+    def format_integrity_fail_dump(
+        game: Optional[GameData],
+        moves_data: List[Dict[str, Any]],
+        analyzed_moves: List[MoveData],
+    ) -> str:
+        """Plain-text dump of every ply, marking those missing a best-move SAN."""
+        plies = list(BulkAnalysisService.iter_integrity_plies(moves_data, analyzed_moves))
+        missing_count = sum(1 for ply in plies if ply["missing"])
+        lines = [
+            "BulkAnalysis integrity fail dump: "
+            f"{BulkAnalysisService.format_game_label(game)} "
+            f"missing={missing_count}/{len(plies)}"
+        ]
+        for ply in plies:
+            dots = "." if ply["is_white_move"] else "..."
+            played = ply["played"] or "-"
+            assess = ply["assess"] or "-"
+            best = ply["best"] or "-"
+            if ply["skipped"]:
+                flag = " [SKIPPED]"
+            elif ply["missing"]:
+                flag = " [MISSING_BEST]"
+            else:
+                flag = ""
+            lines.append(
+                f"  {ply['move_number']}{dots} {played}  assess={assess}  best={best}{flag}"
+            )
+        return "\n".join(lines)
+
+    def _dump_integrity_fail_enabled(self) -> bool:
+        debug = (self.config or {}).get("debug") or {}
+        return bool(debug.get("dump_bulkanalysis_integrity_fail", False))
+
+    def _handle_incomplete_analysis(
+        self,
+        game: GameData,
+        missing_count: int,
+        total_plies: int,
+        moves_data: List[Dict[str, Any]],
+        analyzed_moves: List[MoveData],
+    ) -> None:
+        """Log and notify the bulk run that this game's analysis is not safe to store."""
+        label = self.format_game_label(game)
+        try:
+            LoggingService.get_instance().warning(
+                "Bulk analysis halted: incomplete best-move data "
+                f"({label}; missing={missing_count}, plies={total_plies}; possible OS standby)"
+            )
+        except Exception:
+            pass
+        if self._dump_integrity_fail_enabled():
+            try:
+                LoggingService.get_instance().debug(
+                    self.format_integrity_fail_dump(game, moves_data, analyzed_moves)
+                )
+            except Exception:
+                pass
+        if self._on_incomplete_analysis:
+            self._on_incomplete_analysis(game)
 
     def _perform_brilliant_move_detection_bulk(
         self,
@@ -576,6 +736,25 @@ class BulkAnalysisService(QObject):
                 previous_eval = eval_after
                 previous_is_mate = is_mate
                 previous_mate_moves = mate_moves
+
+            if self._cancelled:
+                return False
+
+            missing_best = self.count_missing_best_moves(moves_data, analyzed_moves)
+            if missing_best > self.missing_best_move_threshold(self.config):
+                self._handle_incomplete_analysis(
+                    game, missing_best, total_moves, moves_data, analyzed_moves
+                )
+                if progress_callback:
+                    progress_callback(
+                        total_moves,
+                        total_moves,
+                        0,
+                        True,
+                        "Incomplete analysis results",
+                        None,
+                    )
+                return False
 
             # Brilliancy detection (if enabled)
             if self._brilliant_move_detection and move_infos_for_brilliancy and analyzed_moves and not self._cancelled:

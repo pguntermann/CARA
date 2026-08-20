@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PyQt6.QtGui import QAction, QKeySequence
-from PyQt6.QtWidgets import QMenu, QMenuBar
+from PyQt6.QtWidgets import QMenuBar
 
 from app.utils.keyboard_shortcuts_catalog import mark_shortcuts_excluded
 from app.utils.themed_icon import (
@@ -98,7 +98,7 @@ def rebuild_engines_menu(mw) -> None:
     brilliancy_detection_id = engine_controller.get_engine_assignment(TASK_BRILLIANCY_DETECTION)
 
     for engine in engines:
-        engine_submenu = QMenu(engine.name, mw)
+        engine_submenu = menu.addMenu(engine.name)
         mark_shortcuts_excluded(engine_submenu)
         mw._apply_menu_styling(engine_submenu)
 
@@ -156,6 +156,5 @@ def rebuild_engines_menu(mw) -> None:
         )
         engine_submenu.addAction(brilliancy_detection_action)
 
-        menu.addMenu(engine_submenu)
         mw.engine_submenus[engine.id] = engine_submenu
 

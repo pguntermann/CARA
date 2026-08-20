@@ -110,7 +110,7 @@ class HighlightRuleFrequencyDialog(QDialog):
         self.bottom_button_top_padding = int(
             dialog_config.get(
                 "bottom_button_top_padding",
-                merged.get("bottom_button_top_padding", 50),
+                merged.get("bottom_button_top_padding", 25),
             )
         )
 

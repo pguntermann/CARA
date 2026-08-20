@@ -19,6 +19,7 @@ from app.views.widgets.branch_select_overlay import BranchSelectOverlay
 
 if TYPE_CHECKING:
     from app.controllers.game_controller import GameController
+    from app.controllers.database_controller import DatabaseController
 
 
 def _range_map_from_document(document: Optional[QTextDocument]) -> PgnRangeMap:
@@ -187,6 +188,41 @@ class ClickablePgnTextEdit(QTextEdit):
                 pass
             # Connect to our custom copy method
             copy_action.triggered.connect(self.copy)
+
+        cursor = self.cursorForPosition(event.pos())
+        doc_pos = cursor.position()
+        sideline_path = None
+        comment_target = None
+        if parent_view is not None:
+            if hasattr(parent_view, "sideline_path_at"):
+                sideline_path = parent_view.sideline_path_at(doc_pos)
+            if hasattr(parent_view, "comment_edit_target_at"):
+                comment_target = parent_view.comment_edit_target_at(doc_pos)
+        if comment_target is not None or sideline_path is not None:
+            menu.addSeparator()
+        tint = None
+        if isinstance(cfg, dict) and (comment_target is not None or sideline_path is not None):
+            from app.utils.themed_icon import (
+                SVG_MENU_PENCIL,
+                SVG_SIMPLE_X,
+                menu_icon_dark_tint_rgb,
+                themed_icon_from_svg,
+            )
+            tint = menu_icon_dark_tint_rgb(cfg)
+        if comment_target is not None:
+            edit_action = menu.addAction("Edit Comments")
+            if tint is not None:
+                edit_action.setIcon(themed_icon_from_svg(SVG_MENU_PENCIL, tint))
+            edit_action.triggered.connect(
+                lambda checked=False, p=doc_pos: parent_view.edit_comments_at_document_pos(p)
+            )
+        if sideline_path is not None:
+            remove_action = menu.addAction("Remove Variation")
+            if tint is not None:
+                remove_action.setIcon(themed_icon_from_svg(SVG_SIMPLE_X, tint))
+            remove_action.triggered.connect(
+                lambda checked=False, p=sideline_path: parent_view.remove_clicked_variation(p)
+            )
         
         # Append the PGN menubar menu items to the context menu (mirrors layout).
         from PyQt6.QtWidgets import QApplication
@@ -256,6 +292,7 @@ class DetailPgnView(QWidget):
         self.config = config
         self._game_model: Optional[GameModel] = None
         self._game_controller: Optional['GameController'] = None
+        self._database_controller: Optional['DatabaseController'] = None
         self._current_pgn_text: str = ""  # Store plain PGN text for re-formatting
         self._current_formatted_html: str = ""  # Store formatted HTML (debug / re-display)
         self._move_info: List[Tuple[str, int, bool]] = []  # List of (move_san, move_number, is_white) tuples for each ply
@@ -265,7 +302,7 @@ class DetailPgnView(QWidget):
         self._show_metadata: bool = True  # Whether to show metadata tags in PGN view
         self._show_comments: bool = True  # Whether to show comments in PGN view
         self._show_variations: bool = True  # Whether to show variations in PGN view
-        self._indent_variations: bool = False  # Traditional indented variation layout (display-only)
+        self._indent_variations: bool = True  # Traditional indented variation layout (display-only)
         self._show_annotations: bool = True  # Whether to show annotations in PGN view
         self._show_results: bool = True  # Whether to show results in PGN view
         self._show_non_standard_tags: bool = False  # Whether to show non-standard tags like [%evp], [%mdl] in comments
@@ -364,8 +401,30 @@ class DetailPgnView(QWidget):
         placeholder = pgn_config.get('placeholder_text', 'PGN notation will appear here...')
         self.pgn_text.setPlaceholderText(placeholder)
         layout.addWidget(self.pgn_text)
-    
-    
+
+    def set_collapsed_state(self, is_collapsed: bool) -> None:
+        """Hide PGN content when the pane is collapsed to a thin strip.
+
+        Args:
+            is_collapsed: True if the PGN pane is collapsed, False if expanded.
+        """
+        splitter_config = (
+            self.config.get('ui', {})
+            .get('panels', {})
+            .get('detail', {})
+            .get('splitter', {})
+        )
+        if is_collapsed:
+            collapsed_height = splitter_config.get('pgn_collapsed_height', 0)
+            self.pgn_text.setVisible(False)
+            self._branch_overlay.hide_overlay()
+            self.setFixedHeight(collapsed_height)
+            self.setMinimumHeight(0)
+        else:
+            self.pgn_text.setVisible(True)
+            self.setMinimumHeight(0)
+            self.setMaximumHeight(16777215)
+
     def set_pgn_text(self, text: str) -> None:
         """Set the PGN text content.
         
@@ -544,6 +603,106 @@ class DetailPgnView(QWidget):
         """
         self._game_controller = controller
 
+    def set_database_controller(self, controller: Optional["DatabaseController"]) -> None:
+        """Set database controller for persisting PGN edits (update row, mark unsaved)."""
+        self._database_controller = controller
+
+    def sideline_path_at(self, position: int) -> Optional[Path]:
+        """Return the variation path at a document position, or None on the mainline."""
+        if not self._show_variations:
+            return None
+        path = self._range_map.path_at(position)
+        if path is None or is_mainline_path(path):
+            return None
+        return path
+
+    def remove_clicked_variation(self, path: Path) -> None:
+        """Remove the sideline that contains ``path`` from the active game."""
+        if not self._game_controller:
+            return
+        ok, err = self._game_controller.remove_variation_at_path(path)
+        if not ok:
+            from app.views.dialogs.message_dialog import MessageDialog
+            MessageDialog.show_warning(self.config, "Remove Variation", err, self)
+            return
+        self._branch_overlay.hide_overlay()
+        game = self._game_model.active_game if self._game_model else None
+        self._persist_pgn_edit(game)
+        from app.services.progress_service import ProgressService
+        ProgressService.get_instance().set_status("Removed variation")
+
+    def comment_edit_target_at(self, position: int) -> Optional[Tuple[str, object]]:
+        """Return ``('path', Path)`` or ``('row', int)`` for a comment/move click, else None."""
+        if self._show_comments:
+            cpath = self._range_map.path_comment_at(position)
+            if cpath is not None:
+                return ("path", cpath)
+        path = self.sideline_path_at(position)
+        if path is not None:
+            return ("path", path)
+        row = self._moves_list_row_for_pgn_comment_at_position(position)
+        if row is not None:
+            return ("row", row)
+        ply = self._find_mainline_move_at_position(position)
+        if ply > 0:
+            return ("row", (ply - 1) // 2)
+        return None
+
+    def edit_comments_at_document_pos(self, position: int) -> None:
+        """Open the comment editor for the move or comment under ``position``."""
+        target = self.comment_edit_target_at(position)
+        if target is None:
+            return
+        kind, payload = target
+        if kind == "row":
+            if self._open_move_comment_row is not None:
+                self._open_move_comment_row(int(payload))
+            return
+        if isinstance(payload, tuple):
+            self._open_sideline_comment_editor(payload)
+
+    def _open_sideline_comment_editor(self, path: Path) -> None:
+        """Edit the comment on a single sideline half-move."""
+        if not self._game_controller or not self._game_model or not self._game_model.active_game:
+            return
+        game = self._game_model.active_game
+        read = self._game_controller.read_comment_at_path(game, path)
+        if read is None:
+            from app.views.dialogs.message_dialog import MessageDialog
+            MessageDialog.show_warning(
+                self.config,
+                "Comments",
+                "Could not read the comment for this move.",
+                self,
+            )
+            return
+        comment, san, move_number, is_white = read
+        from app.views.dialogs.move_comment_dialog import MoveCommentDialog
+
+        new_text = MoveCommentDialog.edit_single_move(
+            self.config, move_number, san, is_white, comment, self
+        )
+        if new_text is None:
+            return
+        ok, err = self._game_controller.apply_comment_at_path(game, path, new_text)
+        if not ok:
+            from app.views.dialogs.message_dialog import MessageDialog
+            MessageDialog.show_warning(self.config, "Comments", err, self)
+            return
+        self._persist_pgn_edit(game)
+        from app.services.progress_service import ProgressService
+        ProgressService.get_instance().set_status("Updated comment")
+
+    def _persist_pgn_edit(self, game) -> None:
+        """Write the active game to its database and refresh PGN-dependent views."""
+        if game and self._database_controller:
+            db_model = self._database_controller.find_database_model_for_game(game)
+            if db_model:
+                db_model.update_game(game)
+                self._database_controller.mark_database_unsaved(db_model)
+        if self._game_model:
+            self._game_model.metadata_updated.emit()
+
     def set_navigate_variations_enabled(self, enabled: bool) -> None:
         """Enable/disable variation navigation UI (overlay + path clicks)."""
         if self._game_controller is not None:
@@ -697,6 +856,11 @@ class DetailPgnView(QWidget):
         return (ply - 1) // 2
     
     def _handle_pgn_comment_double_click(self, position: int) -> bool:
+        if self._show_comments:
+            cpath = self._range_map.path_comment_at(position)
+            if cpath is not None:
+                self._open_sideline_comment_editor(cpath)
+                return True
         row = self._moves_list_row_for_pgn_comment_at_position(position)
         if row is None or self._open_move_comment_row is None:
             return False

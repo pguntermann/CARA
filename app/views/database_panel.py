@@ -30,6 +30,7 @@ from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.table_export import table_to_delimited, get_copy_table_config
 from app.utils.themed_icon import SVG_MENU_FOLDER_OPEN, themed_icon_from_svg
 from app.views.delegates.no_focus_rect_delegate import NoFocusRectItemDelegate
+from app.views.style import StyleManager
 
 
 class DatabasePanel(QWidget):
@@ -284,18 +285,7 @@ class DatabasePanel(QWidget):
                 border-color: rgb({add_tab_hover_border[0]}, {add_tab_hover_border[1]}, {add_tab_hover_border[2]});
             }}
             
-            QTabBar QToolButton {{
-                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
-                border: none;
-            }}
-            
-            QTabBar QToolButton:hover {{
-                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
-            }}
-            
-            QTabBar QToolButton:pressed {{
-                background-color: rgb({scroll_button_color[0]}, {scroll_button_color[1]}, {scroll_button_color[2]});
-            }}
+            {StyleManager.tab_bar_scroll_button_qss(self.config, scroll_button_color)}
         """
         
         self.tab_widget.setStyleSheet(stylesheet)

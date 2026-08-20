@@ -89,6 +89,28 @@ class TestIndentVariations(unittest.TestCase):
         self.assertEqual(oo_on, oo_off)
         self.assertNotEqual(oo_on[0], oo_on[1])
 
+    def test_indent_does_not_break_after_open_paren_without_headers(self) -> None:
+        # Show Metadata off strips headers; the header/moves <br> fallback must not
+        # treat the variation '(' span as a header (that left '(' on its own line).
+        pgn = "1. e4 e5 (1... c5 2. Nf3) 2. Nf3 *"
+        html, _ = PgnFormatterService.format_pgn_to_html(
+            pgn, _MIN_CFG, indent_variations=True
+        )
+        self.assertIn("<br>&nbsp;&nbsp;&nbsp;&nbsp;<span", html)
+        self.assertNotRegex(html, r">\(</span><br>")
+        self.assertIn("cara-path:", html)
+
+    def test_indent_does_not_blank_line_between_sibling_variations(self) -> None:
+        pgn = "1. e4 e5 (1... c5) (1... e6) (1... c6) 2. Nf3 *"
+        html, _ = PgnFormatterService.format_pgn_to_html(
+            pgn, _MIN_CFG, indent_variations=True
+        )
+        self.assertEqual(html.count("<br>&nbsp;&nbsp;&nbsp;&nbsp;<span"), 3)
+        self.assertNotIn("<br><br>", html)
+        self.assertNotRegex(html, r"<br>\s*<br>")
+        # Last sibling still puts the following mainline on its own line.
+        self.assertRegex(html, r"\)</span><br>")
+
 
 if __name__ == "__main__":
     unittest.main()

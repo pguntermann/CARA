@@ -217,11 +217,18 @@ class MainWindow(QMainWindow):
             ps_source_sel = None
 
         db_collapsed = bool(getattr(self, "_database_panel_collapsed", False))
+        pgn_collapsed = bool(getattr(self, "_pgn_pane_collapsed", False))
         splitter_sizes = None
+        pgn_splitter_sizes = None
         try:
             splitter_sizes = self.middle_splitter.sizes() if hasattr(self, "middle_splitter") else None
         except Exception:
             splitter_sizes = None
+        try:
+            if hasattr(self, "detail_panel") and hasattr(self.detail_panel, "pgn_splitter"):
+                pgn_splitter_sizes = self.detail_panel.pgn_splitter.sizes()
+        except Exception:
+            pgn_splitter_sizes = None
 
         # Load merged config with the selected style defaults (no disk mutation).
         cfg_path = ConfigLoader().config_path
@@ -333,9 +340,21 @@ class MainWindow(QMainWindow):
             pass
 
         try:
+            if pgn_splitter_sizes and hasattr(self, "detail_panel") and hasattr(self.detail_panel, "pgn_splitter"):
+                self.detail_panel.pgn_splitter.setSizes(pgn_splitter_sizes)
+        except Exception:
+            pass
+
+        try:
             # Ensure collapsed state matches prior.
             if bool(getattr(self, "_database_panel_collapsed", False)) != db_collapsed:
                 self._toggle_database_panel()
+        except Exception:
+            pass
+
+        try:
+            if bool(getattr(self, "_pgn_pane_collapsed", False)) != pgn_collapsed:
+                self._toggle_pgn_pane()
         except Exception:
             pass
 
@@ -1936,13 +1955,15 @@ class MainWindow(QMainWindow):
                 )
             if hasattr(self.detail_panel, 'moves_view'):
                 self.detail_panel.moves_view.set_database_controller(database_controller)
+            if hasattr(self.detail_panel, 'pgn_view'):
+                self.detail_panel.pgn_view.set_database_controller(database_controller)
+            if hasattr(self.detail_panel, 'player_stats_view'):
                 self.detail_panel.player_stats_view._on_open_pattern_games_in_search_results = self._open_pattern_games_in_search_results
                 self.detail_panel.player_stats_view._on_open_best_games_in_search_results = self._open_best_games_in_search_results
                 self.detail_panel.player_stats_view._on_open_worst_games_in_search_results = self._open_worst_games_in_search_results
                 self.detail_panel.player_stats_view._on_open_brilliant_moves_in_search_results = self._open_brilliant_moves_in_search_results
                 self.detail_panel.player_stats_view._on_open_misses_in_search_results = self._open_misses_in_search_results
                 self.detail_panel.player_stats_view._on_open_blunders_in_search_results = self._open_blunders_in_search_results
-                # Database connections are now handled by the controller
             # Inject selected-games callback for Player Stats "Selected games (Active/All)" source
             player_stats_controller = self.controller.get_player_stats_controller()
             player_stats_controller.set_get_selected_games_callback(
@@ -2003,9 +2024,12 @@ class MainWindow(QMainWindow):
         
         # Track collapsed state
         self._database_panel_collapsed = False
+        self._pgn_pane_collapsed = False
         ui_config = self.config.get('ui', {})
         database_config = ui_config.get('panels', {}).get('database', {})
         self._stored_size = database_config.get('default_height', 240)
+        detail_splitter_config = ui_config.get('panels', {}).get('detail', {}).get('splitter', {})
+        self._pgn_stored_size = detail_splitter_config.get('pgn_height', 200)
         
         # Set initial sizes for vertical splitter
         # Top panels: 80%, Database-Panel: 20%
@@ -2069,24 +2093,64 @@ class MainWindow(QMainWindow):
         # Update menu item checkmark state
         if hasattr(self, 'view_hide_database_panel_action'):
             self.view_hide_database_panel_action.setChecked(self._database_panel_collapsed)
-    
+
+    def _toggle_pgn_pane(self) -> None:
+        """Toggle collapse/expand state of the PGN notation pane."""
+        if not hasattr(self, "detail_panel") or not hasattr(self.detail_panel, "pgn_splitter"):
+            return
+
+        splitter_config = (
+            self.config.get("ui", {})
+            .get("panels", {})
+            .get("detail", {})
+            .get("splitter", {})
+        )
+        collapsed_height = splitter_config.get("pgn_collapsed_height", 0)
+        default_height = splitter_config.get("pgn_height", 200)
+        splitter = self.detail_panel.pgn_splitter
+
+        self._pgn_pane_collapsed = not self._pgn_pane_collapsed
+
+        if self._pgn_pane_collapsed:
+            current_sizes = splitter.sizes()
+            if current_sizes[0] > collapsed_height:
+                self._pgn_stored_size = current_sizes[0]
+            else:
+                self._pgn_stored_size = getattr(self, "_pgn_stored_size", default_height)
+            splitter.setSizes([collapsed_height, current_sizes[1]])
+        else:
+            current_sizes = splitter.sizes()
+            restored_size = getattr(self, "_pgn_stored_size", default_height)
+            splitter.setSizes([restored_size, current_sizes[1]])
+
+        self.detail_panel.pgn_view.set_collapsed_state(self._pgn_pane_collapsed)
+
+        if hasattr(self, "view_hide_pgn_pane_action"):
+            self.view_hide_pgn_pane_action.setChecked(self._pgn_pane_collapsed)
+
     def _setup_splitter_double_click(self) -> None:
-        """Setup double-click handler on the splitter handle to collapse/expand database panel."""
-        # Get the handle for the database panel (index 1)
+        """Setup double-click handlers on splitter handles to collapse/expand panes."""
+        # Handle after widget 0 is the visible bar (handle 0 is a dummy).
         handle = self.middle_splitter.handle(self.database_panel_index)
         if handle:
-            # Install event filter to detect double-clicks
             handle.installEventFilter(self)
-    
+        if hasattr(self, "detail_panel") and hasattr(self.detail_panel, "pgn_splitter"):
+            pgn_handle = self.detail_panel.pgn_splitter.handle(1)
+            if pgn_handle:
+                pgn_handle.installEventFilter(self)
+
     def eventFilter(self, obj, event) -> bool:
-        """Filter events to detect double-clicks on splitter handle."""
-        # Check if this is a double-click on the database panel splitter handle
+        """Filter events to detect double-clicks on splitter handles."""
         if event.type() == QEvent.Type.MouseButtonDblClick:
             handle = self.middle_splitter.handle(self.database_panel_index)
             if obj == handle:
                 self._toggle_database_panel()
-                return True  # Event handled
-        # Let other events pass through
+                return True
+            if hasattr(self, "detail_panel") and hasattr(self.detail_panel, "pgn_splitter"):
+                pgn_handle = self.detail_panel.pgn_splitter.handle(1)
+                if obj == pgn_handle:
+                    self._toggle_pgn_pane()
+                    return True
         return super().eventFilter(obj, event)
     
     def _fix_splitter_cursors(self) -> None:
@@ -2109,6 +2173,11 @@ class MainWindow(QMainWindow):
             handle = self.middle_splitter.handle(i)
             if handle:
                 handle.setCursor(Qt.CursorShape.SizeVerCursor)
+
+        if hasattr(self, "detail_panel") and hasattr(self.detail_panel, "pgn_splitter"):
+            pgn_handle = self.detail_panel.pgn_splitter.handle(1)
+            if pgn_handle:
+                pgn_handle.setCursor(Qt.CursorShape.SizeVerCursor)
     
     def _apply_splitter_styling(self) -> None:
         """Apply styling to splitter handles to prevent macOS theme override."""
@@ -2171,6 +2240,16 @@ class MainWindow(QMainWindow):
             make_binding_id("Navigation", "Next game"),
             "",
             self._navigate_to_next_game,
+        )
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "First game"),
+            "",
+            self._navigate_to_first_game,
+        )
+        self.shortcut_manager.register_shortcut(
+            make_binding_id("Navigation", "Last game"),
+            "",
+            self._navigate_to_last_game,
         )
         self.shortcut_manager.register_shortcut(
             make_binding_id("Navigation", "Jump to start"),
@@ -3768,6 +3847,58 @@ class MainWindow(QMainWindow):
         """Load the next game in the current database list order."""
         self._navigate_to_adjacent_game(1)
 
+    def _navigate_to_first_game(self) -> None:
+        """Load the first game in the current database list order."""
+        self._navigate_to_edge_game(first=True)
+
+    def _navigate_to_last_game(self) -> None:
+        """Load the last game in the current database list order."""
+        self._navigate_to_edge_game(first=False)
+
+    def _navigate_to_edge_game(self, *, first: bool) -> None:
+        """Activate the first or last game in the owning database tab."""
+        if self.controller.is_game_analysis_running():
+            self.controller.set_status("Cannot load game while analysis is running")
+            return
+        if not hasattr(self, "database_panel") or self.database_panel is None:
+            return
+
+        game_controller = self.controller.get_game_controller()
+        active_game = game_controller.get_game_model().active_game
+        model: Optional[DatabaseModel] = None
+
+        if active_game is not None:
+            location = self.database_panel.find_game_location(active_game)
+            if location is not None:
+                model, _ = location
+
+        if model is None:
+            active_info = self.database_panel.get_active_database_info()
+            if not active_info:
+                return
+            model = active_info.get("model")
+            if model is None:
+                return
+
+        count = model.rowCount()
+        if count <= 0:
+            return
+
+        target_row = 0 if first else count - 1
+        game = model.get_game(target_row)
+        if game is None:
+            return
+
+        game_controller.set_active_game(game)
+        status_message = game_controller.format_active_game_status_message(game)
+        if status_message:
+            self.controller.set_status(status_message)
+        ref_ply = getattr(game, "ref_ply", 0)
+        if isinstance(ref_ply, int) and ref_ply > 0:
+            game_controller.navigate_to_ply(ref_ply)
+
+        self.database_panel.select_rows(model, [target_row])
+
     def _navigate_to_adjacent_game(self, delta: int) -> None:
         """Activate the game at current_row + delta in the owning database tab.
 
@@ -4169,8 +4300,8 @@ class MainWindow(QMainWindow):
         show_metadata = pgn_visibility.get("show_metadata", True)
         show_comments = pgn_visibility.get("show_comments", True)
         show_variations = pgn_visibility.get("show_variations", True)
-        indent_variations = pgn_visibility.get("indent_variations", False)
-        navigate_variations = pgn_visibility.get("navigate_variations", False)
+        indent_variations = pgn_visibility.get("indent_variations", True)
+        navigate_variations = pgn_visibility.get("navigate_variations", True)
         show_annotations = pgn_visibility.get("show_annotations", True)
         show_results = pgn_visibility.get("show_results", True)
         show_non_standard_tags = pgn_visibility.get("show_non_standard_tags", False)
@@ -4423,10 +4554,10 @@ class MainWindow(QMainWindow):
                     "show_metadata": pgn_view._show_metadata,
                     "show_comments": pgn_view._show_comments if hasattr(pgn_view, '_show_comments') else True,
                     "show_variations": pgn_view._show_variations if hasattr(pgn_view, '_show_variations') else True,
-                    "indent_variations": pgn_view._indent_variations if hasattr(pgn_view, '_indent_variations') else False,
+                    "indent_variations": pgn_view._indent_variations if hasattr(pgn_view, '_indent_variations') else True,
                     "navigate_variations": (
                         self.controller.get_game_controller().is_navigate_variations_enabled()
-                        if hasattr(self, 'controller') else False
+                        if hasattr(self, 'controller') else True
                     ),
                     "show_annotations": pgn_view._show_annotations if hasattr(pgn_view, '_show_annotations') else True,
                     "show_results": pgn_view._show_results if hasattr(pgn_view, '_show_results') else True,
