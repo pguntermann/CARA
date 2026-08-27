@@ -28,6 +28,22 @@ pip install --force-reinstall --no-deps PyQt6-Qt6==<matching version>
 
 PyPI doesn't always have every point-release pair available for both packages — run `pip install PyQt6-Qt6==` (no version, to list what's available) if the exact match isn't found.
 
+**macOS UF_HIDDEN platform-plugin flag.** macOS sometimes sets the `UF_HIDDEN` file flag on `libqcocoa.dylib` and sibling Qt platform plugins during pip extraction. The flag is invisible to permissions, dlopen, and codesigning checks but prevents Qt plugin discovery, producing the same misleading "Could not find the Qt platform plugin 'cocoa'" error. CARA clears this flag automatically at every startup (`app/utils/macos_startup.py` → `clear_platform_plugin_hidden_flags()` called in `cara.py` before `QApplication` is constructed). If you somehow still hit the error after startup has run (e.g., running Python directly without going through `cara.py`), clear manually:
+
+```bash
+python3 -c "
+import os, glob
+plugins = glob.glob(os.path.expanduser('~/.venv/lib/python*/site-packages/PyQt6/Qt6/plugins/platforms/*.dylib'))
+for p in plugins:
+    st = os.lstat(p)
+    if hasattr(st, 'st_flags') and st.st_flags & 0x8000:
+        os.chflags(p, st.st_flags & ~0x8000)
+        print('cleared', p)
+"
+```
+
+(Adjust the venv path to match yours.)
+
 ## Running Tests
 
 Tests use Python's standard `unittest` framework, living in `tests/` as `test_*.py`.

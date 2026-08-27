@@ -67,6 +67,7 @@ from app.main_window import MainWindow
 from app.services.error_handler import ErrorHandler
 from app.utils.path_resolver import get_app_resource_path
 from app.services.theme_service import load_saved_theme_style_ref
+from app.utils.macos_startup import clear_platform_plugin_hidden_flags
 
 def _is_kde_plasma_session() -> bool:
     """Best-effort detection of KDE Plasma desktop sessions (Linux only)."""
@@ -123,7 +124,11 @@ def main() -> None:
     """Run CARA: Chess Analysis Review Application."""
 
     _disable_plasma_platform_theme_plugin()
-    
+
+    # Clear UF_HIDDEN from Qt's platform plugins on macOS before QApplication.
+    # The flag can be set by pip during extraction and prevents plugin discovery.
+    clear_platform_plugin_hidden_flags()
+
     # Suppress harmless Qt font warnings before creating QApplication
     qInstallMessageHandler(_qt_message_handler)
     
