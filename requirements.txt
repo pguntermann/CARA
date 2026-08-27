@@ -1,6 +1,7 @@
-PyQt6>=6.6.0
+PyQt6==6.11.0
+PyQt6-Qt6==6.11.0
+PyQt6-sip>=13.8,<14
 python-chess>=1.999
 requests>=2.31.0
 asteval>=0.9.31
 charset-normalizer>=3.0.0
-
