@@ -14,14 +14,18 @@ _UF_HIDDEN = 0x8000
 def clear_platform_plugin_hidden_flags() -> None:
     """Clear the UF_HIDDEN file flag from Qt's platform-plugins directory.
 
-    macOS sometimes sets UF_HIDDEN on libqcocoa.dylib (and sibling plugins)
-    during pip's download/extraction.  The flag is invisible to every
-    file-integrity check — permissions, dlopen, codesigning, and architecture
-    all look fine — but prevents Qt's own plugin-discovery from succeeding,
-    causing QGuiApplicationPrivate::createPlatformIntegration() to qFatal-abort
-    with "Could not find the Qt platform plugin 'cocoa'".  The flag can
-    reassert itself between process launches, so this runs unconditionally on
-    every macOS startup rather than as a one-time fix.
+    Root cause: PyQt6-Qt6, installed via pip, carries a com.apple.provenance
+    extended attribute.  On macOS this causes the OS to assert UF_HIDDEN on the
+    installed dylibs — including libqcocoa.dylib and its sibling platform plugins.
+    The flag is invisible to every file-integrity check (permissions, dlopen,
+    codesigning, architecture all look fine) but prevents Qt's own plugin-discovery
+    from succeeding, causing QGuiApplicationPrivate::createPlatformIntegration()
+    to qFatal-abort with "Could not find the Qt platform plugin 'cocoa'".
+    The same mechanism is documented for PyTorch wheels:
+    https://github.com/pytorch/pytorch/issues/178841
+
+    The flag can reassert itself between process launches, so this runs
+    unconditionally on every macOS startup rather than as a one-time fix.
 
     Safe to call on any platform: returns immediately on non-macOS.  All errors
     are suppressed; this must never prevent startup.
