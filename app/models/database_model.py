@@ -36,7 +36,8 @@ class GameData:
                  notes: Optional[str] = None,
                  source_database: str = "",
                  file_position: int = 0,
-                 ref_ply: int = 0) -> None:
+                 ref_ply: int = 0,
+                 header_values: Optional[Dict[str, str]] = None) -> None:
         """Initialize game data.
         
         Args:
@@ -61,6 +62,7 @@ class GameData:
             file_position: Original position of game in file (1-based, 0 if not from file).
             ref_ply: Optional reference ply index used by search results to open a game
                 at a specific move (e.g. a brilliant move). 0 means "no specific ply".
+            header_values: Optional map of PGN header tag name → value (from parse time).
         """
         self.game_number = game_number
         self.white = white
@@ -86,6 +88,7 @@ class GameData:
         self.source_database = source_database
         self.file_position = file_position
         self.ref_ply = ref_ply
+        self.header_values: Dict[str, str] = dict(header_values) if header_values else {}
 
     @property
     def pgn(self) -> str:
@@ -137,6 +140,7 @@ class DatabaseModel(QAbstractTableModel):
     COL_REF_PLY = 19
     COL_TAGS = 20
     COL_PGN = 21
+    FIXED_COLUMN_COUNT = 22
     
     def __init__(self, file_path: Optional[str] = None, config: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the database model.
@@ -150,6 +154,8 @@ class DatabaseModel(QAbstractTableModel):
         self._unsaved_games: Set[GameData] = set()  # Track games with unsaved changes
         self._unsaved_icon: Optional[QIcon] = None  # Cached icon for unsaved indicator
         self._unique_tags: Set[str] = set()  # Cache of unique tag names found in games
+        # Extra table columns for PGN headers not covered by FIXED columns (tag name order).
+        self._dynamic_headers: List[str] = []
         self.file_path: Optional[str] = file_path  # File path for file-based databases, None for clipboard
         self._config: Dict[str, Any] = config or {}
         # Maximum number of characters to show in the PGN column (preview only).
@@ -220,9 +226,9 @@ class DatabaseModel(QAbstractTableModel):
             parent: Parent index (unused for table models).
             
         Returns:
-            Number of columns (22: includes per-game Tags before PGN).
+            Fixed columns plus any dynamic PGN-header columns for this database.
         """
-        return 22
+        return self.FIXED_COLUMN_COUNT + len(self._dynamic_headers)
     
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         """Get item flags for the given index.
@@ -340,6 +346,14 @@ class DatabaseModel(QAbstractTableModel):
                     preview = text
                 setattr(game, "_pgn_preview", preview)
             return preview
+
+        # Dynamic PGN-header columns (indices >= FIXED_COLUMN_COUNT)
+        if col >= self.FIXED_COLUMN_COUNT:
+            dyn_idx = col - self.FIXED_COLUMN_COUNT
+            if 0 <= dyn_idx < len(self._dynamic_headers):
+                tag = self._dynamic_headers[dyn_idx]
+                values = getattr(game, "header_values", None) or {}
+                return str(values.get(tag, "") or "")
         
         return None
     
@@ -384,6 +398,9 @@ class DatabaseModel(QAbstractTableModel):
             ]
             if 0 <= section < len(headers):
                 return headers[section]
+            dyn_idx = section - self.FIXED_COLUMN_COUNT
+            if 0 <= dyn_idx < len(self._dynamic_headers):
+                return self._dynamic_headers[dyn_idx]
         
         return None
     
@@ -582,6 +599,7 @@ class DatabaseModel(QAbstractTableModel):
             self._position_index_fuzzy.clear()
             self._position_reverse_fuzzy.clear()
             self.endRemoveRows()
+            self._clear_dynamic_header_columns()
             self._emit_stats_relevant_data_change()
     
     def remove_games(self, games_to_remove: List['GameData']) -> None:
@@ -965,7 +983,44 @@ class DatabaseModel(QAbstractTableModel):
             tags: Set of tag names to add.
         """
         if tags:
+            before = len(self._unique_tags)
             self._unique_tags.update(tags)
+            if len(self._unique_tags) != before:
+                self._sync_dynamic_header_columns()
+
+    def get_dynamic_header_tags(self) -> List[str]:
+        """Return PGN header tags currently exposed as extra table columns."""
+        return list(self._dynamic_headers)
+
+    def _clear_dynamic_header_columns(self) -> None:
+        """Remove all dynamic PGN-header columns (e.g. after clear())."""
+        if not self._dynamic_headers:
+            return
+        parent = QModelIndex()
+        first = self.FIXED_COLUMN_COUNT
+        last = first + len(self._dynamic_headers) - 1
+        self.beginRemoveColumns(parent, first, last)
+        self._dynamic_headers.clear()
+        self.endRemoveColumns()
+
+    def _sync_dynamic_header_columns(self) -> None:
+        """Add model columns for newly seen eligible PGN headers (additive only).
+
+        Columns are not removed when games are deleted; reopen/clear rebuilds the set.
+        """
+        from app.services.database_table_columns import eligible_dynamic_header_tags
+
+        desired = eligible_dynamic_header_tags(self.get_unique_tags())
+        existing = set(self._dynamic_headers)
+        to_add = [tag for tag in desired if tag not in existing]
+        if not to_add:
+            return
+        parent = QModelIndex()
+        first = self.FIXED_COLUMN_COUNT + len(self._dynamic_headers)
+        last = first + len(to_add) - 1
+        self.beginInsertColumns(parent, first, last)
+        self._dynamic_headers.extend(to_add)
+        self.endInsertColumns()
     
     def get_unique_tags(self) -> List[str]:
         """Get ordered list of unique tags.
@@ -1393,6 +1448,13 @@ class DatabaseModel(QAbstractTableModel):
                 return getattr(game, "game_tags", "") or ""
             elif column == self.COL_PGN:
                 return game.pgn or ""
+            elif column >= self.FIXED_COLUMN_COUNT:
+                dyn_idx = column - self.FIXED_COLUMN_COUNT
+                if 0 <= dyn_idx < len(self._dynamic_headers):
+                    tag = self._dynamic_headers[dyn_idx]
+                    values = getattr(game, "header_values", None) or {}
+                    return str(values.get(tag, "") or "")
+                return ""
             else:
                 return None
         

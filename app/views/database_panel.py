@@ -98,6 +98,7 @@ class DatabasePanel(QWidget):
         self._unsaved_tabs: set = set()  # Set of tab indices with unsaved changes
         self._tab_context_menu_cooldown_until: float = 0  # Ignore context menu for a short time after Close action
         self._selection_mode: str = "replace"  # "replace" or "append" for Select rows actions (not persisted)
+        self._applying_column_layout: bool = False
         self._database_table_viewports: set = set()  # viewports we install event filter on (to avoid right-click changing selection)
 
         self._setup_ui()
@@ -346,10 +347,15 @@ class DatabasePanel(QWidget):
         icon_px = self._tab_bar_icon_pixel_size()
         tab_bar.setIconSize(QSize(icon_px, icon_px))
         tab_bar.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        # Avoid stacking duplicate connections when tabs are added/reconfigured.
+        try:
+            tab_bar.customContextMenuRequested.disconnect(self._on_tab_bar_context_menu)
+        except TypeError:
+            pass
         tab_bar.customContextMenuRequested.connect(self._on_tab_bar_context_menu)
 
     def _on_tab_bar_context_menu(self, pos: QPoint) -> None:
-        """Show context menu for database tab (Close; for file-based tabs also Close all but this)."""
+        """Show context menu for database tab (Close; column layout; Close all but this)."""
         if time.monotonic() < self._tab_context_menu_cooldown_until:
             return
         tab_bar = self.tab_widget.tabBar()
@@ -363,35 +369,650 @@ class DatabasePanel(QWidget):
             return
         identifier = tab_info.get('identifier')
         if identifier == 'clipboard':
+            from app.views.menus.database_panel_context_menus import build_database_tab_context_menu
+
+            ctx = build_database_tab_context_menu(
+                self,
+                include_close=False,
+                include_column_settings=True,
+                include_file_column_settings=False,
+            )
+            action = ctx.menu.exec(tab_bar.mapToGlobal(pos))
+            ctx.menu.close()
+            ctx.menu.hide()
+            self._tab_context_menu_cooldown_until = time.monotonic() + 0.4
+            if action == ctx.save_columns_global_action:
+                QTimer.singleShot(10, lambda: self._save_column_settings_global(tab_index))
+            elif action == ctx.restore_columns_default_action:
+                QTimer.singleShot(10, self._restore_default_column_settings)
             return
         if identifier == 'search_results':
             if not self._on_close_search_results:
                 return
             from app.views.menus.database_panel_context_menus import build_database_tab_context_menu
 
-            ctx = build_database_tab_context_menu(self, include_close_all_but=False)
+            ctx = build_database_tab_context_menu(
+                self,
+                include_close=True,
+                include_close_all_but=False,
+            )
             action = ctx.menu.exec(tab_bar.mapToGlobal(pos))
             ctx.menu.close()
             ctx.menu.hide()
+            self._tab_context_menu_cooldown_until = time.monotonic() + 0.4
             if action == ctx.close_action:
-                self._tab_context_menu_cooldown_until = time.monotonic() + 0.4
                 QTimer.singleShot(10, self._on_close_search_results)
             return
         if not self._on_close_database and not self._on_close_all_but_database:
             return
         from app.views.menus.database_panel_context_menus import build_database_tab_context_menu
+        from app.services.user_settings_service import UserSettingsService
 
-        ctx = build_database_tab_context_menu(self, include_close_all_but=True)
+        has_file_settings = UserSettingsService.get_instance().has_database_table_columns_for_path(
+            identifier
+        )
+        ctx = build_database_tab_context_menu(
+            self,
+            include_close=True,
+            include_close_all_but=True,
+            include_column_settings=True,
+            include_file_column_settings=True,
+            has_file_column_settings=has_file_settings,
+        )
         action = ctx.menu.exec(tab_bar.mapToGlobal(pos))
         # Dismiss menu immediately so it does not stay visible or reopen
         ctx.menu.close()
         ctx.menu.hide()
+        self._tab_context_menu_cooldown_until = time.monotonic() + 0.4
         if action == ctx.close_action and self._on_close_database:
-            self._tab_context_menu_cooldown_until = time.monotonic() + 0.4
             QTimer.singleShot(10, lambda: self._on_close_database(identifier))
         elif action == ctx.close_all_but_action and self._on_close_all_but_database:
-            self._tab_context_menu_cooldown_until = time.monotonic() + 0.4
             QTimer.singleShot(10, lambda: self._on_close_all_but_database(identifier))
+        elif action == ctx.save_columns_global_action:
+            QTimer.singleShot(10, lambda: self._save_column_settings_global(tab_index))
+        elif action == ctx.restore_columns_default_action:
+            QTimer.singleShot(10, self._restore_default_column_settings)
+        elif action == ctx.save_columns_for_file_action:
+            QTimer.singleShot(
+                10, lambda idx=tab_index: self._save_column_settings_for_file(idx)
+            )
+        elif action == ctx.remove_columns_for_file_action:
+            QTimer.singleShot(
+                10, lambda idx=tab_index: self._remove_column_settings_for_file(idx)
+            )
+
+    def _theme_column_widths_config(self) -> Dict[str, Any]:
+        """Return theme ``column_widths`` map for database table defaults."""
+        ui_config = self.config.get("ui", {})
+        panel_config = ui_config.get("panels", {}).get("database", {})
+        widths = panel_config.get("table", {}).get("column_widths", {})
+        return widths if isinstance(widths, dict) else {}
+
+    def _tab_info_for_table(self, table: QTableView) -> Optional[Dict[str, Any]]:
+        for info in self._tab_models.values():
+            if info.get("table") is table:
+                return info
+        return None
+
+    def _apply_column_layout_to_table(
+        self, table: QTableView, identifier: Optional[str], *, force_global: bool = False
+    ) -> None:
+        """Apply persisted visibility, order, widths, and stretch to a table.
+
+        Args:
+            table: Target table view.
+            identifier: Tab identifier (path / clipboard / search_results).
+            force_global: If True, ignore any per-file override and use the global layout.
+        """
+        from app.services.database_table_columns import (
+            DATABASE_TABLE_COLUMNS,
+            dynamic_columns_for_model,
+            effective_visibility_for_tab,
+            normalize_database_table_columns,
+            resolve_column,
+        )
+        from app.services.user_settings_service import UserSettingsService
+
+        model = table.model()
+        if model is None:
+            return
+        header = table.horizontalHeader()
+        is_search = identifier == "search_results"
+        settings = UserSettingsService.get_instance()
+        if force_global:
+            layout = settings.get_database_table_columns()
+        else:
+            layout = settings.get_database_table_columns_for_identifier(identifier)
+        layout = normalize_database_table_columns(
+            layout, widths_config=self._theme_column_widths_config()
+        )
+        visibility = effective_visibility_for_tab(
+            layout, is_search_results=is_search, model=model
+        )
+        columns = layout.get("columns") if isinstance(layout.get("columns"), dict) else {}
+        order = layout.get("column_order") if isinstance(layout.get("column_order"), list) else []
+
+        self._applying_column_layout = True
+        header.blockSignals(True)
+        table.setUpdatesEnabled(False)
+        try:
+            # Unhide all, reset visual order to logical identity, then re-apply layout.
+            for logical in range(header.count()):
+                table.setColumnHidden(logical, False)
+            for logical in range(header.count()):
+                visual = header.visualIndex(logical)
+                while visual != logical and visual >= 0:
+                    header.moveSection(visual, logical)
+                    visual = header.visualIndex(logical)
+
+            all_cols = list(DATABASE_TABLE_COLUMNS) + list(dynamic_columns_for_model(model))
+            for col in all_cols:
+                logical = col.logical_index
+                if logical < 0 or logical >= model.columnCount():
+                    continue
+                table.setColumnHidden(logical, not visibility.get(col.id, True))
+                entry = columns.get(col.id) if isinstance(columns.get(col.id), dict) else {}
+                width = entry.get("width") if isinstance(entry, dict) else None
+                if not isinstance(width, int) or width <= 0:
+                    width = self._column_widths[logical] if logical < len(self._column_widths) else 100
+                if col.id == "col_unsaved":
+                    header.setSectionResizeMode(logical, header.ResizeMode.Fixed)
+                else:
+                    header.setSectionResizeMode(logical, header.ResizeMode.Interactive)
+                header.resizeSection(logical, int(width))
+
+            # Reorder visible columns left-to-right from persisted order.
+            visible_order = [
+                cid
+                for cid in order
+                if visibility.get(str(cid), False)
+                and resolve_column(str(cid), model) is not None
+            ]
+            for target_position, col_id in enumerate(visible_order):
+                col = resolve_column(str(col_id), model)
+                if col is None:
+                    continue
+                current_visual = header.visualIndex(col.logical_index)
+                if current_visual < 0:
+                    continue
+                if current_visual != target_position:
+                    header.moveSection(current_visual, target_position)
+
+            self._stretch_last_visible_column(table, visibility)
+        finally:
+            header.blockSignals(False)
+            self._applying_column_layout = False
+            table.setUpdatesEnabled(True)
+            self._refresh_table_after_column_layout(table)
+
+    def _refresh_table_after_column_layout(self, table: QTableView) -> None:
+        """Force header + body cells to repaint after hide/show/reorder."""
+        header = table.horizontalHeader()
+        # Re-query model data so body cells follow the new visual mapping.
+        model = table.model()
+        if model is not None and model.rowCount() > 0 and model.columnCount() > 0:
+            top_left = model.index(0, 0)
+            bottom_right = model.index(model.rowCount() - 1, model.columnCount() - 1)
+            model.dataChanged.emit(top_left, bottom_right)
+        if header is not None:
+            header.viewport().update()
+        table.viewport().update()
+        table.update()
+
+    def _stretch_last_visible_column(
+        self, table: QTableView, visibility: Optional[Dict[str, bool]] = None
+    ) -> None:
+        """Set the rightmost visible column to Stretch; others Interactive (unsaved Fixed)."""
+        from app.services.database_table_columns import resolve_column_by_logical
+
+        model = table.model()
+        if model is None:
+            return
+        header = table.horizontalHeader()
+        if visibility is None:
+            visibility = {}
+            for logical in range(model.columnCount()):
+                col = resolve_column_by_logical(logical, model)
+                if col is None:
+                    continue
+                visibility[col.id] = not table.isColumnHidden(logical)
+
+        last_visible_logical = None
+        for visual_idx in range(header.count() - 1, -1, -1):
+            logical = header.logicalIndex(visual_idx)
+            if logical < 0:
+                continue
+            col = resolve_column_by_logical(logical, model)
+            if col is None:
+                continue
+            if visibility.get(col.id, not table.isColumnHidden(logical)):
+                last_visible_logical = logical
+                break
+
+        for logical in range(model.columnCount()):
+            col = resolve_column_by_logical(logical, model)
+            if col is None:
+                continue
+            if col.id == "col_unsaved":
+                header.setSectionResizeMode(logical, header.ResizeMode.Fixed)
+            elif logical == last_visible_logical:
+                header.setSectionResizeMode(logical, header.ResizeMode.Stretch)
+            else:
+                header.setSectionResizeMode(logical, header.ResizeMode.Interactive)
+
+    def _capture_column_layout_from_table(self, table: QTableView) -> Dict[str, Any]:
+        """Read current visibility, widths, and visual order from a table header."""
+        from app.services.database_table_columns import (
+            DATABASE_TABLE_COLUMNS,
+            dynamic_columns_for_model,
+            normalize_database_table_columns,
+            resolve_column_by_logical,
+        )
+
+        model = table.model()
+        header = table.horizontalHeader()
+        columns: Dict[str, Dict[str, Any]] = {}
+        all_cols = list(DATABASE_TABLE_COLUMNS) + list(dynamic_columns_for_model(model))
+        for col in all_cols:
+            logical = col.logical_index
+            width = header.sectionSize(logical) if model is not None else 100
+            if width <= 0:
+                width = 100
+            columns[col.id] = {
+                "visible": not table.isColumnHidden(logical),
+                "width": int(width),
+            }
+            if col.system_hidden:
+                columns[col.id]["visible"] = False
+
+        order: List[str] = []
+        if model is not None:
+            for visual_idx in range(header.count()):
+                logical = header.logicalIndex(visual_idx)
+                col = resolve_column_by_logical(logical, model)
+                if col is not None and col.id not in order:
+                    order.append(col.id)
+        for col in all_cols:
+            if col.id not in order:
+                order.append(col.id)
+
+        return normalize_database_table_columns(
+            {"columns": columns, "column_order": order},
+            widths_config=self._theme_column_widths_config(),
+        )
+
+    def _sanitize_layout_for_persist(self, layout: Dict[str, Any]) -> Dict[str, Any]:
+        """Keep system / search-only columns out of user-persisted visibility."""
+        from app.services.database_table_columns import (
+            DATABASE_TABLE_COLUMNS,
+            normalize_database_table_columns,
+        )
+
+        columns = layout.get("columns") if isinstance(layout.get("columns"), dict) else {}
+        cleaned = {k: dict(v) if isinstance(v, dict) else v for k, v in columns.items()}
+        for col in DATABASE_TABLE_COLUMNS:
+            entry = cleaned.get(col.id)
+            if not isinstance(entry, dict):
+                entry = {"visible": False, "width": 100}
+                cleaned[col.id] = entry
+            if col.system_hidden or col.search_results_only:
+                entry["visible"] = False
+        return normalize_database_table_columns(
+            {"columns": cleaned, "column_order": layout.get("column_order")},
+            widths_config=self._theme_column_widths_config(),
+        )
+
+    def _merge_dynamic_column_prefs(
+        self, captured: Dict[str, Any], previous: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Keep previously saved ``hdr_*`` prefs not present on the current table.
+
+        Saving global settings from a file that lacks some headers must not wipe
+        visibility prefs for headers that appear in other databases.
+        """
+        from app.services.database_table_columns import (
+            normalize_database_table_columns,
+            parse_dynamic_header_tag,
+        )
+
+        if not isinstance(previous, dict):
+            return captured
+        prev_cols = previous.get("columns") if isinstance(previous.get("columns"), dict) else {}
+        cap_cols = captured.get("columns") if isinstance(captured.get("columns"), dict) else {}
+        merged_cols = {k: dict(v) if isinstance(v, dict) else v for k, v in cap_cols.items()}
+        for key, entry in prev_cols.items():
+            sid = str(key)
+            if parse_dynamic_header_tag(sid) is None:
+                continue
+            if sid not in merged_cols and isinstance(entry, dict):
+                merged_cols[sid] = dict(entry)
+
+        order: List[str] = []
+        for item in captured.get("column_order") or []:
+            sid = str(item)
+            if sid in merged_cols and sid not in order:
+                order.append(sid)
+        prev_order = previous.get("column_order") if isinstance(previous.get("column_order"), list) else []
+        for item in prev_order:
+            sid = str(item)
+            if parse_dynamic_header_tag(sid) is None:
+                continue
+            if sid in merged_cols and sid not in order:
+                order.append(sid)
+        for sid in merged_cols:
+            if sid not in order:
+                order.append(sid)
+
+        return normalize_database_table_columns(
+            {"columns": merged_cols, "column_order": order},
+            widths_config=self._theme_column_widths_config(),
+        )
+
+    def _on_database_column_moved(
+        self, table: QTableView, _logical: int, _old_vis: int, _new_vis: int
+    ) -> None:
+        if self._applying_column_layout:
+            return
+        # Stretch must track the new rightmost visible column (session only until Save).
+        self._stretch_last_visible_column(table)
+
+    def _on_model_columns_inserted(
+        self,
+        table: QTableView,
+        identifier: Optional[str],
+        first: int,
+        last: int,
+    ) -> None:
+        """Apply saved visibility/width to newly inserted dynamic columns only."""
+        if self._applying_column_layout:
+            return
+        from app.services.database_table_columns import (
+            effective_visibility_for_tab,
+            normalize_database_table_columns,
+            resolve_column_by_logical,
+        )
+        from app.services.user_settings_service import UserSettingsService
+
+        model = table.model()
+        if model is None:
+            return
+        header = table.horizontalHeader()
+        is_search = identifier == "search_results"
+        settings = UserSettingsService.get_instance()
+        layout = normalize_database_table_columns(
+            settings.get_database_table_columns_for_identifier(identifier),
+            widths_config=self._theme_column_widths_config(),
+        )
+        visibility = effective_visibility_for_tab(
+            layout, is_search_results=is_search, model=model
+        )
+        columns = layout.get("columns") if isinstance(layout.get("columns"), dict) else {}
+
+        self._applying_column_layout = True
+        header.blockSignals(True)
+        try:
+            for logical in range(int(first), int(last) + 1):
+                col = resolve_column_by_logical(logical, model)
+                if col is None:
+                    continue
+                table.setColumnHidden(logical, not visibility.get(col.id, False))
+                entry = columns.get(col.id) if isinstance(columns.get(col.id), dict) else {}
+                width = entry.get("width") if isinstance(entry, dict) else None
+                if not isinstance(width, int) or width <= 0:
+                    width = 100
+                header.setSectionResizeMode(logical, header.ResizeMode.Interactive)
+                header.resizeSection(logical, int(width))
+            self._stretch_last_visible_column(table, visibility=None)
+        finally:
+            header.blockSignals(False)
+            self._applying_column_layout = False
+            self._refresh_table_after_column_layout(table)
+
+    def _on_model_columns_removed(self, table: QTableView) -> None:
+        if self._applying_column_layout:
+            return
+        self._stretch_last_visible_column(table)
+
+    def _on_header_context_menu(self, pos: QPoint, table: QTableView) -> None:
+        """Header right-click: hide this column / show hidden columns."""
+        from PyQt6.QtWidgets import QMenu
+
+        from app.services.database_table_columns import (
+            effective_visibility_for_tab,
+            parse_dynamic_header_tag,
+            resolve_column_by_logical,
+            user_controllable_columns,
+        )
+        from app.views.style import StyleManager
+
+        header = table.horizontalHeader()
+        logical = header.logicalIndexAt(pos)
+        tab_info = self._tab_info_for_table(table)
+        identifier = tab_info.get("identifier") if tab_info else None
+        is_search = identifier == "search_results"
+        model = table.model()
+
+        menu = QMenu(self)
+        hide_action = None
+        clicked_col = (
+            resolve_column_by_logical(logical, model) if logical >= 0 else None
+        )
+        if clicked_col is not None:
+            controllable_ids = {
+                c.id
+                for c in user_controllable_columns(
+                    is_search_results=is_search, model=model
+                )
+            }
+            if clicked_col.id in controllable_ids and not table.isColumnHidden(logical):
+                hide_action = menu.addAction(f'Hide column "{clicked_col.label}"')
+
+        show_menu = menu.addMenu("Show column")
+        layout = self._capture_column_layout_from_table(table)
+        visibility = effective_visibility_for_tab(
+            layout, is_search_results=is_search, model=model
+        )
+        hidden_controllable = [
+            c
+            for c in user_controllable_columns(
+                is_search_results=is_search, model=model
+            )
+            if not visibility.get(c.id, True)
+        ]
+        hidden_fixed = [
+            c for c in hidden_controllable if parse_dynamic_header_tag(c.id) is None
+        ]
+        hidden_dynamic = [
+            c for c in hidden_controllable if parse_dynamic_header_tag(c.id) is not None
+        ]
+        show_actions: Dict[Any, Any] = {}
+        if not hidden_controllable:
+            empty = show_menu.addAction("(none hidden)")
+            empty.setEnabled(False)
+        else:
+            for col in hidden_fixed:
+                act = show_menu.addAction(col.label)
+                show_actions[act] = col.id
+            if hidden_fixed and hidden_dynamic:
+                show_menu.addSeparator()
+            for col in hidden_dynamic:
+                act = show_menu.addAction(col.label)
+                show_actions[act] = col.id
+
+        StyleManager.style_context_menu(menu, self.config)
+        chosen = menu.exec(header.mapToGlobal(pos))
+        menu.close()
+        menu.hide()
+
+        insert_before = logical if logical >= 0 else None
+        if hide_action is not None and chosen == hide_action and clicked_col is not None:
+            self._set_column_visible(table, clicked_col.id, False)
+        elif chosen in show_actions:
+            self._set_column_visible(
+                table,
+                show_actions[chosen],
+                True,
+                insert_before_logical=insert_before,
+            )
+
+    def _set_column_visible(
+        self,
+        table: QTableView,
+        column_id: str,
+        visible: bool,
+        *,
+        insert_before_logical: Optional[int] = None,
+    ) -> None:
+        """Show or hide one user-controllable column (session until Save).
+
+        When showing, ``insert_before_logical`` places the column immediately
+        left of that header section (the right-click target). If omitted or
+        invalid, the column keeps its current visual position.
+        """
+        from app.services.database_table_columns import (
+            resolve_column,
+            user_controllable_columns,
+        )
+
+        tab_info = self._tab_info_for_table(table)
+        identifier = tab_info.get("identifier") if tab_info else None
+        is_search = identifier == "search_results"
+        model = table.model()
+        col = resolve_column(column_id, model)
+        if col is None:
+            return
+        if col.id not in {
+            c.id
+            for c in user_controllable_columns(
+                is_search_results=is_search, model=model
+            )
+        }:
+            return
+
+        if not visible:
+            # Refuse hiding the last visible controllable column.
+            remaining = 0
+            for c in user_controllable_columns(
+                is_search_results=is_search, model=model
+            ):
+                if c.id == col.id:
+                    continue
+                if not table.isColumnHidden(c.logical_index):
+                    remaining += 1
+            if remaining <= 0:
+                return
+
+        table.setColumnHidden(col.logical_index, not visible)
+
+        if visible and insert_before_logical is not None and model is not None:
+            header = table.horizontalHeader()
+            anchor = int(insert_before_logical)
+            if (
+                0 <= anchor < model.columnCount()
+                and anchor != col.logical_index
+                and not table.isColumnHidden(anchor)
+            ):
+                from_visual = header.visualIndex(col.logical_index)
+                to_visual = header.visualIndex(anchor)
+                if from_visual >= 0 and to_visual >= 0 and from_visual != to_visual:
+                    # Moving rightward: Qt shifts the target left, so aim one past.
+                    if from_visual < to_visual:
+                        to_visual -= 1
+                    if from_visual != to_visual:
+                        self._applying_column_layout = True
+                        try:
+                            header.moveSection(from_visual, to_visual)
+                        finally:
+                            self._applying_column_layout = False
+
+        self._stretch_last_visible_column(table)
+
+    def _save_column_settings_global(self, tab_index: int) -> None:
+        """Persist current tab layout as the user global database-table default."""
+        tab_info = self._tab_models.get(tab_index)
+        if not tab_info:
+            return
+        table = tab_info.get("table")
+        if table is None:
+            return
+        from app.services.user_settings_service import UserSettingsService
+
+        layout = self._sanitize_layout_for_persist(
+            self._capture_column_layout_from_table(table)
+        )
+        settings = UserSettingsService.get_instance()
+        layout = self._merge_dynamic_column_prefs(
+            layout, settings.get_database_table_columns()
+        )
+        settings.set_database_table_columns(layout)
+
+    def _restore_default_column_settings(self) -> None:
+        """Reset the stored global layout to application factory defaults.
+
+        Per-file overrides are kept. Open tabs that are not using a per-file
+        override are refreshed to the factory global.
+        """
+        from app.services.database_table_columns import default_database_table_columns
+        from app.services.user_settings_service import UserSettingsService
+
+        settings = UserSettingsService.get_instance()
+        factory = default_database_table_columns(self._theme_column_widths_config())
+        settings.set_database_table_columns(factory)
+        self._refresh_tabs_using_global_column_layout()
+
+    def _refresh_tabs_using_global_column_layout(self) -> None:
+        """Re-apply column layout on open tabs that have no per-file override."""
+        from app.services.user_settings_service import UserSettingsService
+
+        settings = UserSettingsService.get_instance()
+        for tab_info in self._tab_models.values():
+            table = tab_info.get("table")
+            identifier = tab_info.get("identifier")
+            if table is None:
+                continue
+            if identifier and settings.has_database_table_columns_for_path(identifier):
+                continue
+            self._apply_column_layout_to_table(table, identifier)
+
+    def _save_column_settings_for_file(self, tab_index: int) -> None:
+        """Persist current layout as a per-file override."""
+        tab_info = self._tab_models.get(tab_index)
+        if not tab_info:
+            return
+        table = tab_info.get("table")
+        identifier = tab_info.get("identifier")
+        if table is None or not identifier or identifier in ("clipboard", "search_results"):
+            return
+        from app.services.user_settings_service import UserSettingsService
+
+        layout = self._sanitize_layout_for_persist(
+            self._capture_column_layout_from_table(table)
+        )
+        settings = UserSettingsService.get_instance()
+        previous = None
+        if settings.has_database_table_columns_for_path(str(identifier)):
+            previous = settings.get_database_table_columns_for_identifier(str(identifier))
+        layout = self._merge_dynamic_column_prefs(layout, previous)
+        settings.set_database_table_columns_for_path(identifier, layout)
+
+    def _remove_column_settings_for_file(self, tab_index: int) -> None:
+        """Remove this file's column override and apply the current global layout."""
+        tab_info = self._tab_models.get(tab_index)
+        if not tab_info:
+            return
+        table = tab_info.get("table")
+        identifier = tab_info.get("identifier") or tab_info.get("file_path")
+        if table is None or not identifier or identifier in ("clipboard", "search_results"):
+            return
+        from app.services.user_settings_service import UserSettingsService
+
+        settings = UserSettingsService.get_instance()
+        settings.remove_database_table_columns_for_path(str(identifier))
+        # Also try file_path in case identifier and path strings diverge.
+        file_path = tab_info.get("file_path")
+        if file_path and str(file_path) != str(identifier):
+            settings.remove_database_table_columns_for_path(str(file_path))
+        self._apply_column_layout_to_table(table, identifier, force_global=True)
 
     def _initialize_tabs(self) -> None:
         """Initialize the database panel tabs."""
@@ -590,43 +1211,30 @@ class DatabasePanel(QWidget):
         
         # Connect to model's dataChanged signal to refresh view immediately
         model.dataChanged.connect(self._on_model_data_changed)
+        # Dynamic PGN-header columns may appear after paste/import on an open tab.
+        model.columnsInserted.connect(
+            lambda parent, first, last, t=tab_table, ident=identifier: self._on_model_columns_inserted(
+                t, ident, first, last
+            )
+        )
+        model.columnsRemoved.connect(
+            lambda *args, t=tab_table: self._on_model_columns_removed(t)
+        )
         
-        # Configure column widths and resize modes
+        # Configure column layout (visibility, order, widths, stretch) from user settings
         header = tab_table.horizontalHeader()
-        column_count = model.columnCount()
-        
-        # Make unsaved column (index 1) non-sortable
         header.setSortIndicatorShown(True)
-        # Note: We can't directly disable sorting for a specific column in Qt,
-        # but the model's sort() method will ignore COL_UNSAVED
-        
-        # Set widths for columns that have width definitions
-        for i in range(min(len(self._column_widths), column_count)):
-            header.setSectionResizeMode(i, header.ResizeMode.Interactive)
-            header.resizeSection(i, self._column_widths[i])
-        
-        # Unsaved column (second column, index 1) should be fixed width
-        if column_count > 1:
-            header.setSectionResizeMode(1, header.ResizeMode.Fixed)
-        
-        # Last column (PGN) stretches to fill remaining space
-        if column_count > 0:
-            header.setSectionResizeMode(column_count - 1, header.ResizeMode.Stretch)
-        
-        # Hide "# in File" column (always hidden - users can restore file order by sorting "#" column)
-        file_num_col = model.COL_FILE_NUM
-        if file_num_col < column_count:
-            tab_table.setColumnHidden(file_num_col, True)
-        
-        # Hide Source DB and Ref Ply columns for non-search-results tabs (only search results need them)
-        if identifier != 'search_results':
-            source_db_col = model.COL_SOURCE_DB
-            if source_db_col < column_count:
-                tab_table.setColumnHidden(source_db_col, True)
-            if hasattr(model, "COL_REF_PLY"):
-                ref_ply_col = model.COL_REF_PLY
-                if ref_ply_col < column_count:
-                    tab_table.setColumnHidden(ref_ply_col, True)
+        header.setSectionsMovable(True)
+        header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        header.customContextMenuRequested.connect(
+            lambda pos, t=tab_table: self._on_header_context_menu(pos, t)
+        )
+        header.sectionMoved.connect(
+            lambda logical, old_vis, new_vis, t=tab_table: self._on_database_column_moved(
+                t, logical, old_vis, new_vis
+            )
+        )
+        self._apply_column_layout_to_table(tab_table, identifier)
 
         # Apply styling
         self._configure_table_styling_for_table(tab_table)
@@ -699,15 +1307,28 @@ class DatabasePanel(QWidget):
         for tab_idx, tab_data in self._tab_models.items():
             if tab_data.get('identifier') == 'search_results':
                 # Update existing tab
+                old_model = tab_data.get('model')
                 tab_data['model'] = model
                 tab_table = tab_data['table']
+                if old_model is not None and old_model is not model:
+                    try:
+                        old_model.columnsInserted.disconnect()
+                    except Exception:
+                        pass
+                    try:
+                        old_model.columnsRemoved.disconnect()
+                    except Exception:
+                        pass
                 tab_table.setModel(model)
-                # Ensure Source DB (and Ref Ply) columns are visible for search results
-                source_db_col = model.COL_SOURCE_DB
-                tab_table.setColumnHidden(source_db_col, False)
-                if hasattr(model, "COL_REF_PLY"):
-                    ref_ply_col = model.COL_REF_PLY
-                    tab_table.setColumnHidden(ref_ply_col, False)
+                model.columnsInserted.connect(
+                    lambda parent, first, last, t=tab_table: self._on_model_columns_inserted(
+                        t, 'search_results', first, last
+                    )
+                )
+                model.columnsRemoved.connect(
+                    lambda *args, t=tab_table: self._on_model_columns_removed(t)
+                )
+                self._apply_column_layout_to_table(tab_table, 'search_results')
                 # Refresh the view
                 tab_table.update()
                 tab_table.viewport().update()
@@ -722,16 +1343,12 @@ class DatabasePanel(QWidget):
         # Update tab label to "Search Results"
         self.tab_widget.setTabText(tab_index, "Search Results")
         
-        # Ensure Source DB (and Ref Ply) columns are visible for search results
+        # Ensure search-results column visibility (Source DB / Move)
         tab_data = self._tab_models.get(tab_index)
         if tab_data:
             tab_table = tab_data.get('table')
             if tab_table:
-                source_db_col = model.COL_SOURCE_DB
-                tab_table.setColumnHidden(source_db_col, False)
-                if hasattr(model, "COL_REF_PLY"):
-                    ref_ply_col = model.COL_REF_PLY
-                    tab_table.setColumnHidden(ref_ply_col, False)
+                self._apply_column_layout_to_table(tab_table, identifier)
         
         return tab_index
     
@@ -1214,18 +1831,26 @@ class DatabasePanel(QWidget):
         else:
             cfg = copy_cfg["tsv"]
             kind = "TSV"
-        # Omit "# in File" column (hidden in UI, duplicates "#" column)
-        column_indices = [c for c in range(model.columnCount()) if c != model.COL_FILE_NUM]
-        # For non-search-results tabs, omit Source DB and Ref Ply (only relevant for search results)
-        tab_identifier = None
+        # Export currently visible columns (left-to-right visual order)
+        table_for_export = None
         for _idx, tab_data in self._tab_models.items():
             if tab_data.get("model") is model:
-                tab_identifier = tab_data.get("identifier")
+                table_for_export = tab_data.get("table")
                 break
-        if tab_identifier != "search_results":
-            column_indices = [c for c in column_indices if c != model.COL_SOURCE_DB]
-            if hasattr(model, "COL_REF_PLY"):
-                column_indices = [c for c in column_indices if c != model.COL_REF_PLY]
+        column_indices: List[int] = []
+        if table_for_export is not None:
+            header = table_for_export.horizontalHeader()
+            for visual_idx in range(header.count()):
+                logical = header.logicalIndex(visual_idx)
+                if logical < 0:
+                    continue
+                if table_for_export.isColumnHidden(logical):
+                    continue
+                column_indices.append(logical)
+        else:
+            column_indices = [
+                c for c in range(model.columnCount()) if c != model.COL_FILE_NUM
+            ]
         if not column_indices:
             progress_service.set_status("No columns to copy")
             return
@@ -1395,7 +2020,19 @@ class DatabasePanel(QWidget):
             file_path: New file path.
         """
         if tab_index in self._tab_models:
+            old_identifier = self._tab_models[tab_index].get("identifier")
             self._tab_models[tab_index]['file_path'] = file_path
+            # Keep identifier in sync for path-keyed settings (column layouts, etc.).
+            if old_identifier and old_identifier not in ("clipboard", "search_results"):
+                self._tab_models[tab_index]["identifier"] = file_path
+                try:
+                    from app.services.user_settings_service import UserSettingsService
+
+                    UserSettingsService.get_instance().remap_database_table_columns_path(
+                        str(old_identifier), str(file_path)
+                    )
+                except Exception:
+                    pass
             # Update tab label with new file name
             file_name = Path(file_path).stem
             self.tab_widget.setTabText(tab_index, file_name)

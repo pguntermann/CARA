@@ -192,6 +192,7 @@ class SearchController:
                 source_database=db_name,
                 file_position=0,  # Search results don't have file position
                 ref_ply=ref_ply,
+                header_values=dict(getattr(game, "header_values", {}) or {}),
             )
             
             # Extract tags from existing game's PGN (game is being copied for search results)
