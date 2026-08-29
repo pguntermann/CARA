@@ -1,5 +1,22 @@
 # Release Notes
 
+# CARA v2.8.8 - (Even) more customization
+
+**Release Date:** 29.08.2026
+
+This release lets you **show or hide detail tabs** (and their related menus), **customize and persist PGN database table columns** with a global default or per-file overrides, and it moves **repeated same-position error patterns** into their own Player Stats section.
+
+## New Features
+
+- **View → Show/Hide:** Toggle which detail tabs are available (and, where applicable, their matching top-level menus). Choices are persisted in user settings. Hidden tabs stay out of the tab bar and related View shortcuts until you show them again.
+- **Database table columns:** Reorder, resize, and show/hide columns on the game table (including extra columns for non-standard PGN headers when present). From a database tab’s context menu you can **Save column settings (global)** as the user-wide default, **Restore default column settings** to reset the global default to the app's recommended default settings, or use **Save column settings (this file)** / **Remove column settings for this file** for per-file settings. Note: If you restore the default column settings, your current per-file overrides remain untouched until you remove them.
+
+## Enhancements
+
+- **Player Stats – Repeated Position Errors:** Repeated blunders, mistakes, misses, or inaccuracies in the same position are listed in a dedicated section, separate from the general Error Patterns list. They are no longer gated by the Error Patterns %-coverage slider.
+
+---
+
 # CARA v2.8.7 - Variations from PV, Bulk analysis sanity checks and more polish
 
 **Release Date:** 20.08.2026
