@@ -935,6 +935,7 @@ class DatabasePanel(QWidget):
         table = tab_info.get("table")
         if table is None:
             return
+        from app.services.progress_service import ProgressService
         from app.services.user_settings_service import UserSettingsService
 
         layout = self._sanitize_layout_for_persist(
@@ -945,6 +946,9 @@ class DatabasePanel(QWidget):
             layout, settings.get_database_table_columns()
         )
         settings.set_database_table_columns(layout)
+        ProgressService.get_instance().set_status(
+            "Saved column settings as global default"
+        )
 
     def _restore_default_column_settings(self) -> None:
         """Reset the stored global layout to application factory defaults.
@@ -953,12 +957,16 @@ class DatabasePanel(QWidget):
         override are refreshed to the factory global.
         """
         from app.services.database_table_columns import default_database_table_columns
+        from app.services.progress_service import ProgressService
         from app.services.user_settings_service import UserSettingsService
 
         settings = UserSettingsService.get_instance()
         factory = default_database_table_columns(self._theme_column_widths_config())
         settings.set_database_table_columns(factory)
         self._refresh_tabs_using_global_column_layout()
+        ProgressService.get_instance().set_status(
+            "Restored default column settings"
+        )
 
     def _refresh_tabs_using_global_column_layout(self) -> None:
         """Re-apply column layout on open tabs that have no per-file override."""
@@ -983,6 +991,7 @@ class DatabasePanel(QWidget):
         identifier = tab_info.get("identifier")
         if table is None or not identifier or identifier in ("clipboard", "search_results"):
             return
+        from app.services.progress_service import ProgressService
         from app.services.user_settings_service import UserSettingsService
 
         layout = self._sanitize_layout_for_persist(
@@ -994,6 +1003,9 @@ class DatabasePanel(QWidget):
             previous = settings.get_database_table_columns_for_identifier(str(identifier))
         layout = self._merge_dynamic_column_prefs(layout, previous)
         settings.set_database_table_columns_for_path(identifier, layout)
+        ProgressService.get_instance().set_status(
+            "Saved column settings for this file"
+        )
 
     def _remove_column_settings_for_file(self, tab_index: int) -> None:
         """Remove this file's column override and apply the current global layout."""
@@ -1004,6 +1016,7 @@ class DatabasePanel(QWidget):
         identifier = tab_info.get("identifier") or tab_info.get("file_path")
         if table is None or not identifier or identifier in ("clipboard", "search_results"):
             return
+        from app.services.progress_service import ProgressService
         from app.services.user_settings_service import UserSettingsService
 
         settings = UserSettingsService.get_instance()
@@ -1013,6 +1026,9 @@ class DatabasePanel(QWidget):
         if file_path and str(file_path) != str(identifier):
             settings.remove_database_table_columns_for_path(str(file_path))
         self._apply_column_layout_to_table(table, identifier, force_global=True)
+        ProgressService.get_instance().set_status(
+            "Removed column settings for this file"
+        )
 
     def _initialize_tabs(self) -> None:
         """Initialize the database panel tabs."""
