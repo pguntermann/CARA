@@ -303,15 +303,29 @@ class ErrorPatternService:
             player_name, games, game_summaries, aggregated_stats
         )
         patterns.extend(inaccuracy_patterns)
-        
-        # Pattern 9: Repeated errors in the same position (blunders, misses, inaccuracies)
-        repeated_position_patterns = self._detect_repeated_position_errors(
-            player_name, games, precomputed_moves
-        )
-        patterns.extend(repeated_position_patterns)
+
+        # Repeated same-position slips live in their own Player Stats section
+        # (not filtered by the Error Patterns %-coverage slider).
         
         patterns.sort(key=lambda p: (-p.game_coverage, -p.percentage))
         return patterns
+
+    def detect_repeated_position_patterns(
+        self,
+        player_name: str,
+        games: List[GameData],
+        precomputed_moves: Optional[List[Optional[List[MoveData]]]] = None,
+    ) -> List[ErrorPattern]:
+        """Detect repeated slips in the same position across games.
+
+        Shown in a dedicated Player Stats section (not gated by the Error Patterns
+        coverage slider).
+        """
+        if not games:
+            return []
+        return self._detect_repeated_position_errors(
+            player_name, games, precomputed_moves
+        )
     
     def _detect_phase_blunder_patterns(
         self,

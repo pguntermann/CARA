@@ -140,6 +140,7 @@ class PlayerStatsPDFService(BasePDFReportService):
         significant_moves: Optional[Dict[str, List[Dict[str, Any]]]] = None,
         opening_tree_summary_lines: Optional[List[str]] = None,
         opening_tree_data: Optional[Dict[str, Any]] = None,
+        repeated_position_patterns: Optional[Sequence[Any]] = None,
     ) -> Path:
         """Write the PDF report to ``path`` and return the resolved path."""
         out = Path(path)
@@ -176,6 +177,7 @@ class PlayerStatsPDFService(BasePDFReportService):
                 opening_tree_summary_lines=opening_tree_summary_lines,
                 opening_tree_data=opening_tree_data,
                 player_name=player_name or "Player",
+                repeated_position_patterns=list(repeated_position_patterns or []),
             )
             _ = y
         finally:
@@ -266,6 +268,7 @@ class PlayerStatsPDFService(BasePDFReportService):
         opening_tree_summary_lines: Optional[List[str]],
         opening_tree_data: Optional[Dict[str, Any]],
         player_name: str,
+        repeated_position_patterns: Optional[List[Any]] = None,
     ) -> float:
         show = self._is_visible
 
@@ -361,6 +364,16 @@ class PlayerStatsPDFService(BasePDFReportService):
                 y,
                 significant_moves=significant_moves,
                 stats=stats,
+            )
+
+        if show("repeated_position_errors", section_visibility) and repeated_position_patterns:
+            y = self._draw_error_patterns(
+                painter,
+                writer,
+                content,
+                y,
+                repeated_position_patterns,
+                title="Repeated Position Errors",
             )
 
         if show("error_patterns", section_visibility) and patterns:
@@ -3197,6 +3210,8 @@ class PlayerStatsPDFService(BasePDFReportService):
         content: QRectF,
         y: float,
         patterns: Sequence[Any],
+        *,
+        title: str = "Error Patterns",
     ) -> float:
         items = [p for p in patterns if p is not None]
         if not items:
@@ -3218,7 +3233,7 @@ class PlayerStatsPDFService(BasePDFReportService):
             writer,
             content,
             y,
-            "Error Patterns",
+            title,
             keep_with=40,
         )
 

@@ -81,6 +81,7 @@ PLAYER_STATS_MENU_SECTIONS: List[Tuple[str, str]] = [
     ("endgame_tree", "Endgame tree"),
     ("games_by_performance", "Games by performance"),
     ("significant_moves", "Significant moves"),
+    ("repeated_position_errors", "Repeated position errors"),
     ("error_patterns", "Error patterns"),
 ]
 
@@ -2710,6 +2711,7 @@ class DetailPlayerStatsView(QWidget):
 
         self.current_stats: Optional["AggregatedPlayerStats"] = None
         self.current_patterns: List["ErrorPattern"] = []
+        self.current_repeated_position_patterns: List["ErrorPattern"] = []
         
         # Get player stats config
         ui_config = self.config.get('ui', {})
@@ -2783,6 +2785,8 @@ class DetailPlayerStatsView(QWidget):
         # Error patterns responsive handling
         self._error_patterns_widget: Optional[QWidget] = None
         self._error_pattern_items: List[Dict[str, Any]] = []  # List of {item, button, desc_label, full_text}
+        self._repeated_position_errors_widget: Optional[QWidget] = None
+        self._repeated_position_error_items: List[Dict[str, Any]] = []
         self._error_pattern_coverage_slider: Optional[QSlider] = None
         self._error_pattern_coverage_value_label: Optional[QLabel] = None
         self._error_pattern_empty_label: Optional[QLabel] = None
@@ -3167,10 +3171,12 @@ class DetailPlayerStatsView(QWidget):
     
     def _handle_stats_updated(self, stats: "AggregatedPlayerStats", 
                               patterns: List["ErrorPattern"],
-                              game_summaries: List) -> None:
+                              game_summaries: List,
+                              repeated_position_patterns: Optional[List["ErrorPattern"]] = None) -> None:
         """Render the stats content when new data is available."""
         self.current_stats = stats
         self.current_patterns = patterns
+        self.current_repeated_position_patterns = list(repeated_position_patterns or [])
         self._last_unavailable_reason = ""
         
         self._set_disabled_placeholder_visible(False)
@@ -3226,6 +3232,7 @@ class DetailPlayerStatsView(QWidget):
         self._sync_player_stats_activity_label()
         self.current_stats = None
         self.current_patterns = []
+        self.current_repeated_position_patterns = []
         self._last_unavailable_reason = reason or "no_player"
         
         self._clear_content()
@@ -3681,6 +3688,8 @@ class DetailPlayerStatsView(QWidget):
         self._openings_grids = []
         self._error_patterns_widget = None
         self._error_pattern_items = []
+        self._repeated_position_errors_widget = None
+        self._repeated_position_error_items = []
         self._error_pattern_coverage_slider = None
         self._error_pattern_coverage_value_label = None
         self._error_pattern_empty_label = None
@@ -3769,6 +3778,8 @@ class DetailPlayerStatsView(QWidget):
         self._openings_grids = []
         self._error_patterns_widget = None
         self._error_pattern_items = []
+        self._repeated_position_errors_widget = None
+        self._repeated_position_error_items = []
         self._error_pattern_coverage_slider = None
         self._error_pattern_coverage_value_label = None
         self._error_pattern_empty_label = None
@@ -4213,6 +4224,23 @@ class DetailPlayerStatsView(QWidget):
             significant_widget,
             section_spacing_val,
         )
+
+        # Repeated Position Errors (not gated by Error Patterns coverage slider)
+        repeated_patterns = getattr(self, "current_repeated_position_patterns", None) or []
+        if repeated_patterns:
+            repeated_widget = self._create_repeated_position_errors_widget(
+                repeated_patterns, text_color, label_font, value_font,
+                section_bg_color, border_color, widgets_config
+            )
+            repeated_widget.setProperty("section_name", "Repeated Position Errors")
+            self._add_player_stats_section(
+                "repeated_position_errors",
+                "Repeated Position Errors",
+                header_font,
+                header_text_color,
+                repeated_widget,
+                section_spacing_val,
+            )
 
         # Error Patterns Section
         if patterns:
@@ -6178,6 +6206,56 @@ class DetailPlayerStatsView(QWidget):
 
         return widget
     
+    def _create_repeated_position_errors_widget(
+        self,
+        patterns: List["ErrorPattern"],
+        text_color: QColor,
+        label_font: QFont,
+        value_font: QFont,
+        bg_color: QColor,
+        border_color: QColor,
+        widgets_config: Dict[str, Any],
+    ) -> QWidget:
+        """Create repeated same-position error cards (no coverage slider)."""
+        border_radius = widgets_config.get('border_radius', 5)
+        section_margins = widgets_config.get('section_margins', [10, 10, 10, 10])
+        section_spacing = widgets_config.get('section_spacing', 8)
+
+        widget = QWidget()
+        widget.setStyleSheet(f"""
+            QWidget {{
+                background-color: rgb({bg_color.red()}, {bg_color.green()}, {bg_color.blue()});
+                border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
+                border-radius: {border_radius}px;
+            }}
+        """)
+        widget.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
+        widget.setMinimumWidth(0)
+        widget.setMaximumWidth(16777215)
+
+        layout = QVBoxLayout(widget)
+        bottom_margin = max(section_margins[1], section_margins[3])
+        layout.setContentsMargins(section_margins[0], section_margins[1], section_margins[2], bottom_margin)
+        layout.setSpacing(section_spacing)
+
+        self._repeated_position_errors_widget = widget
+        self._repeated_position_error_items = []
+        self._error_patterns_label_font = label_font
+        self._error_patterns_value_font = value_font
+        self._error_patterns_text_color = text_color
+
+        for i, pattern in enumerate(patterns):
+            pattern_data = self._create_error_pattern_item(
+                pattern, text_color, label_font, value_font, bg_color, border_color, widgets_config
+            )
+            layout.addWidget(pattern_data['item'])
+            self._repeated_position_error_items.append(pattern_data)
+            if i == len(patterns) - 1:
+                layout.addSpacing(2)
+
+        QTimer.singleShot(0, self._update_error_patterns_visibility)
+        return widget
+
     def _create_error_patterns_widget(self, patterns: List["ErrorPattern"],
                                      text_color: QColor, label_font: QFont, value_font: QFont,
                                      bg_color: QColor, border_color: QColor,
@@ -6923,18 +7001,30 @@ class DetailPlayerStatsView(QWidget):
             self._move_classification_legend_widget = None
     
     def _update_error_patterns_visibility(self) -> None:
-        """Update error patterns visibility and text truncation based on available width."""
-        if not self._error_patterns_widget or not hasattr(self, 'scroll_area'):
+        """Update error / repeated-position pattern row truncation based on width."""
+        self._update_pattern_card_list_visibility(
+            self._error_patterns_widget,
+            self._error_pattern_items,
+        )
+        self._update_pattern_card_list_visibility(
+            getattr(self, "_repeated_position_errors_widget", None),
+            getattr(self, "_repeated_position_error_items", None) or [],
+        )
+
+    def _update_pattern_card_list_visibility(
+        self,
+        section_widget: Optional[QWidget],
+        pattern_items: List[Dict[str, Any]],
+    ) -> None:
+        """Update pattern card visibility and text truncation based on available width."""
+        if not section_widget or not hasattr(self, 'scroll_area'):
             return
         
         # Check if widget is still valid (not deleted)
         try:
-            if not hasattr(self._error_patterns_widget, 'parent'):
-                self._error_patterns_widget = None
+            if not hasattr(section_widget, 'parent'):
                 return
         except RuntimeError:
-            # Widget was deleted
-            self._error_patterns_widget = None
             return
         
         # Viewport width drives collapse thresholds; inner width matches the content track (layout margins).
@@ -6958,13 +7048,13 @@ class DetailPlayerStatsView(QWidget):
         if not label_font or not value_font or not text_color:
             return
 
-        ep_lay = self._error_patterns_widget.layout()
+        ep_lay = section_widget.layout()
         ep_m = ep_lay.contentsMargins() if ep_lay is not None else None
         ep_lr = (ep_m.left() + ep_m.right()) if ep_m is not None else 0
         row_budget = max(50, inner_w - ep_lr)
 
         # Update each error pattern item
-        for pattern_data in self._error_pattern_items:
+        for pattern_data in pattern_items:
             button = pattern_data.get('button')
             desc_label = pattern_data.get('desc_label')
             full_text = pattern_data.get('full_text', '')
@@ -7517,7 +7607,15 @@ class DetailPlayerStatsView(QWidget):
         else:
             text = PlayerStatsTextFormatter.format_section(
                 self.current_stats,
-                self._visible_error_patterns() if section_name == "Error Patterns" else self.current_patterns,
+                (
+                    self._visible_error_patterns()
+                    if section_name == "Error Patterns"
+                    else (
+                        getattr(self, "current_repeated_position_patterns", None) or []
+                        if section_name == "Repeated Position Errors"
+                        else self.current_patterns
+                    )
+                ),
                 section_name,
                 current_player or "Player",
                 top_games_summary=top_games_summary,
@@ -7668,6 +7766,10 @@ class DetailPlayerStatsView(QWidget):
             top_games_summary=top_games_summary,
             opening_tree_summary_lines=opening_tree_summary_lines if opening_tree_summary_lines else None,
             section_visibility=self._section_visibility_prefs,
+            repeated_position_patterns=getattr(
+                self, "current_repeated_position_patterns", None
+            )
+            or [],
         )
         
         if text:
@@ -7789,6 +7891,10 @@ class DetailPlayerStatsView(QWidget):
                 significant_moves=significant_moves,
                 opening_tree_summary_lines=self._build_opening_tree_summary_lines() or None,
                 opening_tree_data=opening_tree_data,
+                repeated_position_patterns=getattr(
+                    self, "current_repeated_position_patterns", None
+                )
+                or [],
             )
             if self._stats_controller:
                 self._stats_controller.set_status(f"PDF report saved: {path}")

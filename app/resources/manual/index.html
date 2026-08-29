@@ -200,7 +200,8 @@
                                 <li><a href="#ps-endgame-tree">5.7.14 Endgame tree</a></li>
                                 <li><a href="#ps-games-by-performance">5.7.15 Games by performance</a></li>
                                 <li><a href="#ps-significant-moves">5.7.16 Significant moves</a></li>
-                                <li><a href="#ps-error-patterns">5.7.17 Error patterns</a></li>
+                                <li><a href="#ps-repeated-position-errors">5.7.17 Repeated position errors</a></li>
+                                <li><a href="#ps-error-patterns">5.7.18 Error patterns</a></li>
                             </ul>
                         </li>
                         <li><a href="#adding-annotations">5.8 Adding Annotations</a>
@@ -2003,19 +2004,34 @@
                 </div>
                 <img src="screenshots/player_stats_section_significant_moves.png" alt="CARA Player Stats — Significant moves section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
 
-                <h5 id="ps-error-patterns">5.7.17 Error patterns</h5>
-                <p><strong>Purpose:</strong> When Player Stats finds candidate issues for the <strong>selected player</strong> across the current analyzed games, this section lists them as separate cards. Each card has a short <strong>description</strong>, a <strong>severity</strong> color (for example critical vs moderate), and a frequency line (how often the pattern shows up and what share of relevant play that is). Rules cover several families of behavior—examples include blunders piling up in one phase, tactical misses, shaky opening error rates, persistently high centipawn loss, conversion or defensive trouble, and repeated slips in the same position.</p>
+                <h5 id="ps-repeated-position-errors">5.7.17 Repeated position errors</h5>
+                <p><strong>Purpose:</strong> Lists cases where the <strong>selected player</strong> made the same quality of slip—blunder, mistake, miss, or inaccuracy—from the <strong>same board position</strong> (normalized FEN: board + side to move) across multiple games. Each card describes one assessment type and how many positions/games are involved. Unlike <a href="#ps-error-patterns">Error patterns</a>, this section is <strong>not</strong> filtered by the %-coverage slider.</p>
+                <p><strong>Interactions:</strong></p>
+                <ul>
+                    <li>Each row has a <strong>View</strong> button. Click it to open a <strong>Search Results</strong> tab with one result row per occurrence; <strong>Ref Ply</strong> jumps the game view to that move (see <a href="#game-table">section 4.4.2</a>).</li>
+                    <li>Right-click in the section for <span class="menu-item">Copy section to clipboard</span> or <span class="menu-item">Copy stats to clipboard</span>.</li>
+                    <li>When the Player Stats area is narrow, the <strong>View</strong> buttons may hide and long descriptions are shortened—same behavior as Error patterns.</li>
+                </ul>
+                <p><strong>Settings:</strong></p>
+                <ul class="settings-list">
+                    <li><strong>Visibility:</strong> <span class="menu-item">Player Stats</span> → <span class="menu-item">Repeated position errors</span>.</li>
+                    <li><strong>Detection thresholds:</strong> Under <code>ui → panels → detail → player_stats → error_patterns → thresholds</code> in <code>config.json</code>, the <code>repeated_position_min_games_*</code> keys set the minimum distinct games required for each assessment type (default 2). See <a href="#customizing-config">section 7.1 Understanding Configuration Files</a>.</li>
+                </ul>
+
+                <h5 id="ps-error-patterns">5.7.18 Error patterns</h5>
+                <p><strong>Purpose:</strong> When Player Stats finds candidate issues for the <strong>selected player</strong> across the current analyzed games, this section lists them as separate cards. Each card has a short <strong>description</strong>, a <strong>severity</strong> color (for example critical vs moderate), and a frequency line (how often the pattern shows up and what share of relevant play that is). Rules cover several families of behavior—examples include blunders piling up in one phase, tactical misses, shaky opening error rates, persistently high centipawn loss, and conversion or defensive trouble. Repeated slips in the same position are listed separately under <a href="#ps-repeated-position-errors">Repeated position errors</a>.</p>
                 <p><strong>Interactions:</strong></p>
                 <ul>
                     <li>Each row has a <strong>View</strong> button. The label counts either matching <strong>games</strong> or individual <strong>occurrences</strong> (when the pattern tracks specific positions or moves), for example <strong>View 5 →</strong>.</li>
                     <li>Click <strong>View</strong> to open a <strong>Search Results</strong> tab. When the pattern supplies reference plies, there is one result row per occurrence and <strong>Ref Ply</strong> tells the game view which move to jump to (see <a href="#game-table">section 4.4.2</a>). Otherwise you get one row per game and opening the game does not target a particular ply.</li>
+                    <li>Use the <strong>Min. share of games</strong> slider to hide patterns whose game coverage is below the chosen percentage (default 25%). This slider does <strong>not</strong> affect <a href="#ps-repeated-position-errors">Repeated position errors</a>.</li>
                     <li>Right-click in the section for <span class="menu-item">Copy section to clipboard</span> or <span class="menu-item">Copy stats to clipboard</span> (section copy uses the heading <strong>Error Patterns</strong> in plain text).</li>
                     <li>When the Player Stats area is narrow, the <strong>View</strong> buttons hide and long descriptions are shortened so the cards still fit—similar to <a href="#ps-games-by-performance">Games by performance</a>.</li>
                 </ul>
                 <p><strong>Settings:</strong></p>
                 <ul class="settings-list">
                     <li><strong>Visibility:</strong> <span class="menu-item">Player Stats</span> → <span class="menu-item">Error patterns</span>.</li>
-                    <li><strong>Detection thresholds:</strong> Under <code>ui → panels → detail → player_stats → error_patterns → thresholds</code> in <code>config.json</code> you can tune when each rule fires (phase blunder share, tactical miss counts, opening error rates, CPL and conversion heuristics, repeated-position minima, and similar). See <a href="#customizing-config">section 7.1 Understanding Configuration Files</a>.</li>
+                    <li><strong>Detection thresholds:</strong> Under <code>ui → panels → detail → player_stats → error_patterns → thresholds</code> in <code>config.json</code> you can tune when each rule fires (phase blunder share, tactical miss counts, opening error rates, CPL and conversion heuristics, and similar). See <a href="#customizing-config">section 7.1 Understanding Configuration Files</a>.</li>
                 </ul>
                 <img src="screenshots/player_stats_section_error_patterns.png" alt="CARA Player Stats — Error patterns section" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
             </div>

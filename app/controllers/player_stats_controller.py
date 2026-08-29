@@ -153,7 +153,7 @@ class PlayerStatsCalculationWorker(QThread):
     """Worker thread for calculating player statistics asynchronously."""
     
     # Last list: parallel to analyzed games, Optional[List[MoveData]] per game (UI reuses without re-loading).
-    stats_ready = pyqtSignal(object, list, list, list)
+    stats_ready = pyqtSignal(object, list, list, list, list)  # stats, error_patterns, summaries, moves, repeated_position
     stats_unavailable = pyqtSignal(str)  # Reason key
     progress_update = pyqtSignal(int, str)  # progress_percent, status_message
     
@@ -317,11 +317,24 @@ class PlayerStatsCalculationWorker(QThread):
                 game_summaries,
                 precomputed_moves=precomputed_moves,
             )
+            repeated_position_patterns = (
+                self.stats_controller.error_pattern_service.detect_repeated_position_patterns(
+                    self.player_name,
+                    analyzed_games,
+                    precomputed_moves=precomputed_moves,
+                )
+            )
             
             if not self._is_cancelled():
                 try:
                     self.progress_update.emit(100, f"Statistics calculated for {self.player_name}")
-                    self.stats_ready.emit(aggregated_stats, error_patterns, game_summaries, precomputed_moves)
+                    self.stats_ready.emit(
+                        aggregated_stats,
+                        error_patterns,
+                        game_summaries,
+                        precomputed_moves,
+                        repeated_position_patterns,
+                    )
                     result_emitted = True
                 except RuntimeError:
                     # Receiver might be deleted, ignore
@@ -349,7 +362,7 @@ class PlayerStatsCalculationWorker(QThread):
 class PlayerStatsController(QObject):
     """Controller responsible for producing and exposing player statistics data."""
     
-    stats_updated = pyqtSignal(object, list, list)  # AggregatedPlayerStats, List[ErrorPattern], List[GameSummary]
+    stats_updated = pyqtSignal(object, list, list, list)  # AggregatedPlayerStats, List[ErrorPattern], List[GameSummary], List[ErrorPattern] repeated_position
     stats_unavailable = pyqtSignal(str)  # Reason key (e.g., "no_player", "no_analyzed_games")
     stats_recalculation_started = pyqtSignal()  # Stats worker is about to run (UI may show a short status line)
     bulk_analysis_blocks_stats_recalculation = pyqtSignal(bool)  # True while bulk analysis runs; pauses DB-driven recalcs
@@ -385,6 +398,7 @@ class PlayerStatsController(QObject):
         
         self.current_stats: Optional[AggregatedPlayerStats] = None
         self.current_patterns: List[ErrorPattern] = []
+        self.current_repeated_position_patterns: List[ErrorPattern] = []
         self.current_game_summaries: List[GameSummary] = []
         # Keep the analyzed games used for the current stats so we can rank individual games.
         self._current_analyzed_games: List["GameData"] = []
@@ -534,6 +548,10 @@ class PlayerStatsController(QObject):
     def get_current_patterns(self) -> List[ErrorPattern]:
         """Get the most recently detected error patterns."""
         return self.current_patterns
+
+    def get_current_repeated_position_patterns(self) -> List[ErrorPattern]:
+        """Get the most recently detected repeated same-position patterns."""
+        return self.current_repeated_position_patterns
     
     def _get_ranked_games_by_cpl(self) -> List[Tuple[float, float, "GameData"]]:
         """Rank analyzed games by the player's average CPL (ascending = best).
@@ -1488,6 +1506,7 @@ class PlayerStatsController(QObject):
         self._last_unavailable_reason = reason
         self.current_stats = None
         self.current_patterns = []
+        self.current_repeated_position_patterns = []
         self.current_game_summaries = []
         self._current_analyzed_games = []
         self._last_analyzed_games = []
@@ -1687,10 +1706,12 @@ class PlayerStatsController(QObject):
         patterns: List[ErrorPattern],
         summaries: List[GameSummary],
         session_moves: Optional[List[Optional[List[MoveData]]]] = None,
+        repeated_position_patterns: Optional[List[ErrorPattern]] = None,
     ) -> None:
         """Handle stats worker ready signal."""
         self.current_stats = stats
         self.current_patterns = patterns
+        self.current_repeated_position_patterns = list(repeated_position_patterns or [])
         self.current_game_summaries = summaries
         # Use the same analyzed games that were used for this calculation
         self._current_analyzed_games = getattr(self, "_last_analyzed_games", [])
@@ -1699,7 +1720,9 @@ class PlayerStatsController(QObject):
             self._session_precomputed_moves = list(session_moves)
         else:
             self._session_precomputed_moves = []
-        self.stats_updated.emit(stats, patterns, summaries)
+        self.stats_updated.emit(
+            stats, patterns, summaries, self.current_repeated_position_patterns
+        )
     
     def _on_stats_worker_unavailable(self, reason: str) -> None:
         """Handle stats worker unavailable signal."""

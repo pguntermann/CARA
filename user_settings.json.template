@@ -1045,6 +1045,7 @@
     "endgame_tree": true,
     "games_by_performance": true,
     "significant_moves": true,
+    "repeated_position_errors": true,
     "error_patterns": true
   },
   "player_stats_time_series": {
@@ -1094,6 +1095,7 @@
         "endgame_tree": true,
         "games_by_performance": true,
         "significant_moves": true,
+        "repeated_position_errors": true,
         "error_patterns": true
       },
       "player_stats_time_series": {

@@ -60,6 +60,7 @@ class PlayerStatsTextFormatter:
         top_games_summary: Optional[Tuple[int, Optional[float], Optional[float], int, Optional[float], Optional[float]]] = None,
         opening_tree_summary_lines: Optional[List[str]] = None,
         section_visibility: Optional[Dict[str, bool]] = None,
+        repeated_position_patterns: Optional[List["ErrorPattern"]] = None,
     ) -> str:
         """Format the full player statistics as text.
         
@@ -69,6 +70,7 @@ class PlayerStatsTextFormatter:
             player_name: Name of the player.
             top_games_summary: Optional (best_count, best_min_acc, best_max_acc, worst_count, worst_min_acc, worst_max_acc).
             section_visibility: Optional map section_id -> visible (matches Player Stats menu); omitted ids default to True.
+            repeated_position_patterns: Optional repeated same-position patterns (own section).
 
         Returns:
             Formatted text string for the full stats.
@@ -135,6 +137,14 @@ class PlayerStatsTextFormatter:
 
         if show("games_by_performance", vis) and top_games_summary is not None:
             lines.extend(PlayerStatsTextFormatter._format_top_games(*top_games_summary))
+            lines.append("")
+
+        if show("repeated_position_errors", vis) and repeated_position_patterns:
+            lines.extend(
+                PlayerStatsTextFormatter._format_repeated_position_errors(
+                    repeated_position_patterns
+                )
+            )
             lines.append("")
 
         if show("error_patterns", vis) and patterns:
@@ -210,6 +220,9 @@ class PlayerStatsTextFormatter:
                 lines.extend(section_lines[3:])
         elif section_name == "Error Patterns":
             section_lines = PlayerStatsTextFormatter._format_error_patterns(patterns)
+            lines.extend(section_lines[3:])
+        elif section_name == "Repeated Position Errors":
+            section_lines = PlayerStatsTextFormatter._format_repeated_position_errors(patterns)
             lines.extend(section_lines[3:])
         
         return "\n".join(lines)
@@ -654,8 +667,25 @@ class PlayerStatsTextFormatter:
         Returns:
             List of formatted lines.
         """
+        return PlayerStatsTextFormatter._format_pattern_cards(
+            patterns, "Error Patterns"
+        )
+
+    @staticmethod
+    def _format_repeated_position_errors(patterns: List["ErrorPattern"]) -> List[str]:
+        """Format repeated same-position error patterns."""
+        return PlayerStatsTextFormatter._format_pattern_cards(
+            patterns, "Repeated Position Errors"
+        )
+
+    @staticmethod
+    def _format_pattern_cards(
+        patterns: List["ErrorPattern"],
+        header: str,
+    ) -> List[str]:
+        """Format pattern cards under a section header."""
         lines: List[str] = []
-        PlayerStatsTextFormatter._add_section_header(lines, "Error Patterns")
+        PlayerStatsTextFormatter._add_section_header(lines, header)
         
         for pattern in patterns:
             lines.append(f"{pattern.description}")
