@@ -24,6 +24,18 @@ STANDARD_TAG_TO_FIELD = {
     "TimeControl": "time_control",
 }
 
+# Heavy CARA payloads are never cached on GameData.header_values at parse time.
+_HEAVY_HEADER_TAGS = frozenset(
+    {
+        "CARAAnalysisData",
+        "CARAAnnotations",
+        "CARANotes",
+    }
+)
+
+# Nested key in update dicts for the header_values cache (dynamic table columns).
+_HEADER_VALUES_KEY = "_header_values"
+
 
 def game_data_updates_for_header_tag(
     tag_name: str,
@@ -60,12 +72,51 @@ def game_data_updates_for_header_tag(
         if removed:
             updates["notes"] = None
 
+    # Keep parse-time header_values cache in sync for dynamic database columns.
+    if tag_name and tag_name not in _HEAVY_HEADER_TAGS:
+        updates[_HEADER_VALUES_KEY] = {
+            tag_name: None if removed else ("" if new_value is None else str(new_value))
+        }
+
     return updates
+
+
+def merge_game_data_updates(target: Dict[str, Any], extra: Dict[str, Any]) -> None:
+    """Merge updates from ``game_data_updates_for_header_tag`` into ``target``.
+
+    Nested ``_header_values`` patches are combined so multi-tag steps keep all tags.
+    """
+    if not extra:
+        return
+    for key, value in extra.items():
+        if key == _HEADER_VALUES_KEY and isinstance(value, dict):
+            bucket = target.setdefault(_HEADER_VALUES_KEY, {})
+            if isinstance(bucket, dict):
+                bucket.update(value)
+            else:
+                target[_HEADER_VALUES_KEY] = dict(value)
+        else:
+            target[key] = value
 
 
 def apply_game_data_updates(game: Any, updates: Dict[str, Any]) -> None:
     """Apply attribute updates produced by ``game_data_updates_for_header_tag``."""
     if not updates:
         return
+    header_patch = updates.get(_HEADER_VALUES_KEY)
     for attr, value in updates.items():
+        if attr == _HEADER_VALUES_KEY:
+            continue
         setattr(game, attr, value)
+
+    if isinstance(header_patch, dict) and header_patch:
+        hv = getattr(game, "header_values", None)
+        if not isinstance(hv, dict):
+            hv = {}
+            setattr(game, "header_values", hv)
+        for tag, value in header_patch.items():
+            name = str(tag)
+            if value is None:
+                hv.pop(name, None)
+            else:
+                hv[name] = str(value)
