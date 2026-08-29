@@ -389,6 +389,8 @@ class UserSettingsService:
                     model.set_profile_order(template_value)
                 elif key == "board_visibility":
                     model.set_board_visibility(template_value)
+                elif key == "detail_panel_visibility":
+                    model.set_detail_panel_visibility(template_value)
                 elif key == "pgn_visibility":
                     model.set_pgn_visibility(template_value)
                 elif key == "game_analysis":
@@ -428,6 +430,8 @@ class UserSettingsService:
                         model.set_moves_list_profiles(section_dict)
                     elif key == "board_visibility":
                         model.set_board_visibility(section_dict)
+                    elif key == "detail_panel_visibility":
+                        model.set_detail_panel_visibility(section_dict)
                     elif key == "pgn_visibility":
                         model.set_pgn_visibility(section_dict)
                     elif key == "pgn_notation":
@@ -770,6 +774,10 @@ class UserSettingsService:
         current = model.get_board_visibility()
         current.update(visibility)
         model.set_board_visibility(current)
+
+    def update_detail_panel_visibility(self, unit_id: str, visible: bool) -> None:
+        """Update one detail-panel tab/menu visibility flag (write-on-exit)."""
+        self.get_model().update_detail_panel_visibility(str(unit_id), bool(visible))
     
     def update_pgn_visibility(self, visibility: Dict[str, bool]) -> None:
         """Update PGN visibility settings.

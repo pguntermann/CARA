@@ -2703,11 +2703,14 @@
                 <p><strong>Shortcut:</strong> <code>F9</code></p>
                 <p>Switches the Detail Panel to the <strong>Notes</strong> tab.<br>See <a href="#notes">section 4.5.9</a> for more information.</p>
 
-                <h5>6.14.12 Hide PGN Pane</h5>
+                <h5>6.14.12 Show/Hide</h5>
+                <p>Checkable items that show or hide Detail Panel tabs and, where applicable, their related top-level menus (for example hiding <strong>Player Stats</strong> hides both the tab and the Player Stats menu). Opening Explorer, PGN header tags, and Game Summary are tab-only; the Game Analysis menu remains available when Game Summary is hidden. At least one detail tab must stay visible. Choices are saved in your user settings when the application exits. View menu shortcuts (F1–F9) for a hidden tab are disabled until you show it again. Automatic tab switches during analysis (Moves List / Game Summary) are skipped if that tab is hidden.</p>
+
+                <h5>6.14.13 Hide PGN Pane</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+↑</code> / <code>⌘+Shift+↑</code></p>
                 <p>Toggles the visibility of the PGN notation pane in the Detail Panel to free more space for the analysis tabs. You can also double-click the splitter handle between the PGN pane and the tabs.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
 
-                <h5>6.14.13 Hide Database Panel</h5>
+                <h5>6.14.14 Hide Database Panel</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+↓</code> / <code>⌘+Shift+↓</code></p>
                 <p>Toggles the visibility of the Database Panel to free more space for the Main and Detail panels.<br>See <a href="#three-panel-layout">section 4.2</a> for more information.</p>
             </div>
@@ -3088,6 +3091,7 @@
                     <li><strong>moves_list_profiles:</strong> Column profile definitions with visibility, width, and order settings for each profile</li>
                     <li><strong>active_profile:</strong> The currently active column profile name</li>
                     <li><strong>board_visibility:</strong> Toggle states for board display elements (coordinates, arrows, evaluation bar, etc.)</li>
+                    <li><strong>detail_panel_visibility:</strong> Which Detail Panel tabs (and related top-level menus) are shown via View → Show/Hide</li>
                     <li><strong>pgn_visibility:</strong> Toggle states for PGN notation display options (including <code>navigate_variations</code> for <span class="menu-item">PGN → Enable navigating into variations</span>)</li>
                     <li><strong>game_analysis:</strong> Game analysis preferences (return to PLY 0, switch tabs, etc.)</li>
                     <li><strong>manual_analysis:</strong> Manual analysis settings (max pieces to explore, exploration depth, etc.)</li>

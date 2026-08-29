@@ -798,6 +798,17 @@
     }
   },
   "active_profile": "Game Analysis - Full",
+  "detail_panel_visibility": {
+    "moves_list": true,
+    "metadata": true,
+    "manual_analysis": true,
+    "opening_explorer": true,
+    "game_summary": true,
+    "player_stats": true,
+    "annotations": true,
+    "ai_summary": true,
+    "notes": true
+  },
   "board_visibility": {
     "show_coordinates": true,
     "show_turn_indicator": true,

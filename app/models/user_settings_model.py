@@ -118,6 +118,28 @@ class UserSettingsModel(QObject):
         self._settings["board_visibility"] = settings.copy()
         self.board_visibility_changed.emit()
         self.settings_changed.emit()
+
+    def get_detail_panel_visibility(self) -> Dict[str, bool]:
+        """Per-unit visibility for detail tabs / related menus (missing id => True)."""
+        from app.services.detail_panel_visibility import normalize_detail_panel_visibility
+
+        raw = self._settings.get("detail_panel_visibility")
+        return normalize_detail_panel_visibility(raw if isinstance(raw, dict) else None)
+
+    def set_detail_panel_visibility(self, visibility: Dict[str, bool]) -> None:
+        """Replace stored detail-panel visibility map."""
+        from app.services.detail_panel_visibility import normalize_detail_panel_visibility
+
+        self._settings["detail_panel_visibility"] = normalize_detail_panel_visibility(
+            visibility
+        )
+        self.settings_changed.emit()
+
+    def update_detail_panel_visibility(self, unit_id: str, visible: bool) -> None:
+        """Set one detail-panel unit's visibility."""
+        cur = self.get_detail_panel_visibility()
+        cur[str(unit_id)] = bool(visible)
+        self.set_detail_panel_visibility(cur)
     
     def get_pgn_visibility(self) -> Dict[str, Any]:
         """Get PGN visibility settings.
