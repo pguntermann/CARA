@@ -25,6 +25,7 @@ from app.utils.concurrency_utils import get_process_pool_max_workers
 from app.utils.game_data_header_sync import (
     apply_game_data_updates,
     game_data_updates_for_header_tag,
+    merge_game_data_updates,
 )
 
 # Mode strings mirror BulkOperationsController (kept local so workers stay picklable).
@@ -91,7 +92,10 @@ def _apply_remove_tags(
         if tag_name in chess_game.headers:
             del chess_game.headers[tag_name]
             removed_any = True
-            field_updates.update(game_data_updates_for_header_tag(tag_name, removed=True))
+            merge_game_data_updates(
+                field_updates,
+                game_data_updates_for_header_tag(tag_name, removed=True),
+            )
     if not removed_any:
         return False, {}, BulkProcessingOutcome.SKIPPED
     return True, field_updates, BulkProcessingOutcome.UPDATED
@@ -145,8 +149,9 @@ def _apply_replace_or_overwrite(
         if should_update and new_value != current_value:
             chess_game.headers[tag_name] = new_value
             updated = True
-            field_updates.update(
-                game_data_updates_for_header_tag(tag_name, new_value, removed=False)
+            merge_game_data_updates(
+                field_updates,
+                game_data_updates_for_header_tag(tag_name, new_value, removed=False),
             )
 
     if updated:
@@ -170,8 +175,9 @@ def _apply_copy(
         if source_value != current_value:
             chess_game.headers[target_tag] = source_value
             updated = True
-            field_updates.update(
-                game_data_updates_for_header_tag(target_tag, source_value, removed=False)
+            merge_game_data_updates(
+                field_updates,
+                game_data_updates_for_header_tag(target_tag, source_value, removed=False),
             )
     if updated:
         return True, field_updates, BulkProcessingOutcome.UPDATED

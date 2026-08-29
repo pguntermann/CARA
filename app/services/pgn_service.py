@@ -1013,6 +1013,20 @@ class PgnService:
             # Extract tag names from headers (already parsed, no extra cost)
             tag_names = list(headers.keys()) if headers else []
 
+            # Cache header values for dynamic database-table columns.
+            # Skip heavy CARA payload tags (already mirrored on GameData flags / fields).
+            _heavy_header_tags = {
+                "CARAAnalysisData",
+                "CARAAnnotations",
+                "CARANotes",
+            }
+            header_values = {}
+            if headers:
+                for key, value in headers.items():
+                    if key in _heavy_header_tags:
+                        continue
+                    header_values[str(key)] = "" if value is None else str(value)
+
             # Compute per-ply Zobrist hashes for Position Search (mainline only).
             # This is done in the worker process during load for performance.
             position_hashes: List[int] = []
@@ -1068,6 +1082,7 @@ class PgnService:
                 "game_tags_raw": game_tags_raw,
                 "game_tags": game_tags_display,
                 "tags": tag_names,  # Tag names extracted during parsing
+                "header_values": header_values,  # Non-heavy PGN headers for dynamic columns
                 "position_hashes": position_hashes,  # Per-ply zobrist hashes (ply 0..N)
                 "position_hashes_fuzzy": position_hashes_fuzzy,  # Per-ply hashes ignoring castling/ep
             }

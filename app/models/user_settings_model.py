@@ -118,6 +118,134 @@ class UserSettingsModel(QObject):
         self._settings["board_visibility"] = settings.copy()
         self.board_visibility_changed.emit()
         self.settings_changed.emit()
+
+    def get_detail_panel_visibility(self) -> Dict[str, bool]:
+        """Per-unit visibility for detail tabs / related menus (missing id => True)."""
+        from app.services.detail_panel_visibility import normalize_detail_panel_visibility
+
+        raw = self._settings.get("detail_panel_visibility")
+        return normalize_detail_panel_visibility(raw if isinstance(raw, dict) else None)
+
+    def set_detail_panel_visibility(self, visibility: Dict[str, bool]) -> None:
+        """Replace stored detail-panel visibility map."""
+        from app.services.detail_panel_visibility import normalize_detail_panel_visibility
+
+        self._settings["detail_panel_visibility"] = normalize_detail_panel_visibility(
+            visibility
+        )
+        self.settings_changed.emit()
+
+    def update_detail_panel_visibility(self, unit_id: str, visible: bool) -> None:
+        """Set one detail-panel unit's visibility."""
+        cur = self.get_detail_panel_visibility()
+        cur[str(unit_id)] = bool(visible)
+        self.set_detail_panel_visibility(cur)
+
+    def get_database_table_columns(self) -> Dict[str, Any]:
+        """Global default column layout for the database pane table."""
+        from app.services.database_table_columns import normalize_database_table_columns
+
+        raw = self._settings.get("database_table_columns")
+        return normalize_database_table_columns(raw if isinstance(raw, dict) else None)
+
+    def set_database_table_columns(self, layout: Dict[str, Any]) -> None:
+        """Replace the global database-table column layout."""
+        from app.services.database_table_columns import normalize_database_table_columns
+
+        self._settings["database_table_columns"] = normalize_database_table_columns(
+            layout if isinstance(layout, dict) else None
+        )
+        self.settings_changed.emit()
+
+    def get_database_table_columns_by_path(self) -> Dict[str, Dict[str, Any]]:
+        """Per-file database-table column layout overrides (keyed by absolute path)."""
+        from app.services.database_table_columns import (
+            normalize_database_table_columns_by_path,
+        )
+
+        raw = self._settings.get("database_table_columns_by_path")
+        return normalize_database_table_columns_by_path(
+            raw if isinstance(raw, dict) else None
+        )
+
+    def set_database_table_columns_by_path(
+        self, by_path: Dict[str, Dict[str, Any]]
+    ) -> None:
+        """Replace the per-file database-table column layout map."""
+        from app.services.database_table_columns import (
+            normalize_database_table_columns_by_path,
+        )
+
+        self._settings["database_table_columns_by_path"] = (
+            normalize_database_table_columns_by_path(
+                by_path if isinstance(by_path, dict) else None
+            )
+        )
+        self.settings_changed.emit()
+
+    def set_database_table_columns_for_path(
+        self, file_path: str, layout: Dict[str, Any]
+    ) -> None:
+        """Set or replace the column layout override for one file path."""
+        from app.services.database_table_columns import (
+            canonical_database_table_path,
+            normalize_database_table_columns,
+        )
+
+        path = canonical_database_table_path(str(file_path or "").strip())
+        if not path or path in ("clipboard", "search_results"):
+            return
+        by_path = self.get_database_table_columns_by_path()
+        # Drop any non-canonical aliases for the same file before writing.
+        target = path
+        for key in list(by_path.keys()):
+            if key != target and canonical_database_table_path(key) == target:
+                del by_path[key]
+        by_path[path] = normalize_database_table_columns(
+            layout if isinstance(layout, dict) else None
+        )
+        self.set_database_table_columns_by_path(by_path)
+
+    def remove_database_table_columns_for_path(self, file_path: str) -> bool:
+        """Remove a per-file column layout override. Returns True if one existed."""
+        from app.services.database_table_columns import canonical_database_table_path
+
+        raw = str(file_path or "").strip()
+        if not raw:
+            return False
+        target = canonical_database_table_path(raw)
+        by_path = self.get_database_table_columns_by_path()
+        removed = False
+        for key in list(by_path.keys()):
+            if key == raw or key == target or canonical_database_table_path(key) == target:
+                del by_path[key]
+                removed = True
+        if removed:
+            self.set_database_table_columns_by_path(by_path)
+        return removed
+
+    def remap_database_table_columns_path(self, old_path: str, new_path: str) -> None:
+        """Move a per-file column layout override when a database file path changes."""
+        from app.services.database_table_columns import (
+            canonical_database_table_path,
+            lookup_database_table_columns_for_path,
+        )
+
+        old_key = str(old_path or "").strip()
+        new_key = canonical_database_table_path(str(new_path or "").strip())
+        if not old_key or not new_key or canonical_database_table_path(old_key) == new_key:
+            return
+        by_path = self.get_database_table_columns_by_path()
+        layout = lookup_database_table_columns_for_path(by_path, old_key)
+        if layout is None:
+            return
+        # Remove all aliases for the old path, then store under the new canonical key.
+        old_canon = canonical_database_table_path(old_key)
+        for key in list(by_path.keys()):
+            if key == old_key or canonical_database_table_path(key) == old_canon:
+                del by_path[key]
+        by_path[new_key] = layout
+        self.set_database_table_columns_by_path(by_path)
     
     def get_pgn_visibility(self) -> Dict[str, Any]:
         """Get PGN visibility settings.

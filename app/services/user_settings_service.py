@@ -389,6 +389,14 @@ class UserSettingsService:
                     model.set_profile_order(template_value)
                 elif key == "board_visibility":
                     model.set_board_visibility(template_value)
+                elif key == "detail_panel_visibility":
+                    model.set_detail_panel_visibility(template_value)
+                elif key == "database_table_columns":
+                    model.set_database_table_columns(template_value)
+                elif key == "database_table_columns_by_path":
+                    model.set_database_table_columns_by_path(
+                        template_value if isinstance(template_value, dict) else {}
+                    )
                 elif key == "pgn_visibility":
                     model.set_pgn_visibility(template_value)
                 elif key == "game_analysis":
@@ -428,6 +436,12 @@ class UserSettingsService:
                         model.set_moves_list_profiles(section_dict)
                     elif key == "board_visibility":
                         model.set_board_visibility(section_dict)
+                    elif key == "detail_panel_visibility":
+                        model.set_detail_panel_visibility(section_dict)
+                    elif key == "database_table_columns":
+                        model.set_database_table_columns(section_dict)
+                    elif key == "database_table_columns_by_path":
+                        model.set_database_table_columns_by_path(section_dict)
                     elif key == "pgn_visibility":
                         model.set_pgn_visibility(section_dict)
                     elif key == "pgn_notation":
@@ -770,6 +784,66 @@ class UserSettingsService:
         current = model.get_board_visibility()
         current.update(visibility)
         model.set_board_visibility(current)
+
+    def update_detail_panel_visibility(self, unit_id: str, visible: bool) -> None:
+        """Update one detail-panel tab/menu visibility flag (write-on-exit)."""
+        self.get_model().update_detail_panel_visibility(str(unit_id), bool(visible))
+
+    def get_database_table_columns(self) -> Dict[str, Any]:
+        """Return the global database-table column layout."""
+        return self.get_model().get_database_table_columns()
+
+    def set_database_table_columns(self, layout: Dict[str, Any]) -> None:
+        """Replace the global database-table column layout (write-on-exit)."""
+        self.get_model().set_database_table_columns(layout)
+
+    def get_database_table_columns_for_identifier(
+        self, identifier: Optional[str]
+    ) -> Dict[str, Any]:
+        """Effective layout for a tab: per-path override if present, else global."""
+        from app.services.database_table_columns import (
+            lookup_database_table_columns_for_path,
+        )
+
+        model = self.get_model()
+        path = str(identifier or "").strip()
+        if path and path not in ("clipboard", "search_results"):
+            layout = lookup_database_table_columns_for_path(
+                model.get_database_table_columns_by_path(), path
+            )
+            if layout is not None:
+                return layout
+        return model.get_database_table_columns()
+
+    def has_database_table_columns_for_path(self, file_path: Optional[str]) -> bool:
+        """True if a per-file column layout override exists."""
+        from app.services.database_table_columns import (
+            lookup_database_table_columns_for_path,
+        )
+
+        path = str(file_path or "").strip()
+        if not path or path in ("clipboard", "search_results"):
+            return False
+        return (
+            lookup_database_table_columns_for_path(
+                self.get_model().get_database_table_columns_by_path(), path
+            )
+            is not None
+        )
+
+    def set_database_table_columns_for_path(
+        self, file_path: str, layout: Dict[str, Any]
+    ) -> None:
+        """Save a per-file column layout override (write-on-exit)."""
+        self.get_model().set_database_table_columns_for_path(file_path, layout)
+
+    def remove_database_table_columns_for_path(self, file_path: str) -> bool:
+        """Remove a per-file column layout override (write-on-exit)."""
+        return self.get_model().remove_database_table_columns_for_path(file_path)
+
+    def remap_database_table_columns_path(self, old_path: str, new_path: str) -> None:
+        """Rename a per-file column layout key after Save As / path change."""
+        self.get_model().remap_database_table_columns_path(old_path, new_path)
     
     def update_pgn_visibility(self, visibility: Dict[str, bool]) -> None:
         """Update PGN visibility settings.

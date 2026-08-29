@@ -281,6 +281,7 @@ class DatabaseController:
                 annotated=game_dict.get("annotated", False),
                 has_notes=game_dict.get("has_notes", False),
                 file_position=0,  # Pasted games don't have file position
+                header_values=game_dict.get("header_values") or {},
             )
             # Extract tags from parsed game dict (already available, no parsing needed)
             tags = game_dict.get("tags", [])
@@ -806,6 +807,7 @@ class DatabaseController:
                     annotated=game_dict.get("annotated", False),
                     has_notes=game_dict.get("has_notes", False),
                     file_position=file_pos,  # Store original file position (1-based)
+                    header_values=game_dict.get("header_values") or {},
                 )
                 games.append(game_data)
                 # Extract tags from parsed game dict (already available, no parsing needed)
@@ -1059,6 +1061,7 @@ class DatabaseController:
                         annotated=game_dict.get("annotated", False),
                         has_notes=game_dict.get("has_notes", False),
                         file_position=file_pos,
+                        header_values=game_dict.get("header_values") or {},
                     )
                     game_data_list.append(game_data)
                     # Extract tags from parsed game dict (already available, no parsing needed)
@@ -1208,6 +1211,7 @@ class DatabaseController:
                     annotated=game_dict.get("annotated", False),
                     has_notes=game_dict.get("has_notes", False),
                     file_position=file_pos,  # Store original file position (1-based)
+                    header_values=game_dict.get("header_values") or {},
                 )
                 games_data.append(game_data)
                 

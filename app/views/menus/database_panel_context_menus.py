@@ -17,16 +17,51 @@ from PyQt6.QtWidgets import QApplication, QMenu
 @dataclass(frozen=True)
 class DatabaseTabContextMenu:
     menu: QMenu
-    close_action: Any
+    close_action: Optional[Any] = None
     close_all_but_action: Optional[Any] = None
+    save_columns_global_action: Optional[Any] = None
+    restore_columns_default_action: Optional[Any] = None
+    save_columns_for_file_action: Optional[Any] = None
+    remove_columns_for_file_action: Optional[Any] = None
 
 
-def build_database_tab_context_menu(panel, *, include_close_all_but: bool) -> DatabaseTabContextMenu:
+def build_database_tab_context_menu(
+    panel,
+    *,
+    include_close: bool = True,
+    include_close_all_but: bool = False,
+    include_column_settings: bool = False,
+    include_file_column_settings: bool = False,
+    has_file_column_settings: bool = False,
+) -> DatabaseTabContextMenu:
     menu = QMenu(panel)
-    close_action = menu.addAction("Close")
+    close_action = None
+    if include_close:
+        close_action = menu.addAction("Close")
     close_all_but_action = None
     if include_close_all_but:
         close_all_but_action = menu.addAction("Close all but this")
+
+    save_columns_global_action = None
+    restore_columns_default_action = None
+    save_columns_for_file_action = None
+    remove_columns_for_file_action = None
+    if include_column_settings:
+        if include_close or include_close_all_but:
+            menu.addSeparator()
+        save_columns_global_action = menu.addAction("Save column settings (global)")
+        restore_columns_default_action = menu.addAction(
+            "Restore default column settings"
+        )
+        if include_file_column_settings:
+            menu.addSeparator()
+            save_columns_for_file_action = menu.addAction(
+                "Save column settings (this file)"
+            )
+            remove_columns_for_file_action = menu.addAction(
+                "Remove column settings for this file"
+            )
+            remove_columns_for_file_action.setEnabled(bool(has_file_column_settings))
 
     from app.utils.themed_icon import (
         SVG_MENU_LAYERS,
@@ -36,7 +71,8 @@ def build_database_tab_context_menu(panel, *, include_close_all_but: bool) -> Da
     )
 
     _ctx_tint = menu_icon_dark_tint_rgb(panel.config)
-    close_action.setIcon(themed_icon_from_svg(SVG_SIMPLE_X, _ctx_tint))
+    if close_action is not None:
+        close_action.setIcon(themed_icon_from_svg(SVG_SIMPLE_X, _ctx_tint))
     if close_all_but_action is not None:
         close_all_but_action.setIcon(themed_icon_from_svg(SVG_MENU_LAYERS, _ctx_tint))
 
@@ -46,7 +82,15 @@ def build_database_tab_context_menu(panel, *, include_close_all_but: bool) -> Da
     from app.views.style.context_menu import try_wire_context_menu_shared_action_icons
 
     try_wire_context_menu_shared_action_icons(menu)
-    return DatabaseTabContextMenu(menu=menu, close_action=close_action, close_all_but_action=close_all_but_action)
+    return DatabaseTabContextMenu(
+        menu=menu,
+        close_action=close_action,
+        close_all_but_action=close_all_but_action,
+        save_columns_global_action=save_columns_global_action,
+        restore_columns_default_action=restore_columns_default_action,
+        save_columns_for_file_action=save_columns_for_file_action,
+        remove_columns_for_file_action=remove_columns_for_file_action,
+    )
 
 
 @dataclass(frozen=True)

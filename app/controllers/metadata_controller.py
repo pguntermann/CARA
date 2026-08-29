@@ -227,7 +227,7 @@ class MetadataController:
             # STEP 5: Update database model (for database view visibility)
             if database_model:
                 # Determine which column changed (if any)
-                column_index = self._get_column_index_for_tag(tag_name)
+                column_index = self._get_column_index_for_tag(tag_name, database_model)
                 
                 if column_index is not None:
                     # Emit dataChanged only for the specific column (performance optimization)
@@ -277,43 +277,44 @@ class MetadataController:
         except Exception:
             return False
     
-    def _update_gamedata_fields(self, game: GameData, tag_name: str, new_value: str) -> None:
+    def _update_gamedata_fields(
+        self,
+        game: GameData,
+        tag_name: str,
+        new_value: str,
+        *,
+        removed: bool = False,
+    ) -> None:
         """Update GameData fields that correspond to PGN tags.
         
         Args:
             game: GameData instance to update.
             tag_name: Name of the tag that was updated.
-            new_value: New value for the tag.
+            new_value: New value for the tag (ignored when removed).
+            removed: True when the header was deleted.
         """
-        tag_to_field_mapping = {
-            "White": "white",
-            "Black": "black",
-            "Result": "result",
-            "Date": "date",
-            "ECO": "eco",
-            "Event": "event",
-            "Site": "site",
-            "WhiteElo": "white_elo",
-            "BlackElo": "black_elo",
-            "TimeControl": "time_control",
-        }
-        
-        if tag_name == "CARAAnalysisData":
-            game.analyzed = bool(new_value) if new_value else False
-        elif tag_name == "CARAAnnotations":
-            game.annotated = bool(new_value) if new_value else False
-        elif tag_name == "CARAGameTags":
-            setattr(game, "game_tags_raw", new_value or "")
-            setattr(game, "game_tags", tags_display_text(parse_game_tags(new_value or "")))
-        elif tag_name in tag_to_field_mapping:
-            field_name = tag_to_field_mapping[tag_name]
-            setattr(game, field_name, new_value)
+        from app.utils.game_data_header_sync import (
+            apply_game_data_updates,
+            game_data_updates_for_header_tag,
+        )
+
+        apply_game_data_updates(
+            game,
+            game_data_updates_for_header_tag(
+                tag_name,
+                None if removed else new_value,
+                removed=removed,
+            ),
+        )
     
-    def _get_column_index_for_tag(self, tag_name: str) -> Optional[int]:
+    def _get_column_index_for_tag(
+        self, tag_name: str, database_model: Optional[DatabaseModel] = None
+    ) -> Optional[int]:
         """Get database model column index for a tag (if it maps to a column).
         
         Args:
             tag_name: Name of the PGN tag.
+            database_model: Optional model for resolving dynamic header columns.
             
         Returns:
             Column index if tag maps to a database column, None otherwise.
@@ -336,7 +337,15 @@ class MetadataController:
             "CARAAnnotations": DatabaseModel.COL_ANNOTATED,
             "CARAGameTags": getattr(DatabaseModel, "COL_TAGS", None),
         }
-        return tag_to_column.get(tag_name)
+        col = tag_to_column.get(tag_name)
+        if col is not None:
+            return col
+        model = database_model if database_model is not None else self._cached_database_model
+        if model is not None:
+            tags = model.get_dynamic_header_tags()
+            if tag_name in tags:
+                return DatabaseModel.FIXED_COLUMN_COUNT + tags.index(tag_name)
+        return None
     
     def add_metadata_tag(self, tag_name: str, tag_value: str) -> bool:
         """Add a new metadata tag to the active game.
@@ -388,7 +397,7 @@ class MetadataController:
             # Update database model (for database view visibility)
             if database_model:
                 # Determine which column changed (if any)
-                column_index = self._get_column_index_for_tag(tag_name)
+                column_index = self._get_column_index_for_tag(tag_name, database_model)
                 
                 if column_index is not None:
                     # Emit dataChanged only for the specific column
@@ -480,35 +489,12 @@ class MetadataController:
             game.pgn = new_pgn
             
             # Update corresponding GameData fields if this tag corresponds to a database column
-            tag_to_field_mapping = {
-                "White": "white",
-                "Black": "black",
-                "Result": "result",
-                "Date": "date",
-                "ECO": "eco",
-                "Event": "event",
-                "Site": "site",
-                "WhiteElo": "white_elo",
-                "BlackElo": "black_elo",
-            }
-            
-            # Special handling for CARAAnalysisData and CARAAnnotations tags (boolean fields)
-            if tag_name == "CARAAnalysisData":
-                game.analyzed = False
-            elif tag_name == "CARAAnnotations":
-                game.annotated = False
-            elif tag_name == "CARAGameTags":
-                setattr(game, "game_tags_raw", "")
-                setattr(game, "game_tags", "")
-            elif tag_name in tag_to_field_mapping:
-                field_name = tag_to_field_mapping[tag_name]
-                # Clear the field when tag is removed
-                setattr(game, field_name, "")
+            self._update_gamedata_fields(game, tag_name, "", removed=True)
             
             # Update database model (for database view visibility)
             if database_model:
                 # Determine which column changed (if any)
-                column_index = self._get_column_index_for_tag(tag_name)
+                column_index = self._get_column_index_for_tag(tag_name, database_model)
                 
                 if column_index is not None:
                     # Emit dataChanged only for the specific column
