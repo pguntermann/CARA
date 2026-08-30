@@ -933,20 +933,25 @@ class DetailPgnView(QWidget):
         """
         if self._game_controller is None or not self._game_controller.is_navigate_variations_enabled():
             return False
-        if not self._show_variations:
-            return False
 
         if self._branch_overlay.is_open():
             self._branch_overlay.activate_selected()
             return True
 
         choices = self._game_controller.get_forward_branch_choices()
+        if not choices:
+            return False
+
+        # Sidelines hidden in the PGN pane: always take the main continuation.
+        # Otherwise Right would stall at every fork (navigate_to_next_move also
+        # refuses to auto-pick when multiple branches exist).
+        if not self._show_variations:
+            return self._game_controller.navigate_to_path(choices[0][0])
+
         if len(choices) > 1:
             self._show_branch_overlay(choices)
             return True
-        if len(choices) == 1:
-            return self._game_controller.navigate_to_path(choices[0][0])
-        return False
+        return self._game_controller.navigate_to_path(choices[0][0])
 
     def handle_variation_nav_back(self) -> bool:
         """Handle Left-key navigation when variation navigation is enabled."""
