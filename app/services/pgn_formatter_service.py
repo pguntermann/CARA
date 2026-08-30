@@ -2625,7 +2625,7 @@ class PgnFormatterService:
         Returns:
             Formatted text with moves individually styled.
         """
-        from app.utils.pgn_variation_path import strip_san_suffixes
+        from app.utils.pgn_variation_path import sans_match
 
         # Pattern to match moves in variations (must include castling so variation castling gets
         # variation styling and is not later treated as a main-line move anchor).
@@ -2714,7 +2714,7 @@ class PgnFormatterService:
                     move_html = None
                     if styled_anchor is not None and variation_path_queue:
                         expected_path, expected_san = variation_path_queue[0]
-                        if strip_san_suffixes(move_san) == strip_san_suffixes(expected_san):
+                        if sans_match(move_san, expected_san):
                             variation_path_queue.pop(0)
                             move_html = styled_anchor(
                                 move_san,
