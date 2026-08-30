@@ -434,19 +434,17 @@ class DetailPgnView(QWidget):
         # Store plain text
         self._current_pgn_text = text
         
-        # Extract move info from ORIGINAL (unfiltered) PGN text
-        # This ensures move extraction works correctly even when filtering is applied
-        # Filtering can break PGN structure, making move extraction fail
+        # Move map from ORIGINAL (unfiltered) PGN — cheap parse only, no HTML.
+        # Filtering can alter structure; highlighting still needs the true mainline plies.
         original_move_info = []
         if text:
             try:
-                _, original_move_info = PgnFormatterService.format_pgn_to_html(
-                    text, 
-                    self.config, 
-                    0  # Don't highlight in HTML formatting
-                )
+                parsed_moves = PgnFormatterService._extract_move_positions_from_pgn(text)
+                original_move_info = [
+                    (move_san, move_number, is_white)
+                    for _ply, move_san, move_number, is_white in parsed_moves
+                ]
             except Exception:
-                # If extraction fails, use empty list
                 original_move_info = []
         
         # Filter PGN text based on visibility flags (for display only)
@@ -461,7 +459,7 @@ class DetailPgnView(QWidget):
             show_non_standard_tags=self._show_non_standard_tags
         )
         
-        # Format and display filtered PGN
+        # Format and display filtered PGN (single HTML pass)
         if pgn_text_to_format:
             formatted_html, _ = PgnFormatterService.format_pgn_to_html(
                 pgn_text_to_format, 
