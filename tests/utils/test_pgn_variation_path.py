@@ -97,5 +97,24 @@ class TestOverDisambiguatedPathAnchors(unittest.TestCase):
         self.assertEqual(d3_paths, [encode_path((0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))])
 
 
+class TestCommentParenthesesPathAnchors(unittest.TestCase):
+    def test_paren_inside_comment_does_not_break_nested_sideline_anchor(self) -> None:
+        # Comment after White's move ends with ":)" — that closing paren must not
+        # truncate the enclosing variation, or the nested (2... Nc6) loses cara-path.
+        pgn = """[Event "Test"]
+[Result "*"]
+
+1. e4 e5 2. Nf3 (2. Nc3 {anyone :)} Nf6 (2... Nc6 3. Bc4) d6) *
+"""
+        html, _ = PgnFormatterService.format_pgn_to_html(
+            pgn, _MIN_CFG, indent_variations=False
+        )
+        # Nested sideline first move must be a path anchor, not a bare span.
+        self.assertRegex(html, r'href="cara-path:[^"]+"[^>]*>Nc6<')
+        # Continuation after the comment stays a variation path move (not mainline ply).
+        self.assertRegex(html, r'href="cara-path:[^"]+"[^>]*>Nf6<')
+        self.assertNotRegex(html, r'href="cara-ply:\d+"[^>]*>Nf6<')
+
+
 if __name__ == "__main__":
     unittest.main()

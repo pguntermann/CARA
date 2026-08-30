@@ -2391,21 +2391,36 @@ class PgnFormatterService:
                 # Simple check: if we see '<' before the '(' without a '>', we're in a tag
                 # But more reliably, we check if '(' is actually a raw character, not in HTML
                 
-                # Find the end of this variation, skipping HTML tags and headers
+                # Find the end of this variation, skipping HTML tags and headers.
+                # Parentheses inside already-styled comment spans (e.g. ":)" or "(48)")
+                # are not variation structure — ignore them while comment-span depth > 0.
                 start = i
                 depth = 0
                 found_end = False
                 j = i
+                scan_comment_depth = 0
                 
                 while j < len(formatted):
                     if formatted[j] == '<':
-                        # Skip to end of HTML tag
+                        if j + 7 <= len(formatted) and formatted[j : j + 7] == '</span>':
+                            if scan_comment_depth > 0:
+                                scan_comment_depth -= 1
+                            j += 7
+                            continue
+                        if j + 5 <= len(formatted) and formatted[j : j + 5] == '<span':
+                            tag_end = formatted.find('>', j)
+                            if tag_end != -1:
+                                tag_content = formatted[j : tag_end + 1]
+                                if comment_color_css in tag_content:
+                                    scan_comment_depth += 1
+                                j = tag_end + 1
+                                continue
+                        # Other HTML tag — skip the tag itself only
                         tag_end = formatted.find('>', j)
                         if tag_end != -1:
                             j = tag_end + 1
                             continue
-                        else:
-                            j += 1
+                        j += 1
                     elif formatted[j] == '[':
                         # Skip header content
                         header_end = formatted.find(']', j)
@@ -2415,9 +2430,13 @@ class PgnFormatterService:
                         else:
                             j += 1
                     elif formatted[j] == '(':
-                        depth += 1
+                        if scan_comment_depth == 0:
+                            depth += 1
                         j += 1
                     elif formatted[j] == ')':
+                        if scan_comment_depth > 0:
+                            j += 1
+                            continue
                         depth -= 1
                         if depth == 0:
                             end = j + 1
