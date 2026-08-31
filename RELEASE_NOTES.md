@@ -1,5 +1,24 @@
 # Release Notes
 
+# CARA v2.8.9 - Performance & Bug Fixes
+
+**Release Date:** 31.08.2026
+
+This is a small **maintenance and bugfix** release focused on improving performance when working with **heavily commented** games, fixing some edge-case bugs with **variation navigation and highlighting** and a **Linux Wayland** database-panel context-menu issue.
+
+## Enhancements
+
+- **PGN formatting performance:** Opening and working with games containing many comments and/or variations is noticeably improved.
+
+## Bug Fixes
+
+- **Variation click/highlight:** Over-disambiguated move SANs in PGN text no longer desync sideline path anchors, so variations occurring after such move SANs stay clickable and highlight correctly.
+- **Variation boundaries:** Parentheses inside `{…}` comments are no longer treated as variation delimiters when matching sidelines.
+- **Right-key with variations hidden:** Fixed an issue where users couldn't navigate to the last move of the game in some edge cases.
+- **Linux Wayland – database context menu:** Choosing **Select mode → Replace/Append** (and similar nested table-menu actions) no longer closes and immediately reopens the context menu.
+
+---
+
 # CARA v2.8.8 - (Even) more customization
 
 **Release Date:** 29.08.2026
