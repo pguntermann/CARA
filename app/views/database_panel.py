@@ -99,7 +99,7 @@ class DatabasePanel(QWidget):
         self._tab_context_menu_cooldown_until: float = 0  # Ignore context menu for a short time after Close action
         self._selection_mode: str = "replace"  # "replace" or "append" for Select rows actions (not persisted)
         self._applying_column_layout: bool = False
-        self._database_table_viewports: set = set()  # viewports we install event filter on (to avoid right-click changing selection)
+        self._database_table_viewports: set = set()  # viewports we filter so right-press does not change selection
 
         self._setup_ui()
         
@@ -1261,7 +1261,9 @@ class DatabasePanel(QWidget):
         # Connect double-click signal
         tab_table.doubleClicked.connect(self._on_table_double_click)
         
-        # Context menu: intercept right-click so it does not change the selection, then show menu
+        # Context menu: consume right-press so selection is unchanged; open via
+        # customContextMenuRequested (release / Menu key) so the menu is not shown
+        # twice when the deferred release arrives after menu.exec() returns.
         tab_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         viewport = tab_table.viewport()
         viewport.installEventFilter(self)
@@ -1610,10 +1612,9 @@ class DatabasePanel(QWidget):
             and obj in self._database_table_viewports
         ):
             if hasattr(event, "button") and event.button() == Qt.MouseButton.RightButton:
-                table = obj.parent()
-                if isinstance(table, QTableView):
-                    self._on_table_context_menu(event.pos(), table)
-                    return True  # consume event so view does not change selection
+                # Consume press so the view does not change selection; menu opens from
+                # customContextMenuRequested when Qt delivers the context-menu request.
+                return True
         return super().eventFilter(obj, event)
 
     @staticmethod

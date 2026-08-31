@@ -434,19 +434,17 @@ class DetailPgnView(QWidget):
         # Store plain text
         self._current_pgn_text = text
         
-        # Extract move info from ORIGINAL (unfiltered) PGN text
-        # This ensures move extraction works correctly even when filtering is applied
-        # Filtering can break PGN structure, making move extraction fail
+        # Move map from ORIGINAL (unfiltered) PGN — cheap parse only, no HTML.
+        # Filtering can alter structure; highlighting still needs the true mainline plies.
         original_move_info = []
         if text:
             try:
-                _, original_move_info = PgnFormatterService.format_pgn_to_html(
-                    text, 
-                    self.config, 
-                    0  # Don't highlight in HTML formatting
-                )
+                parsed_moves = PgnFormatterService._extract_move_positions_from_pgn(text)
+                original_move_info = [
+                    (move_san, move_number, is_white)
+                    for _ply, move_san, move_number, is_white in parsed_moves
+                ]
             except Exception:
-                # If extraction fails, use empty list
                 original_move_info = []
         
         # Filter PGN text based on visibility flags (for display only)
@@ -461,7 +459,7 @@ class DetailPgnView(QWidget):
             show_non_standard_tags=self._show_non_standard_tags
         )
         
-        # Format and display filtered PGN
+        # Format and display filtered PGN (single HTML pass)
         if pgn_text_to_format:
             formatted_html, _ = PgnFormatterService.format_pgn_to_html(
                 pgn_text_to_format, 
@@ -935,20 +933,25 @@ class DetailPgnView(QWidget):
         """
         if self._game_controller is None or not self._game_controller.is_navigate_variations_enabled():
             return False
-        if not self._show_variations:
-            return False
 
         if self._branch_overlay.is_open():
             self._branch_overlay.activate_selected()
             return True
 
         choices = self._game_controller.get_forward_branch_choices()
+        if not choices:
+            return False
+
+        # Sidelines hidden in the PGN pane: always take the main continuation.
+        # Otherwise Right would stall at every fork (navigate_to_next_move also
+        # refuses to auto-pick when multiple branches exist).
+        if not self._show_variations:
+            return self._game_controller.navigate_to_path(choices[0][0])
+
         if len(choices) > 1:
             self._show_branch_overlay(choices)
             return True
-        if len(choices) == 1:
-            return self._game_controller.navigate_to_path(choices[0][0])
-        return False
+        return self._game_controller.navigate_to_path(choices[0][0])
 
     def handle_variation_nav_back(self) -> bool:
         """Handle Left-key navigation when variation navigation is enabled."""

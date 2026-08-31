@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import re
 from typing import List, Optional, Sequence, Tuple
 
 import chess
 import chess.pgn
 
 Path = Tuple[int, ...]
+
+# Piece SAN with optional file/rank disambiguation (ChessBase often over-specifies).
+_PIECE_SAN_RE = re.compile(
+    r"^([NBRQK])([a-h])?([1-8])?(x?)([a-h][1-8])([=][NBRQ])?([+#])?$"
+)
 
 
 def encode_path(path: Sequence[int]) -> str:
@@ -107,6 +113,34 @@ def strip_san_suffixes(san: str) -> str:
     while text and text[-1] in "!?":
         text = text[:-1]
     return text
+
+
+def canonicalize_san_for_match(san: str) -> str:
+    """Normalize a SAN for queue matching (drop piece-move disambiguators).
+
+    PGN text may use ``Ngxe5`` / ``Nfxe5`` while ``board.san()`` emits ``Nxe5``.
+    Pawns and castling are returned unchanged (after ``!?`` stripping).
+    """
+    text = strip_san_suffixes(san)
+    match = _PIECE_SAN_RE.match(text)
+    if not match:
+        return text
+    return (
+        match.group(1)
+        + match.group(4)
+        + match.group(5)
+        + (match.group(6) or "")
+        + (match.group(7) or "")
+    )
+
+
+def sans_match(left: str, right: str) -> bool:
+    """Return True when two SANs refer to the same move for path-queue alignment."""
+    a = strip_san_suffixes(left)
+    b = strip_san_suffixes(right)
+    if a == b:
+        return True
+    return canonicalize_san_for_match(a) == canonicalize_san_for_match(b)
 
 
 def forward_choices(
