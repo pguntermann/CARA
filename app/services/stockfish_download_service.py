@@ -88,7 +88,7 @@ class StockfishBinaryOption:
     id: str
     label: str
     description: str
-    # Substring matched against the GitHub asset filename (lowercased).
+    # Stable identity / match hint derived from the asset filename (lowercased stem).
     asset_token: str
     recommended: bool = False
 
@@ -103,6 +103,12 @@ class ResolvedStockfishAsset:
     size_bytes: int
     release_tag: str
     release_name: str
+
+
+_ARCHIVE_SUFFIXES = (".zip", ".tar.gz", ".tgz", ".tar")
+_UNIVERSAL_DESCRIPTION = (
+    "Official universal build: detects your CPU features at startup and runs the optimal code."
+)
 
 
 def detect_platform() -> PlatformInfo:
@@ -132,126 +138,125 @@ def detect_platform() -> PlatformInfo:
     return PlatformInfo(os_family=os_family, arch=arch, display_name=display)
 
 
-def binary_options_for_platform(info: PlatformInfo) -> List[StockfishBinaryOption]:
-    """Catalog of known official builds for this platform (may be filtered by release)."""
-    if info.os_family == "windows" and info.arch == "arm64":
-        return [
-            StockfishBinaryOption(
-                id="windows-armv8",
-                label="Windows ARM64",
-                description="Recommended for Windows on ARM devices.",
-                asset_token="windows-armv8.zip",
-                recommended=True,
-            ),
-            StockfishBinaryOption(
-                id="windows-armv8-dotprod",
-                label="Windows ARM64 (dotprod)",
-                description="Faster on ARM CPUs that support dot-product instructions.",
-                asset_token="windows-armv8-dotprod.zip",
-            ),
-        ]
+def _is_release_archive(filename: str) -> bool:
+    name = filename.lower()
+    return any(name.endswith(suffix) for suffix in _ARCHIVE_SUFFIXES)
+
+
+def _asset_matches_platform(filename: str, info: PlatformInfo) -> bool:
+    """True if a GitHub release asset name looks like a Stockfish binary for ``info``."""
+    name = filename.lower()
+    if not _is_release_archive(name) or "stockfish" not in name:
+        return False
 
     if info.os_family == "windows":
-        return [
-            StockfishBinaryOption(
-                id="windows-x86-64-avx2",
-                label="Windows x86-64 AVX2",
-                description="Recommended for most modern Intel/AMD PCs (2013+).",
-                asset_token="windows-x86-64-avx2.zip",
-                recommended=True,
-            ),
-            StockfishBinaryOption(
-                id="windows-x86-64-bmi2",
-                label="Windows x86-64 BMI2",
-                description="Often slightly faster on recent Intel CPUs.",
-                asset_token="windows-x86-64-bmi2.zip",
-            ),
-            StockfishBinaryOption(
-                id="windows-x86-64-sse41-popcnt",
-                label="Windows x86-64 SSE4.1",
-                description="Safer choice for older 64-bit PCs without AVX2.",
-                asset_token="windows-x86-64-sse41-popcnt.zip",
-            ),
-            StockfishBinaryOption(
-                id="windows-x86-64",
-                label="Windows x86-64 (baseline)",
-                description="Widest compatibility; slowest of the 64-bit builds.",
-                asset_token="windows-x86-64.zip",
-            ),
-        ]
-
-    if info.os_family == "macos" and info.arch == "arm64":
-        return [
-            StockfishBinaryOption(
-                id="macos-m1-apple-silicon",
-                label="macOS Apple Silicon",
-                description="Recommended for M1/M2/M3/M4 Macs.",
-                asset_token="macos-m1-apple-silicon.tar",
-                recommended=True,
-            ),
-        ]
+        if "windows" not in name:
+            return False
+        if info.arch == "arm64":
+            return ("arm64" in name or "armv8" in name) and "x86" not in name
+        return "x86-64" in name or "x86_64" in name
 
     if info.os_family == "macos":
-        return [
-            StockfishBinaryOption(
-                id="macos-x86-64-avx2",
-                label="macOS Intel AVX2",
-                description="Recommended for most Intel Macs.",
-                asset_token="macos-x86-64-avx2.tar",
-                recommended=True,
-            ),
-            StockfishBinaryOption(
-                id="macos-x86-64-sse41-popcnt",
-                label="macOS Intel SSE4.1",
-                description="For older Intel Macs without AVX2.",
-                asset_token="macos-x86-64-sse41-popcnt.tar",
-            ),
-            StockfishBinaryOption(
-                id="macos-x86-64",
-                label="macOS Intel (baseline)",
-                description="Widest Intel Mac compatibility.",
-                asset_token="macos-x86-64.tar",
-            ),
-        ]
+        # SF19+ ships one macOS universal archive for Intel and Apple Silicon.
+        return "macos" in name or "mac-os" in name or "osx" in name
 
-    # Linux (ubuntu builds are the official Linux packages)
+    # Linux: accept linux-* or legacy ubuntu-* names; never Android packages.
+    if "android" in name:
+        return False
+    if "linux" not in name and "ubuntu" not in name:
+        return False
     if info.arch == "arm64":
-        return [
-            StockfishBinaryOption(
-                id="android-armv8",
-                label="Linux ARM64 (armv8 build)",
-                description="Official ARM64 build (published as Android armv8; works on many aarch64 Linux systems).",
-                asset_token="android-armv8.tar",
-                recommended=True,
-            ),
-        ]
+        return "arm64" in name or "aarch64" in name or "armv8" in name
+    return "x86-64" in name or "x86_64" in name
+
+
+def _asset_preference_key(filename: str) -> Tuple[int, int, str]:
+    """Sort key: prefer universal builds, then shorter / stabler names."""
+    name = filename.lower()
+    universal = 0 if "universal" in name else 1
+    return (universal, len(name), name)
+
+
+def _option_id_from_filename(filename: str) -> str:
+    stem = _safe_stem(filename).lower()
+    if stem.startswith("stockfish-"):
+        stem = stem[len("stockfish-") :]
+    elif stem.startswith("stockfish_"):
+        stem = stem[len("stockfish_") :]
+    cleaned = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in stem)
+    return cleaned.strip("-_") or "stockfish"
+
+
+def _option_label_from_filename(filename: str, info: PlatformInfo) -> str:
+    stem = _safe_stem(filename)
+    lower = stem.lower()
+    if "universal" in lower:
+        if info.os_family == "macos":
+            return "macOS (universal)"
+        if info.os_family == "windows" and info.arch == "arm64":
+            return "Windows ARM64 (universal)"
+        if info.os_family == "windows":
+            return "Windows x86-64 (universal)"
+        if info.arch == "arm64":
+            return "Linux ARM64 (universal)"
+        return "Linux x86-64 (universal)"
+    # Non-universal / unexpected variant: surface a readable stem.
+    label = stem
+    if label.lower().startswith("stockfish-"):
+        label = label[len("stockfish-") :]
+    return label.replace("-", " ").replace("_", " ")
+
+
+def binary_option_for_asset(
+    filename: str,
+    info: PlatformInfo,
+    *,
+    recommended: bool,
+) -> StockfishBinaryOption:
+    """Build a UI option descriptor from a concrete release asset name."""
+    option_id = _option_id_from_filename(filename)
+    return StockfishBinaryOption(
+        id=option_id,
+        label=_option_label_from_filename(filename, info),
+        description=_UNIVERSAL_DESCRIPTION
+        if "universal" in filename.lower()
+        else "Official Stockfish build for this platform.",
+        asset_token=option_id,
+        recommended=recommended,
+    )
+
+
+def binary_options_for_platform(info: PlatformInfo) -> List[StockfishBinaryOption]:
+    """Expected build choices for ``info`` (used when listing before a release fetch).
+
+    Stockfish 19+ publishes one universal archive per OS/arch. Resolution against a
+    live release prefers discovered assets (see ``resolve_options``); this catalog is
+    the stable fallback identity for the common case.
+    """
+    if info.os_family == "windows" and info.arch == "arm64":
+        token = "windows-arm64-universal"
+        label = "Windows ARM64 (universal)"
+    elif info.os_family == "windows":
+        token = "windows-x86-64-universal"
+        label = "Windows x86-64 (universal)"
+    elif info.os_family == "macos":
+        token = "macos-universal"
+        label = "macOS (universal)"
+    elif info.arch == "arm64":
+        token = "linux-arm64-universal"
+        label = "Linux ARM64 (universal)"
+    else:
+        token = "linux-x86-64-universal"
+        label = "Linux x86-64 (universal)"
 
     return [
         StockfishBinaryOption(
-            id="ubuntu-x86-64-avx2",
-            label="Linux x86-64 AVX2",
-            description="Recommended for most modern 64-bit Linux PCs.",
-            asset_token="ubuntu-x86-64-avx2.tar",
+            id=token,
+            label=label,
+            description=_UNIVERSAL_DESCRIPTION,
+            asset_token=token,
             recommended=True,
-        ),
-        StockfishBinaryOption(
-            id="ubuntu-x86-64-bmi2",
-            label="Linux x86-64 BMI2",
-            description="Often slightly faster on recent Intel CPUs.",
-            asset_token="ubuntu-x86-64-bmi2.tar",
-        ),
-        StockfishBinaryOption(
-            id="ubuntu-x86-64-sse41-popcnt",
-            label="Linux x86-64 SSE4.1",
-            description="Safer choice for older 64-bit CPUs without AVX2.",
-            asset_token="ubuntu-x86-64-sse41-popcnt.tar",
-        ),
-        StockfishBinaryOption(
-            id="ubuntu-x86-64",
-            label="Linux x86-64 (baseline)",
-            description="Widest compatibility; slowest of the 64-bit builds.",
-            asset_token="ubuntu-x86-64.tar",
-        ),
+        )
     ]
 
 
@@ -301,21 +306,46 @@ class StockfishDownloadService:
         self,
         info: Optional[PlatformInfo] = None,
     ) -> Tuple[PlatformInfo, str, str, List[ResolvedStockfishAsset]]:
-        """Detect platform, fetch release, and resolve available binary options."""
+        """Detect platform, fetch release, and resolve available binary options.
+
+        Matching is filename-heuristic based (OS/arch + archive type) so Stockfish
+        19+ universal packages and likely future naming variants keep resolving.
+        When several assets match, universal builds are preferred / recommended.
+        """
         platform_info = info or detect_platform()
         tag, release_name, assets = self.fetch_release_assets()
-        catalog = binary_options_for_platform(platform_info)
-        resolved: List[ResolvedStockfishAsset] = []
+        matching = self._matching_assets(platform_info, assets)
 
-        for option in catalog:
-            asset = self._find_asset(assets, option.asset_token)
-            if asset is None:
-                continue
+        if not matching:
+            raise RuntimeError(
+                f"No matching Stockfish binaries were found for {platform_info.display_name} "
+                f"in release {tag or release_name}."
+            )
+
+        matching.sort(key=lambda asset: _asset_preference_key(str(asset.get("name") or "")))
+
+        resolved: List[ResolvedStockfishAsset] = []
+        seen_ids: set[str] = set()
+        for index, asset in enumerate(matching):
             url = str(asset.get("browser_download_url") or "")
             filename = str(asset.get("name") or "")
             size = int(asset.get("size") or 0)
             if not url or not filename:
                 continue
+            option = binary_option_for_asset(
+                filename,
+                platform_info,
+                recommended=(index == 0),
+            )
+            if option.id in seen_ids:
+                option = StockfishBinaryOption(
+                    id=f"{option.id}-{index}",
+                    label=option.label,
+                    description=option.description,
+                    asset_token=option.asset_token,
+                    recommended=option.recommended,
+                )
+            seen_ids.add(option.id)
             resolved.append(
                 ResolvedStockfishAsset(
                     option=option,
@@ -333,28 +363,21 @@ class StockfishDownloadService:
                 f"in release {tag or release_name}."
             )
 
-        # Ensure exactly one recommended flag among available options.
-        if not any(item.option.recommended for item in resolved):
-            first = resolved[0]
-            resolved[0] = ResolvedStockfishAsset(
-                option=StockfishBinaryOption(
-                    id=first.option.id,
-                    label=first.option.label,
-                    description=first.option.description,
-                    asset_token=first.option.asset_token,
-                    recommended=True,
-                ),
-                download_url=first.download_url,
-                filename=first.filename,
-                size_bytes=first.size_bytes,
-                release_tag=first.release_tag,
-                release_name=first.release_name,
-            )
-
         return platform_info, tag, release_name, resolved
 
     @staticmethod
+    def _matching_assets(info: PlatformInfo, assets: Sequence[dict]) -> List[dict]:
+        """Return release assets that look like Stockfish binaries for ``info``."""
+        matched: List[dict] = []
+        for asset in assets:
+            name = str(asset.get("name") or "")
+            if _asset_matches_platform(name, info):
+                matched.append(asset)
+        return matched
+
+    @staticmethod
     def _find_asset(assets: Sequence[dict], token: str) -> Optional[dict]:
+        """Find an asset whose filename contains ``token`` (legacy helper)."""
         token_l = token.lower()
         for asset in assets:
             name = str(asset.get("name") or "").lower()
@@ -491,11 +514,12 @@ def find_stockfish_executable(root: Path) -> Optional[Path]:
     if not candidates:
         return None
 
-    def _score(path: Path) -> Tuple[int, int, str]:
+    def _score(path: Path) -> Tuple[int, int, int, str]:
         name = path.name.lower()
-        # Prefer exact-ish names over helper scripts
+        # Prefer exact-ish names over helper scripts; prefer universal binaries.
         exact = 0 if name.startswith("stockfish") else 1
-        return (exact, len(str(path)), str(path).lower())
+        universal = 0 if "universal" in name else 1
+        return (exact, universal, len(str(path)), str(path).lower())
 
     candidates.sort(key=_score)
     return candidates[0]
