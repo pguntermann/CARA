@@ -565,7 +565,7 @@
           "folder_invalid": "Cannot use that folder: {error}",
           "selected_build": "Selected build: {label} ({size})",
           "download_title": "Downloading Stockfish",
-          "download_detail": "Downloading {filename}\nfrom the official Stockfish release ({release}).",
+          "download_detail": "Downloading {filename} from the official Stockfish release ({release}).",
           "download_starting": "Starting download…",
           "download_preparing": "Preparing download…",
           "download_progress": "{downloaded} / {total}",
