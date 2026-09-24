@@ -130,7 +130,7 @@ class MovesListProfileSetupDialog(QDialog):
 
         help_config = dialog_config.get('help', {}) if isinstance(dialog_config.get('help', {}), dict) else {}
         self.help_enabled = bool(help_config.get('enabled', True))
-        self.help_manual_anchor = str(help_config.get('manual_anchor', 'moves-list'))
+        self.help_manual_anchor = str(help_config.get('manual_anchor', 'setup-profile'))
         self.help_tooltip = str(help_config.get('tooltip', 'Open user manual'))
         self.help_button_size = int(help_config.get('button_size', 22))
         self.help_column_spacing = int(help_config.get('column_spacing', 8))

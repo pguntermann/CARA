@@ -4519,7 +4519,7 @@
         },
         "help": {
           "enabled": true,
-          "manual_anchor": "ai-summary-menu",
+          "manual_anchor": "ai-model-settings",
           "tooltip": "Open user manual",
           "button_size": 22,
           "column_spacing": 8,
@@ -5077,7 +5077,7 @@
         },
         "help": {
           "enabled": true,
-          "manual_anchor": "adding-first-engine",
+          "manual_anchor": "get-stockfish",
           "tooltip": "Open user manual",
           "button_size": 22,
           "column_spacing": 8,
@@ -7534,7 +7534,7 @@
         },
         "help": {
           "enabled": true,
-          "manual_anchor": "moves-list",
+          "manual_anchor": "setup-profile",
           "tooltip": "Open user manual",
           "button_size": 22,
           "column_spacing": 8,
