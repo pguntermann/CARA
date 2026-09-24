@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QStackedWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -31,8 +32,9 @@ from app.services.stockfish_download_service import (
     ResolvedStockfishAsset,
     format_bytes,
 )
+from app.utils.external_open import open_user_manual
 from app.utils.font_utils import resolve_font_family, scale_font_size
-from app.utils.themed_icon import SVG_MENU_FOLDER_OPEN, themed_icon_from_svg
+from app.utils.themed_icon import SVG_MENU_FOLDER_OPEN, SVG_MENU_INFO, themed_icon_from_svg
 from app.views.style import StyleManager
 
 
@@ -206,6 +208,19 @@ class GetStockfishDialog(QDialog):
             dialog_config.get("binary_option_spacing", 10)
         )
 
+        help_config = dialog_config.get("help", {}) if isinstance(dialog_config.get("help", {}), dict) else {}
+        self.help_enabled = bool(help_config.get("enabled", True))
+        self.help_manual_anchor = str(help_config.get("manual_anchor", "get-stockfish"))
+        self.help_tooltip = str(help_config.get("tooltip", "Open user manual"))
+        self.help_button_size = int(help_config.get("button_size", 22))
+        self.help_column_spacing = int(help_config.get("column_spacing", 8))
+        self.help_top_offset = int(help_config.get("top_offset", 0))
+        self.help_tint_color = (
+            QColor(*self.label_text_color)
+            if isinstance(self.label_text_color, list)
+            else QColor(200, 200, 200)
+        )
+
     def _setup_ui(self) -> None:
         self.setAutoFillBackground(True)
         palette = self.palette()
@@ -221,7 +236,18 @@ class GetStockfishDialog(QDialog):
         root.setContentsMargins(int(m[0]), int(m[1]), int(m[2]), int(m[3]))
 
         self.step_label = QLabel()
-        root.addWidget(self.step_label)
+        if self.help_enabled:
+            header_row = QHBoxLayout()
+            header_row.setContentsMargins(0, 0, 0, 0)
+            header_row.setSpacing(self.help_column_spacing)
+            header_row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+            header_row.addWidget(self.step_label, 1, Qt.AlignmentFlag.AlignVCenter)
+            header_row.addWidget(
+                self._build_help_button(), 0, Qt.AlignmentFlag.AlignVCenter
+            )
+            root.addLayout(header_row)
+        else:
+            root.addWidget(self.step_label)
 
         self.stack = QStackedWidget()
         self.stack.addWidget(self._build_welcome_page())
@@ -247,6 +273,38 @@ class GetStockfishDialog(QDialog):
         self.next_button.clicked.connect(self._on_next)
         buttons.addWidget(self.next_button)
         root.addLayout(buttons)
+
+    def _build_help_button(self) -> QToolButton:
+        """Themed manual help button for the wizard step header."""
+        btn_size = max(16, self.help_button_size)
+        icon_size = max(12, btn_size - 6)
+        tint = (
+            self.help_tint_color.red(),
+            self.help_tint_color.green(),
+            self.help_tint_color.blue(),
+        )
+        self.help_button = QToolButton()
+        self.help_button.setToolTip(self.help_tooltip)
+        self.help_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.help_button.setAutoRaise(True)
+        self.help_button.setFixedSize(btn_size, btn_size)
+        self.help_button.setIconSize(QSize(icon_size, icon_size))
+        self.help_button.setAccessibleName(self.help_tooltip)
+        self.help_button.setIcon(themed_icon_from_svg(SVG_MENU_INFO, tint))
+        self.help_button.setStyleSheet(
+            f"QToolButton {{"
+            f"background: transparent; border: none; padding: 0px;"
+            f"margin-top: {self.help_top_offset}px;"
+            f"}}"
+        )
+        self.help_button.clicked.connect(self._on_help_clicked)
+        return self.help_button
+
+    def _on_help_clicked(self) -> None:
+        open_user_manual(
+            anchor=self.help_manual_anchor,
+            context="get_stockfish.help",
+        )
 
     def _build_welcome_page(self) -> QWidget:
         page = QWidget()
@@ -784,35 +842,65 @@ class GetStockfishDialog(QDialog):
             self._binary_group.removeButton(button)
 
         recommended_id = self.controller.recommended_option_id()
+        radio_spacing = int(
+            self.config.get("ui", {})
+            .get("styles", {})
+            .get("radio_button", {})
+            .get("spacing", 5)
+        )
+        title_labels: List[QLabel] = []
+
         for asset in options:
             radio = QRadioButton()
             title = asset.option.label
             if asset.option.recommended or asset.option.id == recommended_id:
                 title = f"{title}{self.copy_recommended_suffix}"
-            radio.setText(title)
+            # Indicator-only radio; title/description share one left edge in a text column.
+            radio.setText("")
+            radio.setAccessibleName(title)
             radio.setProperty("option_id", asset.option.id)
             radio.setToolTip(
                 f"{asset.option.description}\n"
                 f"File: {asset.filename} ({format_bytes(asset.size_bytes)})"
             )
+            radio.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            radio.setCursor(Qt.CursorShape.PointingHandCursor)
+
+            title_label = QLabel(title)
+            title_label.setWordWrap(True)
+            title_label.setCursor(Qt.CursorShape.PointingHandCursor)
+            title_labels.append(title_label)
+
             desc = QLabel(asset.option.description)
             desc.setWordWrap(True)
+            desc.setCursor(Qt.CursorShape.PointingHandCursor)
             desc.setStyleSheet(
                 f"QLabel {{"
                 f"font-family: {self.label_font_family};"
                 f"font-size: {self.hint_font_size}pt;"
                 f"color: rgb({self.hint_text_color[0]}, {self.hint_text_color[1]}, {self.hint_text_color[2]});"
                 f"background-color: transparent;"
-                f"margin-left: 22px;"
                 f"}}"
             )
+
+            text_col = QVBoxLayout()
+            text_col.setContentsMargins(0, 0, 0, 0)
+            text_col.setSpacing(2)
+            text_col.addWidget(title_label)
+            text_col.addWidget(desc)
+
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(max(4, radio_spacing))
+            row.addWidget(radio, 0, Qt.AlignmentFlag.AlignTop)
+            row.addLayout(text_col, 1)
+
             block = QWidget()
             block.setAutoFillBackground(False)
-            block_layout = QVBoxLayout(block)
-            block_layout.setContentsMargins(0, 0, 0, 0)
-            block_layout.setSpacing(2)
-            block_layout.addWidget(radio)
-            block_layout.addWidget(desc)
+            block.setLayout(row)
+            self._bind_label_click_to_radio(title_label, radio)
+            self._bind_label_click_to_radio(desc, radio)
+
             self.binary_list_layout.addWidget(block)
             self._binary_group.addButton(radio)
             self._binary_radios.append(radio)
@@ -826,8 +914,33 @@ class GetStockfishDialog(QDialog):
             font_family=self.label_font_family,
             font_size=self.label_font_size,
         )
+        title_color = (
+            f"rgb({self.label_text_color[0]}, "
+            f"{self.label_text_color[1]}, "
+            f"{self.label_text_color[2]})"
+        )
+        for title_label in title_labels:
+            title_label.setStyleSheet(
+                f"QLabel {{"
+                f"font-family: {self.label_font_family};"
+                f"font-size: {self.label_font_size}pt;"
+                f"color: {title_color};"
+                f"background-color: transparent;"
+                f"}}"
+            )
+
         self.binary_list_layout.addStretch(1)
         self._style_binary_scroll_area()
+
+    @staticmethod
+    def _bind_label_click_to_radio(label: QLabel, radio: QRadioButton) -> None:
+        """Select ``radio`` when the user clicks a companion title/description label."""
+
+        def _on_press(event) -> None:  # noqa: ANN001
+            radio.setChecked(True)
+            QLabel.mousePressEvent(label, event)
+
+        label.mousePressEvent = _on_press  # type: ignore[method-assign]
 
     def _selected_option_id(self) -> Optional[str]:
         for radio in self._binary_radios:

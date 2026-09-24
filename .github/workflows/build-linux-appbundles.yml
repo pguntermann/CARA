@@ -52,8 +52,16 @@ jobs:
             libegl1 \
             libgl1 \
             libxcb-cursor0 \
+            libxcb-render-util0 \
+            libxcb-icccm4 \
+            libxcb-keysyms1 \
+            libxcb-shape0 \
+            libxcb-image0 \
+            libxcb-xkb1 \
             libxcb-xinerama0 \
             libxkbcommon0 \
+            libxkbcommon-x11-0 \
+            libx11-data \
             upx-ucl \
             tar
 
@@ -93,6 +101,67 @@ jobs:
 
       - name: Build with PyInstaller
         run: pyinstaller CARA_linux.spec
+
+      - name: Verify XCB helpers beside libQt6XcbQpa
+        shell: bash
+        run: |
+          helpers=(
+            libxcb-render-util.so.0
+            libxcb-image.so.0
+            libxcb-icccm.so.4
+            libxcb-keysyms.so.1
+            libxcb-shape.so.0
+            libxcb-xkb.so.1
+            libxcb-cursor.so.0
+          )
+          for dir in \
+            "dist/CARA/_internal/PyQt6/Qt6/lib" \
+            "dist/CARA/_internal"
+          do
+            for soname in "${helpers[@]}"; do
+              f="${dir}/${soname}"
+              if [[ ! -f "$f" ]]; then
+                echo "::error::Missing $f"
+                exit 1
+              fi
+              echo "OK: $f"
+            done
+          done
+          # libxkbcommon* only in private fallback (not on XcbQpa $ORIGIN).
+          for soname in libxkbcommon.so.0 libxkbcommon-x11.so.0; do
+            fb="dist/CARA/_internal/cara_xkb_fallback/${soname}"
+            if [[ ! -f "$fb" ]]; then
+              echo "::error::Missing xkb fallback $fb"
+              exit 1
+            fi
+            echo "OK: $fb"
+            for dir in \
+              "dist/CARA/_internal/PyQt6/Qt6/lib" \
+              "dist/CARA/_internal"
+            do
+              if [[ -f "${dir}/${soname}" ]]; then
+                echo "::error::$soname must not be in $dir (would shadow system libs)"
+                exit 1
+              fi
+            done
+          done
+          if [[ ! -d dist/CARA/_internal/cara_xkb_fallback/X11/locale ]]; then
+            echo "::error::Missing cara_xkb_fallback/X11/locale"
+            exit 1
+          fi
+          echo "OK: cara_xkb_fallback/X11/locale"
+          # Prefer the Qt lib-dir copy (matches libqxcb RUNPATH).
+          xcbqpa="dist/CARA/_internal/PyQt6/Qt6/lib/libQt6XcbQpa.so.6"
+          if [[ ! -f "$xcbqpa" ]]; then
+            xcbqpa=$(find dist/CARA/_internal -name 'libQt6XcbQpa.so*' | head -1)
+          fi
+          echo "ldd $xcbqpa (xcb/xkb):"
+          ldd "$xcbqpa" | grep -E 'xcb|xkbcommon|not found' || true
+          if ldd "$xcbqpa" | grep -E 'libxcb-icccm\.so|libxcb-cursor\.so' | grep -q 'not found'; then
+            echo "::error::Critical XcbQpa deps still unresolved"
+            ldd "$xcbqpa"
+            exit 1
+          fi
 
       - name: Create Linux tar.gz
         shell: bash

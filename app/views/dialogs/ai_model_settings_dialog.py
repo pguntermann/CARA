@@ -14,10 +14,14 @@ from PyQt6.QtWidgets import (
     QWidget,
     QCheckBox,
     QSpinBox,
+    QToolButton,
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt6.QtGui import QShowEvent, QPalette, QColor, QAction, QIcon
 from typing import Dict, Any, Optional, List
+
+from app.utils.external_open import open_user_manual
+from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_INFO
 
 
 class ModelDiscoveryThread(QThread):
@@ -173,6 +177,18 @@ class AIModelSettingsDialog(QDialog):
             "<br><br>Local models may be less accurate, less consistent, or occasionally produce incorrect "
             "or irrelevant answers. Use at your own discretion.",
         )
+
+        help_config = dialog_config.get('help', {}) if isinstance(dialog_config.get('help', {}), dict) else {}
+        self.help_enabled = bool(help_config.get('enabled', True))
+        self.help_manual_anchor = str(help_config.get('manual_anchor', 'ai-model-settings'))
+        self.help_tooltip = str(help_config.get('tooltip', 'Open user manual'))
+        self.help_button_size = int(help_config.get('button_size', 22))
+        self.help_column_spacing = int(help_config.get('column_spacing', 8))
+        self.help_top_offset = int(help_config.get('top_offset', 2))
+        label_text = self.labels_config.get('text_color', self.text_color)
+        self.label_text_color = (
+            QColor(*label_text) if isinstance(label_text, list) else QColor(200, 200, 200)
+        )
     
     def _apply_configured_dialog_size(self) -> None:
         """Width from config; height from layout size hint (floored by optional minimum_height)."""
@@ -209,7 +225,16 @@ class AIModelSettingsDialog(QDialog):
         providers_layout.setContentsMargins(0, 0, 0, 0)
         
         openai_group = self._create_provider_group("OpenAI", "openai")
-        providers_layout.addWidget(openai_group)
+        # Only the top GroupBox shares a row with the help icon.
+        if self.help_enabled:
+            top_row = QHBoxLayout()
+            top_row.setContentsMargins(0, 0, 0, 0)
+            top_row.setSpacing(self.help_column_spacing)
+            top_row.addWidget(openai_group, 1)
+            top_row.addWidget(self._build_help_button(), 0, Qt.AlignmentFlag.AlignTop)
+            providers_layout.addLayout(top_row)
+        else:
+            providers_layout.addWidget(openai_group)
         
         anthropic_group = self._create_provider_group("Anthropic", "anthropic")
         providers_layout.addWidget(anthropic_group)
@@ -261,6 +286,38 @@ class AIModelSettingsDialog(QDialog):
         
         layout.addSpacing(self.bottom_button_top_padding)
         layout.addLayout(button_layout)
+
+    def _build_help_button(self) -> QToolButton:
+        """Themed manual help button for the top-right of the OpenAI GroupBox row."""
+        btn_size = max(16, self.help_button_size)
+        icon_size = max(12, btn_size - 6)
+        tint = (
+            self.label_text_color.red(),
+            self.label_text_color.green(),
+            self.label_text_color.blue(),
+        )
+        self.help_button = QToolButton()
+        self.help_button.setToolTip(self.help_tooltip)
+        self.help_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.help_button.setAutoRaise(True)
+        self.help_button.setFixedSize(btn_size, btn_size)
+        self.help_button.setIconSize(QSize(icon_size, icon_size))
+        self.help_button.setAccessibleName(self.help_tooltip)
+        self.help_button.setIcon(themed_icon_from_svg(SVG_MENU_INFO, tint))
+        self.help_button.setStyleSheet(
+            f"QToolButton {{"
+            f"background: transparent; border: none; padding: 0px;"
+            f"margin-top: {self.help_top_offset}px;"
+            f"}}"
+        )
+        self.help_button.clicked.connect(self._on_help_clicked)
+        return self.help_button
+
+    def _on_help_clicked(self) -> None:
+        open_user_manual(
+            anchor=self.help_manual_anchor,
+            context="ai_model_settings.help",
+        )
     
     def _create_provider_group(self, provider_name: str, provider_key: str) -> QGroupBox:
         """Create a provider configuration group box.

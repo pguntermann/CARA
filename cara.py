@@ -29,11 +29,16 @@ _configure_multiprocessing_for_qt_gui()
 
 
 def _configure_linux_frozen_runtime() -> None:
-    """Mitigate GLib/GIO plugin mismatch and GNOME Wayland decoration issues when frozen.
+    """Mitigate GLib/GIO plugin mismatch and GNOME Wayland issues when frozen.
 
     System GIO modules under /usr/lib/.../gio/modules expect the distro GLib; a bundled
-    older GLib causes undefined-symbol failures. GNOME on Wayland with some stacks (e.g.
-    certain VMs) can show missing window frames unless Qt uses the X11/XWayland plugin.
+    older GLib causes undefined-symbol failures.
+
+    On GNOME Wayland, prefer xcb (XWayland): native Wayland in some VMs fails with
+    missing window frames and/or "EGL not available". Xcb helpers sit beside
+    libQt6XcbQpa. libxkbcommon* uses the system library when present; otherwise a
+    private fallback tree is preloaded (with matching XLOCALEDIR) so minimal Fedora
+    can still use xcb without putting Ubuntu libxkbcommon on rolling-distro RPATH.
     """
     if not getattr(sys, "frozen", False):
         return
@@ -43,10 +48,40 @@ def _configure_linux_frozen_runtime() -> None:
     os.environ.pop("GIO_MODULE_DIR", None)
     os.environ.setdefault("GIO_USE_VFS", "local")
 
-    if os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland":
-        desktop = (os.environ.get("XDG_CURRENT_DESKTOP") or "").upper()
-        if "GNOME" in desktop:
-            os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
+    if os.environ.get("XDG_SESSION_TYPE", "").lower() != "wayland":
+        return
+    desktop = (os.environ.get("XDG_CURRENT_DESKTOP") or "").upper()
+    if "GNOME" not in desktop:
+        return
+
+    import ctypes
+    import ctypes.util
+
+    def _xkb_ok() -> bool:
+        return bool(ctypes.util.find_library("xkbcommon-x11"))
+
+    def _preload_xkb_fallback() -> bool:
+        meipass = getattr(sys, "_MEIPASS", None)
+        if not meipass:
+            return False
+        fallback = os.path.join(meipass, "cara_xkb_fallback")
+        locale_dir = os.path.join(fallback, "X11", "locale")
+        xkb = os.path.join(fallback, "libxkbcommon.so.0")
+        xkb_x11 = os.path.join(fallback, "libxkbcommon-x11.so.0")
+        if not (os.path.isfile(xkb) and os.path.isfile(xkb_x11) and os.path.isdir(locale_dir)):
+            return False
+        # Keep Compose/xkb data matched to the bundled Ubuntu libxkbcommon.
+        os.environ["XLOCALEDIR"] = locale_dir
+        try:
+            ctypes.CDLL(xkb, mode=ctypes.RTLD_GLOBAL)
+            ctypes.CDLL(xkb_x11, mode=ctypes.RTLD_GLOBAL)
+        except OSError as exc:
+            print(f"CARA: xkb fallback preload failed: {exc}", file=sys.stderr)
+            return False
+        return True
+
+    if _xkb_ok() or _preload_xkb_fallback():
+        os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
 
 
 _configure_linux_frozen_runtime()

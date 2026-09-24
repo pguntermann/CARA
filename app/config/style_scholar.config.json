@@ -4054,6 +4054,14 @@
         },
         "builtin_hidden_chip_color": {
           "$ref": "$_COLOR_TAUPE_SAND"
+        },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "game-tagging",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 2
         }
       },
       "classification_settings": {
@@ -4176,6 +4184,14 @@
           "border_color": {
             "$ref": "$_COLOR_BOURBON_OUTLINE"
           }
+        },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "classification-settings",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 2
         }
       },
       "move_quality_nag_mapping": {
@@ -4287,6 +4303,14 @@
           "border_color": {
             "$ref": "$_COLOR_BOURBON_OUTLINE"
           }
+        },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "configure-move-quality-nag-mapping",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 2
         }
       },
       "ai_model_settings": {
@@ -4386,6 +4410,14 @@
           "border_color": {
             "$ref": "$_COLOR_BOURBON_OUTLINE"
           }
+        },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "ai-model-settings",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 2
         }
       },
       "engine_configuration": {
@@ -4718,6 +4750,14 @@
               "$ref": "$_COLOR_COCOA_BROWN"
             }
           }
+        },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "adding-additional-engines",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 0
         }
       },
       "engine_dialog": {
@@ -4821,6 +4861,14 @@
           ],
           "content_spacing": 8,
           "path_layout_spacing": 8
+        },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "adding-first-engine",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 2
         }
       },
       "get_stockfish": {
@@ -4910,6 +4958,14 @@
             "$ref": "$_COLOR_DEEP_TEAL"
           },
           "height": 18
+        },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "get-stockfish",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 0
         }
       },
       "bulk_operations": {
@@ -5034,6 +5090,14 @@
             5
           ]
         },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "bulk-operations",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 0
+        },
         "operations_list": {
           "empty_text": "No operations yet",
           "row_min_height": 34,
@@ -5123,6 +5187,7 @@
         "bottom_button_top_padding": 25,
         "minimum_width": 440,
         "minimum_height": 370,
+        "minimum_height_single": 240,
         "background_color": {
           "$ref": "$_COLOR_PAPYRUS_PANEL"
         },
@@ -5204,6 +5269,14 @@
         "text_edits": {
           "minimum_height": 96,
           "side_inset": 10
+        },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "editing-move-comments",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 0
         }
       },
       "opening_encyclopedia_dialog": {
@@ -5835,6 +5908,14 @@
             5
           ]
         },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "searching-games",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 2
+        },
         "tag_picker": {
           "selected_border_color": {
             "$ref": "$_COLOR_DEEP_TEAL"
@@ -5958,6 +6039,15 @@
             0,
             5
           ]
+        },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "import-from-online",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_width": 28,
+          "column_spacing": 8,
+          "top_offset": 2
         }
       },
       "bulk_analysis_dialog": {
@@ -6079,6 +6169,14 @@
           "icon_tint_rgb": {
             "$ref": "$_COLOR_DRIFTWOOD"
           }
+        },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "bulk-analysis",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 2
         }
       },
       "confirmation_dialog": {
@@ -6431,6 +6529,14 @@
           "border_color": {
             "$ref": "$_COLOR_BOURBON_OUTLINE"
           }
+        },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "customizing-keyboard-shortcuts",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 0
         }
       },
 
@@ -6610,6 +6716,14 @@
           "border_color": {
             "$ref": "$_COLOR_BOURBON_OUTLINE"
           }
+        },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "manage-game-highlight-rules",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 0
         }
       },
 
@@ -6799,10 +6913,18 @@
           "minimum": 8,
           "maximum": 72,
           "default": 12
+        },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "annotation-preferences",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 2
         }
       },
       "deduplication_criteria": {
-        "width": 600,
+        "width": 480,
         "bottom_button_top_padding": 25,
         "background_color": {
           "$ref": "$_COLOR_PAPYRUS_PANEL"
@@ -6900,6 +7022,14 @@
           ],
           "margin_top": 10,
           "padding_top": 5
+        },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "deduplicate-games",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 0
         }
       },
       "about_dialog": {
@@ -7281,6 +7411,14 @@
             "padding_left": 5,
             "padding_right": 5
           }
+        },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "setup-profile",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 0
         }
       }
     }

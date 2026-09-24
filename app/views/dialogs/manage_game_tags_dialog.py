@@ -28,6 +28,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QScrollArea,
     QFrame,
+    QToolButton,
 )
 
 from PyQt6.QtSvg import QSvgRenderer
@@ -35,8 +36,10 @@ from PyQt6.QtSvg import QSvgRenderer
 from app.services.game_tags_service import GameTagsService, GameTagDefinition
 from app.services.user_settings_service import UserSettingsService
 from app.views.style import StyleManager
+from app.utils.external_open import open_user_manual
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.path_resolver import get_app_root
+from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_INFO
 
 
 class _NoWheelScrollArea(QScrollArea):
@@ -538,6 +541,17 @@ class ManageGameTagsDialog(QDialog):
         # Hidden built-in tags should look "disabled" but remain interactive.
         self.builtin_hidden_chip_color = dlg_cfg.get("builtin_hidden_chip_color", [75, 75, 82])
 
+        text_color = dlg_cfg.get("text_color", [200, 200, 200])
+        self.label_text_color = QColor(*text_color) if isinstance(text_color, list) else QColor(200, 200, 200)
+
+        help_config = dlg_cfg.get("help", {}) if isinstance(dlg_cfg.get("help", {}), dict) else {}
+        self.help_enabled = bool(help_config.get("enabled", True))
+        self.help_manual_anchor = str(help_config.get("manual_anchor", "game-tagging"))
+        self.help_tooltip = str(help_config.get("tooltip", "Open user manual"))
+        self.help_button_size = int(help_config.get("button_size", 22))
+        self.help_column_spacing = int(help_config.get("column_spacing", 8))
+        self.help_top_offset = int(help_config.get("top_offset", 2))
+
         # Chip styling should match the board `GameTagsWidget` exactly.
         board_cfg = (self.config.get("ui", {}) or {}).get("panels", {}).get("main", {}).get("board", {})
         tags_cfg = board_cfg.get("game_tags_widget", {}) if isinstance(board_cfg, dict) else {}
@@ -582,7 +596,17 @@ class ManageGameTagsDialog(QDialog):
         builtin_section_layout.setContentsMargins(*self.section_content_margins)
         builtin_section_layout.setSpacing(0)
         builtin_section_layout.addWidget(self.builtin_scroll)
-        main_layout.addWidget(builtin_section)
+
+        # Only the top section shares a row with the help icon.
+        if self.help_enabled:
+            top_row = QHBoxLayout()
+            top_row.setContentsMargins(0, 0, 0, 0)
+            top_row.setSpacing(self.help_column_spacing)
+            top_row.addWidget(builtin_section, 1)
+            top_row.addWidget(self._build_help_button(), 0, Qt.AlignmentFlag.AlignTop)
+            main_layout.addLayout(top_row)
+        else:
+            main_layout.addWidget(builtin_section)
 
         # Separator line
         main_layout.addSpacing(self.separator_padding_before)
@@ -631,6 +655,38 @@ class ManageGameTagsDialog(QDialog):
         btn_row.addWidget(self.cancel_btn)
         btn_row.addWidget(self.ok_btn)
         main_layout.addLayout(btn_row)
+
+    def _build_help_button(self) -> QToolButton:
+        """Themed manual help button for the top-right of the built-in tags section."""
+        btn_size = max(16, self.help_button_size)
+        icon_size = max(12, btn_size - 6)
+        tint = (
+            self.label_text_color.red(),
+            self.label_text_color.green(),
+            self.label_text_color.blue(),
+        )
+        self.help_button = QToolButton()
+        self.help_button.setToolTip(self.help_tooltip)
+        self.help_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.help_button.setAutoRaise(True)
+        self.help_button.setFixedSize(btn_size, btn_size)
+        self.help_button.setIconSize(QSize(icon_size, icon_size))
+        self.help_button.setAccessibleName(self.help_tooltip)
+        self.help_button.setIcon(themed_icon_from_svg(SVG_MENU_INFO, tint))
+        self.help_button.setStyleSheet(
+            f"QToolButton {{"
+            f"background: transparent; border: none; padding: 0px;"
+            f"margin-top: {self.help_top_offset}px;"
+            f"}}"
+        )
+        self.help_button.clicked.connect(self._on_help_clicked)
+        return self.help_button
+
+    def _on_help_clicked(self) -> None:
+        open_user_manual(
+            anchor=self.help_manual_anchor,
+            context="manage_game_tags.help",
+        )
 
     def _apply_styling(self) -> None:
         pal = self.palette()

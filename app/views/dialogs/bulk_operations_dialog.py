@@ -33,6 +33,7 @@ from PyQt6.QtWidgets import (
     QRadioButton,
     QScrollArea,
     QSizePolicy,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -65,9 +66,10 @@ from app.utils.bulk_regex_presets import (
 )
 from app.models.database_model import DatabaseModel
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.utils.external_open import open_user_manual
 from app.utils.path_display_utils import truncate_path_for_display, truncate_text_middle
 from app.utils.path_resolver import get_app_resource_path
-from app.utils.themed_icon import themed_icon_from_svg
+from app.utils.themed_icon import SVG_MENU_INFO, themed_icon_from_svg
 from app.views.delegates.combobox_separator_delegate import (
     apply_combobox_separator_delegate,
 )
@@ -1773,6 +1775,14 @@ class BulkOperationsDialog(QDialog):
         self.list_selected_radius = int(list_cfg.get("selected_border_radius", 4))
         self.list_row_padding = list_cfg.get("row_padding", [8, 4, 8, 4])
 
+        help_config = dialog_config.get("help", {})
+        self.help_enabled = bool(help_config.get("enabled", True))
+        self.help_manual_anchor = str(help_config.get("manual_anchor", "bulk-operations"))
+        self.help_tooltip = str(help_config.get("tooltip", "Open user manual"))
+        self.help_button_size = int(help_config.get("button_size", 22))
+        self.help_column_spacing = int(help_config.get("column_spacing", 8))
+        self.help_top_offset = int(help_config.get("top_offset", 0))
+
     def _get_available_tags(self) -> List[str]:
         return self.controller.get_available_tags(self.database)
 
@@ -1816,6 +1826,9 @@ class BulkOperationsDialog(QDialog):
         path_font = QFont(self.label_font_family, max(8, self.label_font_size - 2))
         path_h = QFontMetrics(path_font).lineSpacing()
         label_w_est = self._target_db_label.fontMetrics().horizontalAdvance("Target Database:")
+        help_reserve = 0
+        if self.help_enabled:
+            help_reserve = max(16, self.help_button_size) + self.help_column_spacing
         if db_path:
             self._db_path_full = db_path
             self._db_name_full = db_name
@@ -1828,6 +1841,7 @@ class BulkOperationsDialog(QDialog):
                         - self.layout_margins[0]
                         - self.layout_margins[2]
                         - label_w_est
+                        - help_reserve
                         - 16,
                     ),
                     path_font,
@@ -1846,7 +1860,14 @@ class BulkOperationsDialog(QDialog):
         self.db_path_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         db_grid.addWidget(self.db_path_label, 1, 1, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self._db_header_container = db_container
-        main_layout.addWidget(db_container)
+
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(0, 0, 0, 0)
+        header_row.setSpacing(self.help_column_spacing if self.help_enabled else 0)
+        header_row.addWidget(db_container, 1)
+        if self.help_enabled:
+            header_row.addWidget(self._build_help_button(), 0, Qt.AlignmentFlag.AlignTop)
+        main_layout.addLayout(header_row)
         main_layout.addSpacing(self.section_spacing)
 
         dialog_config = self.config.get("ui", {}).get("dialogs", {}).get("bulk_operations", {})
@@ -2541,6 +2562,38 @@ class BulkOperationsDialog(QDialog):
             input_bg,
             input_border,
             checkmark,
+        )
+
+    def _build_help_button(self) -> QToolButton:
+        """Themed manual help button for the dialog header."""
+        btn_size = max(16, self.help_button_size)
+        icon_size = max(12, btn_size - 6)
+        tint = (
+            self.label_text_color.red(),
+            self.label_text_color.green(),
+            self.label_text_color.blue(),
+        )
+        self.help_button = QToolButton()
+        self.help_button.setToolTip(self.help_tooltip)
+        self.help_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.help_button.setAutoRaise(True)
+        self.help_button.setFixedSize(btn_size, btn_size)
+        self.help_button.setIconSize(QSize(icon_size, icon_size))
+        self.help_button.setAccessibleName(self.help_tooltip)
+        self.help_button.setIcon(themed_icon_from_svg(SVG_MENU_INFO, tint))
+        self.help_button.setStyleSheet(
+            f"QToolButton {{"
+            f"background: transparent; border: none; padding: 0px;"
+            f"margin-top: {self.help_top_offset}px;"
+            f"}}"
+        )
+        self.help_button.clicked.connect(self._on_help_clicked)
+        return self.help_button
+
+    def _on_help_clicked(self) -> None:
+        open_user_manual(
+            anchor=self.help_manual_anchor,
+            context="bulk_operations.help",
         )
 
     def showEvent(self, event: QShowEvent) -> None:

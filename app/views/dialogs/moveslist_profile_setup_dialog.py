@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QSpinBox,
     QHeaderView,
     QAbstractSpinBox,
+    QToolButton,
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QColor, QPalette, QFocusEvent
@@ -37,6 +38,8 @@ from app.models.column_profile_model import (
     COL_ECO, COL_OPENING, COL_FEN_WHITE, COL_FEN_BLACK
 )
 from app.controllers.column_profile_controller import ColumnProfileController
+from app.utils.external_open import open_user_manual
+from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_INFO
 
 class MovesListProfileSetupDialog(QDialog):
     """Dialog for configuring moves list column visibility and order."""
@@ -120,6 +123,18 @@ class MovesListProfileSetupDialog(QDialog):
         dialog_config = self.config.get('ui', {}).get('dialogs', {}).get('moveslist_profile_setup', {})
         self.layout_config = dialog_config.get('layout', {})
         layout_margins = self.layout_config.get('margins', [25, 25, 25, 25])
+
+        labels_config = dialog_config.get('labels', {})
+        label_text = labels_config.get('text_color', dialog_config.get('text_color', [200, 200, 200]))
+        self.label_text_color = QColor(*label_text) if isinstance(label_text, list) else QColor(200, 200, 200)
+
+        help_config = dialog_config.get('help', {}) if isinstance(dialog_config.get('help', {}), dict) else {}
+        self.help_enabled = bool(help_config.get('enabled', True))
+        self.help_manual_anchor = str(help_config.get('manual_anchor', 'setup-profile'))
+        self.help_tooltip = str(help_config.get('tooltip', 'Open user manual'))
+        self.help_button_size = int(help_config.get('button_size', 22))
+        self.help_column_spacing = int(help_config.get('column_spacing', 8))
+        self.help_top_offset = int(help_config.get('top_offset', 0))
         
         main_layout = QVBoxLayout(self)
         main_layout.setSpacing(0)
@@ -195,6 +210,38 @@ class MovesListProfileSetupDialog(QDialog):
         button_layout.addWidget(self.apply_button)
         
         main_layout.addLayout(button_layout)
+
+    def _build_help_button(self) -> QToolButton:
+        """Themed manual help button for the Visible Columns header row."""
+        btn_size = max(16, self.help_button_size)
+        icon_size = max(12, btn_size - 6)
+        tint = (
+            self.label_text_color.red(),
+            self.label_text_color.green(),
+            self.label_text_color.blue(),
+        )
+        self.help_button = QToolButton()
+        self.help_button.setToolTip(self.help_tooltip)
+        self.help_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.help_button.setAutoRaise(True)
+        self.help_button.setFixedSize(btn_size, btn_size)
+        self.help_button.setIconSize(QSize(icon_size, icon_size))
+        self.help_button.setAccessibleName(self.help_tooltip)
+        self.help_button.setIcon(themed_icon_from_svg(SVG_MENU_INFO, tint))
+        self.help_button.setStyleSheet(
+            f"QToolButton {{"
+            f"background: transparent; border: none; padding: 0px;"
+            f"margin-top: {self.help_top_offset}px;"
+            f"}}"
+        )
+        self.help_button.clicked.connect(self._on_help_clicked)
+        return self.help_button
+
+    def _on_help_clicked(self) -> None:
+        open_user_manual(
+            anchor=self.help_manual_anchor,
+            context="moveslist_profile_setup.help",
+        )
     
     def _create_left_panel(self) -> QWidget:
         """Create the left panel with available columns grouped by category."""
@@ -300,8 +347,16 @@ class MovesListProfileSetupDialog(QDialog):
         label_left_padding = layout_config.get('right_panel_label_left_padding', 10)
         
         label = QLabel("Visible Columns (drag to reorder)")
-        label.setContentsMargins(label_left_padding, 0, 0, 0)
-        layout.addWidget(label)
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(label_left_padding, 0, 0, 0)
+        header_row.setSpacing(self.help_column_spacing if self.help_enabled else 0)
+        header_row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        header_row.addWidget(label, 1, Qt.AlignmentFlag.AlignVCenter)
+        if self.help_enabled:
+            header_row.addWidget(
+                self._build_help_button(), 0, Qt.AlignmentFlag.AlignVCenter
+            )
+        layout.addLayout(header_row)
         
         # Table widget for visible columns with drag-and-drop and width editing
         # Use a custom class to preserve cell widgets during drag-and-drop

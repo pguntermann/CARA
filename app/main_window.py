@@ -293,6 +293,17 @@ class MainWindow(QMainWindow):
         try:
             old = self.takeCentralWidget()
             if old is not None:
+                # DatabaseModels outlive the panel; disconnect bridges before
+                # deleteLater so Linux/PyQt cannot deliver column signals mid-teardown.
+                try:
+                    from app.views.database_panel import DatabasePanel as _DatabasePanel
+
+                    for panel in old.findChildren(_DatabasePanel):
+                        panel.detach_from_persistent_models()
+                    if isinstance(old, _DatabasePanel):
+                        old.detach_from_persistent_models()
+                except Exception:
+                    pass
                 old.deleteLater()
         except Exception:
             pass

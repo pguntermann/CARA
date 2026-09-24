@@ -2,7 +2,7 @@
 
 from typing import Dict, Any, List, Optional
 from PyQt6.QtWidgets import QGroupBox
-from PyQt6.QtGui import QColor, QPalette
+from PyQt6.QtGui import QColor, QFont, QPalette
 
 
 def generate_group_box_stylesheet(
@@ -121,10 +121,20 @@ def apply_group_box_styling(
         title_font_weight, title_color, title_left, title_padding
     )
     
+    # QSS title font-size is unreliable on some Linux styles; setFont drives the title.
+    title_font = QFont(title_font_family, int(title_font_size))
+    if title_font_weight:
+        weight = str(title_font_weight).lower()
+        if weight == "bold":
+            title_font.setBold(True)
+        elif weight == "normal":
+            title_font.setBold(False)
+
     for group_box in group_boxes:
         # Flat avoids the native macOS group box frame stacking on top of QSS borders
         # (otherwise a thin outer line appears around the styled border).
         group_box.setFlat(True)
+        group_box.setFont(title_font)
         group_box.setStyleSheet(stylesheet)
         
         # Set content margins on layout if provided

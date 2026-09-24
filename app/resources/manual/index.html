@@ -135,7 +135,8 @@
                         <li><a href="#configuring-engines">5.1 Configuring Engines</a>
                             <ul>
                                 <li><a href="#adding-first-engine">5.1.1 Adding Your First Engine</a></li>
-                                <li><a href="#adding-additional-engines">5.1.2 Adding Additional Engines and Advanced Configuration</a></li>
+                                <li><a href="#get-stockfish">5.1.2 Get Stockfish</a></li>
+                                <li><a href="#adding-additional-engines">5.1.3 Adding Additional Engines and Advanced Configuration</a></li>
                             </ul>
                         </li>
                         <li><a href="#importing-games">5.2 Importing Games</a>
@@ -925,7 +926,7 @@
                     <li><strong>Game Analysis - White Side</strong> (<code>4</code>): Focuses exclusively on White's moves and their analysis. All White-related columns are visible (evaluations, CPL, assessments, best moves, depth), while Black's analysis columns are hidden. This profile is ideal when you played White and want to focus on analyzing your own moves without the distraction of your opponent's move evaluations.</li>
                     <li><strong>Game Analysis - Black Side</strong> (<code>5</code>): Focuses exclusively on Black's moves and their analysis. All Black-related columns are visible, while White's analysis columns are hidden. Use this profile when you played Black and want to concentrate on your own moves.</li>
                 </ul>
-                <p>You can modify any of these default profiles or create your own custom profiles. For smaller adjustments, you can reorder columns by dragging and dropping column headers in the moves list, resize columns by dragging column borders, and show or hide columns using the <span class="menu-item">Moves List</span> menu. For configuring multiple columns at once, use <span class="menu-item">Moves List → Setup Profile...</span> which provides a convenient dialog for managing all column settings. After making changes, save them with <span class="menu-item">Moves List → Save Profile</span> (to update the current profile) or <span class="menu-item">Moves List → Save Profile as...</span> (to create a new profile with a custom name). Custom profiles you create will also be accessible via number keys <code>1</code> through <code>9</code> based on their position in the profile list.</p>
+                <p>You can modify any of these default profiles or create your own custom profiles. For smaller adjustments, you can reorder columns by dragging and dropping column headers in the moves list, resize columns by dragging column borders, and show or hide columns using the <span class="menu-item">Moves List</span> menu. For configuring multiple columns at once, use <span class="menu-item">Moves List → Setup Profile...</span> (see <a href="#setup-profile">section 6.6.5</a>). After making changes, save them with <span class="menu-item">Moves List → Save Profile</span> (to update the current profile) or <span class="menu-item">Moves List → Save Profile as...</span> (to create a new profile with a custom name). Custom profiles you create will also be accessible via number keys <code>1</code> through <code>9</code> based on their position in the profile list.</p>
                 
                 <p>Right-clicking in the table opens a context menu to copy the cell value under the cursor or to export the table as CSV or TSV (visible columns only or all columns).</p>
                 
@@ -1066,7 +1067,7 @@
                 
                 <h5 id="ai-summary">4.5.8 AI Summary</h5>
                 <p>The AI Summary tab provides an interactive chat interface for discussing any position in a game with a Large Language Model (LLM). The AI model has access to extensive game data, including detailed engine analysis, move classifications, evaluation metrics, and positional information, enabling it to provide accurate assessments of the game, played moves, and current position. You can ask questions about the game, request explanations of moves, or generate summaries. Access this tab using <span class="menu-item">View → AI Summary</span> or press <code>F8</code>.</p>
-                <p>CARA supports OpenAI, Anthropic, and custom OpenAI-compatible endpoints. Configure your provider and API key through the AI Model Settings dialog; see <a href="#ai-summary-menu">section 6.12</a>. See <a href="#custom-ai-endpoint">section 7.9</a> for more information on setting up a custom endpoint.</p>
+                <p>CARA supports OpenAI, Anthropic, and custom OpenAI-compatible endpoints. Configure your provider and API key through the AI Model Settings dialog; see <a href="#ai-model-settings">section 6.12.1</a>. See <a href="#custom-ai-endpoint">section 7.9</a> for more information on setting up a custom endpoint.</p>
                 
                 <img src="screenshots/ai_summary.png" alt="CARA AI Summary View - Interactive chat interface for discussing game positions with an AI model that has access to engine analysis and game data" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
@@ -1280,16 +1281,30 @@
                     CARA will automatically validate that the engine supports the UCI protocol. The engine name, author, and version will be detected automatically.</li>
                     
                     <li><strong>Add the engine:</strong><br>
-                    Click "Add" to add the engine. The first engine you add will automatically be assigned to all analysis tasks (game analysis, evaluation, manual analysis, and brilliancy detection), so you can start analyzing games immediately. You can reassign this engine or add additional engines later (see <a href="#adding-additional-engines">section 5.1.2</a>).</li>
+                    Click "Add" to add the engine. The first engine you add will automatically be assigned to all analysis tasks (game analysis, evaluation, manual analysis, and brilliancy detection), so you can start analyzing games immediately. You can reassign this engine or add additional engines later (see <a href="#adding-additional-engines">section 5.1.3</a>).</li>
                 </ol>
                 
                 <img src="screenshots/add_engine_dialog.png" alt="CARA Add Engine Dialog - Dialog for adding UCI chess engines with browse button, validation, and engine information fields" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 
                 <div class="tip-box">
-                    <strong>Don’t have a chess engine yet?</strong> If no engine is configured yet, use <span class="menu-item">Engines → Get Stockfish...</span> to download and set up Stockfish automatically. You can also add an engine you already have with <span class="menu-item">Engines → Add Engine...</span>. See <a href="#recommended-engines">section 7.10 “Recommended Chess Engines”</a> for other suggested free and commercial engines and when to use them in CARA.
+                    <strong>Don’t have a chess engine yet?</strong> If no engine is configured yet, use <span class="menu-item">Engines → Get Stockfish...</span> to download and set up Stockfish automatically (see <a href="#get-stockfish">section 5.1.2</a>). You can also add an engine you already have with <span class="menu-item">Engines → Add Engine...</span>. See <a href="#recommended-engines">section 7.10 “Recommended Chess Engines”</a> for other suggested free and commercial engines and when to use them in CARA.
                 </div>
                 
-                <h5 id="adding-additional-engines">5.1.2 Adding Additional Engines and Advanced Configuration</h5>
+                <h5 id="get-stockfish">5.1.2 Get Stockfish</h5>
+                <p>If you do not have a chess engine yet, <span class="menu-item">Engines → Get Stockfish...</span> opens a short wizard that downloads an official Stockfish build for your computer, installs it in a folder you choose, validates it, and registers it in CARA. This menu item is shown when no engines are configured yet (once you have at least one engine, use <span class="menu-item">Add Engine...</span> for further engines).</p>
+                <p>Stockfish is a free, open-source engine and a reliable default for analysis in CARA. Downloads come from the official Stockfish releases on GitHub.</p>
+                <p>The wizard walks you through these steps:</p>
+                <ol>
+                    <li><strong>Welcome:</strong> Brief introduction and the system CARA detected (for example Windows, macOS, or Linux).</li>
+                    <li><strong>Choose a build:</strong> CARA looks up the latest official release and lists available builds for your platform. Prefer the option marked <strong>Recommended</strong> when shown—modern Stockfish often ships a universal build that picks the best code path for your CPU automatically. If the lookup fails (offline, timeout, or similar), use <strong>Retry</strong>, or download manually from the official Stockfish site and add the engine with <span class="menu-item">Engines → Add Engine...</span>.</li>
+                    <li><strong>Install folder:</strong> Choose where Stockfish should be saved. You can keep the suggested folder or browse to another location.</li>
+                    <li><strong>Download:</strong> Progress is shown while the file is retrieved. You can cancel the download if needed.</li>
+                    <li><strong>Validate:</strong> CARA starts the downloaded program and checks that it responds as a UCI chess engine. If validation fails, common causes include the operating system blocking the new executable, antivirus interference, or a corrupted download—go back and try again, or install manually as above.</li>
+                    <li><strong>Finish:</strong> Stockfish is registered in CARA and assigned to any analysis tasks that did not yet have an engine. You can change assignments later under the <span class="menu-item">Engines</span> menu (see <a href="#adding-additional-engines">section 5.1.3</a>).</li>
+                </ol>
+                <p>Use <strong>Back</strong> and <strong>Next</strong> (or <strong>Download</strong> / <strong>Finish</strong> when those labels appear) to move through the steps, and <strong>Cancel</strong> to leave without finishing the setup.</p>
+                
+                <h5 id="adding-additional-engines">5.1.3 Adding Additional Engines and Advanced Configuration</h5>
                 <p>Once you have your first engine set up, you can add additional engines and configure per-engine, per-task settings to optimize performance for different analysis scenarios:</p>
                 <ul>
                     <li><strong>Multiple engines:</strong> You can add multiple engines and assign different engines to different tasks. For example, you might use a fast engine for continuous evaluation and a stronger engine for deep game analysis, or a separate engine for brilliancy detection.</li>
@@ -1574,7 +1589,7 @@
                     Open a game from your database or paste a PGN game. The game must be active (displayed in the main panel).</li>
                     
                     <li><strong>Verify engine configuration:</strong><br>
-                    Make sure you have at least one UCI-compatible chess engine configured and assigned to the game analysis task. If you haven't configured an engine yet, see <a href="#adding-first-engine">section 5.1.1</a> for step-by-step instructions. For information about assigning engines to specific tasks, see <a href="#adding-additional-engines">section 5.1.2</a>.</li>
+                    Make sure you have at least one UCI-compatible chess engine configured and assigned to the game analysis task. If you haven't configured an engine yet, see <a href="#adding-first-engine">section 5.1.1</a> for step-by-step instructions. For information about assigning engines to specific tasks, see <a href="#adding-additional-engines">section 5.1.3</a>.</li>
                     
                     <li><strong>Start the analysis:</strong><br>
                     Use <span class="menu-item">Game Analysis → Start Game Analysis</span> (<code>Ctrl+G</code> / <code>⌘+G</code>) to begin analyzing the game. CARA will automatically switch to the Moves List tab if configured to do so (see <a href="#analysis-settings">section 5.5.4</a>).</li>
@@ -1742,10 +1757,22 @@
                 <p>You can cancel an ongoing analysis at any time using <span class="menu-item">Game Analysis → Cancel Game Analysis</span> or press <code>Escape</code>. When cancelled, analysis stops at the current move, and all moves analyzed up to that point retain their analysis data.</p>
                 
                 <h5 id="bulk-analysis">5.5.7 Bulk Analysis</h5>
-                <p>To analyze multiple games at once, use <span class="menu-item">Game Analysis → Bulk Analyze Database...</span>.</p>
+                <p>To analyze multiple games at once, use <span class="menu-item">Game Analysis → Bulk Analyze Database...</span>. The dialog analyzes games in the <strong>active database</strong> (the database tab you are currently on).</p>
                 <img src="screenshots/bulk_analyze_dialog.png" alt="CARA Bulk Analysis Dialog - Dialog for analyzing multiple games with game selection options, analysis settings, and progress tracking" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
-                <p>CARA automatically optimizes available CPU cores to analyze multiple games in parallel, maximizing analysis speed. Progress and estimated time remaining are displayed in the status bar, and you can cancel and resume bulk analysis at any time.</p>
-                <p>After each game, CARA validates the analysis integrity. If the results are incomplete—for example because the operating system went into standby or sleep during analysis—the bulk run is aborted and a warning is shown. Games that completed successfully keep their analysis, so you can resume by running bulk analysis again with <strong>Re-analyze already analyzed games</strong> unchecked. It is advisable to disable standby and power-saving modes while running bulk analysis, especially on battery power.</p>
+                <p><strong>Game Selection</strong></p>
+                <ul>
+                    <li><strong>All games:</strong> Analyze every game in the active database.</li>
+                    <li><strong>Selected games only:</strong> Analyze only the rows currently highlighted in the database table. If nothing is selected when you open the dialog, <strong>All games</strong> is chosen by default.</li>
+                </ul>
+                <p><strong>Options</strong></p>
+                <ul>
+                    <li><strong>Re-analyze already analyzed games:</strong> When unchecked (the usual choice), games that already have analysis are skipped so you can finish a cancelled or interrupted run without repeating completed games. When checked, every selected game is analyzed again and previous analysis for those games is replaced.</li>
+                    <li><strong>Parallel games:</strong> How many games CARA may analyze at the same time. Higher values can finish a large set faster on multi-core machines, but also use more CPU and memory.</li>
+                    <li><strong>Max threads:</strong> Caps how many CPU threads the engine(s) may use across the bulk run. <strong>Unlimited</strong> lets CARA use the available cores without that extra limit.</li>
+                    <li><strong>Move Time (ply):</strong> How long the engine spends on each move (in milliseconds). Longer times generally mean stronger, more thorough analysis and a slower overall run.</li>
+                </ul>
+                <p>Click <strong>Start Analysis</strong> to begin. Progress appears in the dialog and in the status bar (including estimated time remaining when available). Use <strong>Cancel</strong> to stop; games that already finished keep their analysis.</p>
+                <p>After each game, CARA checks that the analysis is complete. If results look incomplete—for example because the computer went into standby or sleep during the run—the bulk job is aborted and a warning is shown. Completed games keep their analysis, so you can continue later with <strong>Re-analyze already analyzed games</strong> left unchecked. It is advisable to disable standby and power-saving modes while running bulk analysis, especially on battery power.</p>
             </div>
 
             <div class="outline-item">
@@ -2424,9 +2451,22 @@
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+Delete</code> / <code>⌘+Shift+Delete</code></p>
                 <p>Permanently removes the currently active column profile.</p>
                 
-                <h5>6.6.5 Setup Profile...</h5>
-                <p>Opens a dialog for configuring all column settings at once, including column visibility, order, and widths. This provides a convenient way to manage multiple columns simultaneously rather than toggling them individually.<br>See <a href="#moves-list">section 4.5.1</a> for more information.</p>
+                <h5 id="setup-profile">6.6.5 Setup Profile...</h5>
+                <p>Opens the <strong>Setup Profile</strong> dialog for the currently active Moves List column profile. Use it when you want to change many columns at once—visibility, left-to-right order, and widths—instead of toggling them one by one from the menu or dragging headers in the table. Background on profiles and the built-in layouts is in <a href="#moves-list">section 4.5.1</a>; column meanings are listed in <a href="#moves-list-columns-reference">section 7.7</a>.</p>
                 <img src="screenshots/movelist_setup_profile_dialog.png" alt="CARA Moves List Setup Profile Dialog - Dialog for configuring column visibility, order, and widths for column profiles" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+                <p>The dialog has two panels:</p>
+                <ul>
+                    <li><strong>Left — available columns:</strong> Columns grouped by category (Basic, Evaluation, Best Moves, Analysis, Material, Position, and others). Check a column to show it; uncheck to hide it. At least one column must remain selected.</li>
+                    <li><strong>Right — Visible Columns:</strong> Only the columns that are currently on. Drag rows to set left-to-right order in the Moves List. The <strong>Width</strong> column sets each column’s pixel width.</li>
+                </ul>
+                <p>Buttons:</p>
+                <ul>
+                    <li><strong>Clear All:</strong> Turns off every column except the move-number column (<code>#</code>), which always stays available.</li>
+                    <li><strong>Reset:</strong> Restores the dialog to the last <em>saved</em> layout of the active profile (what is stored in your user settings), discarding unsaved edits in the dialog.</li>
+                    <li><strong>Cancel:</strong> Closes without applying.</li>
+                    <li><strong>Apply:</strong> Updates the Moves List immediately with your visibility, order, and widths for the active profile in this session.</li>
+                </ul>
+                <p>Apply does not by itself write the profile permanently. To keep the layout after you restart CARA—or to lock it into the named profile—use <span class="menu-item">Moves List → Save Profile</span> (overwrite the current profile) or <span class="menu-item">Save Profile as...</span> (create a new named profile). See also <a href="#moves-list-menu">sections 6.6.2–6.6.3</a>.</p>
                 
                 <h5>6.6.6 Column Visibility</h5>
                 <p>The Moves List menu includes submenus organized by column category for toggling individual column visibility:</p>
@@ -2458,10 +2498,43 @@
                 
                 <h5 id="classification-settings">6.7.4 Configure Classification Settings...</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+K</code> / <code>⌘+Shift+K</code></p>
-                <p>Opens a dialog to customize the thresholds used for move classification (Brilliant, Best Move, Good Move, Inaccuracy, Mistake, Blunder). These thresholds determine how moves are categorized based on Centipawn Loss (CPL) values. The dialog also includes settings for brilliancy detection, including shallow depth ranges, minimum agreement requirements, and candidate move selection. See <a href="#analysis-results">section 5.5.2</a> for more information about move classifications and <a href="#brilliant-move-detection">section 5.5.3</a> for details on brilliancy detection.</p>
+                <p>Opens the <strong>Classification Settings</strong> dialog. After analysis, each move gets a quality label (Good Move, Inaccuracy, Mistake, Blunder, and so on) based mainly on <strong>Centipawn Loss (CPL)</strong>—how much worse the played move was than the engine’s best move. This dialog lets you adjust those boundaries and the criteria used for marking moves as <strong>Brilliant</strong>. For an overview of the labels themselves, see <a href="#analysis-results">section 5.5.2</a>; for how brilliancy detection works, see <a href="#brilliant-move-detection">section 5.5.3</a>.</p>
+                <p>The dialog has two main areas:</p>
+                <p><strong>Move Quality Thresholds</strong> — Three values define the CPL ranges:</p>
+                <ul>
+                    <li><strong>Good Move Max CPL:</strong> Moves with CPL up to this value (and that are not Best Move or Book Move) are labeled Good Move.</li>
+                    <li><strong>Inaccuracy Max CPL:</strong> Above the Good Move limit, up to this value → Inaccuracy.</li>
+                    <li><strong>Mistake Max CPL:</strong> Above the Inaccuracy limit, up to this value → Mistake. Above it → Blunder.</li>
+                </ul>
+                <p>A colored <strong>CPL scale</strong> above the fields updates as you change the numbers so you can see the ranges at a glance. The three limits always stay in order (Good ≤ Inaccuracy ≤ Mistake); if you raise or lower one past another, the neighboring values adjust automatically.</p>
+                <p><strong>Brilliant Move Criteria</strong> — Used when <span class="menu-item">Game Analysis → Brilliant Move Detection</span> is on. These settings control the extra shallow-depth pass that can upgrade a strong move to Brilliant:</p>
+                <ul>
+                    <li><strong>Shallow Depth Min / Max:</strong> Depth range where the move is re-checked to see if it still looks like an error at shallow search.</li>
+                    <li><strong>Min Agreement:</strong> How many of those shallow depths must show the move as an error before it can be marked Brilliant. Higher values are stricter.</li>
+                    <li><strong>Move Candidate:</strong> Which analyzed moves are considered—<strong>Best Move only</strong>, or <strong>Best or Good Move</strong> (the wider set may take longer).</li>
+                    <li><strong>Exclude already winning:</strong> When checked, skips brilliancy checks if the side to move was already clearly winning before the move.</li>
+                    <li><strong>Winning threshold (CPL):</strong> How large that pre-move advantage must be (in centipawns) for the exclusion to apply. Available only when Exclude already winning is on.</li>
+                </ul>
+                <p>Use <strong>Reset to Defaults</strong> to restore the built-in thresholds and brilliancy criteria, <strong>Cancel</strong> to discard edits, or <strong>Save</strong> to keep your choices in user settings. New analysis uses the saved settings; already analyzed games keep their existing classifications until you re-analyze them.</p>
 
                 <h5 id="manage-game-highlight-rules">6.7.5 Manage Game Highlight Rules...</h5>
-                <p>Opens a dialog to control which game-highlight detection rules are active, which game phases each rule may fire in, and their relative priority. The same dialog includes highlights composition settings (limits per phase and per move, and related ranking options).</p>
+                <p>Opens the <strong>Manage Game Highlight Rules</strong> dialog. After game analysis, CARA scans the game for tactical and positional patterns (pins, forks, evaluation swings, and many others) and lists them as <strong>Game Highlights</strong> in the <a href="#game-summary">Game Summary</a> tab. This dialog controls which patterns are looked for, where they may appear in the game, how they are ranked, and how many highlights are kept.</p>
+                <p>Use the <strong>filter</strong> box at the top to narrow the list by category or rule name. The status line under the filter reminds you how many rules are shown and whether you can reorder them.</p>
+                <p>Each row is one detection rule:</p>
+                <ul>
+                    <li><strong>Enabled:</strong> Turn a rule on or off. Disabled rules never produce highlights.</li>
+                    <li><strong>Category</strong> and <strong>Rule:</strong> Group and name of the pattern. Hover a rule name for a short description when one is available.</li>
+                    <li><strong>Priority:</strong> How strongly this rule competes when several patterns could be shown. Higher values are preferred. Drag rows up or down to change priority (highest at the top). Reordering is available when the filter is empty so you are working with the full list.</li>
+                    <li><strong>Open / Middle / End:</strong> Allow the rule in Opening, Middlegame, and/or Endgame. At least one phase must stay selected. Some rules apply only to certain phases; unavailable phases are greyed out.</li>
+                </ul>
+                <p>Below the table, <strong>Highlights composition settings</strong> limit how busy the summary stays:</p>
+                <ul>
+                    <li><strong>Max per phase:</strong> Maximum highlights kept in each of Opening, Middlegame, and Endgame.</li>
+                    <li><strong>Max per move:</strong> When several rules fire on the same half-move, how many of those highlights to keep.</li>
+                    <li><strong>Priority penalty:</strong> If a similar highlight already appeared in an earlier phase, this amount is subtracted from the rule’s priority so later phases prefer fresher patterns. Set to <strong>0</strong> to turn that down-ranking off.</li>
+                    <li><strong>Min. highlights:</strong> The priority penalty is applied only when the current phase already has at least this many highlights.</li>
+                </ul>
+                <p><strong>Enable/Disable Filtered</strong> turns all currently visible (filtered) rules on if any are off, or off if they are all on—handy for working with one category at a time. <strong>Restore Defaults</strong> resets every rule and the composition settings. <strong>Cancel</strong> discards edits; <strong>Save</strong> keeps your choices in user settings. New analysis (and refreshed Game Summary content) uses the saved configuration.</p>
                 
                 <h5>6.7.6 Normalized Evaluation Graph</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+N</code> / <code>⌘+Shift+N</code></p>
@@ -2480,7 +2553,16 @@
                 <p>When enabled (off by default), after game analysis completes CARA writes standard move-quality NAGs into the game’s PGN based on the analysis classifications. Existing quality NAGs (<code>$1</code>–<code>$6</code>) on mainline moves are replaced; other NAGs are left unchanged. The default mapping is: Brilliant → <code>$3</code> (<code>!!</code>), Best Move → <code>$1</code> (<code>!</code>), Inaccuracy → <code>$6</code> (<code>?!</code>), Mistake → <code>$2</code> (<code>?</code>), Miss and Blunder → <code>$4</code> (<code>??</code>). Good Move and Book Move write no quality NAG by default. Applies to single-game and bulk analysis. The setting is saved with your user preferences.</p>
                 
                 <h5 id="configure-move-quality-nag-mapping">6.7.11 Configure Move Quality NAG Mapping...</h5>
-                <p>Opens a tabular dialog to customize which quality NAG (if any) is written for each move classification.</p>
+                <p>Opens the <strong>Move Quality NAG Mapping</strong> dialog, where you choose which standard annotation glyph (if any) CARA writes into the PGN for each analysis classification. This mapping is used only when <span class="menu-item">Game Analysis → Update move quality NAGs in PGN</span> is enabled (see <a href="#update-move-quality-nags">section 6.7.10</a>). It applies after single-game and bulk analysis.</p>
+                <p>NAGs (Numeric Annotation Glyphs) are the familiar move marks such as <code>!</code>, <code>!!</code>, <code>?</code>, <code>??</code>, <code>!?</code>, and <code>?!</code>. CARA uses them so annotated games stay readable in other chess software that understands standard PGN annotations.</p>
+                <p>The dialog shows one row per classification (Brilliant, Best Move, Good Move, Book Move, Inaccuracy, Mistake, Miss, Blunder):</p>
+                <ul>
+                    <li><strong>Enabled:</strong> When checked, CARA writes a quality NAG for moves with that classification. When unchecked, no quality NAG is written for that classification (even if a NAG is selected in the row).</li>
+                    <li><strong>Classification:</strong> The move assessment from game analysis.</li>
+                    <li><strong>NAG:</strong> The glyph to write. Choose <strong>None</strong> or one of the six standard quality marks. The <strong>Meaning</strong> column shows a short plain-language description of the selected mark.</li>
+                </ul>
+                <p>By default, stronger positive and negative assessments write a NAG (for example Brilliant → <code>!!</code>, Inaccuracy → <code>?!</code>, Mistake → <code>?</code>, Miss and Blunder → <code>??</code>), while Best Move, Good Move, and Book Move do not write one unless you enable them. You can change any row to match how you like annotated games to look.</p>
+                <p>Use <strong>Reset to Defaults</strong> to restore the built-in mapping, <strong>Cancel</strong> to discard edits, or <strong>Save</strong> to keep your changes in your user settings. The next analysis that updates move quality NAGs will use the saved mapping. Existing quality marks (<code>$1</code>–<code>$6</code>) on mainline moves are replaced according to the mapping; other annotations on those moves are left alone.</p>
                 
                 <h5>6.7.12 Return to PLY 0 after analysis completes</h5>
                 <p>Toggles whether CARA automatically navigates to the starting position (PLY 0) when analysis completes. When enabled, the board and Moves List automatically return to PLY 0 after analysis finishes.</p>
@@ -2601,33 +2683,42 @@
                 <div class="tip-box">
                     <strong>Quick Tip:</strong> CARA works with any UCI-compatible chess engine. For a short list of recommended engines (free and commercial) with links and best use cases, see <a href="#recommended-engines">section 7.10</a>.
                 </div>
+
+                <h5>6.11.2 Get Stockfish...</h5>
+                <p>Opens a wizard that downloads an official Stockfish build, installs it, validates it, and registers it in CARA. The item is available when no engines are configured yet.<br>See <a href="#get-stockfish">section 5.1.2</a> for a step-by-step walkthrough.</p>
                 
-                <h5>6.11.2 Engine Submenus</h5>
+                <h5>6.11.3 Engine Submenus</h5>
                 <p>For each configured engine, a submenu is displayed with the engine's name. Each submenu provides the following options:</p>
                 <ul>
                     <li><strong>Remove Engine:</strong> Permanently removes the engine from CARA. If the engine is currently assigned to any tasks, those assignments are cleared. CARA automatically ensures that at least one engine is always assigned to each analysis task.</li>
-                    <li><strong>Engine Configuration:</strong> Opens the engine configuration dialog with a tab for each task (Evaluation, Game Analysis, Manual Analysis, Brilliancy Detection), where you can set thread count, depth limits, time limits, and engine-specific options per task.<br>See <a href="#adding-additional-engines">section 5.1.2</a> for more information.</li>
+                    <li><strong>Engine Configuration:</strong> Opens the engine configuration dialog with a tab for each task (Evaluation, Game Analysis, Manual Analysis, Brilliancy Detection), where you can set thread count, depth limits, time limits, and engine-specific options per task.<br>See <a href="#adding-additional-engines">section 5.1.3</a> for more information.</li>
                     <li><strong>Set for all tasks:</strong> Assigns this engine to all four analysis tasks at once (game analysis, evaluation, manual analysis, and brilliancy detection).</li>
                     <li><strong>Set as Game Analysis Engine:</strong> Assigns the engine to the game analysis task.</li>
                     <li><strong>Set as Evaluation Engine:</strong> Assigns the engine to the evaluation task (used for the evaluation bar).</li>
                     <li><strong>Set as Manual Analysis Engine:</strong> Assigns the engine to the manual analysis task.</li>
                     <li><strong>Set as Brilliancy Detection Engine:</strong> Assigns the engine to the brilliancy detection task (used when brilliancy detection is enabled after game analysis).</li>
                 </ul>
-                <p>Only one engine can be assigned to each task at a time.<br>See <a href="#adding-additional-engines">section 5.1.2</a> for more information about task assignment.</p>
+                <p>Only one engine can be assigned to each task at a time.<br>See <a href="#adding-additional-engines">section 5.1.3</a> for more information about task assignment.</p>
             </div>
 
             <!-- AI Summary Menu -->
             <div class="outline-item">
                 <h4 id="ai-summary-menu">6.12 AI Summary Menu</h4>
                 
-                <h5>6.12.1 AI Model Settings...</h5>
-                <p>Opens a dialog for configuring AI model settings. CARA supports three options: <strong>OpenAI</strong>, <strong>Anthropic</strong>, and <strong>Custom endpoint</strong> (e.g. a local LLM). You must configure at least one provider and select a model before using the AI Summary feature. For custom endpoints, set the base URL (and optionally an API key) and choose a model; see <a href="#custom-ai-endpoint">section 7.9</a>.</p>
-                <p>To acquire API keys for cloud providers:</p>
+                <h5 id="ai-model-settings">6.12.1 AI Model Settings...</h5>
+                <p>Opens the <strong>AI Model Settings</strong> dialog, where you configure how CARA talks to an AI provider for the <a href="#ai-summary">AI Summary</a> tab. You need at least one provider set up (with a model selected) before you can generate summaries. Only one provider is active at a time; choose which one to use with the <span class="menu-item">Use OpenAI Models</span>, <span class="menu-item">Use Anthropic Models</span>, or <span class="menu-item">Use Custom Endpoint</span> items in this menu (see below).</p>
+                <p>The dialog has three provider sections:</p>
                 <ul>
-                    <li><strong>OpenAI:</strong> Sign up at <a href="https://platform.openai.com/signup" target="_blank">platform.openai.com</a> and create an API key in your account settings. Visit <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a> to manage your keys.</li>
-                    <li><strong>Anthropic:</strong> Sign up at <a href="https://console.anthropic.com/signup" target="_blank">console.anthropic.com</a> and create an API key in your account settings. Visit <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com/settings/keys</a> to manage your keys.</li>
+                    <li><strong>OpenAI</strong> and <strong>Anthropic:</strong> Enter your <strong>API Key</strong> (click the reveal control to show or hide it). Keys are created in your provider account:
+                        <ul>
+                            <li><strong>OpenAI:</strong> <a href="https://platform.openai.com/signup" target="_blank">platform.openai.com</a> — manage keys at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a></li>
+                            <li><strong>Anthropic:</strong> <a href="https://console.anthropic.com/signup" target="_blank">console.anthropic.com</a> — manage keys at <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com/settings/keys</a></li>
+                        </ul>
+                        After the key is entered, click <strong>Refresh Models</strong> so CARA can load the available models, then choose a <strong>Default Model</strong> from the list.
+                    </li>
+                    <li><strong>Custom endpoint:</strong> For a local or self-hosted OpenAI-compatible server (for example LM Studio or Ollama). Check <strong>Enable custom endpoint</strong>, set the <strong>Base URL</strong> (a common local default is <code>http://localhost:1234/v1</code>), leave <strong>API Key</strong> empty if your server does not need one, then click <strong>Refresh Models</strong> and pick a <strong>Default Model</strong>. Step-by-step local setup is in <a href="#custom-ai-endpoint">section 7.9</a>.</li>
                 </ul>
-                <p>For a custom endpoint, an API key is optional (e.g. leave empty for local servers).</p>
+                <p><strong>Request timeout (seconds)</strong> applies to all providers and limits how long CARA waits for a response (useful for slower local models). <strong>Refresh Models</strong> reloads the model lists from the configured providers (requires a network connection for cloud APIs, and a running server for a custom endpoint). <strong>Cancel</strong> discards edits; <strong>Save</strong> stores your settings for the next AI Summary request.</p>
                 
                 <h5>6.12.2 Use OpenAI Models</h5>
                 <p>Toggles whether to use OpenAI models for AI Summary. When enabled, OpenAI models are available for selection. This option is mutually exclusive with "Use Anthropic Models" and "Use Custom Endpoint"—only one provider can be active at a time.</p>
