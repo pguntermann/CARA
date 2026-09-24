@@ -61,6 +61,7 @@ jobs:
             libxcb-xinerama0 \
             libxkbcommon0 \
             libxkbcommon-x11-0 \
+            libx11-data \
             upx-ucl \
             tar
 
@@ -126,15 +127,29 @@ jobs:
               echo "OK: $f"
             done
           done
-          # libxkbcommon* must NOT be bundled (distro Compose/xkb ABI).
+          # libxkbcommon* only in private fallback (not on XcbQpa $ORIGIN).
           for soname in libxkbcommon.so.0 libxkbcommon-x11.so.0; do
-            if find dist/CARA -name "$soname" | grep -q .; then
-              echo "::error::Must not bundle $soname (use system lib)"
-              find dist/CARA -name "$soname"
+            fb="dist/CARA/_internal/cara_xkb_fallback/${soname}"
+            if [[ ! -f "$fb" ]]; then
+              echo "::error::Missing xkb fallback $fb"
               exit 1
             fi
-            echo "OK: $soname not bundled"
+            echo "OK: $fb"
+            for dir in \
+              "dist/CARA/_internal/PyQt6/Qt6/lib" \
+              "dist/CARA/_internal"
+            do
+              if [[ -f "${dir}/${soname}" ]]; then
+                echo "::error::$soname must not be in $dir (would shadow system libs)"
+                exit 1
+              fi
+            done
           done
+          if [[ ! -d dist/CARA/_internal/cara_xkb_fallback/X11/locale ]]; then
+            echo "::error::Missing cara_xkb_fallback/X11/locale"
+            exit 1
+          fi
+          echo "OK: cara_xkb_fallback/X11/locale"
           # Prefer the Qt lib-dir copy (matches libqxcb RUNPATH).
           xcbqpa="dist/CARA/_internal/PyQt6/Qt6/lib/libQt6XcbQpa.so.6"
           if [[ ! -f "$xcbqpa" ]]; then

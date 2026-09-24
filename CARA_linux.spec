@@ -18,13 +18,7 @@ _LINUX_LIB_PREFIXES = (
     "/usr/lib",
 )
 
-# Qt xcb (libqxcb / libQt6XcbQpa) DT_NEEDED / dlopen helpers often missing on
-# minimal distros. Place them next to libQt6XcbQpa (PyQt6/Qt6/lib): that library's
-# RUNPATH is $ORIGIN, and libqxcb's is $ORIGIN/../../lib — both resolve here.
-#
-# Do NOT bundle libxkbcommon*: an Ubuntu-built copy reading a newer distro's
-# Compose/xkb data (e.g. CachyOS/Arch) causes keysym errors and heap corruption
-# (SIGABRT "corrupted size vs. prev_size"). Use the system's libxkbcommon instead.
+# Qt xcb helpers: beside libQt6XcbQpa ($ORIGIN / $ORIGIN/../../lib).
 _XCB_HELPER_SONAMES = (
     "libxcb-render-util.so.0",
     "libxcb-image.so.0",
@@ -34,6 +28,17 @@ _XCB_HELPER_SONAMES = (
     "libxcb-xkb.so.1",
     "libxcb-cursor.so.0",
 )
+
+# libxkbcommon* must NOT sit on XcbQpa's RUNPATH: rolling distros (CachyOS/Arch)
+# must keep using their system libs + Compose data. Ship a private fallback tree
+# for hosts that lack libxkbcommon-x11 (e.g. minimal Fedora); cara.py preloads
+# it only when the system library is missing, and sets matching XLOCALEDIR.
+_XKB_FALLBACK_DIR = "cara_xkb_fallback"
+_XKB_FALLBACK_SONAMES = (
+    "libxkbcommon.so.0",
+    "libxkbcommon-x11.so.0",
+)
+_X11_LOCALE_SRC = "/usr/share/X11/locale"
 
 
 def _ensure_soname_path(path: str, soname: str) -> str:
@@ -77,22 +82,39 @@ def _resolve_soname(soname: str, short_name: str) -> str:
     raise SystemExit(
         f"{soname} not found on the build host. "
         "Install libxcb-cursor0 libxcb-render-util0 libxcb-icccm4 "
-        "libxcb-keysyms1 libxcb-shape0 libxcb-image0 libxcb-xkb1 (Debian/Ubuntu)."
+        "libxcb-keysyms1 libxcb-shape0 libxcb-image0 libxcb-xkb1 "
+        "libxkbcommon0 libxkbcommon-x11-0 (Debian/Ubuntu)."
     )
 
 
 def _linux_xcb_helper_binaries():
-    """Ship XCB helpers beside both libQt6XcbQpa layouts PyInstaller may emit."""
+    """Ship XCB helpers beside XcbQpa; ship xkbcommon only in the private fallback dir."""
     entries = []
     for soname in _XCB_HELPER_SONAMES:
         short = soname[3:].split(".so")[0]  # libxcb-cursor.so.0 -> xcb-cursor
         path = _resolve_soname(soname, short)
-        print(f"CARA_linux.spec: bundling {path}", file=sys.stderr)
-        # Beside Qt's copy (libqxcb RUNPATH $ORIGIN/../../lib).
+        print(f"CARA_linux.spec: bundling {path} (XcbQpa $ORIGIN)", file=sys.stderr)
         entries.append((path, "PyQt6/Qt6/lib"))
-        # Beside the flat _internal copy (that libQt6XcbQpa RUNPATH is $ORIGIN).
         entries.append((path, "."))
+    for soname in _XKB_FALLBACK_SONAMES:
+        short = soname[3:].split(".so")[0]  # libxkbcommon-x11.so.0 -> xkbcommon-x11
+        path = _resolve_soname(soname, short)
+        print(f"CARA_linux.spec: bundling {path} -> {_XKB_FALLBACK_DIR}", file=sys.stderr)
+        entries.append((path, _XKB_FALLBACK_DIR))
     return entries
+
+
+def _linux_xkb_fallback_datas():
+    """Ship build-host X11 locale data for the private libxkbcommon fallback."""
+    if not os.path.isdir(_X11_LOCALE_SRC):
+        raise SystemExit(
+            f"{_X11_LOCALE_SRC} not found. Install libx11-data (Debian/Ubuntu)."
+        )
+    print(
+        f"CARA_linux.spec: bundling {_X11_LOCALE_SRC} -> {_XKB_FALLBACK_DIR}/X11/locale",
+        file=sys.stderr,
+    )
+    return [(_X11_LOCALE_SRC, f"{_XKB_FALLBACK_DIR}/X11/locale")]
 
 
 a = Analysis(
@@ -101,6 +123,7 @@ a = Analysis(
     binaries=_linux_xcb_helper_binaries(),
     datas=[
         *config_json_datas,
+        *_linux_xkb_fallback_datas(),
         ('app/resources', 'app/resources'),
         ('appicon.svg', '.'),
         ('manual.html', '.'),
@@ -121,21 +144,25 @@ a = Analysis(
     optimize=0,
 )
 
-# Do not ship libxkbcommon*: Qt/xcb must use the distro's libxkbcommon +
-# libxkbcommon-x11 with matching Compose/xkb data. A PyInstaller-bundled copy
-# (e.g. from Ubuntu 22.04 CI) mismatches rolling distros and can SIGABRT.
-def _linux_skip_bundled_xkb_libs(binaries_toc):
+# Keep libxkbcommon* only under cara_xkb_fallback (never on XcbQpa $ORIGIN).
+def _linux_filter_xkb_libs(binaries_toc):
     out = []
     for entry in binaries_toc:
         dest = entry[0]
         base = os.path.basename(dest).lower()
-        if base.startswith(("libxkbcommon.so", "libxkbcommon-x11.so", "libxkbregistry.so")):
+        if base.startswith("libxkbregistry.so"):
             continue
+        if base.startswith(("libxkbcommon.so", "libxkbcommon-x11.so")):
+            norm = dest.replace("\\", "/")
+            if f"/{_XKB_FALLBACK_DIR}/" not in f"/{norm}" and not norm.startswith(
+                f"{_XKB_FALLBACK_DIR}/"
+            ):
+                continue
         out.append(entry)
     return out
 
 
-a.binaries = _linux_skip_bundled_xkb_libs(a.binaries)
+a.binaries = _linux_filter_xkb_libs(a.binaries)
 
 pyz = PYZ(a.pure)
 
@@ -166,12 +193,29 @@ coll = COLLECT(
     name='CARA',
 )
 
-# Fail the build if helpers did not land beside XcbQpa.
+# Fail the build if helpers / fallback did not land correctly.
 _internal = Path("dist") / "CARA" / "_internal"
 _qt_lib = _internal / "PyQt6" / "Qt6" / "lib"
+_fallback = _internal / _XKB_FALLBACK_DIR
 for _soname in _XCB_HELPER_SONAMES:
     for _dir in (_qt_lib, _internal):
         _path = _dir / _soname
         if not _path.is_file():
             raise SystemExit(f"CARA_linux.spec: missing {_path} after COLLECT")
         print(f"CARA_linux.spec: OK {_path}", file=sys.stderr)
+for _soname in _XKB_FALLBACK_SONAMES:
+    _path = _fallback / _soname
+    if not _path.is_file():
+        raise SystemExit(f"CARA_linux.spec: missing {_path} after COLLECT")
+    # Must not also sit beside XcbQpa (would override system libs on rolling distros).
+    for _dir in (_qt_lib, _internal):
+        _bad = _dir / _soname
+        if _bad.is_file():
+            raise SystemExit(
+                f"CARA_linux.spec: {_soname} must not be in {_dir} (only {_fallback})"
+            )
+    print(f"CARA_linux.spec: OK {_path}", file=sys.stderr)
+_locale = _fallback / "X11" / "locale"
+if not _locale.is_dir():
+    raise SystemExit(f"CARA_linux.spec: missing {_locale} after COLLECT")
+print(f"CARA_linux.spec: OK {_locale}", file=sys.stderr)
