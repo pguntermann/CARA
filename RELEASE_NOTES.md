@@ -1,5 +1,28 @@
 # Release Notes
 
+# CARA v2.9.0 - Maintenance Release
+
+**Release Date:** 24.09.2026
+
+This release adds **context-sensitive Help** buttons across major dialogs (opening the HTML manual at the matching section), updates **Get Stockfish** for the current universal Stockfish binary download, refreshes the **user manual**, and improves **Linux** packaging and desktop behavior (Wayland/X11, xkb).
+
+## New Features
+
+- **Dialog Help:** Most dialog windows now include a Help icon that opens the HTML user manual at the relevant section.
+
+## Enhancements
+
+- **HTML user manual:** Content and anchors updated to match the new in-dialog Help links and related topics.
+- **Group box headers:** More consistent cross-platform styling of group box titles.
+- **Linux app bundles:** Improved Qt platform / xcb / xkb packaging so GNOME Wayland and common distros (specifically Fedora) start more reliably without shadowing incompatible system libraries.
+
+## Bug Fixes
+
+- **Get Stockfish:** Download/install works with Stockfish’s current universal binary packaging. Minor layout polish in the Get Stockfish wizard.
+- **Database table:** Fixed a crash when importing games from online after switching application themes.
+
+---
+
 # CARA v2.8.9 - Performance & Bug Fixes
 
 **Release Date:** 31.08.2026
