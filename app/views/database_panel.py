@@ -64,9 +64,13 @@ class _DatabaseTableColumnBridge(QObject):
         self._identifier = identifier
 
     def on_columns_inserted(self, _parent: QModelIndex, first: int, last: int) -> None:
+        if _qobject_is_deleted(self._panel) or _qobject_is_deleted(self._table):
+            return
         self._panel._on_model_columns_inserted(self._table, self._identifier, first, last)
 
     def on_columns_removed(self, *_args: Any) -> None:
+        if _qobject_is_deleted(self._panel) or _qobject_is_deleted(self._table):
+            return
         self._panel._on_model_columns_removed(self._table)
 
 
@@ -773,6 +777,8 @@ class DatabasePanel(QWidget):
                 model.columnsRemoved.disconnect(bridge.on_columns_removed)
             except (TypeError, RuntimeError):
                 pass
+            if getattr(model, "_cara_active_column_bridge", None) is bridge:
+                model._cara_active_column_bridge = None
         bridge.deleteLater()
         table._cara_column_bridge = None
 
@@ -782,22 +788,49 @@ class DatabasePanel(QWidget):
         table: QTableView,
         identifier: Optional[str],
     ) -> None:
-        """Connect dynamic-column layout hooks; lifetime follows the table view."""
+        """Connect dynamic-column layout hooks; lifetime follows the table view.
+
+        Only disconnect this panel's bridge — never ``signal.disconnect()`` with
+        no arguments, which also drops QTableView's own model connections and
+        leaves the view unable to track beginInsertColumns (empty/broken table
+        after import, then crashes on theme rebuild).
+        """
         self._unbind_column_layout_signals(table)
-        # Drop any prior receivers (e.g. bare lambdas from an older panel after
-        # theme/UI rebuild). Each database model has a single table view.
-        try:
-            model.columnsInserted.disconnect()
-        except TypeError:
-            pass
-        try:
-            model.columnsRemoved.disconnect()
-        except TypeError:
-            pass
+        # Drop a previous panel's bridge on this shared model (theme rebuild can
+        # leave the old table alive until deleteLater runs).
+        prev = getattr(model, "_cara_active_column_bridge", None)
+        if prev is not None and not _qobject_is_deleted(prev) and prev is not getattr(
+            table, "_cara_column_bridge", None
+        ):
+            try:
+                model.columnsInserted.disconnect(prev.on_columns_inserted)
+            except (TypeError, RuntimeError):
+                pass
+            try:
+                model.columnsRemoved.disconnect(prev.on_columns_removed)
+            except (TypeError, RuntimeError):
+                pass
+            try:
+                prev.deleteLater()
+            except RuntimeError:
+                pass
+            model._cara_active_column_bridge = None
+
         bridge = _DatabaseTableColumnBridge(self, table, identifier)
         model.columnsInserted.connect(bridge.on_columns_inserted)
         model.columnsRemoved.connect(bridge.on_columns_removed)
         table._cara_column_bridge = bridge
+        model._cara_active_column_bridge = bridge
+
+    def detach_from_persistent_models(self) -> None:
+        """Drop model signal hooks before this panel is destroyed (theme rebuild).
+
+        DatabaseModel instances outlive the panel across theme switches. Disconnect
+        bridges synchronously so queued deleteLater cannot leave Linux/PyQt calling
+        into a half-destroyed view.
+        """
+        for tab_info in list(self._tab_models.values()):
+            self._unbind_column_layout_signals(tab_info.get("table"))
 
     def _on_model_columns_inserted(
         self,
@@ -1312,10 +1345,10 @@ class DatabasePanel(QWidget):
         # Enable sorting on the table view
         tab_table.setSortingEnabled(True)
         
-        # Connect to model's dataChanged signal to refresh view immediately
-        model.dataChanged.connect(self._on_model_data_changed)
         # Dynamic PGN-header columns may appear after paste/import on an open tab.
         # Bridge is parented to the table so connections die with the view (models persist).
+        # Do not connect a no-op dataChanged handler here — it would accumulate across
+        # theme rebuilds while deleteLater is pending and can crash on Linux/PyQt.
         self._bind_column_layout_signals(model, tab_table, identifier)
         
         # Configure column layout (visibility, order, widths, stretch) from user settings
