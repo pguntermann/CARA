@@ -29,11 +29,11 @@ _configure_multiprocessing_for_qt_gui()
 
 
 def _configure_linux_frozen_runtime() -> None:
-    """Mitigate GLib/GIO plugin mismatch and GNOME Wayland decoration issues when frozen.
+    """Mitigate GLib/GIO plugin mismatch when frozen.
 
     System GIO modules under /usr/lib/.../gio/modules expect the distro GLib; a bundled
-    older GLib causes undefined-symbol failures. GNOME on Wayland with some stacks (e.g.
-    certain VMs) can show missing window frames unless Qt uses the X11/XWayland plugin.
+    older GLib causes undefined-symbol failures. Leave QT_QPA_PLATFORM unset so Qt
+    picks the session-native plugin (Wayland on modern GNOME/Fedora, xcb on X11).
     """
     if not getattr(sys, "frozen", False):
         return
@@ -42,11 +42,6 @@ def _configure_linux_frozen_runtime() -> None:
 
     os.environ.pop("GIO_MODULE_DIR", None)
     os.environ.setdefault("GIO_USE_VFS", "local")
-
-    if os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland":
-        desktop = (os.environ.get("XDG_CURRENT_DESKTOP") or "").upper()
-        if "GNOME" in desktop:
-            os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
 
 
 _configure_linux_frozen_runtime()
