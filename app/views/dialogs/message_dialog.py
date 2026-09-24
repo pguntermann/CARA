@@ -12,11 +12,8 @@ from PyQt6.QtGui import QPalette, QColor, QFont, QFontMetrics, QShowEvent
 from PyQt6.QtCore import Qt, QUrl
 import re
 from typing import Dict, Any, Literal
-import sys
-import subprocess
 
 from app.utils.font_utils import scale_font_size
-from app.utils.path_resolver import get_app_resource_path
 from app.views.style import StyleManager
 
 
@@ -206,32 +203,14 @@ class MessageDialog(QDialog):
         Args:
             link: The link URL that was clicked.
         """
-        from app.utils.external_open import open_url
-        # Handle manual:// links (custom scheme for manual anchors)
+        from app.utils.external_open import open_url, open_user_manual
+
         if link.startswith("manual://"):
-            # Extract anchor (everything after manual://)
-            anchor = link.replace("manual://", "")
-            manual_path = get_app_resource_path("app/resources/manual/index.html")
-            
-            # On macOS, use osascript to preserve URL fragments (QDesktopServices strips them)
-            if sys.platform == "darwin":
-                url_string = f"file://{manual_path.resolve()}"
-                if anchor:
-                    url_string += f"#{anchor}"
-                # Use osascript to explicitly tell Safari to open location, which preserves fragments
-                # Also activate Safari to bring it to the front
-                # Escape quotes in URL string for AppleScript
-                escaped_url = url_string.replace('"', '\\"')
-                apple_script = f'tell application "Safari" to activate\ntell application "Safari" to open location "{escaped_url}"'
-                subprocess.run(["osascript", "-e", apple_script], check=False)
-            else:
-                # On other platforms, use QDesktopServices which preserves fragments
-                url = QUrl.fromLocalFile(str(manual_path))
-                if anchor:
-                    url.setFragment(anchor)
-                open_url(url, context="message_dialog.manual_link")
+            open_user_manual(
+                anchor=link.replace("manual://", "", 1),
+                context="message_dialog.manual_link",
+            )
         else:
-            # For other links, use default behavior
             open_url(QUrl(link), context="message_dialog.external_link")
     
     @staticmethod

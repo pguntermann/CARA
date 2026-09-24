@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QStackedWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -31,8 +32,9 @@ from app.services.stockfish_download_service import (
     ResolvedStockfishAsset,
     format_bytes,
 )
+from app.utils.external_open import open_user_manual
 from app.utils.font_utils import resolve_font_family, scale_font_size
-from app.utils.themed_icon import SVG_MENU_FOLDER_OPEN, themed_icon_from_svg
+from app.utils.themed_icon import SVG_MENU_FOLDER_OPEN, SVG_MENU_INFO, themed_icon_from_svg
 from app.views.style import StyleManager
 
 
@@ -206,6 +208,19 @@ class GetStockfishDialog(QDialog):
             dialog_config.get("binary_option_spacing", 10)
         )
 
+        help_config = dialog_config.get("help", {}) if isinstance(dialog_config.get("help", {}), dict) else {}
+        self.help_enabled = bool(help_config.get("enabled", True))
+        self.help_manual_anchor = str(help_config.get("manual_anchor", "adding-first-engine"))
+        self.help_tooltip = str(help_config.get("tooltip", "Open user manual"))
+        self.help_button_size = int(help_config.get("button_size", 22))
+        self.help_column_spacing = int(help_config.get("column_spacing", 8))
+        self.help_top_offset = int(help_config.get("top_offset", 0))
+        self.help_tint_color = (
+            QColor(*self.label_text_color)
+            if isinstance(self.label_text_color, list)
+            else QColor(200, 200, 200)
+        )
+
     def _setup_ui(self) -> None:
         self.setAutoFillBackground(True)
         palette = self.palette()
@@ -221,7 +236,18 @@ class GetStockfishDialog(QDialog):
         root.setContentsMargins(int(m[0]), int(m[1]), int(m[2]), int(m[3]))
 
         self.step_label = QLabel()
-        root.addWidget(self.step_label)
+        if self.help_enabled:
+            header_row = QHBoxLayout()
+            header_row.setContentsMargins(0, 0, 0, 0)
+            header_row.setSpacing(self.help_column_spacing)
+            header_row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+            header_row.addWidget(self.step_label, 1, Qt.AlignmentFlag.AlignVCenter)
+            header_row.addWidget(
+                self._build_help_button(), 0, Qt.AlignmentFlag.AlignVCenter
+            )
+            root.addLayout(header_row)
+        else:
+            root.addWidget(self.step_label)
 
         self.stack = QStackedWidget()
         self.stack.addWidget(self._build_welcome_page())
@@ -247,6 +273,38 @@ class GetStockfishDialog(QDialog):
         self.next_button.clicked.connect(self._on_next)
         buttons.addWidget(self.next_button)
         root.addLayout(buttons)
+
+    def _build_help_button(self) -> QToolButton:
+        """Themed manual help button for the wizard step header."""
+        btn_size = max(16, self.help_button_size)
+        icon_size = max(12, btn_size - 6)
+        tint = (
+            self.help_tint_color.red(),
+            self.help_tint_color.green(),
+            self.help_tint_color.blue(),
+        )
+        self.help_button = QToolButton()
+        self.help_button.setToolTip(self.help_tooltip)
+        self.help_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.help_button.setAutoRaise(True)
+        self.help_button.setFixedSize(btn_size, btn_size)
+        self.help_button.setIconSize(QSize(icon_size, icon_size))
+        self.help_button.setAccessibleName(self.help_tooltip)
+        self.help_button.setIcon(themed_icon_from_svg(SVG_MENU_INFO, tint))
+        self.help_button.setStyleSheet(
+            f"QToolButton {{"
+            f"background: transparent; border: none; padding: 0px;"
+            f"margin-top: {self.help_top_offset}px;"
+            f"}}"
+        )
+        self.help_button.clicked.connect(self._on_help_clicked)
+        return self.help_button
+
+    def _on_help_clicked(self) -> None:
+        open_user_manual(
+            anchor=self.help_manual_anchor,
+            context="get_stockfish.help",
+        )
 
     def _build_welcome_page(self) -> QWidget:
         page = QWidget()

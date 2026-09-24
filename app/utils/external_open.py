@@ -123,3 +123,36 @@ def open_path(path: Path, *, context: str = "") -> bool:
         url = QUrl.fromLocalFile(str(path))
     return open_url(url, context=context)
 
+
+def open_user_manual(*, anchor: str = "", context: str = "help.manual") -> bool:
+    """Open the bundled HTML user manual, optionally at ``anchor``.
+
+    On macOS, opens via Safari ``open location`` so ``#fragment`` anchors are preserved
+    (QDesktopServices can strip them).
+    """
+    from app.utils.path_resolver import get_app_resource_path
+
+    manual_path = get_app_resource_path("app/resources/manual/index.html")
+    fragment = (anchor or "").lstrip("#")
+
+    if sys.platform == "darwin":
+        url_string = f"file://{manual_path.resolve()}"
+        if fragment:
+            url_string += f"#{fragment}"
+        escaped_url = url_string.replace('"', '\\"')
+        apple_script = (
+            'tell application "Safari" to activate\n'
+            f'tell application "Safari" to open location "{escaped_url}"'
+        )
+        try:
+            subprocess.run(["osascript", "-e", apple_script], check=False)
+            return True
+        except Exception as e:
+            _debug(f"[{context}] open_user_manual: osascript failed: {e}")
+            return False
+
+    url = QUrl.fromLocalFile(str(manual_path.resolve()))
+    if fragment:
+        url.setFragment(fragment)
+    return open_url(url, context=context)
+

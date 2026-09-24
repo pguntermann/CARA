@@ -17,13 +17,16 @@ from PyQt6.QtWidgets import (
     QDateEdit,
     QSpinBox,
     QCheckBox,
+    QToolButton,
 )
-from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtCore import Qt, QDate, QSize
 from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 
 from app.models.database_model import DatabaseModel
+from app.utils.external_open import open_user_manual
+from app.utils.themed_icon import SVG_MENU_INFO, themed_icon_from_svg
 
 
 
@@ -135,6 +138,16 @@ class ImportGamesDialog(QDialog):
         self.checkbox_checked_border_color = QColor(*checked_config.get("border_color", [100, 120, 160]))
         self.checkbox_hover_border_offset = checkboxes_config.get("hover_border_offset", 20)
 
+        # Dialog help affordance (prototype: reserved right column)
+        help_config = dialog_config.get("help", {})
+        self.help_enabled = bool(help_config.get("enabled", True))
+        self.help_manual_anchor = str(help_config.get("manual_anchor", "import-from-online"))
+        self.help_tooltip = str(help_config.get("tooltip", "Open user manual"))
+        self.help_button_size = int(help_config.get("button_size", 22))
+        self.help_column_width = int(help_config.get("column_width", 28))
+        self.help_column_spacing = int(help_config.get("column_spacing", 8))
+        self.help_top_offset = int(help_config.get("top_offset", 2))
+
     @staticmethod
     def _filters_field_placeholder() -> QWidget:
         """Empty field cell so filter checkboxes sit in the label column like other filter labels."""
@@ -196,7 +209,17 @@ class ImportGamesDialog(QDialog):
         destination_layout.addWidget(self.active_radio)
         destination_layout.addStretch()
         destination_group.setLayout(destination_layout)
-        main_layout.addWidget(destination_group)
+
+        # Only the top GroupBox shares a row with the help icon; lower boxes stay full width.
+        if self.help_enabled:
+            top_row = QHBoxLayout()
+            top_row.setContentsMargins(0, 0, 0, 0)
+            top_row.setSpacing(self.help_column_spacing)
+            top_row.addWidget(destination_group, 1)
+            top_row.addWidget(self._build_help_button(), 0, Qt.AlignmentFlag.AlignTop)
+            main_layout.addLayout(top_row)
+        else:
+            main_layout.addWidget(destination_group)
         
         main_layout.addSpacing(self.section_spacing)
         
@@ -337,6 +360,39 @@ class ImportGamesDialog(QDialog):
         
         main_layout.addSpacing(self.bottom_button_top_padding)
         main_layout.addLayout(buttons_layout)
+
+    def _build_help_button(self) -> QToolButton:
+        """Themed manual help button for the top-right of the first GroupBox row."""
+        btn_size = max(16, self.help_button_size)
+        icon_size = max(12, btn_size - 6)
+        tint = (
+            self.label_text_color.red(),
+            self.label_text_color.green(),
+            self.label_text_color.blue(),
+        )
+
+        self.help_button = QToolButton()
+        self.help_button.setToolTip(self.help_tooltip)
+        self.help_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.help_button.setAutoRaise(True)
+        self.help_button.setFixedSize(btn_size, btn_size)
+        self.help_button.setIconSize(QSize(icon_size, icon_size))
+        self.help_button.setAccessibleName(self.help_tooltip)
+        self.help_button.setIcon(themed_icon_from_svg(SVG_MENU_INFO, tint))
+        self.help_button.setStyleSheet(
+            f"QToolButton {{"
+            f"background: transparent; border: none; padding: 0px;"
+            f"margin-top: {self.help_top_offset}px;"
+            f"}}"
+        )
+        self.help_button.clicked.connect(self._on_help_clicked)
+        return self.help_button
+
+    def _on_help_clicked(self) -> None:
+        open_user_manual(
+            anchor=self.help_manual_anchor,
+            context="import_games.help",
+        )
     
     def _apply_configured_dialog_size(self) -> None:
         """Width from config; height from layout size hint (content-driven)."""

@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QSizePolicy,
     QColorDialog,
+    QToolButton,
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QColor, QPalette, QPainter, QPen, QPixmap, QIcon, QFontDatabase, QShowEvent
@@ -19,6 +20,8 @@ from typing import Dict, Any, List, Optional
 from copy import deepcopy
 
 from app.controllers.annotation_preferences_controller import AnnotationPreferencesController
+from app.utils.external_open import open_user_manual
+from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_INFO
 
 
 class ColorSwatchButton(QPushButton):
@@ -215,6 +218,19 @@ class AnnotationPreferencesDialog(QDialog):
         self.default_colors = default_colors
         self.default_font_family = default_font_family
         self.default_font_size = default_font_size
+
+        help_config = dialog_config.get('help', {}) if isinstance(dialog_config.get('help', {}), dict) else {}
+        self.help_enabled = bool(help_config.get('enabled', True))
+        self.help_manual_anchor = str(help_config.get('manual_anchor', 'annotation-preferences'))
+        self.help_tooltip = str(help_config.get('tooltip', 'Open user manual'))
+        self.help_button_size = int(help_config.get('button_size', 22))
+        self.help_column_spacing = int(help_config.get('column_spacing', 8))
+        self.help_top_offset = int(help_config.get('top_offset', 2))
+        self.help_tint_color = (
+            QColor(*self.label_text_color)
+            if isinstance(self.label_text_color, list)
+            else QColor(200, 200, 200)
+        )
     
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
@@ -246,8 +262,17 @@ class AnnotationPreferencesDialog(QDialog):
             if col >= self.swatches_per_row:
                 col = 0
                 row += 1
-        
-        layout.addWidget(color_group)
+
+        # Only the top GroupBox shares a row with the help icon.
+        if self.help_enabled:
+            top_row = QHBoxLayout()
+            top_row.setContentsMargins(0, 0, 0, 0)
+            top_row.setSpacing(self.help_column_spacing)
+            top_row.addWidget(color_group, 1)
+            top_row.addWidget(self._build_help_button(), 0, Qt.AlignmentFlag.AlignTop)
+            layout.addLayout(top_row)
+        else:
+            layout.addWidget(color_group)
         
         layout.addSpacing(self.section_spacing)
         
@@ -310,6 +335,38 @@ class AnnotationPreferencesDialog(QDialog):
         button_layout.addWidget(self.save_button)
         
         layout.addLayout(button_layout)
+
+    def _build_help_button(self) -> QToolButton:
+        """Themed manual help button for the top-right of the Color Palette row."""
+        btn_size = max(16, self.help_button_size)
+        icon_size = max(12, btn_size - 6)
+        tint = (
+            self.help_tint_color.red(),
+            self.help_tint_color.green(),
+            self.help_tint_color.blue(),
+        )
+        self.help_button = QToolButton()
+        self.help_button.setToolTip(self.help_tooltip)
+        self.help_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.help_button.setAutoRaise(True)
+        self.help_button.setFixedSize(btn_size, btn_size)
+        self.help_button.setIconSize(QSize(icon_size, icon_size))
+        self.help_button.setAccessibleName(self.help_tooltip)
+        self.help_button.setIcon(themed_icon_from_svg(SVG_MENU_INFO, tint))
+        self.help_button.setStyleSheet(
+            f"QToolButton {{"
+            f"background: transparent; border: none; padding: 0px;"
+            f"margin-top: {self.help_top_offset}px;"
+            f"}}"
+        )
+        self.help_button.clicked.connect(self._on_help_clicked)
+        return self.help_button
+
+    def _on_help_clicked(self) -> None:
+        open_user_manual(
+            anchor=self.help_manual_anchor,
+            context="annotation_preferences.help",
+        )
     
     def _apply_styling(self) -> None:
         """Apply styling from config.json to all UI elements."""

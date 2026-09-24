@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QApplication,
     QWidget,
     QGroupBox,
+    QToolButton,
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QShowEvent, QPalette, QColor
@@ -21,7 +22,8 @@ from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 
 from app.controllers.engine_dialog_controller import EngineDialogController
-from app.utils.themed_icon import SVG_MENU_FOLDER_OPEN, themed_icon_from_svg
+from app.utils.external_open import open_user_manual
+from app.utils.themed_icon import SVG_MENU_FOLDER_OPEN, SVG_MENU_INFO, themed_icon_from_svg
 
 
 class EngineDialog(QDialog):
@@ -92,6 +94,18 @@ class EngineDialog(QDialog):
         layout_margins = layout_config.get('margins', [25, 25, 25, 25])
         engine_info_section_spacing = layout_config.get('engine_info_section_spacing', 15)
         buttons_config = dialog_config.get('buttons', {})
+
+        labels_config = dialog_config.get('labels', {})
+        label_text = labels_config.get('text_color', dialog_config.get('text_color', [200, 200, 200]))
+        self.label_text_color = QColor(*label_text) if isinstance(label_text, list) else QColor(200, 200, 200)
+
+        help_config = dialog_config.get('help', {}) if isinstance(dialog_config.get('help', {}), dict) else {}
+        self.help_enabled = bool(help_config.get('enabled', True))
+        self.help_manual_anchor = str(help_config.get('manual_anchor', 'adding-first-engine'))
+        self.help_tooltip = str(help_config.get('tooltip', 'Open user manual'))
+        self.help_button_size = int(help_config.get('button_size', 22))
+        self.help_column_spacing = int(help_config.get('column_spacing', 8))
+        self.help_top_offset = int(help_config.get('top_offset', 2))
         
         layout = QVBoxLayout(self)
         # Set spacing to 0 to disable automatic spacing - we'll use explicit spacing instead
@@ -131,8 +145,17 @@ class EngineDialog(QDialog):
         self.path_layout.addWidget(self.path_input, alignment=Qt.AlignmentFlag.AlignVCenter)
         self.path_layout.addWidget(self.browse_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         path_group_layout.addLayout(self.path_layout)
-        
-        layout.addWidget(path_group)
+
+        # Only the top GroupBox shares a row with the help icon.
+        if self.help_enabled:
+            top_row = QHBoxLayout()
+            top_row.setContentsMargins(0, 0, 0, 0)
+            top_row.setSpacing(self.help_column_spacing)
+            top_row.addWidget(path_group, 1)
+            top_row.addWidget(self._build_help_button(), 0, Qt.AlignmentFlag.AlignTop)
+            layout.addLayout(top_row)
+        else:
+            layout.addWidget(path_group)
         
         layout.addSpacing(layout_spacing)
         
@@ -215,6 +238,38 @@ class EngineDialog(QDialog):
         
         # Connect path input changes
         self.path_input.textChanged.connect(self._on_path_changed)
+
+    def _build_help_button(self) -> QToolButton:
+        """Themed manual help button for the top-right of the Select UCI Engine row."""
+        btn_size = max(16, self.help_button_size)
+        icon_size = max(12, btn_size - 6)
+        tint = (
+            self.label_text_color.red(),
+            self.label_text_color.green(),
+            self.label_text_color.blue(),
+        )
+        self.help_button = QToolButton()
+        self.help_button.setToolTip(self.help_tooltip)
+        self.help_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.help_button.setAutoRaise(True)
+        self.help_button.setFixedSize(btn_size, btn_size)
+        self.help_button.setIconSize(QSize(icon_size, icon_size))
+        self.help_button.setAccessibleName(self.help_tooltip)
+        self.help_button.setIcon(themed_icon_from_svg(SVG_MENU_INFO, tint))
+        self.help_button.setStyleSheet(
+            f"QToolButton {{"
+            f"background: transparent; border: none; padding: 0px;"
+            f"margin-top: {self.help_top_offset}px;"
+            f"}}"
+        )
+        self.help_button.clicked.connect(self._on_help_clicked)
+        return self.help_button
+
+    def _on_help_clicked(self) -> None:
+        open_user_manual(
+            anchor=self.help_manual_anchor,
+            context="engine_dialog.help",
+        )
     
     def _apply_styling(self) -> None:
         """Apply styling to UI elements based on configuration."""
@@ -318,12 +373,8 @@ class EngineDialog(QDialog):
         group_title_padding = group_box_config.get('title_padding', [0, 5])
         group_content_margins = group_box_config.get('content_margins', [10, 20, 10, 15])
         
-        # Get all group boxes from layout
-        group_boxes = []
-        for i in range(self.layout().count()):
-            item = self.layout().itemAt(i)
-            if item and item.widget() and isinstance(item.widget(), QGroupBox):
-                group_boxes.append(item.widget())
+        # Get all group boxes (including those nested in the help top-row layout)
+        group_boxes = list(self.findChildren(QGroupBox))
         
         if group_boxes:
             StyleManager.style_group_boxes(

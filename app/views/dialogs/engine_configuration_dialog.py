@@ -17,18 +17,21 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QApplication,
     QFrame,
+    QToolButton,
 )
 from PyQt6.QtCore import Qt, QSize, QTimer
-from PyQt6.QtGui import QFont, QFontMetrics, QIntValidator, QShowEvent, QMoveEvent, QWheelEvent
+from PyQt6.QtGui import QFont, QFontMetrics, QIntValidator, QShowEvent, QMoveEvent, QWheelEvent, QColor
 from pathlib import Path
 from html import escape
 from typing import Optional, Dict, Any, List
+from app.utils.external_open import open_user_manual
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.path_display_utils import truncate_path_for_display
 from app.utils.path_resolver import get_app_resource_path
 from app.utils.themed_icon import (
     SVG_MENU_COPY,
     SVG_MENU_PASTE_CLIPBOARD,
+    SVG_MENU_INFO,
     themed_icon_from_svg,
 )
 from app.controllers.engine_configuration_controller import EngineConfigurationController
@@ -171,6 +174,18 @@ class EngineConfigurationDialog(QDialog):
         layout_spacing = layout_config.get('spacing', 10)
         layout_margins = layout_config.get('margins', [10, 10, 10, 10])
         spacing_after_header = layout_config.get('spacing_after_header', 8)
+
+        labels_config = dialog_config.get('labels', {})
+        label_text = labels_config.get('text_color', [200, 200, 200])
+        self.label_text_color = QColor(*label_text) if isinstance(label_text, list) else QColor(200, 200, 200)
+
+        help_config = dialog_config.get('help', {}) if isinstance(dialog_config.get('help', {}), dict) else {}
+        self.help_enabled = bool(help_config.get('enabled', True))
+        self.help_manual_anchor = str(help_config.get('manual_anchor', 'adding-additional-engines'))
+        self.help_tooltip = str(help_config.get('tooltip', 'Open user manual'))
+        self.help_button_size = int(help_config.get('button_size', 22))
+        self.help_column_spacing = int(help_config.get('column_spacing', 8))
+        self.help_top_offset = int(help_config.get('top_offset', 0))
         
         layout = QVBoxLayout(self)
         # Use explicit spacing instead of QVBoxLayout's automatic spacing.
@@ -183,7 +198,6 @@ class EngineConfigurationDialog(QDialog):
         
         # Engine info header (same pattern as BulkOperationsDialog database name/path: no boxed frame).
         # Font metrics match BulkOperationsDialog labels (dialogs.*.labels), with header.* as fallback.
-        labels_config = dialog_config.get('labels', {})
         header_config = dialog_config.get('header', {})
         title_font_family = resolve_font_family(
             labels_config.get('font_family') or header_config.get('font_family', 'Helvetica Neue')
@@ -256,7 +270,16 @@ class EngineConfigurationDialog(QDialog):
         path_row_widget.setFixedHeight(path_line_height)
         header_layout.addWidget(path_row_widget)
 
-        layout.addWidget(self._engine_header_widget)
+        # Help sits beside the header only (tabs stay full width).
+        if self.help_enabled:
+            header_row = QHBoxLayout()
+            header_row.setContentsMargins(0, 0, 0, 0)
+            header_row.setSpacing(self.help_column_spacing)
+            header_row.addWidget(self._engine_header_widget, 1)
+            header_row.addWidget(self._build_help_button(), 0, Qt.AlignmentFlag.AlignTop)
+            layout.addLayout(header_row)
+        else:
+            layout.addWidget(self._engine_header_widget)
         layout.addSpacing(layout_spacing)
         
         # Tab widget for tasks (scroll areas use config-fixed heights; dialog height follows layout)
@@ -292,6 +315,38 @@ class EngineConfigurationDialog(QDialog):
         button_layout.addWidget(self.ok_button)
         
         layout.addLayout(button_layout)
+
+    def _build_help_button(self) -> QToolButton:
+        """Themed manual help button for the top-right of the engine header."""
+        btn_size = max(16, self.help_button_size)
+        icon_size = max(12, btn_size - 6)
+        tint = (
+            self.label_text_color.red(),
+            self.label_text_color.green(),
+            self.label_text_color.blue(),
+        )
+        self.help_button = QToolButton()
+        self.help_button.setToolTip(self.help_tooltip)
+        self.help_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.help_button.setAutoRaise(True)
+        self.help_button.setFixedSize(btn_size, btn_size)
+        self.help_button.setIconSize(QSize(icon_size, icon_size))
+        self.help_button.setAccessibleName(self.help_tooltip)
+        self.help_button.setIcon(themed_icon_from_svg(SVG_MENU_INFO, tint))
+        self.help_button.setStyleSheet(
+            f"QToolButton {{"
+            f"background: transparent; border: none; padding: 0px;"
+            f"margin-top: {self.help_top_offset}px;"
+            f"}}"
+        )
+        self.help_button.clicked.connect(self._on_help_clicked)
+        return self.help_button
+
+    def _on_help_clicked(self) -> None:
+        open_user_manual(
+            anchor=self.help_manual_anchor,
+            context="engine_configuration.help",
+        )
     
     def _create_task_tab(self, task: str, task_label: str) -> None:
         """Create a tab for a specific task.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Tuple
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QColor, QShowEvent
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QTableWidgetItem,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -27,8 +28,10 @@ from app.services.move_quality_nag_service import (
     QUALITY_NAG_CHOICES,
 )
 from app.services.pgn_formatter_service import get_nag_text
+from app.utils.external_open import open_user_manual
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.path_resolver import get_app_resource_path
+from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_INFO
 from app.views.style import StyleManager
 from app.views.widgets.row_hover_table_widget import RowHoverTableWidget
 
@@ -150,6 +153,19 @@ class MoveQualityNagMappingDialog(QDialog):
             "border_color", self.border_color
         )
 
+        help_config = dialog_config.get("help", {}) if isinstance(dialog_config.get("help", {}), dict) else {}
+        self.help_enabled = bool(help_config.get("enabled", True))
+        self.help_manual_anchor = str(
+            help_config.get("manual_anchor", "configure-move-quality-nag-mapping")
+        )
+        self.help_tooltip = str(help_config.get("tooltip", "Open user manual"))
+        self.help_button_size = int(help_config.get("button_size", 22))
+        self.help_column_spacing = int(help_config.get("column_spacing", 8))
+        self.help_top_offset = int(help_config.get("top_offset", 2))
+        self.label_text_color = (
+            QColor(*self.text_color) if isinstance(self.text_color, list) else QColor(200, 200, 200)
+        )
+
     def _apply_configured_dialog_size(self) -> None:
         """Width from config; height from layout size hint."""
         w = int(self.dialog_width)
@@ -236,7 +252,18 @@ class MoveQualityNagMappingDialog(QDialog):
         self.table.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
-        main_layout.addWidget(self.table)
+
+        # Narrow help column beside the table (AlignTop); table stays full height.
+        if self.help_enabled:
+            top_row = QHBoxLayout()
+            top_row.setContentsMargins(0, 0, 0, 0)
+            top_row.setSpacing(self.help_column_spacing)
+            top_row.setAlignment(Qt.AlignmentFlag.AlignTop)
+            top_row.addWidget(self.table, 1)
+            top_row.addWidget(self._build_help_button(), 0, Qt.AlignmentFlag.AlignTop)
+            main_layout.addLayout(top_row)
+        else:
+            main_layout.addWidget(self.table)
 
         main_layout.addSpacing(self.bottom_button_top_padding)
 
@@ -257,6 +284,38 @@ class MoveQualityNagMappingDialog(QDialog):
         self.save_button.setDefault(True)
         button_row.addWidget(self.save_button)
         main_layout.addLayout(button_row)
+
+    def _build_help_button(self) -> QToolButton:
+        """Themed manual help button in a narrow column beside the table."""
+        btn_size = max(16, self.help_button_size)
+        icon_size = max(12, btn_size - 6)
+        tint = (
+            self.label_text_color.red(),
+            self.label_text_color.green(),
+            self.label_text_color.blue(),
+        )
+        self.help_button = QToolButton()
+        self.help_button.setToolTip(self.help_tooltip)
+        self.help_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.help_button.setAutoRaise(True)
+        self.help_button.setFixedSize(btn_size, btn_size)
+        self.help_button.setIconSize(QSize(icon_size, icon_size))
+        self.help_button.setAccessibleName(self.help_tooltip)
+        self.help_button.setIcon(themed_icon_from_svg(SVG_MENU_INFO, tint))
+        self.help_button.setStyleSheet(
+            f"QToolButton {{"
+            f"background: transparent; border: none; padding: 0px;"
+            f"margin-top: {self.help_top_offset}px;"
+            f"}}"
+        )
+        self.help_button.clicked.connect(self._on_help_clicked)
+        return self.help_button
+
+    def _on_help_clicked(self) -> None:
+        open_user_manual(
+            anchor=self.help_manual_anchor,
+            context="move_quality_nag_mapping.help",
+        )
 
     def _on_table_selection_changed(self) -> None:
         self.table.refresh_row_chrome()

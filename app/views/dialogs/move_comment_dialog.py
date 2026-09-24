@@ -11,9 +11,13 @@ from PyQt6.QtWidgets import (
     QTextEdit,
     QSizePolicy,
     QWidget,
+    QToolButton,
 )
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent
 
+from app.utils.external_open import open_user_manual
+from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_INFO
 from app.views.style import StyleManager
 from app.views.style.line_edit import generate_line_edit_stylesheet
 
@@ -61,9 +65,11 @@ class MoveCommentDialog(QDialog):
             "bottom_button_top_padding", spacing_config.get("before_buttons", 25)
         )
         self._dialog_minimum_width = dialog_config.get("minimum_width")
+        # Dual White+Black layout; single-field mode uses minimum_height_single (or content sizeHint).
         self._dialog_minimum_height = dialog_config.get(
             "minimum_height", dialog_config.get("height", 370)
         )
+        self._dialog_minimum_height_single = dialog_config.get("minimum_height_single")
 
         bg_color = dialog_config.get("background_color", [40, 40, 45])
         self._bg_color = QColor(bg_color[0], bg_color[1], bg_color[2])
@@ -122,6 +128,14 @@ class MoveCommentDialog(QDialog):
         self._dialog_bg_rgb = dialog_config.get("background_color", [40, 40, 45])
         self._dialog_border_rgb = dialog_config.get("border_color", [60, 60, 65])
 
+        help_config = dialog_config.get("help", {}) if isinstance(dialog_config.get("help", {}), dict) else {}
+        self.help_enabled = bool(help_config.get("enabled", True))
+        self.help_manual_anchor = str(help_config.get("manual_anchor", "editing-move-comments"))
+        self.help_tooltip = str(help_config.get("tooltip", "Open user manual"))
+        self.help_button_size = int(help_config.get("button_size", 22))
+        self.help_column_spacing = int(help_config.get("column_spacing", 8))
+        self.help_top_offset = int(help_config.get("top_offset", 0))
+
     @staticmethod
     def _format_move_header(
         move_number: int, white_san: str, black_san: str, has_black_half: bool
@@ -166,11 +180,10 @@ class MoveCommentDialog(QDialog):
             f"color: rgb({self._label_text_color.red()}, {self._label_text_color.green()}, "
             f"{self._label_text_color.blue()});"
         )
-        main_layout.addWidget(header)
-        main_layout.addSpacing(self._section_spacing)
 
-        # Inset left/right so text fields do not sit flush with the dialog chrome
+        # Shared left/right inset for move label, text fields, and buttons.
         body = QWidget()
+        body.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
         body_layout = QVBoxLayout(body)
         body_layout.setContentsMargins(
             self._text_side_inset,
@@ -179,6 +192,20 @@ class MoveCommentDialog(QDialog):
             0,
         )
         body_layout.setSpacing(0)
+
+        if self.help_enabled:
+            header_row = QHBoxLayout()
+            header_row.setContentsMargins(0, 0, 0, 0)
+            header_row.setSpacing(self.help_column_spacing)
+            header_row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+            header_row.addWidget(header, 1, Qt.AlignmentFlag.AlignVCenter)
+            header_row.addWidget(
+                self._build_help_button(), 0, Qt.AlignmentFlag.AlignVCenter
+            )
+            body_layout.addLayout(header_row)
+        else:
+            body_layout.addWidget(header)
+        body_layout.addSpacing(self._section_spacing)
 
         white_block = QVBoxLayout()
         white_block.setSpacing(self._form_spacing)
@@ -202,6 +229,7 @@ class MoveCommentDialog(QDialog):
         self._black_container = QWidget()
         black_block = QVBoxLayout(self._black_container)
         black_block.setSpacing(self._form_spacing)
+        black_block.setContentsMargins(0, 0, 0, 0)
         bl = QLabel("Black")
         bl.setFont(QFont(self._label_font_family, self._label_font_size))
         bl.setStyleSheet(
@@ -218,14 +246,12 @@ class MoveCommentDialog(QDialog):
         )
         self._black_edit.setEnabled(self._has_black_half)
         black_block.addWidget(self._black_edit)
-        black_block.setContentsMargins(0, 0, 0, 0)
-        if self._single_move_label:
-            self._black_container.hide()
-        else:
+        # Single-field mode: omit Black from the layout so it cannot stretch the dialog.
+        if not self._single_move_label:
             body_layout.addSpacing(self._section_spacing)
-        body_layout.addWidget(self._black_container)
+            body_layout.addWidget(self._black_container)
 
-        main_layout.addWidget(body)
+        main_layout.addWidget(body, 0, Qt.AlignmentFlag.AlignTop)
         main_layout.addSpacing(self._bottom_button_top_padding)
 
         self._ok_button = QPushButton("OK")
@@ -251,6 +277,38 @@ class MoveCommentDialog(QDialog):
         footer_layout.addSpacing(self._button_spacing)
         footer_layout.addWidget(self._ok_button)
         main_layout.addWidget(footer)
+
+    def _build_help_button(self) -> QToolButton:
+        """Themed manual help button for the move header row."""
+        btn_size = max(16, self.help_button_size)
+        icon_size = max(12, btn_size - 6)
+        tint = (
+            self._label_text_color.red(),
+            self._label_text_color.green(),
+            self._label_text_color.blue(),
+        )
+        self.help_button = QToolButton()
+        self.help_button.setToolTip(self.help_tooltip)
+        self.help_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.help_button.setAutoRaise(True)
+        self.help_button.setFixedSize(btn_size, btn_size)
+        self.help_button.setIconSize(QSize(icon_size, icon_size))
+        self.help_button.setAccessibleName(self.help_tooltip)
+        self.help_button.setIcon(themed_icon_from_svg(SVG_MENU_INFO, tint))
+        self.help_button.setStyleSheet(
+            f"QToolButton {{"
+            f"background: transparent; border: none; padding: 0px;"
+            f"margin-top: {self.help_top_offset}px;"
+            f"}}"
+        )
+        self.help_button.clicked.connect(self._on_help_clicked)
+        return self.help_button
+
+    def _on_help_clicked(self) -> None:
+        open_user_manual(
+            anchor=self.help_manual_anchor,
+            context="move_comment.help",
+        )
 
     def _apply_styling(self) -> None:
         palette = self.palette()
@@ -311,8 +369,13 @@ class MoveCommentDialog(QDialog):
         h = lay.sizeHint().height()
         if h <= 0:
             return
-        if self._dialog_minimum_height is not None:
-            h = max(h, int(self._dialog_minimum_height))
+        min_h = (
+            self._dialog_minimum_height_single
+            if self._single_move_label
+            else self._dialog_minimum_height
+        )
+        if min_h is not None:
+            h = max(h, int(min_h))
         self.setFixedHeight(h)
 
     def showEvent(self, event: QShowEvent) -> None:
