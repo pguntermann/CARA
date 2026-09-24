@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTabWidget, QTableView, QApplication
 )
-from PyQt6.QtCore import QItemSelectionModel, QPoint, QEvent, pyqtSignal
+from PyQt6.QtCore import QItemSelectionModel, QPoint, QEvent, QObject, pyqtSignal
 from PyQt6.QtWidgets import QStyleOptionViewItem
 from PyQt6.QtGui import (
     QPalette,
@@ -31,6 +31,43 @@ from app.utils.table_export import table_to_delimited, get_copy_table_config
 from app.utils.themed_icon import SVG_MENU_FOLDER_OPEN, themed_icon_from_svg
 from app.views.delegates.no_focus_rect_delegate import NoFocusRectItemDelegate
 from app.views.style import StyleManager
+
+
+def _qobject_is_deleted(obj: Any) -> bool:
+    """Return True if a sip-wrapped Qt object has already been destroyed."""
+    if obj is None:
+        return True
+    try:
+        from PyQt6 import sip
+        return bool(sip.isdeleted(obj))
+    except Exception:
+        return False
+
+
+class _DatabaseTableColumnBridge(QObject):
+    """Relay model column changes to the panel while the table view still exists.
+
+    Parenting this to the QTableView ensures Qt drops the model connections when
+    the view is destroyed (e.g. theme/UI rebuild). Bare lambdas on the model
+    outlive the view and crash on the next columnsInserted.
+    """
+
+    def __init__(
+        self,
+        panel: "DatabasePanel",
+        table: QTableView,
+        identifier: Optional[str],
+    ) -> None:
+        super().__init__(table)
+        self._panel = panel
+        self._table = table
+        self._identifier = identifier
+
+    def on_columns_inserted(self, _parent: QModelIndex, first: int, last: int) -> None:
+        self._panel._on_model_columns_inserted(self._table, self._identifier, first, last)
+
+    def on_columns_removed(self, *_args: Any) -> None:
+        self._panel._on_model_columns_removed(self._table)
 
 
 class DatabasePanel(QWidget):
@@ -547,6 +584,8 @@ class DatabasePanel(QWidget):
 
     def _refresh_table_after_column_layout(self, table: QTableView) -> None:
         """Force header + body cells to repaint after hide/show/reorder."""
+        if _qobject_is_deleted(table):
+            return
         header = table.horizontalHeader()
         # Re-query model data so body cells follow the new visual mapping.
         model = table.model()
@@ -716,6 +755,50 @@ class DatabasePanel(QWidget):
         # Stretch must track the new rightmost visible column (session only until Save).
         self._stretch_last_visible_column(table)
 
+    def _unbind_column_layout_signals(self, table: Optional[QTableView]) -> None:
+        """Disconnect model column hooks for a table (safe if already gone)."""
+        if table is None or _qobject_is_deleted(table):
+            return
+        bridge = getattr(table, "_cara_column_bridge", None)
+        if bridge is None or _qobject_is_deleted(bridge):
+            table._cara_column_bridge = None
+            return
+        model = table.model()
+        if model is not None and not _qobject_is_deleted(model):
+            try:
+                model.columnsInserted.disconnect(bridge.on_columns_inserted)
+            except (TypeError, RuntimeError):
+                pass
+            try:
+                model.columnsRemoved.disconnect(bridge.on_columns_removed)
+            except (TypeError, RuntimeError):
+                pass
+        bridge.deleteLater()
+        table._cara_column_bridge = None
+
+    def _bind_column_layout_signals(
+        self,
+        model: DatabaseModel,
+        table: QTableView,
+        identifier: Optional[str],
+    ) -> None:
+        """Connect dynamic-column layout hooks; lifetime follows the table view."""
+        self._unbind_column_layout_signals(table)
+        # Drop any prior receivers (e.g. bare lambdas from an older panel after
+        # theme/UI rebuild). Each database model has a single table view.
+        try:
+            model.columnsInserted.disconnect()
+        except TypeError:
+            pass
+        try:
+            model.columnsRemoved.disconnect()
+        except TypeError:
+            pass
+        bridge = _DatabaseTableColumnBridge(self, table, identifier)
+        model.columnsInserted.connect(bridge.on_columns_inserted)
+        model.columnsRemoved.connect(bridge.on_columns_removed)
+        table._cara_column_bridge = bridge
+
     def _on_model_columns_inserted(
         self,
         table: QTableView,
@@ -725,6 +808,8 @@ class DatabasePanel(QWidget):
     ) -> None:
         """Apply saved visibility/width to newly inserted dynamic columns only."""
         if self._applying_column_layout:
+            return
+        if _qobject_is_deleted(table):
             return
         from app.services.database_table_columns import (
             effective_visibility_for_tab,
@@ -770,6 +855,8 @@ class DatabasePanel(QWidget):
 
     def _on_model_columns_removed(self, table: QTableView) -> None:
         if self._applying_column_layout:
+            return
+        if _qobject_is_deleted(table):
             return
         self._stretch_last_visible_column(table)
 
@@ -1228,14 +1315,8 @@ class DatabasePanel(QWidget):
         # Connect to model's dataChanged signal to refresh view immediately
         model.dataChanged.connect(self._on_model_data_changed)
         # Dynamic PGN-header columns may appear after paste/import on an open tab.
-        model.columnsInserted.connect(
-            lambda parent, first, last, t=tab_table, ident=identifier: self._on_model_columns_inserted(
-                t, ident, first, last
-            )
-        )
-        model.columnsRemoved.connect(
-            lambda *args, t=tab_table: self._on_model_columns_removed(t)
-        )
+        # Bridge is parented to the table so connections die with the view (models persist).
+        self._bind_column_layout_signals(model, tab_table, identifier)
         
         # Configure column layout (visibility, order, widths, stretch) from user settings
         header = tab_table.horizontalHeader()
@@ -1329,23 +1410,9 @@ class DatabasePanel(QWidget):
                 tab_data['model'] = model
                 tab_table = tab_data['table']
                 if old_model is not None and old_model is not model:
-                    try:
-                        old_model.columnsInserted.disconnect()
-                    except Exception:
-                        pass
-                    try:
-                        old_model.columnsRemoved.disconnect()
-                    except Exception:
-                        pass
+                    self._unbind_column_layout_signals(tab_table)
                 tab_table.setModel(model)
-                model.columnsInserted.connect(
-                    lambda parent, first, last, t=tab_table: self._on_model_columns_inserted(
-                        t, 'search_results', first, last
-                    )
-                )
-                model.columnsRemoved.connect(
-                    lambda *args, t=tab_table: self._on_model_columns_removed(t)
-                )
+                self._bind_column_layout_signals(model, tab_table, 'search_results')
                 self._apply_column_layout_to_table(tab_table, 'search_results')
                 # Refresh the view
                 tab_table.update()
@@ -1382,7 +1449,8 @@ class DatabasePanel(QWidget):
         tab_info = self._tab_models[tab_index]
         model = tab_info['model']
         table = tab_info.get('table')
-        if table and table.viewport() in self._database_table_viewports:
+        self._unbind_column_layout_signals(table)
+        if table and not _qobject_is_deleted(table) and table.viewport() in self._database_table_viewports:
             self._database_table_viewports.discard(table.viewport())
         
         # Remove from unsaved tabs tracking if present
