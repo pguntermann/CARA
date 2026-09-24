@@ -22,9 +22,9 @@ _LINUX_LIB_PREFIXES = (
 # minimal distros. Place them next to libQt6XcbQpa (PyQt6/Qt6/lib): that library's
 # RUNPATH is $ORIGIN, and libqxcb's is $ORIGIN/../../lib — both resolve here.
 #
-# Ship a matched libxkbcommon + libxkbcommon-x11 from the build host too. Relying
-# on the distro alone fails on pristine Fedora; auto-collected mismatched
-# versions previously segfaulted on some distros when mixed with system libs.
+# Do NOT bundle libxkbcommon*: an Ubuntu-built copy reading a newer distro's
+# Compose/xkb data (e.g. CachyOS/Arch) causes keysym errors and heap corruption
+# (SIGABRT "corrupted size vs. prev_size"). Use the system's libxkbcommon instead.
 _XCB_HELPER_SONAMES = (
     "libxcb-render-util.so.0",
     "libxcb-image.so.0",
@@ -33,8 +33,6 @@ _XCB_HELPER_SONAMES = (
     "libxcb-shape.so.0",
     "libxcb-xkb.so.1",
     "libxcb-cursor.so.0",
-    "libxkbcommon.so.0",
-    "libxkbcommon-x11.so.0",
 )
 
 
@@ -79,17 +77,15 @@ def _resolve_soname(soname: str, short_name: str) -> str:
     raise SystemExit(
         f"{soname} not found on the build host. "
         "Install libxcb-cursor0 libxcb-render-util0 libxcb-icccm4 "
-        "libxcb-keysyms1 libxcb-shape0 libxcb-image0 libxcb-xkb1 "
-        "libxkbcommon0 libxkbcommon-x11-0 (Debian/Ubuntu)."
+        "libxcb-keysyms1 libxcb-shape0 libxcb-image0 libxcb-xkb1 (Debian/Ubuntu)."
     )
 
 
 def _linux_xcb_helper_binaries():
-    """Ship XCB/xkb helpers beside both libQt6XcbQpa layouts PyInstaller may emit."""
+    """Ship XCB helpers beside both libQt6XcbQpa layouts PyInstaller may emit."""
     entries = []
     for soname in _XCB_HELPER_SONAMES:
-        # libxcb-cursor.so.0 -> xcb-cursor; libxkbcommon-x11.so.0 -> xkbcommon-x11
-        short = soname[3:].split(".so")[0]
+        short = soname[3:].split(".so")[0]  # libxcb-cursor.so.0 -> xcb-cursor
         path = _resolve_soname(soname, short)
         print(f"CARA_linux.spec: bundling {path}", file=sys.stderr)
         # Beside Qt's copy (libqxcb RUNPATH $ORIGIN/../../lib).
@@ -125,20 +121,21 @@ a = Analysis(
     optimize=0,
 )
 
-# Drop unused libxkbregistry if PyInstaller collects it. We intentionally ship
-# matched libxkbcommon + libxkbcommon-x11 beside XcbQpa (see binaries above).
-def _linux_filter_xkb_libs(binaries_toc):
+# Do not ship libxkbcommon*: Qt/xcb must use the distro's libxkbcommon +
+# libxkbcommon-x11 with matching Compose/xkb data. A PyInstaller-bundled copy
+# (e.g. from Ubuntu 22.04 CI) mismatches rolling distros and can SIGABRT.
+def _linux_skip_bundled_xkb_libs(binaries_toc):
     out = []
     for entry in binaries_toc:
         dest = entry[0]
         base = os.path.basename(dest).lower()
-        if base.startswith("libxkbregistry.so"):
+        if base.startswith(("libxkbcommon.so", "libxkbcommon-x11.so", "libxkbregistry.so")):
             continue
         out.append(entry)
     return out
 
 
-a.binaries = _linux_filter_xkb_libs(a.binaries)
+a.binaries = _linux_skip_bundled_xkb_libs(a.binaries)
 
 pyz = PYZ(a.pure)
 

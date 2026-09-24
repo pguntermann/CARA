@@ -34,9 +34,10 @@ def _configure_linux_frozen_runtime() -> None:
     System GIO modules under /usr/lib/.../gio/modules expect the distro GLib; a bundled
     older GLib causes undefined-symbol failures.
 
-    On GNOME Wayland, prefer the xcb plugin (XWayland). Native Wayland in some
-    environments (e.g. Parallels VMs) fails with missing window frames and/or
-    "EGL not available" then SIGSEGV. Bundled xcb helpers live beside libQt6XcbQpa.
+    On GNOME Wayland, prefer the xcb plugin (XWayland) when the system provides
+    libxkbcommon-x11. Native Wayland in some environments (e.g. Parallels VMs) fails
+    with missing window frames and/or "EGL not available" then SIGSEGV. Bundled xcb
+    helpers live beside libQt6XcbQpa; libxkbcommon* must come from the distro.
     """
     if not getattr(sys, "frozen", False):
         return
@@ -49,7 +50,11 @@ def _configure_linux_frozen_runtime() -> None:
     if os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland":
         desktop = (os.environ.get("XDG_CURRENT_DESKTOP") or "").upper()
         if "GNOME" in desktop:
-            os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
+            import ctypes.util
+
+            # Avoid forcing xcb when X11 xkb support is missing (load would fail).
+            if ctypes.util.find_library("xkbcommon-x11"):
+                os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
 
 
 _configure_linux_frozen_runtime()

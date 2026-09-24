@@ -112,8 +112,6 @@ jobs:
             libxcb-shape.so.0
             libxcb-xkb.so.1
             libxcb-cursor.so.0
-            libxkbcommon.so.0
-            libxkbcommon-x11.so.0
           )
           for dir in \
             "dist/CARA/_internal/PyQt6/Qt6/lib" \
@@ -128,6 +126,15 @@ jobs:
               echo "OK: $f"
             done
           done
+          # libxkbcommon* must NOT be bundled (distro Compose/xkb ABI).
+          for soname in libxkbcommon.so.0 libxkbcommon-x11.so.0; do
+            if find dist/CARA -name "$soname" | grep -q .; then
+              echo "::error::Must not bundle $soname (use system lib)"
+              find dist/CARA -name "$soname"
+              exit 1
+            fi
+            echo "OK: $soname not bundled"
+          done
           # Prefer the Qt lib-dir copy (matches libqxcb RUNPATH).
           xcbqpa="dist/CARA/_internal/PyQt6/Qt6/lib/libQt6XcbQpa.so.6"
           if [[ ! -f "$xcbqpa" ]]; then
@@ -135,7 +142,7 @@ jobs:
           fi
           echo "ldd $xcbqpa (xcb/xkb):"
           ldd "$xcbqpa" | grep -E 'xcb|xkbcommon|not found' || true
-          if ldd "$xcbqpa" | grep -E 'libxkbcommon-x11\.so|libxcb-icccm\.so|libxcb-cursor\.so' | grep -q 'not found'; then
+          if ldd "$xcbqpa" | grep -E 'libxcb-icccm\.so|libxcb-cursor\.so' | grep -q 'not found'; then
             echo "::error::Critical XcbQpa deps still unresolved"
             ldd "$xcbqpa"
             exit 1
